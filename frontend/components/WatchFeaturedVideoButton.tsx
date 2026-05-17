@@ -1,7 +1,7 @@
 // Self-gating "Watch Demo" CTA used on marketing surfaces (Resumes hero,
 // future landings). Resolves the SuperAdmin-curated featured public video
 // (singleton enforced by migration 0088's partial unique index on
-// videos.is_featured) and opens it in a Dialog with <VideoPlayer>.
+// videos.is_featured) and opens it in a Dialog with <StudioVideoSurface>.
 //
 // Per DRY: the data fetch, the selection rule (only is_featured=true),
 // the modal chrome, and the empty-state gate all live in here — callers
@@ -18,7 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import VideoPlayer, { type VideoPlayerSource } from "@/components/VideoPlayer";
+import StudioVideoSurface, {
+  type FlatVideoSource,
+} from "@/components/studio/StudioVideoSurface";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 
 interface Props {
@@ -71,10 +73,10 @@ export default function WatchFeaturedVideoButton({
         <DialogHeader>
           <DialogTitle>{video!.title}</DialogTitle>
         </DialogHeader>
-        <VideoPlayer
+        <StudioVideoSurface
+          mode="flat"
           source={source}
           title={video!.title}
-          poster={video!.thumbnailUrl ?? undefined}
           controls
           autoPlay
         />
@@ -86,8 +88,8 @@ export default function WatchFeaturedVideoButton({
 // Prefer YouTube iframe over a native <video> tag pointed at a YouTube URL —
 // the API sets videoUrl = youtubeUrl when youtubeUrl is present, but only
 // the iframe branch can actually play that.
-function toPlayerSource(v: PublicVideo): VideoPlayerSource | null {
+function toPlayerSource(v: PublicVideo): FlatVideoSource | null {
   if (v.youtubeVideoId) return { kind: "youtube", videoId: v.youtubeVideoId };
-  if (v.videoUrl) return { kind: "url", url: v.videoUrl };
+  if (v.videoUrl) return { kind: "url", url: v.videoUrl, poster: v.thumbnailUrl ?? null };
   return null;
 }

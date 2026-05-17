@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import VideoPlayer, { type VideoPlayerSource } from "@/components/VideoPlayer";
-import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
+import StudioVideoSurface, {
+  type FlatVideoSource,
+} from "@/components/studio/StudioVideoSurface";
 import type { PublicVideo } from "@/lib/services/studio-service";
 
 interface HeroVideoSpotlightProps {
@@ -79,9 +80,10 @@ export default function HeroVideoSpotlight({
     return () => window.clearTimeout(id);
   }, [index, paused, isVisible, isDesktop, slides.length, desktopRotationMs, mobileRotationMs]);
 
-  // No manual restart effect needed — VideoPlayer is keyed on the slide
-  // id below, so React fully remounts the embed when the rotation
-  // advances. That naturally resets currentTime + retriggers autoplay.
+  // No manual restart effect needed — StudioVideoSurface is keyed on
+  // the slide id below, so React fully remounts the embed when the
+  // rotation advances. That naturally resets currentTime + retriggers
+  // autoplay.
 
   const goToResume = () => {
     if (!hasRealVideo) {
@@ -113,16 +115,16 @@ export default function HeroVideoSpotlight({
   //                               instead of stranding the rotation on
   //                               a static thumbnail.
   const useStudioSurface = isDesktop && hasRealVideo && !current.videoUrl && !current.youtubeVideoId;
-  const playerSource: VideoPlayerSource | null = !hasRealVideo || useStudioSurface
+  const playerSource: FlatVideoSource | null = !hasRealVideo || useStudioSurface
     ? null
     : isDesktop && current.videoUrl
-      ? { kind: "url", url: current.videoUrl }
+      ? { kind: "url", url: current.videoUrl, poster: current.thumbnailUrl }
       : isDesktop && current.youtubeVideoId
         ? { kind: "youtube", videoId: current.youtubeVideoId }
         : { kind: "thumbnail", thumbnailUrl: current.thumbnailUrl };
   const isAutoplaying = useStudioSurface || playerSource?.kind === "url" || playerSource?.kind === "youtube";
 
-  // Overlay chrome stacked on top of the embed inside VideoPlayer's
+  // Overlay chrome stacked on top of the embed inside StudioVideoSurface's
   // AspectFrame. Defined once so the same node renders for every branch.
   const overlay = (
     <>
@@ -209,11 +211,11 @@ export default function HeroVideoSpotlight({
             {overlay}
           </div>
         ) : playerSource ? (
-          <VideoPlayer
+          <StudioVideoSurface
             key={current.id}
+            mode="flat"
             source={playerSource}
             title={displayTitle}
-            poster={current.thumbnailUrl ?? undefined}
             controls={false}
             autoPlay={isAutoplaying}
             loop={isAutoplaying}
@@ -221,7 +223,7 @@ export default function HeroVideoSpotlight({
             className="rounded-2xl shadow-2xl ring-1 ring-border"
           >
             {overlay}
-          </VideoPlayer>
+          </StudioVideoSurface>
         ) : (
           // Empty-state placeholder — no real video yet. Uses AspectFrame
           // implicitly through the same wrapper styling so the box stays

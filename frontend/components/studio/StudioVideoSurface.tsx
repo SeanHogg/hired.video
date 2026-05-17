@@ -1,10 +1,8 @@
-// StudioVideoSurface — the universal on-platform embed for a studio
-// video, extracted from the previously page-local PublicVideoSurface in
-// PublicVideoResume.tsx. Every consumer surface (Resume detail page,
-// public profile, channel grid, homepage hero, async-interview review,
-// etc.) should mount THIS component for any video that came out of the
-// studio so the canvas, audio, voiceover, captions, and CTA hotzones
-// all match what the editor's Preview tab shows.
+// StudioVideoSurface — THE only video player in the app.
+//
+// Every surface that shows a video — studio-published, raw URL, YouTube
+// embed, or static thumbnail — mounts this component. There is no
+// secondary "VideoPlayer" wrapper: the source variants below replace it.
 //
 // Per the standing DRY rule the surface owns its own dispatch — given a
 // payload it decides between:
@@ -19,20 +17,22 @@
 //   • Only thumbnail            → static poster placeholder.
 //   • Nothing                   → friendly empty state.
 //
-// Two consumption modes so the component fits both "I already have the
-// data" callers (PublicVideoResume — full page, payload prefetched) and
-// "I just have a video id, fetch on demand" callers (carousel cells,
-// modal pickers):
+// Three consumption modes pick the data path:
 //
 //   <StudioVideoSurface mode="eager" ready={payload} />
 //   <StudioVideoSurface mode="lazy"  videoId="…" poster="…" />
+//   <StudioVideoSurface mode="flat"  source={{ kind: "youtube", videoId }} />
 //
-// The lazy mode mounts a poster + play overlay; clicking it triggers a
-// `GET /api/studio/public/:videoId` fetch, then swaps to the eager
-// branch with the loaded payload. autoplay=true skips the poster step
-// and fetches immediately on mount.
+// • `eager` — caller already fetched the `/api/studio/public/:id` payload.
+// • `lazy`  — caller has only a studio video id; mounts a poster + Play
+//             overlay, fetches on activation (or immediately when
+//             `autoplay`), then dispatches like eager.
+// • `flat`  — caller has a raw URL / YouTube id / thumbnail and no
+//             studio project to lazy-fetch (marketing CTAs, hero
+//             rotation thumbnails, in-frame element videos). Skips the
+//             script branch.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pause, Play } from "lucide-react";
 import { z } from "zod";
 
@@ -43,10 +43,33 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { compile } from "@/lib/compiler/video-compiler";
 import { VideoTracker } from "@/lib/analytics/video-tracker";
+import type { AspectRatioInput } from "@/lib/studio/aspect";
 import {
   VideoScriptSchema,
   type VideoScript,
 } from "@/lib/services/studio-service";
+
+// ─── YouTube iframe params (shared by eager + flat) ──────────────────────────
+// Single source of truth for the embed URL. Without `playlist=<videoId>`
+// the `loop=1` flag is silently ignored by the YouTube player — fixing
+// that latent bug here means every consumer (hero spotlight, public
+// watch page) loops correctly when they ask for looping.
+
+function youtubeEmbedUrl(
+  videoId: string,
+  opts: { autoplay?: boolean; muted?: boolean; controls?: boolean; loop?: boolean },
+): string {
+  const params = new URLSearchParams({
+    autoplay: opts.autoplay ? "1" : "0",
+    mute: opts.muted ? "1" : "0",
+    controls: opts.controls === false ? "0" : "1",
+    modestbranding: "1",
+    playsinline: "1",
+    rel: "0",
+    ...(opts.loop ? { loop: "1", playlist: videoId } : {}),
+  });
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+}
 
 // ─── API payload schema ─────────────────────────────────────────────────────
 // Shape returned by `GET /api/studio/public/:videoId`. Two variants
@@ -119,7 +142,7 @@ type CommonProps = {
   /** Container class for the outer wrapper. */
   className?: string;
   /** Override the AspectFrame ratio; otherwise read from payload. */
-  aspectRatio?: string;
+  aspectRatio?: AspectRatioInput;
   /** Optional override for the title (defaults to payload). */
   title?: string;
   /** When set, attaches a VideoTracker (per-second engagement
@@ -152,7 +175,29 @@ type LazyProps = CommonProps & {
   fallbackYoutubeVideoId?: string | null;
 };
 
-type Props = EagerProps | LazyProps;
+/** Flat sources — caller has the embed primitive directly, no studio
+ *  project to fetch. The three variants match the three primitives the
+ *  underlying dispatcher already knows how to render. */
+export type FlatVideoSource =
+  | { kind: "youtube"; videoId: string }
+  | { kind: "url"; url: string; poster?: string | null }
+  | { kind: "thumbnail"; thumbnailUrl: string | null };
+
+type FlatProps = CommonProps & {
+  mode: "flat";
+  source: FlatVideoSource;
+  /** Show native playback controls. Default true. Hero spotlight sets
+   *  false for muted-autoplay "live thumbnail" loops. */
+  controls?: boolean;
+  autoPlay?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  /** Absolutely-positioned overlay rendered ON TOP of the embed but
+   *  INSIDE the same AspectFrame — used by the hero spotlight chrome. */
+  children?: ReactNode;
+};
+
+type Props = EagerProps | LazyProps | FlatProps;
 
 export default function StudioVideoSurface(props: Props) {
   if (props.mode === "eager") {
@@ -166,7 +211,83 @@ export default function StudioVideoSurface(props: Props) {
       />
     );
   }
-  return <LazySurface {...props} />;
+  if (props.mode === "lazy") {
+    return <LazySurface {...props} />;
+  }
+  return <FlatSurface {...props} />;
+}
+
+// ─── Flat dispatch ──────────────────────────────────────────────────────────
+// Used when there's no studio project behind the asset — raw URL,
+// YouTube id, or static thumbnail. No fetch, no script branch, no CTA
+// hotzones. Folded in from the now-deleted `components/VideoPlayer.tsx`.
+
+function FlatSurface({
+  source,
+  aspectRatio,
+  title,
+  className,
+  controls = true,
+  autoPlay = false,
+  loop = false,
+  muted = false,
+  children,
+  analyticsProjectId,
+}: FlatProps) {
+  const wrapperClass = `rounded-xl overflow-hidden bg-black shadow-lg ${className ?? ""}`;
+
+  if (source.kind === "youtube") {
+    return (
+      <AspectFrame ratio={aspectRatio} className={wrapperClass}>
+        <iframe
+          src={youtubeEmbedUrl(source.videoId, { autoplay: autoPlay, muted, controls, loop })}
+          title={title ?? "Video"}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0 w-full h-full"
+        />
+        {children}
+      </AspectFrame>
+    );
+  }
+
+  if (source.kind === "url") {
+    return (
+      <AspectFrame ratio={aspectRatio} className={wrapperClass}>
+        <BakedVideo
+          url={source.url}
+          title={title ?? "Video"}
+          poster={source.poster ?? undefined}
+          hotzones={[]}
+          controls={controls}
+          autoplay={autoPlay}
+          loop={loop}
+          muted={muted}
+          analyticsProjectId={analyticsProjectId}
+        />
+        {children}
+      </AspectFrame>
+    );
+  }
+
+  // Thumbnail — static still with hover Play affordance. Click-through
+  // is handled by the caller's overlay (e.g. HeroVideoSpotlight wraps
+  // a transparent <button> in `children`).
+  return (
+    <AspectFrame ratio={aspectRatio} className={wrapperClass}>
+      {source.thumbnailUrl ? (
+        <img
+          src={source.thumbnailUrl}
+          alt={title ?? ""}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20" />
+      )}
+      {children}
+    </AspectFrame>
+  );
 }
 
 // ─── Lazy wrapper ───────────────────────────────────────────────────────────
@@ -337,7 +458,12 @@ function PublicVideoDispatch({
         className={`rounded-xl overflow-hidden bg-black shadow-lg ${className ?? ""}`}
       >
         <iframe
-          src={`https://www.youtube.com/embed/${ready.youtubeVideoId}?modestbranding=1&playsinline=1&rel=0&controls=1${autoplayBaked ? "&autoplay=1&mute=1&loop=1" : ""}`}
+          src={youtubeEmbedUrl(ready.youtubeVideoId!, {
+            autoplay: autoplayBaked,
+            muted: autoplayBaked,
+            controls: true,
+            loop: autoplayBaked,
+          })}
           title={title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
@@ -506,6 +632,9 @@ function BakedVideo({
   poster,
   hotzones,
   autoplay,
+  controls,
+  loop,
+  muted,
   analyticsProjectId,
 }: {
   url: string;
@@ -513,6 +642,12 @@ function BakedVideo({
   poster: string | undefined;
   hotzones: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   autoplay?: boolean;
+  /** Explicit overrides. When omitted the autoplay flag drives all
+   *  three (hero-spotlight "live thumbnail" feel: muted-autoplay-loop,
+   *  no controls). Flat callers pass these directly. */
+  controls?: boolean;
+  loop?: boolean;
+  muted?: boolean;
   analyticsProjectId?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -533,10 +668,10 @@ function BakedVideo({
         ref={videoRef}
         src={url}
         poster={poster}
-        controls={!autoplay}
+        controls={controls ?? !autoplay}
         autoPlay={autoplay}
-        muted={autoplay}
-        loop={autoplay}
+        muted={muted ?? autoplay}
+        loop={loop ?? autoplay}
         playsInline
         preload="metadata"
         title={title}

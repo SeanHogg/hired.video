@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ChartRenderer from "@/components/studio/charts/ChartRenderer";
-import VideoPlayer from "@/components/VideoPlayer";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import type { RenderableElement } from "@/types/renderable-element";
 
 interface RenderableElementViewProps {
@@ -113,7 +113,8 @@ function renderInner(el: RenderableElement): React.ReactNode {
 
     case "video":
       return el.url ? (
-        <VideoPlayer
+        <StudioVideoSurface
+          mode="flat"
           source={{ kind: "url", url: el.url }}
           aspectRatio={`${el.box.w}:${el.box.h}`}
           autoPlay={false}
