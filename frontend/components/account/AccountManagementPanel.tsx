@@ -7,6 +7,8 @@ import {
   AlertCircle,
   BarChart3,
   CreditCard,
+  FileText,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +27,9 @@ import { InvitationAnalytics } from "@/components/account/InvitationAnalytics";
 import { EditRolesModal } from "@/components/account/EditRolesModal";
 import { AccountAnalytics } from "@/components/account/AccountAnalytics";
 import { AccountManagementSkeleton } from "@/components/account/AccountManagementSkeleton";
+import { AccountHygienePanel } from "@/components/account/AccountHygienePanel";
 import { BillingManagement } from "@/components/billing/BillingManagement";
+import { UsageStatementPanel } from "@/components/billing/UsageStatementPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function AccountManagementPanel() {
@@ -39,9 +43,11 @@ export function AccountManagementPanel() {
 
   const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({
     billing: false,
+    "usage-statement": false,
     users: false,
     invitations: false,
     analytics: false,
+    account: false,
   });
 
   const { toast } = useToast();
@@ -200,13 +206,27 @@ export function AccountManagementPanel() {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
         <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-          <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isJobSeeker ? 'sm:grid-cols-1' : 'sm:grid-cols-4'} gap-1 min-w-max sm:min-w-0`}>
+          <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isJobSeeker ? 'sm:grid-cols-3' : 'sm:grid-cols-6'} gap-1 min-w-max sm:min-w-0`}>
             <TabsTrigger
               value="billing"
               className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
             >
               <CreditCard className="h-4 w-4" />
               <span>{t("tabs.billing")}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="usage-statement"
+              className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+            >
+              <FileText className="h-4 w-4" />
+              <span>{t("tabs.accountUsageStatement")}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="account"
+              className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+            >
+              <UserCog className="h-4 w-4" />
+              <span>{t("tabs.accountHygiene")}</span>
             </TabsTrigger>
             {!isJobSeeker && (
               <>
@@ -238,6 +258,14 @@ export function AccountManagementPanel() {
 
         <TabsContent value="billing" className="space-y-6">
           {activeTab === "billing" && <BillingManagement />}
+        </TabsContent>
+
+        <TabsContent value="usage-statement" className="space-y-6">
+          {activeTab === "usage-statement" && <UsageStatementPanel />}
+        </TabsContent>
+
+        <TabsContent value="account" className="space-y-6">
+          {activeTab === "account" && <AccountHygienePanel />}
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">

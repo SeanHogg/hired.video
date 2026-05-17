@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { checkTeamSize } from "../middleware/tierEnforcement.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
   acceptInvitation,
   bulkInviteUsers,
@@ -48,7 +49,13 @@ accountRoutes.post("/invite", async (c) => {
   const limitError = await checkTeamSize(c as any);
   if (limitError) return limitError;
   const request = await c.req.json();
-  return c.json(await inviteAccountUser(request, userId), 200);
+  const result = await inviteAccountUser(request, userId);
+  // Mirror to the central usage ledger so the Usage Statement panel shows
+  // team-invite consumption alongside every other metered dimension.
+  await servicesProcessor
+    .meter({ userId, eventType: "team_invite", metadata: { route: "/invite" } })
+    .catch((err) => console.warn("[account] meter team_invite failed:", err));
+  return c.json(result, 200);
 });
 
 accountRoutes.put("/roles", async (c) => {
@@ -119,7 +126,18 @@ accountRoutes.post("/bulk-invite", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const limitError = await checkTeamSize(c as any);
   if (limitError) return limitError;
-  return c.json(await bulkInviteUsers(userId, await c.req.json()), 200);
+  const body = await c.req.json();
+  const result = await bulkInviteUsers(userId, body);
+  const invitedCount = Array.isArray(body?.invites) ? body.invites.length : 1;
+  await servicesProcessor
+    .meter({
+      userId,
+      eventType: "team_invite",
+      quantity: invitedCount,
+      metadata: { route: "/bulk-invite" },
+    })
+    .catch((err) => console.warn("[account] meter team_invite bulk failed:", err));
+  return c.json(result, 200);
 });
 
 accountRoutes.post("/invitation/:id/resend", async (c) => {

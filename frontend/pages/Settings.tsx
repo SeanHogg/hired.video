@@ -6,8 +6,6 @@ import {
   Palette,
   CreditCard,
   Cookie,
-  Download,
-  Trash2,
   RefreshCw,
   ArrowRight,
   Sparkles,
@@ -64,7 +62,6 @@ import { applyLocale } from "@/lib/i18n/i18n";
 import { PUBLIC_LOCALES, type Locale } from "@shared/i18n";
 import { USER_ROLES } from "@shared/user-roles";
 
-import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
 import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
@@ -74,16 +71,21 @@ import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-serv
 import { useToast } from "@/components/ui/use-toast";
 import { useOpenToWorkToggle } from "@/lib/hooks/use-open-to-work";
 
-// Pre-consolidation, /settings exposed `?tab=payouts` and `?tab=leave-creator`
-// alongside `?tab=creator-profile` (now relabelled "Account"). Remap legacy
-// deep-links so bookmarks / outbound emails still land on the merged tab.
-function remapLegacyCreatorTab(tab: string): string {
+// Legacy /settings tab remappings — bookmarks + outbound emails still resolve
+// after the Account consolidation:
+//   • ?tab=payouts / ?tab=leave-creator → creator-profile (earlier merge)
+//   • ?tab=team-billing / ?tab=account / ?tab=billing → account-billing
+//     (this pass: standalone "Account" + "Team & Billing" sidebar items
+//      collapsed into a single "Account & Billing" surface with sub-tabs
+//      for billing, usage statement, and account hygiene)
+function remapLegacyTab(tab: string): string {
   if (tab === "payouts" || tab === "leave-creator") return "creator-profile";
+  if (tab === "team-billing" || tab === "account" || tab === "billing") return "account-billing";
   return tab;
 }
 
 function SettingsContent() {
-  const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const openToWorkToggle = useOpenToWorkToggle();
   const cookiePrefs = useCookiePreferences();
   const { toast } = useToast();
@@ -118,9 +120,6 @@ function SettingsContent() {
   const [jobPrefs, setJobPrefs] = useState<JobPreferences | null>(null);
   const [savingJobPrefs, setSavingJobPrefs] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number } | null>(null);
-  const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     // ?tab= wins so a deep-link / OAuth callback (?tab=email&connected=…)
@@ -128,11 +127,12 @@ function SettingsContent() {
     // the useEffect-based sync below leaves a flash of the default tab
     // (and prerendered HTML kept the default visible until hydration).
     const explicit = params.get("tab");
-    if (explicit) return remapLegacyCreatorTab(explicit);
+    if (explicit) return remapLegacyTab(explicit);
     // If billing_setup=1 is present (e.g. from /settings/billing?billing_setup=1),
-    // auto-select the team-billing tab so users land on payment setup.
-    if (params.get("billing_setup") === "1") return "team-billing";
-    return "team-billing"; // default
+    // auto-select the consolidated Account & Billing tab so users land on
+    // payment setup directly.
+    if (params.get("billing_setup") === "1") return "account-billing";
+    return "account-billing"; // default
   });
 
   const [security, setSecurity] = useState<{
@@ -158,7 +158,7 @@ function SettingsContent() {
   // Sync active tab from ?tab= query param (e.g. /settings?tab=lead-generation)
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab) setActiveTab(remapLegacyCreatorTab(tab));
+    if (tab) setActiveTab(remapLegacyTab(tab));
     // run once on mount; subsequent tab changes are user-driven
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -207,10 +207,6 @@ function SettingsContent() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    // Load verification status for banner
-    getVerificationStatus().then(setVerification).catch(() => setVerification(null));
-
-
 
     // Load privacy settings from API
     settingsService
@@ -353,13 +349,6 @@ function SettingsContent() {
     setSecurity(null); // force reload
     setSearchParams((p) => { p.delete("connected"); return p; }, { replace: true });
   }, [searchParams, isAuthenticated]);
-
-  // Cooldown timer for resend button
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const id = setInterval(() => setResendCooldown((c) => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(id);
-  }, [resendCooldown]);
 
   const savePrivacyPatch = async (patch: Partial<PrivacySettings>) => {
     try {
@@ -775,13 +764,9 @@ function SettingsContent() {
                   {/* Mobile: scrollable horizontal list */}
                   <div className="lg:hidden w-full overflow-x-auto -mx-6 px-6">
                     <TabsList className="inline-flex h-auto w-auto gap-1 min-w-max bg-muted p-1">
-                      <TabsTrigger value="team-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                      <TabsTrigger value="account-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <CreditCard className="h-4 w-4" />
-                        <span>{t("tabs.teamBilling")}</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="account" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
-                        <SettingsIcon className="h-4 w-4" />
-                        <span>{t("tabs.account")}</span>
+                        <span>{t("tabs.accountBilling")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="creator-profile" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <UserCircle className="h-4 w-4" />
@@ -837,18 +822,11 @@ function SettingsContent() {
                         {t("labels.tabGroupAccount")}
                       </div>
                       <TabsTrigger
-                        value="team-billing"
+                        value="account-billing"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <CreditCard className="h-4 w-4" />
-                        <span>{t("tabs.teamBilling")}</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="account"
-                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
-                      >
-                        <SettingsIcon className="h-4 w-4" />
-                        <span>{t("tabs.account")}</span>
+                        <span>{t("tabs.accountBilling")}</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -1928,8 +1906,13 @@ function SettingsContent() {
                 </Card>
               </TabsContent>
 
-              {/* Team & Billing Tab */}
-              <TabsContent value="team-billing" className="space-y-6">
+              {/* Account & Billing — consolidated surface. AccountManagementPanel
+                  owns the sub-tabs (Account Billing & Subscription / Usage
+                  Statement / Account / Team Members / Invitation Analytics /
+                  Analytics). The old standalone "Account" sidebar item was
+                  folded in as the Account sub-tab; legacy ?tab=team-billing,
+                  ?tab=account, and ?tab=billing all remap here. */}
+              <TabsContent value="account-billing" className="space-y-6">
                 <AccountManagementPanel />
               </TabsContent>
 
@@ -1941,97 +1924,11 @@ function SettingsContent() {
                 <ContentCreatorSection />
               </TabsContent>
 
-              {/* Account Tab */}
-              <TabsContent value="account" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("headings.accountManagement")}</CardTitle>
-                    <CardDescription>
-                      {t("messages.accountManagementDesc")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Email Verification Section */}
-                    <div className="rounded-md border p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-sm font-medium mb-1">{t("headings.emailVerification")}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {verification?.email}
-                          </p>
-                        </div>
-                        <Badge variant={verification?.emailConfirmed ? "default" : "destructive"}>
-                          {verification?.emailConfirmed ? t("labels.verified") : t("labels.notVerified")}
-                        </Badge>
-                      </div>
-                      {!verification?.emailConfirmed ? (
-                        <div className="mt-3 flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={async () => {
-                              const ok = await resendEmailVerification();
-                              if (ok) setResendCooldown(60);
-                            }}
-                            disabled={resendCooldown > 0}
-                          >
-                            {resendCooldown > 0 ? t("actions.resendIn", { seconds: resendCooldown }) : t("actions.resendVerificationEmail")}
-                          </Button>
-                          <Link to="/verify-email" className="text-primary underline text-sm">{t("actions.goToVerificationPage")}</Link>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">{t("headings.dataExport")}</h4>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {t("messages.dataExportDesc")}
-                      </p>
-                      <Button variant="outline" className="gap-2">
-                        <Download className="h-4 w-4" />
-                        {t("actions.downloadData")}
-                      </Button>
-                    </div>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">{t("headings.password")}</h4>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {t("messages.passwordChangeDesc")}
-                      </p>
-                      <Button variant="outline" className="gap-2" onClick={() => window.open('https://hired.video/forgot-password', '_blank')}>
-                        <RefreshCw className="h-4 w-4" />
-                        {t("actions.changePassword")}
-                      </Button>
-                    </div>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-medium mb-2 text-destructive">
-                        {t("headings.deleteAccount")}
-                      </h4>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {t("messages.deleteAccountDesc")}
-                      </p>
-                      <Button
-                        variant="destructive"
-                        className="gap-2"
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {t("headings.deleteAccount")}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
                 </div>
               </div>
             </Tabs>
           </div>
       </div>
-
-      {/* Delete Account Dialog */}
-      <DeleteAccountDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-      />
     </AppShell>
 );
 }

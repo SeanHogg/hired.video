@@ -727,6 +727,7 @@ const App = () => (
                       <Route path="/phone" element={<PhoneDashboard />} />
                       {/* My Services hub — see ServicesNav. Each top-level tab is its own route. */}
                       <Route path="/services" element={<ServicesManagement />} />
+                      <Route path="/services/creator" element={<ServicesManagement />} />
                       <Route path="/services/offerings" element={<ServicesManagement />} />
                       <Route path="/services/inquiries" element={<ServicesManagement />} />
                       {/* Pool list moved to /resumes?tab=sourced (see EntityHubShell

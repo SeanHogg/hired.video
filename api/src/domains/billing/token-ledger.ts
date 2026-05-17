@@ -32,6 +32,7 @@ import {
 } from "../../services/billing/BillingService.js";
 import type { LLMUsage } from "../../services/adapters/llm-client.js";
 import { isAdminRole } from "./audience.js";
+import { servicesProcessor } from "../services-processing/index.js";
 
 /**
  * Thrown by `ensureBudget()` when a user has zero tokens available across
@@ -104,6 +105,21 @@ export const tokenLedger: TokenLedger = {
       sessionId,
       toolRunId,
     });
+
+    // Write-through to the central usage ledger so the Usage Statement panel
+    // + monthly close cron can see AI consumption next to every other gated
+    // dimension. Best-effort — token accounting still lives in token_usage,
+    // this is the audit projection.
+    try {
+      await servicesProcessor.meter({
+        userId,
+        eventType: "ai_tokens",
+        quantity: usage.totalTokens,
+        metadata: { featureKey, model: usage.model, toolRunId, sessionId },
+      });
+    } catch (err) {
+      console.warn(`[token-ledger] failed to mirror ai_tokens to usage_ledger:`, err);
+    }
 
     if (toolRunId) {
       // Keep tool_runs.tokens_used in sync with the charge. Best-effort —

@@ -16,11 +16,13 @@ import {
   ShoppingBag,
   Trophy,
   TrendingUp,
+  Video,
 } from "lucide-react";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
 
 interface ServicesNavProps {
   hasCompanyAccess?: boolean;
+  creatorEnrolled?: boolean;
 }
 
 interface Tab {
@@ -29,12 +31,15 @@ interface Tab {
   icon: React.ComponentType<{ className?: string }>;
   /** When true, only show if `hasCompanyAccess` is true. */
   agencyOnly?: boolean;
+  /** When true, only show if the caller is enrolled in the creator program. */
+  creatorOnly?: boolean;
   /** Match the tab as active when the URL starts with any of these. */
   matchPrefixes?: string[];
 }
 
 const TABS: readonly Tab[] = [
   { to: "/services", label: "Dashboard", icon: TrendingUp, matchPrefixes: ["/services"] },
+  { to: "/services/creator", label: "Content Creator", icon: Video, creatorOnly: true },
   { to: "/services/offerings", label: "Offerings", icon: ShoppingBag },
   { to: "/services/inquiries", label: "Inquiries", icon: Inbox },
   { to: "/services/team", label: "Team", icon: Trophy, agencyOnly: true },
@@ -44,7 +49,7 @@ const TABS: readonly Tab[] = [
   { to: "/services/settings", label: "Settings", icon: Settings, agencyOnly: true },
 ] as const;
 
-export default function ServicesNav({ hasCompanyAccess = false }: ServicesNavProps) {
+export default function ServicesNav({ hasCompanyAccess = false, creatorEnrolled = false }: ServicesNavProps) {
   const location = useLocation();
 
   // Dashboard is the index — only active when path is exactly /services or
@@ -57,7 +62,11 @@ export default function ServicesNav({ hasCompanyAccess = false }: ServicesNavPro
     return location.pathname.startsWith(tab.to);
   };
 
-  const visibleTabs = TABS.filter((t) => !t.agencyOnly || hasCompanyAccess);
+  const visibleTabs = TABS.filter((t) => {
+    if (t.agencyOnly && !hasCompanyAccess) return false;
+    if (t.creatorOnly && !creatorEnrolled) return false;
+    return true;
+  });
 
   return (
     <nav className="mb-6 border-b">

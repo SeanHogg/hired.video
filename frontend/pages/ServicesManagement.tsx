@@ -187,7 +187,8 @@ export default function ServicesManagement() {
   // is still honored for inbound links from older emails / docs.
   const location = useLocation();
   const tabParam = searchParams.get("tab");
-  const activeTab = useMemo<"dashboard" | "services" | "inquiries">(() => {
+  const activeTab = useMemo<"dashboard" | "creator" | "services" | "inquiries">(() => {
+    if (location.pathname.startsWith("/services/creator")) return "creator";
     if (location.pathname.startsWith("/services/offerings")) return "services";
     if (location.pathname.startsWith("/services/inquiries")) return "inquiries";
     if (tabParam === "services") return "services";
@@ -590,7 +591,7 @@ export default function ServicesManagement() {
         <div className="pt-16">
         <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
-          <ServicesNav hasCompanyAccess={hasCompanyAccess} />
+          <ServicesNav hasCompanyAccess={hasCompanyAccess} creatorEnrolled={creatorActive} />
 
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -683,13 +684,6 @@ export default function ServicesManagement() {
                   {/* Affiliate widget — only when active */}
                   {affiliateActive && (
                     <AffiliateDashboardContent />
-                  )}
-
-                  {/* Creator widget — only when active. Per-creator metrics
-                      live in the consolidated metrics grid above; per-program
-                      enable/disable lives in the Offerings tab. */}
-                  {creatorActive && creatorProfile && (
-                    <ContentCreatorSection onProfileChange={handleCreatorProfileChange} />
                   )}
 
                   {/* Empty state when no standard services active */}
@@ -791,6 +785,11 @@ export default function ServicesManagement() {
 
                 </div>
               </div>
+            </TabsContent>
+
+            {/* ── Content Creator ─────────────────────────────────────────── */}
+            <TabsContent value="creator" className="space-y-4">
+              <ContentCreatorSection onProfileChange={handleCreatorProfileChange} />
             </TabsContent>
 
             {/* ── Services ────────────────────────────────────────────────── */}
