@@ -34,7 +34,7 @@ import {
 } from "../services/media/stockmedia.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { slugify } from "../../../shared/slugify.js";
-import { filterVisibleCreators } from "../services/creators/visibility.js";
+import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
 
 const {
@@ -1318,6 +1318,29 @@ studioFeaturesRoutes.get("/voice-clones/marketplace", async (c) => {
     hasNextPage: page * limit < total,
     hasPreviousPage: page > 1,
   }));
+});
+
+// ── GET /voice-clones/public/:id — anonymous-readable public listing ────────
+// Mirrors the public-prefix pattern used by /api/studio/public — needed so
+// shared marketplace links (`/marketplace/voices/:id`) resolve for users who
+// haven't signed in. Returns the SAFE projection only (no sampleAudioUrl /
+// sampleAudioKey) and 404s on anything that isn't `visibility = public`. The
+// authenticated `/voice-clones/:id` route below still serves owners +
+// licensees with the full record.
+studioFeaturesRoutes.get("/voice-clones/public/:id", async (c) => {
+  const id = c.req.param("id");
+  const db = getDb();
+  const [clone] = await db.select().from(studioVoiceClones)
+    .where(eq(studioVoiceClones.id, id))
+    .limit(1);
+  if (!clone || clone.visibility !== "public") {
+    return c.json(fail("NOT_FOUND", "Voice clone not found"), 404);
+  }
+  // #314 paywall — free creators' clones aren't surfaced on public routes.
+  if (!(await isCreatorVisible(clone.userId))) {
+    return c.json(fail("NOT_FOUND", "Voice clone not found"), 404);
+  }
+  return c.json(ok({ ...clone, sampleAudioUrl: null, sampleAudioKey: null }));
 });
 
 // ── GET /voice-clones/:id — single clone (owner / public / licensee) ────────

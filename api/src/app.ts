@@ -181,6 +181,10 @@ export function createApp() {
     // to the entity stay watchable. Owners still hit the auth'd `/projects`
     // endpoint to see their drafts + analytics.
     "/api/studio/projects/public",
+    // Public voice-clone detail (#762). Powers the
+    // `/marketplace/voices/:id` share-link landing page for unauthenticated
+    // viewers. Returns the SAFE projection only (no sampleAudioUrl).
+    "/api/studio/voice-clones/public",
     "/api/users/check-slug",
     "/api/resume/roast",
     "/api/og",

@@ -27,7 +27,8 @@
  *
  *   Public
  *     GET    /api/courses/public                — paginated published-course feed
- *     GET    /api/courses/public/:userId/:slug  — public course detail
+ *     GET    /api/courses/public/:userIdOrSlug/:slug — public course detail. The first
+ *                                                segment is a UUID OR a userProfiles.customUrlSlug.
  *
  *   Learner
  *     POST   /api/courses/:id/enroll            — enrol current user (free courses only for now)
@@ -46,6 +47,7 @@ import {
   SCORM_VERSIONS,
 } from "../db/schema/courses.js";
 import { slugify } from "../../../shared/slugify.js";
+import { isUuid } from "../../../shared/value-types.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 
 const {
@@ -199,8 +201,23 @@ courseRoutes.get("/public", async (c) => {
   }
 });
 
-courseRoutes.get("/public/:userId/:slug", async (c) => {
+courseRoutes.get("/public/:userIdOrSlug/:slug", async (c) => {
   const db = getDb();
+  // The first URL segment is the author identifier — accept either a UUID
+  // (legacy) OR a userProfiles.customUrlSlug (what the marketplace card +
+  // share-URL helpers produce, see CourseMarketplaceCard / buildShareAction).
+  // Same resolution pattern as /api/users/:id and /api/users/:id/resumes.
+  const userIdOrSlug = c.req.param("userIdOrSlug");
+  let authorUserId = userIdOrSlug;
+  if (!isUuid(userIdOrSlug)) {
+    const [p] = await db
+      .select({ userId: userProfiles.userId })
+      .from(userProfiles)
+      .where(eq(userProfiles.customUrlSlug, userIdOrSlug))
+      .limit(1);
+    if (!p) return c.json(error("NOT_FOUND", "Course not found"), 404);
+    authorUserId = p.userId;
+  }
   const [row] = await db
     .select({
       course: courses,
@@ -211,7 +228,7 @@ courseRoutes.get("/public/:userId/:slug", async (c) => {
     .innerJoin(users, eq(courses.userId, users.id))
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(and(
-      eq(courses.userId, c.req.param("userId")),
+      eq(courses.userId, authorUserId),
       eq(courses.slug, c.req.param("slug")),
       eq(courses.status, "published"),
       eq(users.emailVerified, true),

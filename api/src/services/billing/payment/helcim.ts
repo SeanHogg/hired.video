@@ -48,6 +48,20 @@ function helcimPaymentMethodValue(type?: PaymentMethodType): "cc" | "ach" | "cc-
   return "cc-ach";
 }
 
+/**
+ * Map ISO 3166-1 alpha-2 (what `BillingAddressSchema` stores) to alpha-3,
+ * which is what Helcim's customer API accepts. Sending "US" returns
+ * 400 `billing Address.country (US) must be a valid Constant`.
+ * Only the codes surfaced by `BillingAddressForm.COUNTRY_OPTIONS` are
+ * mapped — extend in lockstep if the form adds more countries.
+ */
+const HELCIM_ALPHA3_BY_ALPHA2: Record<string, string> = {
+  US: "USA",
+  CA: "CAN",
+  GB: "GBR",
+  AU: "AUS",
+};
+
 /** Convert a normalised BillingAddress to Helcim's customer-API shape. */
 function helcimBillingAddress(addr: BillingAddress) {
   return {
@@ -56,7 +70,7 @@ function helcimBillingAddress(addr: BillingAddress) {
     street2: addr.line2 ?? "",
     city: addr.city,
     province: addr.state,
-    country: addr.country,
+    country: HELCIM_ALPHA3_BY_ALPHA2[addr.country] ?? addr.country,
     postalCode: addr.postalCode,
     phone: addr.phone ?? "",
     email: undefined as string | undefined,

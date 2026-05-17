@@ -124,6 +124,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 // /profile is now a redirect to the canonical /people/:id — see route below.
 const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
 const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplatePreview"));
+const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
+const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
 // viewer became the default at /resumes/:id. Old links redirect in-place.
@@ -766,6 +768,8 @@ const App = () => (
                       <Route path="/marketplace" element={<Navigate to="/search" replace />} />
                       <Route path="/marketplace/templates" element={<Navigate to="/search?category=templates" replace />} />
                       <Route path="/marketplace/templates/:templateId" element={<MarketplaceTemplatePreview />} />
+                      <Route path="/marketplace/voices/:voiceCloneId" element={<VoicePublicDetail />} />
+                      <Route path="/courses/:authorSlug/:courseSlug" element={<CoursePublicDetail />} />
                       <Route path="/account" element={<Navigate to="/settings" replace />} />
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
