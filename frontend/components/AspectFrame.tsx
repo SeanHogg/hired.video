@@ -3,8 +3,8 @@
  *
  * Single source of truth for "render a child inside a box with a known
  * width:height ratio". Used by:
- *   • <VideoPlayer> for every embed surface (public page, hero spotlight,
- *     thumbnail tiles).
+ *   • <StudioVideoSurface> for every embed surface (public page, hero
+ *     spotlight, thumbnail tiles, profile/resume sections).
  *   • Studio's preview canvas wrapper (when we wire it).
  *
  * Accepts the ratio as either a number (1.7777…) or a `"W:H"` string

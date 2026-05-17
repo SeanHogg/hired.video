@@ -1,7 +1,7 @@
 /**
  * RenderableElementView — DOM-mode renderer for a single
  * `RenderableElement`. Dispatches per kind to the right shared
- * component (ChartRenderer for charts, VideoPlayer for video,
+ * component (ChartRenderer for charts, StudioVideoSurface for video,
  * native <img>/<audio>/<video> for the simple kinds).
  *
  * Pair to the canvas-mode `drawNode` in `lib/renderer/canvas-nodes.ts`

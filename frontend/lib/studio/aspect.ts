@@ -7,8 +7,9 @@
  *   • Backend `videos.storyboard.video.aspect` is a string like `"16:9"`.
  *   • Older callers and CSS expect a number like 16/9 = 1.7777.
  *
- * Centralised so AspectFrame, VideoPlayer, and any aspect-aware logic
- * share one parser + the same fallback (16:9) on missing/invalid input.
+ * Centralised so AspectFrame, StudioVideoSurface, and any aspect-aware
+ * logic share one parser + the same fallback (16:9) on missing/invalid
+ * input.
  */
 
 export type AspectRatioInput = number | string | null | undefined;
