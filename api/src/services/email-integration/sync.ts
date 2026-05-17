@@ -197,8 +197,14 @@ async function syncAccount(
     }
     await deps.repos.externalEmailAccounts.patch(account.id, account.userId, cursorPatch as any);
 
-    // Build the digest off the freshly persisted batch.
-    const digestSummary = await buildSyncDigest({ llm: deps.llm }, persisted);
+    // Build the digest off the freshly persisted batch. Skip the LLM
+    // call when nothing job-relevant landed — a sync that pulls 30
+    // newsletters doesn't need a recap and the call counts toward the
+    // Cloudflare Workers per-invocation subrequest budget (see #714).
+    const digestSummary =
+      jobRelated > 0
+        ? await buildSyncDigest({ llm: deps.llm }, persisted)
+        : null;
 
     await deps.repos.emailSyncRuns.patch(run.id, {
       completedAt: new Date(),

@@ -1,40 +1,37 @@
 /**
- * NotificationsRepository — system-to-user alerts and task list.
+ * NotificationsRepository — system-to-user alerts.
  *
- * Covers:
- *   • notifications — "you got a connection request" etc.
- *   • tasks         — per-user action items
- *
- * Separate from Conversations (user-to-user) and FollowUps (scheduled
- * outbound) because the lifecycle differs: notifications are
- * dismissable events, tasks have status progression, neither has a
- * reply/thread model the way conversations do.
+ * Two methods used in production: `insertNotification` (from the
+ * notification service) and `findNotificationsForUser` (from the inbox
+ * aggregator). The mark-read paths historically lived here but the
+ * live route in `routes/notifications.ts` updates the DB directly, and
+ * the repo variants set a non-existent `read_at` column — so they were
+ * dropped. Tasks live in `routes/task.ts` and read `schema.tasks`
+ * directly; no repo method survived from that surface either.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
-const { notifications, tasks } = schema;
+const { notifications } = schema;
 
 export type DbLike = any;
 
 export type NotificationRow = typeof notifications.$inferSelect;
 export type NotificationInsert = typeof notifications.$inferInsert;
-export type TaskRow = typeof tasks.$inferSelect;
-export type TaskInsert = typeof tasks.$inferInsert;
 
 export interface INotificationsRepository {
   findNotificationsForUser(userId: string, limit?: number): Promise<NotificationRow[]>;
   insertNotification(input: NotificationInsert): Promise<void>;
-  markNotificationRead(id: string, userId: string): Promise<void>;
-  markAllNotificationsReadForUser(userId: string): Promise<void>;
-  findTasksForUser(userId: string): Promise<TaskRow[]>;
-  insertTask(input: TaskInsert): Promise<TaskRow>;
-  updateTask(id: string, userId: string, patch: Partial<TaskInsert>): Promise<void>;
 }
 
 export class NotificationsRepository implements INotificationsRepository {
-  constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly db: DbLike, _now: () => Date = () => new Date()) {
+    // `_now` kept for factory-signature parity with the other repos
+    // (see `repositories/index.ts`); not consumed since this repo has
+    // no timestamp-stamping writes after the read_at cleanup.
+    void _now;
+  }
 
   async findNotificationsForUser(userId: string, limit = 50): Promise<NotificationRow[]> {
     return (await this.db
@@ -47,39 +44,5 @@ export class NotificationsRepository implements INotificationsRepository {
 
   async insertNotification(input: NotificationInsert): Promise<void> {
     await this.db.insert(notifications).values(input as any);
-  }
-
-  async markNotificationRead(id: string, userId: string): Promise<void> {
-    await this.db
-      .update(notifications)
-      .set({ isRead: true, readAt: this.now() } as any)
-      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
-  }
-
-  async markAllNotificationsReadForUser(userId: string): Promise<void> {
-    await this.db
-      .update(notifications)
-      .set({ isRead: true, readAt: this.now() } as any)
-      .where(eq(notifications.userId, userId));
-  }
-
-  async findTasksForUser(userId: string): Promise<TaskRow[]> {
-    return (await this.db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.userId, userId))
-      .orderBy(desc(tasks.createdAt))) as TaskRow[];
-  }
-
-  async insertTask(input: TaskInsert): Promise<TaskRow> {
-    const [row] = await this.db.insert(tasks).values(input as any).returning();
-    return row as TaskRow;
-  }
-
-  async updateTask(id: string, userId: string, patch: Partial<TaskInsert>): Promise<void> {
-    await this.db
-      .update(tasks)
-      .set({ ...patch, updatedAt: this.now() } as any)
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
   }
 }

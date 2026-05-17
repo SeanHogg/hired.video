@@ -190,7 +190,7 @@ export type {
   ImpersonationRoleSwitchRow, ImpersonationRoleSwitchInsert,
   ActivityLogRow, ActivityLogInsert,
 } from "./auditRepository.js";
-export type { NotificationRow, NotificationInsert, TaskRow, TaskInsert } from "./notificationsRepository.js";
+export type { NotificationRow, NotificationInsert } from "./notificationsRepository.js";
 export type { ConversationRow, ConversationInsert, ConversationParticipantRow, ConversationParticipantInsert, MessageRow, MessageInsert, AiChatSessionRow, AiChatMessageRow } from "./conversationsRepository.js";
 export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, FollowUpLogRow } from "./followUpsRepository.js";
 export type { ExternalEmailAccountRow, ExternalEmailAccountInsert, ExternalEmailAccountPatch } from "./externalEmailAccountsRepository.js";
