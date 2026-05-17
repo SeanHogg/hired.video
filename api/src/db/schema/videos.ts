@@ -6,7 +6,10 @@ import {
   timestamp,
   jsonb,
   integer,
+  boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 
@@ -37,9 +40,18 @@ export const videos = pgTable("videos", {
   privacyStatus: varchar("privacy_status", { length: 50 })
     .default("unlisted")
     .notNull(),
+  // SA-curated homepage hero. Partial unique index (see below) makes
+  // this a true singleton across the whole table: at most one row may
+  // be is_featured=true at any time. Toggled via the SA-only PATCH
+  // /api/admin/studio/videos/:id/featured route. See migration 0088.
+  isFeatured: boolean("is_featured").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("uq_videos_is_featured_singleton")
+    .on(t.isFeatured)
+    .where(sql`${t.isFeatured} = true`),
+]);
 
 export type Video = typeof videos.$inferSelect;
 export type NewVideo = typeof videos.$inferInsert;

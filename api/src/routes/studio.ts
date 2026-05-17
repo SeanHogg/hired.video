@@ -1721,6 +1721,38 @@ studioRoutes.delete("/projects/:projectId", async (c) => {
 });
 
 // ─── PATCH /projects/:projectId/status ────────────────────────────────────────
+//
+// Status is the canonical publish/unpublish toggle. The studio ellipsis
+// menu's "Publish to Profile" / "Remove from Profile" lands here with
+// status="published" / "exported". The handler is responsible for keeping
+// THREE pieces of state in sync so every read surface agrees:
+//
+//   1. studio_projects.status                — the enum itself
+//   2. studio_projects.is_profile_primary    — "THE video on my profile"
+//                                              (per-user singleton via the
+//                                              partial unique index from
+//                                              migration 0088). Publish
+//                                              flips this true + rolls
+//                                              off any sibling primary
+//                                              in the same tx. Unpublish
+//                                              flips it false.
+//   3. videos.privacy_status                 — gates the off-platform CDN
+//                                              URL. Mirrored to "public"
+//                                              on publish, "unlisted" on
+//                                              unpublish. The sibling
+//                                              /visibility route owns
+//                                              this same mirror for
+//                                              user-driven privacy
+//                                              toggles — we just keep
+//                                              the publish path in step
+//                                              so /u/:handle (which
+//                                              filters by privacy_status)
+//                                              doesn't drift from
+//                                              /api/studio/videos/user
+//                                              (which filters by status).
+//
+// Was gap #723 (privacy mirror) + #725 (no primary concept). Closed
+// 2026-05-16 alongside the homepage-featured flag.
 studioRoutes.patch("/projects/:projectId/status", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
@@ -1735,7 +1767,12 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
 
   const db = getDb();
   const [row] = await db
-    .select({ id: studioProjects.id, userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .select({
+      id: studioProjects.id,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      videoId: studioProjects.videoId,
+    })
     .from(studioProjects)
     .where(eq(studioProjects.id, projectId))
     .limit(1);
@@ -1746,13 +1783,59 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
     if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
     throw e;
   }
+
+  const nextStatus = parsed.data.status;
+  const isPublish = nextStatus === "published";
+  const isUnpublish = nextStatus === "exported";
+
+  // The primary-profile pointer is owned by the row's userId (creator),
+  // not the actor. Without this distinction a delegated editor publishing
+  // on behalf of someone else would flip THEIR own primary. The row's
+  // userId is the right scope key for the unique index too.
+  if (isPublish) {
+    // Roll off any sibling primary first so the partial unique index
+    // never sees two true rows in the same tx. The same-row update
+    // below promotes the freshly-published one.
+    await db
+      .update(studioProjects)
+      .set({ isProfilePrimary: false, updatedAt: new Date() })
+      .where(and(
+        eq(studioProjects.userId, row.userId),
+        eq(studioProjects.isProfilePrimary, true),
+      ));
+  }
+
   const [updated] = await db
     .update(studioProjects)
-    .set({ status: parsed.data.status, userId: user.sub, updatedAt: new Date() } as any)
+    .set({
+      status: nextStatus,
+      updatedAt: new Date(),
+      ...(isPublish ? { isProfilePrimary: true } : {}),
+      ...(isUnpublish ? { isProfilePrimary: false } : {}),
+    } as any)
     .where(eq(studioProjects.id, projectId))
     .returning();
   if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
-  return c.json(ok(toProjectDto(updated)));
+
+  // Mirror to the linked videos row so privacy-status readers (channels,
+  // homepage feed) agree with status readers. Skip when there is no
+  // rendered video — those projects are still served via the live
+  // <StudioPlayer/> branch and don't have a CDN URL to gate.
+  if (row.videoId && (isPublish || isUnpublish)) {
+    await db
+      .update(videos)
+      .set({
+        privacyStatus: isPublish ? "public" : "unlisted",
+        updatedAt: new Date(),
+      })
+      .where(eq(videos.id, row.videoId));
+  }
+
+  const linkedVideo = row.videoId
+    ? (await db.select().from(videos).where(eq(videos.id, row.videoId)).limit(1))[0] ?? null
+    : null;
+
+  return c.json(ok(toProjectDto(updated, linkedVideo)));
 });
 
 // ─── PATCH /projects/:projectId/visibility ───────────────────────────────────

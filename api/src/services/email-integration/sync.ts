@@ -83,6 +83,31 @@ function isJobCategory(c: ClassificationResult["category"]): boolean {
   return (JOB_INBOX_CATEGORIES as readonly string[]).includes(c);
 }
 
+/** Drizzle's neon-http driver throws `DrizzleQueryError` whose `.message`
+ *  is just the query text + params, with the real Postgres/Neon error
+ *  hanging off `.cause` (often a `NeonDbError` carrying a `code` SQLSTATE
+ *  + `detail`/`hint`). Walking the cause chain so the sync summary
+ *  surfaces something actionable ("23503 foreign_key_violation: …")
+ *  instead of "Failed query: update …". */
+function describeDbError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  let root: Error = err;
+  for (let hop = 0; hop < 5; hop++) {
+    const next = (root as { cause?: unknown }).cause;
+    if (!(next instanceof Error)) break;
+    root = next;
+  }
+  const code = (root as { code?: unknown }).code;
+  const detail = (root as { detail?: unknown }).detail;
+  const hint = (root as { hint?: unknown }).hint;
+  const parts: string[] = [];
+  if (typeof code === "string" && code) parts.push(code);
+  parts.push(root.message);
+  if (typeof detail === "string" && detail) parts.push(`detail: ${detail}`);
+  if (typeof hint === "string" && hint) parts.push(`hint: ${hint}`);
+  return parts.join(" — ");
+}
+
 async function syncAccount(
   deps: SyncDeps,
   account: ExternalEmailAccountRow,
@@ -189,7 +214,7 @@ async function syncAccount(
     } as any);
   } catch (err) {
     status = "error";
-    errorMessage = err instanceof Error ? err.message : String(err);
+    errorMessage = describeDbError(err);
     console.error(`[email-sync] account ${account.id} sync failed:`, err);
     // Diagnostic writes — wrap each in its own try/catch so a follow-up DB
     // failure (e.g. mid-migration schema drift, transient Neon error)

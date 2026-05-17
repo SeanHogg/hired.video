@@ -10,6 +10,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 
@@ -144,6 +145,17 @@ export const studioProjects = pgTable("studio_projects", {
   // no MP4 render required. `videos.privacy_status` still gates the
   // off-platform CDN URL. See migration 0083_studio_projects_is_public.
   isPublic: boolean("is_public").default(false).notNull(),
+  // "THE video resume on my profile" pointer. Per-user singleton — the
+  // partial unique index below enforces that at most one project per
+  // user has is_profile_primary=true. Flipped atomically by the publish/
+  // unpublish handler in PATCH /api/studio/projects/:id/status (Publish
+  // sets this row true + clears any sibling primary in one tx;
+  // Unpublish sets it false). All "show the profile video" read paths
+  // — /api/channels/:handle, /api/studio/videos/user/:userId,
+  // ResumeProfileLayout — filter on this column so the surface picks
+  // the unambiguous primary regardless of how many other "exported" or
+  // historical "published" rows exist. See migration 0088.
+  isProfilePrimary: boolean("is_profile_primary").default(false).notNull(),
   retryCount: integer("retry_count").default(0).notNull(),
   // Subject links live in `studio_project_subjects` (many-to-many) per
   // migration 0061 — see studioProjectSubjects below. The legacy 1:1
@@ -154,6 +166,9 @@ export const studioProjects = pgTable("studio_projects", {
   index("idx_studio_projects_company").on(table.companyId),
   index("idx_studio_projects_assigned_user").on(table.assignedUserId),
   index("idx_studio_projects_kind").on(table.kind),
+  uniqueIndex("uq_studio_projects_profile_primary_per_user")
+    .on(table.userId)
+    .where(sql`${table.isProfilePrimary} = true`),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;
