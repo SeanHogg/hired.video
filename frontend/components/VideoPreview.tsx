@@ -1,14 +1,18 @@
 // VideoPreview.tsx — canvas RAF loop calling frameRenderer.render().
-// When an audio track is provided it is played/paused in sync with the video.
-// When voiceover is enabled, the configured TTS engine (Web Speech / Kokoro
-// / Piper / VibeVoice) speaks each scene's text at the right time.
+// Music + voiceover-clip playback is delegated to the shared
+// `useMusicScheduler` hook so V1 preview, V2 preview, and the /v/:id
+// live player all schedule audio through the SAME `scheduleClipsToDestination`
+// seam (per the DRY rule). TTS voiceover (`speakWithEngine`) stays in
+// this component because the V1 voiceover model is a TTS spec, not a
+// pre-rendered audio clip — V2's pre-rendered VoiceoverClip[] rides on
+// the music-clip lane via canvas-state-to-clips.ts.
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { render } from "@/lib/renderer/frame-renderer";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { VideoAudio, VoiceoverConfig, SceneElement, ElementBox } from "@/types/video-script";
-import { scheduleClipsToDestination, type ClipScheduleHandle } from "@/lib/audio/clip-scheduler";
 import { normalizeAudioClips } from "@/lib/audio/normalize-clips";
+import { useMusicScheduler } from "@/lib/audio/use-music-scheduler";
 import { speakWithEngine, stopEngine, type TtsEngineId } from "@/lib/services/tts-engines";
 import CanvasElementOverlay from "@/components/studio/CanvasElementOverlay";
 import EndCapOverlay from "@/components/studio/EndCapOverlay";
@@ -57,15 +61,6 @@ export default function VideoPreview({
   const rafRef      = useRef<number>(0);
   const timeRef     = useRef(currentTime);
   const lastTsRef   = useRef<number | null>(null);
-  // Live music playback — owns the AudioContext and the schedule
-  // returned by scheduleClipsToDestination. Rebuilt on play/pause +
-  // clip-list changes; seeks during playback are tolerated (clips
-  // stay synced to wall-clock since they were scheduled at known
-  // offsets — see gap register for the seek-resync follow-up).
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const audioMasterRef = useRef<GainNode | null>(null);
-  const audioHandleRef = useRef<ClipScheduleHandle | null>(null);
-  const audioClipsKeyRef = useRef<string>("");
 
   // ── Voiceover: browser TTS synced to scene timing ──────────────────────
   const voActiveRef = useRef<string | null>(null);
@@ -137,110 +132,29 @@ export default function VideoPreview({
     timeRef.current = currentTime;
   }, [currentTime]);
 
-  // ── Music playback: schedule all clips on play, tear down on pause ────
-  // The scheduler is the single playback path for both preset clips
-  // (procedural AmbientPlayer) and rendered URL clips (decoded buffer
-  // sources). VideoPreview hands it the clip list + the current
-  // playhead so clips line up to scene timings.
+  // ── Music + voiceover-clip playback ────────────────────────────────
+  // Delegated to the shared `useMusicScheduler` so V1 + V2 preview +
+  // /v/:id watch surface all schedule audio through the same seam.
+  // Per DRY: this component no longer owns AudioContext lifecycle.
   const totalDuration = compiledVideo?.totalDuration ?? 0;
   const clips = normalizeAudioClips(audio, totalDuration);
-  // Stable key for the clip list so we don't tear down + re-decode
-  // music every render. Master volume / mute changes flow through the
-  // running GainNode in the separate live-volume effect below — they
-  // do NOT rebuild the schedule.
-  const clipsKey = clips.map((c) => `${c.id}|${c.track}|${c.startSec}|${c.endSec}|${c.volume ?? 1}`).join(";");
-  // Debounce key updates by 150ms so a clip drag (which mutates startSec
-  // every mousemove tick) doesn't tear down + re-decode the AudioContext
-  // on every frame — #477. The committed key only advances once the user
-  // pauses; the schedule then rebuilds from the final positions.
-  const [debouncedClipsKey, setDebouncedClipsKey] = useState(clipsKey);
-  useEffect(() => {
-    if (debouncedClipsKey === clipsKey) return;
-    const t = window.setTimeout(() => setDebouncedClipsKey(clipsKey), 150);
-    return () => window.clearTimeout(t);
-  }, [clipsKey, debouncedClipsKey]);
   const masterVolume = audio?.volume ?? 0.6;
+  useMusicScheduler({
+    playing,
+    clips,
+    masterVolume,
+    playheadRef: timeRef,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    function stopAll() {
-      audioHandleRef.current?.stop();
-      audioHandleRef.current = null;
-      audioMasterRef.current?.disconnect();
-      audioMasterRef.current = null;
-      audioCtxRef.current?.close().catch(() => {});
-      audioCtxRef.current = null;
-      audioClipsKeyRef.current = "";
-    }
-
-    if (!playing || clips.length === 0) {
-      stopAll();
-      return;
-    }
-    // Already running with the same clip list — keep playing.
-    if (audioCtxRef.current && audioClipsKeyRef.current === debouncedClipsKey) return;
-    stopAll();
-
-    (async () => {
-      try {
-        const ctx = new AudioContext();
-        if (ctx.state === "suspended") {
-          try { await ctx.resume(); } catch (e) {
-            console.warn("[VideoPreview] AudioContext resume failed — music may be silent until next user gesture", e);
-          }
-        }
-        const master = ctx.createGain();
-        // Read masterVolume at start time. Live tweaks are applied via
-        // the live-volume effect, NOT by rebuilding.
-        master.gain.value = masterVolume;
-        master.connect(ctx.destination);
-        const handle = await scheduleClipsToDestination(clips, ctx, master, timeRef.current);
-        if (cancelled) {
-          handle.stop();
-          master.disconnect();
-          ctx.close().catch(() => {});
-          return;
-        }
-        audioCtxRef.current = ctx;
-        audioMasterRef.current = master;
-        audioHandleRef.current = handle;
-        audioClipsKeyRef.current = debouncedClipsKey;
-      } catch (e) {
-        console.error("[VideoPreview] failed to start music playback", e);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // masterVolume intentionally NOT in deps — the live-volume effect
-    // handles updates without rebuilding the schedule. clipsKey is folded
-    // into `debouncedClipsKey` (#477) so dragging doesn't churn the ctx.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, debouncedClipsKey]);
-
-  // Live master-volume tweaks while playing — apply to the running
-  // GainNode so the slider is responsive without rebuilding.
-  useEffect(() => {
-    const master = audioMasterRef.current;
-    const ctx = audioCtxRef.current;
-    if (master && ctx) {
-      master.gain.setTargetAtTime(masterVolume, ctx.currentTime, 0.05);
-    }
-  }, [masterVolume]);
-
-  // Stop audio when component unmounts
+  // Stop TTS voiceover engine on unmount (the shared scheduler tears
+  // down its own AudioContext separately).
   useEffect(() => {
     return () => {
-      audioHandleRef.current?.stop();
-      audioHandleRef.current = null;
-      audioMasterRef.current?.disconnect();
-      audioMasterRef.current = null;
-      audioCtxRef.current?.close().catch(() => {});
-      audioCtxRef.current = null;
       stopEngine();
-      if (voCancelRef.current) { voCancelRef.current(); voCancelRef.current = null; }
+      if (voCancelRef.current) {
+        voCancelRef.current();
+        voCancelRef.current = null;
+      }
     };
   }, []);
 

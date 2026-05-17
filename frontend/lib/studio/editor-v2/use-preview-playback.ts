@@ -2,19 +2,22 @@
  * Preview playback for the v2 canvas editor.
  *
  * Owns the playhead clock (`requestAnimationFrame`-driven), drives the
- * active scene off the playhead, and keeps the optional music track in
- * sync. Single source of truth so the play button, the canvas (for
- * widget visibility), and any future timeline indicator all read from
- * one hook — no consumer recomputes "what scene are we in?" locally.
+ * active scene off the playhead, and delegates audio scheduling to the
+ * shared `useMusicScheduler` hook so V2's preview music + voiceover
+ * play through the SAME pipeline as V1's `<VideoPreview/>` and the
+ * server render path (`scheduleClipsToDestination`). Per the DRY rule
+ * there is one audio-scheduling seam in the editor codebase, and this
+ * hook routes through it via the `canvasStateToAudioClips` adapter.
  *
- * Out of scope for this pass (gap-registered): video-clip audio tracks,
- * voiceover playback, frame-accurate sync with WebCodecs render. The
- * preview is "good enough" for the user to judge the composition; the
- * render facade still owns export.
+ * Single source of truth so the play button, the canvas (for widget
+ * visibility), and any future timeline indicator all read from one
+ * hook — no consumer recomputes "what scene are we in?" locally.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { resolvePlayableSrc } from "@/lib/studio/music-catalog";
+import { useMusicScheduler } from "@/lib/audio/use-music-scheduler";
 import { totalDurationSeconds, type CanvasState } from "./canvas-state";
+import { DEFAULT_AUDIO_MIX } from "./canvas-state";
+import { canvasStateToAudioClips } from "./canvas-state-to-clips";
 
 export interface PreviewPlayback {
   /** Seconds from start of composition. */
@@ -39,17 +42,31 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
   const [playhead, setPlayhead] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const playheadRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastTickRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
 
   const duration = useMemo(() => totalDurationSeconds(state), [state]);
 
   // Keep the ref in sync with state — rAF reads from the ref to avoid
-  // stale-closure issues when isPlaying flips.
+  // stale-closure issues when isPlaying flips. The shared
+  // `useMusicScheduler` also reads from this ref so the scheduler knows
+  // the latest playhead at start time without re-rendering every frame.
   useEffect(() => {
     playheadRef.current = playhead;
   }, [playhead]);
+
+  // Audio. Single source — `canvasStateToAudioClips` projects music +
+  // voiceovers into the flat AudioClip[] the shared scheduler consumes.
+  // Replaces the prior `<audio>`-element-per-music-source code path
+  // that couldn't schedule voiceovers and had no audioMix coupling.
+  const audioClips = useMemo(() => canvasStateToAudioClips(state), [state]);
+  const masterVolume = state.audioMix?.masterGain ?? DEFAULT_AUDIO_MIX.masterGain;
+  useMusicScheduler({
+    playing: isPlaying,
+    clips: audioClips,
+    masterVolume,
+    playheadRef,
+  });
 
   const tick = useCallback(
     (now: number) => {
@@ -83,63 +100,6 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
     };
   }, [isPlaying, tick]);
 
-  // Music track sync. Lazily creates the audio element when the chosen
-  // source changes; pauses on stop; seeks on user-initiated jumps.
-  // resolvePlayableSrc() unifies stock + custom + procedural sources —
-  // there's no parallel resolution path anywhere in the editor.
-  const musicSource = state.musicSource;
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const url = await resolvePlayableSrc(musicSource);
-      if (cancelled) return;
-      setResolvedSrc(url);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [musicSource]);
-  useEffect(() => {
-    if (!resolvedSrc) {
-      audioRef.current?.pause();
-      audioRef.current = null;
-      return;
-    }
-    if (audioRef.current?.src !== resolvedSrc) {
-      audioRef.current?.pause();
-      const audio = new Audio(resolvedSrc);
-      audio.preload = "auto";
-      // Loop the bed: procedural stock tracks are short (~24-32s) and
-      // compositions routinely run longer. Looping keeps music
-      // continuous across the whole composition without forcing the
-      // generator to render the worst-case duration up front. Custom
-      // (composed / uploaded) music gets the same treatment because
-      // gap-registered #603 trades exact-length playback for a sane
-      // default behaviour everywhere.
-      audio.loop = true;
-      audioRef.current = audio;
-    }
-  }, [resolvedSrc]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (isPlaying) {
-      // Snap audio to the latest playhead (read via ref so this effect
-      // doesn't re-run on every rAF tick, which would cause audio
-      // scrubbing clicks). Once playing the audio advances under its own
-      // clock; we only re-sync when isPlaying or the track itself flips.
-      const target = playheadRef.current;
-      if (Math.abs(audio.currentTime - target) > 0.25) {
-        audio.currentTime = Math.min(audio.duration || target, target);
-      }
-      audio.play().catch(() => {});
-    } else {
-      audio.pause();
-    }
-  }, [isPlaying, resolvedSrc]);
-
   const play = useCallback(() => {
     if (duration <= 0) return;
     // Snap back to 0 if we're already at the end.
@@ -161,12 +121,6 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
       const clamped = Math.max(0, Math.min(duration, seconds));
       playheadRef.current = clamped;
       setPlayhead(clamped);
-      if (audioRef.current) {
-        audioRef.current.currentTime = Math.min(
-          audioRef.current.duration || clamped,
-          clamped,
-        );
-      }
     },
     [duration],
   );
