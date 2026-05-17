@@ -90,10 +90,11 @@ interface StudioProjectRow {
   linkedVideoUrl: string | null;
   linkedVideoStatus: string | null;
   linkedVideoPrivacy: string | null;
-  // Mirror of the linked video's isFeatured flag — surfaced on the
-  // project row so the SA can pin a video to the homepage carousel
-  // without expanding the per-project video list.
-  linkedVideoIsFeatured: boolean;
+  // Project-level visibility + featured flags (migration 0091). The
+  // homepage carousel selects on these directly, so a v2 NLE project
+  // with no `videos` row can still be featured.
+  isPublic: boolean;
+  isFeatured: boolean;
   userVideos: VideoRecord[];
   createdAt: string;
   updatedAt: string;
@@ -202,80 +203,38 @@ function VideoPreviewCell({ video }: { video: VideoRecord }) {
   );
 }
 
-// Shared gate logic for "can this thing be featured on the homepage?"
-// Project-level and video-level controls both ask the same question:
-// is there a public video to promote? Extracted per the DRY rule so
-// the disabled state, tooltip copy, and inverse-action wording stay
-// in sync across the row, the dropdown menu, and the bulk action.
+// Shared gate logic for "can this project be featured on the
+// homepage?". The only prerequisite now is `studio_projects.is_public`
+// — a project with a saved canvas plays live on the public watch page
+// via <CanvasStatePreview/> whether or not it has been rendered to MP4,
+// so the linked-video requirement was dropped in migration 0091. Kept
+// extracted per the DRY rule: row tooltip, dropdown menu, and bulk
+// action all read from this one helper.
 function describeFeatureState(opts: {
   isFeatured: boolean;
-  privacyStatus: string | null; // null = no linked video on project
+  isPublic: boolean;
 }, t: (key: string, opts?: any) => string): {
   disabled: boolean;
   reason: string | null;
 } {
   if (opts.isFeatured) return { disabled: false, reason: null };
-  if (opts.privacyStatus === null) {
-    return {
-      disabled: true,
-      reason: t("messages.featureRequiresLinkedVideo", {
-        defaultValue: "Project has no linked video to feature",
-      }),
-    };
-  }
-  if (opts.privacyStatus !== "public") {
+  if (!opts.isPublic) {
     return {
       disabled: true,
       reason: t("messages.featureRequiresPublic", {
-        defaultValue: "Video must be public to feature on homepage",
+        defaultValue: "Project must be public to feature on homepage",
       }),
     };
   }
   return { disabled: false, reason: null };
 }
 
-// Homepage-carousel toggle button. Used inside the per-project expanded
-// video table and the standalone Orphan Videos section. Self-gates the
-// disabled state + tooltip via the shared describeFeatureState helper.
-function FeatureVideoToggle({
-  video,
-  onToggle,
-}: {
-  video: VideoRecord;
-  onToggle: (v: VideoRecord) => void;
-}) {
-  const { t } = useTranslation();
-  const { disabled, reason } = describeFeatureState(
-    { isFeatured: video.isFeatured, privacyStatus: video.privacyStatus },
-    t,
-  );
-  return (
-    <Button
-      variant={video.isFeatured ? "default" : "ghost"}
-      size="sm"
-      className={`h-7 gap-1 ${video.isFeatured ? "bg-amber-500 hover:bg-amber-600 text-white" : "text-muted-foreground hover:text-amber-600"}`}
-      onClick={() => onToggle(video)}
-      disabled={disabled}
-      title={
-        reason ??
-        (video.isFeatured
-          ? t("actions.unfeature", { defaultValue: "Remove from homepage" })
-          : t("actions.featureOnHomepage", { defaultValue: "Feature on homepage" }))
-      }
-    >
-      <Star className={`h-3.5 w-3.5 ${video.isFeatured ? "fill-current" : ""}`} />
-      {video.isFeatured ? t("labels.featured", { defaultValue: "Featured" }) : t("actions.feature", { defaultValue: "Feature" })}
-    </Button>
-  );
-}
-
-// Self-gating dropdown item that maps the project's
-// (linkedVideoIsFeatured, linkedVideoPrivacy, videoId) tuple into a
-// "Feature on homepage" or "Remove from homepage" action. Always
-// renders for SA viewers — when the project isn't actionable yet (no
-// linked video, or the linked video isn't public) the item shows
-// disabled with the reason as a tooltip, so the SA can see what
-// prerequisite is missing instead of wondering where the affordance is.
+// Self-gating dropdown item that maps the project's (isFeatured,
+// isPublic) tuple into a "Feature on homepage" or "Remove from
+// homepage" action. Always renders for SA viewers — when the project
+// isn't yet public the item shows disabled with the reason as a
+// tooltip, so the SA can see the prerequisite instead of wondering
+// where the affordance is.
 function ProjectFeatureMenuItem({
   project,
   onToggle,
@@ -285,13 +244,10 @@ function ProjectFeatureMenuItem({
 }) {
   const { t } = useTranslation();
   const { disabled, reason } = describeFeatureState(
-    {
-      isFeatured: project.linkedVideoIsFeatured,
-      privacyStatus: project.videoId ? project.linkedVideoPrivacy : null,
-    },
+    { isFeatured: project.isFeatured, isPublic: project.isPublic },
     t,
   );
-  const label = project.linkedVideoIsFeatured
+  const label = project.isFeatured
     ? t("actions.unfeatureFromHomepage", { defaultValue: "Remove from homepage" })
     : t("actions.featureOnHomepage", { defaultValue: "Feature on homepage" });
   return (
@@ -304,7 +260,7 @@ function ProjectFeatureMenuItem({
       title={reason ?? undefined}
     >
       <Star
-        className={`h-4 w-4 mr-2 ${project.linkedVideoIsFeatured ? "fill-current text-amber-500" : ""}`}
+        className={`h-4 w-4 mr-2 ${project.isFeatured ? "fill-current text-amber-500" : ""}`}
       />
       {label}
       {reason && (
@@ -430,63 +386,17 @@ export default function StudioManagement() {
     }
   };
 
-  // Toggle a video's homepage-carousel flag. N>=0 videos may be featured
-  // at once (the 0088 singleton was dropped in 0090), so this is a pure
-  // per-row flip — no sibling roll-off. If the toggled video happens to
-  // be a project's linked video, mirror the flag onto that project's
-  // `linkedVideoIsFeatured` so the row's star indicator and dropdown
-  // label stay in sync until the next reload.
-  const handleToggleFeatured = async (video: VideoRecord) => {
-    const next = !video.isFeatured;
-    setProjects((prev) =>
-      prev.map((p) => ({
-        ...p,
-        linkedVideoIsFeatured: p.videoId === video.id ? next : p.linkedVideoIsFeatured,
-        userVideos: p.userVideos.map((v) =>
-          v.id === video.id ? { ...v, isFeatured: next } : v,
-        ),
-      })),
-    );
-    setOrphanVideos((prev) =>
-      prev.map((v) => (v.id === video.id ? { ...v, isFeatured: next } : v)),
-    );
-    try {
-      await apiClient.patch(`/api/admin/studio/videos/${video.id}/featured`, { isFeatured: next });
-      toast({
-        title: next
-          ? t("messages.videoFeaturedOn", { defaultValue: "Featured on homepage" })
-          : t("messages.videoFeaturedOff", { defaultValue: "Removed from homepage" }),
-      });
-    } catch {
-      toast({
-        title: t("errors.failedToToggleFeatured", { defaultValue: "Failed to update featured flag" }),
-        variant: "destructive",
-      });
-      loadProjects();
-    }
-  };
-
-  // Project-level feature toggle. Targets the project's linked video,
-  // which is what the homepage carousel actually plays. Server validates
-  // that the project has a linked video AND that it's public; a 4xx
-  // failure rolls back the optimistic flip via loadProjects().
+  // Project-level feature toggle — the only "feature on homepage"
+  // action. Targets `studio_projects.is_featured` directly so v2 NLE
+  // projects without a `videos` row are equally featurable. Server
+  // requires `studio_projects.is_public=true` to promote; a 4xx rolls
+  // back the optimistic flip via loadProjects(). The legacy per-video
+  // `handleToggleFeatured` was removed when migration 0091 moved the
+  // flag onto the project — `videos.is_featured` is no longer read.
   const handleToggleProjectFeatured = async (project: StudioProjectRow) => {
-    const next = !project.linkedVideoIsFeatured;
+    const next = !project.isFeatured;
     setProjects((prev) =>
-      prev.map((p) =>
-        p.id === project.id
-          ? {
-              ...p,
-              linkedVideoIsFeatured: next,
-              userVideos: p.userVideos.map((v) =>
-                v.id === project.videoId ? { ...v, isFeatured: next } : v,
-              ),
-            }
-          : p,
-      ),
-    );
-    setOrphanVideos((prev) =>
-      prev.map((v) => (v.id === project.videoId ? { ...v, isFeatured: next } : v)),
+      prev.map((p) => (p.id === project.id ? { ...p, isFeatured: next } : p)),
     );
     try {
       await apiClient.patch(`/api/admin/studio/projects/${project.id}/featured`, { isFeatured: next });
@@ -523,7 +433,7 @@ export default function StudioManagement() {
           ? t("messages.featuredProjectsCount", { defaultValue: "Featured {{count}} project(s) on homepage", count: succeeded })
           : t("messages.unfeaturedProjectsCount", { defaultValue: "Removed {{count}} project(s) from homepage", count: succeeded }),
         ...(failed > 0
-          ? { description: t("messages.bulkFeatureFailedSuffix", { defaultValue: "{{count}} failed (no linked video or not public)", count: failed }) }
+          ? { description: t("messages.bulkFeatureFailedSuffix", { defaultValue: "{{count}} failed (project not public)", count: failed }) }
           : {}),
       });
     }
@@ -698,7 +608,6 @@ export default function StudioManagement() {
                   <th className="text-left py-1 pr-3 font-medium">{t("labels.callStatus")}</th>
                   <th className="text-left py-1 pr-3 font-medium">{t("tabs.privacy")}</th>
                   <th className="text-left py-1 pr-3 font-medium">{t("labels.created")}</th>
-                  <th className="text-left py-1 pr-3 font-medium">{t("labels.homepageFeatured", { defaultValue: "Homepage" })}</th>
                   <th className="text-left py-1 font-medium w-8" />
                 </tr>
               </thead>
@@ -730,9 +639,6 @@ export default function StudioManagement() {
                     </td>
                     <td className="py-1.5 pr-3 text-muted-foreground text-xs">
                       {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "—"}
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      <FeatureVideoToggle video={v} onToggle={handleToggleFeatured} />
                     </td>
                     <td className="py-1.5">
                       {canDelete && (
@@ -920,7 +826,7 @@ export default function StudioManagement() {
                         <div className="flex items-center gap-2">
                           <Video className="h-4 w-4 text-muted-foreground shrink-0" />
                           <p className="font-medium text-sm truncate max-w-[200px]">{project.title}</p>
-                          {project.linkedVideoIsFeatured && (
+                          {project.isFeatured && (
                             <Star
                               className="h-3.5 w-3.5 text-amber-500 fill-current shrink-0"
                               aria-label={t("labels.featured", { defaultValue: "Featured" })}
@@ -1026,7 +932,6 @@ export default function StudioManagement() {
                                     <th className="text-left py-1 pr-3 font-medium">{t("tabs.privacy")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.linkColumn")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.created")}</th>
-                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.homepageFeatured", { defaultValue: "Homepage" })}</th>
                                     <th className="text-left py-1 font-medium w-8" />
                                   </tr>
                                 </thead>
@@ -1083,9 +988,6 @@ export default function StudioManagement() {
                                       </td>
                                       <td className="py-1.5 pr-3 text-muted-foreground text-xs">
                                         {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "—"}
-                                      </td>
-                                      <td className="py-1.5 pr-3">
-                                        <FeatureVideoToggle video={v} onToggle={handleToggleFeatured} />
                                       </td>
                                       <td className="py-1.5">
                                         {canDelete && (

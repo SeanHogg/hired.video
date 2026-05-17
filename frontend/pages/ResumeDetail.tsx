@@ -35,7 +35,6 @@ import ResumeStatsSheet from "@/components/ResumeStatsSheet";
 import Sidebar from "@/components/Sidebar";
 import SkillNetwork from "@/components/SkillNetwork";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -63,77 +62,101 @@ import {
   type ResumeTemplateDescriptor,
 } from "@/types/resume-template";
 
-function youTubeEmbed(url: string): string {
+// Extract a YouTube video id from common URL shapes (youtu.be/<id>,
+// youtube.com/watch?v=<id>). Returns null for unparseable input so the
+// caller can fall back to the raw URL branch.
+function youTubeIdFromUrl(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.hostname.includes("youtu.be")) {
       const id = u.pathname.split("/").filter(Boolean)[0];
-      if (id) return `https://www.youtube.com/embed/${id}`;
+      return id || null;
     }
     if (u.hostname.includes("youtube.com")) {
-      const v = u.searchParams.get("v");
-      if (v) return `https://www.youtube.com/embed/${v}`;
+      return u.searchParams.get("v");
     }
   } catch {}
-  return url;
+  return null;
 }
 
 // Discriminated union so a studio-project-backed video keeps its
-// project id (and routes through <StudioVideoSurface/> → the universal
-// player) instead of being flattened to a bare URL. resume.metaData
-// URLs continue to use the legacy iframe/native-video branch — they
-// don't have a project to hydrate from.
+// project id (lazy fetch hydrates the v2 canvas) while legacy
+// metaData URLs ride the same <StudioVideoSurface/> through its flat
+// mode — both routes mount the SAME player chrome the public /v/:id
+// page uses, so the resume header and the watch page never diverge.
 type VideoSlotItem =
   | { kind: "studio"; id: string; title: string; thumbnailUrl: string | null; videoUrl: string | null; youtubeVideoId: string | null }
   | { kind: "metadata"; id: string; title: string; url: string; metaType: MetaType };
 
+// Self-gating: returns null when there's nothing to show. Carousel
+// chrome only renders when N>1; a single video mounts bare so the
+// resume header reads as "the video", not "a tile in a deck".
 function VideoSlot({ items }: { items: VideoSlotItem[] }) {
   const [idx, setIdx] = useState(0);
   if (items.length === 0) return null;
-  const current = items[idx];
-  return (
-    <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
-      <CardContent className="p-6">
-        <div className="relative">
-          {items.length > 1 && (
-            <>
-              <button type="button" aria-label="Previous" className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p - 1 + items.length) % items.length)}>
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button type="button" aria-label="Next" className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p + 1) % items.length)}>
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </>
-          )}
-          {current.kind === "studio" ? (
-            // Universal studio surface — hydrates the project on click +
-            // mounts the same player the editor's Preview tab uses, so
-            // saved-but-unrendered projects play live off the script
-            // (the fix the user asked for: no more broken <video src=""/>
-            // for projects without an MP4 yet).
+  const current = items[idx % items.length];
+
+  // Map every item shape (studio project, metaData YouTube, metaData
+  // MP4/WebM) onto a single <StudioVideoSurface/> mount. Both surfaces
+  // (this one + /v/:id) now resolve to the SAME render pipeline.
+  const player =
+    current.kind === "studio" ? (
+      <StudioVideoSurface
+        mode="lazy"
+        videoId={current.id}
+        poster={current.thumbnailUrl}
+        title={current.title}
+        fallbackVideoUrl={current.videoUrl}
+        fallbackYoutubeVideoId={current.youtubeVideoId}
+      />
+    ) : (() => {
+        // metaData: derive the flat source from the metaType.
+        const ytId =
+          current.metaType === MetaType.YouTube ? youTubeIdFromUrl(current.url) : null;
+        if (ytId) {
+          return (
             <StudioVideoSurface
-              mode="lazy"
-              videoId={current.id}
-              poster={current.thumbnailUrl}
+              mode="flat"
+              source={{ kind: "youtube", videoId: ytId }}
               title={current.title}
-              fallbackVideoUrl={current.videoUrl}
-              fallbackYoutubeVideoId={current.youtubeVideoId}
             />
-          ) : current.metaType === MetaType.YouTube ? (
-            <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
-              <iframe className="absolute inset-0 w-full h-full" src={youTubeEmbed(current.url)} title={current.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-            </div>
-          ) : (
-            <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
-              <video className="absolute inset-0 w-full h-full" controls>
-                <source src={current.url} type={current.metaType === MetaType.VideoWebM ? "video/webm" : "video/mp4"} />
-              </video>
-            </div>
-          )}
-        </div>
-        <div className="mt-4 text-xs opacity-80 text-center">Video {idx + 1} / {items.length}</div>
-      </CardContent>
-    </Card>
+          );
+        }
+        return (
+          <StudioVideoSurface
+            mode="flat"
+            source={{ kind: "url", url: current.url }}
+            title={current.title}
+            controls
+          />
+        );
+      })();
+
+  if (items.length === 1) return player;
+
+  return (
+    <div className="relative">
+      {player}
+      <button
+        type="button"
+        aria-label="Previous"
+        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
+        onClick={() => setIdx((p) => (p - 1 + items.length) % items.length)}
+      >
+        <ChevronLeft className="w-5 h-5" />
+      </button>
+      <button
+        type="button"
+        aria-label="Next"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
+        onClick={() => setIdx((p) => (p + 1) % items.length)}
+      >
+        <ChevronRight className="w-5 h-5" />
+      </button>
+      <div className="mt-2 text-xs opacity-80 text-center text-white">
+        Video {idx + 1} / {items.length}
+      </div>
+    </div>
   );
 }
 

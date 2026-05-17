@@ -2448,22 +2448,65 @@ studioRoutes.get("/videos/public", async (c) => {
 });
 
 // ─── GET /videos/featured ─────────────────────────────────────────────────────
-// Homepage hero carousel. Returns only is_featured=true public videos
-// in the order the SuperAdmin last promoted them (most-recent first).
-// Empty array → HeroVideoSpotlight falls back to its skeleton state.
-// No auth required. Toggled via:
-//   • PATCH /api/admin/studio/videos/:id/featured
-//   • PATCH /api/admin/studio/projects/:id/featured  (resolves to videoId)
+// Homepage hero carousel. Returns SA-featured public projects in the
+// order they were last promoted (most-recent first). Empty array →
+// HeroVideoSpotlight falls back to its skeleton state. No auth required.
+//
+// Source of truth is `studio_projects.is_featured` (migration 0091)
+// rather than the legacy `videos.is_featured`. v2 (kind='nle') projects
+// play live off `timelineSpec` via <CanvasStatePreview/> and have no
+// `videos` row until export — sourcing here from projects lets the
+// hero surface every featurable canvas regardless of whether it's
+// been rendered to MP4. The returned `id` is the project id; the
+// frontend's <StudioVideoSurface mode="lazy"/> hits
+// `/api/studio/public/:videoId` (already accepts project ids) which
+// mounts the SAME player the public /v/:id watch page uses. Toggled
+// via PATCH /api/admin/studio/projects/:id/featured.
 studioRoutes.get("/videos/featured", async (c) => {
   const db = getDb();
   const rows = await db
-    .select(PUBLIC_VIDEO_SELECT)
-    .from(videos)
-    .innerJoin(users, eq(videos.userId, users.id))
-    .where(and(eq(videos.privacyStatus, "public"), eq(videos.isFeatured, true)))
-    .orderBy(desc(videos.updatedAt))
+    .select({
+      id: studioProjects.id,
+      videoId: studioProjects.videoId,
+      storyboard: studioProjects.storyboard,
+      createdAt: studioProjects.createdAt,
+      updatedAt: studioProjects.updatedAt,
+      // LEFT-joined optional baked video. Thumbnails + MP4 URL flow
+      // when present; the live canvas branch always works regardless.
+      videoTitle: videos.title,
+      youtubeUrl: videos.youtubeUrl,
+      youtubeVideoId: videos.youtubeVideoId,
+      r2Key: videos.r2Key,
+      thumbnailUrl: videos.thumbnailUrl,
+      description: videos.description,
+      ownerName: users.name,
+      resumeId: videos.resumeId,
+    })
+    .from(studioProjects)
+    .innerJoin(users, eq(studioProjects.userId, users.id))
+    .leftJoin(videos, eq(videos.id, studioProjects.videoId))
+    .where(and(eq(studioProjects.isFeatured, true), eq(studioProjects.isPublic, true)))
+    .orderBy(desc(studioProjects.updatedAt))
     .limit(20);
-  return c.json(ok(rows.map(mapPublicVideo)));
+
+  return c.json(ok(rows.map((r) => {
+    const meta = r.storyboard as { _name?: string } | null;
+    return {
+      // Project id — public watch endpoint resolves either project or
+      // video id, so the lazy surface hydrates either way.
+      id: r.id,
+      title: meta?._name ?? r.videoTitle ?? `${r.ownerName ?? "Hired.video"} Video`,
+      videoUrl: r.youtubeUrl ?? (r.r2Key ? cdnUrl(r.r2Key) : null),
+      youtubeUrl: r.youtubeUrl,
+      youtubeVideoId: r.youtubeVideoId,
+      thumbnailUrl: r.thumbnailUrl,
+      description: r.description,
+      isFeatured: true,
+      ownerName: r.ownerName,
+      resumeId: r.resumeId,
+      createdAt: asIso(r.createdAt),
+    };
+  })));
 });
 
 // ─── GET /public/:videoId ──────────────────────────────────────────────────────

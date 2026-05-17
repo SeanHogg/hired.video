@@ -156,6 +156,14 @@ export const studioProjects = pgTable("studio_projects", {
   // the unambiguous primary regardless of how many other "exported" or
   // historical "published" rows exist. See migration 0088.
   isProfilePrimary: boolean("is_profile_primary").default(false).notNull(),
+  // SA-curated homepage carousel flag. Project-level (not video-level)
+  // because v2 (kind='nle') projects play live off `timelineSpec` via
+  // <CanvasStatePreview/> and have no `videos` row until export — the
+  // old `videos.is_featured` gate locked them out of the carousel even
+  // when fully public. Toggled via PATCH /api/admin/studio/projects/:id
+  // /featured. Read by GET /api/studio/videos/featured. Multi-feature:
+  // any number of rows may be true. See migration 0091.
+  isFeatured: boolean("is_featured").default(false).notNull(),
   retryCount: integer("retry_count").default(0).notNull(),
   // Subject links live in `studio_project_subjects` (many-to-many) per
   // migration 0061 — see studioProjectSubjects below. The legacy 1:1

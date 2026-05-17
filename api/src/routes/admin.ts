@@ -544,6 +544,8 @@ adminRoutes.get("/studio/projects", async (c) => {
 				status: schema.studioProjects.status,
 				storyboard: schema.studioProjects.storyboard,
 				videoId: schema.studioProjects.videoId,
+				isPublic: schema.studioProjects.isPublic,
+				isFeatured: schema.studioProjects.isFeatured,
 				createdAt: schema.studioProjects.createdAt,
 				updatedAt: schema.studioProjects.updatedAt,
 			})
@@ -637,7 +639,12 @@ adminRoutes.get("/studio/projects", async (c) => {
 			linkedVideoUrl: linked ? videoUrl(linked) : null,
 			linkedVideoStatus: linked?.status ?? null,
 			linkedVideoPrivacy: linked?.privacyStatus ?? null,
-			linkedVideoIsFeatured: linked?.isFeatured ?? false,
+			// Project-level featured flag (migration 0091). The project
+			// — not its optional linked video — is the unit the homepage
+			// feed selects on, so v2 NLE projects with no `videos` row
+			// can still be featured.
+			isPublic: r.isPublic,
+			isFeatured: r.isFeatured,
 			userVideos: userVids,
 			createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
 			updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
@@ -787,38 +794,17 @@ adminRoutes.delete("/studio/videos/:videoId", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// PATCH /api/admin/studio/videos/:videoId/featured — SA-only homepage pin.
+// PATCH /api/admin/studio/projects/:projectId/featured — SA-only homepage pin.
 // Body: { isFeatured: boolean }
-// Multi-feature: any number of rows may be is_featured=true. Consumed
-// by GET /api/studio/videos/featured which feeds HeroVideoSpotlight's
-// carousel. The 0088 singleton index was dropped in 0090.
-// ---------------------------------------------------------------------------
-adminRoutes.patch("/studio/videos/:videoId/featured", async (c) => {
-	const videoId = c.req.param("videoId");
-	const body = await c.req.json().catch(() => null);
-	const parsed = z.object({ isFeatured: z.boolean() }).safeParse(body);
-	if (!parsed.success) {
-		return c.json({ error: { code: "BAD_REQUEST", message: "isFeatured must be boolean" } }, 400);
-	}
-	const db = getDb();
-
-	const [updated] = await db
-		.update(schema.videos)
-		.set({ isFeatured: parsed.data.isFeatured, updatedAt: new Date() })
-		.where(eq(schema.videos.id, videoId))
-		.returning();
-
-	if (!updated) return c.json({ error: { code: "NOT_FOUND", message: "Video not found" } }, 404);
-	return c.json(ok({ id: videoId, isFeatured: updated.isFeatured }), 200);
-});
-
-// ---------------------------------------------------------------------------
-// PATCH /api/admin/studio/projects/:projectId/featured — SA-only homepage pin
-// at the project granularity. Body: { isFeatured: boolean }
-// Resolves to the project's linked video (studio_projects.video_id) and
-// toggles its is_featured flag. 400 if the project has no linked video
-// or if the video isn't public yet — both are required for the hero
-// carousel to render anything meaningful.
+//
+// Flips `studio_projects.is_featured` directly. No linked-video
+// requirement: v2 (kind='nle') projects play live off `timelineSpec`
+// through <CanvasStatePreview/> and don't need an exported MP4 to
+// surface on the homepage. The hero carousel mounts the same player
+// the public /v/:id watch page uses, so anything that plays there
+// plays here. Promoting still requires `is_public=true` — otherwise
+// the public-feed query would filter the row out and the carousel
+// would render a phantom tile.
 // ---------------------------------------------------------------------------
 adminRoutes.patch("/studio/projects/:projectId/featured", async (c) => {
 	const projectId = c.req.param("projectId");
@@ -830,38 +816,28 @@ adminRoutes.patch("/studio/projects/:projectId/featured", async (c) => {
 	const db = getDb();
 
 	const [project] = await db
-		.select({ videoId: schema.studioProjects.videoId })
+		.select({ isPublic: schema.studioProjects.isPublic })
 		.from(schema.studioProjects)
 		.where(eq(schema.studioProjects.id, projectId))
 		.limit(1);
 
 	if (!project) return c.json({ error: { code: "NOT_FOUND", message: "Project not found" } }, 404);
-	if (!project.videoId) {
-		return c.json({ error: { code: "NO_LINKED_VIDEO", message: "Project has no linked video to feature" } }, 400);
-	}
 
-	// Promoting to featured requires public visibility — otherwise the
-	// hero would render a row the public endpoint won't actually return.
-	if (parsed.data.isFeatured) {
-		const [video] = await db
-			.select({ privacyStatus: schema.videos.privacyStatus })
-			.from(schema.videos)
-			.where(eq(schema.videos.id, project.videoId))
-			.limit(1);
-		if (!video) return c.json({ error: { code: "NOT_FOUND", message: "Linked video not found" } }, 404);
-		if (video.privacyStatus !== "public") {
-			return c.json({ error: { code: "NOT_PUBLIC", message: "Linked video must be public to feature" } }, 400);
-		}
+	// Promoting to featured requires the project to be public —
+	// otherwise the homepage feed's `is_public=true` filter would drop
+	// it and the SA would have toggled a no-op flag.
+	if (parsed.data.isFeatured && !project.isPublic) {
+		return c.json({ error: { code: "NOT_PUBLIC", message: "Project must be public to feature on homepage" } }, 400);
 	}
 
 	const [updated] = await db
-		.update(schema.videos)
+		.update(schema.studioProjects)
 		.set({ isFeatured: parsed.data.isFeatured, updatedAt: new Date() })
-		.where(eq(schema.videos.id, project.videoId))
+		.where(eq(schema.studioProjects.id, projectId))
 		.returning();
 
-	if (!updated) return c.json({ error: { code: "NOT_FOUND", message: "Linked video not found" } }, 404);
-	return c.json(ok({ id: projectId, videoId: project.videoId, isFeatured: updated.isFeatured }), 200);
+	if (!updated) return c.json({ error: { code: "NOT_FOUND", message: "Project not found" } }, 404);
+	return c.json(ok({ id: projectId, isFeatured: updated.isFeatured }), 200);
 });
 
 // ---------------------------------------------------------------------------
