@@ -34,9 +34,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { canvasStateToText } from "@/lib/studio/editor-v2/canvas-to-text";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import {
+  canvasStateToTimeline,
+  timelineToCanvasState,
+} from "@/lib/studio/editor-v2/timeline-emit";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { VideoScript } from "@/types/video-script";
 import {
@@ -122,25 +125,33 @@ function VersionHistoryTrigger({
   state: CanvasState;
   onRestoreCanvasFromScript: (next: CanvasState) => void;
 }) {
-  // The v1 dialog renders its own trigger button; we just have to
-  // hand it the storyboard the user is currently editing + the
-  // restore adapter.
+  // The dialog renders its own trigger button; we just have to hand
+  // it the current snapshot + a restore adapter. We send Timeline JSON
+  // (the V2 wire format) so the round-trip is lossless — the legacy V1
+  // path went through `canvasStateToScript` which DROPPED `cta` and
+  // `linked-content` widgets entirely, so restoring an old version of
+  // a Resume-containing project would have lost the Resume. Restore
+  // tolerates either shape so pre-#832 V1 snapshots still load.
   return (
     <Suspense fallback={null}>
       <VersionHistoryDialog
         projectId={projectId}
-        currentStoryboard={canvasStateToScript(state)}
-        onRestore={(storyboard) => {
-          // Convert the restored v1 script back into a CanvasState
-          // and apply it. The lossless migration paths (#611) carry
-          // every v1 field across so restored versions don't lose
-          // chips / scene-type / per-scene effects.
-          const next = scriptToCanvasState(storyboard as VideoScript);
-          onRestoreCanvasFromScript(next);
-        }}
+        currentStoryboard={canvasStateToTimeline(state)}
+        onRestore={(storyboard) => onRestoreCanvasFromScript(snapshotToCanvasState(storyboard))}
       />
     </Suspense>
   );
+}
+
+/** Restore-side adapter: prefer Timeline JSON (lossless round-trip),
+ *  fall back to V1 `VideoScript` for legacy snapshots written before
+ *  #832. Discriminates by shape — Timeline JSON has a `tracks` array;
+ *  V1 VideoScript has a `video` + `scenes` shape. */
+function snapshotToCanvasState(snapshot: unknown): CanvasState {
+  if (snapshot && typeof snapshot === "object" && Array.isArray((snapshot as { tracks?: unknown }).tracks)) {
+    return timelineToCanvasState(snapshot);
+  }
+  return scriptToCanvasState(snapshot as VideoScript);
 }
 
 function ReviewCommentsTrigger({ projectId }: { projectId: string }) {
