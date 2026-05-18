@@ -17,7 +17,7 @@
  * gone. UI-state seeds that the editor still reads from the URL
  * (`?capture=`) are forwarded along on the destination URL.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -26,7 +26,10 @@ import {
   Globe,
   Pencil,
   Search,
+  ShoppingBag,
+  Sparkles,
   Trash2,
+  User as UserIcon,
   Video,
 } from "lucide-react";
 import { projectVisibilityVisual } from "@/lib/studio/visibility";
@@ -45,7 +48,11 @@ import {
 } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId, studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
-import { studioTemplatesService } from "@/lib/services/studio-templates-service";
+import {
+  studioTemplatesService,
+  type LicensedStudioTemplate,
+  type StudioTemplate,
+} from "@/lib/services/studio-templates-service";
 import { parseStudioSubject } from "@shared/studio-subject";
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
@@ -64,7 +71,27 @@ import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 // honours them on first paint. Non-listed params are dropped.
 const EDITOR_FORWARDED_PARAMS = ["capture"] as const;
 
-type CategoryFilter = "all" | TemplateCategory;
+// "mine" is a pseudo-category — when selected, the carousel swaps from the
+// built-in catalog over to the user's own published + claimed/purchased
+// templates. Keeping it on the same pill row mirrors the screenshot UX the
+// user requested without splitting the filter into a separate toggle.
+type CategoryFilter = "all" | "mine" | TemplateCategory;
+
+// Sub-filter on the dedicated "Your templates" section. Lets users narrow
+// to just the templates they authored versus templates they claimed/bought
+// — the two halves come from different endpoints so the UI keeps them
+// labelled distinctly.
+type UserTemplateScope = "all" | "created" | "purchased";
+
+// Normalised shape the "Your templates" surfaces consume so the card +
+// carousel + grid renderers don't branch on "is this a creator-published
+// row or a license join". The provenance field gates the badge label and
+// the Edit affordance — only `created` rows get an edit pencil because
+// purchased rows don't belong to the viewer.
+type OwnedTemplate = {
+  template: StudioTemplate;
+  provenance: "created" | "purchased" | "claimed";
+};
 
 export default function StudioLanding() {
   const navigate = useNavigate();
@@ -76,6 +103,14 @@ export default function StudioLanding() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  // User's own published templates + claimed/purchased licensed templates.
+  // Loaded once on mount and reused by both the "Mine" carousel mode and
+  // the dedicated "Your templates" section below — single source of truth
+  // for "what does this user own" across both surfaces.
+  const [userCreatedTemplates, setUserCreatedTemplates] = useState<StudioTemplate[]>([]);
+  const [userLicensedTemplates, setUserLicensedTemplates] = useState<LicensedStudioTemplate[]>([]);
+  const [userTemplatesLoading, setUserTemplatesLoading] = useState(true);
+  const [userTemplateScope, setUserTemplateScope] = useState<UserTemplateScope>("all");
   // Single drawer mounted at the page root — cards open it by setting
   // `detailsProject`. Avoids N drawers in the DOM for a long video grid.
   const [detailsProject, setDetailsProject] = useState<StudioProject | null>(null);
@@ -203,6 +238,28 @@ export default function StudioLanding() {
     };
   }, [toast, workspaceQuery]);
 
+  // Load the user's own + licensed templates once on mount. Both endpoints
+  // soft-fail to an empty list — a network blip or 401 shouldn't break the
+  // built-in carousel, which is the primary CTA on this page.
+  useEffect(() => {
+    let cancelled = false;
+    setUserTemplatesLoading(true);
+    Promise.all([
+      studioTemplatesService.listMine().catch(() => [] as StudioTemplate[]),
+      studioTemplatesService.listMyLicensedTemplates().catch(
+        () => [] as LicensedStudioTemplate[],
+      ),
+    ]).then(([mine, licensed]) => {
+      if (cancelled) return;
+      setUserCreatedTemplates(mine);
+      setUserLicensedTemplates(licensed);
+      setUserTemplatesLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
     return [...projects].sort((a, b) =>
@@ -213,6 +270,10 @@ export default function StudioLanding() {
   const filteredTemplates = useMemo(() => {
     const q = query.trim().toLowerCase();
     return TEMPLATE_CATALOG.filter((t) => {
+      // The Mine pill swaps to the user-templates carousel; the built-in
+      // catalog is hidden in that mode so the category filter doesn't
+      // apply here.
+      if (category === "mine") return false;
       if (category !== "all" && t.category !== category) return false;
       if (!q) return true;
       return (
@@ -220,6 +281,44 @@ export default function StudioLanding() {
       );
     });
   }, [query, category]);
+
+  // Composed list of every template the user owns — their own published
+  // rows plus their claimed/purchased licenses. Sorted by most-recent so
+  // the freshly-acquired template lands at the front. Search query
+  // applies to this surface too so users can find a specific one without
+  // scrolling.
+  const ownedTemplates = useMemo<OwnedTemplate[]>(() => {
+    const q = query.trim().toLowerCase();
+    const created: OwnedTemplate[] = userCreatedTemplates.map((t) => ({
+      template: t,
+      provenance: "created" as const,
+    }));
+    const licensed: OwnedTemplate[] = userLicensedTemplates.map((row) => ({
+      template: row.template,
+      provenance:
+        row.license.source === "purchase" ? ("purchased" as const) : ("claimed" as const),
+    }));
+    const merged = [...created, ...licensed];
+    const filtered = merged.filter(({ template: t }) => {
+      if (!q) return true;
+      return (
+        t.name.toLowerCase().includes(q) ||
+        (t.description ?? "").toLowerCase().includes(q)
+      );
+    });
+    filtered.sort((a, b) =>
+      (b.template.updatedAt ?? "").localeCompare(a.template.updatedAt ?? ""),
+    );
+    return filtered;
+  }, [userCreatedTemplates, userLicensedTemplates, query]);
+
+  const ownedTemplatesByScope = useMemo(() => {
+    if (userTemplateScope === "all") return ownedTemplates;
+    if (userTemplateScope === "created") {
+      return ownedTemplates.filter((o) => o.provenance === "created");
+    }
+    return ownedTemplates.filter((o) => o.provenance !== "created");
+  }, [ownedTemplates, userTemplateScope]);
 
   function openTemplate(templateId: string) {
     // skipNavigate is set on the shared `create` so the deep-link
@@ -230,6 +329,46 @@ export default function StudioLanding() {
       .then((created) => {
         if (created) navigate(`/studio/${encodeURIComponent(created.id)}`);
       });
+  }
+
+  // Open a user-published (or claimed/purchased) studio template — mints
+  // a new draft project from the template's canvas script and routes the
+  // user to /studio/<real-id>. Mirrors the `?studioTemplate=` deep-link
+  // handler above; kept inline here so the carousel/grid card clicks
+  // don't need to fake a URL bounce.
+  async function openStudioTemplate(template: StudioTemplate) {
+    const script = template.videoScript as VideoScript | null | undefined;
+    if (!script) {
+      toast({
+        title: "Template has no content",
+        description: "The creator hasn't finished setting it up yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const created = await create({
+        kind: "script",
+        script,
+        name: template.name,
+      });
+      if (created) navigate(`/studio/${encodeURIComponent(created.id)}`);
+    } catch (err) {
+      toast({
+        title: "Couldn't open template",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Preview a user-published template — same listing page the
+  // marketplace + built-in carousel both link to. Falls back to the
+  // template id when the row hasn't generated a slug yet (private +
+  // unlisted drafts).
+  function previewStudioTemplate(template: StudioTemplate) {
+    const slug = template.listingSlug ?? template.id;
+    navigate(`/marketplace/templates/${slug}`);
   }
 
   // Click-through to the public marketplace preview page. Same URL the
@@ -306,14 +445,42 @@ export default function StudioLanding() {
               onClick={() => setCategory(c.id)}
             />
           ))}
+          {/* "Mine" pill — sibling to the built-in categories so users
+              with their own published or claimed templates can quickly
+              scope the carousel to those. The full "Your templates"
+              section below provides the Created/Purchased split. */}
+          <CategoryPill
+            label="Mine"
+            active={category === "mine"}
+            onClick={() => setCategory("mine")}
+          />
         </div>
 
-        <TemplateCarousel
-          templates={filteredTemplates}
-          onPick={openTemplate}
-          onPreview={previewTemplate}
-        />
+        {category === "mine" ? (
+          <OwnedTemplateCarousel
+            owned={ownedTemplates}
+            loading={userTemplatesLoading}
+            onPick={openStudioTemplate}
+            onPreview={previewStudioTemplate}
+          />
+        ) : (
+          <TemplateCarousel
+            templates={filteredTemplates}
+            onPick={openTemplate}
+            onPreview={previewTemplate}
+          />
+        )}
       </section>
+
+      <YourTemplatesSection
+        owned={ownedTemplatesByScope}
+        totalOwned={ownedTemplates.length}
+        loading={userTemplatesLoading}
+        scope={userTemplateScope}
+        onScopeChange={setUserTemplateScope}
+        onPick={openStudioTemplate}
+        onPreview={previewStudioTemplate}
+      />
 
       <section>
         {/* My videos header — title + workspace switcher inline. The
@@ -623,6 +790,92 @@ function TemplateCarousel({
   onPick: (id: string) => void;
   onPreview: (id: ContentTemplate) => void;
 }) {
+  if (templates.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+        No templates match your search.
+      </div>
+    );
+  }
+  return (
+    <HorizontalScroller itemCount={templates.length}>
+      {templates.map((template) => {
+        const Icon = template.icon;
+        return (
+          <div
+            key={template.id}
+            className="group relative flex w-60 shrink-0 snap-start flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md"
+          >
+            {/* Card body: clicking starts a new project from this
+                template (the primary action on /studio). Wrapped in
+                its own button so it doesn't nest with the Preview
+                pill below. */}
+            <button
+              type="button"
+              onClick={() => onPick(template.id)}
+              className="flex flex-1 flex-col text-left"
+              aria-label={`Use ${template.label} template`}
+            >
+              <div className="relative">
+                <TemplateThumb template={template} />
+                {/* Hover label confirms the click action. The Preview
+                    pill is rendered as a sibling button outside this
+                    one so click events route to the right handler. */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
+                    <Pencil className="h-3.5 w-3.5" />
+                    Use
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 p-3">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-purple/10 text-brand-purple">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium leading-tight">
+                    {template.label}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {template.desc}
+                  </p>
+                </div>
+              </div>
+            </button>
+            {/* Preview pill — opens /marketplace/templates/<slug>, the
+                same SEO surface the homepage + search results link to.
+                Positioned absolutely so it sits over the thumb without
+                nesting inside the Use button. */}
+            <button
+              type="button"
+              onClick={() => onPreview(template.id)}
+              aria-label={`Preview ${template.label} template`}
+              className="absolute right-2 top-2 z-10 hidden items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-md backdrop-blur transition hover:bg-white group-hover:flex group-focus-within:flex"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Preview
+            </button>
+          </div>
+        );
+      })}
+    </HorizontalScroller>
+  );
+}
+
+/**
+ * Horizontal scroller with overflow arrow controls — extracted so the
+ * built-in TemplateCarousel and the Mine-mode OwnedTemplateCarousel
+ * share the exact same scroll mechanics (snap, arrow visibility, smooth
+ * scroll). itemCount is the only signal the scroller needs to re-check
+ * its overflow bounds when the visible cards change.
+ */
+function HorizontalScroller({
+  itemCount,
+  children,
+}: {
+  itemCount: number;
+  children: ReactNode;
+}) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -641,21 +894,12 @@ function TemplateCarousel({
       el.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [templates.length]);
+  }, [itemCount]);
 
   function scrollByCards(direction: 1 | -1) {
     const el = scrollerRef.current;
     if (!el) return;
-    // One viewport-width step keeps the next visible card aligned to the edge.
     el.scrollBy({ left: direction * el.clientWidth * 0.9, behavior: "smooth" });
-  }
-
-  if (templates.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">
-        No templates match your search.
-      </div>
-    );
   }
 
   return (
@@ -674,67 +918,270 @@ function TemplateCarousel({
         ref={scrollerRef}
         className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:thin]"
       >
-        {templates.map((template) => {
-          const Icon = template.icon;
-          return (
-            <div
-              key={template.id}
-              className="group relative flex w-60 shrink-0 snap-start flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md"
-            >
-              {/* Card body: clicking starts a new project from this
-                  template (the primary action on /studio). Wrapped in
-                  its own button so it doesn't nest with the Preview
-                  pill below. */}
-              <button
-                type="button"
-                onClick={() => onPick(template.id)}
-                className="flex flex-1 flex-col text-left"
-                aria-label={`Use ${template.label} template`}
-              >
-                <div className="relative">
-                  <TemplateThumb template={template} />
-                  {/* Hover label confirms the click action. The Preview
-                      pill is rendered as a sibling button outside this
-                      one so click events route to the right handler. */}
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                    <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
-                      <Pencil className="h-3.5 w-3.5" />
-                      Use
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 p-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-purple/10 text-brand-purple">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium leading-tight">
-                      {template.label}
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {template.desc}
-                    </p>
-                  </div>
-                </div>
-              </button>
-              {/* Preview pill — opens /marketplace/templates/<slug>, the
-                  same SEO surface the homepage + search results link to.
-                  Positioned absolutely so it sits over the thumb without
-                  nesting inside the Use button. */}
-              <button
-                type="button"
-                onClick={() => onPreview(template.id)}
-                aria-label={`Preview ${template.label} template`}
-                className="absolute right-2 top-2 z-10 hidden items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-md backdrop-blur transition hover:bg-white group-hover:flex group-focus-within:flex"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                Preview
-              </button>
-            </div>
-          );
-        })}
+        {children}
       </div>
     </div>
+  );
+}
+
+// ─── Owned templates (created + claimed/purchased) ──────────────────────────
+
+/**
+ * Self-contained card for a template the user owns — used inside the
+ * Mine-mode carousel AND the dedicated "Your templates" grid below the
+ * built-ins. Renders the row's thumbnail image (or a fallback marquee
+ * for templates that don't have one yet) plus a provenance badge so the
+ * user can tell their published rows from their purchased/claimed ones
+ * at a glance. Self-gates the Preview pill: only public/unlisted rows
+ * have a listing page, so private drafts render the card without it.
+ */
+function OwnedTemplateCard({
+  owned,
+  onPick,
+  onPreview,
+}: {
+  owned: OwnedTemplate;
+  onPick: (template: StudioTemplate) => void;
+  onPreview: (template: StudioTemplate) => void;
+}) {
+  const { template, provenance } = owned;
+  const badge = PROVENANCE_BADGE[provenance];
+  const canPreview = template.visibility !== "private";
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">
+      <button
+        type="button"
+        onClick={() => onPick(template)}
+        className="flex flex-1 flex-col text-left"
+        aria-label={`Use ${template.name} template`}
+      >
+        <div className="relative aspect-video w-full overflow-hidden bg-muted">
+          {template.thumbnailUrl ? (
+            <img
+              src={template.thumbnailUrl}
+              alt={template.name}
+              className="h-full w-full object-cover"
+              crossOrigin="anonymous"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 via-brand-purple/80 to-brand-blue text-white">
+              <Sparkles className="h-6 w-6 opacity-80" />
+            </div>
+          )}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
+              <Pencil className="h-3.5 w-3.5" />
+              Use
+            </span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2 p-3">
+          <div className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+            badge.iconClassName,
+          )}>
+            <badge.Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium leading-tight">
+              {template.name}
+            </p>
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+              {template.description?.trim() || badge.fallbackBlurb}
+            </p>
+          </div>
+        </div>
+      </button>
+      {/* Provenance badge — always visible so users can scan the grid
+          and tell their own published rows from purchased/claimed ones
+          without hovering. */}
+      <span
+        className={cn(
+          "pointer-events-none absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur",
+          badge.pillClassName,
+        )}
+      >
+        <badge.Icon className="h-3 w-3" />
+        {badge.label}
+      </span>
+      {canPreview && (
+        <button
+          type="button"
+          onClick={() => onPreview(template)}
+          aria-label={`Preview ${template.name} template`}
+          className="absolute right-2 top-2 z-10 hidden items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-md backdrop-blur transition hover:bg-white group-hover:flex group-focus-within:flex"
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Preview
+        </button>
+      )}
+    </div>
+  );
+}
+
+const PROVENANCE_BADGE: Record<
+  OwnedTemplate["provenance"],
+  {
+    label: string;
+    Icon: typeof UserIcon;
+    iconClassName: string;
+    pillClassName: string;
+    fallbackBlurb: string;
+  }
+> = {
+  created: {
+    label: "Yours",
+    Icon: UserIcon,
+    iconClassName: "bg-brand-purple/10 text-brand-purple",
+    pillClassName: "bg-brand-purple/90 text-white",
+    fallbackBlurb: "Your published template.",
+  },
+  purchased: {
+    label: "Purchased",
+    Icon: ShoppingBag,
+    iconClassName: "bg-emerald-500/10 text-emerald-600",
+    pillClassName: "bg-emerald-500/90 text-white",
+    fallbackBlurb: "Template you purchased from the marketplace.",
+  },
+  claimed: {
+    label: "Claimed",
+    Icon: Sparkles,
+    iconClassName: "bg-sky-500/10 text-sky-600",
+    pillClassName: "bg-sky-500/90 text-white",
+    fallbackBlurb: "Free template you claimed.",
+  },
+};
+
+function OwnedTemplateCarousel({
+  owned,
+  loading,
+  onPick,
+  onPreview,
+}: {
+  owned: OwnedTemplate[];
+  loading: boolean;
+  onPick: (template: StudioTemplate) => void;
+  onPreview: (template: StudioTemplate) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="flex gap-4 overflow-hidden pb-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-video w-60 shrink-0 animate-pulse rounded-lg bg-muted"
+          />
+        ))}
+      </div>
+    );
+  }
+  if (owned.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+        You don't own any templates yet. Publish a project as a template or
+        claim one from the marketplace to see it here.
+      </div>
+    );
+  }
+  return (
+    <HorizontalScroller itemCount={owned.length}>
+      {owned.map((row) => (
+        <div
+          key={`${row.provenance}:${row.template.id}`}
+          className="w-60 shrink-0 snap-start"
+        >
+          <OwnedTemplateCard owned={row} onPick={onPick} onPreview={onPreview} />
+        </div>
+      ))}
+    </HorizontalScroller>
+  );
+}
+
+/**
+ * Dedicated "Your templates" section beneath the built-in catalog. Hosts
+ * the All / Created / Purchased sub-filter so users can browse + filter
+ * their owned templates without competing with the main built-in
+ * carousel above. Renders nothing when the user has no owned templates
+ * — keeping the page tidy for fresh accounts.
+ */
+function YourTemplatesSection({
+  owned,
+  totalOwned,
+  loading,
+  scope,
+  onScopeChange,
+  onPick,
+  onPreview,
+}: {
+  owned: OwnedTemplate[];
+  totalOwned: number;
+  loading: boolean;
+  scope: UserTemplateScope;
+  onScopeChange: (scope: UserTemplateScope) => void;
+  onPick: (template: StudioTemplate) => void;
+  onPreview: (template: StudioTemplate) => void;
+}) {
+  // Skip the section entirely if the user owns nothing yet — the Mine
+  // pill above still surfaces an empty-state message if they click into
+  // it, so there's no discoverability loss here.
+  if (!loading && totalOwned === 0) return null;
+  return (
+    <section className="mb-12">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-medium">Your templates</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Templates you've published, claimed, or purchased.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <CategoryPill
+            label="All"
+            active={scope === "all"}
+            onClick={() => onScopeChange("all")}
+          />
+          <CategoryPill
+            label="Created"
+            active={scope === "created"}
+            onClick={() => onScopeChange("created")}
+          />
+          <CategoryPill
+            label="Purchased"
+            active={scope === "purchased"}
+            onClick={() => onScopeChange("purchased")}
+          />
+        </div>
+      </div>
+      {loading ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-video animate-pulse rounded-lg bg-muted"
+            />
+          ))}
+        </div>
+      ) : owned.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">
+          {scope === "created"
+            ? "You haven't published any templates yet."
+            : scope === "purchased"
+              ? "You haven't purchased or claimed any templates yet."
+              : "No templates match your search."}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {owned.map((row) => (
+            <OwnedTemplateCard
+              key={`${row.provenance}:${row.template.id}`}
+              owned={row}
+              onPick={onPick}
+              onPreview={onPreview}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

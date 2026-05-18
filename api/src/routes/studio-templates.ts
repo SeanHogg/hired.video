@@ -14,6 +14,7 @@
  *   GET    /templates/public                — every visibility='public' listing (anon ok)
  *   GET    /templates/me                    — caller's own templates
  *   GET    /templates/me/earnings           — per-template earnings rollup (creator only)
+ *   GET    /templates/me/licensed           — studio templates the caller claimed/purchased (joined w/ template row)
  *   GET    /templates/listing/:slug         — public listing detail (anon ok)
  *   GET    /templates/:id                   — listing detail (anon ok)
  *   PATCH  /templates/:id                   — edit / publish / unpublish
@@ -186,6 +187,19 @@ studioTemplatesRoutes.get("/templates/me/earnings", async (c) => {
   if (typeof userId !== "string") return userId;
   const data = await svc().earningsForCreator(userId);
   return c.json(success(data));
+});
+
+// Studio templates the caller has claimed (free) or purchased (paid).
+// Used by /studio "Your templates" so the user can browse + open the
+// templates they own without going through the marketplace. Joined with
+// the template row so a single round-trip is enough to render cards.
+// `owner` licenses are excluded — those mirror `/templates/me` and the
+// consumer wants Created and Purchased rendered as distinct lists.
+studioTemplatesRoutes.get("/templates/me/licensed", async (c) => {
+  const userId = requireUserId(c);
+  if (typeof userId !== "string") return userId;
+  const rows = await svc().listLicensedStudioTemplatesForUser(userId);
+  return c.json(success(rows));
 });
 
 // Public marketplace listing — visibility='public' rows across all creators.

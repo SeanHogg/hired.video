@@ -29,8 +29,10 @@ interface ProfileHeaderProps {
   onShare?: () => void;
   stats?: { connections: number; followers: number; profileViews: number };
   // Optional right-column content (e.g. profile-associated video player).
-  // Self-gating callers may return null when nothing qualifies — the
-  // flex column then collapses without leaving a stray empty slot.
+  // Renders directly under the owner's Edit/Share action buttons so the
+  // associated video sits within the same vertical stack as the actions
+  // it relates to. Self-gating callers may return null when nothing
+  // qualifies — the flex column then collapses cleanly.
   rightSlot?: ReactNode;
 }
 
@@ -60,6 +62,8 @@ export default function ProfileHeader({
     ? t("labels.atCompany", { role: currentRole, company: currentCompany })
     : currentRole || currentCompany || "";
 
+  const showOwnerActions = isOwner && Boolean(onEditProfile || onShare);
+
   return (
     <Card>
       <CardContent className="p-6">
@@ -76,27 +80,12 @@ export default function ProfileHeader({
 
           {/* Info */}
           <div className="flex-1">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-              <div>
-                <h1 className="text-2xl lg:text-3xl font-bold">{fullName}</h1>
-                {headline && (
-                  <p className="text-base lg:text-lg text-muted-foreground mt-1">
-                    {headline}
-                  </p>
-                )}
-              </div>
-              {isOwner && (
-                <div className="flex items-center gap-2">
-                  {onEditProfile && (
-                    <SectionEditButton onClick={onEditProfile} label={t("actions.editProfile")} />
-                  )}
-                  {onShare && (
-                    <Button variant="outline" size="sm" onClick={onShare}>
-                      <Share className="h-4 w-4 mr-2" />
-                      {t("actions.share")}
-                    </Button>
-                  )}
-                </div>
+            <div className="mb-3">
+              <h1 className="text-2xl lg:text-3xl font-bold">{fullName}</h1>
+              {headline && (
+                <p className="text-base lg:text-lg text-muted-foreground mt-1">
+                  {headline}
+                </p>
               )}
             </div>
 
@@ -169,8 +158,26 @@ export default function ProfileHeader({
             )}
           </div>
 
-          {rightSlot && (
-            <div className="w-full lg:w-80 flex-shrink-0">{rightSlot}</div>
+          {/* Right column: owner action buttons stacked above the
+              associated video. Collapses entirely when there are no
+              actions to render and rightSlot is null. */}
+          {(showOwnerActions || rightSlot) && (
+            <div className="w-full lg:w-80 flex-shrink-0 space-y-3">
+              {showOwnerActions && (
+                <div className="flex items-center justify-end gap-2">
+                  {onEditProfile && (
+                    <SectionEditButton onClick={onEditProfile} label={t("actions.editProfile")} />
+                  )}
+                  {onShare && (
+                    <Button variant="outline" size="sm" onClick={onShare}>
+                      <Share className="h-4 w-4 mr-2" />
+                      {t("actions.share")}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {rightSlot}
+            </div>
           )}
         </div>
       </CardContent>

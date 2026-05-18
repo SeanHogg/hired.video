@@ -23,6 +23,7 @@ import {
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 import { EntityShareGroup } from "@/components/EntityShareGroup";
 import { EntityTrackItem } from "@/components/EntityTrackItem";
+import { EntityCloneItem } from "@/components/EntityCloneItem";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface JobActionsMenuProps {
@@ -42,6 +43,10 @@ interface JobActionsMenuProps {
   onViewAnalytics?: () => void;
   onTrack?: () => void;
   onContactOwner?: () => void;
+  /** Owner-only — `POST /api/jobs/:id/clone`. Backend appends " (Copy)" to
+   *  title and lands the clone as `isActive: false` so the owner reviews
+   *  the copy before publishing. */
+  onClone?: () => void;
   onDelete?: () => void;
   /** Extra dropdown items appended to the menu (e.g. AddToListMenu). */
   extraMenuItems?: React.ReactNode;
@@ -65,6 +70,7 @@ export function JobActionsMenu({
   onViewAnalytics,
   onTrack,
   onContactOwner,
+  onClone,
   onDelete,
   extraMenuItems,
   triggerClassName,
@@ -74,7 +80,7 @@ export function JobActionsMenu({
   const showRunTool = isOwner && !!jobId;
   const hasOwnerActions =
     isOwner &&
-    (onEdit || onRename || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
+    (onEdit || onRename || onClone || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
   const hasPublicActions =
     onView || onShare || onCopyLink || onShowQR || onEmbed || onTrack || onContactOwner;
 
@@ -114,6 +120,8 @@ export function JobActionsMenu({
             Rename
           </DropdownMenuItem>
         )}
+        {/* Clone — owner only. Self-gates on isOwner + onClone presence. */}
+        <EntityCloneItem isOwner={isOwner} onClone={onClone} label="Clone Job" />
         {/* Studio deep-link — owner only since the wizard expects the
             user's own subject content. */}
         {isOwner && jobId && (

@@ -7,6 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
 import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
+import { slugify } from "../../../shared/slugify.js";
 
 const {
   companyProfiles,
@@ -541,6 +542,62 @@ companyRoutes.delete("/:id", async (c) => {
   const db = getDb();
   await db.delete(companyProfiles).where(eq(companyProfiles.id, access!.companyId));
   return c.json(success(null, "Company deleted"), 200);
+});
+
+/** POST /api/companies/:id/clone — duplicate a company the caller owns.
+ *  Name + slug both get " (Copy)" / "-copy[-N]" suffixes; engagement +
+ *  verification metadata reset on the clone. Mirrors the job + resume +
+ *  studio-project clone pattern. */
+companyRoutes.post("/:id/clone", async (c) => {
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
+  const db = getDb();
+  const [original] = await db
+    .select()
+    .from(companyProfiles)
+    .where(eq(companyProfiles.id, access!.companyId))
+    .limit(1);
+  if (!original) return c.json(error("NOT_FOUND", "Company not found"), 404);
+
+  // Slug is uniquely constrained — derive from the cloned name, then append
+  // a numeric suffix until we land on an unused slug. Caps at 50 attempts
+  // to avoid a pathological loop on a degenerate name.
+  const baseSlug = slugify(`${original.name}-copy`);
+  let candidateSlug: string | null = baseSlug;
+  for (let i = 1; i <= 50; i++) {
+    const test = i === 1 ? baseSlug : `${baseSlug}-${i}`;
+    const [conflict] = await db
+      .select({ id: companyProfiles.id })
+      .from(companyProfiles)
+      .where(eq(companyProfiles.slug, test))
+      .limit(1);
+    if (!conflict) { candidateSlug = test; break; }
+    candidateSlug = null;
+  }
+
+  const {
+    id: _omitId,
+    createdAt: _omitCreated,
+    updatedAt: _omitUpdated,
+    isVerified: _omitVerified,
+    featured: _omitFeatured,
+    featuredUntil: _omitFeaturedUntil,
+    featuredRankBoost: _omitFeaturedRank,
+    reviewCount: _omitReviewCount,
+    reviewAvgOverall: _omitReviewAvg,
+    ...rest
+  } = original as Record<string, unknown>;
+  const [clone] = await db
+    .insert(companyProfiles)
+    .values({
+      ...rest,
+      ownerId: c.var.user!.sub,
+      name: `${original.name} (Copy)`,
+      slug: candidateSlug,
+      isActive: false,
+    } as any)
+    .returning();
+  return c.json(success(rowToCompanyMeta(clone!)), 201);
 });
 
 // ─── Employer Branding Pages ──────────────────────────────────────────────────

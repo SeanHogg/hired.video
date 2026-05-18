@@ -16,9 +16,12 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
+import { EntityCloneItem } from "@/components/EntityCloneItem";
 import { buildTrackAction } from "@/lib/card-track-action";
 import { buildShareAction } from "@/lib/card-share-action";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
+import { apiClient } from "@/lib/api-client";
+import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import EntityVideos from "@/components/studio/EntityVideos";
@@ -193,6 +196,26 @@ export default function CompanyCard({
   // Owner-only menu extras — same items in both vertical and horizontal
   // layouts so an owner browsing the list view doesn't lose Edit / Create
   // Video access.
+  // Default clone handler — `POST /api/companies/:id/clone` via apiClient,
+  // then navigate to the clone's edit page. Backend appends " (Copy)" to
+  // the name + regenerates the slug, lands the clone as inactive.
+  const handleCloneCompany = async () => {
+    try {
+      const res = await apiClient.post<{ id: string }>(
+        `/api/companies/${company.id}/clone`,
+      );
+      if (res.data?.id) {
+        toast({ title: "Company cloned", description: `"${company.name} (Copy)" is ready to edit.` });
+        navigate(`/companies/edit/${res.data.id}`);
+      }
+    } catch (err) {
+      toast({
+        title: "Couldn't clone company",
+        description: (err as Error).message || "Try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  };
   const ownerMenuExtras = (
     <>
       {extraMenuItems}
@@ -204,6 +227,11 @@ export default function CompanyCard({
           </Link>
         </DropdownMenuItem>
       )}
+      <EntityCloneItem
+        isOwner={isOwned}
+        onClone={isOwned && company.id ? handleCloneCompany : undefined}
+        label="Clone Company"
+      />
       {isOwned && company.id && (
         <CreateVideoMenuItem subject={{ kind: "company", id: company.id }} />
       )}

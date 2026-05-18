@@ -203,6 +203,10 @@ export interface RawApiItem {
   size?: string;
   isVerified?: boolean;
   isPro?: boolean;
+  /** True when the content was authored by hired.video / a superadmin
+   *  (Sean Hogg) rather than a community creator. Drives `<OfficialBadge/>`
+   *  visibility on listing cards + detail surfaces. See gap #183. */
+  isOfficial?: boolean;
   jobData?: {
     id: string;
     title: string;

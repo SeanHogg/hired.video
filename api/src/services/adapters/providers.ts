@@ -12,6 +12,14 @@
  *   - Long-form narrative (resume_roast, articles, match_insights)
  *     leans on Hermes 3 / Llama 3.3.
  *
+ * Every chain is auto-padded by `withFallbackChain` below:
+ *   1. Caller-supplied explicit fallbacks (paid + caller's free choice)
+ *   2. Shared `FREE_TIER_FALLBACK_POOL` (qwen3-coder / gemma / hermes)
+ *   3. `PAID_TERMINAL_MODEL` (cerebras/llama3.1-8b) — only for use
+ *      cases in `INTERACTIVE_USE_CASES`. Restores cross-vendor
+ *      diversity so an OpenRouter-wide free-pool outage doesn't 503
+ *      user-facing features (closes gap #525 Part B).
+ *
  * The Builderforce gateway (consumed via `@seanhogg/builderforce-sdk`
  * in llm-client.ts) is the single transport for every model; vendor
  * identity is signalled by the model string (`openrouter/...`,
@@ -105,24 +113,58 @@ const FREE_TIER_FALLBACK_POOL = [
   "nousresearch/hermes-3-llama-3.1-405b:free",
 ] as const;
 
-/** Auto-pad a use-case profile with the shared free-tier fallback pool
- *  so a single-model 429 can never 503 the whole feature. Caller-supplied
- *  fallbacks take precedence (paid → caller's free choice → pool); the
- *  primary's `temperature` and `maxTokens` apply to every appended pool
- *  entry so generation parameters stay coherent across the chain. We
- *  de-dupe by model id so primary/explicit fallbacks aren't dispatched
- *  to twice. */
-function withFreeTierFallbacks(profile: UseCaseProfile): UseCaseProfile {
+/** Paid-tier terminal fallback for user-interactive use cases. Cerebras
+ *  Llama 3.1-8B is the established paid model in the codebase
+ *  (`match`'s primary) — sub-200ms TTFT, OpenAI-compatible JSON mode,
+ *  on a vendor independent of OpenRouter. Closes gap #525 Part B: when
+ *  OpenRouter's free pool has an incident, the whole free chain fails
+ *  for the same reason; this terminal attempt restores provider
+ *  diversity so the user sees a real answer instead of a 503. Real $;
+ *  applied only to the use cases in INTERACTIVE_USE_CASES below. */
+const PAID_TERMINAL_MODEL = "cerebras/llama3.1-8b" as const;
+
+/** Use cases that should never bottom out at the free pool — when every
+ *  free model fails, eat the paid call rather than 503 the user. Per
+ *  gap #525 Part B's list. Excluded: low-interactivity / high-volume
+ *  pipelines (autofill, email_*, vendor_extract, job_parser, etc.)
+ *  where a deterministic 503 + retry on next tick is fine and a paid
+ *  call per item would explode cost. */
+const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase>([
+  "career_360",
+  "chat",
+  "match",
+  "match_insights",
+  "profile_audit",
+  "resume_optimize",
+  "resume_roast",
+  "studio_script",
+]);
+
+/** Auto-pad a use-case profile so a single-model 429 can never 503 the
+ *  whole feature. Layered chain: caller-supplied fallbacks (paid +
+ *  caller's free choice) → shared free-tier pool → paid terminal for
+ *  interactive use cases. The primary's `temperature` and `maxTokens`
+ *  apply to every appended entry so generation parameters stay coherent
+ *  across the chain. We de-dupe by model id so a model that already
+ *  appears upstream isn't dispatched to twice (so e.g. `match`'s
+ *  Cerebras primary doesn't get re-added as the terminal). */
+function withFallbackChain(useCase: LLMUseCase, profile: UseCaseProfile): UseCaseProfile {
   const explicit = profile.fallbacks ?? [];
   const seen = new Set<string>([profile.model, ...explicit.map((f) => f.model)]);
-  const padded: InferenceProfile[] = FREE_TIER_FALLBACK_POOL
+  const cloneForChain = (model: string): InferenceProfile => ({
+    model,
+    temperature: profile.temperature,
+    ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
+  });
+  const freePool = FREE_TIER_FALLBACK_POOL
     .filter((m) => !seen.has(m))
-    .map((model) => ({
-      model,
-      temperature: profile.temperature,
-      ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
-    }));
-  return { ...profile, fallbacks: [...explicit, ...padded] };
+    .map(cloneForChain);
+  freePool.forEach((p) => seen.add(p.model));
+  const paidTerminal =
+    INTERACTIVE_USE_CASES.has(useCase) && !seen.has(PAID_TERMINAL_MODEL)
+      ? [cloneForChain(PAID_TERMINAL_MODEL)]
+      : [];
+  return { ...profile, fallbacks: [...explicit, ...freePool, ...paidTerminal] };
 }
 
 const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
@@ -194,7 +236,7 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
 
 export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = Object.fromEntries(
   (Object.entries(RAW_USE_CASE_PROFILES) as [LLMUseCase, UseCaseProfile][]).map(
-    ([useCase, profile]) => [useCase, withFreeTierFallbacks(profile)],
+    ([useCase, profile]) => [useCase, withFallbackChain(useCase, profile)],
   ),
 ) as Record<LLMUseCase, UseCaseProfile>;
 

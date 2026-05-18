@@ -26,6 +26,8 @@ import { formatDate } from "@/lib/utils";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { buildTrackAction } from "@/lib/card-track-action";
 import { buildShareAction } from "@/lib/card-share-action";
+import { resumeService } from "@/lib/services/resume-service";
+import { toast } from "@/components/ui/use-toast";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { ResumePrivacy, ResumeWithOwnership } from "@/types/resume";
@@ -79,6 +81,10 @@ interface ResumeCardProps {
   onChangePrivacy?: (privacy: ResumePrivacy) => void;
   onPromoteToMaster?: () => void;
   onCopyToMaster?: () => void;
+  /** Owner-only override for Clone. Defaults to calling
+   *  `resumeService.cloneResume(id)` and navigating to the clone's edit
+   *  page; most callers don't need to pass this. */
+  onClone?: () => void;
   onDelete?: () => void;
   onTrack?: () => void;
   onContactOwner?: () => void;
@@ -129,6 +135,7 @@ export default function ResumeCard({
   onChangePrivacy,
   onPromoteToMaster,
   onCopyToMaster,
+  onClone,
   onDelete,
   onTrack,
   onContactOwner,
@@ -145,6 +152,23 @@ export default function ResumeCard({
   // `canViewStats` gate from `useResumePermissions` (#671).
   const { canManageJobs } = usePermissions();
   const canViewStats = isOwner || canManageJobs;
+
+  // Default clone handler — POST /api/resumes/:id/clone via resumeService,
+  // then navigate to the clone's edit page. Backend appends " (copy)" to
+  // the title and lands the clone as `status: draft`.
+  const handleCloneResume = async () => {
+    try {
+      const cloned = await resumeService.cloneResume(id);
+      toast({ title: "Resume cloned", description: `"${cloned.title}" is ready to edit.` });
+      window.location.href = `/resumes/${cloned.id}`;
+    } catch (err) {
+      toast({
+        title: "Couldn't clone resume",
+        description: (err as Error).message || "Try again in a moment.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Prepare badges for header. Tracked state lives in the bottom action row,
   // not the header, so every content type exposes tracking the same way.
@@ -427,6 +451,7 @@ export default function ResumeCard({
             onChangePrivacy={onChangePrivacy}
             onPromoteToMaster={onPromoteToMaster}
             onCopyToMaster={onCopyToMaster}
+            onClone={isOwner ? (onClone ?? handleCloneResume) : undefined}
             onDelete={onDelete}
             isTracked={ownership === "tracked"}
             onTrack={onTrack}

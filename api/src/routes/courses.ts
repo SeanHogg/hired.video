@@ -464,6 +464,74 @@ courseRoutes.delete("/:id", async (c) => {
   return c.json(success({ deleted: deleted.id }), 200);
 });
 
+/** POST /api/courses/:id/clone — deep-clone an owned course including its
+ *  modules + lessons. Title gets " (Copy)" appended; slug is regenerated;
+ *  status resets to draft so the clone never accidentally goes public.
+ *  Mirrors the resume + job + studio-project clone pattern. */
+courseRoutes.post("/:id/clone", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [original] = await db
+    .select()
+    .from(courses)
+    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
+    .limit(1);
+  if (!original) return c.json(error("NOT_FOUND", "Course not found"), 404);
+
+  // Slug is `unique(userId, slug)` so we only have to dodge collisions
+  // within the caller's own course catalog.
+  const baseSlug = slugify(`${original.title}-copy`);
+  let candidateSlug = baseSlug;
+  for (let i = 2; i <= 50; i++) {
+    const [conflict] = await db.select({ id: courses.id }).from(courses)
+      .where(and(eq(courses.userId, userId), eq(courses.slug, candidateSlug))).limit(1);
+    if (!conflict) break;
+    candidateSlug = `${baseSlug}-${i}`;
+  }
+
+  const {
+    id: _omitId, createdAt: _omitCreated, updatedAt: _omitUpdated,
+    publishedAt: _omitPublished, enrollmentCount: _omitEnroll,
+    completionCount: _omitComplete, averageRating: _omitRating,
+    ratingCount: _omitRatingCount,
+    ...rest
+  } = original as Record<string, unknown>;
+  const [clone] = await db.insert(courses).values({
+    ...rest,
+    userId,
+    title: `${original.title} (Copy)`,
+    slug: candidateSlug,
+    status: "draft",
+  } as any).returning();
+
+  // Deep-clone modules + lessons so the cloned course is editable end-to-end.
+  // Module ids change, so we keep a sourceId → cloneId map to remap lesson FKs.
+  const originalModules = await db.select().from(courseModules)
+    .where(eq(courseModules.courseId, original.id))
+    .orderBy(courseModules.sortOrder);
+  const moduleIdMap = new Map<string, string>();
+  for (const m of originalModules) {
+    const { id: _mid, createdAt: _mcreated, updatedAt: _mupdated, courseId: _mcid, ...mRest } = m as Record<string, unknown>;
+    const [clonedModule] = await db.insert(courseModules).values({
+      ...mRest, courseId: clone!.id,
+    } as any).returning({ id: courseModules.id });
+    moduleIdMap.set(m.id, clonedModule!.id);
+  }
+  const originalLessons = await db.select().from(courseLessons)
+    .where(eq(courseLessons.courseId, original.id))
+    .orderBy(courseLessons.sortOrder);
+  for (const l of originalLessons) {
+    const { id: _lid, createdAt: _lcreated, updatedAt: _lupdated, courseId: _lcid, moduleId, ...lRest } = l as Record<string, unknown>;
+    const remappedModuleId = moduleIdMap.get(moduleId as string) ?? null;
+    await db.insert(courseLessons).values({
+      ...lRest, courseId: clone!.id, moduleId: remappedModuleId,
+    } as any);
+  }
+
+  return c.json(success({ id: clone!.id, slug: candidateSlug }), 201);
+});
+
 // ---------------------------------------------------------------------------
 // Owner — modules
 // ---------------------------------------------------------------------------

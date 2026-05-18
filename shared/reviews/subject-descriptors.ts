@@ -25,7 +25,12 @@ export type SubjectType =
   | "company"
   | "promo_project"
   | "service"
-  | "voice_clone";
+  | "voice_clone"
+  | "article"
+  | "resume_template"
+  | "video_template"
+  | "course"
+  | "certification";
 
 export type Eligibility = "any" | "buyer_only" | "owner_blocked";
 
@@ -228,11 +233,138 @@ export const VOICE_CLONE_DESCRIPTOR: SubjectDescriptor = {
   subjectPath: (id) => `/marketplace/voices/${id}`,
 };
 
+export const ARTICLE_DESCRIPTOR: SubjectDescriptor = {
+  type: "article",
+  noun: "article",
+  formTitle: (name) => `Review "${name}"`,
+  emptyState: () => "No reviews yet. Be the first to share what you thought.",
+  writeCta: "Write a review",
+  sectionTitle: "Reader reviews",
+  subRatings: [
+    { key: "clarity", label: "Clarity" },
+    { key: "depth", label: "Depth" },
+    { key: "usefulness", label: "Usefulness" },
+  ],
+  metadataFields: [],
+  bodySections: [
+    { key: "body", label: "Your review", placeholder: "What did you learn? What did you wish was different?" },
+  ],
+  // Any authenticated reader can review — engagement-based content needs
+  // broad rating coverage to feed the Partner Program adoption signal (#180).
+  eligibility: "owner_blocked",
+  verification: "none",
+  requiresProToWrite: false,
+  subjectPath: (id) => `/articles/${id}`,
+};
+
+export const RESUME_TEMPLATE_DESCRIPTOR: SubjectDescriptor = {
+  type: "resume_template",
+  noun: "resume template",
+  formTitle: (name) => `Review the "${name}" template`,
+  emptyState: (name) => `No reviews yet for "${name}".`,
+  writeCta: "Write a review",
+  sectionTitle: "Reviews",
+  subRatings: [
+    { key: "design", label: "Design" },
+    { key: "atsFriendliness", label: "ATS friendliness" },
+    { key: "value", label: "Value" },
+  ],
+  metadataFields: [
+    { key: "industry", label: "Industry you used it for", type: "text", maxLength: 80, placeholder: "e.g. Finance, Healthcare" },
+  ],
+  bodySections: [
+    { key: "body", label: "Your review", placeholder: "How did this template work for your application?" },
+  ],
+  eligibility: "buyer_only",
+  verification: "was_buyer",
+  requiresProToWrite: false,
+  subjectPath: (id) => `/marketplace/templates/resume/${id}`,
+};
+
+export const VIDEO_TEMPLATE_DESCRIPTOR: SubjectDescriptor = {
+  type: "video_template",
+  noun: "video template",
+  formTitle: (name) => `Review the "${name}" video template`,
+  emptyState: (name) => `No reviews yet for "${name}".`,
+  writeCta: "Write a review",
+  sectionTitle: "Reviews",
+  subRatings: [
+    { key: "creativity", label: "Creativity" },
+    { key: "easeOfUse", label: "Ease of use" },
+    { key: "value", label: "Value" },
+  ],
+  metadataFields: [
+    { key: "useCase", label: "What did you use it for?", type: "text", maxLength: 120, placeholder: "e.g. Personal brand reel, recruiter outreach" },
+  ],
+  bodySections: [
+    { key: "body", label: "Your review", placeholder: "How well did the template adapt to your project?" },
+  ],
+  eligibility: "buyer_only",
+  verification: "was_buyer",
+  requiresProToWrite: false,
+  subjectPath: (id) => `/marketplace/templates/video/${id}`,
+};
+
+export const COURSE_DESCRIPTOR: SubjectDescriptor = {
+  type: "course",
+  noun: "course",
+  formTitle: (name) => `Review "${name}"`,
+  emptyState: (name) => `No reviews yet for "${name}".`,
+  writeCta: "Write a review",
+  sectionTitle: "Student reviews",
+  subRatings: [
+    { key: "content", label: "Content quality" },
+    { key: "instructor", label: "Instructor" },
+    { key: "value", label: "Value" },
+  ],
+  metadataFields: [
+    { key: "completionStatus", label: "How far did you get?", type: "select", options: [
+      { value: "previewed", label: "Previewed only" },
+      { value: "in_progress", label: "In progress" },
+      { value: "completed", label: "Completed" },
+    ] },
+  ],
+  bodySections: [
+    { key: "body", label: "Your review", placeholder: "What worked, what would you change?" },
+  ],
+  eligibility: "buyer_only",
+  verification: "was_buyer",
+  requiresProToWrite: false,
+  subjectPath: (id) => `/marketplace/courses/${id}`,
+};
+
+export const CERTIFICATION_DESCRIPTOR: SubjectDescriptor = {
+  type: "certification",
+  noun: "certification",
+  formTitle: (name) => `Review the "${name}" certification`,
+  emptyState: (name) => `No reviews yet for "${name}".`,
+  writeCta: "Write a review",
+  sectionTitle: "Holder reviews",
+  subRatings: [
+    { key: "rigor", label: "Rigor" },
+    { key: "relevance", label: "Relevance to my work" },
+    { key: "recognition", label: "Industry recognition" },
+  ],
+  metadataFields: [],
+  bodySections: [
+    { key: "body", label: "Your review", placeholder: "Has this certification helped you professionally?" },
+  ],
+  eligibility: "buyer_only",
+  verification: "was_buyer",
+  requiresProToWrite: false,
+  subjectPath: (id) => `/verify/${id}`,
+};
+
 const REGISTRY: Record<SubjectType, SubjectDescriptor> = {
   company: COMPANY_DESCRIPTOR,
   promo_project: PROMO_PROJECT_DESCRIPTOR,
   service: SERVICE_DESCRIPTOR,
   voice_clone: VOICE_CLONE_DESCRIPTOR,
+  article: ARTICLE_DESCRIPTOR,
+  resume_template: RESUME_TEMPLATE_DESCRIPTOR,
+  video_template: VIDEO_TEMPLATE_DESCRIPTOR,
+  course: COURSE_DESCRIPTOR,
+  certification: CERTIFICATION_DESCRIPTOR,
 };
 
 export const ALL_SUBJECT_TYPES: SubjectType[] = Object.keys(REGISTRY) as SubjectType[];

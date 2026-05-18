@@ -33,6 +33,9 @@ interface ResumeScoreBadgesProps {
    *  the tool-history sheet at the right tool. Omit on read-only contexts
    *  (e.g. public profile) and the chips render as plain badges. */
   onChipClick?: (toolId: string) => void;
+  /** Show only the Overall chip. Used by tight rows like the resume
+   *  picker where the full sub-score cluster overflows the row. */
+  compact?: boolean;
 }
 
 /**
@@ -63,6 +66,7 @@ export default function ResumeScoreBadges({
   size = "sm",
   className,
   onChipClick,
+  compact = false,
 }: ResumeScoreBadgesProps) {
   const scores = resume.scores;
   const hasAny =
@@ -78,6 +82,20 @@ export default function ResumeScoreBadges({
 
   const onScore = onChipClick ? () => onChipClick(SCORE_TOOL_ID) : undefined;
   const onSentiment = onChipClick ? () => onChipClick(SENTIMENT_TOOL_ID) : undefined;
+
+  if (compact) {
+    return (
+      <span className={cn("inline-flex items-center gap-1", className)}>
+        <ScoreChip
+          label="Overall"
+          fullLabel="Overall score"
+          score={scores?.overall}
+          size={size}
+          onClick={onScore}
+        />
+      </span>
+    );
+  }
 
   return (
     <span className={cn("inline-flex items-center gap-1 flex-wrap", className)}>

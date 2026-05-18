@@ -55,6 +55,10 @@ interface JobCardProps {
   onViewToolHistory?: () => void;
   /** Owner-only — opens the delete confirmation dialog. */
   onDelete?: () => void;
+  /** Owner-only override for Clone. Defaults to calling
+   *  `jobService.cloneJob(job.id)` and navigating to the clone's edit page,
+   *  so most callers don't need to pass this. */
+  onClone?: () => void;
   /** Optional override for the Share entry — defaults to clipboard copy. */
   onShare?: () => void;
   /** Optional override for the Copy Link entry — defaults to clipboard copy. */
@@ -80,6 +84,7 @@ export default function JobCard({
   onViewAnalytics,
   onViewToolHistory,
   onDelete,
+  onClone,
   onShare,
   onCopyLink,
   onShowQR,
@@ -207,6 +212,19 @@ export default function JobCard({
     }
   };
 
+  // Default clone handler — POST /api/jobs/:id/clone via jobService, then
+  // navigate to the clone's edit page so the owner can review + publish. The
+  // backend appends " (Copy)" to the title and lands the clone as inactive.
+  const handleCloneJob = async () => {
+    try {
+      const cloned = await jobService.cloneJob(job.id);
+      toast.success(t("messages.jobCloned", { defaultValue: "Job cloned" }));
+      window.location.href = `/jobs/edit/${cloned.id}`;
+    } catch (err) {
+      toast.error((err as Error).message || t("errors.cloneJobFailed", { defaultValue: "Couldn't clone job" }));
+    }
+  };
+
   const renderActionsFooter = () => (
     <div className="p-4 bg-background border-t border-border flex items-center justify-between gap-2">
       <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleView(); }} className="gap-2">
@@ -251,6 +269,7 @@ export default function JobCard({
                 }
               : undefined
           }
+          onClone={isOwned ? (onClone ?? handleCloneJob) : undefined}
           onDelete={isOwned ? onDelete : undefined}
           extraMenuItems={extraMenuItems}
         />

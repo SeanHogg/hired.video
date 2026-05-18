@@ -39,7 +39,7 @@ export default function ResumeSelectItem({ resume }: ResumeSelectItemProps) {
       <div className="flex w-full items-center gap-2">
         <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="truncate">{label}</span>
-        <ResumeScoreBadges resume={resume} className="ml-auto" />
+        <ResumeScoreBadges resume={resume} compact className="ml-auto" />
       </div>
     </SelectItem>
   );

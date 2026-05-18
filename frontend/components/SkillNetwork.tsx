@@ -243,6 +243,7 @@ export default function SkillNetwork({
               items={items}
               itemIndex={itemIndex}
               evidence={evidence}
+              isOwner={isOwner}
             />
           </TabsContent>
 
@@ -499,6 +500,7 @@ function NetworkTab({
   items,
   evidence,
   height = 560,
+  isOwner = false,
 }: {
   skills: Skill[];
   items: ResolvedItem[];
@@ -507,6 +509,10 @@ function NetworkTab({
   /** Canvas height in pixels. Overridable so the SkillSubgraphDialog
    *  can render a taller version inside a modal. */
   height?: number;
+  /** Gates the orphan-skills hint, whose copy ("Click Rebuild Evidence
+   *  …, or open the resume editor …") only makes sense for the resume
+   *  owner. Non-owners just see the graph without the editorial nudge. */
+  isOwner?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const graphRef = useRef<any>(null);
@@ -670,7 +676,7 @@ function NetworkTab({
           onReset={handleReset}
         />
       </div>
-      {orphanSkills.length > 0 && (
+      {isOwner && orphanSkills.length > 0 && (
         <div className="text-xs text-muted-foreground">
           {orphanSkills.length} skill{orphanSkills.length === 1 ? "" : "s"}{" "}
           without linked evidence (direct or inherited). Click{" "}

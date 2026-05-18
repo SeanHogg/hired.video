@@ -13,7 +13,7 @@
  * handles for one transactional unit.
  */
 
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { studioTemplates, templateLicenses } = schema;
@@ -74,6 +74,18 @@ export interface CreatorTemplateEarningsRow {
   paidLicenseCount: number;
 }
 
+/** Studio template the caller has acquired via a `free` claim or paid
+ *  `purchase` license. Owner-licenses (the auto-granted row from publish)
+ *  are excluded — those duplicate `findForCreator` and the consumer wants
+ *  to render "Created by me" and "Purchased / claimed" as distinct lists.
+ *
+ *  Both rows are returned so the UI can render the template card AND show
+ *  the source (Free / Paid) + grant date without a second round-trip. */
+export interface LicensedStudioTemplateRow {
+  template: StudioTemplateRow;
+  license: TemplateLicenseRow;
+}
+
 // ─── Repository interface ───────────────────────────────────────────────────
 
 export interface IStudioTemplatesRepository {
@@ -82,6 +94,9 @@ export interface IStudioTemplatesRepository {
   findBySlug(slug: string): Promise<StudioTemplateRow | null>;
   findForCreator(creatorId: string): Promise<StudioTemplateRow[]>;
   listPublic(opts?: { search?: string; limit?: number }): Promise<StudioTemplateRow[]>;
+  /** Templates the user has acquired via `free` claim or paid `purchase`.
+   *  Excludes `owner` licenses (those mirror `findForCreator`). */
+  findLicensedStudioTemplatesForUser(userId: string): Promise<LicensedStudioTemplateRow[]>;
   /** Per-template revenue rollup for the creator. Left-joins against
    *  `template_licenses` filtered to `source='purchase'` so templates with
    *  zero paid sales still appear (with `earningsCents=0`). */
@@ -263,6 +278,32 @@ export class StudioTemplatesRepository implements IStudioTemplatesRepository {
       .from(templateLicenses)
       .where(eq(templateLicenses.userId, userId))
       .orderBy(desc(templateLicenses.grantedAt))) as TemplateLicenseRow[];
+  }
+
+  async findLicensedStudioTemplatesForUser(userId: string): Promise<LicensedStudioTemplateRow[]> {
+    // INNER JOIN — only return rows where the studio template still exists.
+    // `template_licenses.template_id` is TEXT (it carries descriptor ids for
+    // resume/job kinds too); cast on the join so Postgres has a defined
+    // `text = text` operator — same trick `earningsForCreator` uses.
+    const rows = (await this.db
+      .select({ template: studioTemplates, license: templateLicenses })
+      .from(templateLicenses)
+      .innerJoin(
+        studioTemplates,
+        sql`${templateLicenses.templateId} = ${studioTemplates.id}::text`,
+      )
+      .where(
+        and(
+          eq(templateLicenses.userId, userId),
+          eq(templateLicenses.templateKind, "studio"),
+          inArray(templateLicenses.source, ["free", "purchase"]),
+        ),
+      )
+      .orderBy(desc(templateLicenses.grantedAt))) as Array<{
+      template: StudioTemplateRow;
+      license: TemplateLicenseRow;
+    }>;
+    return rows;
   }
 
   async insertLicense(input: TemplateLicenseInsert): Promise<TemplateLicenseRow | null> {

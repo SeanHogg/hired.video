@@ -290,6 +290,20 @@ export class JobService {
   }
 
   /**
+   * Clone job — `POST /api/jobs/:id/clone`. Backend appends " (Copy)" to the
+   * title and lands the clone as `isActive: false`. Returns the cloned row
+   * (full Job shape) so callers can navigate to its edit page.
+   */
+  async cloneJob(id: string): Promise<Job> {
+    const response = await apiClient.post<Job>(
+      `/api/jobs/${id}/clone`,
+      {},
+      JobSchema,
+    );
+    return response.data;
+  }
+
+  /**
    * Save/bookmark job
    */
   async saveJob(jobId: string): Promise<void> {

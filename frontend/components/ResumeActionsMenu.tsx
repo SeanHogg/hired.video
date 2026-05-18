@@ -20,6 +20,7 @@ import type { ResumeDownloadFormat } from "@/lib/analytics/resume-tracker";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 import { EntityShareGroup } from "@/components/EntityShareGroup";
 import { EntityTrackItem } from "@/components/EntityTrackItem";
+import { EntityCloneItem } from "@/components/EntityCloneItem";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface ResumeActionsMenuProps {
@@ -60,6 +61,11 @@ interface ResumeActionsMenuProps {
    * primary resume rich" flow the user asked for.
    */
   onCopyToMaster?: () => void;
+  /** Owner-only — `POST /api/resumes/:id/clone`. Backend appends " (copy)"
+   *  to title and lands the clone as `status: draft`. Distinct from
+   *  `onCreateVariation` (which links the new row to this one as a
+   *  parent/variant); Clone produces an independent copy. */
+  onClone?: () => void;
   onDelete?: () => void;
   /** For tracked (non-owned) resumes — shows Track/Untrack instead of owner actions */
   isTracked?: boolean;
@@ -100,6 +106,7 @@ export function ResumeActionsMenu({
   onChangePrivacy,
   onPromoteToMaster,
   onCopyToMaster,
+  onClone,
   onDelete,
   onViewAnalytics,
   triggerClassName,
@@ -112,7 +119,7 @@ export function ResumeActionsMenu({
 }: ResumeActionsMenuProps) {
   const showCopyToMaster = isOwner && !!onCopyToMaster && !!parentId;
   const showRunTool = isOwner && !!resumeId;
-  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
+  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onClone || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
   const hasPublicActions = onView || onShare || onCopyLink || onShowQR || onEmbed || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
@@ -166,6 +173,9 @@ export function ResumeActionsMenu({
             Create Variation
           </DropdownMenuItem>
         )}
+        {/* Clone — owner only. Distinct from "Create Variation" (parent/child
+            link). Self-gates on isOwner + onClone presence. */}
+        <EntityCloneItem isOwner={isOwner} onClone={onClone} label="Clone Resume" />
         {/* Studio deep-link (#270) — owner-only since the wizard requires
             login + the user's own subject content. CreateVideoMenuItem
             owns the URL formatting + label so every entity menu reads

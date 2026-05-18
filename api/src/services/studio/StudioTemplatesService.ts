@@ -25,6 +25,7 @@ import type {
   TemplateLicenseRow,
   TemplateKind,
   CreatorTemplateEarningsRow,
+  LicensedStudioTemplateRow,
 } from "../../repositories/index.js";
 import { buildRepos } from "../../repositories/index.js";
 
@@ -430,6 +431,16 @@ export class StudioTemplatesService {
 
   async listLicensesForUser(userId: string): Promise<TemplateLicenseRow[]> {
     return this.deps.repos.studioTemplates.findLicensesForUser(userId);
+  }
+
+  /** Studio templates the user has acquired via `free` claim or paid
+   *  `purchase` — used by the /studio landing "Your templates" section to
+   *  show "claimed / bought" cards alongside the user's own published
+   *  templates. Owner licenses are excluded (those mirror
+   *  `listForCreator`); the consumer composes the two lists with the
+   *  source-of-record distinction preserved. */
+  async listLicensedStudioTemplatesForUser(userId: string): Promise<LicensedStudioTemplateRow[]> {
+    return this.deps.repos.studioTemplates.findLicensedStudioTemplatesForUser(userId);
   }
 
   async hasLicense(userId: string, kind: TemplateKind, templateId: string): Promise<boolean> {

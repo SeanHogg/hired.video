@@ -698,3 +698,45 @@ jobRoutes.delete("/:id", async (c) => {
   if (!deleted) return c.json(error("NOT_FOUND", "Job not found or not owned by you"), 404);
   return c.json(success(null, "Job deleted"));
 });
+
+/** POST /api/jobs/:id/clone — duplicate a job the caller posted.
+ *  Title gets " (Copy)" appended; the clone lands as inactive so the owner
+ *  reviews + republishes intentionally. Mirrors the resume + studio-project
+ *  clone pattern so every owner-created entity supports the universal Clone
+ *  action. */
+jobRoutes.post("/:id/clone", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [original] = await db
+    .select()
+    .from(schema.jobItems)
+    .where(and(eq(schema.jobItems.id, c.req.param("id")), eq((schema.jobItems as any).postedByUserId, userId)))
+    .limit(1);
+  if (!original) return c.json(error("NOT_FOUND", "Job not found or not owned by you"), 404);
+  // Drizzle keys we never copy: id (regenerated), createdAt/updatedAt (defaultNow),
+  // sponsored billing fields (paid feature scoped to the original), and the
+  // body-cleanse cursor (the clone re-enters the worker as a fresh row).
+  const {
+    id: _omitId,
+    createdAt: _omitCreated,
+    updatedAt: _omitUpdated,
+    sponsored: _omitSponsored,
+    sponsoredUntil: _omitSponsoredUntil,
+    sponsoredRankBoost: _omitSponsoredRank,
+    bodyCleansedAt: _omitCleansedAt,
+    bodyCleanseStatus: _omitCleanseStatus,
+    ...rest
+  } = original as Record<string, unknown>;
+  const [clone] = await db
+    .insert(schema.jobItems)
+    .values({
+      ...rest,
+      postedByUserId: userId,
+      title: `${original.title} (Copy)`,
+      isActive: false,
+    } as any)
+    .returning();
+  const job = await jobService.getJobById(clone!.id);
+  return c.json(success(job), 201);
+});

@@ -31,7 +31,6 @@
 import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Copy,
   Library,
   Loader2,
   MoreHorizontal,
@@ -53,6 +52,7 @@ import {
   type StudioProject,
 } from "@/lib/services/studio-service";
 import DeleteProjectConfirm from "@/components/studio/shared/DeleteProjectConfirm";
+import { EntityCloneItem } from "@/components/EntityCloneItem";
 
 const PublishAsTemplateDialog = lazy(
   () => import("@/components/studio/PublishAsTemplateDialog"),
@@ -142,10 +142,7 @@ export default function ProjectChromeMenu({
           <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Project
           </DropdownMenuLabel>
-          <DropdownMenuItem onClick={handleClone} disabled={busy}>
-            <Copy className="mr-2 h-3.5 w-3.5" />
-            Clone project
-          </DropdownMenuItem>
+          <EntityCloneItem isOwner onClone={busy ? undefined : handleClone} label="Clone project" />
           <DropdownMenuItem
             onClick={() => setConfirmDelete(true)}
             disabled={busy}

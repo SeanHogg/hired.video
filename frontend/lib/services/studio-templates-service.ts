@@ -64,6 +64,17 @@ export const TemplateLicenseSchema = z.object({
 
 export type TemplateLicense = z.infer<typeof TemplateLicenseSchema>;
 
+/** Studio template + the license row that granted it to the caller.
+ *  Returned by `GET /templates/me/licensed`; used by the /studio "Your
+ *  templates" surface to render cards alongside the user's own published
+ *  templates without forcing a second round-trip per row. */
+export const LicensedStudioTemplateSchema = z.object({
+  template: StudioTemplateSchema,
+  license: TemplateLicenseSchema,
+});
+
+export type LicensedStudioTemplate = z.infer<typeof LicensedStudioTemplateSchema>;
+
 // ─── Creator earnings rollup ────────────────────────────────────────────────
 
 export const CreatorTemplateEarningsRowSchema = z.object({
@@ -187,6 +198,17 @@ export const studioTemplatesService = {
       "/api/studio/templates/licenses/me",
     );
     return z.array(TemplateLicenseSchema).parse(res.data ?? []);
+  },
+
+  /** Studio templates the caller has claimed (free) or purchased (paid),
+   *  joined with the template row so a single round-trip renders cards.
+   *  Owner-licenses are excluded server-side — those duplicate `listMine`
+   *  and the /studio surface renders Created vs Purchased separately. */
+  async listMyLicensedTemplates(): Promise<LicensedStudioTemplate[]> {
+    const res = await apiClient.get<LicensedStudioTemplate[]>(
+      "/api/studio/templates/me/licensed",
+    );
+    return z.array(LicensedStudioTemplateSchema).parse(res.data ?? []);
   },
 
   /** Per-template + aggregate earnings rollup for the creator dashboard.
