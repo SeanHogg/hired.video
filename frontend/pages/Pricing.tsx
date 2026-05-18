@@ -36,10 +36,13 @@ import {
   Palette,
   Lock,
   Download,
+  Mail,
 } from "lucide-react";
 import {
   PRO_MONTHLY_PRICE as PRO_MONTHLY_PRICE_DEFAULT,
   PRO_YEARLY_PRICE as PRO_YEARLY_PRICE_DEFAULT,
+  INBOX_SYNC_INCLUDED_ACCOUNTS,
+  INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
 } from "@shared/pricing";
 import { TIER_COPY } from "@shared/tier-copy";
 import { pricingConfigService } from "@/lib/services/pricing-config-service";
@@ -135,6 +138,12 @@ export default function Pricing() {
     }
   }, [user?.role]);
 
+  // One copy line per persona today — keep the inbox quota + add-on price
+  // in one string so changing either reaches every plan card simultaneously.
+  // "per user" suffix only renders on personas where Pro is billed per-seat.
+  const inboxSyncFeature = (perUserSuffix = ""): string =>
+    `Inbox Sync — Gmail / Outlook (${INBOX_SYNC_INCLUDED_ACCOUNTS} mailboxes${perUserSuffix}, +$${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo each)`;
+
   const personaCopy: Partial<Record<
     UserRole,
     {
@@ -175,6 +184,7 @@ export default function Pricing() {
         "AI interview practice",
         "Priority job matching & salary insights",
         "Video & profile analytics",
+        inboxSyncFeature(),
       ],
       unitLabel: "per month",
       userCountLabel: "",
@@ -205,6 +215,7 @@ export default function Pricing() {
         "Performance dashboards & team leaderboards",
         "Unlimited seats & team collaboration",
         "Exclusive job boards + bidding",
+        inboxSyncFeature(" per seat"),
       ],
       unitLabel: "per seat / month",
       userCountLabel: "Seats",
@@ -232,6 +243,7 @@ export default function Pricing() {
         "Company video promos via AI Studio",
         "Brand kits & company-wide templates",
         "Calendar & smart notifications",
+        inboxSyncFeature(" per user"),
         "Advanced analytics, time-to-hire, API access",
         "GDPR data-residency & SOC 2 (on the roadmap)",
         "Unlimited users",
@@ -1832,6 +1844,21 @@ export default function Pricing() {
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          Inbox Sync (Gmail / Outlook)
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {INBOX_SYNC_INCLUDED_ACCOUNTS} mailboxes included
+                          <div className="text-xs">
+                            +${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo per extra
+                          </div>
                         </td>
                       </tr>
                       <tr>

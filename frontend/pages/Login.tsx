@@ -24,11 +24,15 @@ import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
 import { apiClient } from "@/lib/api-client";
+import { readRedirectParam, safeRedirectTo } from "@/lib/auth-redirect";
 
 export default function Login() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const redirectParam = searchParams.get("redirect") || "/dashboard";
+  // Honors both `?redirectTo=` (gap #762 convention) and the legacy `?redirect=`
+  // that OAuth/magic-link/verify-email already write. Both pass through the
+  // open-redirect sanitizer; `redirectTo` wins when both are set.
+  const redirectParam = readRedirectParam(searchParams, "/dashboard");
   const oauthError = searchParams.get("error");
   const { t } = useTranslation();
 
@@ -291,7 +295,16 @@ export default function Login() {
                   )}
                   <p className="text-sm text-muted-foreground">
                     {t("prompts.noAccount")}{" "}
-                    <Link to="/signup" className="text-primary hover:underline font-medium">{t("actions.signUp")}</Link>
+                    <Link
+                      to={
+                        redirectParam && redirectParam !== "/dashboard"
+                          ? `/signup?redirectTo=${encodeURIComponent(safeRedirectTo(redirectParam, ""))}`
+                          : "/signup"
+                      }
+                      className="text-primary hover:underline font-medium"
+                    >
+                      {t("actions.signUp")}
+                    </Link>
                   </p>
                 </div>
               </CardContent>

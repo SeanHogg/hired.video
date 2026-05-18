@@ -273,6 +273,12 @@ function widgetToElement(widget: Widget): SceneElement | null {
       // No matching SceneElement kind, so don't double-emit here — v1's
       // render path picks the CTA up from the scene-level fields.
       return null;
+    case "linked-content":
+      // v1's SceneElement union has no entity-card equivalent. Drop the
+      // widget from the v1-emit path — the canvas + render-side v2
+      // applier (once it lands; gap-registered) is the source of truth
+      // for how linked content paints.
+      return null;
     case "shape-rect":
     case "shape-circle":
     case "divider":

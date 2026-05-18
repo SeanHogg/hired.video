@@ -1,6 +1,10 @@
 /**
  * Frontend client for /api/integrations/email — connect / list /
- * disconnect mailboxes, manage rules, run manual sync, fetch sync history.
+ * disconnect mailboxes, manage rules, fetch sync history.
+ *
+ * Manual sync runs in the PWA via `runClientSync`
+ * (lib/email-integration/sync-client.ts); the legacy `syncNow` server
+ * endpoint was removed in the #757 cutover.
  */
 
 import { apiClient } from "@/lib/api-client";
@@ -57,19 +61,6 @@ export interface EmailSyncRun {
   errorMessage: string | null;
 }
 
-export interface SyncSummary {
-  accountId: string;
-  status: "success" | "partial" | "error";
-  messagesSynced: number;
-  messagesClassified: number;
-  messagesExcluded: number;
-  messagesJobRelated: number;
-  jobsLinked: number;
-  jobsCreated: number;
-  rulesFired: Record<string, number>;
-  errorMessage: string | null;
-}
-
 class EmailIntegrationService {
   /** Build the OAuth start URL for a provider. The browser navigates
    *  here; the API redirects to Google/Microsoft and back to the
@@ -102,17 +93,6 @@ class EmailIntegrationService {
 
   async disconnect(id: string): Promise<void> {
     await apiClient.delete(`/api/integrations/email/accounts/${id}`);
-  }
-
-  async syncNow(
-    accountIds?: string[],
-  ): Promise<{ accounts: number; summaries: SyncSummary[] }> {
-    const body = accountIds && accountIds.length > 0 ? { accountIds } : {};
-    const r = await apiClient.post<{ accounts: number; summaries: SyncSummary[] }>(
-      "/api/integrations/email/sync/now",
-      body,
-    );
-    return r.data ?? { accounts: 0, summaries: [] };
   }
 
   async listRules(): Promise<EmailUserRule[]> {

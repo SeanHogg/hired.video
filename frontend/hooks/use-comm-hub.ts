@@ -48,6 +48,12 @@ export interface EmailInboxFilters {
   accountIds?: string[];
   unreadOnly?: boolean;
   includeArchived?: boolean;
+  /** Junk view — surfaces ONLY messages a user "Mark as Junk" rule
+   *  captured. Bypasses the default job-only filter so users can
+   *  audit / restore false positives. Mutually exclusive with
+   *  includeArchived (the junk view always includes archived rows
+   *  since junked emails are archived on insert). */
+  junkOnly?: boolean;
 }
 
 export interface HubItem {
@@ -135,6 +141,7 @@ function buildInboxQuery(filters?: EmailInboxFilters): string {
   }
   if (filters.unreadOnly) params.set("unread", "1");
   if (filters.includeArchived) params.set("archived", "1");
+  if (filters.junkOnly) params.set("junk", "1");
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }
@@ -163,6 +170,17 @@ export interface UseCommHubReturn {
   dismissExternalEmail: (externalEmailId: string) => Promise<void>;
   /** Bulk variant — single round-trip for the "Delete selected" action. */
   bulkDismissExternalEmails: (ids: string[]) => Promise<void>;
+  /** Mark-as-Junk: archives this message AND creates a user rule so
+   *  future syncs auto-junk every match. `choice` carries the
+   *  sender/domain/sender+subject shape the user picked in the
+   *  JunkConfirmDialog. */
+  junkExternalEmail: (
+    externalEmailId: string,
+    choice: { matchKind: string; matchValue: string | null },
+  ) => Promise<void>;
+  /** Restore an archived/junked email back into the inbox feed. Used
+   *  by the Junk filter's per-row "Restore" action. */
+  restoreExternalEmail: (externalEmailId: string) => Promise<void>;
 }
 
 export interface UseCommHubOptions {
@@ -420,6 +438,44 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
     [refresh, setExternalEmails],
   );
 
+  const junkExternalEmail = useCallback(
+    async (
+      externalEmailId: string,
+      choice: { matchKind: string; matchValue: string | null },
+    ) => {
+      // Optimistic remove — the row goes to the junk view + future
+      // matches stop reaching the inbox.
+      setExternalEmails((es) => es.filter((e) => e.id !== externalEmailId));
+      try {
+        await apiClient.post(
+          `/api/inbox/external-emails/${externalEmailId}/junk`,
+          choice,
+        );
+      } catch {
+        refresh();
+      }
+    },
+    [refresh, setExternalEmails],
+  );
+
+  const restoreExternalEmail = useCallback(
+    async (externalEmailId: string) => {
+      // Best-effort optimistic remove from the current view (the
+      // junk filter); the regular inbox will pick it up on next
+      // refresh.
+      setExternalEmails((es) => es.filter((e) => e.id !== externalEmailId));
+      try {
+        await apiClient.post(
+          `/api/inbox/external-emails/${externalEmailId}/archive`,
+          { archived: false },
+        );
+      } catch {
+        refresh();
+      }
+    },
+    [refresh, setExternalEmails],
+  );
+
   const dismissNotification = useCallback(
     async (notificationId: string) => {
       setPersistedNotifs((ns) => ns.filter((n) => n.id !== notificationId));
@@ -474,6 +530,8 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
     markExternalEmailUnread,
     dismissExternalEmail,
     bulkDismissExternalEmails,
+    junkExternalEmail,
+    restoreExternalEmail,
   };
 }
 

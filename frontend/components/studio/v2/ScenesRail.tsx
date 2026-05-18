@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, GripVertical } from "lucide-react";
+import { Plus, GripVertical, StickyNote } from "lucide-react";
 import type { Scene } from "@/lib/studio/editor-v2/canvas-state";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -167,8 +167,9 @@ function SceneThumb({
           <div className="aspect-video w-full overflow-hidden rounded border border-border">
             <SceneThumbnail scene={scene} />
           </div>
-          <p className="mt-1 truncate text-[11px] font-medium">
+          <p className="mt-1 flex items-center gap-1 truncate text-[11px] font-medium">
             {index + 1}. {scene.label}
+            <SceneNotesBadge notes={scene.directorNotes} />
           </p>
           <p className="text-[10px] text-muted-foreground">
             {scene.durationSeconds.toFixed(1)}s · {scene.widgets.length} widget
@@ -186,6 +187,25 @@ function SceneThumb({
         />
       </div>
     </li>
+  );
+}
+
+/** Indicator chip surfaced on each scene thumbnail when the director
+ *  has attached notes — same shared component pattern the rest of the
+ *  rail uses. Self-gates per DRY: returns null when notes are empty
+ *  so consumers don't gate visibility themselves. Hover surfaces the
+ *  notes preview via the native title tooltip — light-weight, no
+ *  separate hover-card dependency. */
+function SceneNotesBadge({ notes }: { notes: string | null | undefined }) {
+  if (!notes) return null;
+  return (
+    <span
+      title={notes}
+      aria-label="Scene has director's notes"
+      className="inline-flex"
+    >
+      <StickyNote className="h-3 w-3 shrink-0 text-amber-500" />
+    </span>
   );
 }
 

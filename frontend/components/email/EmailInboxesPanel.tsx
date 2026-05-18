@@ -29,6 +29,7 @@ import {
   type ConnectedEmailAccount,
   type EmailSyncRun,
 } from "@/lib/services/email-integration-service";
+import { runClientSync } from "@/lib/email-integration/sync-client";
 
 function formatRelative(iso: string | null): string {
   if (!iso) return "never";
@@ -99,25 +100,30 @@ export function EmailInboxesPanel() {
     setSelected(checked ? new Set(accounts.map((a) => a.id)) : new Set());
   };
 
+  // Drives the PWA-side orchestrator (`runClientSync` in
+  // `lib/email-integration/sync-client.ts`) instead of a server-side
+  // `POST /sync/now`. The Worker subrequest budget resets per chunk
+  // (gap #755 / #757), and `ConnectedEmailAccount` already satisfies
+  // the structural shape `runClientSync` expects.
   const handleSyncNow = async () => {
     if (selected.size === 0) return;
     setSyncing(true);
     try {
-      const result = await emailIntegrationService.syncNow([...selected]);
-      const total = result.summaries.reduce((acc, s) => acc + s.messagesSynced, 0);
-      const errored = result.summaries.filter((s) => s.status === "error");
+      const summaries = await runClientSync(accounts, { accountIds: [...selected] });
+      const total = summaries.reduce((acc, s) => acc + s.messagesIngested, 0);
+      const errored = summaries.filter((s) => s.status === "error");
       if (errored.length > 0) {
         toast({
           title: "Sync partial",
           description:
-            `${total} message${total === 1 ? "" : "s"} across ${result.accounts - errored.length}/${result.accounts} mailbox${result.accounts === 1 ? "" : "es"}. ` +
+            `${total} message${total === 1 ? "" : "s"} across ${summaries.length - errored.length}/${summaries.length} mailbox${summaries.length === 1 ? "" : "es"}. ` +
             `${errored.length} failed — see Recent Sync Activity for details.`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Sync complete",
-          description: `${total} message${total === 1 ? "" : "s"} synced across ${result.accounts} mailbox${result.accounts === 1 ? "" : "es"}.`,
+          description: `${total} message${total === 1 ? "" : "s"} synced across ${summaries.length} mailbox${summaries.length === 1 ? "" : "es"}.`,
         });
       }
       await refresh();

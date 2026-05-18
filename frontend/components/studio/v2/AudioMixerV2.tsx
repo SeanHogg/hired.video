@@ -38,6 +38,7 @@ import { Slider } from "@/components/ui/slider";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import {
   DEFAULT_AUDIO_MIX,
+  DEFAULT_DUCK_AMOUNT,
   type CanvasAudioMix,
   type CanvasState,
   type VoiceoverClip,
@@ -109,6 +110,26 @@ export default function AudioMixerV2({
             />
           )}
 
+          {/* Ducking — only meaningful when both music + voiceover are
+              present. Self-gate per DRY: returns null otherwise so the
+              user doesn't see a control that can't actually do
+              anything. The slider value is the ducked multiplier; the
+              shared `audio-ducking.ts` helper composes it with the
+              music lane gain so preview + export match (1:1 split:
+              preview pipes through `canvasStateToAudioClips`, export
+              through `canvasStateToTimeline` — both call the same
+              `computeDuckingSegments`). */}
+          {hasMusic && hasVoiceover && (
+            <DuckingRow
+              enabled={Boolean(mix.duckMusicUnderVoiceover)}
+              amount={mix.duckAmount ?? DEFAULT_DUCK_AMOUNT}
+              onToggle={(duckMusicUnderVoiceover) =>
+                onPatchMix({ duckMusicUnderVoiceover })
+              }
+              onAmount={(duckAmount) => onPatchMix({ duckAmount })}
+            />
+          )}
+
           {/* Voiceover lane — master plus a row per clip */}
           {hasVoiceover && (
             <>
@@ -143,6 +164,51 @@ export default function AudioMixerV2({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DuckingRow({
+  enabled,
+  amount,
+  onToggle,
+  onAmount,
+}: {
+  enabled: boolean;
+  amount: number;
+  onToggle: (next: boolean) => void;
+  onAmount: (next: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="flex items-center gap-1.5 text-xs">
+          <Music className="h-3 w-3" />
+          Duck music under voiceover
+        </Label>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onToggle(e.target.checked)}
+          aria-label="Auto-duck music under voiceover"
+        />
+      </div>
+      {enabled && (
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+            {Math.round(amount * 100)}%
+          </span>
+          <Slider
+            min={0}
+            max={1}
+            step={0.05}
+            value={[amount]}
+            onValueChange={([v]) => onAmount(v)}
+            className="flex-1"
+            aria-label="Ducked music volume"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

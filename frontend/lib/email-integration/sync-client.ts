@@ -1,16 +1,19 @@
 /**
- * Client-driven email sync orchestrator — the browser-side counterpart
- * to `api/src/services/email-integration/sync.ts`. Runs entirely in
- * the PWA (no Service Worker yet; tab-focus / button-driven sync).
+ * Client-driven email sync orchestrator — the only path connected
+ * mailboxes use. Runs entirely in the PWA (no Service Worker yet;
+ * tab-focus / button-driven sync — gap #758 will add `periodicSync`).
  *
- * Why client-driven exists (see Gap Register #755):
- *   The server-side sync hits Cloudflare Workers' 50-subrequest
- *   per-invocation budget when sweeping multiple mailboxes. The client
- *   has no such cap — it can fan out N HTTP requests to gmail.googleapis.com
- *   directly, then POST the normalised batch to the server in 25-row
- *   chunks. Each chunk is a fresh Worker invocation with its own
- *   budget, so the LLM Stage-2 + dedup + persist work amortises across
- *   many invocations instead of clipping mid-sweep.
+ * Why client-driven (see Gap Register #755 + #757):
+ *   A server-side sweep hits Cloudflare Workers' 50-subrequest
+ *   per-invocation budget when fanning out across multiple mailboxes.
+ *   The browser has no such cap — it pulls direct from
+ *   gmail.googleapis.com / graph.microsoft.com, then POSTs the
+ *   normalised batch to the server in 25-row chunks. Each chunk is a
+ *   fresh Worker invocation with its own budget, so LLM Stage-2 +
+ *   dedup + persist amortises across many invocations instead of
+ *   clipping mid-sweep. The old server-side cron sweep was deleted
+ *   under #757 because the dual-path setup kept re-creating the same
+ *   budget bug whenever the cron path ran.
  *
  * Flow per connected mailbox:
  *   1. GET /accounts/:id/access-token  → short-lived bearer
@@ -112,9 +115,18 @@ async function ingestChunk(
   return r.data;
 }
 
+/** Minimal account shape `runClientSync` needs. Both `InboxAccount`
+ *  (from `useCommHub`) and `ConnectedEmailAccount` (from the Settings
+ *  page service) already satisfy this — using a structural Pick
+ *  decouples the orchestrator from either consumer's full type. */
+export type SyncableAccount = Pick<
+  InboxAccount,
+  "id" | "provider" | "accountEmail" | "accountLabel" | "status"
+>;
+
 /** Sync a single connected mailbox. */
 async function syncAccount(
-  account: InboxAccount,
+  account: SyncableAccount,
   userRules: UserRule[],
   onProgress?: (p: ClientSyncProgress) => void,
 ): Promise<ClientSyncSummary> {
@@ -219,10 +231,10 @@ export interface ClientSyncOptions {
 }
 
 /** Sync every active connected mailbox (or only the ones listed) via
- *  the client-driven path. The result shape mirrors the existing
- *  `SyncSummary[]` so the InboxToolbar can render the same rollup. */
+ *  the client-driven path. The result shape mirrors the per-run
+ *  summary used by the InboxToolbar so the rollup renders the same. */
 export async function runClientSync(
-  accounts: InboxAccount[],
+  accounts: SyncableAccount[],
   options: ClientSyncOptions = {},
 ): Promise<ClientSyncSummary[]> {
   const targets = accounts.filter(

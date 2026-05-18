@@ -310,6 +310,15 @@ serviceRoutes.post("/", async (c) => {
       imageUrl: body.imageUrl ?? null,
     } as any)
     .returning();
+  // Auto-enable providesServices on the creator's profile so the public
+  // services list (`GET /public/:userId`) surfaces this offering without
+  // forcing them back into Settings to flip the toggle manually. Idempotent
+  // — the WHERE clause skips the UPDATE when the flag is already on, and
+  // a failure here must NOT roll back the successful insert above.
+  db.update(userProfiles)
+    .set({ providesServices: true, updatedAt: new Date() } as any)
+    .where(and(eq(userProfiles.userId, userId), eq(userProfiles.providesServices, false)))
+    .catch((err) => console.warn("[services] auto-flip providesServices failed:", err));
   return c.json(success(row), 201);
 });
 

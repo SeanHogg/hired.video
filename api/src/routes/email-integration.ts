@@ -1,14 +1,21 @@
 /**
  * /api/integrations/email — connect / list / disconnect mailboxes,
- * manage classification rules, trigger manual sync, fetch sync history
- * + digest.
+ * manage classification rules, fetch sync history + digest.
  *
  * OAuth flow:
- *   GET  /:provider/connect   → redirect to provider auth
- *   GET  /:provider/callback  → token exchange, store encrypted refresh
- *   GET  /accounts            → list mailboxes
- *   DELETE /accounts/:id      → disconnect
- *   POST /sync/now            → run sync immediately for all accounts
+ *   GET  /:provider/connect              → redirect to provider auth
+ *   GET  /:provider/callback             → token exchange, store encrypted refresh
+ *   GET  /accounts                       → list mailboxes
+ *   PATCH  /accounts/:id                 → patch label / status / min-score
+ *   DELETE /accounts/:id                 → disconnect
+ *   GET  /accounts/:id/access-token      → vend short-lived bearer for PWA sync
+ *
+ * Sync itself runs in the PWA via `runClientSync`
+ * (frontend/lib/email-integration/sync-client.ts) → each chunk lands
+ * on `POST /api/inbox/external-emails/ingest`. The old server-side
+ * `POST /sync/now` + scheduled.ts cron sweep were removed in the
+ * #757 cutover — keeping two sync paths only re-created the original
+ * Cloudflare Workers subrequest-budget bug whenever the cron path ran.
  *
  * Rules:
  *   GET    /rules
@@ -35,11 +42,10 @@ import {
   encryptToken,
   refreshAccessToken,
 } from "../services/email-integration/oauth.js";
-import {
-  syncAllDueAccounts,
-  syncSelectedAccountsForUser,
-} from "../services/email-integration/sync.js";
-import { createLLMClient } from "../services/adapters/llm-client.js";
+import { requirePro } from "../middleware/auth-gates.js";
+import { getSubscription } from "../services/billing/BillingService.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
+import { INBOX_SYNC_INCLUDED_ACCOUNTS } from "../../../shared/pricing.js";
 
 function getEnv(key: string): string {
   return process.env[key] || (globalThis as any).__ENV?.[key] || "";
@@ -84,6 +90,45 @@ function safeRedirect(raw: string | undefined, fallback: string): string {
   return raw;
 }
 
+/**
+ * Inbox Sync entitlement check — shared by `/connect` and `/callback` so
+ * the Pro gate + 3-inbox cap can't drift between them. Returns either
+ * `{ ok: true }` (user may proceed) or `{ ok: false, redirect }` where
+ * `redirect` is the in-app path the browser should land on (an
+ * upgrade page when blocked).
+ *
+ * Admin / SuperAdmin bypass — same posture as `requirePro`.
+ *
+ * When `skipIfExisting` is supplied (callback path), re-connecting an
+ * already-tracked `(provider, email)` is exempt from the cap so users
+ * can re-consent without being blocked.
+ */
+async function checkInboxSyncEntitlement(
+  userId: string,
+  userRole: string | null | undefined,
+  repos: ReturnType<typeof buildRepos>,
+  skipIfExisting?: { provider: string; accountEmail: string },
+): Promise<{ ok: true } | { ok: false; redirect: string }> {
+  if (userRole === USER_ROLES.SUPER_ADMIN || userRole === USER_ROLES.ADMIN) {
+    return { ok: true };
+  }
+  const sub = await getSubscription(userId);
+  if (!sub.isPro) {
+    return { ok: false, redirect: "/pricing?upgrade=inbox-sync" };
+  }
+  const active = await repos.externalEmailAccounts.findActiveForUser(userId);
+  if (active.length < INBOX_SYNC_INCLUDED_ACCOUNTS) return { ok: true };
+  if (skipIfExisting) {
+    const existing = await repos.externalEmailAccounts.findByProviderEmail(
+      userId,
+      skipIfExisting.provider,
+      skipIfExisting.accountEmail,
+    );
+    if (existing) return { ok: true };
+  }
+  return { ok: false, redirect: "/pricing?upgrade=inbox-extra" };
+}
+
 export const emailIntegrationRoutes = new Hono<AppEnv>();
 
 // ── Connect / callback ───────────────────────────────────────────────────────
@@ -111,6 +156,12 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
       `${base}/verify-email?redirect=${encodeURIComponent("/settings?tab=email")}`,
     );
   }
+  // Pro gate + 3-inbox cap. Browser navigation can't render a 402 JSON
+  // envelope, so on block we bounce to the Pricing page with an upgrade
+  // highlight instead. Helper is shared with the /callback path so the
+  // two gates can't drift.
+  const entitlement = await checkInboxSyncEntitlement(uid, user.role, repos);
+  if (!entitlement.ok) return c.redirect(`${base}${entitlement.redirect}`);
   const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
   const cfg = EMAIL_PROVIDER_CONFIG[provider];
   if (!cfg) return c.json(error("NOT_FOUND", `Unknown provider: ${provider}`), 404);
@@ -162,6 +213,18 @@ emailIntegrationRoutes.get("/:provider/callback", async (c) => {
   }
 
   const repos = buildRepos(getDb());
+  // Belt-and-braces: re-check Pro + cap at callback time so a user who
+  // downgraded between /connect and /callback (or completed an older
+  // link) can't slip past the gate. Re-connecting an existing mailbox
+  // is exempt from the cap.
+  const cbUser = await repos.users.findById(state.userId);
+  const cbEntitlement = await checkInboxSyncEntitlement(
+    state.userId,
+    cbUser?.role ?? null,
+    repos,
+    { provider, accountEmail: mailboxEmail },
+  );
+  if (!cbEntitlement.ok) return c.redirect(`${base}${cbEntitlement.redirect}`);
   const encryptedRefresh = await encryptToken(tokens.refresh_token);
   await repos.externalEmailAccounts.upsert({
     userId: state.userId,
@@ -235,8 +298,9 @@ emailIntegrationRoutes.delete("/accounts/:id", async (c) => {
  *  PWA sync. The browser uses it to call Gmail/Graph APIs directly
  *  (CORS-enabled) instead of routing every message fetch through the
  *  Worker. The refresh token stays server-side encrypted — only the
- *  ~1h access token crosses the wire. See #755 for the architecture. */
-emailIntegrationRoutes.get("/accounts/:id/access-token", async (c) => {
+ *  ~1h access token crosses the wire. See #755 for the architecture.
+ *  Pro-gated — this is the actual sync engine entry point. */
+emailIntegrationRoutes.get("/accounts/:id/access-token", requirePro("Inbox Sync"), async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const repos = buildRepos(getDb());
@@ -328,22 +392,11 @@ emailIntegrationRoutes.delete("/rules/:id", async (c) => {
   return c.json(success({ success: true }));
 });
 
-// ── Manual sync + history ────────────────────────────────────────────────────
-
-emailIntegrationRoutes.post("/sync/now", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  // Optional body: { accountIds?: string[] } — when supplied, syncs only
-  // the named mailboxes. Empty / missing body syncs every active account.
-  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
-  const accountIds = Array.isArray((body as any)?.accountIds)
-    ? ((body as any).accountIds as unknown[]).filter((x): x is string => typeof x === "string")
-    : undefined;
-  const repos = buildRepos(getDb());
-  const llm = createLLMClient(c.env, c.var.user);
-  const summaries = await syncSelectedAccountsForUser({ repos, llm }, uid, accountIds);
-  return c.json(success({ accounts: summaries.length, summaries }));
-});
+// ── Sync history ─────────────────────────────────────────────────────────────
+// (Manual sync moved to the PWA — see `runClientSync` in
+//  frontend/lib/email-integration/sync-client.ts. The chunks land on
+//  `POST /api/inbox/external-emails/ingest`, which writes the same
+//  `email_sync_runs` rows surfaced below.)
 
 emailIntegrationRoutes.get("/sync-runs", async (c) => {
   const uid = c.var.user?.sub;
@@ -391,14 +444,4 @@ emailIntegrationRoutes.get("/sync-runs", async (c) => {
     ),
   );
 });
-
-// ── Cron-driven all-accounts sweep (admin / scheduled.ts callable) ────────────
-
-export async function runEmailSyncSweep(
-  env: { BUILDERFORCE_API_KEY?: string; BUILDERFORCE_GATEWAY_URL?: string } | undefined,
-): Promise<void> {
-  const repos = buildRepos(getDb());
-  const llm = createLLMClient(env, null);
-  await syncAllDueAccounts({ repos, llm });
-}
 

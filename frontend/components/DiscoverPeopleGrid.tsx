@@ -7,7 +7,6 @@
  * a prop-drilled boolean.
  */
 
-import { useMemo } from "react";
 import Pagination from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
 import { Button } from "@/components/ui/button";
@@ -70,14 +69,10 @@ export default function DiscoverPeopleGrid({
     ? createRolePermissions(user.role).canManageJobs
     : false;
 
-  // Drop the viewer's own row before rendering — "Discover People" should
-  // never offer you a "Connect" button to yourself. The public-users API
-  // returns everyone (including self) so this surface filters at the view
-  // layer rather than the fetch layer.
-  const visiblePeople = useMemo(
-    () => (user ? people.filter((p) => p.id !== user.id) : people),
-    [people, user],
-  );
+  // The /api/users/public endpoint excludes the viewer's own row server-side
+  // (so pagination counts match the visible slice). No client-side filter
+  // needed — passing `people` through directly.
+  const visiblePeople = people;
 
   // Batch-fetch connection statuses for everyone in the visible slice so
   // each card renders its real button (Connect / Pending / Message / etc.)

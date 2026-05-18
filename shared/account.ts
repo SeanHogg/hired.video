@@ -100,6 +100,31 @@ export const AccountAnalyticsSchema = z.object({
 });
 export type AccountAnalytics = z.infer<typeof AccountAnalyticsSchema>;
 
+/**
+ * Single source of truth for "which roles is this inviter allowed to assign".
+ * Used by both the frontend dropdown (to hide unavailable options) and the
+ * backend invite handler (to reject hand-crafted POSTs that try to escalate).
+ *
+ * Accepts the raw role string(s) from the inviter — pass either a single
+ * role or the legacy multi-role array. Returns an empty list when the
+ * inviter has no recognized authority to invite, which the caller must
+ * treat as "deny" (NOT fail-open).
+ */
+export function getAvailableRolesForInvite(userRoles: string | string[]): string[] {
+  const roles = Array.isArray(userRoles) ? userRoles : [userRoles];
+  const lower = roles.map((r) => (r ?? "").toLowerCase());
+  if (lower.includes("admin") || lower.includes("super_admin")) {
+    return ["recruiter", "employer"];
+  }
+  if (lower.includes("employer")) {
+    return ["recruiter", "employer"];
+  }
+  if (lower.includes("recruiter")) {
+    return ["recruiter"];
+  }
+  return [];
+}
+
 // Bulk invite response DTO
 export const BulkInviteResponseSchema = z.object({
   totalProcessed: z.number(),

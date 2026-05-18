@@ -52,6 +52,11 @@ export interface FindInboxOptions {
   unreadOnly?: boolean;
   /** When true, include archived/dismissed messages. Defaults false. */
   includeArchived?: boolean;
+  /** When true, show ONLY messages classified as spam by a user "Mark
+   *  as Junk" rule. Overrides the default job-only filter; junk emails
+   *  are archived on insert so they would otherwise be invisible. The
+   *  view exists so users can audit / restore false positives. */
+  junkOnly?: boolean;
 }
 
 export interface IExternalEmailMessagesRepository {
@@ -84,21 +89,32 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     opts: FindInboxOptions = {},
   ): Promise<ExternalEmailInboxRow[]> {
     const limit = opts.limit ?? 50;
-    const conditions = [
-      eq(externalEmailMessages.userId, userId),
-      // Job-only filter — the inbox surface is for job-related mail.
-      // Newsletters / spam / personal / "other" emails stay in the
-      // table (so the classifier can revise later) but never reach the
-      // inbox feed. Unclassified rows (still pending or LLM failure
-      // fallback) are excluded too: there is no useful preview yet.
-      inArray(externalEmailMessages.category, JOB_INBOX_CATEGORIES as unknown as string[]),
-      // Per-account confidence floor. Joining on accounts means each
-      // mailbox sets its own threshold (Inbox settings → "Minimum job
-      // score"); the hard floor below catches a misconfigured 0.
-      sql`${externalEmailMessages.score} >= ${externalEmailAccounts.minJobScore}`,
-      sql`${externalEmailMessages.score} >= ${JOB_INBOX_HARD_FLOOR}::numeric`,
-    ];
-    if (!opts.includeArchived) {
+    const conditions = [eq(externalEmailMessages.userId, userId)];
+    if (opts.junkOnly) {
+      // Junk view — bypass the job-only + score-floor gates so the
+      // user can see what their Mark-as-Junk rules captured (and
+      // restore false positives via the bulk-archive route with
+      // archived:false).
+      conditions.push(eq(externalEmailMessages.category, "spam"));
+    } else {
+      conditions.push(
+        // Job-only filter — the inbox surface is for job-related mail.
+        // Newsletters / spam / personal / "other" emails stay in the
+        // table (so the classifier can revise later) but never reach the
+        // inbox feed. Unclassified rows (still pending or LLM failure
+        // fallback) are excluded too: there is no useful preview yet.
+        inArray(externalEmailMessages.category, JOB_INBOX_CATEGORIES as unknown as string[]),
+        // Per-account confidence floor. Joining on accounts means each
+        // mailbox sets its own threshold (Inbox settings → "Minimum job
+        // score"); the hard floor below catches a misconfigured 0.
+        sql`${externalEmailMessages.score} >= ${externalEmailAccounts.minJobScore}`,
+        sql`${externalEmailMessages.score} >= ${JOB_INBOX_HARD_FLOOR}::numeric`,
+      );
+    }
+    if (!opts.includeArchived && !opts.junkOnly) {
+      // Junk rows are archived on insert; forcing isArchived=false
+      // would hide every junk match. The junk view shows both
+      // archived + non-archived spam rows so users can audit.
       conditions.push(eq(externalEmailMessages.isArchived, false));
     }
     if (opts.unreadOnly) {

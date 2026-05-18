@@ -1,30 +1,34 @@
 /**
- * Client-driven ingest — the per-message companion to the server-side
- * cron sweep.
+ * Client-driven ingest — the only path connected mailboxes use to
+ * reach the server.
  *
- * The PWA orchestrator fetches mail directly from Gmail/Outlook (using
- * short-lived access tokens vended by `GET /accounts/:id/access-token`),
- * runs Stage-1 rules client-side, and POSTs chunks of normalised
- * messages to `POST /inbox/external-emails/ingest`. This service
- * persists each chunk, runs Stage-2 LLM classification ONLY for
- * messages the client couldn't classify, then runs dedup + auto-create
- * exactly like the cron sweep.
+ * The PWA orchestrator
+ * ([`runClientSync`](../../../../../frontend/lib/email-integration/sync-client.ts))
+ * fetches mail directly from Gmail/Outlook (using short-lived access
+ * tokens vended by `GET /accounts/:id/access-token`), runs Stage-1
+ * rules client-side, and POSTs chunks of normalised messages to
+ * `POST /inbox/external-emails/ingest`. This service persists each
+ * chunk, runs Stage-2 LLM classification ONLY for messages the
+ * client couldn't classify, then runs dedup + auto-create.
  *
- * Why split this from `sync.ts`:
- *   • `sync.ts` is one big Worker invocation pulling every mail provider
- *     for every account — runs against Cloudflare's 50-subrequest budget.
- *   • `ingest.ts` is one Worker invocation per CHUNK — budget resets
- *     between client posts, so a 100-message backfill fans across N
- *     invocations instead of clipping mid-sweep.
+ * Why one-Worker-invocation-per-chunk: each POST is its own
+ * Cloudflare Workers invocation with a fresh 50-subrequest budget,
+ * so a 100-message backfill fans across N invocations instead of
+ * clipping mid-sweep (the failure mode that made #755 / #757 retire
+ * the old server-side cron sweep).
  *
- * Idempotent on `(accountId, providerMessageId)` — re-posting the same
- * chunk is a no-op.
+ * Idempotent on `(accountId, providerMessageId)` — re-posting the
+ * same chunk is a no-op, and a transient Neon failure on the final
+ * cursor-advance write is caught + retried via `runWithNeonRetry`
+ * (gap #727) without 400-ing a chunk whose messages were already
+ * persisted.
  */
 
 import type { Repos } from "../../repositories/index.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import type { ExternalEmailAccountRow } from "../../repositories/externalEmailAccountsRepository.js";
-import type { ExternalEmailMessageInsert, ExternalEmailMessageRow } from "../../repositories/externalEmailMessagesRepository.js";
+import type { ExternalEmailMessageInsert } from "../../repositories/externalEmailMessagesRepository.js";
+import { describeDbError, runWithNeonRetry } from "../../db/errors.js";
 import { classifyEmail, summariseEmail } from "./classify.js";
 import {
   autoCreateJobFromEmail,
@@ -191,6 +195,25 @@ export async function ingestForAccount(
           (result.rulesFired[classification.ruleName] ?? 0) + 1;
       }
 
+      // Junk shortcut — user authored a rule that says "this sender is
+      // spam". Skip summary + dedup + auto-create entirely and archive
+      // the row on insert so it never reaches the inbox feed. The
+      // (accountId, providerMessageId) unique key keeps re-sync from
+      // resurrecting it.
+      const isUserJunk =
+        classification.source === "user_rule" &&
+        classification.category === "spam";
+      if (isUserJunk) {
+        await deps.repos.externalEmailMessages.patch(row.id, {
+          category: classification.category,
+          score: String(classification.score) as any,
+          isArchived: true,
+        } as any);
+        result.messagesIngested += 1;
+        result.messagesExcluded += 1;
+        continue;
+      }
+
       const summary = await summariseEmail({ llm: deps.llm }, email, classification);
       const applyUrls = extractApplyUrls(email);
       const applyUrl = applyUrls[0] ?? null;
@@ -246,23 +269,48 @@ export async function ingestForAccount(
     } catch (err) {
       console.error(`[email-ingest] message ${wireMsg.providerMessageId} failed:`, err);
       // Continue — one bad message shouldn't drop the rest of the chunk.
-      result.errorMessage = err instanceof Error ? err.message : String(err);
+      // describeDbError walks the cause chain so we surface the real
+      // SQLSTATE/detail instead of Drizzle's "Failed query: ..." wrapper.
+      result.errorMessage = describeDbError(err);
     }
   }
 
-  // Advance the provider cursor if the client supplied one. Same
-  // shape as the cron sweep: gmail uses lastHistoryId, outlook uses
-  // lastDeltaLink.
+  // Advance the provider cursor if the client supplied one. The PWA
+  // is the source of truth on what was synced — losing this write is
+  // recoverable on the next sync (idempotent on
+  // (accountId, providerMessageId)). So a transient Neon HTTP blip
+  // here MUST NOT 400 the chunk back to the client when the messages
+  // were already persisted.
+  //
+  // Strategy: one retry on transient errors via runWithNeonRetry; any
+  // remaining failure is recorded on errorMessage but does not throw.
+  // (Gap #727: previously the wrapper text "Failed query: update ..."
+  // was the entire response body.)
   const cursorPatch: Partial<ExternalEmailAccountRow> = { lastSyncedAt: new Date() };
   if (request.nextCursor) {
     if (account.provider === "gmail") cursorPatch.lastHistoryId = request.nextCursor;
     else if (account.provider === "outlook") cursorPatch.lastDeltaLink = request.nextCursor;
   }
-  await deps.repos.externalEmailAccounts.patch(
-    account.id,
-    account.userId,
-    cursorPatch as any,
-  );
+  try {
+    await runWithNeonRetry(
+      () =>
+        deps.repos.externalEmailAccounts.patch(
+          account.id,
+          account.userId,
+          cursorPatch as any,
+        ),
+      { label: "email-ingest:cursor-patch" },
+    );
+  } catch (err) {
+    const reason = describeDbError(err);
+    console.error(
+      `[email-ingest] cursor-advance failed for account ${account.id} (messages already persisted):`,
+      err,
+    );
+    result.errorMessage = result.errorMessage
+      ? `${result.errorMessage}; cursor-advance: ${reason}`
+      : `cursor-advance: ${reason}`;
+  }
 
   return result;
 }

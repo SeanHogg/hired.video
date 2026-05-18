@@ -16,6 +16,7 @@ import {
   FREE_TEAM_MEMBER_LIMIT,
   FREE_PUBLISHED_VIDEOS_LIMIT,
   FREE_INTERVIEW_SESSIONS_PER_MONTH,
+  INBOX_SYNC_INCLUDED_ACCOUNTS,
 } from "../../../../shared/pricing.js";
 import type { PlanTier, UsageEventType } from "../../../../shared/usage-statement.js";
 
@@ -174,6 +175,33 @@ export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
     overageCentsPerUnit: 0,
     gateBehavior: "soft",
   },
+  // Inbox Sync — Pro-only feature. `email_sync` counts each ingest chunk
+  // for the Usage Statement (display only; unlimited within the Pro plan).
+  // `email_account` is a snapshot dimension (current connected mailbox
+  // count, not a monthly tally) — the cap is enforced at /connect time;
+  // services-processor injects a synthetic statement line from the
+  // external_email_accounts table because the dimension doesn't fit the
+  // append-only ledger semantics.
+  email_sync: {
+    eventType: "email_sync",
+    label: "Inbox sync runs",
+    unit: "runs",
+    monthlyCap: { free: 0, pro: 0, trial: 0 },
+    overageCentsPerUnit: 0,
+    gateBehavior: "soft",
+  },
+  email_account: {
+    eventType: "email_account",
+    label: "Connected inboxes",
+    unit: "inboxes",
+    monthlyCap: {
+      free: 0,
+      pro: INBOX_SYNC_INCLUDED_ACCOUNTS,
+      trial: INBOX_SYNC_INCLUDED_ACCOUNTS,
+    },
+    overageCentsPerUnit: 0,
+    gateBehavior: "hard",
+  },
 };
 
 /** Return all entitlements visible on the Usage Statement for a given plan,
@@ -183,6 +211,14 @@ export function listEntitlements(plan: PlanTier): EntitlementSpec[] {
     // Hide 4K from Free statements — Free users can't trigger it. Everything
     // else stays visible so users see what's available + consumed.
     if (spec.eventType === "export_4k" && plan === "free") return false;
+    // Inbox Sync dimensions are Pro-only — hide from Free statements so the
+    // panel doesn't advertise a feature the user can't access.
+    if (
+      (spec.eventType === "email_sync" || spec.eventType === "email_account") &&
+      plan === "free"
+    ) {
+      return false;
+    }
     return true;
   });
 }

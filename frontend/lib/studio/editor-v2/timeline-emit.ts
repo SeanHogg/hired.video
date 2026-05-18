@@ -128,9 +128,10 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     cursor += sceneFrames;
   }
 
-  // Music track lays a single clip across the full composition on A1.
-  // Source is `music:<selectionId>` for both stock + custom — the render
-  // facade resolves the URL via the MediaSource map populated separately
+  // Music track lays one OR MORE clips across the full composition on
+  // A1, depending on the audioMix ducking config. Source is
+  // `music:<selectionId>` for both stock + custom — the render facade
+  // resolves the URL via the MediaSource map populated separately
   // (gap-registered). resolveMusic() is the SINGLE seam between music
   // source state and any playable representation; consumers don't
   // re-derive playable URLs.
@@ -141,19 +142,54 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   // output verbatim. The full mix shape is also stashed on the first
   // background clip's params so a save → load round-trip preserves
   // master / voiceover-lane settings the music clip alone can't express.
+  //
+  // Ducking: when `mix.duckMusicUnderVoiceover` is true, the shared
+  // `computeDuckingSegments` helper splits the full-composition span
+  // into open / ducked segments based on the voiceovers' time
+  // windows. We emit one Clip per segment so the render facade hears
+  // the right gain at every moment — same data the preview path uses
+  // via `canvas-state-to-clips.ts`, single SSoT for the segment math.
   const mix = state.audioMix;
-  const musicGain = mix
+  const musicLaneGain = mix
     ? (mix.musicMuted ? 0 : mix.masterGain * mix.musicGain)
     : 0.6;
   const resolvedMusic = resolveMusic(state.musicSource);
-  if (resolvedMusic && cursor > 0) {
-    a1.clips.push({
-      id: `music_${resolvedMusic.selectionId}`,
-      sourceId: `music:${resolvedMusic.selectionId}`,
-      startFrame: 0,
-      durationFrames: cursor,
-      sourceInFrame: 0,
-      gain: musicGain,
+  if (resolvedMusic && cursor > 0 && musicLaneGain > 0) {
+    const totalSec = cursor / fps;
+    const voiceoverIntervals: DuckingInterval[] = state.voiceovers
+      .filter((vo) => !(mix?.voiceoverMuted) && !vo.muted)
+      .map((vo) => {
+        const anchorIdx = vo.anchorSceneId
+          ? state.scenes.findIndex((s) => s.id === vo.anchorSceneId)
+          : 0;
+        const startFrame = anchorIdx >= 0 ? sceneStartFrame(state, anchorIdx, fps) : 0;
+        return {
+          startSec: startFrame / fps,
+          endSec: startFrame / fps + vo.durationSeconds,
+        };
+      });
+    const segments = computeDuckingSegments(totalSec, voiceoverIntervals, {
+      enabled: Boolean(mix?.duckMusicUnderVoiceover),
+      duckAmount: mix?.duckAmount,
+    });
+    segments.forEach((seg, i) => {
+      const startFrame = Math.round(seg.startSec * fps);
+      const endFrame = Math.round(seg.endSec * fps);
+      const durationFrames = Math.max(1, endFrame - startFrame);
+      a1.clips.push({
+        id:
+          segments.length === 1
+            ? `music_${resolvedMusic.selectionId}`
+            : `music_${resolvedMusic.selectionId}_${i}`,
+        sourceId: `music:${resolvedMusic.selectionId}`,
+        startFrame,
+        durationFrames,
+        // Each segment seeks into the same source at its own start
+        // offset so the music isn't restarted at each segment edge —
+        // it continues uninterrupted under the duck.
+        sourceInFrame: startFrame,
+        gain: musicLaneGain * seg.gainMultiplier,
+      });
     });
   }
   // Voiceover clips lay sequentially on A2 with their per-clip gain
@@ -469,6 +505,10 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
         : undefined;
     const backgroundEffect =
       typeof params.backgroundEffect === "string" ? params.backgroundEffect : undefined;
+    const directorNotes =
+      typeof params.directorNotes === "string" && params.directorNotes.length > 0
+        ? params.directorNotes
+        : undefined;
     scenes.push({
       id: sceneId,
       label:
@@ -484,6 +524,7 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
       ...(sourceEnterAnimations ? { sourceEnterAnimations } : {}),
       ...(sceneEffects && sceneEffects.length > 0 ? { effects: sceneEffects } : {}),
       ...(transitionIn ? { transitionIn } : {}),
+      ...(directorNotes ? { directorNotes } : {}),
     });
   }
 
@@ -624,6 +665,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
     case "canvas-v2:video": {
       const sourceId = stringOr(params.sourceId, "");
       const url = stringOr(params.url, "");
+      const chromaKey = parseChromaKeyParams(params.chromaKey);
       return {
         ...base,
         effects: liftLegacyAnimation(params, base.effects),
@@ -633,6 +675,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
           data: {
             source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
             muted: params.muted === true,
+            ...(chromaKey ? { chromaKey } : {}),
           },
         },
       };
@@ -869,4 +912,22 @@ function numberOr(v: unknown, fallback: number): number {
 
 function stringOr(v: unknown, fallback: string): string {
   return typeof v === "string" ? v : fallback;
+}
+
+/** Parse a saved `chromaKey` blob into a `ChromaKeyParams` shape, or
+ *  null when the data is missing / malformed. `keyColor` is the only
+ *  required field; the rest fall back to the standard defaults so a
+ *  partial save still produces a usable key. */
+function parseChromaKeyParams(value: unknown): ChromaKeyParams | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.keyColor !== "string") return null;
+  return {
+    keyColor: v.keyColor,
+    threshold: typeof v.threshold === "number" ? v.threshold : 0.4,
+    softness: typeof v.softness === "number" ? v.softness : 0.1,
+    ...(typeof v.spillSuppression === "number"
+      ? { spillSuppression: v.spillSuppression }
+      : {}),
+  };
 }

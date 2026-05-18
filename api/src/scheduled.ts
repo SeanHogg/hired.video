@@ -18,7 +18,6 @@ import { scrapeAllActiveSources } from "./services/job/scraper.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/company/recruiter-match.js";
 import { workers as registeredWorkers } from "./workers/registry.js";
 import { isWorkerDue, runWorker } from "./workers/runner.js";
-import { runEmailSyncSweep } from "./routes/email-integration.js";
 import { runMonthClose } from "./domains/services-processing/month-close.js";
 
 // ---------------------------------------------------------------------------
@@ -291,22 +290,17 @@ async function processMonthlyUsageClose(): Promise<void> {
 }
 
 export async function runScheduled(): Promise<void> {
+  // Email sync intentionally absent — the cron sweep was removed in
+  // gap #757. Connected mailboxes now sync exclusively via the PWA
+  // (frontend/lib/email-integration/sync-client.ts → POST
+  // /api/inbox/external-emails/ingest). Service Worker `periodicSync`
+  // is the planned mechanism for syncing while the tab is closed
+  // (tracked as gap #758).
   await Promise.allSettled([
     processFollowUps(),
     processJobQueue(),
     scrapeAllActiveSources(),
     processRegisteredWorkers(),
     processMonthlyUsageClose(),
-    // Email-integration sweep — refresh + delta-sync every active mailbox
-    // due for sync, classify new messages, dedup against applied jobs,
-    // auto-create job_items for high-confidence opportunities, write the
-    // sync digest. The env reference here is via process.env / globalThis
-    // since scheduled.ts is invoked outside the Hono context.
-    runEmailSyncSweep({
-      BUILDERFORCE_API_KEY:
-        process?.env?.BUILDERFORCE_API_KEY ?? (globalThis as any).__ENV?.BUILDERFORCE_API_KEY,
-      BUILDERFORCE_GATEWAY_URL:
-        process?.env?.BUILDERFORCE_GATEWAY_URL ?? (globalThis as any).__ENV?.BUILDERFORCE_GATEWAY_URL,
-    }),
   ]);
 }

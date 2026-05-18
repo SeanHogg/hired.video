@@ -1,12 +1,12 @@
 /**
  * Thin re-export — the canonical provider types live in
- * `shared/email-providers/` so the client-driven PWA sync runs the
- * SAME Gmail/Outlook code as the server-side cron sweep.
+ * `shared/email-providers/`, which the client-driven PWA sync
+ * imports directly. The server only ever consumes the wire shape
+ * (`NormalisedEmail`) here, on the receive side of the ingest route.
  *
- * `NormalisedEmail.receivedAt` is an ISO 8601 string here (single wire
- * shape across client + server). The server-side persistence layer
- * (`sync.ts`, `ingest.ts`) wraps `new Date(email.receivedAt)` at the
- * DB insert boundary.
+ * `NormalisedEmail.receivedAt` is an ISO 8601 string (single wire
+ * shape across client + server). `ingest.ts` wraps
+ * `new Date(email.receivedAt)` at the DB insert boundary.
  */
 
 export type {

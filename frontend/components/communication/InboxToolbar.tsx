@@ -75,10 +75,27 @@ export function InboxToolbar({
             onFiltersChange({
               ...filters,
               includeArchived: !filters.includeArchived,
+              // Show-dismissed + Junk are mutually exclusive views —
+              // toggling one off-the-other keeps the result list
+              // unambiguous.
+              junkOnly: filters.includeArchived ? filters.junkOnly : false,
             })
           }
         >
           Show dismissed
+        </FilterChip>
+        <FilterChip
+          active={!!filters.junkOnly}
+          onClick={() =>
+            onFiltersChange({
+              ...filters,
+              junkOnly: !filters.junkOnly,
+              includeArchived: filters.junkOnly ? filters.includeArchived : false,
+            })
+          }
+          title="Show messages a Mark-as-Junk rule captured. Auto-archived on insert."
+        >
+          Junk
         </FilterChip>
 
         {accounts.length > 0 && (

@@ -60,6 +60,10 @@ interface InvitationManagementProps {
   onRefresh: () => void;
   onInviteUser: () => void;
   onBulkInvite: () => void;
+  /** Open the Edit Roles modal pre-populated with the chosen row. The panel
+   *  owns the modal state + the selected user; this component only signals
+   *  intent. */
+  onEditRoles?: (user: AccountUser) => void;
 }
 
 export function InvitationManagement({
@@ -67,6 +71,7 @@ export function InvitationManagement({
   onRefresh,
   onInviteUser,
   onBulkInvite,
+  onEditRoles,
 }: InvitationManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -197,13 +202,11 @@ export function InvitationManagement({
     }
 
     // Show role editing for users that can have roles edited
-    if (user.canEditRoles) {
+    if (user.canEditRoles && onEditRoles) {
       items.push(
         <DropdownMenuItem
           key="edit-roles"
-          onClick={() => {
-            /* TODO: Implement role editing */
-          }}
+          onClick={() => onEditRoles(user)}
           disabled={loading}
         >
           <Settings className="h-4 w-4 mr-2" />

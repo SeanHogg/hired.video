@@ -258,8 +258,29 @@ export const servicesProcessor: ServicesProcessor = {
       consumedByType.set(r.eventType as UsageEventType, total);
     }
 
+    // Snapshot dimensions don't fit append-only ledger semantics. For each
+    // such dimension, read the live count from its owning table and inject
+    // it as the `consumedQuantity` for the corresponding line.
+    let connectedInboxCount = 0;
+    if (plan !== "free") {
+      const [row] = (await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(schema.externalEmailAccounts)
+        .where(
+          and(
+            eq(schema.externalEmailAccounts.userId, userId),
+            eq(schema.externalEmailAccounts.status, "active"),
+          ),
+        )) as Array<{ count: number | string | null }>;
+      const raw = row?.count ?? 0;
+      connectedInboxCount = typeof raw === "string" ? Number(raw) : raw;
+    }
+
     const lines: UsageStatementLine[] = listEntitlements(plan).map((spec) => {
-      const consumed = consumedByType.get(spec.eventType) ?? 0;
+      const consumed =
+        spec.eventType === "email_account"
+          ? connectedInboxCount
+          : consumedByType.get(spec.eventType) ?? 0;
       const cap = spec.monthlyCap[plan];
       const overage = cap > 0 ? Math.max(0, consumed - cap) : 0;
       const overageCents = overage * spec.overageCentsPerUnit;

@@ -24,9 +24,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mail, Trash2, MailOpen, ExternalLink, Briefcase } from "lucide-react";
+import {
+  Loader2,
+  Mail,
+  Trash2,
+  MailOpen,
+  ExternalLink,
+  Briefcase,
+  ShieldX,
+} from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import type { HubItem } from "@/hooks/use-comm-hub";
+import { EmailBodyFrame } from "@/components/communication/EmailBodyFrame";
+import {
+  JunkConfirmDialog,
+  type JunkRuleChoice,
+} from "@/components/communication/JunkConfirmDialog";
+import { JobMailCTAs } from "@/components/communication/JobMailCTAs";
 
 interface ExternalEmailDetail {
   id: string;
@@ -58,6 +72,10 @@ export interface InboxDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   onMarkUnread: (id: string) => void;
   onDismiss: (id: string) => void;
+  /** Mark-as-Junk + auto-create rule. The hook handles the optimistic
+   *  remove + server round-trip; this sheet just collects the rule
+   *  shape from the JunkConfirmDialog. */
+  onJunk: (id: string, choice: JunkRuleChoice) => Promise<void>;
 }
 
 function providerOpenUrl(detail: ExternalEmailDetail): string | null {
@@ -85,10 +103,13 @@ export function InboxDetailSheet({
   onOpenChange,
   onMarkUnread,
   onDismiss,
+  onJunk,
 }: InboxDetailSheetProps) {
   const [detail, setDetail] = useState<ExternalEmailDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [junkOpen, setJunkOpen] = useState(false);
+  const [junkSubmitting, setJunkSubmitting] = useState(false);
 
   const externalEmailId =
     item?.kind === "external_email" ? item.externalEmailId ?? null : null;
@@ -122,6 +143,18 @@ export function InboxDetailSheet({
   }, [open, externalEmailId]);
 
   const isEmail = item?.kind === "external_email";
+
+  const handleJunkConfirm = async (choice: JunkRuleChoice) => {
+    if (!detail) return;
+    setJunkSubmitting(true);
+    try {
+      await onJunk(detail.id, choice);
+      setJunkOpen(false);
+      onOpenChange(false);
+    } finally {
+      setJunkSubmitting(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -202,6 +235,12 @@ export function InboxDetailSheet({
                   </div>
                 )}
 
+                <JobMailCTAs
+                  category={detail.category}
+                  linkedJobId={detail.linkedJobId}
+                  applyUrl={detail.applyUrl}
+                />
+
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Subject</div>
                   <div className="text-sm font-medium">
@@ -211,12 +250,11 @@ export function InboxDetailSheet({
 
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Body</div>
-                  <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed bg-background border rounded p-3 max-h-[40vh] overflow-auto">
-                    {detail.bodyText?.trim() ||
-                      stripHtmlForPreview(detail.bodyHtml) ||
-                      detail.snippet ||
-                      "(no body)"}
-                  </pre>
+                  <EmailBodyFrame
+                    bodyHtml={detail.bodyHtml}
+                    bodyText={detail.bodyText}
+                    fallback={detail.snippet ?? "(no body)"}
+                  />
                 </div>
               </div>
             </ScrollArea>
@@ -243,6 +281,15 @@ export function InboxDetailSheet({
                 <Trash2 className="h-3.5 w-3.5 mr-1" />
                 Dismiss
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-rose-700 hover:bg-rose-50 border-rose-200"
+                onClick={() => setJunkOpen(true)}
+              >
+                <ShieldX className="h-3.5 w-3.5 mr-1" />
+                Mark as Junk
+              </Button>
               {providerOpenUrl(detail) && (
                 <Button
                   variant="ghost"
@@ -260,31 +307,20 @@ export function InboxDetailSheet({
                 </Button>
               )}
             </div>
+
+            <JunkConfirmDialog
+              open={junkOpen}
+              onOpenChange={setJunkOpen}
+              fromEmail={detail.fromEmail}
+              subject={detail.subject}
+              isSubmitting={junkSubmitting}
+              onConfirm={handleJunkConfirm}
+            />
           </>
         ) : null}
       </SheetContent>
     </Sheet>
   );
-}
-
-/** Strip HTML tags + collapse whitespace for the plain-text body
- *  fallback. The sanitiser is intentionally crude — the iframe-based
- *  rich render is tracked as a follow-up Gap Register entry; today we
- *  trade fidelity for safety. */
-function stripHtmlForPreview(html: string | null): string {
-  if (!html) return "";
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 export default InboxDetailSheet;

@@ -12,8 +12,10 @@ import {
   InviteStatus,
   InviteUserRequest,
   InviteUserResponse,
+  getAvailableRolesForInvite,
 } from "../../../../shared/account.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
+import { ForbiddenError } from "../../middleware/errorHandler.js";
 import { splitName } from "./userActor.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
@@ -158,9 +160,40 @@ export async function listAccountUsers(currentUserId: string, currentUserRole: s
   return row ? [normalizeUser(row, ctx)] : [];
 }
 
+/**
+ * Look up the inviter's role from the DB and confirm `requestedRole` is one
+ * they're allowed to assign. Throws ForbiddenError (403) when the inviter
+ * is unknown OR the role isn't in the allowed list. NEVER fail-open.
+ *
+ * Pulled out so `inviteAccountUser` and the hoisted `bulkInviteUsers` path
+ * can share the exact same authority check.
+ */
+async function assertCanAssignRole(
+  db: ReturnType<typeof getDb>,
+  invitedByUserId: string,
+  requestedRole: string,
+): Promise<void> {
+  const [inviter] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, invitedByUserId))
+    .limit(1);
+  if (!inviter?.role) {
+    throw new ForbiddenError("Inviter role could not be resolved");
+  }
+  const allowed = getAvailableRolesForInvite(inviter.role);
+  if (!allowed.includes(String(requestedRole).toLowerCase())) {
+    throw new ForbiddenError("You are not allowed to assign this role");
+  }
+}
+
 export async function inviteAccountUser(request: InviteUserRequest, invitedByUserId: string,
   deps?: Partial<AccountDeps>): Promise<InviteUserResponse> {
   const d = resolveDeps(deps); const db = d.db;
+  // Server-side authority check: the frontend dropdown is the UX guard,
+  // this is the security guard against hand-crafted POSTs that send a
+  // role the inviter has no business assigning (eg recruiter → employer).
+  await assertCanAssignRole(db, invitedByUserId, String(request.role));
   const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((b) => b.toString(16).padStart(2, "0")).join("");
   const [row] = await db
     .insert(accountInvitations)
@@ -410,10 +443,15 @@ export async function getAccountAnalytics(userId: string, userRole: string,
   };
 }
 
-export async function bulkInviteUsers(userId: string, payload: unknown): Promise<BulkInviteResponse> {
+export async function bulkInviteUsers(userId: string, payload: unknown,
+  deps?: Partial<AccountDeps>): Promise<BulkInviteResponse> {
+  const d = resolveDeps(deps); const db = d.db;
   const data = payload as { emails?: string[]; role?: string };
   const emails = Array.isArray(data.emails) ? data.emails : [];
   const role = data.role ?? USER_ROLES.JOB_SEEKER;
+  // Authority check once per bulk call rather than once per email — same
+  // ForbiddenError surface as the single-invite path, just avoids N round-trips.
+  await assertCanAssignRole(db, userId, String(role));
   const results: BulkInviteResponse = {
     totalProcessed: emails.length,
     successCount: 0,
@@ -424,7 +462,7 @@ export async function bulkInviteUsers(userId: string, payload: unknown): Promise
   };
   for (const email of emails) {
     try {
-      await inviteAccountUser({ email, role: role as any }, userId);
+      await inviteAccountUser({ email, role: role as any }, userId, deps);
       results.successCount += 1;
       results.successfulInvitations.push({ email });
     } catch (e) {

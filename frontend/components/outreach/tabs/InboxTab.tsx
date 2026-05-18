@@ -126,6 +126,13 @@ export function InboxTab(_props: InboxTabProps = {}) {
     [hub],
   );
 
+  const handleDetailJunk = useCallback(
+    async (id: string, choice: { matchKind: string; matchValue: string | null }) => {
+      await hub.junkExternalEmail(id, choice);
+    },
+    [hub],
+  );
+
   const selectableCount = externalEmailIds.size;
   const allSelected =
     selectableCount > 0 && visibleSelectedIds.size === selectableCount;
@@ -231,6 +238,7 @@ export function InboxTab(_props: InboxTabProps = {}) {
         onOpenChange={setDetailOpen}
         onMarkUnread={handleDetailMarkUnread}
         onDismiss={handleDetailDismiss}
+        onJunk={handleDetailJunk}
       />
       <InboxSyncHistorySheet
         open={historyOpen}

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { authService } from "@/lib/services/auth-service";
 import { useState } from "react";
+import { readRedirectParam, withRedirectTo } from "@/lib/auth-redirect";
 
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
@@ -21,6 +22,9 @@ export default function SignupSuccess() {
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const email = searchParams.get("email") || t("messages.fallbackEmail");
   const firstName = searchParams.get("firstName") || "";
+  // Forward `?redirectTo=` (or legacy `?redirect=`) through to /login so the
+  // deep-linked tool round-trip completes once the user verifies + signs in.
+  const redirectTo = readRedirectParam(searchParams, "");
 
   return (
     <AppShell bgClassName="bg-background">
@@ -119,7 +123,7 @@ export default function SignupSuccess() {
                       {t("prompts.alreadyConfirmedEmail")}
                     </p>
                     <Button asChild className="w-full">
-                      <Link to="/login">{t("actions.signIn")}</Link>
+                      <Link to={withRedirectTo("/login", redirectTo)}>{t("actions.signIn")}</Link>
                     </Button>
                   </div>
 

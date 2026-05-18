@@ -13,21 +13,15 @@
  *
  *   2. **Transient Neon HTTP hiccups.** Neon's HTTP proxy occasionally
  *      returns 5xx or `fetch failed` on otherwise valid queries. The
- *      cron sweep and the client-driven ingest both rely on a final
- *      cursor-advance write; losing it because of a transient blip
- *      marked accounts `status: "error"` and tripped the entire sync
- *      run. `runWithNeonRetry` retries once with a short backoff when
- *      the failure looks transient.
+ *      client-driven email ingest relies on a final cursor-advance
+ *      write; losing it on a transient blip used to 400 the chunk
+ *      even though the messages were already persisted.
+ *      `runWithNeonRetry` retries once with a short backoff when the
+ *      failure looks transient.
  *
- * Used by:
- *   - services/email-integration/sync.ts (cron sweep)
- *   - services/email-integration/ingest.ts (client-driven chunk ingest)
- *   - routes/inbox.ts (surfacing the real cause on 400 responses)
- *
- * Tracks gap #727 (formerly "Email sync DB writes are failing for at
- * least 2 accounts"): the partial fix added `describeDbError` locally
- * to sync.ts; this lifts both helpers into one place and adds the
- * retry that the gap entry called out as still-open.
+ * Tracks gaps #727 (transient Neon writes surfacing only as opaque
+ * "Failed query: …" text) and #757 (server-side cron email-sweep
+ * removed in favour of the PWA-driven ingest path).
  */
 
 /** Walk `err.cause` up to 5 hops and emit `<sqlstate> — <message> —

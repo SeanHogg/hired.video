@@ -2,10 +2,11 @@
  * Stage-1 deterministic classifier — pure-function rules engine over
  * (sender, subject, body, headers). Shared by every email-sync surface:
  *
- *   • Server-side cron sync (api/src/services/email-integration/sync.ts)
- *   • Client-driven PWA sync (frontend/lib/email-integration/sync-client.ts)
+ *   • Client-driven PWA sync (frontend/lib/email-integration/sync-client.ts) — primary path.
+ *   • Server-side re-validation on ingest (api/src/services/email-integration/ingest.ts)
+ *     — confirms the client tag before trusting it.
  *
- * Both surfaces run the SAME rule set so the inbox shows the same
+ * Both sides run the SAME rule set so the inbox shows the same
  * categories regardless of which side did the classification. The LLM
  * fallback (Stage-2) stays server-only — it touches Anthropic and bills
  * the user's token ledger.

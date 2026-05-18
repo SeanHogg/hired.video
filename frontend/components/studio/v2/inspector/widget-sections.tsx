@@ -15,6 +15,7 @@ import type {
   TextWidgetParams,
   ImageWidgetParams,
   VideoWidgetParams,
+  ChromaKeyParams,
   ShapeWidgetParams,
   DividerWidgetParams,
   ChartWidgetParams,
@@ -25,6 +26,7 @@ import type {
   ContainerStyle,
   WidgetKind,
 } from "@/lib/studio/editor-v2/canvas-state";
+import { DEFAULT_CHROMA_KEY } from "@/lib/studio/chroma-key";
 import {
   LINKED_CONTENT_REGISTRY,
   type LinkedContentKind,
@@ -517,6 +519,91 @@ const VIDEO_CONTENT_SECTION: WidgetInspectorSection = {
           />
           Muted
         </label>
+      </div>
+    );
+  },
+};
+
+/** Chroma-key (green-screen) controls. Self-gates by widget kind so
+ *  the dispatch in the WIDGET_INSPECTOR registry doesn't have to
+ *  branch — the section renders for video widgets and returns null
+ *  otherwise. Persists `chromaKey: null` rather than removing the
+ *  field so the user's last-used colour survives a toggle off/on
+ *  cycle (a single React state slice across the editor doesn't help
+ *  here; this is committed canvas state). */
+const VIDEO_CHROMA_SECTION: WidgetInspectorSection = {
+  id: "chroma",
+  title: "Chroma key (green screen)",
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "video") return null;
+    const data = widget.params.data;
+    const active = data.chromaKey ?? null;
+    const setChroma = (next: ChromaKeyParams | null) =>
+      onUpdateWidgetParams({
+        kind: "video",
+        data: { ...data, chromaKey: next },
+      });
+    const setOne = (patch: Partial<ChromaKeyParams>) => {
+      const base = active ?? DEFAULT_CHROMA_KEY;
+      setChroma({ ...base, ...patch });
+    };
+    return (
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={Boolean(active)}
+            onChange={(e) =>
+              setChroma(e.target.checked ? { ...DEFAULT_CHROMA_KEY } : null)
+            }
+          />
+          Enable chroma key
+        </label>
+        {active && (
+          <>
+            <Field label="Key colour">
+              <ColorInput
+                value={active.keyColor}
+                onChange={(keyColor) => setOne({ keyColor })}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Threshold">
+                <NumberField
+                  value={Number(active.threshold.toFixed(2))}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(threshold) => setOne({ threshold })}
+                />
+              </Field>
+              <Field label="Softness">
+                <NumberField
+                  value={Number(active.softness.toFixed(2))}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(softness) => setOne({ softness })}
+                />
+              </Field>
+            </div>
+            <Field label="Spill suppression">
+              <NumberField
+                value={Number(
+                  (active.spillSuppression ?? DEFAULT_CHROMA_KEY.spillSuppression ?? 0).toFixed(2),
+                )}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(spillSuppression) => setOne({ spillSuppression })}
+              />
+            </Field>
+            <p className="text-[10px] text-muted-foreground">
+              Preview matches export when the render pipeline lands. Today the
+              key applies in the editor preview only.
+            </p>
+          </>
+        )}
       </div>
     );
   },
@@ -1071,7 +1158,7 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   text: [LAYOUT_SECTION, textContentSection("text"), ...SHARED_TAIL],
   heading: [LAYOUT_SECTION, textContentSection("heading"), ...SHARED_TAIL],
   image: [LAYOUT_SECTION, IMAGE_CONTENT_SECTION, ...SHARED_TAIL],
-  video: [LAYOUT_SECTION, VIDEO_CONTENT_SECTION, ...SHARED_TAIL],
+  video: [LAYOUT_SECTION, VIDEO_CONTENT_SECTION, VIDEO_CHROMA_SECTION, ...SHARED_TAIL],
   "shape-rect": [LAYOUT_SECTION, shapeContentSection("shape-rect"), ...SHARED_TAIL],
   "shape-circle": [LAYOUT_SECTION, shapeContentSection("shape-circle"), ...SHARED_TAIL],
   divider: [LAYOUT_SECTION, DIVIDER_CONTENT_SECTION, ...SHARED_TAIL],

@@ -24,7 +24,7 @@ import RemoveBrandingToggle from "@/components/studio/shared/RemoveBrandingToggl
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { Input } from "@/components/ui/input";
-import { ColorInput, Field } from "./fields";
+import { AutoSizeTextarea, ColorInput, Field } from "./fields";
 import { TRANSITION_PRESETS } from "@/lib/studio/motion-presets";
 import { scenePatchFromBgPreset } from "@/lib/studio/visual-themes";
 import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
@@ -108,6 +108,32 @@ export const SCENE_SECTIONS: SceneInspectorSection[] = [
         allowedCategories={["color", "stylize", "transform", "key"]}
         compact
       />
+    ),
+  },
+  {
+    id: "scene-director-notes",
+    title: "Director's notes",
+    // Free-form text the director attaches to the scene — shot intent,
+    // blocking, dailies feedback, talent direction, todos. Not
+    // rendered into the final video; the ScenesRail badge surfaces
+    // its presence so reviewers can spot scenes with open notes.
+    // Stored as `null` when cleared so a "remove all notes" round-
+    // trips losslessly without leaving an empty string behind.
+    render: ({ scene, onUpdateScene }) => (
+      <div className="space-y-2">
+        <AutoSizeTextarea
+          value={scene.directorNotes ?? ""}
+          onChange={(next) =>
+            onUpdateScene({ directorNotes: next.length === 0 ? null : next })
+          }
+          minRows={4}
+          placeholder="Shot intent, blocking, talent direction, dailies feedback…"
+          ariaLabel="Director's notes for this scene"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Visible to editors only — never rendered into the final video.
+        </p>
+      </div>
     ),
   },
   {

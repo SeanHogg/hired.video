@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
+import { eq, ne, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -320,6 +320,24 @@ userRoutes.get("/public", async (c) => {
   const page = Number(c.req.query("page") ?? 1) || 1;
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
   const offset = (page - 1) * limit;
+  // When the request is authenticated, hide the viewer's own row from the
+  // Discover People grid server-side so paging counts match what the UI
+  // actually renders. Anonymous callers see everyone.
+  const viewerId = c.var.user?.sub;
+
+  const baseConds = [
+    eq(users.isActive, true),
+    // Hide unverified accounts — keeps spam signups out of the public
+    // directory until they prove ownership of the email address.
+    eq(users.emailVerified, true),
+    or(
+      eq(userProfiles.profileVisibility, "public"),
+      // Users without a userProfiles row fall through the left join with
+      // NULL — still include them since the default visibility is public.
+      isNull(userProfiles.userId),
+    )!,
+  ];
+  if (viewerId) baseConds.push(ne(users.id, viewerId));
 
   const rows = await db
     .select({
@@ -354,20 +372,7 @@ userRoutes.get("/public", async (c) => {
       creatorProfiles,
       and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
     )
-    .where(
-      and(
-        eq(users.isActive, true),
-        // Hide unverified accounts — keeps spam signups out of the public
-        // directory until they prove ownership of the email address.
-        eq(users.emailVerified, true),
-        or(
-          eq(userProfiles.profileVisibility, "public"),
-          // Users without a userProfiles row fall through the left join with
-          // NULL — still include them since the default visibility is public.
-          isNull(userProfiles.userId),
-        ),
-      ),
-    )
+    .where(and(...baseConds))
     .limit(limit)
     .offset(offset);
 

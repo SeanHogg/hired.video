@@ -34,6 +34,7 @@ import OAuthProviders from "@/components/OAuthProviders";
 import { RegisterGate } from "@/components/security/RegisterGate";
 import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
 import { trackSignUp } from "@/lib/gtm";
+import { readRedirectParam, safeRedirectTo, withRedirectTo } from "@/lib/auth-redirect";
 
 export default function Signup() {
   const location = useLocation();
@@ -188,14 +189,15 @@ export default function Signup() {
         captcha.token,
       );
       trackSignUp("email");
-      // Carry any ?redirect=<tool-path> forward so the user returns to the
-      // tool they were using when prompted to sign up.
+      // Carry any ?redirectTo=<tool-path> (or legacy ?redirect=) forward so
+      // the user returns to the tool they were using when prompted to sign
+      // up. readRedirectParam sanitizes against open-redirects.
       const search = new URLSearchParams(location.search);
-      const redirect = search.get("redirect");
+      const redirect = readRedirectParam(search, "");
       const successParams = new URLSearchParams({
         email,
         firstName,
-        ...(redirect ? { redirect } : {}),
+        ...(redirect ? { redirectTo: redirect } : {}),
       });
       navigate(`/signup-success?${successParams.toString()}`);
     } catch (err) {
@@ -432,7 +434,10 @@ export default function Signup() {
                   <p className="text-sm text-muted-foreground">
                     {t("prompts.haveAccount")}{" "}
                     <Link
-                      to="/login"
+                      to={withRedirectTo(
+                        "/login",
+                        readRedirectParam(new URLSearchParams(location.search), ""),
+                      )}
                       className="text-primary hover:underline font-medium"
                     >
                       {t("actions.signIn")}

@@ -2,22 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Users,
-  UserPlus,
   AlertCircle,
   CreditCard,
   FileText,
   UserCog,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 
 import { accountService } from "@/lib/services/account-service";
-import {
-  AccountUser,
-  canManageUsers,
-} from "@/types/account";
+import { AccountUser } from "@/types/account";
 import { InviteUserModal } from "@/components/account/InviteUserModal";
 import { BulkInviteModal } from "@/components/account/BulkInviteModal";
 import { InvitationManagement } from "@/components/account/InvitationManagement";
@@ -140,8 +135,6 @@ export function AccountManagementPanel() {
     }
   };
 
-  const canManage = canManageUsers(currentUserRoles);
-
   if (authLoading) {
     return <AccountManagementSkeleton />;
   }
@@ -154,26 +147,15 @@ export function AccountManagementPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">
-            {t("headings.accountManagementPanel")}
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            {isJobSeeker
-              ? t("messages.accountPanelDescJobSeeker")
-              : t("messages.accountPanelDescTeam")}
-          </p>
-        </div>
-        {canManage && activeTab === "users" && (
-          <Button
-            onClick={() => setInviteModalOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <UserPlus className="h-4 w-4" />
-            {t("actions.inviteUser")}
-          </Button>
-        )}
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">
+          {t("headings.accountManagementPanel")}
+        </h2>
+        <p className="text-muted-foreground mt-1">
+          {isJobSeeker
+            ? t("messages.accountPanelDescJobSeeker")
+            : t("messages.accountPanelDescTeam")}
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
@@ -245,6 +227,10 @@ export function AccountManagementPanel() {
                 onRefresh={loadAccountUsers}
                 onInviteUser={() => setInviteModalOpen(true)}
                 onBulkInvite={() => setBulkInviteModalOpen(true)}
+                onEditRoles={(u) => {
+                  setSelectedUser(u);
+                  setEditRolesModalOpen(true);
+                }}
               />
             </>
           )}

@@ -35,6 +35,17 @@ export const FREE_PUBLISHED_VIDEOS_LIMIT = 1;
 /** Free tier: max AI interview practice sessions per calendar month. Pro is unlimited. */
 export const FREE_INTERVIEW_SESSIONS_PER_MONTH = 3;
 
+// ── Inbox Sync (Gmail / Outlook connected mailboxes) ────────────────────────
+// Inbox Sync is a Pro-only feature. Pro plans include `INBOX_SYNC_INCLUDED_ACCOUNTS`
+// connected mailboxes; beyond that, extra mailbox slots are sold as an add-on
+// at `INBOX_SYNC_EXTRA_ACCOUNT_PRICE`/month per slot. The cap is hard:
+// connect-time gating in [api/src/routes/email-integration.ts] returns 402
+// with a CTA pointing at the add-on SKU on the Pricing page.
+/** Pro tier: max connected inboxes included in the base subscription. */
+export const INBOX_SYNC_INCLUDED_ACCOUNTS = 3;
+/** Add-on monthly price per extra connected inbox beyond the included 3. */
+export const INBOX_SYNC_EXTRA_ACCOUNT_PRICE = 5;
+
 // ── Token pack SKUs (one-off top-ups) ───────────────────────────────────────
 // Pricing model: TRUE cost basis ~$3/M tokens (LLM ~$1.50 + hosting/storage/
 // bandwidth/Stripe/ops ~$1.50). Margin tiers tuned so every pack still nets

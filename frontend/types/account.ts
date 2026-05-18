@@ -244,43 +244,7 @@ export const getInviteStatusColor = (status: InviteStatus): string => {
   }
 };
 
-export const canManageUsers = (userRoles: string[]): boolean => {
-  return userRoles.some((role) => role === "admin" || role === "employer");
-};
-
-export const canInviteUsers = (userRoles: string[]): boolean => {
-  return canManageUsers(userRoles);
-};
-
-export const canEditRoles = (
-  userRoles: string[],
-  targetUserRoles: string[],
-): boolean => {
-  // Admins can edit anyone except other admins
-  if (userRoles.includes("admin")) {
-    return !targetUserRoles.includes("admin");
-  }
-
-  // Employer users can edit non-admin roles
-  if (userRoles.includes("employer")) {
-    return !targetUserRoles.some((role) => role === "admin");
-  }
-
-  return false;
-};
-
-export const getAvailableRolesForInvite = (userRoles: string[]): string[] => {
-  if (userRoles.includes("admin")) {
-    return ["recruiter", "employer"];
-  }
-
-  if (userRoles.includes("employer")) {
-    return ["recruiter", "employer"];
-  }
-
-  if (userRoles.includes("recruiter")) {
-    return ["recruiter"];
-  }
-
-  return [];
-};
+// SSoT lives in shared/account.ts so the backend invite handler can enforce
+// the same allowed-roles list. Re-exported here so existing UI imports
+// (`@/types/account`) keep working without churn.
+export { getAvailableRolesForInvite } from "../../shared/account";

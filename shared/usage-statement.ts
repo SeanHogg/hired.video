@@ -32,7 +32,9 @@ export type UsageEventType =
   | "career_coach_msg"
   | "export_4k"
   | "export_1080p"
-  | "bulk_score_run";
+  | "bulk_score_run"
+  | "email_sync"
+  | "email_account";
 
 export type PlanTier = "free" | "pro" | "trial";
 

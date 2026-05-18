@@ -28,7 +28,8 @@ import {
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { buildAuthLinkTo } from "@/lib/auth-redirect";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { EmailSettingsTab } from "@/components/email/EmailSettingsTab";
 import { AppShell } from "@/components/AppShell";
@@ -96,6 +97,7 @@ function SettingsContent() {
     ? ([...PUBLIC_LOCALES, "w"] as const)
     : PUBLIC_LOCALES;
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -469,6 +471,11 @@ function SettingsContent() {
   // Sync hero with the same CTAs.
   if (!isAuthenticated || !user) {
     if (searchParams.get("tab") === "email") {
+      // gap #762: this hero is reached via deep link from /tools "Inbox Sync"
+      // (unauthenticated). Carry the current `/settings?tab=email` path
+      // through signup/login so the user lands back here after auth instead
+      // of the default post-login redirect.
+      const currentPathWithSearch = `${location.pathname}${location.search}`;
       return (
         <AppShell>
           <div className="max-w-4xl mx-auto px-4 py-16">
@@ -484,7 +491,7 @@ function SettingsContent() {
                 {t("messages.inboxSyncIntro")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/signup">
+                <Link to={buildAuthLinkTo("/signup", currentPathWithSearch)}>
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:opacity-90 text-lg px-8"
@@ -493,7 +500,7 @@ function SettingsContent() {
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Link to="/login">
+                <Link to={buildAuthLinkTo("/login", currentPathWithSearch)}>
                   <Button size="lg" variant="outline" className="text-lg px-8">
                     {t("actions.signIn")}
                   </Button>
