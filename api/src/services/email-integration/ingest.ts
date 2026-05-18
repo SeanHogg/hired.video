@@ -103,13 +103,6 @@ export interface IngestRequestMessage extends NormalisedEmailWire {
 export interface IngestRequest {
   accountId: string;
   messages: IngestRequestMessage[];
-  /** Provider-side delta cursor to persist on the account row once
-   *  the chunk lands — Gmail historyId or Outlook deltaLink. */
-  nextCursor?: string | null;
-  /** Client-generated UUID stamped on every chunk POST of a single
-   *  logical sync. Lets `email_sync_runs` aggregate per-session
-   *  rather than per-chunk (gap #811). */
-  syncSessionId?: string | null;
 }
 
 export interface IngestResult {
@@ -211,7 +204,9 @@ export async function ingestForAccount(
   };
 
   if (request.messages.length === 0) {
-    await advanceCursor(deps, account, request.nextCursor ?? null, result);
+    // No-op chunks shouldn't reach the server — the orchestrator
+    // skips them — but if one does, return the empty result. The
+    // cursor advance now happens on /finalize (gap #826), not here.
     return result;
   }
 
@@ -420,7 +415,8 @@ export async function ingestForAccount(
     }
   }
 
-  // ───── PASS C — bulk patch + cursor advance.
+  // ───── PASS C — bulk patch. Cursor + sync-run audit moved to
+  // /finalize (gap #826).
   if (patches.length > 0) {
     try {
       await deps.repos.externalEmailMessages.patchMany(patches);

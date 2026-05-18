@@ -4,22 +4,32 @@
  * tab-focus / button-driven sync — gap #758 will add `periodicSync`).
  *
  * Why client-driven (see Gap Register #755 + #757):
- *   A server-side sweep hits Cloudflare Workers' 50-subrequest
- *   per-invocation budget when fanning out across multiple mailboxes.
- *   The browser has no such cap — it pulls direct from
- *   gmail.googleapis.com / graph.microsoft.com, then POSTs the
- *   normalised batch to the server in 5-row chunks. Each chunk is a
- *   fresh Worker invocation with its own budget, so LLM Stage-2 +
- *   dedup + persist amortises across many invocations instead of
- *   clipping mid-sweep. The old server-side cron sweep was deleted
- *   under #757 because the dual-path setup kept re-creating the same
- *   budget bug whenever the cron path ran.
+ *   A server-side sweep hits Cloudflare Workers' per-invocation
+ *   subrequest budget (50 on Bundled, 1000 on Unbound) when fanning
+ *   out across multiple mailboxes. The browser has no such cap — it
+ *   pulls direct from gmail.googleapis.com / graph.microsoft.com,
+ *   then POSTs the normalised batch to the server in CHUNK_SIZE-row
+ *   chunks. Each chunk is a fresh Worker invocation with its own
+ *   budget, so LLM Stage-2 + dedup + persist amortises across many
+ *   invocations instead of clipping mid-sweep. The old server-side
+ *   cron sweep was deleted under #757 because the dual-path setup
+ *   kept re-creating the same budget bug whenever the cron path ran.
  *
- *   Chunk size dropped from 25 → 5 on 2026-05-17 after a real-world
- *   sync (14 messages) tripped the 1000-subrequest cap mid-ingest —
- *   each message fans out into rules-fired + ledger + LLM + dedup
- *   writes (~70 subrequests / message), so 25 messages × 70 calls
- *   blew the budget. Real fix (bulk DB writes) is gap #811 + #815.
+ *   Two trips per logical sync now live on the server (gap #826):
+ *     • N × POST /external-emails/ingest — persist + classify only.
+ *     • 1 × POST /external-emails/finalize — sync-run audit + cursor
+ *       advance + metering. Splitting the trailing writes off the
+ *       chunk loop keeps each ingest invocation well under the
+ *       Bundled-Worker budget even when summarise + classify LLM
+ *       calls eat 2N subrequests on top of the DB writes.
+ *
+ *   Chunk size history:
+ *     • 25 → 5 on 2026-05-17 after a 14-message real sync tripped
+ *       the budget (per-message DB fan-out, fixed by #815).
+ *     • 5 → 20 on 2026-05-17 after #815 collapsed DB ops into 3
+ *       fixed calls per chunk.
+ *     • 20 → 10 on 2026-05-18 after the budget tripped again
+ *       (summariseEmail running on every message, fixed by #826).
  *
  * Flow per connected mailbox:
  *   1. GET /accounts/:id/access-token  → short-lived bearer
@@ -28,6 +38,8 @@
  *   4. POST /inbox/external-emails/ingest in chunks of CHUNK_SIZE —
  *      server runs LLM Stage-2 only for un-classified-by-rules
  *      messages, plus dedup + persist
+ *   5. POST /inbox/external-emails/finalize once with the aggregate
+ *      counters + the new provider cursor.
  */
 
 import {
@@ -49,14 +61,12 @@ const PROVIDERS: Record<string, EmailProvider> = {
   outlook: outlookProvider,
 };
 
-// 20 is the new ceiling now that #815 landed — the server-side ingest
-// pipeline batches every DB op (insert / patch / dedup-context load) so
-// per-chunk subrequests are flat in N for the DB side, only the LLM
-// calls scale 2N. At 20 messages that's still well under the Cloudflare
-// Worker 1000-subrequest cap with margin to spare for retries. The
-// server still enforces a hard 25 in `services/email-integration/ingest.ts`
-// (`MAX_CHUNK_SIZE`) so bumping past 25 here would 400 the chunk.
-const CHUNK_SIZE = 20;
+// 10 is the new ceiling after gap #826 — even with per-row LLM
+// classify + summary the Bundled-Worker 50-subrequest cap stays out
+// of reach (≈ 3 fixed + 1 insert + ≤10 classify + ≤10 summarise + 1
+// patch ≈ ≤25). The trailing sync-run audit + cursor advance now
+// live on a separate /finalize call with its own budget.
+const CHUNK_SIZE = 10;
 const BACKFILL_LIMIT = 30;
 
 interface AccessTokenResp {
@@ -77,6 +87,13 @@ interface IngestResp {
   errorMessage: string | null;
 }
 
+interface FinalizeResp {
+  accountId: string;
+  syncSessionId: string;
+  cursorAdvanced: boolean;
+  errorMessage: string | null;
+}
+
 export interface ClientSyncSummary {
   accountId: string;
   accountLabel: string;
@@ -93,7 +110,7 @@ export interface ClientSyncSummary {
 
 export interface ClientSyncProgress {
   accountId: string;
-  phase: "auth" | "pull" | "ingest";
+  phase: "auth" | "pull" | "ingest" | "finalize";
   ingested: number;
   total: number;
 }
@@ -118,20 +135,41 @@ async function fetchUserRules(): Promise<UserRule[]> {
 async function ingestChunk(
   accountId: string,
   messages: Array<NormalisedEmail & { clientCategory?: string; clientScore?: number; clientRuleName?: string }>,
-  nextCursor: string | null,
-  syncSessionId: string,
 ): Promise<IngestResp> {
   const r = await apiClient.post<IngestResp>(
     "/api/inbox/external-emails/ingest",
-    { accountId, messages, nextCursor, syncSessionId },
+    { accountId, messages },
   );
   if (!r.data) throw new Error("Ingest returned no body");
   return r.data;
 }
 
-/** Generate a per-logical-sync UUID stamped onto every chunk POST so
- *  the server can aggregate chunk counters into one `email_sync_runs`
- *  row (gap #811). `crypto.randomUUID()` is universally available in
+async function finalizeSync(
+  accountId: string,
+  syncSessionId: string,
+  nextCursor: string | null,
+  aggregate: {
+    messagesIngested: number;
+    messagesExcluded: number;
+    messagesJobRelated: number;
+    jobsLinked: number;
+    jobsCreated: number;
+    rulesFired: Record<string, number>;
+    status: "success" | "partial" | "error";
+    errorMessage: string | null;
+  },
+): Promise<FinalizeResp> {
+  const r = await apiClient.post<FinalizeResp>(
+    "/api/inbox/external-emails/finalize",
+    { accountId, syncSessionId, nextCursor, aggregate },
+  );
+  if (!r.data) throw new Error("Finalize returned no body");
+  return r.data;
+}
+
+/** Generate a per-logical-sync UUID stamped on the finalize call so
+ *  the server can write one `email_sync_runs` row per logical sync
+ *  (gap #811). `crypto.randomUUID()` is universally available in
  *  the browsers we ship to. */
 function newSyncSessionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -159,8 +197,8 @@ async function syncAccount(
   onProgress?: (p: ClientSyncProgress) => void,
 ): Promise<ClientSyncSummary> {
   const label = account.accountLabel?.trim() || account.accountEmail;
-  // One session id for the whole logical sync — every chunk POST below
-  // shares it so the server aggregates into one Sync History row.
+  // One session id for the whole logical sync — the finalize call
+  // below stamps it so the server writes one Sync History row.
   const syncSessionId = newSyncSessionId();
   const summary: ClientSyncSummary = {
     accountId: account.id,
@@ -175,6 +213,7 @@ async function syncAccount(
     rulesFired: {},
     errorMessage: null,
   };
+  let pulledCursor: string | null = null;
 
   try {
     onProgress?.({ accountId: account.id, phase: "auth", ingested: 0, total: 0 });
@@ -185,13 +224,14 @@ async function syncAccount(
 
     onProgress?.({ accountId: account.id, phase: "pull", ingested: 0, total: 0 });
     // First sync resumes from server-stored cursor; the server stamps
-    // the next cursor onto the account row on each ingest, so the
+    // the next cursor onto the account row on each finalize, so the
     // client can stay stateless. NULL cursor = initial backfill.
     const { messages, nextCursor } = await provider.pullDelta(
       { accessToken: token.accessToken },
       { cursor: null, backfillLimit: BACKFILL_LIMIT },
     );
     summary.messagesFetched = messages.length;
+    pulledCursor = nextCursor;
 
     // Stage-1 classification in the browser — most messages match
     // rules and don't need the server's LLM hop. The same shared rules
@@ -215,20 +255,11 @@ async function syncAccount(
     });
 
     // Chunk + POST. Each chunk is its own Worker invocation so the
-    // LLM Stage-2 + dedup subrequest budget resets between batches.
-    let cursorToPersist: string | null = nextCursor;
+    // LLM Stage-2 + summary subrequest budget resets between batches.
     for (let i = 0; i < tagged.length; i += CHUNK_SIZE) {
       const chunk = tagged.slice(i, i + CHUNK_SIZE);
-      // Only attach the cursor to the LAST chunk so an interrupted
-      // sync doesn't advance the cursor past unprocessed messages.
-      const isLastChunk = i + CHUNK_SIZE >= tagged.length;
       try {
-        const resp = await ingestChunk(
-          account.id,
-          chunk,
-          isLastChunk ? cursorToPersist : null,
-          syncSessionId,
-        );
+        const resp = await ingestChunk(account.id, chunk);
         summary.messagesIngested += resp.messagesIngested;
         summary.messagesExcluded += resp.messagesExcluded;
         summary.messagesJobRelated += resp.messagesJobRelated;
@@ -237,7 +268,10 @@ async function syncAccount(
         for (const [rule, count] of Object.entries(resp.rulesFired)) {
           summary.rulesFired[rule] = (summary.rulesFired[rule] ?? 0) + count;
         }
-        if (resp.errorMessage) summary.status = "partial";
+        if (resp.errorMessage) {
+          summary.status = "partial";
+          summary.errorMessage = resp.errorMessage;
+        }
       } catch (err) {
         summary.status = "partial";
         summary.errorMessage = err instanceof Error ? err.message : String(err);
@@ -252,6 +286,47 @@ async function syncAccount(
   } catch (err) {
     summary.status = "error";
     summary.errorMessage = err instanceof Error ? err.message : String(err);
+  }
+
+  // Finalize: write the sync-run audit row, advance the provider
+  // cursor, and meter the logical sync. Best-effort — a failure here
+  // doesn't undo the ingest work; it just leaves the cursor pinned so
+  // the next sync re-pulls (already-classified rows skip Stage-2 on
+  // the server-side idempotency check).
+  try {
+    onProgress?.({
+      accountId: account.id,
+      phase: "finalize",
+      ingested: summary.messagesIngested,
+      total: summary.messagesFetched,
+    });
+    const fin = await finalizeSync(
+      account.id,
+      syncSessionId,
+      pulledCursor,
+      {
+        messagesIngested: summary.messagesIngested,
+        messagesExcluded: summary.messagesExcluded,
+        messagesJobRelated: summary.messagesJobRelated,
+        jobsLinked: summary.jobsLinked,
+        jobsCreated: summary.jobsCreated,
+        rulesFired: summary.rulesFired,
+        status: summary.status,
+        errorMessage: summary.errorMessage,
+      },
+    );
+    if (fin.errorMessage) {
+      summary.status = summary.status === "error" ? "error" : "partial";
+      summary.errorMessage = summary.errorMessage
+        ? `${summary.errorMessage}; ${fin.errorMessage}`
+        : fin.errorMessage;
+    }
+  } catch (err) {
+    summary.status = summary.status === "error" ? "error" : "partial";
+    const msg = err instanceof Error ? err.message : String(err);
+    summary.errorMessage = summary.errorMessage
+      ? `${summary.errorMessage}; finalize: ${msg}`
+      : `finalize: ${msg}`;
   }
 
   return summary;
