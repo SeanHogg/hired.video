@@ -354,6 +354,9 @@ export function InboxPanel({
     items,
     unreadCount,
     isLoading,
+    hasMoreEmails,
+    isLoadingMoreEmails,
+    loadMoreEmails,
     markAllRead,
     openMessage,
     markNotificationRead,
@@ -422,9 +425,52 @@ export function InboxPanel({
                 onToggleSelected={onToggleSelected}
               />
             ))}
+            <LoadMoreEmailsSentinel
+              hasMore={hasMoreEmails}
+              isLoading={isLoadingMoreEmails}
+              onLoadMore={loadMoreEmails}
+            />
           </div>
         )}
       </ScrollArea>
+    </div>
+  );
+}
+
+/** Sentinel row at the bottom of the inbox list that triggers the next
+ *  page of the email stream. Self-gates on `hasMore` so consumers
+ *  (InboxPanel + any future inbox surface) don't need a `{hasMore && …}`
+ *  guard — they always mount it, and it returns null when nothing's
+ *  left to load. */
+function LoadMoreEmailsSentinel({
+  hasMore,
+  isLoading,
+  onLoadMore,
+}: {
+  hasMore: boolean;
+  isLoading: boolean;
+  onLoadMore: () => void;
+}) {
+  if (!hasMore) return null;
+  return (
+    <div className="px-3 py-3 border-t bg-muted/20">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="w-full h-8 text-xs"
+        disabled={isLoading}
+        onClick={() => onLoadMore()}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+            Loading older emails…
+          </>
+        ) : (
+          "Older emails…"
+        )}
+      </Button>
     </div>
   );
 }

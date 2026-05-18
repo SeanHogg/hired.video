@@ -9,7 +9,10 @@
  * rules client-side, and POSTs chunks of normalised messages to
  * `POST /inbox/external-emails/ingest`. This service persists each
  * chunk, runs Stage-2 LLM classification ONLY for messages the
- * client couldn't classify, then runs dedup + auto-create.
+ * client couldn't classify, then runs dedup + auto-create. When all
+ * chunks complete, the client makes one trailing
+ * `POST /inbox/external-emails/finalize` call which runs the
+ * sync-run audit upsert + provider-cursor advance.
  *
  * Why one-Worker-invocation-per-chunk: each POST is its own
  * Cloudflare Workers invocation with a fresh subrequest budget,
@@ -17,25 +20,38 @@
  * clipping mid-sweep (the failure mode that made #755 / #757 retire
  * the old server-side cron sweep).
  *
+ * Why a separate finalize invocation (gap #826): keeping the
+ * sync-run upsert + cursor write inside the ingest chunk loaded
+ * every chunk with trailing bookkeeping that ran AFTER the LLM
+ * fan-out had already burned most of the Bundled-Worker
+ * 50-subrequest budget. Splitting them lets the chunk spend its
+ * full budget on persistence + classification, then a tiny
+ * finalize invocation handles the two writes with budget to spare.
+ *
  * Bulk-ops contract (gap #815 close): each chunk runs in three passes
  * to keep the per-chunk Cloudflare Worker subrequest count flat in N:
  *   1. PASS A — one batched INSERT (+ one batched conflict-backfill
  *      SELECT) via `externalEmailMessages.insertMany()`.
  *   2. PASS B — in-memory loop: Stage-1 rules + Stage-2 LLM +
- *      summary + dedup (against ONE pre-loaded `DedupContext`) +
+ *      summary (ONLY for messages that pass the job-category gate —
+ *      gap #826) + dedup (against ONE pre-loaded `DedupContext`) +
  *      auto-create. The only per-message subrequests in this pass
  *      are the LLM calls and the optional `insertJob` for
  *      auto-create — every other op is in-memory.
  *   3. PASS C — one batched UPDATE via `externalEmailMessages.patchMany()`.
- * Result: chunk subrequests ≈ 4 fixed (account lookup, rules load,
- * dedup load, insertMany) + 2N LLM calls + ≤N auto-create inserts +
- * 1 patchMany + 1 cursor advance. Down from ~6N before.
+ * Result: chunk subrequests ≈ 3 fixed (account lookup, rules load,
+ * dedup load) + 1 insertMany + ≤N Stage-2 LLM classify (only when
+ * client-side Stage-1 missed) + ≤M summarise (only `passed`
+ * messages — typically a small fraction) + ≤K auto-create inserts +
+ * 1 patchMany. Down from ~6N before #815 and from ~2N+2 trailing
+ * writes before #826.
  *
  * Idempotent on `(accountId, providerMessageId)` — re-posting the
- * same chunk is a no-op, and a transient Neon failure on the final
- * cursor-advance write is caught + retried via `runWithNeonRetry`
- * (gap #727) without 400-ing a chunk whose messages were already
- * persisted.
+ * same chunk is a no-op. The cursor only advances at finalize, so a
+ * dropped finalize call leaves the cursor pointing at the start of
+ * the just-synced batch; the next sync re-pulls and the per-row
+ * idempotency check (`if (row.category && row.linkedJobId …)` in
+ * PASS B) skips Stage-2 + summary for the already-classified rows.
  */
 
 import type { Repos } from "../../repositories/index.js";
@@ -87,16 +103,6 @@ export interface IngestRequestMessage extends NormalisedEmailWire {
 export interface IngestRequest {
   accountId: string;
   messages: IngestRequestMessage[];
-  /** Provider cursor advanced by the client during this chunk. Persisted
-   *  on the account row so the next pull resumes after these messages. */
-  nextCursor?: string | null;
-  /** Client-generated UUID stamped on every chunk POST of a single
-   *  logical sync. Drives the `email_sync_runs` upsert so one logical
-   *  sync produces one history row regardless of chunk count. Optional
-   *  for backwards-compat — chunks without a session id skip the
-   *  sync-run write (legacy callers don't see History rows but ingest
-   *  still works). */
-  syncSessionId?: string | null;
 }
 
 export interface IngestResult {
@@ -107,6 +113,37 @@ export interface IngestResult {
   jobsLinked: number;
   jobsCreated: number;
   rulesFired: Record<string, number>;
+  errorMessage: string | null;
+}
+
+/** Aggregate the client computed across every chunk POST in this
+ *  logical sync. The finalize endpoint folds it into one
+ *  `email_sync_runs` row and advances the provider cursor. */
+export interface FinalizeRequest {
+  accountId: string;
+  syncSessionId: string;
+  /** Provider cursor advanced by the client during this logical sync.
+   *  Persisted on the account row so the next pull resumes after the
+   *  messages this session ingested. Null means the client didn't
+   *  reach a new cursor (e.g. zero messages this sync). */
+  nextCursor: string | null;
+  aggregate: {
+    messagesIngested: number;
+    messagesExcluded: number;
+    messagesJobRelated: number;
+    jobsLinked: number;
+    jobsCreated: number;
+    rulesFired: Record<string, number>;
+    /** Worst per-chunk status the client saw. */
+    status: "success" | "partial" | "error";
+    errorMessage: string | null;
+  };
+}
+
+export interface FinalizeResult {
+  accountId: string;
+  syncSessionId: string;
+  cursorAdvanced: boolean;
   errorMessage: string | null;
 }
 

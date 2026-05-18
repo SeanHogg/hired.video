@@ -16,7 +16,7 @@
  * without the streams needing to know about each other.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGatedResource } from "@/hooks/use-gated-resource";
 import { useSignalR } from "@/hooks/use-signalr";
 import { apiClient } from "@/lib/api-client";
@@ -249,7 +249,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
   // When the filter dep flips, the gated fetcher reloads page 1. We need
   // to drop the appended pages too — otherwise stale page-2 rows from
   // the previous filter would linger.
-  useMemo(() => {
+  useEffect(() => {
     setExtraEmails([]);
     setNextCursor(null);
   }, [filterQuery]);
@@ -583,6 +583,9 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
     unreadCount,
     isConnected,
     isLoading,
+    hasMoreEmails,
+    isLoadingMoreEmails,
+    loadMoreEmails,
     refresh,
     openMessage,
     markNotificationRead,
