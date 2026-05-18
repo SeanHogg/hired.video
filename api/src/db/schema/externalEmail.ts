@@ -98,8 +98,17 @@ export const externalEmailMessages = pgTable(
     summary: text("summary"),
 
     /** Discovered apply URL extracted from the body — used by the dedup
-     *  + auto-create flow (P3) when no existing job_items row matches. */
+     *  + auto-create flow (P3) when no existing job_items row matches.
+     *  Holds the FIRST extracted URL only; the full list lives in
+     *  `applyUrls` jsonb below. Kept as a scalar so dedup + auto-create
+     *  (single-job-per-email) don't need to change shape. */
     applyUrl: text("apply_url"),
+    /** Every recognised apply/jobs/careers/ATS URL the body contained,
+     *  with anchor text when present. Powers the multi-Apply CTA list
+     *  on digest emails (LinkedIn Job Alerts, Indeed weekly, Wellfound
+     *  newsletters) that promote N roles in one message. Shape:
+     *  `Array<{ url: string; label: string | null }>`. */
+    applyUrls: jsonb("apply_urls"),
     /** Confidence of the dedup match against an existing job_items row.
      *  Distinct from the classifier `score`. */
     dedupScore: numeric("dedup_score", { precision: 4, scale: 3 }),

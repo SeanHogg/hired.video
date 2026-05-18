@@ -39,8 +39,13 @@ export function AccountManagementPanel() {
   const isJobSeeker = user?.role === USER_ROLES.JOB_SEEKER;
   const [activeTab, setActiveTab] = useState("billing");
 
-  // Mock current user roles for demo - in real app this would come from auth context
-  const currentUserRoles = ["admin"];
+  // Closes gap-register #781 — derived from auth, not hardcoded. SuperAdmin
+  // gets the same role list as `admin` for invite/edit-roles dropdowns;
+  // every other role flows through `getAvailableRolesForInvite` (which
+  // returns `[]` for job_seeker so the Invite UI hides itself).
+  const currentUserRoles = user?.role
+    ? [user.role === USER_ROLES.SUPER_ADMIN ? "admin" : user.role]
+    : [];
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {

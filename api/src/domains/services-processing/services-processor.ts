@@ -14,6 +14,7 @@
 // ([entitlement-catalog.ts](./entitlement-catalog.ts)) is the only place a
 // new limit needs to be declared; this file is event-type-agnostic.
 
+import type { Context } from "hono";
 import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { getSubscription } from "../../services/billing/BillingService.js";
@@ -30,6 +31,8 @@ import {
   getEntitlement,
   listEntitlements,
 } from "./entitlement-catalog.js";
+
+const UPGRADE_URL = "/pricing";
 
 export class EntitlementExceededError extends Error {
   readonly code = "ENTITLEMENT_EXCEEDED" as const;
@@ -85,6 +88,17 @@ export interface ServicesProcessor {
   /** Live or closed statement for `(userId, periodStart)`. If `periodStart`
    *  is omitted, returns the current calendar month preview. */
   getStatement(userId: string, periodStart?: Date): Promise<UsageStatement>;
+
+  /** Route-handler ergonomics for `gate()` — returns either a `Response`
+   *  (the 402 envelope to short-circuit with) when the caller is over their
+   *  Free-tier cap, or `null` when they're allowed through. Anonymous + admin
+   *  callers always get `null` (gate() handles that internally). */
+  enforce(c: Context, eventType: UsageEventType, quantity?: number): Promise<Response | null>;
+
+  /** Route-handler ergonomics for `meter()` — fire-and-forget, no-op when
+   *  the request has no authenticated user, swallows ledger errors with a
+   *  structured warn-log so a billing blip can never fail the user request. */
+  meterEvent(c: Context, eventType: UsageEventType, metadata?: Record<string, unknown>, quantity?: number): void;
 }
 
 export function startOfMonthUtc(at: Date = new Date()): Date {
@@ -308,6 +322,34 @@ export const servicesProcessor: ServicesProcessor = {
       currency: "USD",
       status: "open",
     };
+  },
+
+  async enforce(c, eventType, quantity = 1) {
+    const gate = await this.gate({ user: c.var.user, eventType, quantity });
+    if (gate.allowed) return null;
+    const spec = getEntitlement(eventType);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "ENTITLEMENT_EXCEEDED",
+          message: gate.reason ?? `${spec.label} limited to ${gate.cap} on the Free plan`,
+          upgradeUrl: UPGRADE_URL,
+          cap: gate.cap,
+          consumed: gate.consumed,
+          eventType,
+        },
+      },
+      402,
+    );
+  },
+
+  meterEvent(c, eventType, metadata, quantity = 1) {
+    const userId = c.var.user?.sub;
+    if (!userId) return;
+    void this.meter({ userId, eventType, quantity, metadata }).catch((err) =>
+      console.warn(`[services-processor] meter ${eventType} failed:`, err),
+    );
   },
 };
 

@@ -1,38 +1,28 @@
 /**
  * EmailSyncRunsRepository — per-account sync run audit + digest source.
  *
- * Each cron-driven sync writes one row, mutating it as the run advances
- * (counts → status → digest summary on the P4 pass).
+ * Read-only today: the PWA-driven ingest path (`services/email-integration/ingest.ts`)
+ * doesn't write to `email_sync_runs` since the #757 cutover, so this repo
+ * only exposes the listing surface that the Email Settings / Inbox sync-history
+ * sheet renders. Re-introducing writes (one row per logical sync) is
+ * tracked in gap-register #811.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { emailSyncRuns } = schema;
 
 export type DbLike = any;
 
-export type EmailSyncRunRow = typeof emailSyncRuns.$inferSelect;
-export type EmailSyncRunInsert = typeof emailSyncRuns.$inferInsert;
-export type EmailSyncRunPatch = Partial<EmailSyncRunInsert>;
+type EmailSyncRunRow = typeof emailSyncRuns.$inferSelect;
 
 export interface IEmailSyncRunsRepository {
-  start(input: EmailSyncRunInsert): Promise<EmailSyncRunRow>;
-  patch(id: string, patch: EmailSyncRunPatch): Promise<void>;
   findRecentForUser(userId: string, limit?: number): Promise<EmailSyncRunRow[]>;
 }
 
 export class EmailSyncRunsRepository implements IEmailSyncRunsRepository {
   constructor(private readonly db: DbLike) {}
-
-  async start(input: EmailSyncRunInsert): Promise<EmailSyncRunRow> {
-    const [row] = await this.db.insert(emailSyncRuns).values(input as any).returning();
-    return row as EmailSyncRunRow;
-  }
-
-  async patch(id: string, patch: EmailSyncRunPatch): Promise<void> {
-    await this.db.update(emailSyncRuns).set(patch as any).where(eq(emailSyncRuns.id, id));
-  }
 
   async findRecentForUser(userId: string, limit = 10): Promise<EmailSyncRunRow[]> {
     return (await this.db

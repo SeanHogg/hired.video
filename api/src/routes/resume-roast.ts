@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 
 export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 resumeRoastRoutes.use("*", attachTokenBudget());
@@ -169,7 +169,7 @@ resumeRoastRoutes.post("/roast", async (c) => {
   // Closes gap-register #765 — Free-tier 3 roasts / month. Anonymous users
   // skip the gate automatically (servicesProcessor.gate returns allowed=true
   // for `!user?.sub`) so the loss-leader path keeps working.
-  const blocked = await enforceEntitlement(c, "resume_roast");
+  const blocked = await servicesProcessor.enforce(c, "resume_roast");
   if (blocked) return blocked;
 
   if (hasAnyLLMProviderKey(c.env)) {
@@ -180,13 +180,13 @@ resumeRoastRoutes.post("/roast", async (c) => {
         systemPrompt: ROAST_SYSTEM_PROMPT,
         userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
       }, RoastResponseSchema);
-      meterEntitlement(c, "resume_roast");
+      servicesProcessor.meterEvent(c, "resume_roast");
       return c.json(ok(data));
     } catch (err) {
       console.error("[resume/roast] LLM error, falling back to mock:", err);
     }
   }
 
-  meterEntitlement(c, "resume_roast");
+  servicesProcessor.meterEvent(c, "resume_roast");
   return c.json(ok(buildMockRoast(parsed.data.resumeText)));
 });

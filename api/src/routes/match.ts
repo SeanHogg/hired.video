@@ -17,7 +17,7 @@ import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
   handleAnalyze,
   handleTailor,
@@ -71,13 +71,13 @@ matchRoutes.post("/analyze", async (c) => {
 /** POST /api/match/tailor — rewrite resume to match job */
 matchRoutes.post("/tailor", async (c) => {
   // Closes gap-register #765 — Free-tier 3 tailor variations / month.
-  const blocked = await enforceEntitlement(c, "resume_tailor");
+  const blocked = await servicesProcessor.enforce(c, "resume_tailor");
   if (blocked) return blocked;
 
   const body = await c.req.json().catch(() => null);
   const response = await relay(c, handleTailor(buildMatchDeps(c), c.var.user?.sub ?? null, body));
   if (response.status >= 200 && response.status < 300) {
-    meterEntitlement(c, "resume_tailor");
+    servicesProcessor.meterEvent(c, "resume_tailor");
   }
   return response;
 });

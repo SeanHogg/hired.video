@@ -6,7 +6,7 @@ import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { getPublicJobs, getHiredVideoCommunityCompanyId, JobEntity } from "../services/job/JobService.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos } = schema;
 
@@ -521,7 +521,7 @@ searchRoutes.post("/saved", async (c) => {
 
   // Closes gap-register #766: enforce Free-tier 3-saved-search cap that was
   // previously marketing-only on the Pricing page.
-  const blocked = await enforceEntitlement(c, "saved_search");
+  const blocked = await servicesProcessor.enforce(c, "saved_search");
   if (blocked) return blocked;
 
   const db = getDb();
@@ -536,7 +536,7 @@ searchRoutes.post("/saved", async (c) => {
     .values({ userId, ...parsed.data } as any)
     .returning()) as any[];
 
-  meterEntitlement(c, "saved_search", { id: row?.id });
+  servicesProcessor.meterEvent(c, "saved_search", { id: row?.id });
 
   return c.json(success(row), 201);
 });

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 
 export const valuePropositionRoutes = new Hono<{ Variables: Variables }>();
 valuePropositionRoutes.use("*", attachTokenBudget());
@@ -38,12 +38,12 @@ async function generate(c: any) {
   // single cap (DRY); they all consume from the same `value_prop_pitch`
   // entitlement regardless of which job+resume identification shape they
   // accept.
-  const blocked = await enforceEntitlement(c, "value_prop_pitch");
+  const blocked = await servicesProcessor.enforce(c, "value_prop_pitch");
   if (blocked) return blocked;
 
   await c.req.json().catch(() => ({}));
   const response = c.json(success(buildResponse()), 200);
-  meterEntitlement(c, "value_prop_pitch");
+  servicesProcessor.meterEvent(c, "value_prop_pitch");
   return response;
 }
 

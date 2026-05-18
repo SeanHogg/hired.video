@@ -3,10 +3,11 @@
 // job_opportunity / application_status / interview_invite / offer
 // email so the user doesn't have to leave the inbox to act on it.
 //
-// Self-gates: rendering nothing when (a) the category isn't a
-// job-mail category or (b) we don't have a linkedJobId to bind tools
-// to (without an id, the deep-links degrade to "pick a job" — same
-// flow the user gets from /tools, no inbox-specific value).
+// Self-gates: renders nothing when the category isn't a job-mail
+// category or when there's no actionable target (no linkedJobId AND
+// no applyUrl(s)). Tool-deep-links require a `linkedJobId` since the
+// /tools/* pages bind to a job by id; rendering a "Tailor resume"
+// button with no jobId would land the user on an empty picker.
 //
 // Tool sourcing goes through `getCatalogToolsForEntity` so this stays
 // in lock-step with the Tools page and the entity action-menus — the
@@ -37,17 +38,39 @@ const PROMOTED_TOOL_IDS = ["resume-tailor", "job-resume-match", "value-propositi
 export interface JobMailCTAsProps {
   category: string | null;
   linkedJobId: string | null;
+  /** First extracted apply URL — kept for backwards compatibility
+   *  with rows ingested before migration 0094 populated `applyUrls`. */
   applyUrl: string | null;
+  /** Every apply URL the body contained, with optional anchor text.
+   *  Populated for digest emails (LinkedIn Job Alerts, Indeed weekly,
+   *  Wellfound newsletters) where one message lists N jobs. */
+  applyUrls?: Array<{ url: string; label: string | null }> | null;
 }
 
-export function JobMailCTAs({ category, linkedJobId, applyUrl }: JobMailCTAsProps) {
+function truncateLabel(label: string, max = 70): string {
+  if (label.length <= max) return label;
+  return label.slice(0, max - 1).trimEnd() + "…";
+}
+
+export function JobMailCTAs({
+  category,
+  linkedJobId,
+  applyUrl,
+  applyUrls,
+}: JobMailCTAsProps) {
   const { user } = useAuth();
   const isActionableCategory = !!category && ACTIONABLE_JOB_CATEGORIES.has(category);
   if (!isActionableCategory) return null;
 
-  // Without a linkedJobId, deep-linking tools is meaningless (they'd
-  // ask the user to pick a job). The Apply URL is still useful, so
-  // we render a minimal panel below if applyUrl is set.
+  // Coalesce the two URL sources. Prefer the labelled array (post-
+  // migration 0094); fall back to the scalar applyUrl for legacy
+  // rows so the panel keeps rendering one Apply button.
+  const links = (applyUrls && applyUrls.length > 0)
+    ? applyUrls
+    : applyUrl
+      ? [{ url: applyUrl, label: null }]
+      : [];
+
   const hasJobContext = !!linkedJobId;
 
   const tools = hasJobContext
@@ -56,54 +79,76 @@ export function JobMailCTAs({ category, linkedJobId, applyUrl }: JobMailCTAsProp
       )
     : [];
 
-  if (!hasJobContext && !applyUrl) return null;
+  if (!hasJobContext && links.length === 0) return null;
 
   return (
     <div className="rounded border bg-emerald-50/40 border-emerald-200 p-3 space-y-2">
       <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-900">
         <Briefcase className="h-3.5 w-3.5" />
-        Job actions
+        {links.length > 1
+          ? `Job actions · ${links.length} roles in this message`
+          : "Job actions"}
       </div>
-      <div className="flex flex-wrap gap-2">
-        {hasJobContext && (
+
+      {/* Tool deep-links require a linkedJobId. Rendered as a tight
+          row above the apply-link list. */}
+      {hasJobContext && (
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
             <Link to={`/jobs/${linkedJobId}`}>
               <Briefcase className="h-3.5 w-3.5 mr-1" />
               View job
             </Link>
           </Button>
-        )}
-        {applyUrl && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-            <a href={applyUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1" />
-              Apply
-            </a>
-          </Button>
-        )}
-        {tools.map((tool) => (
-          <Button
-            key={tool.id}
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            asChild
-          >
-            <Link to={tool.href}>
-              <Wand2 className="h-3.5 w-3.5 mr-1" />
-              {tool.title}
-              {tool.tier === "pro" && (
-                <Badge
-                  variant="outline"
-                  className="ml-1 text-[9px] px-1 py-0 border-amber-300 text-amber-700 bg-amber-50"
-                >
-                  PRO
-                </Badge>
-              )}
-            </Link>
-          </Button>
-        ))}
-      </div>
+          {tools.map((tool) => (
+            <Button
+              key={tool.id}
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              asChild
+            >
+              <Link to={tool.href}>
+                <Wand2 className="h-3.5 w-3.5 mr-1" />
+                {tool.title}
+                {tool.tier === "pro" && (
+                  <Badge
+                    variant="outline"
+                    className="ml-1 text-[9px] px-1 py-0 border-amber-300 text-amber-700 bg-amber-50"
+                  >
+                    PRO
+                  </Badge>
+                )}
+              </Link>
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* Apply links — one per extracted URL. For digest emails this
+          can be a list of 5+ roles; we render them as labelled
+          buttons so the user can act on each without leaving the
+          inbox. */}
+      {links.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {links.map((link, idx) => (
+            <Button
+              key={`${link.url}-${idx}`}
+              variant="outline"
+              size="sm"
+              className="h-auto py-1.5 px-2 text-xs justify-start whitespace-normal text-left"
+              asChild
+            >
+              <a href={link.url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                <span className="flex-1 break-words">
+                  {link.label ? truncateLabel(link.label) : "Apply"}
+                </span>
+              </a>
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

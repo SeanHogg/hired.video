@@ -1548,29 +1548,11 @@ studioRoutes.post("/upload", async (c) => {
   // Mirror to the central usage ledger so video publishes show up on the
   // Usage Statement panel. Re-uploads to the same project (where the project
   // already had a video) are still counted as one publish event each.
-  await servicesProcessor
-    .meter({
-      userId: user.sub,
-      eventType: "video_publish",
-      metadata: { projectId: project.id, videoId: video.id, resolution },
-    })
-    .catch((err) => console.warn("[studio] meter video_publish failed:", err));
+  servicesProcessor.meterEvent(c, "video_publish", { projectId: project.id, videoId: video.id, resolution });
   if (resolution === "4k") {
-    await servicesProcessor
-      .meter({
-        userId: user.sub,
-        eventType: "export_4k",
-        metadata: { projectId: project.id, videoId: video.id },
-      })
-      .catch((err) => console.warn("[studio] meter export_4k failed:", err));
+    servicesProcessor.meterEvent(c, "export_4k", { projectId: project.id, videoId: video.id });
   } else if (resolution === "1080p") {
-    await servicesProcessor
-      .meter({
-        userId: user.sub,
-        eventType: "export_1080p",
-        metadata: { projectId: project.id, videoId: video.id },
-      })
-      .catch((err) => console.warn("[studio] meter export_1080p failed:", err));
+    servicesProcessor.meterEvent(c, "export_1080p", { projectId: project.id, videoId: video.id });
   }
 
   return c.json(ok(toProjectDto(updatedProject, video)), 201);

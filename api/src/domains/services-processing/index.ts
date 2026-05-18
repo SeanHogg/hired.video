@@ -31,4 +31,3 @@ export {
 } from "./entitlement-catalog.js";
 export type { EntitlementSpec } from "./entitlement-catalog.js";
 export { closeMonthForUser, runMonthClose } from "./month-close.js";
-export { enforceEntitlement, meterEntitlement } from "./route-helpers.js";

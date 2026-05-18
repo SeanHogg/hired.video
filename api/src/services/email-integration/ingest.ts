@@ -50,7 +50,7 @@ import { classifyEmail, summariseEmail } from "./classify.js";
 import {
   autoCreateJobFromEmail,
   dedupAgainst,
-  extractApplyUrls,
+  extractJobLinks,
   loadDedupContext,
   type DedupContext,
 } from "./dedup.js";
@@ -68,7 +68,6 @@ export interface IngestDeps {
     | "externalEmailAccounts"
     | "externalEmailMessages"
     | "emailUserRules"
-    | "emailSyncRuns"
     | "jobs"
   >;
   llm: LLMClient;
@@ -273,8 +272,16 @@ export async function ingestForAccount(
       }
 
       const summary = await summariseEmail({ llm: deps.llm }, email, classification);
-      const applyUrls = extractApplyUrls(email);
-      const applyUrl = applyUrls[0] ?? null;
+      // Pull every anchor-with-apply-URL out of the body. Digest mail
+      // (LinkedIn Job Alerts, Indeed weekly, Wellfound newsletter)
+      // typically contains N jobs in one message — the array is what
+      // powers the multi-Apply CTA list in the detail sheet. The
+      // scalar `applyUrl` (first entry) is what dedup + auto-create
+      // operate on (single-job-per-email for now; multi-job auto-create
+      // is tracked in the gap register).
+      const jobLinks = extractJobLinks(email);
+      const applyUrls = jobLinks.length > 0 ? jobLinks : null;
+      const applyUrl = jobLinks[0]?.url ?? null;
 
       let linkedJobId: string | null = null;
       let dedupScore: number | null = null;
@@ -327,6 +334,7 @@ export async function ingestForAccount(
           score: String(classification.score) as any,
           summary,
           applyUrl,
+          applyUrls: applyUrls as any,
           linkedJobId,
           dedupScore: dedupScore == null ? null : (String(dedupScore) as any),
           dedupMethod: dedupMethod as any,

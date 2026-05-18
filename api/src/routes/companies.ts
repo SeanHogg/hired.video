@@ -8,7 +8,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import type { CompanyBenefits } from "../db/schema/companies.js";
 import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
 import { slugify } from "../../../shared/slugify.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 
 const {
   companyProfiles,
@@ -309,14 +309,14 @@ companyRoutes.post("/", async (c) => {
   // Closes gap-register #780: enforce Free-tier 50-companies/mo cap that
   // was previously declared in entitlement-catalog but never enforced at
   // the write site. SuperAdmins bypass automatically via isAdminRole.
-  const blocked = await enforceEntitlement(c, "company_db_write");
+  const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
   const slug = String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const db = getDb();
   const [row] = await db.insert(companyProfiles).values({ ownerId: uid, name: body.name, slug, ...buildWritableFields(body) } as any).returning();
 
-  meterEntitlement(c, "company_db_write", { id: row?.id });
+  servicesProcessor.meterEvent(c, "company_db_write", { id: row?.id });
 
   return c.json(success(rowToCompanyMeta(row)), 201);
 });
@@ -573,7 +573,7 @@ companyRoutes.post("/:id/clone", async (c) => {
   // Closes gap-register #780: clones create a new company_profiles row,
   // so they consume the same cap as POST /api/companies. Otherwise the
   // 50/mo Free cap is trivially bypassed via repeated clone calls.
-  const blocked = await enforceEntitlement(c, "company_db_write");
+  const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
   // Slug is uniquely constrained — derive from the cloned name, then append
@@ -618,7 +618,7 @@ companyRoutes.post("/:id/clone", async (c) => {
     } as any)
     .returning();
 
-  meterEntitlement(c, "company_db_write", { id: clone?.id });
+  servicesProcessor.meterEvent(c, "company_db_write", { id: clone?.id });
 
   return c.json(success(rowToCompanyMeta(clone!)), 201);
 });
@@ -805,7 +805,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
 
   // Closes gap-register #780: only the new-row branch consumes the cap —
   // the dedup-and-merge branch above is a PATCH equivalent, not a create.
-  const blocked = await enforceEntitlement(c, "company_db_write");
+  const blocked = await servicesProcessor.enforce(c, "company_db_write");
   if (blocked) return blocked;
 
   // Create new company record
@@ -824,7 +824,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
     } as any)
     .returning();
 
-  meterEntitlement(c, "company_db_write", { id: created?.id });
+  servicesProcessor.meterEvent(c, "company_db_write", { id: created?.id });
 
   return c.json(success({
     company: created,

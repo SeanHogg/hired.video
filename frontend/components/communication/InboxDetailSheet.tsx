@@ -58,6 +58,10 @@ interface ExternalEmailDetail {
   summary: string | null;
   linkedJobId: string | null;
   applyUrl: string | null;
+  /** Every `<a>`-anchored apply/jobs/careers URL the body contained,
+   *  with anchor text. Digest emails (LinkedIn Job Alerts, Indeed
+   *  weekly) ship N entries per row. */
+  applyUrls: Array<{ url: string; label: string | null }> | null;
   isRead: boolean;
   isArchived: boolean;
   receivedAt: string;
@@ -295,6 +299,7 @@ export function InboxDetailSheet({
                 category={detail.category}
                 linkedJobId={detail.linkedJobId}
                 applyUrl={detail.applyUrl}
+                applyUrls={detail.applyUrls}
               />
 
               <div className="space-y-0.5">

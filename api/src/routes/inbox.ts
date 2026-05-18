@@ -80,6 +80,7 @@ inboxRoutes.get("/external-emails/:id", async (c) => {
       summary: row.summary,
       linkedJobId: row.linkedJobId,
       applyUrl: row.applyUrl,
+      applyUrls: (row as any).applyUrls ?? null,
       isRead: row.isRead,
       isArchived: row.isArchived,
       receivedAt:

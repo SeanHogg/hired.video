@@ -247,13 +247,10 @@ interviewRoutes.post("/sessions", async (c) => {
     } as any)
     .returning();
 
-  await servicesProcessor
-    .meter({
-      userId: user.sub,
-      eventType: "interview_session",
-      metadata: { sessionId: session?.id, interviewType: parsed.data.interviewType },
-    })
-    .catch((err) => console.warn("[interview] meter interview_session failed:", err));
+  servicesProcessor.meterEvent(c, "interview_session", {
+    sessionId: session?.id,
+    interviewType: parsed.data.interviewType,
+  });
 
   return c.json(ok(session), 201);
 });

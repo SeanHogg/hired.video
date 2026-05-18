@@ -196,7 +196,6 @@ export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, Follo
 export type { ExternalEmailAccountRow, ExternalEmailAccountInsert, ExternalEmailAccountPatch } from "./externalEmailAccountsRepository.js";
 export type { ExternalEmailMessageRow, ExternalEmailMessageInsert, ExternalEmailInboxRow } from "./externalEmailMessagesRepository.js";
 export type { EmailUserRuleRow, EmailUserRuleInsert, EmailUserRulePatch } from "./emailUserRulesRepository.js";
-export type { EmailSyncRunRow, EmailSyncRunInsert, EmailSyncRunPatch } from "./emailSyncRunsRepository.js";
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";

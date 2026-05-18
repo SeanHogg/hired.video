@@ -29,15 +29,89 @@ export interface DedupResult {
 const APPLY_URL_RE =
   /https?:\/\/[^\s"'<>]*?(?:apply|jobs?|careers?|posting|gh\/jobs|lever\.co|greenhouse\.io|ashbyhq|workday)[^\s"'<>]*/gi;
 
-export function extractApplyUrls(email: NormalisedEmail): string[] {
-  const haystack = `${email.bodyHtml ?? ""}\n${email.bodyText ?? ""}\n${email.snippet}`;
-  const out = new Set<string>();
-  for (const match of haystack.matchAll(APPLY_URL_RE)) {
-    // Strip trailing punctuation that often glues onto URLs in HTML.
-    const url = match[0].replace(/[).,;>'"\]]+$/, "");
-    out.add(url);
+/** Anchor-first extractor — pulls every `<a href="…">…</a>` whose URL
+ *  matches APPLY_URL_RE and pairs it with the anchor's visible text.
+ *  Used by digest-email rendering (LinkedIn Job Alerts, Indeed weekly,
+ *  Wellfound newsletters) to surface a labelled "Apply" button per
+ *  role rather than one unlabelled link.
+ *
+ *  Falls back to the plain-text URL scrape when the body has no
+ *  anchors (text-only mail). De-duped on canonical URL (query-string
+ *  variants of the same job collapse to one entry — first label
+ *  wins). Capped at 12 entries so a runaway newsletter doesn't blow
+ *  up the row payload. */
+export interface ExtractedJobLink {
+  url: string;
+  label: string | null;
+}
+
+const ANCHOR_RE = /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function canonicalUrl(url: string): string {
+  // Strip click-trackers and tag params so two LinkedIn alert links
+  // pointing at the same job collapse to one entry.
+  try {
+    const u = new URL(url);
+    const drop = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "trk", "trkInfo", "lipi", "midToken", "midSig", "trackingId"];
+    for (const k of drop) u.searchParams.delete(k);
+    return u.toString().replace(/[).,;>'"\]]+$/, "");
+  } catch {
+    return url.replace(/[).,;>'"\]]+$/, "");
   }
-  return [...out].slice(0, 6);
+}
+
+export function extractJobLinks(email: NormalisedEmail): ExtractedJobLink[] {
+  const seen = new Map<string, ExtractedJobLink>();
+  const html = email.bodyHtml ?? "";
+  if (html.length > 0) {
+    for (const m of html.matchAll(ANCHOR_RE)) {
+      const rawUrl = m[1];
+      if (!APPLY_URL_RE.test(rawUrl)) continue;
+      // Reset the global regex state — `.test()` against a /g regex is
+      // stateful and would otherwise alternate-match.
+      APPLY_URL_RE.lastIndex = 0;
+      const url = canonicalUrl(rawUrl);
+      const label = stripTags(m[2]).slice(0, 160) || null;
+      if (!seen.has(url)) {
+        seen.set(url, { url, label });
+      } else if (!seen.get(url)!.label && label) {
+        seen.set(url, { url, label });
+      }
+      if (seen.size >= 12) break;
+    }
+  }
+  // Plain-text fallback / supplement — catches text-only mail and
+  // any in-body URLs that weren't wrapped in an anchor.
+  if (seen.size < 12) {
+    const textHay = `${email.bodyText ?? ""}\n${email.snippet}`;
+    for (const m of textHay.matchAll(APPLY_URL_RE)) {
+      const url = canonicalUrl(m[0].replace(/[).,;>'"\]]+$/, ""));
+      if (!seen.has(url)) seen.set(url, { url, label: null });
+      if (seen.size >= 12) break;
+    }
+  }
+  return [...seen.values()];
+}
+
+/** Backwards-compat thin wrapper — every caller that just wants the
+ *  URL strings (dedup, auto-create) still works without rewriting,
+ *  while new callers (multi-Apply CTA renderer) use `extractJobLinks`
+ *  for the richer label-aware shape. */
+export function extractApplyUrls(email: NormalisedEmail): string[] {
+  return extractJobLinks(email).map((l) => l.url).slice(0, 6);
 }
 
 function normalize(s: string | null | undefined): string {

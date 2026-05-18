@@ -59,7 +59,7 @@ import {
 import { buildResumeDeps } from "../services/resume/deps.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
   CreateResumeSchema,
   UpdateResumeSchema,
@@ -863,7 +863,7 @@ resumeRoutes.post("/save", async (c) => {
 
 resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   // Closes gap-register #765 — Free-tier 5 PDF parses / month.
-  const blocked = await enforceEntitlement(c, "resume_parse");
+  const blocked = await servicesProcessor.enforce(c, "resume_parse");
   if (blocked) return blocked;
 
   const contentType = c.req.header("Content-Type") ?? "";
@@ -917,7 +917,7 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   }
 
   const parsed = preParsed ?? (await parseResumeTextWithAI(c, resumeText));
-  meterEntitlement(c, "resume_parse");
+  servicesProcessor.meterEvent(c, "resume_parse");
   return c.json(ok({ result: JSON.stringify(parsed) }), 200);
 });
 
@@ -1125,7 +1125,7 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
   const user = c.var.user;
 
   // Closes gap-register #765 — Free-tier 5 summaries / month.
-  const blocked = await enforceEntitlement(c, "resume_summary");
+  const blocked = await servicesProcessor.enforce(c, "resume_summary");
   if (blocked) return blocked;
 
   const repo = buildRepos(getDb()).resumes;
@@ -1150,7 +1150,7 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
       });
       const summary = content.trim();
       if (summary) {
-        meterEntitlement(c, "resume_summary");
+        servicesProcessor.meterEvent(c, "resume_summary");
         return c.json(ok({ result: summary }), 200);
       }
     } catch (err) {
@@ -1161,7 +1161,7 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
     }
   }
 
-  meterEntitlement(c, "resume_summary");
+  servicesProcessor.meterEvent(c, "resume_summary");
   return c.json(ok({ result: buildDeterministicSummary(resumeText) }), 200);
 });
 

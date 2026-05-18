@@ -13,7 +13,7 @@ import {
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
-import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 
 export const aiRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -133,7 +133,7 @@ aiRoutes.post("/chat", async (c) => {
   // Gate only fresh user turns; tool follow-ups are part of the same logical
   // message round and were already counted on the originating turn.
   if (!isToolFollowup) {
-    const blocked = await enforceEntitlement(c, "career_coach_msg");
+    const blocked = await servicesProcessor.enforce(c, "career_coach_msg");
     if (blocked) return blocked;
   }
 
@@ -265,7 +265,7 @@ aiRoutes.post("/chat", async (c) => {
   // Same `isToolFollowup` guard as the gate above so a multi-turn tool
   // exchange consumes one message, not three.
   if (!isToolFollowup) {
-    meterEntitlement(c, "career_coach_msg", { sessionId });
+    servicesProcessor.meterEvent(c, "career_coach_msg", { sessionId });
   }
 
   return c.json(
