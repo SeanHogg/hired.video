@@ -68,6 +68,7 @@ export interface IngestDeps {
     | "externalEmailAccounts"
     | "externalEmailMessages"
     | "emailUserRules"
+    | "emailSyncRuns"
     | "jobs"
   >;
   llm: LLMClient;
@@ -89,6 +90,13 @@ export interface IngestRequest {
   /** Provider cursor advanced by the client during this chunk. Persisted
    *  on the account row so the next pull resumes after these messages. */
   nextCursor?: string | null;
+  /** Client-generated UUID stamped on every chunk POST of a single
+   *  logical sync. Drives the `email_sync_runs` upsert so one logical
+   *  sync produces one history row regardless of chunk count. Optional
+   *  for backwards-compat — chunks without a session id skip the
+   *  sync-run write (legacy callers don't see History rows but ingest
+   *  still works). */
+  syncSessionId?: string | null;
 }
 
 export interface IngestResult {
@@ -365,6 +373,41 @@ export async function ingestForAccount(
     } catch (err) {
       console.error("[email-ingest] bulk patch failed:", err);
       result.errorMessage = describeDbError(err);
+    }
+  }
+
+  // ───── PASS D — sync-run upsert (gap #811).
+  // Aggregates per-chunk counters into one logical-sync row keyed on
+  // (accountId, syncSessionId). Best-effort: a failure here doesn't
+  // throw the chunk back to the client — the messages already
+  // persisted and the cursor still needs to advance.
+  if (request.syncSessionId) {
+    try {
+      await deps.repos.emailSyncRuns.upsertChunkResult({
+        userId: account.userId,
+        accountId: account.id,
+        syncSessionId: request.syncSessionId,
+        delta: {
+          messagesSynced: result.messagesIngested,
+          // `messagesClassified` mirrors `messagesIngested` for this
+          // path — every row inserted by the ingest chunk also gets a
+          // category assigned (Stage-1 or Stage-2 or the LLM-failure
+          // fallback). Kept as a distinct column for parity with the
+          // pre-cutover server-sweep shape that the Sync History sheet
+          // still renders.
+          messagesClassified: result.messagesIngested,
+          messagesExcluded: result.messagesExcluded,
+          messagesJobRelated: result.messagesJobRelated,
+          jobsLinked: result.jobsLinked,
+          jobsCreated: result.jobsCreated,
+          rulesFired: result.rulesFired,
+          errorMessage: result.errorMessage,
+          status: result.errorMessage ? "partial" : "success",
+        },
+      });
+    } catch (err) {
+      console.error("[email-ingest] sync-run upsert failed:", err);
+      // Don't poison the chunk response over an audit-row write.
     }
   }
 

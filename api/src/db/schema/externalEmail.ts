@@ -180,9 +180,14 @@ export type EmailUserRule = typeof emailUserRules.$inferSelect;
 export type NewEmailUserRule = typeof emailUserRules.$inferInsert;
 
 /**
- * Per-account sync run audit + digest source. Each cron-driven sync
- * pass writes one row; the P4 digest pass enriches `digestSummary` with
- * an LLM-batched recap of the new messages.
+ * Per-account sync run audit + digest source. One row per **logical
+ * sync** (one click of "Sync now", one cron firing, one Service-Worker
+ * `periodicSync` wake). The PWA orchestrator splits a logical sync
+ * into N chunked POSTs to `/inbox/external-emails/ingest` and stamps
+ * every chunk with the same `sync_session_id`; the ingest service
+ * upserts this row on that key, summing counters across chunks. The
+ * unique partial index on `(account_id, sync_session_id)` is what
+ * makes the upsert atomic (gap #811, migration 0095).
  */
 export const emailSyncRuns = pgTable(
   "email_sync_runs",
@@ -192,6 +197,10 @@ export const emailSyncRuns = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => externalEmailAccounts.id, { onDelete: "cascade" }),
+    /** Client-generated UUID stamped on every chunk POST of a single
+     *  logical sync. Nullable to keep pre-migration-0095 rows valid;
+     *  new rows always carry one. */
+    syncSessionId: varchar("sync_session_id", { length: 64 }),
     startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     status: varchar("status", { length: 16 }).default("running").notNull(),

@@ -119,13 +119,28 @@ async function ingestChunk(
   accountId: string,
   messages: Array<NormalisedEmail & { clientCategory?: string; clientScore?: number; clientRuleName?: string }>,
   nextCursor: string | null,
+  syncSessionId: string,
 ): Promise<IngestResp> {
   const r = await apiClient.post<IngestResp>(
     "/api/inbox/external-emails/ingest",
-    { accountId, messages, nextCursor },
+    { accountId, messages, nextCursor, syncSessionId },
   );
   if (!r.data) throw new Error("Ingest returned no body");
   return r.data;
+}
+
+/** Generate a per-logical-sync UUID stamped onto every chunk POST so
+ *  the server can aggregate chunk counters into one `email_sync_runs`
+ *  row (gap #811). `crypto.randomUUID()` is universally available in
+ *  the browsers we ship to. */
+function newSyncSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Worst-case fallback for ancient browsers — the server only
+  // requires uniqueness per (accountId, syncSessionId), so a
+  // time-prefixed random suffix is fine.
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** Minimal account shape `runClientSync` needs. Both `InboxAccount`
@@ -144,6 +159,9 @@ async function syncAccount(
   onProgress?: (p: ClientSyncProgress) => void,
 ): Promise<ClientSyncSummary> {
   const label = account.accountLabel?.trim() || account.accountEmail;
+  // One session id for the whole logical sync — every chunk POST below
+  // shares it so the server aggregates into one Sync History row.
+  const syncSessionId = newSyncSessionId();
   const summary: ClientSyncSummary = {
     accountId: account.id,
     accountLabel: label,
@@ -209,6 +227,7 @@ async function syncAccount(
           account.id,
           chunk,
           isLastChunk ? cursorToPersist : null,
+          syncSessionId,
         );
         summary.messagesIngested += resp.messagesIngested;
         summary.messagesExcluded += resp.messagesExcluded;

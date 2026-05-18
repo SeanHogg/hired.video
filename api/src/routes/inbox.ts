@@ -301,6 +301,13 @@ inboxRoutes.post("/external-emails/ingest", requirePro("Inbox Sync"), async (c) 
         accountId: body.accountId,
         messages: body.messages,
         nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
+        // Client-generated UUID stamped on every chunk POST of a single
+        // logical sync; the ingest service aggregates per-chunk counters
+        // into one `email_sync_runs` row on this key (gap #811).
+        syncSessionId:
+          typeof body.syncSessionId === "string" && body.syncSessionId.length > 0
+            ? body.syncSessionId
+            : null,
       },
     );
     // Meter one `email_sync` event per ingest chunk so the Usage
