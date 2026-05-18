@@ -108,34 +108,57 @@ export default function ResumeInlineBody({ id }: ResumeInlineBodyProps) {
   );
 }
 
-/** Measure container width via ResizeObserver, scale a fixed-width
- *  child via `transform: scale(...)` to fit. Single source of truth
- *  for "fit any DeclarativeXRenderer into a fractional canvas widget"
- *  — future job / profile / company inline bodies reuse this shell. */
+/** Measure container + inner template via ResizeObserver, scale the
+ *  fixed-width inner via `transform: scale(...)` so the template fills
+ *  100% of the bounded widget — cropping vertically when the natural
+ *  template aspect-ratio is taller than the widget, cropping
+ *  horizontally when shorter. Single source of truth for "fit any
+ *  DeclarativeXRenderer into a fractional canvas widget"; future job /
+ *  profile / company inline bodies reuse this shell.
+ *
+ *  Why fill-with-crop (not fit-with-letterbox): resume templates are
+ *  long documents that almost always exceed widget height once scaled
+ *  to fit width — letterboxing leaves a band of whitespace below the
+ *  visible portion, which is exactly the bug we're fixing. Crop hides
+ *  the bottom of the template (the CTA pill links viewers to the full
+ *  page) while keeping the visually identifiable header / opening
+ *  sections flush to the widget edges. */
 function ScaledTemplateFrame({ children }: { children: React.ReactNode }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const container = containerRef.current;
+    const inner = innerRef.current;
+    if (!container || !inner) return;
     const update = () => {
-      const w = el.getBoundingClientRect().width;
-      if (w <= 0) return;
-      // Cap at 1 so a generously-sized widget doesn't blow the template
-      // up past its authored resolution — readable density wins over
-      // edge-fill.
-      setScale(Math.min(1, w / TEMPLATE_NATIVE_WIDTH));
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      // CSS transforms don't affect offsetHeight — so the inner div's
+      // offsetHeight is the template's natural pixel height at the
+      // authored 800px width, even after we've stamped the scale.
+      const ih = inner.offsetHeight;
+      if (cw <= 0 || ch <= 0 || ih <= 0) return;
+      const widthScale = cw / TEMPLATE_NATIVE_WIDTH;
+      const heightScale = ch / ih;
+      // `max` so the smaller dimension dictates the scale → the
+      // template always fills both width and height, with the
+      // remaining dimension cropped via the container's `overflow:
+      // hidden`. No letterbox whitespace.
+      setScale(Math.max(widthScale, heightScale));
     };
     update();
     const ro = new ResizeObserver(update);
-    ro.observe(el);
+    ro.observe(container);
+    ro.observe(inner);
     return () => ro.disconnect();
   }, []);
 
   return (
     <div ref={containerRef} className="h-full w-full overflow-hidden bg-white">
       <div
+        ref={innerRef}
         style={{
           width: TEMPLATE_NATIVE_WIDTH,
           transform: `scale(${scale})`,
