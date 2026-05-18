@@ -68,6 +68,7 @@ export function normalizeJobData(
     companyId: jobData.companyId || item.companyId,
     expiresAt: jobData.expiresAt || item.expiresAt,
     slug: jobData.slug || item.slug || `job-${item.id}`,
+    isOfficial: item.isOfficial,
   };
 }
 
@@ -110,6 +111,7 @@ export function normalizeCompanyData(
     teamMembers: item.teamMembers || companyData.teamMembers || [],
     onboardingProgress: item.onboardingProgress || companyData.onboardingProgress || 0,
     slug: item.slug || companyData.slug || `company-${item.id}`,
+    isOfficial: item.isOfficial,
   };
 }
 
@@ -160,6 +162,7 @@ export function normalizePersonData(
           | "connected"),
     showOwnership: context.showOwnership || false,
     slug: item.slug || `person-${item.id}`,
+    isOfficial: item.isOfficial,
   };
 }
 
@@ -208,6 +211,7 @@ export function normalizeResumeData(
     ownership,
     showOwnership: context.showOwnership || false,
     slug: item.slug || `resume-${item.id}`,
+    isOfficial: item.isOfficial,
   };
 }
 
@@ -239,6 +243,7 @@ export function normalizeVideoData(
     showOwnership: context.showOwnership || false,
     userId: item.userId,
     status: (item.status as "active" | "draft" | "archived") || "active",
+    isOfficial: item.isOfficial,
   };
 }
 
@@ -268,6 +273,7 @@ export function normalizeMediaData(
       determineOwnership(item, context) === "none"
         ? "tracked"
         : (determineOwnership(item, context) as "owned" | "tracked"),
+    isOfficial: item.isOfficial,
   };
 }
 

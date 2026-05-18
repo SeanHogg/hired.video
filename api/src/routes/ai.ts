@@ -13,6 +13,7 @@ import {
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
+import { servicesProcessor } from "../domains/services-processing/services-processor.js";
 
 export const aiRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -126,6 +127,29 @@ aiRoutes.post("/chat", async (c) => {
 
   if (!userMessage && !isToolFollowup) {
     return c.json(error("VALIDATION_ERROR", "message is required"), 400);
+  }
+
+  // Closes gap-register #765 — Free-tier 20 Career Coach messages / month.
+  // Gate only fresh user turns; tool follow-ups are part of the same logical
+  // message round and were already counted on the originating turn.
+  if (!isToolFollowup) {
+    const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "career_coach_msg" });
+    if (!gate.allowed) {
+      return c.json(
+        {
+          success: false as const,
+          error: {
+            code: "ENTITLEMENT_EXCEEDED",
+            message: gate.reason ?? `Career Coach limited to ${gate.cap} messages on the Free plan`,
+            upgradeUrl: "/pricing",
+            cap: gate.cap,
+            consumed: gate.consumed,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        402,
+      );
+    }
   }
 
   const db = getDb();
@@ -251,6 +275,15 @@ aiRoutes.post("/chat", async (c) => {
   // Token usage is charged automatically by `LLMClient.callMessages`
   // (with `sessionId` linked through the `LLMCallOpts`) — no second
   // recordTokenUsage call needed.
+
+  // Meter the message count for the Free-tier 20/mo Career Coach cap.
+  // Same `isToolFollowup` guard as the gate above so a multi-turn tool
+  // exchange consumes one message, not three.
+  if (!isToolFollowup) {
+    await servicesProcessor
+      .meter({ userId, eventType: "career_coach_msg", metadata: { sessionId } })
+      .catch((err) => console.warn("[ai/chat] meter career_coach_msg failed:", err));
+  }
 
   return c.json(
     success({

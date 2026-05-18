@@ -481,7 +481,10 @@ courseRoutes.post("/:id/clone", async (c) => {
 
   // Slug is `unique(userId, slug)` so we only have to dodge collisions
   // within the caller's own course catalog.
-  const baseSlug = slugify(`${original.title}-copy`);
+  const baseSlug = slugify(`${original.title}-copy`, {
+    fallback: () => `course-${crypto.randomUUID().slice(0, 8)}`,
+    maxLen: 50,
+  });
   let candidateSlug = baseSlug;
   for (let i = 2; i <= 50; i++) {
     const [conflict] = await db.select({ id: courses.id }).from(courses)

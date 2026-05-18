@@ -17,6 +17,7 @@ import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { servicesProcessor } from "../domains/services-processing/services-processor.js";
 import {
   handleAnalyze,
   handleTailor,
@@ -69,8 +70,32 @@ matchRoutes.post("/analyze", async (c) => {
 
 /** POST /api/match/tailor — rewrite resume to match job */
 matchRoutes.post("/tailor", async (c) => {
+  // Closes gap-register #765 — Free-tier 3 tailor variations / month.
+  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "resume_tailor" });
+  if (!gate.allowed) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "ENTITLEMENT_EXCEEDED",
+          message: gate.reason ?? `Resume Tailor limited to ${gate.cap} runs on the Free plan`,
+          upgradeUrl: "/pricing",
+          cap: gate.cap,
+          consumed: gate.consumed,
+        },
+      },
+      402,
+    );
+  }
+
   const body = await c.req.json().catch(() => null);
-  return relay(c, handleTailor(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  const response = await relay(c, handleTailor(buildMatchDeps(c), c.var.user?.sub ?? null, body));
+  if (c.var.user?.sub && response.status >= 200 && response.status < 300) {
+    await servicesProcessor
+      .meter({ userId: c.var.user.sub, eventType: "resume_tailor" })
+      .catch((err) => console.warn("[match/tailor] meter resume_tailor failed:", err));
+  }
+  return response;
 });
 
 /** POST /api/match/bycontent — raw-string analyze */

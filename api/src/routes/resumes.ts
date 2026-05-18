@@ -59,6 +59,7 @@ import {
 import { buildResumeDeps } from "../services/resume/deps.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
+import { servicesProcessor } from "../domains/services-processing/services-processor.js";
 import {
   CreateResumeSchema,
   UpdateResumeSchema,
@@ -861,6 +862,25 @@ resumeRoutes.post("/save", async (c) => {
 });
 
 resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
+  // Closes gap-register #765 — Free-tier 5 PDF parses / month.
+  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "resume_parse" });
+  if (!gate.allowed) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "ENTITLEMENT_EXCEEDED",
+          message: gate.reason ?? `Resume parsing limited to ${gate.cap} files on the Free plan`,
+          upgradeUrl: "/pricing",
+          cap: gate.cap,
+          consumed: gate.consumed,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      402,
+    );
+  }
+
   const contentType = c.req.header("Content-Type") ?? "";
 
   let resumeText = "";
@@ -912,6 +932,11 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   }
 
   const parsed = preParsed ?? (await parseResumeTextWithAI(c, resumeText));
+  if (c.var.user?.sub) {
+    await servicesProcessor
+      .meter({ userId: c.var.user.sub, eventType: "resume_parse" })
+      .catch((err) => console.warn("[resumes/parse] meter resume_parse failed:", err));
+  }
   return c.json(ok({ result: JSON.stringify(parsed) }), 200);
 });
 
@@ -1118,6 +1143,25 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const user = c.var.user;
 
+  // Closes gap-register #765 — Free-tier 5 summaries / month.
+  const gate = await servicesProcessor.gate({ user, eventType: "resume_summary" });
+  if (!gate.allowed) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "ENTITLEMENT_EXCEEDED",
+          message: gate.reason ?? `Resume Summary limited to ${gate.cap} runs on the Free plan`,
+          upgradeUrl: "/pricing",
+          cap: gate.cap,
+          consumed: gate.consumed,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      402,
+    );
+  }
+
   const repo = buildRepos(getDb()).resumes;
   const resolved: ResolvedResume = await resolveResumeForSummary(
     repo,
@@ -1139,7 +1183,14 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
         responseFormat: "text",
       });
       const summary = content.trim();
-      if (summary) return c.json(ok({ result: summary }), 200);
+      if (summary) {
+        if (user?.sub) {
+          await servicesProcessor
+            .meter({ userId: user.sub, eventType: "resume_summary" })
+            .catch((err) => console.warn("[resume/summarize] meter resume_summary failed:", err));
+        }
+        return c.json(ok({ result: summary }), 200);
+      }
     } catch (err) {
       console.warn(
         "[resume/summarize] LLM error, falling back to deterministic summary:",
@@ -1148,6 +1199,11 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
     }
   }
 
+  if (user?.sub) {
+    await servicesProcessor
+      .meter({ userId: user.sub, eventType: "resume_summary" })
+      .catch((err) => console.warn("[resume/summarize] meter resume_summary failed:", err));
+  }
   return c.json(ok({ result: buildDeterministicSummary(resumeText) }), 200);
 });
 

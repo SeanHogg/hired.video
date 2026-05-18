@@ -12,6 +12,7 @@ import PeopleCard from "@/components/PeopleCard";
 import ResumeCard from "@/components/ResumeCard";
 import VideoCard from "@/components/VideoCard";
 import MediaCard from "@/components/MediaCard";
+import { OfficialBadge } from "@/components/badges/OfficialBadge";
 
 import {
   normalizeJobData,
@@ -55,6 +56,30 @@ interface UseCardRendererProps {
 }
 
 /**
+ * Wrap a rendered card so the OfficialBadge can overlay the top-right
+ * corner when the underlying content is platform-authored (`isOfficial`).
+ * The badge is self-gating — it returns null when not official — so this
+ * wrapper is always safe to apply. DRY: lives here once instead of being
+ * repeated in every per-type card branch. See gap #183 / #789.
+ */
+function wrapWithOfficialBadge(
+  isOfficial: boolean | null | undefined,
+  child: React.ReactNode,
+  key?: string,
+): React.ReactNode {
+  if (!isOfficial) return child;
+  return (
+    <div key={key} className="relative">
+      <OfficialBadge
+        isOfficial={isOfficial}
+        className="absolute top-2 right-2 z-10 shadow-sm"
+      />
+      {child}
+    </div>
+  );
+}
+
+/**
  * Hook for creating card renderers with consistent normalization
  */
 export function useCardRenderer({
@@ -91,7 +116,8 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          return (
+          return wrapWithOfficialBadge(
+            normalizedData.isOfficial,
             <JobCard
               key={normalizedData.id}
               job={normalizedData}
@@ -100,7 +126,8 @@ export function useCardRenderer({
               onView={() => interactions.onView?.(normalizedData)}
               onTrack={interactions.onTrack}
               onUntrack={interactions.onUntrack}
-            />
+            />,
+            normalizedData.id,
           );
         }
 
@@ -110,7 +137,8 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          return (
+          return wrapWithOfficialBadge(
+            normalizedData.isOfficial,
             <CompanyCard
               key={normalizedData.id}
               company={normalizedData}
@@ -120,7 +148,8 @@ export function useCardRenderer({
               onActions={() => interactions.onActions?.(normalizedData)}
               onTrack={interactions.onTrack}
               onUntrack={interactions.onUntrack}
-            />
+            />,
+            normalizedData.id,
           );
         }
 
@@ -131,7 +160,8 @@ export function useCardRenderer({
             effectiveUserContext,
           );
 
-          return (
+          return wrapWithOfficialBadge(
+            normalizedData.isOfficial,
             <PeopleCard
               key={normalizedData.id}
               person={normalizedData}
@@ -140,7 +170,8 @@ export function useCardRenderer({
               onView={() => interactions.onView?.(normalizedData)}
               onTrack={interactions.onTrack}
               onUntrack={interactions.onUntrack}
-            />
+            />,
+            normalizedData.id,
           );
         }
 
@@ -150,7 +181,8 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          return (
+          return wrapWithOfficialBadge(
+            normalizedData.isOfficial,
             <ResumeCard
               key={normalizedData.id}
               id={normalizedData.id}
@@ -165,14 +197,16 @@ export function useCardRenderer({
               itemOwnership={resumeOwnership}
               onView={() => interactions.onView?.(normalizedData)}
               onActions={() => interactions.onActions?.(normalizedData)}
-            />
+            />,
+            normalizedData.id,
           );
         }
 
         case "video": {
           normalizedData = normalizeVideoData(item, context);
 
-          return (
+          return wrapWithOfficialBadge(
+            normalizedData.isOfficial,
             <VideoCard
               key={normalizedData.id}
               id={normalizedData.id}
@@ -186,7 +220,8 @@ export function useCardRenderer({
               company={normalizedData.company}
               createdAt={normalizedData.createdAt}
               onView={() => interactions.onView?.(normalizedData)}
-            />
+            />,
+            normalizedData.id,
           );
         }
 
@@ -217,14 +252,16 @@ export function useCardRenderer({
 
 
 
-          return (
+          return wrapWithOfficialBadge(
+            mediaData.isOfficial,
             <MediaCard
               key={mediaData.id}
               media={mediaCardData}
               resumeId={resumeId}
               onView={() => interactions.onView?.(mediaData)}
               onPlay={() => interactions.onView?.(mediaData)}
-            />
+            />,
+            mediaData.id,
           );
         }
 
@@ -254,46 +291,53 @@ export function renderCardItem(
   switch (cardType) {
     case "job": {
       normalizedData = normalizeJobData(item, context);
-      return (
+      return wrapWithOfficialBadge(
+        normalizedData.isOfficial,
         <JobCard
           key={normalizedData.id}
           job={normalizedData}
           onView={() => interactions.onView?.(normalizedData)}
           onTrack={interactions.onTrack}
           onUntrack={interactions.onUntrack}
-        />
+        />,
+        normalizedData.id,
       );
     }
 
     case "company": {
       normalizedData = normalizeCompanyData(item, context);
-      return (
+      return wrapWithOfficialBadge(
+        normalizedData.isOfficial,
         <CompanyCard
           key={normalizedData.id}
           company={normalizedData}
           onView={() => interactions.onView?.(normalizedData)}
           onTrack={interactions.onTrack}
           onUntrack={interactions.onUntrack}
-        />
+        />,
+        normalizedData.id,
       );
     }
 
     case "people": {
       normalizedData = normalizePersonData(item, context);
-      return (
+      return wrapWithOfficialBadge(
+        normalizedData.isOfficial,
         <PeopleCard
           key={normalizedData.id}
           person={normalizedData}
           onView={() => interactions.onView?.(normalizedData)}
           onTrack={interactions.onTrack}
           onUntrack={interactions.onUntrack}
-        />
+        />,
+        normalizedData.id,
       );
     }
 
     case "resume": {
       normalizedData = normalizeResumeData(item, context);
-      return (
+      return wrapWithOfficialBadge(
+        normalizedData.isOfficial,
         <ResumeCard
           key={normalizedData.id}
           id={normalizedData.id}
@@ -305,13 +349,15 @@ export function renderCardItem(
           privacy={normalizedData.privacy}
           ownership={normalizedData.ownership}
           onView={() => interactions.onView?.(normalizedData)}
-        />
+        />,
+        normalizedData.id,
       );
     }
 
     case "video": {
       normalizedData = normalizeVideoData(item, context);
-      return (
+      return wrapWithOfficialBadge(
+        normalizedData.isOfficial,
         <VideoCard
           key={normalizedData.id}
           id={normalizedData.id}
@@ -325,7 +371,8 @@ export function renderCardItem(
           company={normalizedData.company}
           createdAt={normalizedData.createdAt}
           onView={() => interactions.onView?.(normalizedData)}
-        />
+        />,
+        normalizedData.id,
       );
     }
 
@@ -348,14 +395,16 @@ export function renderCardItem(
       // The referenceId points to a resume section, not the resume itself
       const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
 
-      return (
+      return wrapWithOfficialBadge(
+        mediaData.isOfficial,
         <MediaCard
           key={mediaData.id}
           media={mediaCardData}
           resumeId={resumeId}
           onView={() => interactions.onView?.(mediaData)}
           onPlay={() => interactions.onView?.(mediaData)}
-        />
+        />,
+        mediaData.id,
       );
 
     }

@@ -14,6 +14,10 @@ export interface BaseCardData {
   updatedAt: string;
   views: number;
   showOwnership: boolean;
+  /** True when the item was authored by hired.video / a superadmin
+   *  (e.g. seeded official content). Card renderers feed this into
+   *  `<OfficialBadge/>`. See gap #183. */
+  isOfficial?: boolean;
 }
 
 // Enhanced user context and permissions

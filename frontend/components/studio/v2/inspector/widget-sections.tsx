@@ -9,6 +9,8 @@
  * the user lands on the field they're most likely to edit (text body,
  * source URL, fill colour).
  */
+import { lazy, Suspense, useState } from "react";
+import { Camera } from "lucide-react";
 import type {
   TextWidgetParams,
   ImageWidgetParams,
@@ -34,6 +36,17 @@ import {
 } from "@/lib/studio/editor-v2/widget-motion";
 import { FONT_PRESETS } from "@/lib/studio/font-catalog";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { uploadRecording } from "@/lib/services/studio-features-service";
 import {
   AutoSizeTextarea,
   ColorInput,
@@ -49,6 +62,15 @@ import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
 import ContentLinkPicker from "@/components/studio/shared/ContentLinkPicker";
 import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import type { WidgetInspectorSection, WidgetSectionCtx } from "./types";
+
+// Lazy — keeps MediaRecorder + getUserMedia off the editor's initial
+// bundle; mirrors ActionsPanel's loading pattern so the WebcamRecorder
+// chunk is shared between both surfaces.
+const WebcamRecorder = lazy(() =>
+  import("@/components/studio/WebcamRecorder").then((m) => ({
+    default: m.WebcamRecorder,
+  })),
+);
 
 // ───────────────────────────────────────────────────────────────────────────
 // Shared sections — applied to every widget kind.
@@ -685,11 +707,17 @@ const WEBCAM_CONTENT_SECTION: WidgetInspectorSection = {
     return (
       <div className="space-y-3">
         <Field label="Recording URL">
-          <Input
-            value={data.recordingUrl ?? ""}
-            placeholder="Paste recording URL, or record via Actions → Webcam"
-            onChange={(e) => set({ recordingUrl: e.target.value || null })}
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              value={data.recordingUrl ?? ""}
+              placeholder="Paste recording URL, or record from your webcam"
+              onChange={(e) => set({ recordingUrl: e.target.value || null })}
+              className="flex-1"
+            />
+            <WebcamRecordTrigger
+              onCaptured={(url) => set({ recordingUrl: url })}
+            />
+          </div>
         </Field>
         <label className="flex items-center gap-2 text-xs">
           <input
@@ -711,6 +739,86 @@ const WEBCAM_CONTENT_SECTION: WidgetInspectorSection = {
     );
   },
 };
+
+// Open-on-click dialog hosting WebcamRecorder; uploads the captured
+// blob through the same /api/studio/recording/upload pipeline the
+// Actions panel uses so the URL survives a page refresh. Falls back to
+// an in-memory blob URL with a destructive toast when the upload fails
+// — the recording itself is still usable in this tab.
+function WebcamRecordTrigger({ onCaptured }: { onCaptured: (url: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  async function handleComplete(blob: Blob, durationMs: number) {
+    setUploading(true);
+    try {
+      const ext = (blob.type || "").includes("mp4") ? "mp4" : "webm";
+      const file = new File([blob], `webcam-${Date.now()}.${ext}`, {
+        type: blob.type || "video/webm",
+      });
+      const { videoUrl } = await uploadRecording(file, "webcam", undefined, durationMs);
+      if (videoUrl) {
+        onCaptured(videoUrl);
+        toast({ title: "Recording uploaded" });
+      } else {
+        onCaptured(URL.createObjectURL(blob));
+        toast({
+          title: "Saved locally only",
+          description: "Upload returned no URL — this clip will be lost on refresh.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      onCaptured(URL.createObjectURL(blob));
+      toast({
+        title: "Upload failed — using local clip",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      setOpen(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !uploading && setOpen(next)}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="shrink-0"
+          aria-label="Record from webcam"
+          title="Record from webcam"
+        >
+          <Camera className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Record from webcam</DialogTitle>
+          <DialogDescription>
+            Record a clip — it lands in the Recording URL field when you finish.
+          </DialogDescription>
+        </DialogHeader>
+        <Suspense
+          fallback={
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Loading…
+            </div>
+          }
+        >
+          <WebcamRecorder mode="webcam" onRecordingComplete={handleComplete} />
+        </Suspense>
+        {uploading && (
+          <p className="text-xs text-muted-foreground">Uploading recording…</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const DIVIDER_CONTENT_SECTION: WidgetInspectorSection = {
   id: "content",

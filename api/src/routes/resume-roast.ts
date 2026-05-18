@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
+import { servicesProcessor } from "../domains/services-processing/services-processor.js";
 
 export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 resumeRoastRoutes.use("*", attachTokenBudget());
@@ -165,6 +166,29 @@ resumeRoastRoutes.post("/roast", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", parsed.error.flatten()), 400);
   }
 
+  // Closes gap-register #765 — Free-tier 3 roasts / month. Anonymous users
+  // skip the gate entirely (loss-leader for the marketing landing page) so
+  // unauthenticated callers continue to get free roasts.
+  const userId = c.var.user?.sub;
+  if (userId) {
+    const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "resume_roast" });
+    if (!gate.allowed) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "ENTITLEMENT_EXCEEDED",
+            message: gate.reason ?? `Resume Roast limited to ${gate.cap} runs on the Free plan`,
+            upgradeUrl: "/pricing",
+            cap: gate.cap,
+            consumed: gate.consumed,
+          },
+        },
+        402,
+      );
+    }
+  }
+
   if (hasAnyLLMProviderKey(c.env)) {
     try {
       const llm = createLLMClient(c.env, c.var.user);
@@ -173,11 +197,21 @@ resumeRoastRoutes.post("/roast", async (c) => {
         systemPrompt: ROAST_SYSTEM_PROMPT,
         userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
       }, RoastResponseSchema);
+      if (userId) {
+        await servicesProcessor
+          .meter({ userId, eventType: "resume_roast" })
+          .catch((err) => console.warn("[resume/roast] meter resume_roast failed:", err));
+      }
       return c.json(ok(data));
     } catch (err) {
       console.error("[resume/roast] LLM error, falling back to mock:", err);
     }
   }
 
+  if (userId) {
+    await servicesProcessor
+      .meter({ userId, eventType: "resume_roast" })
+      .catch((err) => console.warn("[resume/roast] meter resume_roast failed:", err));
+  }
   return c.json(ok(buildMockRoast(parsed.data.resumeText)));
 });

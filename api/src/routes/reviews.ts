@@ -38,7 +38,22 @@ import {
   type SubjectDescriptor,
 } from "../../../shared/reviews/subject-descriptors.js";
 
-const { reviews, reviewComments, feedPosts, companyProfiles, promoProjects, creatorProfiles, users } = schema;
+const {
+  reviews,
+  reviewComments,
+  feedPosts,
+  companyProfiles,
+  promoProjects,
+  creatorProfiles,
+  users,
+  articles,
+  courses,
+  courseEnrollments,
+  courseCertificates,
+  resumeTemplates,
+  studioTemplates,
+  templateLicenses,
+} = schema;
 
 export const reviewRoutes = new Hono<{ Variables: Variables }>();
 
@@ -142,6 +157,12 @@ async function resolveSubject(
   db: ReturnType<typeof getDb>,
   type: SubjectType,
   id: string,
+  /** Reviewer's user id. Optional for backwards compatibility with the
+   *  is-owner check at comment-resolve time. Required to populate
+   *  `buyerId` on many-buyer subjects (course / template / certification)
+   *  where the buyer is identified by a license/enrollment row, not a
+   *  single column on the subject itself. */
+  reviewerId?: string,
 ): Promise<ResolvedSubject | null> {
   switch (type) {
     case "company": {
@@ -178,6 +199,99 @@ async function resolveSubject(
         requiredState: { actual: row.status, required: "accepted" },
         verifyAgainst: {},
       };
+    }
+    case "article": {
+      const [row] = await db
+        .select({ ownerId: articles.userId })
+        .from(articles)
+        .where(eq(articles.id, id))
+        .limit(1);
+      if (!row) return null;
+      return { ownerId: row.ownerId, verifyAgainst: {} };
+    }
+    case "course": {
+      const [row] = await db
+        .select({ ownerId: courses.userId })
+        .from(courses)
+        .where(eq(courses.id, id))
+        .limit(1);
+      if (!row) return null;
+      // For many-buyer subjects we resolve the reviewer's enrollment to
+      // populate `buyerId`. Without an enrollment, `buyerId` stays
+      // undefined and the buyer_only eligibility check fails closed.
+      let buyerId: string | undefined;
+      if (reviewerId) {
+        const [enrol] = await db
+          .select({ userId: courseEnrollments.userId })
+          .from(courseEnrollments)
+          .where(and(eq(courseEnrollments.courseId, id), eq(courseEnrollments.userId, reviewerId)))
+          .limit(1);
+        if (enrol) buyerId = enrol.userId;
+      }
+      return { ownerId: row.ownerId, buyerId, verifyAgainst: {} };
+    }
+    case "resume_template": {
+      const [row] = await db
+        .select({ ownerId: resumeTemplates.createdBy })
+        .from(resumeTemplates)
+        .where(eq(resumeTemplates.id, id))
+        .limit(1);
+      if (!row) return null;
+      // resume_templates.createdBy is nullable (platform-seeded templates
+      // have no creator). Fall back to a sentinel so `ownerId === reviewerId`
+      // self-review block never spuriously matches.
+      const ownerId = row.ownerId ?? "00000000-0000-0000-0000-000000000000";
+      let buyerId: string | undefined;
+      if (reviewerId) {
+        const [lic] = await db
+          .select({ userId: templateLicenses.userId })
+          .from(templateLicenses)
+          .where(
+            and(
+              eq(templateLicenses.templateKind, "resume"),
+              eq(templateLicenses.templateId, id),
+              eq(templateLicenses.userId, reviewerId),
+            ),
+          )
+          .limit(1);
+        if (lic) buyerId = lic.userId;
+      }
+      return { ownerId, buyerId, verifyAgainst: {} };
+    }
+    case "video_template": {
+      const [row] = await db
+        .select({ ownerId: studioTemplates.creatorId })
+        .from(studioTemplates)
+        .where(eq(studioTemplates.id, id))
+        .limit(1);
+      if (!row) return null;
+      let buyerId: string | undefined;
+      if (reviewerId) {
+        const [lic] = await db
+          .select({ userId: templateLicenses.userId })
+          .from(templateLicenses)
+          .where(
+            and(
+              eq(templateLicenses.templateKind, "studio"),
+              eq(templateLicenses.templateId, id),
+              eq(templateLicenses.userId, reviewerId),
+            ),
+          )
+          .limit(1);
+        if (lic) buyerId = lic.userId;
+      }
+      return { ownerId: row.ownerId, buyerId, verifyAgainst: {} };
+    }
+    case "certification": {
+      const [row] = await db
+        .select({ ownerId: courseCertificates.userId })
+        .from(courseCertificates)
+        .where(eq(courseCertificates.id, id))
+        .limit(1);
+      if (!row) return null;
+      // For certs the "buyer" semantic == the cert holder. Self-attestation
+      // reviews are intentional (Coursera-style "what this cert did for me").
+      return { ownerId: row.ownerId, buyerId: row.ownerId, verifyAgainst: {} };
     }
     // Stubbed — descriptor exists, subject lookup not wired yet. The
     // route returns 501 so callers don't silently no-op.
@@ -455,7 +569,35 @@ async function recomputeAggregateCache(
     return;
   }
 
-  // service / voice_clone — cache columns don't exist yet, no-op.
+  if (subjectType === "course") {
+    const [agg] = await db
+      .select({
+        cnt: sql<number>`count(*)::int`,
+        avg: sql<number | null>`avg(${reviews.overallRating})::float`,
+      })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.subjectType, "course"),
+          eq(reviews.subjectId, subjectId),
+          eq(reviews.status, "published"),
+        ),
+      );
+    await db
+      .update(courses)
+      .set({
+        averageRating: agg?.avg ?? null,
+        ratingCount: agg?.cnt ?? 0,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(courses.id, subjectId));
+    return;
+  }
+
+  // service / voice_clone / article / resume_template / video_template /
+  // certification — cache columns don't exist yet, no-op. See gap #793
+  // for the schema additions that would let these subjects denormalise
+  // rating count + avg onto their listing rows.
 }
 
 function rowToComment(row: typeof reviewComments.$inferSelect) {
@@ -634,7 +776,7 @@ async function upsertHandler(c: any): Promise<Response> {
   const subjectId = c.req.param("subjectId");
   const db = getDb();
 
-  const subject = await resolveSubject(db, subjectType, subjectId);
+  const subject = await resolveSubject(db, subjectType, subjectId, uid);
   if (!subject) {
     return c.json(error("NOT_FOUND", `${descriptor.noun} not found`), 404);
   }
