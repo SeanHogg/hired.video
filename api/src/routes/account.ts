@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { checkTeamSize } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
   acceptInvitation,
@@ -46,7 +45,7 @@ accountRoutes.get("/users", async (c) => {
 accountRoutes.post("/invite", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const limitError = await checkTeamSize(c as any);
+  const limitError = await servicesProcessor.enforce(c, "team_invite");
   if (limitError) return limitError;
   const request = await c.req.json();
   const result = await inviteAccountUser(request, userId);
@@ -122,7 +121,7 @@ accountRoutes.get("/analytics", async (c) => {
 accountRoutes.post("/bulk-invite", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const limitError = await checkTeamSize(c as any);
+  const limitError = await servicesProcessor.enforce(c, "team_invite");
   if (limitError) return limitError;
   const body = await c.req.json();
   const result = await bulkInviteUsers(userId, body);

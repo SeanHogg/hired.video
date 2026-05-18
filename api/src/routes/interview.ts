@@ -6,10 +6,7 @@ import type { Env, Variables } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
-import {
-  attachTokenBudget,
-  checkInterviewSessionsThisMonth,
-} from "../middleware/tierEnforcement.js";
+import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 
 const { interviewSessions, interviewAnswers } = schema;
@@ -232,7 +229,7 @@ interviewRoutes.post("/sessions", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const limitErr = await checkInterviewSessionsThisMonth(c);
+  const limitErr = await servicesProcessor.enforce(c, "interview_session");
   if (limitErr) return limitErr;
 
   const db = getDb();

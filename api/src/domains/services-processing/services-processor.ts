@@ -116,6 +116,25 @@ async function resolvePlan(userId: string): Promise<PlanTier> {
   return "free";
 }
 
+/**
+ * Single-seam consumption count for any catalog dimension. `gate()` and
+ * `getStatement()` both route through here; consumers that need a cap
+ * check outside the Hono `Context` flow (e.g. the email-integration
+ * OAuth `/connect` redirect handler that authenticates via `link_token`
+ * and never builds a `JwtPayload`) call this directly to avoid
+ * synthesising one.
+ *
+ * Dispatches on `spec.consumedSource` so a dimension's "what counts as
+ * consumed" answer lives in exactly one place — the catalog entry.
+ */
+export async function loadConsumed(
+  userId: string,
+  eventType: UsageEventType,
+  periodStart: Date = startOfMonthUtc(),
+): Promise<number> {
+  return consumedInPeriod(userId, eventType, periodStart);
+}
+
 async function consumedInPeriod(
   userId: string,
   eventType: UsageEventType,
@@ -184,14 +203,29 @@ async function consumedInPeriod(
       // videos row against. Re-uploads to the same project replace the
       // existing video and don't count as new publishes.
       const [row] = (await db
-        .select({
-          total: sql<number>`count(DISTINCT ${schema.videos.studioProjectId})::int`,
-        })
-        .from(schema.videos)
+        .select({ total: sql<number>`count(*)::int` })
+        .from(schema.studioProjects)
         .where(
           and(
-            eq(schema.videos.userId, userId),
-            isNotNull(schema.videos.studioProjectId),
+            eq(schema.studioProjects.userId, userId),
+            isNotNull(schema.studioProjects.videoId),
+          ),
+        )) as Array<{ total: number | string | null }>;
+      const v = row?.total ?? 0;
+      return typeof v === "string" ? Number(v) : v;
+    }
+
+    case "connected_inboxes_active": {
+      // Snapshot count of `external_email_accounts` rows with `status =
+      // 'active'`. Disconnecting a mailbox frees the slot immediately, so
+      // periodStart is intentionally ignored.
+      const [row] = (await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(schema.externalEmailAccounts)
+        .where(
+          and(
+            eq(schema.externalEmailAccounts.userId, userId),
+            eq(schema.externalEmailAccounts.status, "active"),
           ),
         )) as Array<{ total: number | string | null }>;
       const v = row?.total ?? 0;
@@ -339,29 +373,25 @@ export const servicesProcessor: ServicesProcessor = {
       consumedByType.set(r.eventType as UsageEventType, total);
     }
 
-    // Snapshot dimensions don't fit append-only ledger semantics. For each
-    // such dimension, read the live count from its owning table and inject
-    // it as the `consumedQuantity` for the corresponding line.
-    let connectedInboxCount = 0;
-    if (plan !== "free") {
-      const [row] = (await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(schema.externalEmailAccounts)
-        .where(
-          and(
-            eq(schema.externalEmailAccounts.userId, userId),
-            eq(schema.externalEmailAccounts.status, "active"),
-          ),
-        )) as Array<{ count: number | string | null }>;
-      const raw = row?.count ?? 0;
-      connectedInboxCount = typeof raw === "string" ? Number(raw) : raw;
+    // Non-ledger dimensions (lifetime / snapshot) have to be counted from
+    // their own authoritative table — the SUM-by-event-type ledger query
+    // above returns zero for them. Dispatch via the catalog's
+    // `consumedSource` so every dimension gets its number from one place
+    // (the same dispatcher `gate()` uses).
+    const visible = listEntitlements(plan);
+    const nonLedgerCounts = await Promise.all(
+      visible.map(async (spec) => {
+        const source = spec.consumedSource ?? "ledger_monthly";
+        if (source === "ledger_monthly") return null;
+        return [spec.eventType, await consumedInPeriod(userId, spec.eventType, period)] as const;
+      }),
+    );
+    for (const entry of nonLedgerCounts) {
+      if (entry) consumedByType.set(entry[0], entry[1]);
     }
 
-    const lines: UsageStatementLine[] = listEntitlements(plan).map((spec) => {
-      const consumed =
-        spec.eventType === "email_account"
-          ? connectedInboxCount
-          : consumedByType.get(spec.eventType) ?? 0;
+    const lines: UsageStatementLine[] = visible.map((spec) => {
+      const consumed = consumedByType.get(spec.eventType) ?? 0;
       const cap = spec.monthlyCap[plan];
       const overage = cap > 0 ? Math.max(0, consumed - cap) : 0;
       const overageCents = overage * spec.overageCentsPerUnit;

@@ -1398,42 +1398,15 @@ studioRoutes.post("/upload", async (c) => {
     }
   }
 
-  // Free-tier video quota — single source of truth in shared/studio-quota.ts
-  // so the studio UI can pre-check with the same rule. SuperAdmins bypass.
-  // Re-uploads to the same project replace the existing video and don't
-  // count against the quota, so we exclude the current project from the
-  // published-video count.
+  // Free-tier video quota — routed through ServiceProcessor's `video_publish`
+  // entitlement, which counts distinct studio_projects with a non-null
+  // videoId. Re-uploads to the same project don't bump the count (they
+  // patch the existing project row's videoId rather than creating a new
+  // one), so the gate is correct for re-render flows. SuperAdmins/admins
+  // bypass automatically inside servicesProcessor.gate via isAdminRole.
   {
-    const sub = await getSubscription(user.sub);
-    const isSuperAdmin =
-      user.isSuperAdmin === true ||
-      user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true;
-
-    const owned = await db
-      .select({ id: studioProjects.id, videoId: studioProjects.videoId })
-      .from(studioProjects)
-      .where(eq(studioProjects.userId, user.sub));
-    const publishedVideoCount = owned.filter(
-      (p) => p.videoId != null && (!maybeProjectId || p.id !== maybeProjectId),
-    ).length;
-
-    const decision = decideStudioQuota({
-      isPro: sub.isPro,
-      isSuperAdmin,
-      publishedVideoCount,
-    });
-    if (!decision.allowed) {
-      return c.json(
-        fail(
-          "QUOTA_EXCEEDED",
-          TIER_COPY.freeQuotaExceededForFeature({
-            freeAllowance: "publish 1 video",
-            feature: "videos",
-          }),
-        ),
-        402,
-      );
-    }
+    const blocked = await servicesProcessor.enforce(c, "video_publish");
+    if (blocked) return blocked;
   }
 
   // Resolve workspace selection from form fields (multipart) or default

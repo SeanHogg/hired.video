@@ -45,7 +45,8 @@ import {
 import { requirePro } from "../middleware/auth-gates.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
-import { INBOX_SYNC_INCLUDED_ACCOUNTS } from "../../../shared/pricing.js";
+import { loadConsumed } from "../domains/services-processing/services-processor.js";
+import { getEntitlement } from "../domains/services-processing/entitlement-catalog.js";
 
 function getEnv(key: string): string {
   return process.env[key] || (globalThis as any).__ENV?.[key] || "";
@@ -116,8 +117,13 @@ async function checkInboxSyncEntitlement(
   if (!sub.isPro) {
     return { ok: false, redirect: "/pricing?upgrade=inbox-sync" };
   }
-  const active = await repos.externalEmailAccounts.findActiveForUser(userId);
-  if (active.length < INBOX_SYNC_INCLUDED_ACCOUNTS) return { ok: true };
+  // Cap + consumed count both come from the catalog dispatcher — same
+  // seam `gate()` uses for every other entitlement, so the included-3
+  // value lives in exactly one place (`shared/pricing.ts` →
+  // entitlement-catalog → here).
+  const cap = getEntitlement("email_account").monthlyCap.pro;
+  const consumed = await loadConsumed(userId, "email_account");
+  if (consumed < cap) return { ok: true };
   if (skipIfExisting) {
     const existing = await repos.externalEmailAccounts.findByProviderEmail(
       userId,
