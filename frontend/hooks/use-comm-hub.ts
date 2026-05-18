@@ -16,7 +16,7 @@
  * without the streams needing to know about each other.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useGatedResource } from "@/hooks/use-gated-resource";
 import { useSignalR } from "@/hooks/use-signalr";
 import { apiClient } from "@/lib/api-client";
@@ -121,6 +121,7 @@ interface InboxResponse {
   pendingRequests: Connection[];
   externalEmails: PersistedExternalEmail[];
   accounts: InboxAccount[];
+  nextEmailCursor: string | null;
 }
 
 const POLL_INTERVAL_MS = 60_000;
@@ -131,17 +132,21 @@ const EMPTY_INBOX: InboxResponse = {
   pendingRequests: [],
   externalEmails: [],
   accounts: [],
+  nextEmailCursor: null,
 };
 
-function buildInboxQuery(filters?: EmailInboxFilters): string {
-  if (!filters) return "";
+function buildInboxQuery(
+  filters?: EmailInboxFilters,
+  emailCursor?: string | null,
+): string {
   const params = new URLSearchParams();
-  if (filters.accountIds && filters.accountIds.length > 0) {
+  if (filters?.accountIds && filters.accountIds.length > 0) {
     params.set("accountIds", filters.accountIds.join(","));
   }
-  if (filters.unreadOnly) params.set("unread", "1");
-  if (filters.includeArchived) params.set("archived", "1");
-  if (filters.junkOnly) params.set("junk", "1");
+  if (filters?.unreadOnly) params.set("unread", "1");
+  if (filters?.includeArchived) params.set("archived", "1");
+  if (filters?.junkOnly) params.set("junk", "1");
+  if (emailCursor) params.set("emailCursor", emailCursor);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }
@@ -152,6 +157,15 @@ export interface UseCommHubReturn {
   unreadCount: number;
   isConnected: boolean;
   isLoading: boolean;
+  /** True when the external-email stream has more rows beyond what's
+   *  currently loaded. Drives the "Older emails…" sentinel in InboxPanel. */
+  hasMoreEmails: boolean;
+  /** True while a `loadMoreEmails()` round-trip is in flight. */
+  isLoadingMoreEmails: boolean;
+  /** Fetch the next chunk of external emails using the server-side
+   *  cursor and append them to the merged feed. No-op when there are
+   *  no more rows or a previous call is still pending. */
+  loadMoreEmails: () => Promise<void>;
   refresh: () => Promise<void>;
   openMessage: (conversationId: string) => void;
   markNotificationRead: (notificationId: string) => Promise<void>;
@@ -192,11 +206,13 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
   const { emailFilters } = options;
   // Stringify the filter to use as the fetcher cache key — the fetch
   // closure captures it so changing filters triggers a refresh through
-  // useGatedResource's polling cycle.
+  // useGatedResource's polling cycle. The cursor is intentionally
+  // omitted: polling always reloads page 1.
   const filterQuery = useMemo(() => buildInboxQuery(emailFilters), [
     emailFilters?.accountIds?.join(",") ?? "",
     emailFilters?.unreadOnly ?? false,
     emailFilters?.includeArchived ?? false,
+    emailFilters?.junkOnly ?? false,
   ]);
   const {
     notifications: liveNotifs,
@@ -222,11 +238,59 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
       deps: [filterQuery],
     });
 
+  // Pages 2+ live outside the gated cache so polling doesn't wipe them.
+  // The dedup pass in the items memo keeps a row from appearing twice
+  // when a poll happens to surface a message that's also in the appended
+  // chunk.
+  const [extraEmails, setExtraEmails] = useState<PersistedExternalEmail[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingMoreEmails, setIsLoadingMoreEmails] = useState(false);
+
+  // When the filter dep flips, the gated fetcher reloads page 1. We need
+  // to drop the appended pages too — otherwise stale page-2 rows from
+  // the previous filter would linger.
+  useMemo(() => {
+    setExtraEmails([]);
+    setNextCursor(null);
+  }, [filterQuery]);
+
   const conversations = inbox.conversations;
   const persistedNotifs = inbox.notifications;
   const requests = inbox.pendingRequests;
-  const externalEmails = inbox.externalEmails;
   const accounts = inbox.accounts;
+  const externalEmails = useMemo(() => {
+    if (extraEmails.length === 0) return inbox.externalEmails;
+    const seen = new Set(inbox.externalEmails.map((e) => e.id));
+    const appended = extraEmails.filter((e) => !seen.has(e.id));
+    return appended.length === 0
+      ? inbox.externalEmails
+      : [...inbox.externalEmails, ...appended];
+  }, [inbox.externalEmails, extraEmails]);
+
+  // The server's nextEmailCursor reflects page 1 only. Once we've loaded
+  // pages 2+, our local `nextCursor` is authoritative until the next
+  // poll resets it back to page 1's cursor.
+  const effectiveNextCursor =
+    extraEmails.length > 0 ? nextCursor : inbox.nextEmailCursor;
+  const hasMoreEmails = !!effectiveNextCursor;
+
+  const loadMoreEmails = useCallback(async () => {
+    if (!effectiveNextCursor || isLoadingMoreEmails) return;
+    setIsLoadingMoreEmails(true);
+    try {
+      const qs = buildInboxQuery(emailFilters, effectiveNextCursor);
+      const response = await apiClient.get<InboxResponse>(`/api/inbox${qs}`);
+      const payload = response.data ?? EMPTY_INBOX;
+      setExtraEmails((prev) => {
+        const seen = new Set(prev.map((e) => e.id));
+        const fresh = payload.externalEmails.filter((e) => !seen.has(e.id));
+        return fresh.length === 0 ? prev : [...prev, ...fresh];
+      });
+      setNextCursor(payload.nextEmailCursor);
+    } finally {
+      setIsLoadingMoreEmails(false);
+    }
+  }, [effectiveNextCursor, emailFilters, isLoadingMoreEmails]);
 
   // Local mutators used by the optimistic update paths below — we splice
   // into the cached `inbox` aggregate via `setInbox` so the gate predicate

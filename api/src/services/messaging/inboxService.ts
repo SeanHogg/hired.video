@@ -117,17 +117,47 @@ export interface InboxResponse {
    *  on the Outreach Inbox tab so the client can render account chips
    *  without a second round-trip. */
   accounts: InboxAccountDto[];
+  /** Opaque cursor for the next page of the email stream — null when
+   *  the current chunk reached the end. Encoded `<receivedAtIso>__<id>`
+   *  so the route + client never need to handle the tuple themselves. */
+  nextEmailCursor: string | null;
 }
 
 const MAX_CONVERSATIONS = 25;
 const MAX_NOTIFICATIONS = 50;
 const MAX_EXTERNAL_EMAILS = 50;
 
+const EMAIL_CURSOR_SEPARATOR = "__";
+
+/** Round-trip the (receivedAt, id) anchor through one opaque string so
+ *  callers don't need to know its shape. ISO timestamps never contain
+ *  underscores and UUIDs never contain them either, so a `__` split is
+ *  unambiguous. */
+export function encodeEmailCursor(receivedAt: string, id: string): string {
+  return `${receivedAt}${EMAIL_CURSOR_SEPARATOR}${id}`;
+}
+
+export function decodeEmailCursor(
+  raw: string | null | undefined,
+): { receivedAt: string; id: string } | undefined {
+  if (!raw) return undefined;
+  const idx = raw.indexOf(EMAIL_CURSOR_SEPARATOR);
+  if (idx <= 0 || idx === raw.length - EMAIL_CURSOR_SEPARATOR.length) return undefined;
+  const receivedAt = raw.slice(0, idx);
+  const id = raw.slice(idx + EMAIL_CURSOR_SEPARATOR.length);
+  if (!receivedAt || !id) return undefined;
+  return { receivedAt, id };
+}
+
 export async function getInboxFor(
   deps: InboxServiceDeps,
   userId: string,
   emailOpts: FindInboxOptions = {},
 ): Promise<InboxResponse> {
+  // Pull `limit + 1` rows so we can tell whether another page exists
+  // without an extra COUNT — if N+1 came back the (N+1)-th row's
+  // (receivedAt, id) becomes the next-page cursor anchor.
+  const emailLimit = emailOpts.limit ?? MAX_EXTERNAL_EMAILS;
   // Fan out the repo reads in parallel — they're independent and hitting
   // the DB pool, not the public API rate limiter. External-email read is
   // safe to include even with no integrations connected: the repo returns
@@ -143,19 +173,42 @@ export async function getInboxFor(
     deps.repos.notifications.findNotificationsForUser(userId, MAX_NOTIFICATIONS),
     deps.repos.users.findConnectionsForUser(userId),
     deps.repos.externalEmailMessages.findInboxForUser(userId, {
-      limit: MAX_EXTERNAL_EMAILS,
       ...emailOpts,
+      limit: emailLimit + 1,
     }),
     deps.repos.externalEmailAccounts.findAllForUser(userId),
   ]);
 
+  const hasMoreEmails = externalEmailRows.length > emailLimit;
+  const emailPage = hasMoreEmails
+    ? externalEmailRows.slice(0, emailLimit)
+    : externalEmailRows;
+
   const conversations = await buildConversationDtos(deps, userId, conversationRows);
   const notifications = notificationRows.map(toNotificationDto);
   const pendingRequests = await buildPendingRequestDtos(deps, userId, pendingRows);
-  const externalEmails = externalEmailRows.map(toExternalEmailDto);
+  const externalEmails = emailPage.map(toExternalEmailDto);
   const accounts = accountRows.map(toAccountDto);
 
-  return { conversations, notifications, pendingRequests, externalEmails, accounts };
+  const lastEmail = emailPage[emailPage.length - 1];
+  const nextEmailCursor =
+    hasMoreEmails && lastEmail
+      ? encodeEmailCursor(
+          lastEmail.receivedAt instanceof Date
+            ? lastEmail.receivedAt.toISOString()
+            : new Date(lastEmail.receivedAt).toISOString(),
+          lastEmail.id,
+        )
+      : null;
+
+  return {
+    conversations,
+    notifications,
+    pendingRequests,
+    externalEmails,
+    accounts,
+    nextEmailCursor,
+  };
 }
 
 function toAccountDto(row: ExternalEmailAccountRow): InboxAccountDto {

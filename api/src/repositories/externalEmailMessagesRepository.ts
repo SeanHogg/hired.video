@@ -9,8 +9,11 @@
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { JOB_INBOX_CATEGORIES } from "../../../shared/email-classification/index.js";
 
 const { externalEmailMessages, externalEmailAccounts } = schema;
+
+export { JOB_INBOX_CATEGORIES };
 
 export type DbLike = any;
 
@@ -23,20 +26,6 @@ export interface ExternalEmailInboxRow extends ExternalEmailMessageRow {
   accountLabel: string | null;
   accountEmail: string;
 }
-
-/** Job-related categories — single source of truth for inbox visibility.
- *  Anything outside this set (newsletter / spam / personal / other) is
- *  kept in the table but hidden from the inbox feed. Mirrors the same
- *  set the sync orchestrator uses to decide whether to run dedup +
- *  auto-create. */
-export const JOB_INBOX_CATEGORIES = [
-  "job_opportunity",
-  "application_status",
-  "recruiter_outreach",
-  "interview_invite",
-  "offer",
-  "rejection",
-] as const;
 
 /** Hard floor below which messages never reach the inbox regardless of
  *  per-account minJobScore — a safety net against a user dialing their
@@ -57,6 +46,19 @@ export interface FindInboxOptions {
    *  are archived on insert so they would otherwise be invisible. The
    *  view exists so users can audit / restore false positives. */
   junkOnly?: boolean;
+  /** Page cursor — fetch rows strictly older than this anchor. Tuple
+   *  comparison on `(received_at, id)` so two rows with identical
+   *  receivedAt are still ordered deterministically (uuid v7 is
+   *  monotonic enough for our case). Null/omit = first page. */
+  cursor?: InboxCursor;
+}
+
+/** Page cursor anchor — the last row of the previous page. The repo
+ *  emits `(received_at, id)` tuples in DESC order, so the next page
+ *  satisfies `(received_at, id) < (cursor.receivedAt, cursor.id)`. */
+export interface InboxCursor {
+  receivedAt: string;
+  id: string;
 }
 
 export interface IExternalEmailMessagesRepository {
@@ -139,6 +141,14 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     if (opts.accountIds && opts.accountIds.length > 0) {
       conditions.push(inArray(externalEmailMessages.accountId, opts.accountIds));
     }
+    if (opts.cursor) {
+      // Tuple comparison keeps the cursor stable when two messages
+      // landed in the same millisecond — `id` is the deterministic
+      // tiebreaker so the page boundary doesn't double-emit or skip.
+      conditions.push(
+        sql`(${externalEmailMessages.receivedAt}, ${externalEmailMessages.id}) < (${opts.cursor.receivedAt}::timestamptz, ${opts.cursor.id}::uuid)`,
+      );
+    }
 
     const rows = (await this.db
       .select({
@@ -152,7 +162,7 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
         eq(externalEmailAccounts.id, externalEmailMessages.accountId),
       )
       .where(and(...conditions))
-      .orderBy(desc(externalEmailMessages.receivedAt))
+      .orderBy(desc(externalEmailMessages.receivedAt), desc(externalEmailMessages.id))
       .limit(Math.min(200, Math.max(1, limit)))) as Array<{
       message: ExternalEmailMessageRow;
       accountLabel: string | null;

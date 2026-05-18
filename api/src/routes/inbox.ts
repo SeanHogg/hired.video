@@ -17,7 +17,7 @@ import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { describeDbError } from "../db/errors.js";
 import { buildRepos } from "../repositories/index.js";
-import { getInboxFor } from "../services/messaging/inboxService.js";
+import { decodeEmailCursor, getInboxFor } from "../services/messaging/inboxService.js";
 import { ingestForAccount } from "../services/email-integration/ingest.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import type { FindInboxOptions } from "../repositories/externalEmailMessagesRepository.js";
@@ -26,9 +26,9 @@ import { servicesProcessor } from "../domains/services-processing/services-proce
 
 export const inboxRoutes = new Hono<{ Variables: Variables }>();
 
-/** Parse the ?accountIds=a,b,c&unread=1&archived=1 query into the
- *  options shape the repo + service expect. Centralised here so both
- *  the page-tab and overlay clients get the same semantics. */
+/** Parse the ?accountIds=a,b,c&unread=1&archived=1&emailCursor=… query
+ *  into the options shape the repo + service expect. Centralised here so
+ *  both the page-tab and overlay clients get the same semantics. */
 function parseEmailFilters(c: any): FindInboxOptions {
   const url = new URL(c.req.url);
   const accountIdsCsv = url.searchParams.get("accountIds");
@@ -41,7 +41,8 @@ function parseEmailFilters(c: any): FindInboxOptions {
   const unreadOnly = url.searchParams.get("unread") === "1";
   const includeArchived = url.searchParams.get("archived") === "1";
   const junkOnly = url.searchParams.get("junk") === "1";
-  return { accountIds, unreadOnly, includeArchived, junkOnly };
+  const cursor = decodeEmailCursor(url.searchParams.get("emailCursor"));
+  return { accountIds, unreadOnly, includeArchived, junkOnly, cursor };
 }
 
 inboxRoutes.get("/", async (c) => {
