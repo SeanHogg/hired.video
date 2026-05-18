@@ -20,6 +20,40 @@ import {
 } from "../../../../shared/pricing.js";
 import type { PlanTier, UsageEventType } from "../../../../shared/usage-statement.js";
 
+/** Where the gate reads "consumed so far" from.
+ *
+ *  - `"ledger_monthly"` (default): SUM(`usage_ledger.quantity`) for the
+ *    current calendar month. The right answer for AI-event dimensions
+ *    that have no domain table of their own.
+ *
+ *  - `"team_invitations_lifetime"`: count of `account_invitations` rows
+ *    (`pending` + `accepted`) authored by the user. Lifetime semantic —
+ *    the cap counts the total team-member count, not how many invites
+ *    they sent this month.
+ *
+ *  - `"interview_sessions_monthly"`: count of `interview_sessions` rows
+ *    the user created since the start of the current UTC month. Monthly
+ *    semantic, but reads from the authoritative domain table so legacy
+ *    sessions that pre-date ledger metering still count.
+ *
+ *  - `"published_video_projects_lifetime"`: count of distinct
+ *    `studio_projects` the user has a published `videos` row against.
+ *    Lifetime semantic — the cap is the total number of published video
+ *    resumes, not a publish rate. Re-uploads to the same project replace
+ *    the existing video and don't count.
+ *
+ *  - `"connected_inboxes_active"`: count of `external_email_accounts`
+ *    rows with `status = 'active'` for the user. Snapshot semantic —
+ *    the cap is the current number of connected mailboxes, not a
+ *    connect rate. Disconnecting a mailbox frees the slot immediately.
+ */
+export type ConsumedSource =
+  | "ledger_monthly"
+  | "team_invitations_lifetime"
+  | "interview_sessions_monthly"
+  | "published_video_projects_lifetime"
+  | "connected_inboxes_active";
+
 export interface EntitlementSpec {
   eventType: UsageEventType;
   label: string;
@@ -36,6 +70,10 @@ export interface EntitlementSpec {
    *  blocking; the user pays at month close. AI tokens are 'soft' because
    *  packs cover the overflow; counts are 'hard' for the Free tier. */
   gateBehavior: "hard" | "soft";
+  /** Where the gate counts "consumed so far" from. Defaults to
+   *  `ledger_monthly` when omitted (the right answer for every dimension
+   *  that doesn't have its own authoritative domain table). */
+  consumedSource?: ConsumedSource;
 }
 
 export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
@@ -62,18 +100,25 @@ export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
     },
     overageCentsPerUnit: 0,
     gateBehavior: "hard",
+    // Cap is "lifetime distinct published video projects", not monthly.
+    // Re-uploads to the same project replace the existing video and don't
+    // count as new publishes.
+    consumedSource: "published_video_projects_lifetime",
   },
   team_invite: {
     eventType: "team_invite",
     label: "Team members",
     unit: "invites",
     monthlyCap: {
-      free: FREE_TEAM_MEMBER_LIMIT,
+      free: FREE_TEAM_MEMBER_LIMIT - 1, // inviter is seat 1, cap counts invitees
       pro: 0,
       trial: 0,
     },
     overageCentsPerUnit: 0,
     gateBehavior: "hard",
+    // Cap is "lifetime total team size", not invites-per-month. Counts
+    // pending + accepted invitations authored by this user.
+    consumedSource: "team_invitations_lifetime",
   },
   interview_session: {
     eventType: "interview_session",
@@ -86,6 +131,9 @@ export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
     },
     overageCentsPerUnit: 0,
     gateBehavior: "hard",
+    // Monthly semantic, but reads from the authoritative interview_sessions
+    // table so sessions that pre-date ledger metering still count.
+    consumedSource: "interview_sessions_monthly",
   },
   saved_search: {
     eventType: "saved_search",
@@ -178,10 +226,8 @@ export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
   // Inbox Sync — Pro-only feature. `email_sync` counts each ingest chunk
   // for the Usage Statement (display only; unlimited within the Pro plan).
   // `email_account` is a snapshot dimension (current connected mailbox
-  // count, not a monthly tally) — the cap is enforced at /connect time;
-  // services-processor injects a synthetic statement line from the
-  // external_email_accounts table because the dimension doesn't fit the
-  // append-only ledger semantics.
+  // count, not a monthly tally) — services-processor's dispatcher reads
+  // the count straight from the `external_email_accounts` table.
   email_sync: {
     eventType: "email_sync",
     label: "Inbox sync runs",
@@ -201,6 +247,7 @@ export const ENTITLEMENT_CATALOG: Record<UsageEventType, EntitlementSpec> = {
     },
     overageCentsPerUnit: 0,
     gateBehavior: "hard",
+    consumedSource: "connected_inboxes_active",
   },
 };
 

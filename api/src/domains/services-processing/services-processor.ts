@@ -15,7 +15,7 @@
 // new limit needs to be declared; this file is event-type-agnostic.
 
 import type { Context } from "hono";
-import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { getSubscription } from "../../services/billing/BillingService.js";
 import { isAdminRole } from "../billing/audience.js";
@@ -121,22 +121,89 @@ async function consumedInPeriod(
   eventType: UsageEventType,
   periodStart: Date,
 ): Promise<number> {
+  const spec = getEntitlement(eventType);
+  const source = spec.consumedSource ?? "ledger_monthly";
   const db = getDb();
-  const [row] = (await db
-    .select({
-      total: sql<number>`COALESCE(SUM(${schema.usageLedger.quantity}), 0)`,
-    })
-    .from(schema.usageLedger)
-    .where(
-      and(
-        eq(schema.usageLedger.userId, userId),
-        eq(schema.usageLedger.eventType, eventType),
-        gte(schema.usageLedger.periodStart, periodStart),
-        lt(schema.usageLedger.periodStart, endOfMonthUtc(periodStart)),
-      ),
-    )) as Array<{ total: number | string | null }>;
-  const v = row?.total ?? 0;
-  return typeof v === "string" ? Number(v) : v;
+
+  // Dispatch on `consumedSource` so the gate counts from the right table
+  // for each dimension. Single seam: a new dimension declares its source
+  // in the catalog, the gate reads from that source automatically.
+  switch (source) {
+    case "ledger_monthly": {
+      const [row] = (await db
+        .select({
+          total: sql<number>`COALESCE(SUM(${schema.usageLedger.quantity}), 0)`,
+        })
+        .from(schema.usageLedger)
+        .where(
+          and(
+            eq(schema.usageLedger.userId, userId),
+            eq(schema.usageLedger.eventType, eventType),
+            gte(schema.usageLedger.periodStart, periodStart),
+            lt(schema.usageLedger.periodStart, endOfMonthUtc(periodStart)),
+          ),
+        )) as Array<{ total: number | string | null }>;
+      const v = row?.total ?? 0;
+      return typeof v === "string" ? Number(v) : v;
+    }
+
+    case "team_invitations_lifetime": {
+      // Count pending + accepted invitations authored by this user. Cap
+      // counts total team size, not invites per month.
+      const [row] = (await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(schema.accountInvitations)
+        .where(
+          and(
+            eq(schema.accountInvitations.invitedBy, userId),
+            inArray(schema.accountInvitations.status, ["pending", "accepted"]),
+          ),
+        )) as Array<{ total: number | string | null }>;
+      const v = row?.total ?? 0;
+      return typeof v === "string" ? Number(v) : v;
+    }
+
+    case "interview_sessions_monthly": {
+      // Read from the authoritative interview_sessions table so sessions
+      // that pre-date ledger metering still count.
+      const [row] = (await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(schema.interviewSessions)
+        .where(
+          and(
+            eq(schema.interviewSessions.userId, userId),
+            gte(schema.interviewSessions.createdAt, periodStart),
+          ),
+        )) as Array<{ total: number | string | null }>;
+      const v = row?.total ?? 0;
+      return typeof v === "string" ? Number(v) : v;
+    }
+
+    case "published_video_projects_lifetime": {
+      // Count distinct studio_projects the user has a non-failed published
+      // videos row against. Re-uploads to the same project replace the
+      // existing video and don't count as new publishes.
+      const [row] = (await db
+        .select({
+          total: sql<number>`count(DISTINCT ${schema.videos.studioProjectId})::int`,
+        })
+        .from(schema.videos)
+        .where(
+          and(
+            eq(schema.videos.userId, userId),
+            isNotNull(schema.videos.studioProjectId),
+          ),
+        )) as Array<{ total: number | string | null }>;
+      const v = row?.total ?? 0;
+      return typeof v === "string" ? Number(v) : v;
+    }
+
+    default: {
+      const _exhaustive: never = source;
+      void _exhaustive;
+      return 0;
+    }
+  }
 }
 
 export const servicesProcessor: ServicesProcessor = {
