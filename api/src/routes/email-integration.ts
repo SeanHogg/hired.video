@@ -401,12 +401,13 @@ emailIntegrationRoutes.delete("/rules/:id", async (c) => {
 // ── Sync history ─────────────────────────────────────────────────────────────
 // Manual sync moved to the PWA — see `runClientSync` in
 // frontend/lib/email-integration/sync-client.ts. The chunks land on
-// `POST /api/inbox/external-emails/ingest`, which `upsertChunkResult`s
-// one `email_sync_runs` row per logical sync keyed on
-// `(account_id, sync_session_id)` (gap #811, migration 0095). Multi-chunk
-// syncs aggregate into one row instead of N. Rows from before the
-// migration carry `sync_session_id IS NULL` and stay in the table as
-// historical audit — they don't aggregate but are still surfaced below.
+// `POST /api/inbox/external-emails/ingest` for persist + classify, and
+// one trailing `POST /api/inbox/external-emails/finalize` (gap #826)
+// `upsertChunkResult`s one `email_sync_runs` row per logical sync keyed
+// on `(account_id, sync_session_id)` (gap #811, migration 0095). Rows
+// from before #811 carry `sync_session_id IS NULL` and stay in the
+// table as historical audit — they don't aggregate but are still
+// surfaced below.
 
 emailIntegrationRoutes.get("/sync-runs", async (c) => {
   const uid = c.var.user?.sub;

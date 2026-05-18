@@ -3,17 +3,19 @@
  *
  * One row per **logical sync**. The PWA orchestrator (`runClientSync`
  * in `frontend/lib/email-integration/sync-client.ts`) splits a logical
- * sync into N chunked POSTs and stamps every chunk with the same
- * `syncSessionId`. The ingest service calls `upsertChunkResult()` once
- * per chunk; the first call inserts a row, subsequent calls sum the
- * counter deltas + merge the rules-fired map into the existing row.
+ * sync into N chunked POSTs and then makes one trailing
+ * `/external-emails/finalize` call (gap #826) carrying the aggregate
+ * counters + a `syncSessionId`. The finalize service calls
+ * `upsertChunkResult()` once per logical sync — the first call inserts
+ * a row, and the upsert path stays in place as belt-and-braces for any
+ * retry/Service-Worker overlap that double-fires the finalize call.
  *
  * Atomicity comes from the partial unique index on
  * `(account_id, sync_session_id) WHERE sync_session_id IS NOT NULL`
- * (migration 0095). The PWA orchestrator awaits each chunk POST
- * sequentially, so concurrent chunks within one session aren't a
- * concern in practice; the unique index is the belt-and-braces for
- * any retry / Service-Worker overlap.
+ * (migration 0095). The orchestrator awaits each chunk POST
+ * sequentially and only fires finalize once at the end, so concurrent
+ * writes within one session aren't a concern in practice; the unique
+ * index covers retries.
  */
 
 import { and, asc, desc, eq } from "drizzle-orm";
