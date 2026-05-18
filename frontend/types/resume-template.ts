@@ -369,6 +369,85 @@ export const SALES_GROWTH_EMERALD: ResumeTemplateDescriptor = printPreset({
   layout: { columns: 1 },
 });
 
+// 11. Actor — Headshot Hero, hero mode for the 8x10 portrait, projects-first.
+// Industry-standard one-pager: the avatar IS the headshot, credits read as
+// "Project · Role · Director/Network" — modelled as the projects section
+// with `showHighlights: true` so the renderer surfaces those three columns
+// per row.
+export const ACTOR_HEADSHOT_HERO: ResumeTemplateDescriptor = {
+  id: "actor-headshot-hero",
+  name: "Actor — Headshot Hero",
+  industry: "Film / Theatre / Television",
+  priceCents: 0,
+  description:
+    "Industry-standard actor one-pager — large headshot, projects-first credits (film / TV / theatre), training, special skills, reps + contact.",
+  version: "1.2",
+  documentMode: "hero",
+  theme: {
+    themeKey: "minimal-slate",
+    fontFamily: "serif",
+    headingStyle: "caps",
+    density: "compact",
+    cardStyle: "ghost",
+    sectionTitleSize: "md",
+  },
+  layout: { columns: 1 },
+  hero: {
+    enabled: true,
+    layout: "split",
+    showAvatar: true,
+    showContactButtons: true,
+    showSummary: true,
+    showVideo: true,
+  },
+  sections: [
+    { key: "projects", enabled: true, title: "Credits", icon: "folder-open", layout: "list", showHighlights: true, sortBy: "date_desc" },
+    { key: "skills", enabled: true, title: "Special Skills", icon: "star", layout: "grid", columns: 3 },
+    { key: "languages", enabled: true, title: "Languages & Dialects", icon: "languages", layout: "grid", columns: 3 },
+    { key: "education", enabled: true, title: "Training", icon: "graduation-cap", layout: "list", sortBy: "date_desc" },
+    { key: "awards", enabled: true, title: "Awards & Festivals", icon: "trophy", layout: "list" },
+    { key: "references", enabled: true, title: "Representation", icon: "user-check", layout: "list" },
+  ],
+};
+
+// 12. Director — Filmography Serif, print mode, projects/awards-led.
+// Mirrors the working filmmaker resume convention: filmography first,
+// festival selections + awards above work history, training last.
+export const DIRECTOR_FILMOGRAPHY_SERIF: ResumeTemplateDescriptor = printPreset({
+  id: "director-filmography-serif",
+  name: "Director — Filmography Serif",
+  industry: "Film / Television",
+  priceCents: 0,
+  description:
+    "Print-style directorial CV — filmography-led with festival selections and awards above the fold, classic serif with divider headings.",
+  theme: {
+    themeKey: "trusted-taupe",
+    fontFamily: "serif",
+    headingStyle: "divider",
+    density: "spacious",
+    cardStyle: "ghost",
+    sectionTitleSize: "lg",
+  },
+  layout: { columns: 1 },
+  hero: {
+    enabled: true,
+    layout: "compact",
+    showAvatar: false,
+    showContactButtons: true,
+    showSummary: true,
+    showVideo: false,
+  },
+  sections: [
+    { key: "projects", enabled: true, title: "Filmography", icon: "folder-open", layout: "list", showHighlights: true, sortBy: "date_desc" },
+    { key: "awards", enabled: true, title: "Festivals & Awards", icon: "trophy", layout: "list" },
+    { key: "publications", enabled: true, title: "Press & Coverage", icon: "book-open", layout: "list" },
+    { key: "work", enabled: true, title: "Work History", icon: "building", layout: "list", showHighlights: true, sortBy: "date_desc" },
+    { key: "education", enabled: true, title: "Training", icon: "graduation-cap", layout: "list", sortBy: "date_desc" },
+    { key: "skills", enabled: true, title: "Crafts", icon: "star", layout: "grid", columns: 3 },
+    { key: "references", enabled: true, title: "Representation", icon: "user-check", layout: "list" },
+  ],
+});
+
 export const TEMPLATE_PRESETS: ResumeTemplateDescriptor[] = [
   DEFAULT_DESCRIPTOR,
   PAYROLL_IRON_GRAY,
@@ -380,6 +459,8 @@ export const TEMPLATE_PRESETS: ResumeTemplateDescriptor[] = [
   SOFTWARE_ENGINEER_GRAPHITE,
   HEALTHCARE_CLINICAL_BLUE,
   SALES_GROWTH_EMERALD,
+  ACTOR_HEADSHOT_HERO,
+  DIRECTOR_FILMOGRAPHY_SERIF,
 ];
 
 export function getTemplateById(id: string | null | undefined): ResumeTemplateDescriptor | null {

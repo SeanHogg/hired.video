@@ -91,6 +91,12 @@ export interface CanvasStageProps {
     entityId: string,
     atFraction: { x: number; y: number },
   ) => void;
+  /** Screenshot drag-drop → drop point is remembered, then the parent
+   *  opens the display-media picker; the captured frame becomes an
+   *  Image widget at `atFraction`. The drop carries no payload of its
+   *  own (the picker can't be invoked from inside a sync drop handler),
+   *  so this is purely "place here when capture finishes". */
+  onScreenshotDrop?: (atFraction: { x: number; y: number }) => void;
   /** Seconds elapsed into the active scene during playback. `null` means
    *  preview is paused — show every widget regardless of visibleFrom /
    *  visibleTo so the editor stays useful while authoring. */
@@ -123,6 +129,7 @@ export default function CanvasStage({
   onBackgroundDrop,
   onMediaDrop,
   onLinkedContentDrop,
+  onScreenshotDrop,
   playheadInScene,
   defaultFontId,
   mode = "edit",
@@ -190,6 +197,12 @@ export default function CanvasStage({
         if (ref) onLinkedContentDrop?.(ref.kind, ref.id, f);
         break;
       }
+      case "screenshot":
+        // The picker can't open synchronously inside a drop handler in
+        // any browser, so we just record the drop point and let the
+        // parent run the async capture/upload then place the image.
+        onScreenshotDrop?.(f);
+        break;
       case "font":
       case "music":
         // Targeted drops (font onto text widget / music onto timeline)

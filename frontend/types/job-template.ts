@@ -279,6 +279,52 @@ export const JOB_RISK_ASPHALT: JobTemplateDescriptor = printJobPreset({
   layout: { columns: 2, sidebar: ["skills", "requirements", "qualifications"] },
 });
 
+// 8. Casting Call — Film / Theatre. Renders a role posting in the
+// industry-standard breakdown order: role description → requirements
+// (age range, gender, look, union status) → qualifications (experience
+// level) → submission instructions (skills slot repurposed as
+// "special skills required", apply slot as "how to submit"). Hero is
+// hidden so the role name + production read as the headline, not the
+// production company logo. Pairs with the `casting_call` Studio video
+// template — the video is the announcement, the job posting is the
+// long-form breakdown.
+export const JOB_CASTING_CALL: JobTemplateDescriptor = printJobPreset({
+  id: "job-casting-call",
+  name: "Casting Call — Film & Theatre",
+  industry: "Film / Theatre / Television",
+  priceCents: 0,
+  description:
+    "Industry-standard casting breakdown — role description, requirements (age / gender / look / union), submission window, and how-to-submit instructions.",
+  theme: {
+    themeKey: "trusted-taupe",
+    fontFamily: "serif",
+    headingStyle: "divider",
+    density: "spacious",
+    cardStyle: "ghost",
+    sectionTitleSize: "lg",
+  },
+  layout: { columns: 1 },
+  hero: {
+    enabled: true,
+    layout: "compact",
+    showCompanyLogo: false,
+    showSalary: true,
+    showLocation: true,
+    showEmploymentType: true,
+    showApplyButton: true,
+    showVideo: true,
+  },
+  sections: [
+    { key: "description", enabled: true, title: "The role", icon: "briefcase", layout: "prose" },
+    { key: "requirements", enabled: true, title: "Casting requirements", icon: "target", layout: "list" },
+    { key: "qualifications", enabled: true, title: "Experience", icon: "graduation-cap", layout: "list" },
+    { key: "skills", enabled: true, title: "Special skills required", icon: "sparkles", layout: "grid", columns: 3 },
+    { key: "benefits", enabled: true, title: "Production details", icon: "gift", layout: "list" },
+    { key: "company", enabled: true, title: "About the production", icon: "building", layout: "prose" },
+    { key: "apply", enabled: true, title: "How to submit a self-tape", icon: "send", layout: "compact" },
+  ],
+});
+
 export const JOB_TEMPLATE_PRESETS: JobTemplateDescriptor[] = [
   DEFAULT_JOB_DESCRIPTOR,
   JOB_CORPORATE_IRON_GRAY,
@@ -287,6 +333,7 @@ export const JOB_TEMPLATE_PRESETS: JobTemplateDescriptor[] = [
   JOB_HOSPITALITY_AMBER,
   JOB_CREATIVE_MINIMAL,
   JOB_RISK_ASPHALT,
+  JOB_CASTING_CALL,
 ];
 
 export function getJobTemplateById(id: string | null | undefined): JobTemplateDescriptor | null {

@@ -11,14 +11,18 @@ import {
   BarChart3,
   Briefcase,
   Building2,
+  Clapperboard,
   Code2,
   FileText,
   Film,
   FilePlus2,
+  Mic2,
   Megaphone,
   Monitor,
   Palette,
+  ScrollText,
   Sparkles,
+  Star,
   UserCircle,
   Wrench,
   type LucideIcon,
@@ -53,16 +57,25 @@ export type ContentTemplate =
   | "job_ad"
   | "company_promo"
   | "sizzle_reel"
-  | "tool_promo";
+  | "tool_promo"
+  | "self_tape"
+  | "monologue"
+  | "showreel"
+  | "director_pitch"
+  | "casting_call";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
- *  the landing page can group them without a parallel mapping table. */
-export type TemplateCategory = "promote" | "showcase" | "hiring" | "quick";
+ *  the landing page can group them without a parallel mapping table. The
+ *  "film" pill clusters Director / Actor surfaces (self-tapes, monologues,
+ *  showreels, director pitches, casting calls) so the demographic finds
+ *  its templates in one place. */
+export type TemplateCategory = "promote" | "showcase" | "hiring" | "quick" | "film";
 
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: "promote", label: "Promote Yourself" },
   { id: "showcase", label: "Showcase Work" },
   { id: "hiring", label: "Hiring" },
+  { id: "film", label: "Film & Acting" },
   { id: "quick", label: "Quick" },
 ];
 
@@ -303,6 +316,95 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // the browser — there's no scenario where the user wouldn't
     // reach for screen capture next.
     defaultRecordingMode: "screen+webcam",
+  },
+  // ─── Film & Acting templates ───────────────────────────────────────────────
+  // Director + Actor templates share the generic BasicIntake — the user
+  // describes the scene / role / treatment in prose and the editor opens
+  // pre-seeded with a film-industry-shaped composition (slate / scene /
+  // outro for self-tape, role + sides + how-to-submit for casting calls,
+  // etc.). Per DRY: no per-template intake forms; the existing prompt
+  // textarea handles every "describe what you want" path. Adding a new
+  // film template = one TEMPLATE_CATALOG entry + one SEEDS entry.
+  {
+    id: "self_tape",
+    label: "Self-tape audition",
+    desc: "Slate, scene read, and a clean outro — the industry-standard self-tape layout.",
+    icon: Clapperboard,
+    importMode: "none",
+    // Personal-brand prompt config — the actor IS the product. Future
+    // film-specific StudioPurpose could rephrase the system prompt, but
+    // for now personal_brand produces an actor-friendly script.
+    purpose: "personal_brand",
+    category: "film",
+    defaultName: "Self-tape audition",
+    defaultPrompt:
+      "Create a self-tape audition layout: a slate scene with the actor's name, role, and agent, a scene-read with the dialogue, and a clean outro thanking the casting team.",
+    firstTabLabel: "Audition",
+    IntakeForm: BasicIntake,
+    // Self-tapes are recorded against a backdrop — auto-open the webcam
+    // recorder on the Actions tab so the actor doesn't have to hunt for it.
+    defaultRecordingMode: "webcam",
+  },
+  {
+    id: "monologue",
+    label: "Monologue",
+    desc: "Single-take dramatic monologue with captions for casting reviewers.",
+    icon: Mic2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "film",
+    defaultName: "Monologue",
+    defaultPrompt:
+      "Create a single-scene monologue layout — actor close-up, optional title card, captions on by default so the casting reviewer can read along.",
+    firstTabLabel: "Monologue",
+    IntakeForm: BasicIntake,
+    defaultRecordingMode: "webcam",
+  },
+  {
+    id: "showreel",
+    label: "Actor showreel",
+    desc: "Multi-scene reel of your best clips — opens with credits, cuts on the beat.",
+    icon: Star,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "film",
+    defaultName: "Actor showreel",
+    defaultPrompt:
+      "Create a 60-90 second actor showreel: title card with the actor's name + reps, three to five scene snippets with project / role chips, and an outro card with contact info.",
+    firstTabLabel: "Reel",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "director_pitch",
+    label: "Director's pitch",
+    desc: "Treatment-style pitch for a film or series — logline, tone, characters, ask.",
+    icon: Film,
+    importMode: "none",
+    // product_launch prompt config — a film is a product being pitched.
+    purpose: "product_launch",
+    category: "film",
+    defaultName: "Director's pitch",
+    defaultPrompt:
+      "Create a director's pitch deck: title + logline, tone reference, character beats, comparable films, the ask (budget / partnership / cast), and a closing scene with director contact info.",
+    firstTabLabel: "Pitch",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "casting_call",
+    label: "Casting call",
+    desc: "Director-facing call: describe the role, submission window, and how to send a self-tape.",
+    icon: ScrollText,
+    importMode: "none",
+    // job_ad prompt config — a casting call is structurally a job listing
+    // (role description, requirements, submission window). The film
+    // category keeps it visually separated from corporate Job Ad.
+    purpose: "job_ad",
+    category: "film",
+    defaultName: "Casting call",
+    defaultPrompt:
+      "Create a casting call: production title, role name + character description, shoot dates + location, union / non-union status, submission deadline, and explicit how-to-submit instructions for self-tapes.",
+    firstTabLabel: "Casting call",
+    IntakeForm: BasicIntake,
   },
 ];
 

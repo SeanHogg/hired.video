@@ -41,9 +41,7 @@ import {
   classifyByRules,
   type ClassificationResult,
   isJobCategory,
-  JOB_INBOX_CATEGORIES,
   type NormalisedEmailWire,
-  type RuleCondition,
 } from "../../../../shared/email-classification/index.js";
 
 export interface IngestDeps {
@@ -314,7 +312,3 @@ export async function ingestForAccount(
 
   return result;
 }
-
-// Re-export so route handlers don't need to walk the import path.
-export { JOB_INBOX_CATEGORIES };
-export type { RuleCondition };

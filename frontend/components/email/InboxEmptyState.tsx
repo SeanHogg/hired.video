@@ -52,5 +52,3 @@ export function InboxEmptyState() {
     </div>
   );
 }
-
-export default InboxEmptyState;

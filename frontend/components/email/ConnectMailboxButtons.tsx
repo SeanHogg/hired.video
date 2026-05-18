@@ -36,7 +36,7 @@ import {
   INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
 } from "@shared/pricing";
 
-export interface ConnectMailboxButtonsProps {
+interface ConnectMailboxButtonsProps {
   /** Where to return to after the OAuth round-trip. Defaults to the
    *  Settings integrations tab so the user lands back on the surface
    *  where they manage mailboxes. Inbox-side callers pass the inbox
@@ -102,5 +102,3 @@ export function ConnectMailboxButtons({ redirect }: ConnectMailboxButtonsProps) 
     </div>
   );
 }
-
-export default ConnectMailboxButtons;

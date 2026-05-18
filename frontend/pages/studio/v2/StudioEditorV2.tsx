@@ -91,6 +91,7 @@ import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback"
 import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
 import { useCanvasClipboard } from "@/lib/studio/editor-v2/use-canvas-clipboard";
 import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts";
+import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capture";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
@@ -691,6 +692,24 @@ export default function StudioEditorV2() {
     [activeSceneId, placeWidget],
   );
 
+  // Single Control for the Screenshot palette tile + canvas screenshot
+  // drop. Both surfaces call this; capture / upload lives in exactly
+  // one hook (`useScreenshotCapture`) so there's no parallel pipeline.
+  const { capture: captureScreenshot } = useScreenshotCapture();
+  const placeScreenshot = useCallback(
+    async (atFraction?: { x: number; y: number }) => {
+      const handle = toast({
+        title: "Capturing screenshot…",
+        description: "Pick a window, tab, or screen in the browser dialog.",
+      });
+      const url = await captureScreenshot();
+      handle.dismiss();
+      if (!url) return;
+      addMediaWidget("image", url, 0, atFraction);
+    },
+    [addMediaWidget, captureScreenshot, toast],
+  );
+
   const setCaptionsState = useCallback((captions: CanvasState["captions"]) => {
     setState((prev) => ({ ...prev, captions }));
   }, []);
@@ -1245,6 +1264,7 @@ export default function StudioEditorV2() {
                       onInsertLinkedContent={(entityKind, entityId) =>
                         insertLinkedContent(entityKind, entityId)
                       }
+                      onCaptureScreenshot={() => placeScreenshot()}
                     />
                   )}
                   {leftTab === "actions" && (
@@ -1352,6 +1372,7 @@ export default function StudioEditorV2() {
                     onLinkedContentDrop={(entityKind, entityId, atFraction) =>
                       insertLinkedContent(entityKind, entityId, atFraction)
                     }
+                    onScreenshotDrop={(atFraction) => placeScreenshot(atFraction)}
                     playheadInScene={
                       playback.isPlaying &&
                       playback.activeSceneIdAtPlayhead === activeScene.id

@@ -19,7 +19,8 @@ export type DragKind =
   | "font"
   | "music"
   | "media-url"
-  | "linked-content";
+  | "linked-content"
+  | "screenshot";
 
 /**
  * Per-kind MIME type. Multiple types can be present on the same drag
@@ -34,12 +35,14 @@ export const DRAG_MIME: Record<DragKind, string> = {
   music: "application/x-studio-music-id",
   "media-url": "application/x-studio-media-url",
   "linked-content": "application/x-studio-linked-content-ref",
+  screenshot: "application/x-studio-screenshot-trigger",
 };
 
 const KIND_ORDER: DragKind[] = [
   "widget",
   "linked-content",
   "media-url",
+  "screenshot",
   "background",
   "theme",
   "font",
@@ -56,7 +59,9 @@ export interface DragPayload {
    *   - music    → MusicTrack.id
    *   - media-url → URL string
    *   - linked-content → `<entityKind>:<entityId>` (see
-   *     `lib/studio/editor-v2/linked-content.ts:encodeLinkedContentRef`) */
+   *     `lib/studio/editor-v2/linked-content.ts:encodeLinkedContentRef`)
+   *   - screenshot → opaque marker string (the actual frame is captured
+   *     after drop, by `useScreenshotCapture`, so no payload is needed) */
   data: string;
   /** Set for `media-url` drops so the canvas knows whether to drop an
    *  Image or Video widget. */
@@ -153,6 +158,7 @@ export const DRAG_KIND_META: Record<DragKind, DragKindMeta> = {
   music: { label: "Drop on the timeline", accent: "rose-500" },
   "media-url": { label: "Drop to add media", accent: "sky-500" },
   "linked-content": { label: "Drop to embed your content", accent: "indigo-500" },
+  screenshot: { label: "Drop to capture a screenshot", accent: "sky-500" },
 };
 
 // Re-export WidgetKind so consumers of the protocol that build widget

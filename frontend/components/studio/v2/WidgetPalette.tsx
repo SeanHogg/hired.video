@@ -24,6 +24,7 @@ import {
   Minus,
   BarChart3,
   Camera,
+  MonitorUp,
   Tags,
   Megaphone,
 } from "lucide-react";
@@ -72,6 +73,11 @@ export interface WidgetPaletteProps {
    *  the widget via `makeLinkedContentWidget()` and append it to the
    *  active scene. */
   onInsertLinkedContent: (entityKind: LinkedContentKind, entityId: string) => void;
+  /** Fire the shared screenshot Control (open picker → capture → upload
+   *  → insert Image widget). Wired both to the Screenshot tile's click
+   *  and — via the canvas drop handler — to the drop case, so capture
+   *  logic lives in exactly one hook. */
+  onCaptureScreenshot: () => void;
 }
 
 const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout", "data"];
@@ -79,6 +85,7 @@ const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout"
 export default function WidgetPalette({
   onInsert,
   onInsertLinkedContent,
+  onCaptureScreenshot,
 }: WidgetPaletteProps) {
   // Same collapsible-multi-open behaviour as Design + Actions tabs so
   // all three left-rail panels feel identical. Default to all-open here
@@ -115,10 +122,44 @@ export default function WidgetPalette({
                 }
               />
             ))}
+            {group === "media" && (
+              <ScreenshotTile onCapture={onCaptureScreenshot} />
+            )}
           </LeftPanelSection>
         );
       })}
       <LinkedContentPaletteSection onInsert={onInsertLinkedContent} />
     </LeftPanelScroller>
+  );
+}
+
+/**
+ * Screenshot palette tile. Self-gates per the DRY rule: when the
+ * browser doesn't expose `getDisplayMedia` (older Safari, WebView, …)
+ * the tile returns null instead of forcing every parent to thread a
+ * `canCaptureScreenshot` boolean through.
+ *
+ * Both click and drag fire the same shared Control in `useScreenshotCapture`
+ * (wired by the parent into `onCapture` here and into the canvas's
+ * `onScreenshotDrop` handler) — no parallel capture logic anywhere.
+ */
+function ScreenshotTile({ onCapture }: { onCapture: () => void }) {
+  if (
+    typeof navigator === "undefined" ||
+    typeof navigator.mediaDevices?.getDisplayMedia !== "function"
+  ) {
+    return null;
+  }
+  return (
+    <LeftPanelTile
+      label="Screenshot"
+      icon={MonitorUp}
+      onClick={onCapture}
+      draggable
+      onDragStart={(e) =>
+        writeDragPayload(e.dataTransfer, { kind: "screenshot", data: "1" })
+      }
+      hint="Pick a window, tab, or screen and a snapshot lands on the canvas"
+    />
   );
 }

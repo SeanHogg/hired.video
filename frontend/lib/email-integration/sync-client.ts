@@ -8,20 +8,26 @@
  *   per-invocation budget when fanning out across multiple mailboxes.
  *   The browser has no such cap — it pulls direct from
  *   gmail.googleapis.com / graph.microsoft.com, then POSTs the
- *   normalised batch to the server in 25-row chunks. Each chunk is a
+ *   normalised batch to the server in 5-row chunks. Each chunk is a
  *   fresh Worker invocation with its own budget, so LLM Stage-2 +
  *   dedup + persist amortises across many invocations instead of
  *   clipping mid-sweep. The old server-side cron sweep was deleted
  *   under #757 because the dual-path setup kept re-creating the same
  *   budget bug whenever the cron path ran.
  *
+ *   Chunk size dropped from 25 → 5 on 2026-05-17 after a real-world
+ *   sync (14 messages) tripped the 1000-subrequest cap mid-ingest —
+ *   each message fans out into rules-fired + ledger + LLM + dedup
+ *   writes (~70 subrequests / message), so 25 messages × 70 calls
+ *   blew the budget. Real fix (bulk DB writes) is gap #811 + #815.
+ *
  * Flow per connected mailbox:
  *   1. GET /accounts/:id/access-token  → short-lived bearer
  *   2. provider.pullDelta(auth, cursor) → NormalisedEmail[] direct from Gmail/Outlook
  *   3. Stage-1 rules client-side (shared module → zero server hop)
- *   4. POST /inbox/external-emails/ingest in chunks of 25 — server runs
- *      LLM Stage-2 only for un-classified-by-rules messages, plus
- *      dedup + persist
+ *   4. POST /inbox/external-emails/ingest in chunks of CHUNK_SIZE —
+ *      server runs LLM Stage-2 only for un-classified-by-rules
+ *      messages, plus dedup + persist
  */
 
 import {
@@ -43,7 +49,7 @@ const PROVIDERS: Record<string, EmailProvider> = {
   outlook: outlookProvider,
 };
 
-const CHUNK_SIZE = 25;
+const CHUNK_SIZE = 5;
 const BACKFILL_LIMIT = 30;
 
 interface AccessTokenResp {

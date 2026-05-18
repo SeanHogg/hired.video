@@ -30,6 +30,7 @@ import {
   type EmailSyncRun,
 } from "@/lib/services/email-integration-service";
 import { runClientSync } from "@/lib/email-integration/sync-client";
+import { useEmailAccounts } from "@/hooks/use-email-accounts";
 
 function formatRelative(iso: string | null): string {
   if (!iso) return "never";
@@ -45,35 +46,63 @@ function formatRelative(iso: string | null): string {
 export function EmailInboxesPanel() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [accounts, setAccounts] = useState<ConnectedEmailAccount[]>([]);
+  // Accounts come from the shared `useEmailAccounts()` hook — same
+  // source as `<ConnectMailboxButtons />`, so disconnects propagate to
+  // the gate's at-cap CTA without a manual round-trip.
+  const {
+    accounts,
+    loading: accountsLoading,
+    refresh: refreshAccounts,
+    setAccounts,
+  } = useEmailAccounts();
   const [runs, setRuns] = useState<EmailSyncRun[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [runsLoading, setRunsLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   // Per-mailbox selection for the Sync-now button. Defaults to "every
   // active account selected" on each refresh — newly connected mailboxes
   // opt-in automatically; the user can deselect to limit Gmail/Outlook
   // quota spend or LLM cost.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const loading = accountsLoading || runsLoading;
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  // Keep selection in sync with the canonical account list — drop ids
+  // for disconnected mailboxes, opt-in newly connected active ones.
+  useEffect(() => {
+    if (accountsLoading) return;
+    setSelected((prev) => {
+      const activeIds = new Set(
+        accounts.filter((a) => a.status === "active").map((a) => a.id),
+      );
+      const hadAnySelection = prev.size > 0;
+      // First load (no prior selection) → opt every active mailbox in.
+      if (!hadAnySelection) return activeIds;
+      // Subsequent loads → preserve user's deselections, only drop ids
+      // that no longer exist and add newly connected actives.
+      const next = new Set<string>();
+      for (const id of prev) if (activeIds.has(id)) next.add(id);
+      for (const id of activeIds) if (!prev.has(id) && !next.has(id)) next.add(id);
+      return next;
+    });
+  }, [accounts, accountsLoading]);
+
+  const refreshRuns = useCallback(async () => {
+    setRunsLoading(true);
     try {
-      const [a, s] = await Promise.all([
-        emailIntegrationService.listAccounts(),
-        emailIntegrationService.listSyncRuns(8),
-      ]);
-      setAccounts(a);
+      const s = await emailIntegrationService.listSyncRuns(8);
       setRuns(s);
-      setSelected(new Set(a.filter((acc) => acc.status === "active").map((acc) => acc.id)));
     } finally {
-      setLoading(false);
+      setRunsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    refresh();
-  }, [isAuthenticated, refresh]);
+    refreshRuns();
+  }, [isAuthenticated, refreshRuns]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshAccounts(), refreshRuns()]);
+  }, [refreshAccounts, refreshRuns]);
 
   const handleDisconnect = async (id: string) => {
     if (!confirm("Disconnect this mailbox? Synced messages stay; new emails will stop arriving.")) return;
@@ -126,7 +155,7 @@ export function EmailInboxesPanel() {
           description: `${total} message${total === 1 ? "" : "s"} synced across ${summaries.length} mailbox${summaries.length === 1 ? "" : "es"}.`,
         });
       }
-      await refresh();
+      await refreshAll();
     } catch (err) {
       toast({
         title: "Sync failed",
@@ -286,5 +315,3 @@ function SyncHistory({ runs }: SyncHistoryProps) {
     </Card>
   );
 }
-
-export default EmailInboxesPanel;

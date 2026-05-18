@@ -23,10 +23,18 @@ export interface EmailAccountsState {
   hasActive: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
+  /** Optimistic-update entry point — consumers that mutate the
+   *  connected-mailbox list (disconnect, patch label) can drop the
+   *  next-state in immediately instead of waiting for a refresh. */
+  setAccounts: (
+    next:
+      | ConnectedEmailAccount[]
+      | ((prev: ConnectedEmailAccount[]) => ConnectedEmailAccount[]),
+  ) => void;
 }
 
 export function useEmailAccounts(): EmailAccountsState {
-  const { data, isLoading, refresh } = useGatedResource<ConnectedEmailAccount[]>({
+  const { data, isLoading, refresh, setData } = useGatedResource<ConnectedEmailAccount[]>({
     fetcher: () => emailIntegrationService.listAccounts(),
     defaults: EMPTY,
   });
@@ -37,5 +45,6 @@ export function useEmailAccounts(): EmailAccountsState {
     hasActive: activeCount > 0,
     loading: isLoading,
     refresh,
+    setAccounts: setData,
   };
 }

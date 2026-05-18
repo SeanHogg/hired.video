@@ -601,4 +601,221 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
       ]),
     ],
   }),
+
+  // ─── Film & Acting seeds ─────────────────────────────────────────────────
+  // Realistic starter compositions so the marketplace preview is credible.
+  // Per the file-level comment: the user is expected to edit text widget-
+  // by-widget after picking the template — empty placeholders are
+  // discouraged.
+
+  self_tape: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      // Industry-standard slate — actor name, role, agent/representation.
+      makeScene("Slate", "#0f172a", 4, [
+        makeHeading("Jamie Reyes", { y: 0.2, align: "center", color: "#ffffff" }),
+        makeText("Auditioning for: ELENA — Lead", {
+          y: 0.4, align: "center", fontPx: 28, color: "#fde68a",
+        }),
+        makeText("Repped by Bell & Co · 5'7\" · NYC-based", {
+          y: 0.55, align: "center", fontPx: 22, color: "#cbd5e1",
+        }),
+        makeText("Take 1", {
+          y: 0.75, align: "center", fontPx: 20, color: "#94a3b8",
+        }),
+      ]),
+      // Scene-read placeholder — the actor records over this; widgets
+      // are the on-screen sides/cue card.
+      makeScene("Scene read", "#000000", 30, [
+        makeHeading("Scene read", { y: 0.05, fontPx: 28, align: "center", color: "#475569" }),
+        makeText(
+          "Record your take here. The dialogue lives in your Sides PDF — keep it off-camera.",
+          { y: 0.45, height: 0.2, align: "center", fontPx: 22, color: "#475569" },
+        ),
+      ]),
+      // Clean closer — thank-you card, optional contact.
+      makeScene("Thanks", "#0f172a", 4, [
+        makeHeading("Thank you", { y: 0.32, align: "center", color: "#ffffff" }),
+        makeText("Jamie Reyes · jamie@bellco.agency", {
+          y: 0.55, align: "center", fontPx: 24, color: "#fde68a",
+        }),
+      ]),
+    ],
+  }),
+
+  monologue: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      makeScene("Title", "#0f172a", 3, [
+        makeHeading('"The Letter Scene"', { y: 0.34, align: "center", color: "#ffffff" }),
+        makeText("from Long Day's Journey into Night · O'Neill", {
+          y: 0.55, align: "center", fontPx: 22, color: "#a78bfa",
+        }),
+      ]),
+      // Single take — black background so the actor's framing reads first.
+      makeScene("Performance", "#000000", 45, [
+        makeText(
+          "Captions are on by default for casting reviewers — see Captions panel.",
+          { y: 0.9, align: "center", fontPx: 16, color: "#334155", height: 0.05 },
+        ),
+      ]),
+      makeScene("Closer", "#0f172a", 3, [
+        makeText("Jamie Reyes", { y: 0.45, align: "center", fontPx: 28, color: "#ffffff" }),
+        makeText("Available for callbacks · jamie@bellco.agency", {
+          y: 0.6, align: "center", fontPx: 20, color: "#a78bfa",
+        }),
+      ]),
+    ],
+  }),
+
+  showreel: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      // Title card — actor name + reps, sets the reel up.
+      makeScene("Title", "#000000", 3, [
+        makeHeading("JAMIE REYES", { y: 0.32, align: "center", color: "#ffffff", fontPx: 84 }),
+        makeText("Reel · 2026", {
+          y: 0.52, align: "center", fontPx: 26, color: "#fbbf24",
+        }),
+        makeText("Bell & Co · Drama / Comedy / Voice", {
+          y: 0.68, align: "center", fontPx: 20, color: "#94a3b8",
+        }),
+      ]),
+      // Three project beats with role / production chips so reviewers
+      // can read the breadth at a glance even before the clip plays.
+      makeScene("Drama beat", "#000000", 8, [
+        makeText("DRAMA", { y: 0.05, fontPx: 18, color: "#fbbf24" }),
+        makeChips(
+          ["Northern Lights (2025) · ELENA · Lead"],
+          { y: 0.88, height: 0.08, fontPx: 16, chipColor: "rgba(0,0,0,0.6)", textColor: "#ffffff" },
+        ),
+      ]),
+      makeScene("Comedy beat", "#000000", 8, [
+        makeText("COMEDY", { y: 0.05, fontPx: 18, color: "#fbbf24" }),
+        makeChips(
+          ["Cul-de-Sac (2024) · MAYA · Recurring"],
+          { y: 0.88, height: 0.08, fontPx: 16, chipColor: "rgba(0,0,0,0.6)", textColor: "#ffffff" },
+        ),
+      ]),
+      makeScene("Voice beat", "#000000", 8, [
+        makeText("VOICE", { y: 0.05, fontPx: 18, color: "#fbbf24" }),
+        makeChips(
+          ["Echo Hollow (2025) · NARRATOR"],
+          { y: 0.88, height: 0.08, fontPx: 16, chipColor: "rgba(0,0,0,0.6)", textColor: "#ffffff" },
+        ),
+      ]),
+      makeScene("Contact", "#000000", 4, [
+        makeCta("Get in touch", "Email Bell & Co", "mailto:reps@bellco.agency", {
+          subheadline: "jamie@bellco.agency · IMDb: nm0123456",
+          bgColor: "#0f172a",
+          textColor: "#ffffff",
+          accentColor: "#fbbf24",
+          accentTextColor: "#0f172a",
+        }),
+      ]),
+    ],
+  }),
+
+  director_pitch: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      // Title + logline — the one-sentence movie.
+      makeScene("Logline", "#0f172a", 6, [
+        makeHeading("THE LAST FERRY", { y: 0.25, align: "center", color: "#ffffff", fontPx: 80 }),
+        makeText(
+          "A grieving cartographer races her estranged sister back to the last island before the storm wipes it from the map.",
+          { y: 0.5, align: "center", fontPx: 22, color: "#e2e8f0", height: 0.25 },
+        ),
+        makeText("a feature by Lin Carrow", {
+          y: 0.85, align: "center", fontPx: 18, color: "#a78bfa",
+        }),
+      ]),
+      // Tone reference — comp titles.
+      makeScene("Tone", "#1e1b4b", 6, [
+        makeHeading("Tone", { y: 0.08, fontPx: 48, color: "#ffffff" }),
+        makeText(
+          "The Lighthouse meets Manchester by the Sea — water, weather, two sisters, one final crossing.",
+          { y: 0.32, height: 0.4, fontPx: 26, color: "#e0e7ff" },
+        ),
+        makeChips(
+          ["Drama", "Family", "Atmospheric", "Coastal Maine"],
+          { y: 0.72, height: 0.18, fontPx: 22, chipColor: "rgba(167,139,250,0.25)", textColor: "#c4b5fd" },
+        ),
+      ]),
+      // Characters — three beats max.
+      makeScene("Characters", "#1e1b4b", 7, [
+        makeHeading("Characters", { y: 0.08, fontPx: 48, color: "#ffffff" }),
+        makeText(
+          "• MAREN (38) — cartographer, mapping a dying island\n• JUNE (34) — her sister, has not been home in twelve years\n• THE FERRYMAN — knows what's coming, won't say",
+          { y: 0.3, height: 0.6, fontPx: 24, color: "#e0e7ff" },
+        ),
+      ]),
+      // The ask — budget, partnership, cast attachments.
+      makeScene("Ask", "#0f172a", 5, [
+        makeHeading("The ask", { y: 0.08, fontPx: 48, color: "#ffffff" }),
+        makeText(
+          "$2.4M production · seeking lead-cast attachment · principal photography Sept-Oct 2026 in Stonington, ME.",
+          { y: 0.32, height: 0.45, fontPx: 24, color: "#fde68a" },
+        ),
+      ]),
+      makeScene("Contact", "#0f172a", 4, [
+        makeCta("Let's talk", "Read the treatment", "https://lincarrow.film/lastferry", {
+          subheadline: "lin@lincarrow.film",
+          bgColor: "#7c3aed",
+          textColor: "#ffffff",
+          accentColor: "#ffffff",
+          accentTextColor: "#7c3aed",
+        }),
+      ]),
+    ],
+  }),
+
+  casting_call: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      makeScene("Hook", "#7c3aed", 4, [
+        makeHeading("CASTING", { y: 0.25, align: "center", color: "#fde68a", fontPx: 72 }),
+        makeText("THE LAST FERRY · feature · SAG-AFTRA Modified Low Budget", {
+          y: 0.5, align: "center", fontPx: 26, color: "#ffffff",
+        }),
+        makeText("Self-tapes due Friday June 19", {
+          y: 0.68, align: "center", fontPx: 22, color: "#fde68a",
+        }),
+      ]),
+      // The role — name, age range, description, sides info.
+      makeScene("Role", "#1e1b4b", 7, [
+        makeHeading("JUNE", { y: 0.08, fontPx: 56, color: "#ffffff" }),
+        makeText("Female-presenting · 30-38 · any ethnicity · supporting lead", {
+          y: 0.25, fontPx: 22, color: "#a78bfa",
+        }),
+        makeText(
+          "Estranged sister returning to her childhood island. Sharp, weather-beaten, guarded. Sides on the submission portal.",
+          { y: 0.42, height: 0.4, fontPx: 24, color: "#e0e7ff" },
+        ),
+      ]),
+      // Shoot + comp.
+      makeScene("Shoot", "#1e1b4b", 5, [
+        makeHeading("Shoot", { y: 0.08, fontPx: 48, color: "#ffffff" }),
+        makeChips(
+          ["Stonington, ME", "Sept-Oct 2026", "SAG-AFTRA MLB", "Travel + lodging covered"],
+          { y: 0.35, height: 0.45, fontPx: 22, chipColor: "rgba(124,58,237,0.35)", textColor: "#c4b5fd" },
+        ),
+      ]),
+      // Submission instructions — the most-important card.
+      makeScene("Submit", "#0f172a", 5, [
+        makeCta(
+          "Submit your self-tape",
+          "Open submission portal",
+          "https://lincarrow.film/casting",
+          {
+            subheadline: "Slate + one read of the sides · landscape · 3 min max",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+            accentColor: "#fde68a",
+            accentTextColor: "#1e1b4b",
+          },
+        ),
+      ]),
+    ],
+  }),
 };
