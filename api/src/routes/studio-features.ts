@@ -1925,6 +1925,7 @@ studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics
       heatmap: [],
       viewers: [],
       topDropOffSecond: null,
+      referrers: [],
     }));
   }
 
@@ -1981,6 +1982,29 @@ studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics
     }
   }
 
+  // Traffic-source rollup keyed on document.referrer captured at view
+  // time. Bare hostname is what the dashboard chart needs — strip
+  // protocol/path so "https://linkedin.com/feed/abc" + "linkedin.com/in/foo"
+  // collapse into one "linkedin.com" bar. Empty/null referrers
+  // (direct visits, opaque referrer policy, in-app navigation) land in
+  // the "Direct" bucket so the chart always sums to totalViews.
+  const referrerCounts = new Map<string, number>();
+  for (const view of views) {
+    const raw = view.referrer?.trim();
+    let source = "Direct";
+    if (raw) {
+      try {
+        source = new URL(raw).hostname.replace(/^www\./, "");
+      } catch {
+        source = raw.slice(0, 100);
+      }
+    }
+    referrerCounts.set(source, (referrerCounts.get(source) ?? 0) + 1);
+  }
+  const referrers = Array.from(referrerCounts.entries())
+    .map(([source, count]) => ({ source, views: count }))
+    .sort((a, b) => b.views - a.views);
+
   return c.json(ok({
     totalViews,
     avgWatchTimeSec,
@@ -1991,6 +2015,7 @@ studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics
       .map(([key, data]) => ({ id: key, ...data }))
       .sort((a, b) => b.views - a.views)
       .slice(0, 50),
+    referrers,
   }));
 });
 

@@ -104,6 +104,14 @@ export const PublicVideoReadySchema = z.object({
   aspect: z.string().nullable().optional(),
   resolution: z.string().nullable().optional(),
   ctaHotzones: z.array(CtaHotzoneSchema).optional().default([]),
+  // SEO meta authored in the project Details drawer (Meta tab). The
+  // public watch page overlays these onto the og: / twitter: / keywords
+  // tags; null/empty means "fall back to the video's title/description/
+  // thumbnail". Schema accepts undefined for backwards compatibility
+  // with older payloads that haven't been redeployed.
+  metaDescription: z.string().nullable().optional(),
+  keywords: z.array(z.string()).optional().default([]),
+  socialCardImage: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 
@@ -369,6 +377,9 @@ function LazySurface({
       aspect: null,
       resolution: null,
       ctaHotzones: [],
+      metaDescription: null,
+      keywords: [],
+      socialCardImage: null,
       createdAt: new Date().toISOString(),
     };
     return (
@@ -491,6 +502,7 @@ function PublicVideoDispatch({
         videoUrl={directVideoUrl}
         autoplay={autoplay}
         analyticsProjectId={analyticsProjectId}
+        hotzones={ready.ctaHotzones}
         className={className}
       />
     );
@@ -530,6 +542,7 @@ function PublicStudioCanvas({
   videoUrl,
   autoplay,
   analyticsProjectId,
+  hotzones,
   className,
 }: {
   canvasState: CanvasState | null;
@@ -539,6 +552,11 @@ function PublicStudioCanvas({
    *  frame paused and the user clicks the Play overlay to start. */
   autoplay?: boolean;
   analyticsProjectId?: string;
+  /** CTA hot-zones authored on the project's Timeline. Overlaid on
+   *  top of the canvas/MP4 as clickable anchors when the playhead is
+   *  inside each zone's [startSec, endSec) window. Click capture is
+   *  self-fired by <CtaHotzonesOverlay> off `analyticsProjectId`. */
+  hotzones?: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   className?: string;
 }) {
   const playback = usePreviewPlayback(canvasState ?? emptyCanvasState());
@@ -612,6 +630,16 @@ function PublicStudioCanvas({
       >
         <div className="relative w-full" style={{ aspectRatio }}>
           <CanvasStatePreview state={canvasState} playback={playback} />
+          {/* CTA-hotzones overlay — visible when the playhead enters
+              any zone's [startSec, endSec). Self-fires the cta-click
+              analytics call off `analyticsProjectId`. Pauses playback
+              on click so the user isn't bounced mid-frame. */}
+          <CtaHotzonesOverlay
+            hotzones={hotzones ?? []}
+            currentTimeSec={playback.playhead}
+            onActivate={() => playback.pause()}
+            analyticsProjectId={analyticsProjectId}
+          />
           {!started && (
             <button
               type="button"
@@ -646,6 +674,7 @@ function PublicStudioCanvas({
       <RawVideoPlayback
         url={videoUrl}
         analyticsProjectId={analyticsProjectId}
+        hotzones={hotzones ?? []}
         className={className}
       />
     );
@@ -668,13 +697,16 @@ function PublicStudioCanvas({
 function RawVideoPlayback({
   url,
   analyticsProjectId,
+  hotzones,
   className,
 }: {
   url: string;
   analyticsProjectId?: string;
+  hotzones?: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [currentTimeSec, setCurrentTimeSec] = useState<number | undefined>(undefined);
   useEffect(() => {
     if (!analyticsProjectId || !videoRef.current) return;
     const tracker = new VideoTracker(analyticsProjectId);
@@ -691,6 +723,13 @@ function RawVideoPlayback({
         playsInline
         preload="metadata"
         className="absolute inset-0 h-full w-full object-contain"
+        onTimeUpdate={(e) => setCurrentTimeSec(e.currentTarget.currentTime)}
+      />
+      <CtaHotzonesOverlay
+        hotzones={hotzones ?? []}
+        currentTimeSec={currentTimeSec}
+        onActivate={() => videoRef.current?.pause()}
+        analyticsProjectId={analyticsProjectId}
       />
     </div>
   );
@@ -757,6 +796,7 @@ function BakedVideo({
         hotzones={hotzones}
         currentTimeSec={currentTimeSec}
         onActivate={() => videoRef.current?.pause()}
+        analyticsProjectId={analyticsProjectId}
       />
     </>
   );

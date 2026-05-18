@@ -37,6 +37,25 @@ export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   courses: "Courses",
 };
 
+// Per-program "home" — where a creator goes to actually do the work after
+// enabling a program from YourProgramsPanel. Each program lives on a
+// different surface; this map keeps the destination DRY across the panel,
+// dashboards, and onboarding handoffs.
+//
+// `services` lands back on the offerings page with `#my-services` so the
+// list scrolls into view (the creator is already on the page when they
+// see the program card). `voice` deep-links into the studio editor's
+// Voice Clones sub-tab — there is no standalone manager yet
+// (Gap #786). `courses` points at the lightweight CoursesManager stub
+// (Gap #785 tracks the full authoring surface).
+export const CREATOR_PROGRAM_HOME: Record<CreatorProgram, string> = {
+  video: "/studio",
+  voice: "/studio?tab=voice-clones",
+  services: "/services/offerings#my-services",
+  articles: "/articles",
+  courses: "/courses",
+};
+
 export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
   video: "Sell promo videos and creative cuts. Escrow + revisions handled by the platform.",
   voice: "List voice clones in the marketplace. Buyers license your voice for projects.",

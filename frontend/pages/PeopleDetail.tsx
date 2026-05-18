@@ -24,7 +24,7 @@ import ContactSidebar from "@/components/profile/sections/ContactSidebar";
 import OpportunityPreferencesSection from "@/components/profile/sections/OpportunityPreferencesSection";
 import ProfileHeader from "@/components/profile/sections/ProfileHeader";
 import ProfileHeaderVideos from "@/components/profile/sections/ProfileHeaderVideos";
-import ServicesSection from "@/components/profile/sections/ServicesSection";
+import ProfileServicesPanel from "@/components/profile/sections/ProfileServicesPanel";
 import SkillsSection from "@/components/profile/sections/SkillsSection";
 import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
 import VideoResumeSection from "@/components/profile/sections/VideoResumeSection";
@@ -88,7 +88,6 @@ function PeopleDetailContent() {
     profile,
     masterResume,
     videos,
-    services,
     isOwner,
     connection,
     inTalentPool,
@@ -357,8 +356,7 @@ function PeopleDetailContent() {
     openCart();
   };
 
-  const handleRequestQuote = (serviceId: string) => {
-    const svc = services.find((s) => s.id === serviceId) ?? null;
+  const handleRequestQuote = (svc: ServiceOffering) => {
     setInquiryService(svc);
   };
 
@@ -589,13 +587,15 @@ function PeopleDetailContent() {
                       </AlertDescription>
                     </Alert>
                   )}
-                  <ServicesSection
-                    services={services}
-                    isOwner={isOwner}
-                    providerFirstName={firstName || undefined}
-                    onAddToCart={handleAddServiceToCart}
-                    onRequestQuote={handleRequestQuote}
-                  />
+                  {profile?.id && (
+                    <ProfileServicesPanel
+                      userId={profile.id}
+                      isOwner={isOwner}
+                      providerFirstName={firstName || undefined}
+                      onAddToCart={handleAddServiceToCart}
+                      onRequestQuote={handleRequestQuote}
+                    />
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

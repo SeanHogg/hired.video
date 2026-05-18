@@ -234,21 +234,10 @@ export default function VideoAnalyticsDashboard({
 
   const duration = videoDurationSec ?? analytics?.heatmap?.length ?? 0;
 
-  // Compute referrer breakdown from viewers (the API returns heatmap-level data;
-  // in a real implementation the backend would return referrers separately, but we
-  // derive placeholder-safe data here).
-  const referrerBreakdown = useMemo(() => {
-    if (!analytics) return [];
-    // Group viewers by company as a proxy; in production this would be referrer data.
-    const map = new Map<string, number>();
-    analytics.viewers.forEach((v) => {
-      const key = v.company || "Direct";
-      map.set(key, (map.get(key) ?? 0) + v.views);
-    });
-    return Array.from(map.entries())
-      .map(([source, views]) => ({ source, views }))
-      .sort((a, b) => b.views - a.views);
-  }, [analytics]);
+  // Referrer breakdown comes straight from the backend rollup keyed on
+  // document.referrer at view time — no proxy/derivation here. Older
+  // payloads (pre-deploy) may omit the field; treat as empty.
+  const referrerBreakdown = analytics?.referrers ?? [];
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -264,7 +253,11 @@ export default function VideoAnalyticsDashboard({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard
           title="Total Views"
-          value={analytics?.totalViews ?? eventCounts?.views ?? 0}
+          // Prefer the /view POST counter (one row per page mount) over
+          // the heatmap row count (which only lands on 30s tick /
+          // beforeunload / ended and thus under-counts short visits).
+          // Fall through to the heatmap when the events endpoint 403s.
+          value={eventCounts?.views ?? analytics?.totalViews ?? 0}
           icon={Eye}
           loading={loading}
         />

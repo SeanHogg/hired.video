@@ -280,7 +280,7 @@ export default function VendorSync() {
                 prior "one section per category" layout per #438. */}
             <CategoryFilterBar
               value={activeCategory}
-              onChange={setActiveCategory}
+              onChange={(next) => setActiveCategory(next)}
               allLabel="All vendors"
               allCount={connectors.length}
               options={VENDOR_CATEGORY_ORDER.map((cat) => ({

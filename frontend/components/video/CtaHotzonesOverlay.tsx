@@ -15,6 +15,7 @@
  */
 
 import type { CtaHotzone } from "@shared/cta-hotzones";
+import { recordProjectCtaClick } from "@/lib/services/studio-features-service";
 
 interface CtaHotzonesOverlayProps {
   hotzones: CtaHotzone[];
@@ -25,12 +26,19 @@ interface CtaHotzonesOverlayProps {
    *  playback. The browser still opens the link via `window.open` —
    *  this is a side-effect hook, not a click interceptor. */
   onActivate?: (zone: CtaHotzone) => void;
+  /** Studio project id. When supplied the overlay self-fires
+   *  POST /api/studio/projects/:id/cta-click on every activation so
+   *  consumers don't have to re-implement the tracking call (DRY).
+   *  Omit on editor previews — those shouldn't count toward the
+   *  owner's CTR. Failures are swallowed inside the service helper. */
+  analyticsProjectId?: string;
 }
 
 export default function CtaHotzonesOverlay({
   hotzones,
   currentTimeSec,
   onActivate,
+  analyticsProjectId,
 }: CtaHotzonesOverlayProps) {
   if (!hotzones.length) return null;
   if (typeof currentTimeSec !== "number") return null;
@@ -48,7 +56,15 @@ export default function CtaHotzonesOverlay({
           href={zone.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => onActivate?.(zone)}
+          onClick={() => {
+            onActivate?.(zone);
+            if (analyticsProjectId) {
+              void recordProjectCtaClick(analyticsProjectId, {
+                referrer: typeof document !== "undefined" ? document.referrer || undefined : undefined,
+                targetUrl: zone.url,
+              });
+            }
+          }}
           aria-label="Open call-to-action link"
           className="absolute pointer-events-auto cursor-pointer"
           style={{

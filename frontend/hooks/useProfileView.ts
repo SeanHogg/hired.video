@@ -6,7 +6,6 @@ import {
 } from "@/lib/services/dashboard-service";
 import { recruiterService } from "@/lib/services/recruiter-service";
 import { resumeService } from "@/lib/services/resume-service";
-import { servicesService, type ServiceOffering } from "@/lib/services/services-service";
 import { studioService, type UserVideo } from "@/lib/services/studio-service";
 import { userService, type UserProfile } from "@/lib/services/user-service";
 import { createRolePermissions } from "@/lib/role-utils";
@@ -33,8 +32,6 @@ export interface ProfileView {
   masterResume: Resume | null;
   /** Published studio videos. Never private; public for all viewers. */
   videos: UserVideo[];
-  /** Marketplace services published by this user. */
-  services: ServiceOffering[];
   /** True when the authenticated viewer is the profile owner. */
   isOwner: boolean;
   /** Connection relationship from viewer → owner. Always `{status: "none"}`
@@ -138,7 +135,6 @@ export function useProfileView(target: ProfileViewTarget): ProfileView {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [masterResume, setMasterResume] = useState<Resume | null>(null);
   const [videos, setVideos] = useState<UserVideo[]>([]);
-  const [services, setServices] = useState<ServiceOffering[]>([]);
   const [connection, setConnection] = useState<ConnectionRelationship>({
     status: "none",
     id: null,
@@ -163,7 +159,6 @@ export function useProfileView(target: ProfileViewTarget): ProfileView {
       if (!loaded) {
         setMasterResume(null);
         setVideos([]);
-        setServices([]);
         setConnection({ status: "none", id: null });
         setInTalentPool(null);
         setDashboard(null);
@@ -176,10 +171,11 @@ export function useProfileView(target: ProfileViewTarget): ProfileView {
       const viewerId = authUser?.id;
 
       // Fan out secondary fetches in parallel — they're all independent.
-      const [resume, videoRes, svcList, rel] = await Promise.all([
+      // Services moved into <ProfileServicesPanel/> which self-fetches the
+      // active list for the relevant audience.
+      const [resume, videoRes, rel] = await Promise.all([
         fetchMasterResume(loaded, viewerIsOwner),
         loaded.id ? studioService.getVideosForUser(loaded.id) : Promise.resolve({ data: [] as UserVideo[] }),
-        loaded.id ? servicesService.getPublicServices(loaded.id) : Promise.resolve([] as ServiceOffering[]),
         !viewerIsOwner && viewerId && loaded.id
           ? fetchConnection(viewerId, loaded.id)
           : Promise.resolve<ConnectionRelationship>({ status: "none", id: null }),
@@ -187,7 +183,6 @@ export function useProfileView(target: ProfileViewTarget): ProfileView {
 
       setMasterResume(resume);
       setVideos(videoRes.data ?? []);
-      setServices(svcList ?? []);
       setConnection(rel);
 
       // Recruiter-only: talent-pool membership check.
@@ -244,7 +239,6 @@ export function useProfileView(target: ProfileViewTarget): ProfileView {
     profile,
     masterResume,
     videos,
-    services,
     isOwner,
     connection,
     inTalentPool,

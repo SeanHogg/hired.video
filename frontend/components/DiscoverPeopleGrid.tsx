@@ -7,11 +7,13 @@
  * a prop-drilled boolean.
  */
 
+import { useMemo } from "react";
 import Pagination from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
 import { Button } from "@/components/ui/button";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useAuth } from "@/lib/auth";
+import { useConnectionStatuses } from "@/lib/use-connection-statuses";
 import { createRolePermissions } from "@/lib/role-utils";
 import type { PublicUser } from "@/lib/services/user-service";
 
@@ -68,6 +70,22 @@ export default function DiscoverPeopleGrid({
     ? createRolePermissions(user.role).canManageJobs
     : false;
 
+  // Drop the viewer's own row before rendering — "Discover People" should
+  // never offer you a "Connect" button to yourself. The public-users API
+  // returns everyone (including self) so this surface filters at the view
+  // layer rather than the fetch layer.
+  const visiblePeople = useMemo(
+    () => (user ? people.filter((p) => p.id !== user.id) : people),
+    [people, user],
+  );
+
+  // Batch-fetch connection statuses for everyone in the visible slice so
+  // each card renders its real button (Connect / Pending / Message / etc.)
+  // instead of always showing "Connect". Hook self-excludes the viewer.
+  const connectionStatuses = useConnectionStatuses(
+    visiblePeople.map((p) => p.id),
+  );
+
   return (
     <div>
       {isLoading ? (
@@ -83,7 +101,7 @@ export default function DiscoverPeopleGrid({
           <p className="text-red-600 mb-4">{error}</p>
           <Button onClick={onRetry}>Try Again</Button>
         </div>
-      ) : people.length === 0 ? (
+      ) : visiblePeople.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-600 mb-4">
             {isFilteredByList
@@ -100,7 +118,7 @@ export default function DiscoverPeopleGrid({
               : "flex flex-col gap-4"
           }
         >
-          {people.map((person) => {
+          {visiblePeople.map((person) => {
             const personMetadata = {
               id: person.id,
               slug: person.slug,
@@ -138,14 +156,13 @@ export default function DiscoverPeopleGrid({
               experienceLevel: "Mid Level",
               currentPosition: person.currentRole || "",
               currentCompany: person.currentCompany || "",
-              ownership: "tracked" as const,
             };
 
             return (
               <PeopleCard
                 key={person.id}
                 person={personMetadata}
-                connectionStatus="none"
+                connectionStatus={connectionStatuses[person.id] ?? "none"}
                 layout={viewMode === "list" ? "horizontal" : "vertical"}
                 onConnect={onConnect}
                 onMessage={onMessage}
@@ -168,7 +185,7 @@ export default function DiscoverPeopleGrid({
         </div>
       )}
 
-      {!isLoading && !error && people.length > 0 && (
+      {!isLoading && !error && visiblePeople.length > 0 && (
         <Pagination
           currentPage={currentPage}
           totalItems={totalPeople}

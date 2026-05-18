@@ -288,6 +288,15 @@ export default function ServicesManagement() {
     loadInquiries(); // load eagerly so dashboard metrics are populated
   }, [isAuthenticated, user]);
 
+  // Scroll a hashed anchor (e.g. `/services/offerings#my-services`) into
+  // view after the services list has mounted. React Router doesn't trigger
+  // the browser's native hash-jump on client-side navigation.
+  useEffect(() => {
+    if (!location.hash || loading) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash, loading]);
+
   async function loadServices() {
     setLoading(true);
     try {
@@ -803,6 +812,9 @@ export default function ServicesManagement() {
                   onProfileChange={handleCreatorProfileChange}
                 />
               )}
+              {/* `#my-services` anchor — YourProgramsPanel's "Services" card
+                  deep-links here so the list scrolls into view. */}
+              <div id="my-services" className="scroll-mt-24 space-y-3">
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -892,6 +904,7 @@ export default function ServicesManagement() {
                   ))}
                 </div>
               )}
+              </div>
             </TabsContent>
 
             {/* ── Inquiries ────────────────────────────────────────────────── */}

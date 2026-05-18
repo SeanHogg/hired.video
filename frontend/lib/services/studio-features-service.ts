@@ -219,6 +219,10 @@ export interface VideoAnalytics {
     views: number;
     avgPercent: number;
   }>;
+  /** Traffic source breakdown derived from document.referrer captured
+   *  at view time. Bare hostnames; direct/in-app visits land under
+   *  "Direct". Sum equals totalViews. */
+  referrers: Array<{ source: string; views: number }>;
 }
 
 // ─── TTS ────────────────────────────────────────────────────────────────────
@@ -623,6 +627,28 @@ export async function trackVideoView(params: {
 export async function getVideoAnalytics(projectId: string): Promise<VideoAnalytics> {
   const res = await apiClient.get<VideoAnalytics>(`/api/studio/analytics/projects/${projectId}`);
   return res.data;
+}
+
+// One-shot view + CTA-click counters keyed on the studio project. The
+// heatmap tracker (above) only fires on 30s tick / beforeunload / ended,
+// so it under-counts short visits — these endpoints land an authoritative
+// row the moment the surface mounts or the hot-zone is clicked. Both
+// endpoints accept anonymous (no-auth) callers; the rollup the dashboard
+// reads from is /api/studio/projects/:id/analytics. Silent-catch so
+// telemetry never breaks the watch page.
+export async function recordProjectView(projectId: string, referrer?: string): Promise<void> {
+  await apiClient
+    .post(`/api/studio/projects/${projectId}/view`, { referrer })
+    .catch(() => {});
+}
+
+export async function recordProjectCtaClick(projectId: string, opts?: { referrer?: string; targetUrl?: string }): Promise<void> {
+  await apiClient
+    .post(`/api/studio/projects/${projectId}/cta-click`, {
+      referrer: opts?.referrer,
+      metadata: opts?.targetUrl ? { targetUrl: opts.targetUrl } : undefined,
+    })
+    .catch(() => {});
 }
 
 // ─── Stock Media (gap #128) ─────────────────────────────────────────────────

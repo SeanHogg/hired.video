@@ -10,6 +10,7 @@ import {
   X,
   Check,
   ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import {
   legalService,
   CREATOR_PROGRAMS,
   CREATOR_PROGRAM_LABEL,
+  CREATOR_PROGRAM_HOME,
   CREATOR_PROGRAM_TERMS_KIND,
   type CreatorProgram,
   type CreatorProfile,
@@ -114,6 +116,13 @@ export default function YourProgramsPanel({ profile, onProfileChange }: Props) {
                   <div className="font-medium text-sm flex-1">{CREATOR_PROGRAM_LABEL[p]}</div>
                   {isOn && <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">Active</Badge>}
                 </div>
+                {isOn && (
+                  <Button asChild size="sm" className="w-full mb-1.5">
+                    <Link to={CREATOR_PROGRAM_HOME[p]}>
+                      Manage <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant={isOn ? "outline" : "default"}

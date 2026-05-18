@@ -7,6 +7,7 @@ import StudioVideoSurface, {
   type PublicVideoReady,
   type PublicVideoPayload as PublicVideo,
 } from "@/components/studio/StudioVideoSurface";
+import { recordProjectView } from "@/lib/services/studio-features-service";
 
 // ─── Meta helpers ─────────────────────────────────────────────────────────────
 function setMeta(name: string, content: string) {
@@ -19,13 +20,27 @@ function setMeta(name: string, content: string) {
   el.setAttribute("content", content);
 }
 
+// Combine the owner-authored Meta-tab fields (metaDescription / keywords /
+// socialCardImage) with the video's default title/description/thumbnail.
+// Meta-tab values win when set — the share preview reflects what the owner
+// typed in the Details drawer, not the raw render fallback. Empty/null
+// fields fall through silently so a partially-filled Meta tab still gets
+// the missing slots filled from the video defaults.
 function applyOgTags(video: PublicVideoReady) {
   const title = video.title;
-  const desc = video.description || "Watch this video resume on hired.video";
-  const thumb = video.thumbnailUrl || "https://hired.video/og-default.png";
+  const desc =
+    video.metaDescription ||
+    video.description ||
+    "Watch this video resume on hired.video";
+  const thumb =
+    video.socialCardImage ||
+    video.thumbnailUrl ||
+    "https://hired.video/og-default.png";
   const url = `https://hired.video/v/${video.id}`;
+  const keywords = video.keywords?.length ? video.keywords.join(", ") : null;
 
   document.title = title;
+  setMeta("description", desc);
   setMeta("og:title", title);
   setMeta("og:description", desc);
   setMeta("og:image", thumb);
@@ -35,6 +50,7 @@ function applyOgTags(video: PublicVideoReady) {
   setMeta("twitter:title", title);
   setMeta("twitter:description", desc);
   setMeta("twitter:image", thumb);
+  if (keywords) setMeta("keywords", keywords);
   if (video.youtubeUrl) {
     setMeta("og:video", video.youtubeUrl);
     setMeta("og:video:type", "text/html");
@@ -58,7 +74,15 @@ export default function PublicVideoResume() {
         const result = PublicVideoSchema.safeParse(raw);
         if (result.success) {
           setVideo(result.data);
-          if (isReady(result.data)) applyOgTags(result.data);
+          if (isReady(result.data)) {
+            applyOgTags(result.data);
+            // Authoritative view counter for the Total Views / CTR
+            // denominator on the owner's analytics dashboard. The
+            // per-second heatmap tracker (mounted by StudioVideoSurface
+            // below) under-counts short visits because it only flushes
+            // on 30s tick / beforeunload / ended.
+            void recordProjectView(result.data.id, document.referrer || undefined);
+          }
         } else {
           setError("Could not load this video resume.");
         }
@@ -160,8 +184,14 @@ export default function PublicVideoResume() {
         {/* Universal studio video surface — same component every other
             on-platform embed mounts (Resume detail page, profile,
             channel grid). Encapsulates the YouTube / baked / live
-            script dispatch + chrome. */}
-        <StudioVideoSurface mode="eager" ready={ready} />
+            script dispatch + chrome. `analyticsProjectId` is passed so
+            the surface attaches per-second engagement tracking and
+            forwards CTA-hotzone clicks to the analytics endpoint. */}
+        <StudioVideoSurface
+          mode="eager"
+          ready={ready}
+          analyticsProjectId={ready.id}
+        />
 
         {/* Description */}
         {ready.description && (

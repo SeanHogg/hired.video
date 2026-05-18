@@ -98,6 +98,7 @@ import {
   type SubmissionFilters,
 } from "@/lib/services/submission-service";
 import { apiClient } from "@/lib/api-client";
+import { useConnectionStatuses } from "@/lib/use-connection-statuses";
 import { listsService } from "@/lib/services/lists-service";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
@@ -433,46 +434,18 @@ export default function People() {
     }
   };
 
-  // Connection statuses keyed by the other user's id
-  const [connectionStatuses, setConnectionStatuses] = useState<
-    Record<string, ConnectionStatus>
-  >({});
-
-  // Fetch connection statuses whenever the people list changes
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id || people.length === 0) {
-      setConnectionStatuses({});
-      return;
-    }
-    const otherIds = people.filter((p) => p.id !== user.id).map((p) => p.id);
-    if (otherIds.length === 0) return;
-
-    let cancelled = false;
-    userService.getConnectionStatuses(otherIds).then((statuses) => {
-      if (!cancelled) {
-        const mapped: Record<string, ConnectionStatus> = {};
-        for (const [id, s] of Object.entries(statuses)) {
-          if (!s.connected) {
-            mapped[id] = "none";
-          } else if (s.status === "accepted") {
-            mapped[id] = "connected";
-          } else if (s.status === "pending") {
-            mapped[id] = s.fromUserId === user.id ? "pending_sent" : "pending_received";
-          } else {
-            mapped[id] = "none";
-          }
-        }
-        setConnectionStatuses(mapped);
-      }
-    }).catch(() => {
-      if (!cancelled) setConnectionStatuses({});
-    });
-    return () => { cancelled = true; };
-  }, [isAuthenticated, user?.id, people]);
-
-  const getConnectionStatus = (_userId: string, personId: string): ConnectionStatus => {
-    return connectionStatuses[personId] ?? "none";
-  };
+  // Connection statuses for the Connections tab — DiscoverPeopleGrid owns
+  // its own batched fetch for the Browse tab. Shared hook is the single
+  // source of truth for the request + status-mapping logic.
+  const trackedIds = useMemo(
+    () => (user ? getAllPeopleForUser(user.id).tracked.map((p) => p.id) : []),
+    [user, people],
+  );
+  const connectionStatuses = useConnectionStatuses(trackedIds);
+  const getConnectionStatus = (
+    _userId: string,
+    personId: string,
+  ): ConnectionStatus => connectionStatuses[personId] ?? "none";
 
   // Helper functions
   const getExperienceLevel = (person: any): string => {

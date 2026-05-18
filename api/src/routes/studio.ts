@@ -2594,29 +2594,14 @@ studioRoutes.get("/public/:videoId", async (c) => {
   // shared link before the owner finished rendering.
   const videoIdIsUuid = isUuid(videoId);
   let resolvedVideoId: string | null = null;
-  // Project-side info, populated when the param resolves to a studio
-  // project (by UUID or vanity slug). Carries the project-level visibility
-  // and the saved script so the public payload can serve the unified
-  // <StudioPlayer/> live — no MP4 render required (#666).
-  let projectInfo: {
-    id: string;
-    isPublic: boolean;
-    title: string | null;
-    script: unknown | null;
-    timelineSpec: unknown | null;
-    kind: string | null;
-    ownerName: string | null;
-    ownerAvatar: string | null;
-  } | null = null;
   const projectSelect = {
     id: studioProjects.id,
     videoId: studioProjects.videoId,
     isPublic: studioProjects.isPublic,
     kind: studioProjects.kind,
-    // Title isn't a column — toProjectDto reads it from
-    // storyboard._name (set by save-draft). Same trick here. The whole
-    // storyboard doubles as the live-playback VideoScript on v1
-    // (kind='scene') projects.
+    // Title + SEO meta aren't columns — toProjectDto reads them from the
+    // storyboard JSONB (set by save-draft). The whole storyboard doubles
+    // as the live-playback VideoScript on v1 (kind='scene') projects.
     storyboard: studioProjects.storyboard,
     // v2 (kind='nle') projects carry their authoring canvas here; the
     // public watch page converts this client-side via
@@ -2626,6 +2611,39 @@ studioRoutes.get("/public/:videoId", async (c) => {
     ownerName: users.name,
     ownerAvatar: userProfiles.avatarUrl,
   };
+  type ProjectRow = {
+    id: string;
+    videoId: string | null;
+    isPublic: boolean;
+    kind: string | null;
+    storyboard: unknown;
+    timelineSpec: unknown;
+    ownerName: string | null;
+    ownerAvatar: string | null;
+  };
+  // Pulls the JSONB-stored meta fields out of a project row in one place
+  // so the UUID and slug lookups can't drift on which fields they expose.
+  const toProjectInfo = (proj: ProjectRow) => {
+    const meta = proj.storyboard as Record<string, unknown> | null;
+    return {
+      id: proj.id,
+      isPublic: proj.isPublic,
+      title: (meta?._name as string | undefined) ?? null,
+      script: proj.storyboard ?? null,
+      timelineSpec: proj.timelineSpec ?? null,
+      kind: proj.kind ?? null,
+      ownerName: proj.ownerName,
+      ownerAvatar: proj.ownerAvatar,
+      metaDescription: (meta?._metaDescription as string | undefined) ?? null,
+      keywords: Array.isArray(meta?._keywords) ? (meta!._keywords as string[]) : [],
+      socialCardImage: (meta?._socialCardImage as string | undefined) ?? null,
+    };
+  };
+  // Project-side info, populated when the param resolves to a studio
+  // project (by UUID or vanity slug). Carries the project-level visibility
+  // and the saved script so the public payload can serve the unified
+  // <StudioPlayer/> live — no MP4 render required (#666).
+  let projectInfo: ReturnType<typeof toProjectInfo> | null = null;
   if (videoIdIsUuid) {
     const [proj] = await db
       .select(projectSelect)
@@ -2636,17 +2654,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
       .limit(1);
     if (proj) {
       if (proj.videoId) resolvedVideoId = proj.videoId;
-      const meta = proj.storyboard as { _name?: string } | null;
-      projectInfo = {
-        id: proj.id,
-        isPublic: proj.isPublic,
-        title: meta?._name ?? null,
-        script: proj.storyboard ?? null,
-        timelineSpec: proj.timelineSpec ?? null,
-        kind: proj.kind ?? null,
-        ownerName: proj.ownerName,
-        ownerAvatar: proj.ownerAvatar,
-      };
+      projectInfo = toProjectInfo(proj);
     }
   } else if (isValidSlug(videoId)) {
     // Looks like a kebab-case slug — match against `storyboard._slug`.
@@ -2662,17 +2670,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
       .limit(1);
     if (proj) {
       if (proj.videoId) resolvedVideoId = proj.videoId;
-      const meta = proj.storyboard as { _name?: string } | null;
-      projectInfo = {
-        id: proj.id,
-        isPublic: proj.isPublic,
-        title: meta?._name ?? null,
-        script: proj.storyboard ?? null,
-        timelineSpec: proj.timelineSpec ?? null,
-        kind: proj.kind ?? null,
-        ownerName: proj.ownerName,
-        ownerAvatar: proj.ownerAvatar,
-      };
+      projectInfo = toProjectInfo(proj);
     }
   }
   const condition = resolvedVideoId
@@ -2817,6 +2815,14 @@ studioRoutes.get("/public/:videoId", async (c) => {
     aspect,
     resolution,
     ctaHotzones,
+    // SEO meta authored in the project Details drawer (Meta tab). The
+    // public watch page overlays these onto the og:/twitter:/keywords
+    // tags so the share preview reflects what the owner typed, not the
+    // raw video.title/description fallback chain. Null/empty means
+    // "fall back to defaults" — the client decides the precedence.
+    metaDescription: projectInfo?.metaDescription ?? null,
+    keywords: projectInfo?.keywords ?? [],
+    socialCardImage: projectInfo?.socialCardImage ?? null,
     createdAt: asIso(v?.createdAt ?? new Date()),
   }));
 });
