@@ -35,6 +35,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
+import { canvasStateToText } from "@/lib/studio/editor-v2/canvas-to-text";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { VideoScript } from "@/types/video-script";
@@ -198,18 +199,12 @@ function ATSTrigger({
   videoId: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  // Project script in plain-text form — concatenated title/subtitle/text
-  // per scene. Built lazily on open so we don't run the conversion on
-  // every state change.
+  // Project script in plain-text form. `canvasStateToText` is the
+  // shared extractor — used here AND by the Skills Demo trigger
+  // below, so the two surfaces stay in lockstep on what counts as
+  // "what the video says" (DRY).
   function buildScriptText(): string {
-    const script = canvasStateToScript(state);
-    return script.scenes
-      .map((s) => {
-        const parts = [s.title, s.subtitle, typeof s.text === "string" ? s.text : (s.text ?? []).join(" ")];
-        return parts.filter(Boolean).join(" — ");
-      })
-      .filter((line) => line.length > 0)
-      .join("\n\n");
+    return canvasStateToText(state);
   }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -275,15 +270,8 @@ function AsyncInterviewTrigger() {
 function SkillsDemoTrigger({ state }: { state: CanvasState }) {
   const [open, setOpen] = useState(false);
   // Reuse the canvas's concatenated text as an approximate resume
-  // body. The dialog handles the actual capture flow.
-  const resumeText = canvasStateToScript(state)
-    .scenes.map((s) =>
-      [s.title, s.subtitle, typeof s.text === "string" ? s.text : (s.text ?? []).join(" ")]
-        .filter(Boolean)
-        .join(" — "),
-    )
-    .filter(Boolean)
-    .join("\n\n");
+  // body — same shared extractor the ATS trigger uses (DRY).
+  const resumeText = canvasStateToText(state);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>

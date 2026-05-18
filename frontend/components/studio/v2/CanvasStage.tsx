@@ -1,7 +1,10 @@
 /**
- * The canvas stage — the central "video frame" surface. Renders the
- * active scene with its widgets, accepts drops from the palette, and
- * handles widget select / move / resize.
+ * The canvas stage — the central "video frame" AUTHORING surface.
+ * Renders the active scene with its widgets, accepts drops from the
+ * palette, and handles widget select / move / resize. Playback +
+ * fullscreen preview + export all go through `CanvasV2Preview` /
+ * `renderTimelineFrame` (canvas-2D); this component is DOM only and
+ * exists solely so the author can interact with widgets while editing.
  *
  * Selection semantics:
  *   - Click an empty area of the canvas → frame selection (right panel
@@ -57,13 +60,6 @@ export type Selection =
   | { kind: "scene"; sceneId: string }
   | { kind: "widget"; sceneId: string; widgetId: string };
 
-/** Interaction stance for the stage. `edit` — the authoring surface:
- *  widgets are draggable / selectable, CTA buttons are inert visuals so
- *  clicks select the widget for editing. `preview` — the playback
- *  surface: drag/select are off, selection chrome is hidden, and
- *  interactive widgets (CTA) render as real links the viewer can click. */
-export type CanvasStageMode = "edit" | "preview";
-
 export interface CanvasStageProps {
   scene: Scene;
   canvasWidth: number;
@@ -104,16 +100,6 @@ export interface CanvasStageProps {
   /** Project-level font (FontPreset.id). Applied to every text /
    *  heading widget body unless that widget overrides locally. */
   defaultFontId?: string | null;
-  /** "edit" (default) — drag, select, no link navigation. "preview" —
-   *  drag/select disabled, selection chrome hidden, CTA button is a
-   *  real anchor. Single source of truth for "is this surface live?" */
-  mode?: CanvasStageMode;
-  /** Called when a CTA widget's button is activated in preview mode.
-   *  Receives the destination URL so the host can pause playback,
-   *  record analytics, etc. before the browser follows the link.
-   *  The link is rendered with target="_blank", so navigation happens
-   *  in a new tab regardless of whether the host handles this. */
-  onCtaActivate?: (url: string) => void;
 }
 
 export default function CanvasStage({
@@ -132,10 +118,7 @@ export default function CanvasStage({
   onScreenshotDrop,
   playheadInScene,
   defaultFontId,
-  mode = "edit",
-  onCtaActivate,
 }: CanvasStageProps) {
-  const isPreview = mode === "preview";
   const stageRef = useRef<HTMLDivElement>(null);
   // `dragKind` is null when no recognised drag is hovering. We track
   // the kind (not just a boolean) so the kind-aware drop overlay can
@@ -235,12 +218,12 @@ export default function CanvasStage({
         role="application"
         aria-label={`Canvas for ${scene.label}`}
         tabIndex={0}
-        onDragOver={isPreview ? undefined : handleDragOver}
-        onDragLeave={isPreview ? undefined : handleDragLeave}
-        onDrop={isPreview ? undefined : handleDrop}
-        onClick={isPreview ? undefined : handleBackgroundClick}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleBackgroundClick}
         onKeyDown={(e) => {
-          if (!isPreview && e.key === "Escape") handleBackgroundClick(e);
+          if (e.key === "Escape") handleBackgroundClick(e);
         }}
         className={cn("absolute left-0 top-0 outline-none")}
         style={{
@@ -277,7 +260,6 @@ export default function CanvasStage({
               widget={widget}
               stageRef={stageRef}
               selected={
-                !isPreview &&
                 selection.kind === "widget" && selection.widgetId === widget.id
               }
               onSelect={() =>
@@ -290,8 +272,6 @@ export default function CanvasStage({
                   : null
               }
               animateInput={widgetAnimateInput(widget, playheadInScene, scene.durationSeconds)}
-              mode={mode}
-              onCtaActivate={onCtaActivate}
             />
           ))}
       </div>
@@ -319,8 +299,6 @@ interface WidgetViewProps {
    *  playhead. Drives the animate-* effect math (fade/zoom/pan/pulse/
    *  shake) so the editor preview reproduces the render-side pixels. */
   animateInput: AnimateInput;
-  mode: CanvasStageMode;
-  onCtaActivate?: (url: string) => void;
 }
 
 function WidgetView({
@@ -331,10 +309,7 @@ function WidgetView({
   onMove,
   motion,
   animateInput,
-  mode,
-  onCtaActivate,
 }: WidgetViewProps) {
-  const isPreview = mode === "preview";
   const startRef = useRef<{
     pointerId: number;
     mode: "move" | "resize" | "rotate";
@@ -412,38 +387,25 @@ function WidgetView({
   }
 
   const containerCss = containerStyleToCss(widget.containerStyle);
-  // In preview mode the wrapper is purely a positioned container — every
-  // edit interaction (drag, resize, rotate, select-on-click) drops away
-  // so the inner body's own affordances (e.g. the CTA anchor) receive
-  // their native click. We also drop role="button" / tabIndex so the
-  // wrapper doesn't claim keyboard focus over an inner link.
   return (
     <div
-      role={isPreview ? undefined : "button"}
-      tabIndex={isPreview ? undefined : 0}
-      onPointerDown={isPreview ? undefined : (e) => beginDrag(e, "move")}
-      onPointerMove={isPreview ? undefined : handlePointerMove}
-      onPointerUp={isPreview ? undefined : endDrag}
-      onPointerCancel={isPreview ? undefined : endDrag}
-      onClick={
-        isPreview
-          ? undefined
-          : (e) => {
-              e.stopPropagation();
-              onSelect();
-            }
-      }
-      onKeyDown={
-        isPreview
-          ? undefined
-          : (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect();
-              }
-            }
-      }
-      className={cn("absolute select-none", isPreview ? null : "cursor-move")}
+      role="button"
+      tabIndex={0}
+      onPointerDown={(e) => beginDrag(e, "move")}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="absolute cursor-move select-none"
       style={{
         left: `${widget.position.x * 100}%`,
         top: `${widget.position.y * 100}%`,
@@ -473,9 +435,9 @@ function WidgetView({
         className="h-full w-full overflow-hidden"
         style={widgetEffectsToCss(widget.effects, animateInput)}
       >
-        <WidgetBody widget={widget} mode={mode} onCtaActivate={onCtaActivate} />
+        <WidgetBody widget={widget} />
       </div>
-      {!isPreview && selected && (
+      {selected && (
         <div
           onPointerDown={(e) => beginDrag(e, "resize")}
           onPointerMove={handlePointerMove}
@@ -484,7 +446,7 @@ function WidgetView({
           aria-label="Resize widget"
         />
       )}
-      {!isPreview && selected && (
+      {selected && (
         <>
           {/* Stick — decorative line from the widget's top-left corner
               out to the rotation ball. transformOrigin "top center" +
@@ -517,15 +479,7 @@ function WidgetView({
   );
 }
 
-function WidgetBody({
-  widget,
-  mode,
-  onCtaActivate,
-}: {
-  widget: Widget;
-  mode: CanvasStageMode;
-  onCtaActivate?: (url: string) => void;
-}) {
+function WidgetBody({ widget }: { widget: Widget }) {
   const p = widget.params;
   switch (p.kind) {
     case "text":
@@ -635,16 +589,14 @@ function WidgetBody({
     case "chips":
       return <ChipsBody data={p.data} />;
     case "cta":
-      return <CtaBody data={p.data} mode={mode} onCtaActivate={onCtaActivate} />;
+      return <CtaBody data={p.data} />;
     case "linked-content":
-      return <LinkedContentBody data={p.data} mode={mode} onCtaActivate={onCtaActivate} />;
+      return <LinkedContentBody data={p.data} />;
   }
 }
 
 function CtaBody({
   data,
-  mode,
-  onCtaActivate,
 }: {
   data: {
     headline: string;
@@ -658,8 +610,6 @@ function CtaBody({
     cardFontPx?: number;
     ctaFontPx?: number;
   };
-  mode: CanvasStageMode;
-  onCtaActivate?: (url: string) => void;
 }) {
   const buttonLabel = data.ctaText || "Call to action";
   // Resolved via the canvas-state helper so the DOM preview and the
@@ -667,20 +617,6 @@ function CtaBody({
   // subheadline-derivation ratio + back-compat defaults for CTAs
   // authored before these fields existed).
   const sizes = resolveCtaFontSizes(data.cardFontPx, data.ctaFontPx);
-  const buttonStyle: React.CSSProperties = {
-    backgroundColor: data.accentColor,
-    color: data.accentTextColor,
-    fontSize: sizes.button,
-  };
-  const buttonClass =
-    "inline-flex items-center rounded-full px-4 py-1.5 font-semibold";
-
-  // The button is only a live link in preview mode AND when the author
-  // gave it somewhere to go. In edit mode (or with no URL) it renders as
-  // an inert span so a click inside the editor still lands on the widget
-  // wrapper's select handler — matching the Webflow/Framer convention.
-  const interactive = mode === "preview" && !!data.ctaUrl;
-
   return (
     <div
       className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
@@ -694,22 +630,16 @@ function CtaBody({
           {data.subheadline}
         </p>
       )}
-      {interactive ? (
-        <a
-          href={data.ctaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(buttonClass, "cursor-pointer hover:opacity-90 transition-opacity")}
-          style={buttonStyle}
-          onClick={() => onCtaActivate?.(data.ctaUrl)}
-        >
-          {buttonLabel}
-        </a>
-      ) : (
-        <span className={buttonClass} style={buttonStyle}>
-          {buttonLabel}
-        </span>
-      )}
+      <span
+        className="inline-flex items-center rounded-full px-4 py-1.5 font-semibold"
+        style={{
+          backgroundColor: data.accentColor,
+          color: data.accentTextColor,
+          fontSize: sizes.button,
+        }}
+      >
+        {buttonLabel}
+      </span>
     </div>
   );
 }

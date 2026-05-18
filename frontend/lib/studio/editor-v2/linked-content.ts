@@ -62,7 +62,12 @@ export type LinkedContentKind =
 
 /** Tile metadata for the palette section (one row per item the current
  *  user owns). Fetched from `LinkedContentMeta.listForUser` and rendered
- *  with the same `LeftPanelTile` the static widget catalog uses. */
+ *  with the same `LeftPanelTile` the static widget catalog uses. The
+ *  same shape is also returned from `fetchSummary(id)` and consumed by
+ *  the canvas-v2:linked-content applier — the optional `body` /
+ *  `badges` fields are read by the canvas drawer to paint richer
+ *  content (bullet lines, skill / tag chips) when present. Palette
+ *  tiles ignore them. */
 export interface LinkedContentSummary {
   kind: LinkedContentKind;
   id: string;
@@ -70,6 +75,13 @@ export interface LinkedContentSummary {
   /** Secondary line (e.g. "Active · Master") — optional, rendered as a
    *  hint / tooltip when present. */
   subtitle?: string;
+  /** Body lines drawn beneath the subtitle in the canvas applier.
+   *  Each line wraps independently — kinds should pre-bullet (e.g.
+   *  prefix with `"• "`) where appropriate. Palette tiles ignore. */
+  body?: string[];
+  /** Pill chips drawn at the bottom of the canvas card (skills /
+   *  tags / categories). Palette tiles ignore. */
+  badges?: string[];
 }
 
 interface LinkedContentMeta {
@@ -87,6 +99,12 @@ interface LinkedContentMeta {
    *  Errors are swallowed by the caller — the section just renders the
    *  empty state. */
   listForUser: () => Promise<LinkedContentSummary[]>;
+  /** Fetch a single entity's render-friendly summary by id. Used by
+   *  the canvas-v2 render pipeline's preload pass so the synchronous
+   *  applier can draw a card without bringing the entity's full DOM
+   *  renderer into the export path. Errors resolve to `null` so a
+   *  broken / private id renders an empty card instead of crashing. */
+  fetchSummary: (id: string) => Promise<LinkedContentSummary | null>;
   /** Lazy-loaded canvas body — renders the entity inside the widget
    *  using its OWN renderer (e.g. `<DeclarativeResumeRenderer/>` for
    *  resumes) so the embedded card looks like a thumbnail of the
@@ -116,6 +134,37 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
           subtitle: subtitleForResume(r),
         }));
     },
+    fetchSummary: async (id) => {
+      try {
+        const r = await resumeService
+          .getResumeForEmbed(id)
+          .catch(() => resumeService.getResumeById(id));
+        if (!r?.id) return null;
+        const c = r.content;
+        const basics = c?.basics;
+        const fullName = basics?.name?.trim();
+        const headline = basics?.label?.trim() || basics?.summary?.split("\n")[0]?.slice(0, 120);
+        const top = (c?.work ?? []).slice(0, 2);
+        return {
+          kind: "resume",
+          id: r.id,
+          title: fullName || r.title || "Untitled resume",
+          subtitle: headline || subtitleForResume(r),
+          body: top
+            .map((e) => {
+              const parts = [e.position, e.name].filter(Boolean);
+              return parts.length ? `• ${parts.join(" · ")}` : "";
+            })
+            .filter(Boolean),
+          badges: (c?.skills ?? [])
+            .map((s) => s.name)
+            .filter((s): s is string => Boolean(s))
+            .slice(0, 6),
+        };
+      } catch {
+        return null;
+      }
+    },
     InlineBody: ResumeInlineBody,
   },
   job: {
@@ -138,6 +187,44 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
           subtitle: [j.company, j.location].filter(Boolean).join(" · ") || undefined,
         }));
     },
+    fetchSummary: async (id) => {
+      try {
+        const j = await jobService.getJobById(id);
+        if (!j?.id) return null;
+        // Job records vary in shape across the API surface — read
+        // tolerantly. Description / requirements may live under
+        // `description`, `summary`, `data.description`; pull whichever
+        // exists, split to lines, cap.
+        const raw = j as Record<string, unknown>;
+        const data = (raw.data ?? raw) as Record<string, unknown>;
+        const description = typeof data.description === "string"
+          ? data.description
+          : typeof data.summary === "string"
+            ? data.summary
+            : "";
+        const bullets = description
+          .split(/\n+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+          .slice(0, 3)
+          .map((s) => `• ${s.slice(0, 90)}`);
+        const tags = Array.isArray((data as { tags?: unknown }).tags)
+          ? ((data as { tags: unknown[] }).tags
+              .filter((t): t is string => typeof t === "string")
+              .slice(0, 5))
+          : [];
+        return {
+          kind: "job",
+          id: j.id,
+          title: j.title || "Untitled job",
+          subtitle: [j.company, j.location].filter(Boolean).join(" · ") || undefined,
+          body: bullets,
+          badges: tags,
+        };
+      } catch {
+        return null;
+      }
+    },
     InlineBody: JobInlineBody,
   },
   article: {
@@ -157,6 +244,39 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
             ? `Published${a.readMinutes ? ` · ${a.readMinutes} min` : ""}`
             : a.status.charAt(0).toUpperCase() + a.status.slice(1),
       }));
+    },
+    fetchSummary: async (id) => {
+      try {
+        const a = await articleService.getMine(id);
+        if (!a?.id) return null;
+        const raw = a as unknown as {
+          summary?: string; excerpt?: string; body?: string; tags?: unknown;
+        };
+        const excerpt = raw.summary ?? raw.excerpt ?? "";
+        const body = excerpt
+          ? [excerpt.slice(0, 220)]
+          : typeof raw.body === "string"
+            ? [raw.body.replace(/[#*_>`-]/g, "").trim().slice(0, 220)]
+            : [];
+        const tags = Array.isArray(raw.tags)
+          ? raw.tags
+              .filter((t): t is string => typeof t === "string")
+              .slice(0, 5)
+          : [];
+        return {
+          kind: "article",
+          id: a.id,
+          title: a.title || "Untitled article",
+          subtitle:
+            a.status === "published"
+              ? `Published${a.readMinutes ? ` · ${a.readMinutes} min` : ""}`
+              : a.status.charAt(0).toUpperCase() + a.status.slice(1),
+          body,
+          badges: tags,
+        };
+      } catch {
+        return null;
+      }
     },
     InlineBody: ArticleInlineBody,
   },
@@ -189,6 +309,41 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
         return [];
       }
     },
+    fetchSummary: async (id) => {
+      try {
+        const u = await userService.getUserById(id);
+        if (!u?.id) return null;
+        const fullName =
+          [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
+          "Profile";
+        const d = u.data ?? {};
+        const company = (d as { company?: string; companyName?: string }).company
+          ?? (d as { company?: string; companyName?: string }).companyName;
+        const role = (d as { role?: string; title?: string }).role
+          ?? (d as { role?: string; title?: string }).title;
+        const body = [
+          role && company ? `• ${role} at ${company}` : role ? `• ${role}` : company ? `• ${company}` : "",
+          (d as { about?: string }).about
+            ? `${(d as { about: string }).about.slice(0, 160)}`
+            : "",
+        ].filter(Boolean);
+        const skills = Array.isArray((d as { skills?: unknown }).skills)
+          ? ((d as { skills: unknown[] }).skills
+              .filter((s): s is string => typeof s === "string")
+              .slice(0, 6))
+          : [];
+        return {
+          kind: "profile",
+          id: u.id,
+          title: fullName,
+          subtitle: u.data?.headline ?? undefined,
+          body,
+          badges: skills,
+        };
+      } catch {
+        return null;
+      }
+    },
     InlineBody: ProfileInlineBody,
   },
   company: {
@@ -210,6 +365,35 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
               ? `${c.activeJobCount} open role${c.activeJobCount === 1 ? "" : "s"}`
               : undefined,
         }));
+    },
+    fetchSummary: async (id) => {
+      try {
+        const c = await companyService.getCompanyProfileById(id);
+        if (!c?.id) return null;
+        const data = c.data ?? {};
+        const description = (data as { description?: string }).description ?? "";
+        const body = description ? [description.slice(0, 220)] : [];
+        const tech = Array.isArray((data as { techStack?: unknown }).techStack)
+          ? ((data as { techStack: unknown[] }).techStack
+              .filter((t): t is string => typeof t === "string")
+              .slice(0, 6))
+          : [];
+        const size = (data as { size?: string }).size;
+        const badges = [
+          ...(size ? [size] : []),
+          ...tech,
+        ].slice(0, 6);
+        return {
+          kind: "company",
+          id: c.id,
+          title: (data as { name?: string }).name || "Unnamed company",
+          subtitle: (data as { industry?: string }).industry ?? undefined,
+          body,
+          badges,
+        };
+      } catch {
+        return null;
+      }
     },
     InlineBody: CompanyInlineBody,
   },
@@ -235,6 +419,33 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
               ? "Published"
               : String(p.status).replace(/_/g, " "),
         }));
+    },
+    fetchSummary: async (id) => {
+      try {
+        const res = await studioService.getProject(id);
+        const p = res.data;
+        if (!p?.id) return null;
+        const raw = p as Record<string, unknown> & { description?: string; kind?: string };
+        const description = typeof raw.description === "string" ? raw.description : "";
+        const body = description ? [description.slice(0, 200)] : [];
+        const badges = [
+          p.isPublic && p.videoUrl ? "Public" : null,
+          typeof raw.kind === "string" ? raw.kind : null,
+        ].filter((s): s is string => Boolean(s));
+        return {
+          kind: "video",
+          id: p.id,
+          title: p.title || "Untitled video",
+          subtitle:
+            p.isPublic && p.videoUrl
+              ? "Published"
+              : String(p.status).replace(/_/g, " "),
+          body,
+          badges,
+        };
+      } catch {
+        return null;
+      }
     },
     InlineBody: VideoInlineBody,
   },

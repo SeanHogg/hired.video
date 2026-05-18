@@ -31,28 +31,40 @@ import {
   type DuckingInterval,
 } from "./audio-ducking";
 import { isLinkedContentKind } from "./linked-content";
-import { resolveMusic, type MusicSource } from "../music-catalog";
+import {
+  resolveMusic,
+  resolvePlayableSrc,
+  type MusicSource,
+} from "../music-catalog";
 import {
   TIMELINE_SCHEMA_VERSION,
   defaultTrack,
   type Clip,
   type ClipEffect,
+  type MediaSource,
   type Timeline,
   type Track,
 } from "@shared/timeline";
 
 /**
  * Emit a Timeline JSON document from canvas state. Each scene becomes a
- * background clip on V1 (sourceless, just a `canvas-v2:background`
- * effect) plus one overlay clip per widget on V2.
+ * background clip on `v1` plus one DEDICATED widget track per widget
+ * (`widget-<widgetId>`). One-track-per-widget is the load-bearing
+ * invariant: it gives every widget its own active-clip slot under
+ * `renderTimelineFrame`'s "one active clip per track per frame" rule
+ * — without this, simultaneous widgets in the same scene would
+ * overlap on a shared track and fail `isRenderable()`. Track ordering
+ * within the emitted timeline encodes paint order: lower index draws
+ * first (further back), higher index draws on top. Widget tracks are
+ * sorted by `widget.position.z` so the saved z-index reads correctly
+ * at render time.
  */
 export function canvasStateToTimeline(state: CanvasState): Timeline {
   const fps = state.fps;
   let cursor = 0;
 
   const v1: Track = defaultTrack({ id: "v1", kind: "video", label: "Background" });
-  const v2: Track = defaultTrack({ id: "v2", kind: "video", label: "Widgets" });
-  // v3 ("scene-post") sits ABOVE the widget track so its sourceless
+  // `v3` ("scene-post") sits ABOVE every widget track so its sourceless
   // clips' effects run after every widget has been composited — that's
   // what lets scene-level blur / glow / vignette / film-grain see the
   // full frame instead of just the bg. Adding a clip is `{startFrame,
@@ -60,6 +72,9 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   const v3: Track = defaultTrack({ id: "v3", kind: "video", label: "Scene post" });
   const a1: Track = defaultTrack({ id: "a1", kind: "audio", label: "A1" });
   const a2: Track = defaultTrack({ id: "a2", kind: "audio", label: "A2" });
+  // One track per widget across the whole composition. Sorted by z
+  // before assembly so render-time paint order matches authoring intent.
+  const widgetEntries: Array<{ track: Track; z: number }> = [];
 
   for (const scene of state.scenes) {
     const sceneFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
@@ -105,7 +120,14 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
 
     for (const widget of scene.widgets) {
       const clip = widgetToClip(widget, cursor, sceneFrames, fps);
-      if (clip) v2.clips.push(clip);
+      if (!clip) continue;
+      const track = defaultTrack({
+        id: `widget-${widget.id}`,
+        kind: "video",
+        label: widget.params.kind,
+      });
+      track.clips.push(clip);
+      widgetEntries.push({ track, z: widget.position.z });
     }
 
     // Scene-level post-effects ride on v3 (sourceless clip with the
@@ -231,13 +253,20 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     });
   }
 
+  // Sort widget tracks by z so the renderer paints lower-z first and
+  // higher-z on top — same compositing order CanvasStage uses via
+  // CSS z-index. Two widgets in different scenes never share a frame
+  // (scenes are sequential), so a stable global sort is sufficient.
+  widgetEntries.sort((a, b) => a.z - b.z);
+  const widgetTracks = widgetEntries.map((e) => e.track);
+
   const timeline: Timeline = {
     schemaVersion: TIMELINE_SCHEMA_VERSION,
     fps,
     width: state.width,
     height: state.height,
     backgroundColor: "#000000",
-    tracks: [v1, v2, v3, a1, a2],
+    tracks: [v1, ...widgetTracks, v3, a1, a2],
     markers: state.scenes.map((scene, idx) => ({
       id: scene.id,
       frame: sceneStartFrame(state, idx, fps),
@@ -245,6 +274,62 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     })),
   };
   return timeline;
+}
+
+/**
+ * Build the `Record<sourceId, MediaSource>` map the Timeline renderer's
+ * audio mixer needs. The Timeline JSON itself only carries opaque
+ * `sourceId` strings on audio clips (`music:<selectionId>` for the
+ * music lane and the raw voiceover URL for the voiceover lane) —
+ * resolving each id to a playable URL is this helper's job. Async
+ * because stock-music selections may need procedural rendering on
+ * first use. Single source of truth so every render entry point
+ * (export, publish, future server worker) constructs the same map.
+ */
+export async function resolveTimelineAudioSources(
+  state: CanvasState,
+): Promise<Record<string, MediaSource>> {
+  const sources: Record<string, MediaSource> = {};
+  const fps = state.fps;
+  const uploadedAt = new Date(0).toISOString();
+
+  const resolvedMusic = resolveMusic(state.musicSource);
+  if (resolvedMusic) {
+    const url = await resolvePlayableSrc(state.musicSource);
+    if (url) {
+      const sourceId = `music:${resolvedMusic.selectionId}`;
+      sources[sourceId] = {
+        id: sourceId,
+        kind: "audio",
+        url,
+        proxyUrl: null,
+        durationFrames: 0,
+        fps,
+        width: null,
+        height: null,
+        filename: resolvedMusic.label,
+        uploadedAt,
+      };
+    }
+  }
+
+  for (const vo of state.voiceovers) {
+    if (!vo.url || sources[vo.url]) continue;
+    sources[vo.url] = {
+      id: vo.url,
+      kind: "audio",
+      url: vo.url,
+      proxyUrl: null,
+      durationFrames: Math.max(1, Math.round(vo.durationSeconds * fps)),
+      fps,
+      width: null,
+      height: null,
+      filename: vo.label || "voiceover",
+      uploadedAt,
+    };
+  }
+
+  return sources;
 }
 
 function sceneStartFrame(state: CanvasState, index: number, fps: number): number {
@@ -463,8 +548,15 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   if (!isTimeline(timeline)) return emptyCanvasState();
   const fps = timeline.fps;
   const v1 = timeline.tracks.find((t) => t.id === "v1") ?? timeline.tracks[0];
-  const v2 = timeline.tracks.find((t) => t.id === "v2");
   const v3 = timeline.tracks.find((t) => t.id === "v3");
+  // Widgets now live on per-widget tracks named `widget-<widgetId>`.
+  // Collect every widget clip across the composition so the per-scene
+  // bucketing below sees them as a flat list, the same way the legacy
+  // single-v2-track shape did. Preserves the array-order paint order
+  // baked in by `canvasStateToTimeline` (which sorts by z before emit).
+  const widgetClips = timeline.tracks
+    .filter((t) => t.id.startsWith("widget-") && t.kind === "video")
+    .flatMap((t) => t.clips);
 
   const scenes: Scene[] = [];
   const v1Clips = (v1?.clips ?? []).slice().sort((a, b) => a.startFrame - b.startFrame);
@@ -474,7 +566,7 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     const params = bgEffect?.params ?? {};
     const sceneId = stringOr(params.sceneId, bg.id);
     const colorRaw = stringOr(params.color, "#0f172a");
-    const overlay = (v2?.clips ?? []).filter(
+    const overlay = widgetClips.filter(
       (c) =>
         c.startFrame >= bg.startFrame &&
         c.startFrame + c.durationFrames <= bg.startFrame + bg.durationFrames,

@@ -9,30 +9,22 @@
  *     `/marketplace/templates/<slug>` press-play preview)
  *
  * Per the DRY rule: both surfaces render the IDENTICAL pixel output for
- * the same `CanvasState`. Previously the marketplace player went through
- * the legacy v1 `compile()` + scene-graph renderer while the editor used
- * `CanvasStage`, so visitors saw a different composition from what they
- * landed on after clicking Use — this component closes that gap.
- *
- * The component owns layout (centered + fit-zoom via ResizeObserver) and
- * mounts `<CanvasStage mode="preview">` with the active scene supplied by
- * the caller's `usePreviewPlayback` hook. Selection / drop / move are
- * frozen no-ops (the stage is non-interactive in preview mode anyway).
+ * the same `CanvasState`. Preview mounts `<CanvasV2Preview/>` — a real
+ * HTML `<canvas>` running the same `canvas-v2:*` effect registry the
+ * export pipeline uses (`renderTimelineFrame`). Player and export
+ * therefore can't drift on widget rendering. The DOM-based
+ * `<CanvasStage/>` is retained for edit-mode only (drag / select /
+ * resize handles), not for playback.
  *
  * Branding watermark is rendered self-gated inside `<BrandWatermark/>` —
  * no prop drilling of "show branding?".
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BrandWatermark from "@/components/studio/shared/BrandWatermark";
-import type { CanvasState, Scene } from "@/lib/studio/editor-v2/canvas-state";
+import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { PreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { cn } from "@/lib/utils";
-import CanvasStage, { type Selection } from "./CanvasStage";
-
-const FROZEN_SELECTION: Selection = { kind: "scene", sceneId: "__preview__" };
-const NO_OP_SELECT = () => {};
-const NO_OP_DROP = () => {};
-const NO_OP_MOVE = () => {};
+import CanvasV2Preview from "./CanvasV2Preview";
 
 export interface CanvasStatePreviewProps {
   state: CanvasState;
@@ -44,15 +36,12 @@ export interface CanvasStatePreviewProps {
    *  zoom from its measured size — caller controls aspect via the
    *  wrapping element. */
   className?: string;
-  /** Called when a CTA widget in the preview is activated. */
-  onCtaActivate?: (url: string) => void;
 }
 
 export default function CanvasStatePreview({
   state,
   playback,
   className,
-  onCtaActivate,
 }: CanvasStatePreviewProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -73,14 +62,7 @@ export default function CanvasStatePreview({
     return () => observer.disconnect();
   }, []);
 
-  const activeScene: Scene | undefined = useMemo(
-    () =>
-      state.scenes.find((s) => s.id === playback.activeSceneIdAtPlayhead) ??
-      state.scenes[0],
-    [state.scenes, playback.activeSceneIdAtPlayhead],
-  );
-
-  if (!activeScene) {
+  if (state.scenes.length === 0) {
     return (
       <div
         ref={wrapRef}
@@ -94,11 +76,6 @@ export default function CanvasStatePreview({
     );
   }
 
-  const zoom =
-    box.w > 0 && box.h > 0
-      ? Math.max(0.05, Math.min(box.w / state.width, box.h / state.height))
-      : 0.05;
-
   return (
     <div
       ref={wrapRef}
@@ -108,23 +85,14 @@ export default function CanvasStatePreview({
       )}
     >
       <div className="relative">
-        <CanvasStage
-          scene={activeScene}
-          canvasWidth={state.width}
-          canvasHeight={state.height}
-          zoom={zoom}
-          selection={FROZEN_SELECTION}
-          onSelect={NO_OP_SELECT}
-          onWidgetDrop={NO_OP_DROP}
-          onWidgetMove={NO_OP_MOVE}
-          playheadInScene={
-            playback.activeSceneIdAtPlayhead === activeScene.id
-              ? playback.activeSceneElapsed
-              : 0
+        <CanvasV2Preview
+          state={state}
+          playback={playback}
+          zoom={
+            box.w > 0 && box.h > 0
+              ? Math.max(0.05, Math.min(box.w / state.width, box.h / state.height))
+              : 0.05
           }
-          defaultFontId={state.fontFamily}
-          mode="preview"
-          onCtaActivate={onCtaActivate}
         />
         {/* BrandWatermark self-gates (returns null for Pro users who've
             opted out via project state). Positioned bottom-right of the

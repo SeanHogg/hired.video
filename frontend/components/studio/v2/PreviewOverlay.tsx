@@ -72,11 +72,7 @@ export default function PreviewOverlay({
       </header>
 
       <div className="relative z-10 flex flex-1 items-center justify-center overflow-hidden p-6">
-        <CanvasStatePreview
-          state={state}
-          playback={playback}
-          onCtaActivate={() => playback.pause()}
-        />
+        <CanvasStatePreview state={state} playback={playback} />
       </div>
 
       {/* Shared <PlaybackControls/> — same component the public watch

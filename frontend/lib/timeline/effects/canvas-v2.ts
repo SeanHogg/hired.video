@@ -23,6 +23,12 @@ import { drawParticleField } from "./particle-field";
 import { ANIMATE_EFFECT_KINDS, applyAnimateEffectsToCtx } from "./animate";
 import { drawChart } from "@/lib/studio/chart-canvas";
 import { resolveCtaFontSizes } from "@/lib/studio/editor-v2/canvas-state";
+import {
+  getLinkedContentMeta,
+  isLinkedContentKind,
+  type LinkedContentKind,
+  type LinkedContentSummary,
+} from "@/lib/studio/editor-v2/linked-content";
 import type { ChartType } from "@/types/video-script";
 import type { ChartFormat } from "@/lib/studio/chart-data";
 
@@ -256,6 +262,11 @@ function applyWidgetPixelEffects(
 
 const imageCache = new Map<string, HTMLImageElement | "loading" | "failed">();
 const videoCache = new Map<string, HTMLVideoElement | "loading" | "failed">();
+// Keyed by `${kind}:${id}` — mirrors the `encodeLinkedContentRef` shape
+// so future consumers can share the cache key. Populated by the preload
+// pass via the registry's `fetchSummary`; null means the entity exists
+// but couldn't be fetched (private / deleted / network failure).
+const linkedContentCache = new Map<string, LinkedContentSummary | null | "loading">();
 
 function ensureImageLoaded(url: string): HTMLImageElement | null {
   if (!url) return null;
@@ -300,6 +311,7 @@ function ensureVideoLoaded(url: string): HTMLVideoElement | null {
 export async function preloadCanvasV2Media(timeline: Timeline): Promise<void> {
   const imageUrls = new Set<string>();
   const videoUrls = new Set<string>();
+  const linkedEntities = new Set<string>();
   for (const track of timeline.tracks) {
     for (const clip of track.clips) {
       for (const effect of clip.effects ?? []) {
@@ -312,6 +324,12 @@ export async function preloadCanvasV2Media(timeline: Timeline): Promise<void> {
         } else if (effect.kind === "canvas-v2:webcam") {
           const url = stringOr(effect.params.recordingUrl, "");
           if (url) videoUrls.add(url);
+        } else if (effect.kind === "canvas-v2:linked-content") {
+          const kindRaw = stringOr(effect.params.entityKind, "");
+          const id = stringOr(effect.params.entityId, "");
+          if (kindRaw && id && isLinkedContentKind(kindRaw)) {
+            linkedEntities.add(`${kindRaw}:${id}`);
+          }
         }
       }
     }
@@ -358,6 +376,30 @@ export async function preloadCanvasV2Media(timeline: Timeline): Promise<void> {
         v.src = url;
         videoCache.set(url, "loading");
       }),
+    );
+  }
+  // Linked-content entities — fetch each entity's summary so the
+  // canvas-v2:linked-content applier (synchronous, per the registry
+  // contract) can paint title + subtitle from cache. Errors collapse
+  // to a `null` cache entry which the applier renders as an empty card
+  // — never throws.
+  for (const key of linkedEntities) {
+    if (linkedContentCache.has(key)) continue;
+    const sepIdx = key.indexOf(":");
+    if (sepIdx <= 0) continue;
+    const kind = key.slice(0, sepIdx) as LinkedContentKind;
+    const id = key.slice(sepIdx + 1);
+    if (!isLinkedContentKind(kind) || !id) continue;
+    linkedContentCache.set(key, "loading");
+    tasks.push(
+      getLinkedContentMeta(kind)
+        .fetchSummary(id)
+        .then((summary) => {
+          linkedContentCache.set(key, summary);
+        })
+        .catch(() => {
+          linkedContentCache.set(key, null);
+        }),
     );
   }
   const timeout = new Promise<void>((resolve) => setTimeout(resolve, 10_000));
@@ -1030,6 +1072,183 @@ registerEffect({
     ctx.fillStyle = accentTextColor;
     ctx.textBaseline = "middle";
     ctx.fillText(buttonText, x + w / 2, buttonY + buttonH / 2);
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
+  },
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// canvas-v2:linked-content — embed a user's resume / job / article /
+// profile / company / video as a card on the canvas. The editor preview
+// path mounts the entity's OWN React renderer via `LinkedContentBody`;
+// the render path can't do that (canvas-only, no React), so this
+// applier draws a thumbnail card with title + subtitle + a CTA pill.
+//
+// Entity data is fetched in `preloadCanvasV2Media`'s preload pass and
+// stashed in `linkedContentCache` so this applier stays synchronous
+// per the registry contract. Cache miss / fetch failure renders the
+// neutral empty card — never throws.
+//
+// Resolves the architectural half of gap #813 (the registry now has
+// the applier). Full pixel-parity with `<LinkedContentBody>` (running
+// each entity's full template renderer through canvas) is a separate
+// fidelity gap — drawing this thumbnail is the export-completeness
+// fix; deeper rendering rides on the canvas-side template renderer
+// being available later.
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:linked-content",
+  label: "Linked content card",
+  category: "title",
+  defaults: {
+    x: 0.15,
+    y: 0.2,
+    width: 0.7,
+    height: 0.6,
+    entityKind: "resume",
+    entityId: "",
+    bgColor: "#ffffff",
+    textColor: "#0f172a",
+    mutedColor: "#64748b",
+    accentColor: "#4f46e5",
+    accentTextColor: "#ffffff",
+  },
+  paramHints: {
+    bgColor: { type: "color" },
+    textColor: { type: "color" },
+    mutedColor: { type: "color" },
+    accentColor: { type: "color" },
+    accentTextColor: { type: "color" },
+  },
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
+    const { x, y, w, h } = rect;
+    const kindRaw = stringOr(effect.params.entityKind, "resume");
+    const entityId = stringOr(effect.params.entityId, "");
+    const bgColor = stringOr(effect.params.bgColor, "#ffffff");
+    const textColor = stringOr(effect.params.textColor, "#0f172a");
+    const mutedColor = stringOr(effect.params.mutedColor, "#64748b");
+    const accentColor = stringOr(effect.params.accentColor, "#4f46e5");
+    const accentTextColor = stringOr(effect.params.accentTextColor, "#ffffff");
+
+    ctx.save();
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+
+    const radius = Math.min(24, Math.min(w, h) * 0.08);
+    ctx.fillStyle = bgColor;
+    drawRoundedRect(ctx, x, y, w, h, radius);
+    ctx.fill();
+
+    const padding = Math.round(Math.min(w, h) * 0.07);
+    const cacheKey = isLinkedContentKind(kindRaw) && entityId ? `${kindRaw}:${entityId}` : null;
+    const cached = cacheKey ? linkedContentCache.get(cacheKey) : undefined;
+    const summary =
+      cached && cached !== "loading" ? cached : null;
+    const kindLabel = isLinkedContentKind(kindRaw)
+      ? getLinkedContentMeta(kindRaw).label
+      : "Linked content";
+    const ctaLabel = isLinkedContentKind(kindRaw)
+      ? getLinkedContentMeta(kindRaw).ctaLabel
+      : "Open";
+
+    // Kind label (small, muted) — anchors the card so viewers see
+    // "Resume / Job / Article" before the title.
+    const kindFontPx = Math.max(11, Math.round(Math.min(w, h) * 0.05));
+    ctx.font = `600 ${kindFontPx}px sans-serif`;
+    ctx.fillStyle = mutedColor;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(kindLabel.toUpperCase(), x + padding, y + padding, w - padding * 2);
+
+    // Title — bold, primary text colour.
+    const titleFontPx = Math.max(18, Math.round(Math.min(w, h) * 0.11));
+    ctx.font = `bold ${titleFontPx}px sans-serif`;
+    ctx.fillStyle = textColor;
+    const titleY = y + padding + kindFontPx + Math.round(kindFontPx * 0.4);
+    const title = summary?.title ?? (entityId ? `Loading ${kindLabel.toLowerCase()}…` : `No ${kindLabel.toLowerCase()} selected`);
+    wrapText(ctx, title, x + padding, titleY + titleFontPx / 2, w - padding * 2, titleFontPx * 1.2);
+
+    // Subtitle — muted, optional.
+    const subFontPx = Math.max(13, Math.round(titleFontPx * 0.55));
+    const subY = titleY + titleFontPx * 1.6;
+    let cursorY = subY;
+    if (summary?.subtitle) {
+      ctx.font = `${subFontPx}px sans-serif`;
+      ctx.fillStyle = mutedColor;
+      wrapText(ctx, summary.subtitle, x + padding, cursorY + subFontPx / 2, w - padding * 2, subFontPx * 1.3);
+      cursorY += subFontPx * 1.6;
+    }
+
+    // CTA pill at bottom-right — computed first so body lines can stop
+    // above it without overlap.
+    const ctaFontPx = Math.max(12, Math.round(Math.min(w, h) * 0.06));
+    ctx.font = `bold ${ctaFontPx}px sans-serif`;
+    const ctaPadX = ctaFontPx;
+    const ctaH = ctaFontPx + Math.round(ctaFontPx * 1.1);
+    const ctaTextW = ctx.measureText(ctaLabel).width;
+    const ctaW = ctaTextW + ctaPadX * 2;
+    const ctaX = x + w - padding - ctaW;
+    const ctaY = y + h - padding - ctaH;
+
+    // Body bullets — drawn between subtitle and CTA. Each line wraps
+    // within the card width.
+    const bodyFontPx = Math.max(12, Math.round(titleFontPx * 0.46));
+    const bodyLineH = bodyFontPx * 1.35;
+    const bodyMaxY = ctaY - padding * 0.8;
+    if (summary?.body && summary.body.length > 0) {
+      ctx.font = `${bodyFontPx}px sans-serif`;
+      ctx.fillStyle = textColor;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      for (const line of summary.body) {
+        if (cursorY + bodyLineH > bodyMaxY) break;
+        wrapText(ctx, line, x + padding, cursorY + bodyFontPx / 2, w - padding * 2, bodyLineH);
+        cursorY += bodyLineH * Math.max(1, Math.ceil(ctx.measureText(line).width / (w - padding * 2)));
+      }
+    }
+
+    // Badge chips — pill row above the CTA. Wraps to a second row if
+    // there's vertical room; truncates otherwise.
+    if (summary?.badges && summary.badges.length > 0) {
+      const chipFontPx = Math.max(11, Math.round(bodyFontPx * 0.85));
+      ctx.font = `600 ${chipFontPx}px sans-serif`;
+      const chipPadX = Math.round(chipFontPx * 0.6);
+      const chipPadY = Math.round(chipFontPx * 0.3);
+      const chipGap = Math.round(chipFontPx * 0.4);
+      const chipH = chipFontPx + chipPadY * 2;
+      const chipsBottomY = ctaY - padding * 0.4;
+      const chipsStartY = Math.max(cursorY + bodyLineH * 0.5, chipsBottomY - chipH);
+      let chipX = x + padding;
+      const chipY = chipsStartY;
+      for (const badge of summary.badges) {
+        const textW = ctx.measureText(badge).width;
+        const chipW = textW + chipPadX * 2;
+        if (chipX + chipW > ctaX - chipGap) break;
+        ctx.fillStyle = mutedColor;
+        ctx.globalAlpha = 0.18;
+        drawRoundedRect(ctx, chipX, chipY, chipW, chipH, chipH / 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = textColor;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(badge, chipX + chipPadX, chipY + chipH / 2);
+        chipX += chipW + chipGap;
+      }
+    }
+
+    // Draw the CTA pill last so it sits over everything else.
+    ctx.font = `bold ${ctaFontPx}px sans-serif`;
+    ctx.fillStyle = accentColor;
+    drawRoundedRect(ctx, ctaX, ctaY, ctaW, ctaH, ctaH / 2);
+    ctx.fill();
+    ctx.fillStyle = accentTextColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(ctaLabel, ctaX + ctaW / 2, ctaY + ctaH / 2);
+
     ctx.restore();
     applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },

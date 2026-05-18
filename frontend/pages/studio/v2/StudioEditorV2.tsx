@@ -46,7 +46,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { NotFoundError } from "@/lib/errors";
 import Navigation from "@/components/Navigation";
@@ -76,6 +75,7 @@ import {
 } from "@/lib/studio/editor-v2/linked-content";
 import {
   canvasStateToTimeline,
+  resolveTimelineAudioSources,
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
@@ -99,6 +99,7 @@ import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capt
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
+import CanvasV2Preview from "@/components/studio/v2/CanvasV2Preview";
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
@@ -841,13 +842,13 @@ export default function StudioEditorV2() {
     onDelete: onDeleteSelection,
   });
 
-  // ───── Export — converts CanvasState → VideoScript → v1's
-  // compile + exportVideo pipeline so v2 reuses the SAME render path
-  // v1 has shipped + battle-tested (WebCodecs / ffmpeg.wasm /
-  // MediaRecorder, watermark, audio mix). Single render seam: every v2
-  // export AND every v2 publish goes through `renderToBlob` (DRY) so
-  // the YouTube / LinkedIn / Profile flows can't drift from the
-  // local-download flow.
+  // ───── Export — converts CanvasState → Timeline JSON → `renderTimeline()`
+  // (the canvas-v2 effect registry is the single seam for compositing).
+  // Closes the historical drift between the V2 player (DOM CanvasStage)
+  // and the V2 export (used to translate through V1 scene-graph, which
+  // dropped `linked-content` / `cta` widgets and re-laid-out text).
+  // Now the export draws every widget through the same `canvas-v2:*`
+  // appliers the editor preview will eventually share. Gap #828.
   const [exporting, setExporting] = useState(false);
   // In-memory blob of the most recent render — lets a "Publish" click
   // immediately after a successful export skip re-rendering. Cleared
@@ -858,65 +859,30 @@ export default function StudioEditorV2() {
   }, [state]);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
 
-  // Tracks whether the user opted into a silent-fallback retry for the
-  // current render attempt. Reset on every fresh user-initiated render so
-  // a successful render after the opt-in doesn't quietly re-apply silent
-  // mode on the next click. Threaded into `exportVideo` so the renderer
-  // owns the WebCodecs/MediaRecorder retry mechanics (DRY: callers don't
-  // re-implement the catch + reroute).
-  const allowSilentFallbackRef = useRef(false);
-
   async function renderToBlob(): Promise<Blob | null> {
     if (state.scenes.length === 0) return null;
     if (renderedBlobRef.current) return renderedBlobRef.current;
-    const script = canvasStateToScript(state);
-    const { compile } = await import("@/lib/compiler/video-compiler");
-    const { exportVideo } = await import("@/lib/renderer/video-exporter");
-    const compiled = compile(script);
-    const blob = await exportVideo(compiled, {
-      audio: script.video.audio,
-      allowSilentFallback: allowSilentFallbackRef.current,
-    });
-    renderedBlobRef.current = blob;
-    return blob;
+    const timeline = canvasStateToTimeline(state);
+    const sources = await resolveTimelineAudioSources(state);
+    const { renderTimeline } = await import("@/lib/timeline/render");
+    const result = await renderTimeline(timeline, sources);
+    renderedBlobRef.current = result.blob;
+    return result.blob;
   }
 
   // Wraps a render-driving callback (`handleExport`, `ensureRendered`,
-  // etc.) so a thrown `RenderAudioContextError` surfaces a single shared
-  // "audio failed — try silent render?" toast with a one-tap retry that
-  // re-invokes the same callback with the silent-fallback flag flipped.
-  // Single source of truth so every render entry point gets the same
-  // recovery affordance (DRY).
-  async function withAudioErrorRecovery<T>(
+  // etc.) so any throw surfaces a single shared error toast. The new
+  // `renderTimeline()` path uses `OfflineAudioContext` for audio mixing
+  // (not a live `AudioContext`), so the V1-era "audio device dropped
+  // mid-render" recovery affordance no longer applies — the offline
+  // mixer can't fail that way.
+  async function withRenderErrorRecovery<T>(
     label: string,
     run: () => Promise<T>,
   ): Promise<T | null> {
     try {
       return await run();
     } catch (err) {
-      const { RenderAudioContextError } = await import("@/lib/renderer/video-exporter");
-      if (err instanceof RenderAudioContextError) {
-        toast({
-          title: "Audio device error",
-          description: err.message,
-          variant: "destructive",
-          action: (
-            <ToastAction
-              altText="Render without audio"
-              onClick={() => {
-                allowSilentFallbackRef.current = true;
-                renderedBlobRef.current = null;
-                void run().finally(() => {
-                  allowSilentFallbackRef.current = false;
-                });
-              }}
-            >
-              Render without audio
-            </ToastAction>
-          ),
-        });
-        return null;
-      }
       toast({
         title: `${label} failed`,
         description: err instanceof Error ? err.message : String(err),
@@ -929,13 +895,18 @@ export default function StudioEditorV2() {
   async function handleExport() {
     if (state.scenes.length === 0) return;
     setExporting(true);
-    await withAudioErrorRecovery("Export", async () => {
+    await withRenderErrorRecovery("Export", async () => {
       const blob = await renderToBlob();
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "video"}.webm`;
+      // `renderTimeline()` produces MP4 via WebCodecs (and ffmpeg-wasm
+      // for the rare codecs that need it); both branches emit an .mp4
+      // container. The legacy V1 exporter used .webm — extension flipped
+      // to match the new content type.
+      const ext = blob.type.includes("webm") ? "webm" : "mp4";
+      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "video"}.${ext}`;
       a.click();
       // Let the click resolve before revoking — Safari otherwise drops
       // the download.
@@ -979,7 +950,7 @@ export default function StudioEditorV2() {
     if (projectRow && isProjectBakedFresh(projectRow)) return projectRow;
 
     setExporting(true);
-    const result = await withAudioErrorRecovery("Render", async () => {
+    const result = await withRenderErrorRecovery("Render", async () => {
       try {
         const blob = await renderToBlob();
         if (!blob) return null;
@@ -1351,48 +1322,55 @@ export default function StudioEditorV2() {
                 className="absolute inset-0 overflow-auto bg-muted/30 p-6"
               >
                 <div className="flex min-h-full min-w-min items-center justify-center">
-                  <CanvasStage
-                    scene={activeScene}
-                    canvasWidth={state.width}
-                    canvasHeight={state.height}
-                    zoom={zoom}
-                    selection={selection}
-                    onSelect={setSelection}
-                    onWidgetDrop={(kind, at) => insertWidget(kind, at)}
-                    onWidgetMove={updateWidgetPosition}
-                    onThemeDrop={(themeId) => {
-                      const theme = VISUAL_THEMES.find((t) => t.id === themeId);
-                      if (!theme) return;
-                      setState((prev) => applyThemeToState(prev, theme));
-                      toast({ title: `Theme: ${theme.label}` });
-                    }}
-                    onBackgroundDrop={(bgValue) => {
-                      const preset = BG_PRESETS.find((p) => p.value === bgValue);
-                      if (!preset) return;
-                      updateScene(activeScene.id, scenePatchFromBgPreset(preset));
-                      toast({ title: `Background: ${preset.label}` });
-                    }}
-                    onMediaDrop={(url, mediaType, atFraction) => {
-                      if (mediaType === "video") {
-                        addMediaWidget("video", url, 0, atFraction);
-                      } else {
-                        addMediaWidget("image", url, 0, atFraction);
+                  {playback.isPlaying ? (
+                    // Playback uses the canvas-v2 effect registry — the
+                    // SAME compositor the export runs — so the user sees
+                    // exactly what the rendered MP4 will look like. Edit
+                    // chrome (handles, drop targets) doesn't belong here
+                    // since drag/select are suspended during playback
+                    // anyway.
+                    <CanvasV2Preview
+                      state={state}
+                      playback={playback}
+                      zoom={zoom}
+                    />
+                  ) : (
+                    <CanvasStage
+                      scene={activeScene}
+                      canvasWidth={state.width}
+                      canvasHeight={state.height}
+                      zoom={zoom}
+                      selection={selection}
+                      onSelect={setSelection}
+                      onWidgetDrop={(kind, at) => insertWidget(kind, at)}
+                      onWidgetMove={updateWidgetPosition}
+                      onThemeDrop={(themeId) => {
+                        const theme = VISUAL_THEMES.find((t) => t.id === themeId);
+                        if (!theme) return;
+                        setState((prev) => applyThemeToState(prev, theme));
+                        toast({ title: `Theme: ${theme.label}` });
+                      }}
+                      onBackgroundDrop={(bgValue) => {
+                        const preset = BG_PRESETS.find((p) => p.value === bgValue);
+                        if (!preset) return;
+                        updateScene(activeScene.id, scenePatchFromBgPreset(preset));
+                        toast({ title: `Background: ${preset.label}` });
+                      }}
+                      onMediaDrop={(url, mediaType, atFraction) => {
+                        if (mediaType === "video") {
+                          addMediaWidget("video", url, 0, atFraction);
+                        } else {
+                          addMediaWidget("image", url, 0, atFraction);
+                        }
+                      }}
+                      onLinkedContentDrop={(entityKind, entityId, atFraction) =>
+                        insertLinkedContent(entityKind, entityId, atFraction)
                       }
-                    }}
-                    onLinkedContentDrop={(entityKind, entityId, atFraction) =>
-                      insertLinkedContent(entityKind, entityId, atFraction)
-                    }
-                    onScreenshotDrop={(atFraction) => placeScreenshot(atFraction)}
-                    playheadInScene={
-                      playback.isPlaying &&
-                      playback.activeSceneIdAtPlayhead === activeScene.id
-                        ? playback.activeSceneElapsed
-                        : null
-                    }
-                    defaultFontId={state.fontFamily}
-                    mode={playback.isPlaying ? "preview" : "edit"}
-                    onCtaActivate={() => playback.pause()}
-                  />
+                      onScreenshotDrop={(atFraction) => placeScreenshot(atFraction)}
+                      playheadInScene={null}
+                      defaultFontId={state.fontFamily}
+                    />
+                  )}
                 </div>
               </div>
               {/* Floating canvas-stage chrome — edit toolbar (left) +

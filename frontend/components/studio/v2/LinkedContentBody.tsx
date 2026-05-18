@@ -1,18 +1,13 @@
 /**
  * LinkedContentBody — canvas-side preview for the `linked-content`
- * widget.
- *
- * Layout contract:
- *   - Per-kind `<meta.InlineBody/>` fills the widget edge-to-edge with
- *     the entity's OWN renderer (e.g. `<DeclarativeResumeRenderer/>`
- *     for resumes). This is what makes a resume widget look like the
- *     resume's actual published template, not a hand-rolled summary.
- *   - A floating CTA pill in the bottom-right corner — coloured from
- *     the canvas theme so it sits cleanly on top of any template's
- *     palette. Edit mode renders the pill inert (a `<span>` so clicks
- *     fall through to widget-selection); preview mode renders it as
- *     a real `<a target="_blank">` that opens the entity's canonical
- *     route.
+ * widget. Lives inside the EDIT canvas only — playback is now the
+ * canvas-v2 renderer's job (`CanvasV2Preview` → `canvas-v2:linked-content`
+ * applier), so this component never has to render a "playback CTA"
+ * variant. Per-kind `<meta.InlineBody/>` paints the entity using its
+ * OWN React renderer (e.g. `<DeclarativeResumeRenderer/>`) so the
+ * authoring surface shows a faithful preview of the bound entity.
+ * The floating CTA pill is always inert (a `<span>`) — clicks fall
+ * through to the surrounding widget-selection handler.
  *
  * Empty state: `entityId === ""` means the widget hasn't been bound to
  * a specific item yet (legacy `defaultWidget("linked-content")` path
@@ -27,19 +22,12 @@ import {
   type LinkedContentColors,
 } from "@/lib/studio/editor-v2/linked-content";
 import type { LinkedContentWidgetParams } from "@/lib/studio/editor-v2/canvas-state";
-import type { CanvasStageMode } from "./CanvasStage";
 
 interface LinkedContentBodyProps {
   data: LinkedContentWidgetParams;
-  mode: CanvasStageMode;
-  onCtaActivate?: (url: string) => void;
 }
 
-export default function LinkedContentBody({
-  data,
-  mode,
-  onCtaActivate,
-}: LinkedContentBodyProps) {
+export default function LinkedContentBody({ data }: LinkedContentBodyProps) {
   const meta = getLinkedContentMeta(data.entityKind);
   const Icon = meta.icon;
   const InlineBody = meta.InlineBody;
@@ -56,9 +44,6 @@ export default function LinkedContentBody({
     );
   }
 
-  const isPreview = mode === "preview";
-  const viewUrl = meta.viewUrl(data.entityId);
-
   return (
     <div className="relative h-full w-full overflow-hidden rounded-md shadow-sm">
       <Suspense
@@ -73,56 +58,20 @@ export default function LinkedContentBody({
       >
         <InlineBody id={data.entityId} />
       </Suspense>
-      <CtaPill
-        label={meta.ctaLabel}
-        url={viewUrl}
-        colors={colors}
-        isPreview={isPreview}
-        onCtaActivate={onCtaActivate}
-      />
+      <CtaPill label={meta.ctaLabel} colors={colors} />
     </div>
   );
 }
 
-/** Floating CTA pill positioned over the inline body. Edit mode is
- *  inert (no `<a>`) so clicks still select the widget for inspection;
- *  preview mode is a real anchor so viewers can jump to the entity. */
-function CtaPill({
-  label,
-  url,
-  colors,
-  isPreview,
-  onCtaActivate,
-}: {
-  label: string;
-  url: string;
-  colors: LinkedContentColors;
-  isPreview: boolean;
-  onCtaActivate?: (url: string) => void;
-}) {
-  const base =
-    "absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-md";
-  const style = {
-    background: colors.accentColor,
-    color: colors.accentTextColor,
-  };
-  if (isPreview) {
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => onCtaActivate?.(url)}
-        className={base}
-        style={style}
-      >
-        {label}
-        <ExternalLink className="h-3 w-3" />
-      </a>
-    );
-  }
+/** Inert floating CTA pill positioned over the inline body — clicks
+ *  fall through to widget selection. The canvas-v2 renderer draws an
+ *  interactive equivalent for the playback / export surface. */
+function CtaPill({ label, colors }: { label: string; colors: LinkedContentColors }) {
   return (
-    <span className={base} style={style}>
+    <span
+      className="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-md"
+      style={{ background: colors.accentColor, color: colors.accentTextColor }}
+    >
       {label}
       <ExternalLink className="h-3 w-3" />
     </span>
