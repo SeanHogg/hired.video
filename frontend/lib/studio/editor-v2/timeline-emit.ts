@@ -435,6 +435,18 @@ function widgetToEffect(widget: Widget): ClipEffect {
           ...rect,
           entityKind: p.data.entityKind,
           entityId: p.data.entityId,
+          // Per-widget colours are stamped from the active theme at
+          // insert time + on every `applyThemeToState` walk; the
+          // round-trip carries them verbatim so re-opening a saved
+          // project preserves the user-seen styling without re-running
+          // theme application on load.
+          ...(p.data.bgColor !== undefined ? { bgColor: p.data.bgColor } : {}),
+          ...(p.data.textColor !== undefined ? { textColor: p.data.textColor } : {}),
+          ...(p.data.mutedColor !== undefined ? { mutedColor: p.data.mutedColor } : {}),
+          ...(p.data.accentColor !== undefined ? { accentColor: p.data.accentColor } : {}),
+          ...(p.data.accentTextColor !== undefined
+            ? { accentTextColor: p.data.accentTextColor }
+            : {}),
         },
       };
   }
@@ -802,6 +814,13 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
           data: {
             entityKind,
             entityId: stringOr(params.entityId, ""),
+            ...(typeof params.bgColor === "string" ? { bgColor: params.bgColor } : {}),
+            ...(typeof params.textColor === "string" ? { textColor: params.textColor } : {}),
+            ...(typeof params.mutedColor === "string" ? { mutedColor: params.mutedColor } : {}),
+            ...(typeof params.accentColor === "string" ? { accentColor: params.accentColor } : {}),
+            ...(typeof params.accentTextColor === "string"
+              ? { accentTextColor: params.accentTextColor }
+              : {}),
           },
         },
       };

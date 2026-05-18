@@ -97,8 +97,9 @@ export const TIER_COPY = {
   proFeatureRequired: (featureName: string): string =>
     `${featureName} is a ${TIER_NAME.pro} feature. Upgrade to access it.`,
 
-  /** Free-tier hard-limit refusal envelope. Used by `checkTeamSize` /
-   *  `checkInterviewSessionsThisMonth` and any future per-period guard. */
+  /** Free-tier hard-limit refusal envelope. Used by `servicesProcessor.enforce`
+   *  (team_invite, interview_session, video_publish, …) and any future
+   *  per-period guard. */
   freeLimitReached: (input: { limit: number; unit: string }): string =>
     `${TIER_NAME.free} accounts are limited to ${input.limit} ${input.unit}. Upgrade to ${TIER_NAME.pro} to add more.`,
 

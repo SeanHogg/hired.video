@@ -2,11 +2,11 @@
  * ExternalEmailAccountsRepository — connected mailboxes (Gmail, Outlook).
  *
  * Encryption is service-layer concern: the repo stores whatever's in
- * `oauthRefreshTokenEnc` verbatim. Callers (oauth.ts, sync.ts) handle
+ * `oauthRefreshTokenEnc` verbatim. Callers (oauth.ts, ingest.ts) handle
  * the encrypt/decrypt step.
  */
 
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { externalEmailAccounts } = schema;
@@ -18,7 +18,6 @@ export type ExternalEmailAccountInsert = typeof externalEmailAccounts.$inferInse
 export type ExternalEmailAccountPatch = Partial<ExternalEmailAccountInsert>;
 
 export interface IExternalEmailAccountsRepository {
-  findActiveForUser(userId: string): Promise<ExternalEmailAccountRow[]>;
   findAllForUser(userId: string): Promise<ExternalEmailAccountRow[]>;
   findById(id: string, userId: string): Promise<ExternalEmailAccountRow | null>;
   findByProviderEmail(
@@ -29,20 +28,10 @@ export interface IExternalEmailAccountsRepository {
   upsert(input: ExternalEmailAccountInsert): Promise<ExternalEmailAccountRow>;
   patch(id: string, userId: string, patch: ExternalEmailAccountPatch): Promise<void>;
   remove(id: string, userId: string): Promise<void>;
-  /** Used by the sync worker to find accounts that have been quiet for
-   *  longer than the requested cadence. */
-  findDueForSync(maxLastSyncedAt: Date): Promise<ExternalEmailAccountRow[]>;
 }
 
 export class ExternalEmailAccountsRepository implements IExternalEmailAccountsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
-
-  async findActiveForUser(userId: string): Promise<ExternalEmailAccountRow[]> {
-    return (await this.db
-      .select()
-      .from(externalEmailAccounts)
-      .where(and(eq(externalEmailAccounts.userId, userId), eq(externalEmailAccounts.status, "active")))) as ExternalEmailAccountRow[];
-  }
 
   async findAllForUser(userId: string): Promise<ExternalEmailAccountRow[]> {
     return (await this.db
@@ -108,20 +97,5 @@ export class ExternalEmailAccountsRepository implements IExternalEmailAccountsRe
     await this.db
       .delete(externalEmailAccounts)
       .where(and(eq(externalEmailAccounts.id, id), eq(externalEmailAccounts.userId, userId)));
-  }
-
-  async findDueForSync(maxLastSyncedAt: Date): Promise<ExternalEmailAccountRow[]> {
-    const rows = (await this.db
-      .select()
-      .from(externalEmailAccounts)
-      .where(
-        and(
-          eq(externalEmailAccounts.status, "active"),
-          isNotNull(externalEmailAccounts.oauthRefreshTokenEnc),
-        ),
-      )) as ExternalEmailAccountRow[];
-    // Filter in JS because the OR-style "null lastSyncedAt OR < threshold"
-    // is awkward in drizzle and the row count is bounded by user count.
-    return rows.filter((r) => !r.lastSyncedAt || r.lastSyncedAt < maxLastSyncedAt);
   }
 }

@@ -70,7 +70,10 @@ import {
   makeLinkedContentWidget,
   totalDurationSeconds,
 } from "@/lib/studio/editor-v2/canvas-state";
-import type { LinkedContentKind } from "@/lib/studio/editor-v2/linked-content";
+import {
+  resolveLinkedContentColors,
+  type LinkedContentKind,
+} from "@/lib/studio/editor-v2/linked-content";
 import {
   canvasStateToTimeline,
   timelineToCanvasState,
@@ -585,12 +588,19 @@ export default function StudioEditorV2() {
       entityId: string,
       atFraction?: { x: number; y: number },
     ) => {
+      // Pull the current theme / palette through `resolveLinkedContentColors`
+      // so a card dropped onto a themed canvas adopts that theme's
+      // chrome immediately — no per-template branching here, the
+      // resolver is the single source of truth. Same colours are
+      // re-stamped by `applyThemeToState` when the user later switches
+      // themes, so the two paths can't drift.
+      const colors = resolveLinkedContentColors(state);
       placeWidget(
-        makeLinkedContentWidget({ entityKind, entityId }),
+        makeLinkedContentWidget({ entityKind, entityId, ...colors }),
         atFraction,
       );
     },
-    [placeWidget],
+    [placeWidget, state],
   );
 
   const updateWidgetPosition = useCallback(

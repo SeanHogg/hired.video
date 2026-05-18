@@ -11,7 +11,6 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-copy.js";
-import { decideStudioQuota } from "../../../shared/studio-quota.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
 import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";

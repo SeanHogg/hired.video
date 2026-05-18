@@ -217,8 +217,8 @@ JSON schema:
 
 // POST /api/interview/sessions
 // Create a new interview session. Free tier is capped at
-// FREE_INTERVIEW_SESSIONS_PER_MONTH calendar-month sessions via the
-// `checkInterviewSessionsThisMonth` middleware helper; Pro is unbounded
+// FREE_INTERVIEW_SESSIONS_PER_MONTH calendar-month sessions via
+// `servicesProcessor.enforce(c, "interview_session")`; Pro is unbounded
 // (token budget still applies via per-answer LLM calls).
 interviewRoutes.post("/sessions", async (c) => {
   const user = c.var.user;

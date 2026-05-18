@@ -18,6 +18,11 @@
  * scene editor is untouched.
  */
 
+import {
+  resolveLinkedContentColors,
+  stampLinkedContentColors,
+} from "./linked-content";
+
 export const CANVAS_STATE_VERSION = 1;
 
 export type WidgetKind =
@@ -204,6 +209,20 @@ export interface LinkedContentWidgetParams {
    *  string means the widget hasn't been bound yet — the body renders
    *  an empty state prompting the user to pick from the inspector. */
   entityId: string;
+  /** Card colours — stamped at insert time from the active theme /
+   *  colour palette so a resume dropped onto a "Director Pitch"
+   *  template adopts that template's look. Mirrors the CTA widget's
+   *  per-widget colour pattern so `applyThemeToState` can re-stamp
+   *  the chrome when the user picks a new theme. Single source of
+   *  truth: `resolveLinkedContentColors()` in `linked-content.ts`. */
+  bgColor?: string;
+  textColor?: string;
+  /** Subtitle / body / chip-text colour (lower-emphasis text). */
+  mutedColor?: string;
+  /** CTA button background + icon-chip accent. */
+  accentColor?: string;
+  /** CTA button text (computed for contrast against accent). */
+  accentTextColor?: string;
 }
 
 export type WidgetParams =
@@ -762,9 +781,18 @@ export function applyThemeToState(
   const primary = palette?.[0] ?? themePrimary;
   const accent = palette?.[1] ?? themeAccent;
   const surface = palette?.[2] ?? themeSurface;
-  return {
+  // Resolve linked-content card colours against the same theme so a
+  // resume / job card already on the canvas re-themes when the user
+  // picks a new visual theme. Single source of truth lives in
+  // `resolveLinkedContentColors` so insert-time stamping and re-theme
+  // stamping can't drift.
+  const themedState: CanvasState = {
     ...state,
     themeId: theme.id,
+  };
+  const linkedColors = resolveLinkedContentColors(themedState);
+  return {
+    ...themedState,
     scenes: state.scenes.map((scene) => ({
       ...scene,
       backgroundColor: primary,
@@ -778,6 +806,15 @@ export function applyThemeToState(
                 ...w.params.data,
                 color: w.params.kind === "heading" ? accent : surface,
               },
+            },
+          };
+        }
+        if (w.params.kind === "linked-content") {
+          return {
+            ...w,
+            params: {
+              kind: "linked-content",
+              data: stampLinkedContentColors(w.params.data, linkedColors),
             },
           };
         }

@@ -5,7 +5,7 @@
  *
  * Sibling modules:
  *   - `middleware/auth-gates.ts`        (requirePro, requireVideoAnalytics)
- *   - `middleware/free-tier-limits.ts`  (checkTeamSize, checkInterviewSessionsThisMonth)
+ *   - `domains/services-processing/services-processor.ts`  (per-period entitlement gates — team_invite, interview_session, video_publish, resume_tailor, …)
  */
 
 import type { Context, MiddlewareHandler } from "hono";

@@ -6,10 +6,10 @@
  * for any feature that's checked from more than one route file (so the
  * pricing-copy "Video Analytics" name lives in exactly one place).
  *
- * Other middleware concerns (token-budget metering, free-tier monthly
- * limit counters) live in sibling modules:
+ * Other middleware concerns (token-budget metering, per-period entitlement
+ * gates) live in sibling modules:
  *   - `middleware/token-budget.ts`        (checkTokenBudget, attachTokenBudget…)
- *   - `middleware/free-tier-limits.ts`    (checkTeamSize, checkInterviewSessionsThisMonth…)
+ *   - `domains/services-processing/services-processor.ts`  (servicesProcessor.enforce / meterEvent — every catalog-declared dimension)
  */
 
 import type { Context, MiddlewareHandler } from "hono";
