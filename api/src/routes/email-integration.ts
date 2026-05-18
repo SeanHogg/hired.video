@@ -161,7 +161,7 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
   // highlight instead. Helper is shared with the /callback path so the
   // two gates can't drift.
   const entitlement = await checkInboxSyncEntitlement(uid, user.role, repos);
-  if (!entitlement.ok) return c.redirect(`${base}${entitlement.redirect}`);
+  if (entitlement.ok === false) return c.redirect(`${base}${entitlement.redirect}`);
   const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
   const cfg = EMAIL_PROVIDER_CONFIG[provider];
   if (!cfg) return c.json(error("NOT_FOUND", `Unknown provider: ${provider}`), 404);
@@ -224,7 +224,7 @@ emailIntegrationRoutes.get("/:provider/callback", async (c) => {
     repos,
     { provider, accountEmail: mailboxEmail },
   );
-  if (!cbEntitlement.ok) return c.redirect(`${base}${cbEntitlement.redirect}`);
+  if (cbEntitlement.ok === false) return c.redirect(`${base}${cbEntitlement.redirect}`);
   const encryptedRefresh = await encryptToken(tokens.refresh_token);
   await repos.externalEmailAccounts.upsert({
     userId: state.userId,

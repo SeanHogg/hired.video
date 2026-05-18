@@ -15,55 +15,14 @@
  * users (the OAuth flow needs a session).
  */
 
-import { useEffect, useState } from "react";
 import { Inbox as InboxIcon, Mail } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import {
-  emailIntegrationService,
-  type ConnectedEmailAccount,
-} from "@/lib/services/email-integration-service";
+import { useEmailAccounts } from "@/hooks/use-email-accounts";
 import { ConnectMailboxButtons } from "./ConnectMailboxButtons";
-
-interface AccountState {
-  loading: boolean;
-  hasActive: boolean;
-}
-
-function useHasActiveMailbox(): AccountState {
-  const { isAuthenticated } = useAuth();
-  const [state, setState] = useState<AccountState>({ loading: true, hasActive: false });
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setState({ loading: false, hasActive: false });
-      return;
-    }
-    let cancelled = false;
-    emailIntegrationService
-      .listAccounts()
-      .then((accounts: ConnectedEmailAccount[]) => {
-        if (cancelled) return;
-        setState({
-          loading: false,
-          hasActive: accounts.some((a) => a.status === "active"),
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Endpoint failure: don't block the empty state behind a spinner.
-        setState({ loading: false, hasActive: false });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
-
-  return state;
-}
 
 export function InboxEmptyState() {
   const { isAuthenticated } = useAuth();
-  const { loading, hasActive } = useHasActiveMailbox();
+  const { loading, hasActive } = useEmailAccounts();
 
   // While probing, render the neutral "all caught up" — beats flashing a
   // "connect inbox" CTA at users who actually have one connected.
