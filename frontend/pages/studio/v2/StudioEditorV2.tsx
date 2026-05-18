@@ -1367,7 +1367,6 @@ export default function StudioEditorV2() {
                         insertLinkedContent(entityKind, entityId, atFraction)
                       }
                       onScreenshotDrop={(atFraction) => placeScreenshot(atFraction)}
-                      playheadInScene={null}
                       defaultFontId={state.fontFamily}
                     />
                   )}

@@ -31,7 +31,6 @@ import {
 import { applyChromaKeyToPixels } from "@/lib/studio/chroma-key";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
-import { motionStyleAt } from "@/lib/studio/editor-v2/widget-motion";
 import {
   computeAnimateOutput,
   type AnimateInput,
@@ -93,10 +92,6 @@ export interface CanvasStageProps {
    *  own (the picker can't be invoked from inside a sync drop handler),
    *  so this is purely "place here when capture finishes". */
   onScreenshotDrop?: (atFraction: { x: number; y: number }) => void;
-  /** Seconds elapsed into the active scene during playback. `null` means
-   *  preview is paused — show every widget regardless of visibleFrom /
-   *  visibleTo so the editor stays useful while authoring. */
-  playheadInScene?: number | null;
   /** Project-level font (FontPreset.id). Applied to every text /
    *  heading widget body unless that widget overrides locally. */
   defaultFontId?: string | null;
@@ -116,7 +111,6 @@ export default function CanvasStage({
   onMediaDrop,
   onLinkedContentDrop,
   onScreenshotDrop,
-  playheadInScene,
   defaultFontId,
 }: CanvasStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -252,28 +246,21 @@ export default function CanvasStage({
           effect={scene.backgroundEffect}
           baseColor={scene.backgroundColor}
         />
-        {scene.widgets
-          .filter((widget) => isWidgetVisibleAt(widget, playheadInScene))
-          .map((widget) => (
-            <WidgetView
-              key={widget.id}
-              widget={widget}
-              stageRef={stageRef}
-              selected={
-                selection.kind === "widget" && selection.widgetId === widget.id
-              }
-              onSelect={() =>
-                onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
-              }
-              onMove={(position) => onWidgetMove(widget.id, position)}
-              motion={
-                playheadInScene !== null && playheadInScene !== undefined
-                  ? motionStyleAt(widget, playheadInScene, scene.durationSeconds)
-                  : null
-              }
-              animateInput={widgetAnimateInput(widget, playheadInScene, scene.durationSeconds)}
-            />
-          ))}
+        {scene.widgets.map((widget) => (
+          <WidgetView
+            key={widget.id}
+            widget={widget}
+            stageRef={stageRef}
+            selected={
+              selection.kind === "widget" && selection.widgetId === widget.id
+            }
+            onSelect={() =>
+              onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
+            }
+            onMove={(position) => onWidgetMove(widget.id, position)}
+            animateInput={widgetAnimateInputForStartPose(widget, scene.durationSeconds)}
+          />
+        ))}
       </div>
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
           gates: returns null when no drag is hovering. Lives OUTSIDE the
@@ -292,12 +279,9 @@ interface WidgetViewProps {
   selected: boolean;
   onSelect: () => void;
   onMove: (position: WidgetPosition) => void;
-  /** Live motion style during playback. `null` when the editor is
-   *  paused (the widget renders unanimated, in its authored pose). */
-  motion: import("@/lib/studio/editor-v2/widget-motion").MotionStyle | null;
-  /** Clip-local time + duration in seconds, derived from the parent's
-   *  playhead. Drives the animate-* effect math (fade/zoom/pan/pulse/
-   *  shake) so the editor preview reproduces the render-side pixels. */
+  /** Clip-local time + duration in seconds. Always `clipTimeSec=0` in
+   *  the edit canvas — the editor shows widgets in their authored
+   *  start pose so animate-* effects render their first frame. */
   animateInput: AnimateInput;
 }
 
@@ -307,7 +291,6 @@ function WidgetView({
   selected,
   onSelect,
   onMove,
-  motion,
   animateInput,
 }: WidgetViewProps) {
   const startRef = useRef<{
@@ -412,14 +395,13 @@ function WidgetView({
         width: `${widget.position.width * 100}%`,
         height: `${widget.position.height * 100}%`,
         zIndex: widget.position.z,
-        // Motion transforms come on the LEFT so they apply in screen
-        // space AFTER the widget's authored rotation — a slide-from-
-        // left widget enters along the canvas X, not its own rotated
-        // axis. Rotation stays on the right so the resize handle math
-        // (which un-rotates pointer deltas) is unaffected.
-        transform: composeTransform(motion?.transform, widget.position.rotation),
+        // Rotation is the only authored transform — motion / animate
+        // effects only render visibly on the playback canvas, not in
+        // the edit canvas.
+        transform: widget.position.rotation !== 0
+          ? `rotate(${widget.position.rotation}deg)`
+          : undefined,
         transformOrigin: "center",
-        opacity: motion ? motion.opacity : undefined,
         // Selection chrome — double-stroke (white halo + brand-purple
         // ring) so it stays visible regardless of scene background.
         // A flat brand-coloured outline disappears on purple/dark
@@ -928,20 +910,18 @@ function widgetEffectsToCss(
  * lifespan (matches what the renderer does — each widget compiles to
  * its own clip whose duration is `visibleTo - visibleFrom`).
  */
-function widgetAnimateInput(
+/** Build the AnimateInput for the editor's authored-start pose:
+ *  clipTimeSec = 0 so animate-* effects render their first frame
+ *  (e.g. fade-in shows the pre-fade pose, zoom-in shows the start
+ *  scale). Playback frames are produced by `<CanvasV2Preview/>` via
+ *  the canvas-v2 effect registry — this helper is editor-only. */
+function widgetAnimateInputForStartPose(
   widget: Widget,
-  playheadInScene: number | null | undefined,
   sceneDurationSeconds: number,
 ): AnimateInput {
   const from = widget.visibleFrom ?? 0;
   const to = widget.visibleTo ?? sceneDurationSeconds;
-  const clipDurationSec = Math.max(0, to - from);
-  if (playheadInScene == null) {
-    // Authoring mode — show the widget at its authored start state.
-    return { clipTimeSec: 0, clipDurationSec };
-  }
-  const clipTimeSec = Math.max(0, playheadInScene - from);
-  return { clipTimeSec, clipDurationSec };
+  return { clipTimeSec: 0, clipDurationSec: Math.max(0, to - from) };
 }
 
 function numberParam(v: unknown, fallback: number): number {
@@ -982,15 +962,6 @@ function sceneEffectsToCss(
   return parts.join(" ");
 }
 
-function composeTransform(motionTransform: string | undefined, rotationDeg: number): string | undefined {
-  const hasMotion = motionTransform !== undefined && motionTransform !== "none";
-  const hasRotation = rotationDeg !== 0;
-  if (!hasMotion && !hasRotation) return undefined;
-  if (!hasMotion) return `rotate(${rotationDeg}deg)`;
-  if (!hasRotation) return motionTransform;
-  return `${motionTransform} rotate(${rotationDeg}deg)`;
-}
-
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
@@ -1010,18 +981,5 @@ function unrotateDelta(dx: number, dy: number, rotationDeg: number): {
   const cos = Math.cos(r);
   const sin = Math.sin(r);
   return { dx: cos * dx - sin * dy, dy: sin * dx + cos * dy };
-}
-
-// During authoring (playheadInScene === null) every widget is visible so
-// the user can edit them. During playback (number) we honour the widget's
-// visibleFrom / visibleTo window so the preview matches the rendered
-// output. Single source of truth — both editor preview AND the eventual
-// render path should resolve "is this widget visible at time t?" the
-// same way (DRY).
-function isWidgetVisibleAt(widget: Widget, playheadInScene: number | null | undefined): boolean {
-  if (playheadInScene == null) return true;
-  if (widget.visibleFrom != null && playheadInScene < widget.visibleFrom) return false;
-  if (widget.visibleTo != null && playheadInScene > widget.visibleTo) return false;
-  return true;
 }
 
