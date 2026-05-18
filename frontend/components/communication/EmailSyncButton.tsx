@@ -1,13 +1,9 @@
 /**
  * EmailSyncButton — single source of truth for the "Sync now" action.
  *
- * Mounted in two surfaces today:
- *   1. InboxTab card header (variant="prominent" — primary button)
- *   2. InboxToolbar (variant="ghost" — compact, lives next to History/Settings)
- *
- * The component self-gates: returns null when the user has no
- * connected mailboxes, so consumers don't have to prop-drill a
- * `canSync` boolean.
+ * Mounted in [InboxToolbar](./InboxToolbar.tsx) next to History / Settings.
+ * Self-gates: returns null when the user has no connected mailboxes,
+ * so consumers don't have to prop-drill a `canSync` boolean.
  *
  * Drives the **client-side** sync orchestrator
  * (`frontend/lib/email-integration/sync-client.ts`) which fetches mail
@@ -30,22 +26,17 @@ export interface EmailSyncButtonProps {
   /** Called after a sync finishes (success or partial) so the parent
    *  can refresh the inbox feed to surface newly classified messages. */
   onSynced?: (summaries: ClientSyncSummary[]) => void;
-  /** Visual variant. `prominent` = primary CTA button for card headers,
-   *  `ghost` = subtle row-inline action for the toolbar. */
-  variant?: "prominent" | "ghost";
   className?: string;
 }
 
 export function EmailSyncButton({
   accounts,
   onSynced,
-  variant = "prominent",
   className,
 }: EmailSyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
   const [resultText, setResultText] = useState<string | null>(null);
 
-  // Self-gate per the DRY rule — no consumer prop-drilling required.
   if (accounts.length === 0) return null;
 
   const handleSync = async () => {
@@ -70,28 +61,6 @@ export function EmailSyncButton({
       setSyncing(false);
     }
   };
-
-  if (variant === "prominent") {
-    return (
-      <div className={cn("flex items-center gap-2", className)}>
-        <Button
-          size="sm"
-          onClick={handleSync}
-          disabled={syncing}
-        >
-          {syncing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-          )}
-          Sync inbox
-        </Button>
-        {resultText && (
-          <span className="text-[11px] text-muted-foreground">{resultText}</span>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className={cn("flex items-center gap-2", className)}>

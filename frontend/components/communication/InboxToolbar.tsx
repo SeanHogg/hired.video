@@ -120,7 +120,6 @@ export function InboxToolbar({
         <div className="ml-auto flex items-center gap-1">
           <EmailSyncButton
             accounts={accounts}
-            variant="ghost"
             onSynced={() => onRefresh()}
           />
           <Button
