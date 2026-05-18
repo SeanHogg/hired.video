@@ -14,10 +14,18 @@
  * render linked content decide their own visibility / empty states by
  * inspecting the same registry.
  */
-import type { ComponentType } from "react";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import { FileText } from "lucide-react";
 import { resumeService } from "@/lib/services/resume-service";
-import type { Basics, ResumeContent, Skill } from "@shared/resume";
+
+// Per-kind inline body components are lazy-loaded — the resume body
+// pulls in `DeclarativeResumeRenderer` (heavy), which we don't want
+// on every page that imports `linked-content.ts` (e.g. the drag
+// protocol shared by every studio surface). Each kind ships its own
+// `<EntityInlineBody/>` under `components/studio/v2/inline-bodies/`.
+const ResumeInlineBody = lazy(
+  () => import("@/components/studio/v2/inline-bodies/ResumeInlineBody"),
+);
 
 /** Entity kinds that can be embedded as a card on the v2 canvas. Start
  *  with `resume`; future kinds (`job`, `profile`, `company`, `video`,
@@ -37,23 +45,6 @@ export interface LinkedContentSummary {
   subtitle?: string;
 }
 
-/** Rich preview data fetched on-demand when a linked-content widget
- *  mounts on the canvas. Shape is intentionally generic so the canvas
- *  body renderer is one component regardless of entity kind — per-kind
- *  semantics live in the registry's `fetchPreview` projection. */
-export interface LinkedContentPreview {
-  kind: LinkedContentKind;
-  id: string;
-  /** Headline (resume title / job title / person name). */
-  title: string;
-  /** Sub-headline (current role · company / location / posted date). */
-  subtitle?: string;
-  /** Body paragraph (resume summary / job description excerpt). */
-  body?: string;
-  /** Up to ~6 chip-style tags (skills / keywords / requirements). */
-  chips?: string[];
-}
-
 interface LinkedContentMeta {
   /** Singular display label ("Resume", "Job"). */
   label: string;
@@ -69,10 +60,15 @@ interface LinkedContentMeta {
    *  Errors are swallowed by the caller — the section just renders the
    *  empty state. */
   listForUser: () => Promise<LinkedContentSummary[]>;
-  /** Fetch the preview projection for a single item by id. Returns
-   *  `null` when the entity can't be resolved (deleted / unauthorized /
-   *  not yet picked). */
-  fetchPreview: (id: string) => Promise<LinkedContentPreview | null>;
+  /** Lazy-loaded canvas body — renders the entity inside the widget
+   *  using its OWN renderer (e.g. `<DeclarativeResumeRenderer/>` for
+   *  resumes) so the embedded card looks like a thumbnail of the
+   *  entity's actual published page, not a hand-rolled summary. The
+   *  component owns its own fetch + loading / error states; the
+   *  outer `LinkedContentBody` just provides chrome (bg colour, CTA
+   *  pill, drag-select target) so adding a new kind is one lazy
+   *  import here + one component file under `inline-bodies/`. */
+  InlineBody: LazyExoticComponent<ComponentType<{ id: string }>>;
 }
 
 export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMeta> = {
@@ -93,28 +89,7 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
           subtitle: subtitleForResume(r),
         }));
     },
-    fetchPreview: async (id) => {
-      try {
-        const resume = await resumeService.getResumeById(id);
-        if (!resume) return null;
-        const content = (resume.content as ResumeContent | undefined) ?? undefined;
-        const basics: Basics | undefined = content?.basics;
-        const skills: Skill[] = content?.skills ?? [];
-        return {
-          kind: "resume",
-          id: resume.id ?? id,
-          title: resume.title || basics?.name || "Untitled resume",
-          subtitle: basics?.label || undefined,
-          body: basics?.summary || undefined,
-          chips: skills
-            .map((s) => s?.name ?? "")
-            .filter((name): name is string => name.length > 0)
-            .slice(0, 6),
-        };
-      } catch {
-        return null;
-      }
-    },
+    InlineBody: ResumeInlineBody,
   },
 };
 

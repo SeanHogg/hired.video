@@ -197,7 +197,7 @@ export function resolveCtaFontSizes(
 /** Linked-content widget — embeds a card preview of a user-owned entity
  *  (resume / job / profile / …) at a fractional position on the canvas.
  *  The widget stores only the entity reference; the preview body
- *  self-fetches via `LINKED_CONTENT_REGISTRY[entityKind].fetchPreview`
+ *  self-fetches via `LINKED_CONTENT_REGISTRY[entityKind].InlineBody`
  *  so the canvas, the inspector, and any future render-side applier all
  *  read the same projection. Adding a new entity kind = one row in the
  *  registry; no `WidgetKind` or `WidgetParams` change.

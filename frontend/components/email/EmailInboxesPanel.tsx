@@ -3,9 +3,14 @@
  * mailboxes, hosts the Connect / Sync-now buttons, and shows the recent
  * sync-run activity with AI digest.
  *
- * Owns its own data: accounts + sync runs are read together because the
- * Sync-now button mutates both. Rule data lives in the sibling
- * <EmailRulesPanel> and is fetched there.
+ * Account data comes from the shared `useEmailAccounts()` hook so
+ * disconnects propagate to the sibling `<ConnectMailboxButtons />`
+ * gate without a manual round-trip. Sync-run history is fetched
+ * locally (single consumer). Rule data lives in `<EmailRulesPanel>`.
+ *
+ * Self-gating against Pro happens one level up in `<EmailSettingsTab>`
+ * — Free users never mount this panel, so the component assumes
+ * `isPro && isAuthenticated`.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
