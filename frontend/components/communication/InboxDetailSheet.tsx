@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Loader2,
   Mail,
@@ -160,10 +159,10 @@ export function InboxDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-xl p-0 flex flex-col"
+        className="w-full sm:max-w-4xl p-0 flex flex-col"
         aria-describedby="inbox-detail-description"
       >
-        <SheetHeader className="px-5 pt-5 pb-3 border-b">
+        <SheetHeader className="px-5 pt-5 pb-3 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
             <Mail className="h-4 w-4 text-emerald-600" />
             <span className="truncate">
@@ -187,79 +186,11 @@ export function InboxDetailSheet({
           <div className="p-5 text-sm text-destructive">{error}</div>
         ) : detail ? (
           <>
-            <ScrollArea className="flex-1">
-              <div className="p-5 space-y-4">
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">From</div>
-                  <div className="text-sm font-medium">
-                    {detail.fromName?.trim()
-                      ? `${detail.fromName} <${detail.fromEmail}>`
-                      : detail.fromEmail}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Mailbox</div>
-                  <div className="text-sm">
-                    {detail.provider} · {detail.accountLabel}
-                  </div>
-                </div>
-
-                {(detail.category || detail.score != null) && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {detail.category && (
-                      <Badge variant="secondary" className="uppercase tracking-wide">
-                        {detail.category.replace(/_/g, " ")}
-                      </Badge>
-                    )}
-                    {detail.score != null && (
-                      <Badge variant="outline">
-                        {Math.round(detail.score * 100)}% confidence
-                      </Badge>
-                    )}
-                    {detail.linkedJobId && (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
-                        <Briefcase className="h-3 w-3 mr-1" />
-                        Linked to job
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {detail.summary && (
-                  <div className="rounded border bg-muted/40 p-3 space-y-1">
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                      AI summary
-                    </div>
-                    <p className="text-sm">{detail.summary}</p>
-                  </div>
-                )}
-
-                <JobMailCTAs
-                  category={detail.category}
-                  linkedJobId={detail.linkedJobId}
-                  applyUrl={detail.applyUrl}
-                />
-
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Subject</div>
-                  <div className="text-sm font-medium">
-                    {detail.subject || "(no subject)"}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Body</div>
-                  <EmailBodyFrame
-                    bodyHtml={detail.bodyHtml}
-                    bodyText={detail.bodyText}
-                    fallback={detail.snippet ?? "(no body)"}
-                  />
-                </div>
-              </div>
-            </ScrollArea>
-
-            <div className="border-t px-5 py-3 flex items-center gap-2 flex-wrap">
+            {/* Action bar moved to the top per UX feedback — primary
+                affordances (Mark unread / Dismiss / Mark as Junk / Open in
+                provider) should be the first thing the user reaches for,
+                not the last. */}
+            <div className="border-b px-5 py-2 flex items-center gap-2 flex-wrap shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -306,6 +237,87 @@ export function InboxDetailSheet({
                   </a>
                 </Button>
               )}
+            </div>
+
+            {/* Metadata header — compact block above the body. Allowed to
+                scroll on small viewports via `max-h-[40vh] overflow-y-auto`
+                so a verbose AI summary or many CTAs don't push the body
+                offscreen. */}
+            <div className="px-5 pt-4 pb-2 space-y-3 shrink-0 max-h-[40vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-xs text-muted-foreground">From</div>
+                  <div className="text-sm font-medium truncate">
+                    {detail.fromName?.trim()
+                      ? `${detail.fromName} <${detail.fromEmail}>`
+                      : detail.fromEmail}
+                  </div>
+                </div>
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-xs text-muted-foreground">Mailbox</div>
+                  <div className="text-sm truncate">
+                    {detail.provider} · {detail.accountLabel}
+                  </div>
+                </div>
+              </div>
+
+              {(detail.category || detail.score != null) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {detail.category && (
+                    <Badge variant="secondary" className="uppercase tracking-wide">
+                      {detail.category.replace(/_/g, " ")}
+                    </Badge>
+                  )}
+                  {detail.score != null && (
+                    <Badge variant="outline">
+                      {Math.round(detail.score * 100)}% confidence
+                    </Badge>
+                  )}
+                  {detail.linkedJobId && (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                      <Briefcase className="h-3 w-3 mr-1" />
+                      Linked to job
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {detail.summary && (
+                <div className="rounded border bg-muted/40 p-3 space-y-1">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    AI summary
+                  </div>
+                  <p className="text-sm">{detail.summary}</p>
+                </div>
+              )}
+
+              <JobMailCTAs
+                category={detail.category}
+                linkedJobId={detail.linkedJobId}
+                applyUrl={detail.applyUrl}
+              />
+
+              <div className="space-y-0.5">
+                <div className="text-xs text-muted-foreground">Subject</div>
+                <div className="text-sm font-medium">
+                  {detail.subject || "(no subject)"}
+                </div>
+              </div>
+            </div>
+
+            {/* Body fills the rest of the panel down to its lower edge.
+                `min-h-0` lets the flex item shrink below content size so
+                the iframe's own scrollbar handles overflow. */}
+            <div className="flex-1 flex flex-col min-h-0 px-5 pb-5">
+              <div className="text-xs text-muted-foreground mb-1 flex items-center justify-between">
+                <span>Body</span>
+              </div>
+              <EmailBodyFrame
+                bodyHtml={detail.bodyHtml}
+                bodyText={detail.bodyText}
+                fallback={detail.snippet ?? "(no body)"}
+                className="flex-1 min-h-0 flex flex-col"
+              />
             </div>
 
             <JunkConfirmDialog

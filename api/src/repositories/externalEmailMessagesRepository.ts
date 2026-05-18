@@ -66,7 +66,23 @@ export interface IExternalEmailMessagesRepository {
   findByIdWithAccount(id: string, userId: string): Promise<ExternalEmailInboxRow | null>;
   findByAccount(accountId: string): Promise<ExternalEmailMessageRow[]>;
   insert(input: ExternalEmailMessageInsert): Promise<ExternalEmailMessageRow>;
+  /** Bulk insert + conflict-resolve in one round-trip. Inserts new rows
+   *  via `onConflictDoNothing` on `(accountId, providerMessageId)`, then
+   *  one batched SELECT pulls every row in the input set back (both
+   *  freshly-inserted and pre-existing) so callers always get a row per
+   *  input. Single source of truth for "ingest a chunk of messages" —
+   *  the per-message `insert()` path on top is for callers (legacy cron
+   *  + tests) that aren't chunked. */
+  insertMany(inputs: ExternalEmailMessageInsert[]): Promise<ExternalEmailMessageRow[]>;
   patch(id: string, patch: Partial<ExternalEmailMessageInsert>): Promise<void>;
+  /** Apply per-row patches in one round-trip via a `VALUES(...) JOIN`
+   *  UPDATE. Single source of truth for batched ingest finals so the
+   *  Worker subrequest budget collapses from O(N) to O(1) per chunk
+   *  (gap #815). Skipping rows whose patch is empty is the caller's
+   *  responsibility. */
+  patchMany(
+    patches: Array<{ id: string; patch: Partial<ExternalEmailMessageInsert> }>,
+  ): Promise<void>;
   markRead(id: string, userId: string): Promise<void>;
   markUnread(id: string, userId: string): Promise<void>;
   markAllReadForUser(userId: string): Promise<void>;
@@ -219,11 +235,113 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     return existing[0]!;
   }
 
+  async insertMany(
+    inputs: ExternalEmailMessageInsert[],
+  ): Promise<ExternalEmailMessageRow[]> {
+    if (inputs.length === 0) return [];
+    // Step 1 — bulk INSERT with conflict-skip. `returning *` covers
+    // the freshly-inserted rows but NOT conflicted ones, so we do a
+    // single batched SELECT afterwards keyed by
+    // (accountId, providerMessageId) to pull the existing rows back.
+    // Two round-trips per chunk regardless of size vs. 2N for the
+    // per-message path.
+    const inserted = (await this.db
+      .insert(externalEmailMessages)
+      .values(inputs as any)
+      .onConflictDoNothing({
+        target: [externalEmailMessages.accountId, externalEmailMessages.providerMessageId],
+      })
+      .returning()) as ExternalEmailMessageRow[];
+
+    if (inserted.length === inputs.length) return inserted;
+
+    // Step 2 — backfill conflicted rows. Group by accountId so the
+    // SELECT can use the same (accountId, providerMessageId) unique
+    // index that the conflict target uses. In practice every chunk has
+    // a single accountId (callers ingest per-account) — keep the loop
+    // for the defensive case but it's a 1-iteration loop on the hot path.
+    const insertedIds = new Set(inserted.map((r) => r.providerMessageId));
+    const conflicts = inputs.filter(
+      (i) => !insertedIds.has(i.providerMessageId as string),
+    );
+    if (conflicts.length === 0) return inserted;
+
+    const byAccount = new Map<string, string[]>();
+    for (const c of conflicts) {
+      const accountId = c.accountId as string;
+      const arr = byAccount.get(accountId) ?? [];
+      arr.push(c.providerMessageId as string);
+      byAccount.set(accountId, arr);
+    }
+    const existing: ExternalEmailMessageRow[] = [];
+    for (const [accountId, providerMessageIds] of byAccount) {
+      const rows = (await this.db
+        .select()
+        .from(externalEmailMessages)
+        .where(
+          and(
+            eq(externalEmailMessages.accountId, accountId),
+            inArray(externalEmailMessages.providerMessageId, providerMessageIds),
+          ),
+        )) as ExternalEmailMessageRow[];
+      existing.push(...rows);
+    }
+    return [...inserted, ...existing];
+  }
+
   async patch(id: string, patch: Partial<ExternalEmailMessageInsert>): Promise<void> {
     await this.db
       .update(externalEmailMessages)
       .set({ ...patch, updatedAt: this.now() } as any)
       .where(eq(externalEmailMessages.id, id));
+  }
+
+  async patchMany(
+    patches: Array<{ id: string; patch: Partial<ExternalEmailMessageInsert> }>,
+  ): Promise<void> {
+    if (patches.length === 0) return;
+    // Single UPDATE FROM (VALUES …) keyed by id. Every column the
+    // ingest pass writes is covered; columns the patch leaves
+    // undefined fall back to the existing row value via COALESCE
+    // ordering — the v.<col> placeholder is typed-null per patch and
+    // the SET clause uses `COALESCE(v.<col>, m.<col>)` so omitted
+    // fields don't clobber whatever was there. Single round-trip
+    // regardless of N (gap #815).
+    //
+    // Note: numeric columns are passed as strings (drizzle convention
+    // for `numeric` so JS floats don't lose precision) — the cast in
+    // the VALUES row keeps the type narrow for the planner.
+    const now = this.now();
+    const rows = patches.map(({ id, patch }) =>
+      sql`(${id}::uuid,
+            ${patch.category ?? null},
+            ${(patch as any).score ?? null}::numeric,
+            ${patch.summary ?? null},
+            ${patch.applyUrl ?? null},
+            ${patch.linkedJobId ?? null}::uuid,
+            ${(patch as any).dedupScore ?? null}::numeric,
+            ${patch.dedupMethod ?? null},
+            ${patch.isArchived ?? null}::boolean)`,
+    );
+    const values = sql.join(rows, sql`, `);
+    await this.db.execute(sql`
+      UPDATE ${externalEmailMessages} AS m
+      SET
+        category = COALESCE(v.category, m.category),
+        score = COALESCE(v.score, m.score),
+        summary = COALESCE(v.summary, m.summary),
+        apply_url = COALESCE(v.apply_url, m.apply_url),
+        linked_job_id = COALESCE(v.linked_job_id, m.linked_job_id),
+        dedup_score = COALESCE(v.dedup_score, m.dedup_score),
+        dedup_method = COALESCE(v.dedup_method, m.dedup_method),
+        is_archived = COALESCE(v.is_archived, m.is_archived),
+        updated_at = ${now}
+      FROM (VALUES ${values}) AS v(
+        id, category, score, summary, apply_url,
+        linked_job_id, dedup_score, dedup_method, is_archived
+      )
+      WHERE m.id = v.id
+    `);
   }
 
   async markRead(id: string, userId: string): Promise<void> {

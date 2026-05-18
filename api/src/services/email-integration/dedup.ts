@@ -23,7 +23,7 @@ import type { NormalisedEmail } from "./providers/types.js";
 export interface DedupResult {
   jobId: string | null;
   score: number;
-  method: "apply_url" | "thread_id" | "company_title" | null;
+  method: "apply_url" | "company_title" | null;
 }
 
 const APPLY_URL_RE =
@@ -80,14 +80,16 @@ export interface DedupContext {
   applications: JobApplicationRow[];
   savedJobs: SavedJobRow[];
   jobs: JobRow[];
-  /** Previously linked emails on the same thread, if any. */
-  threadLinkedJobId: string | null;
 }
 
+/** Load the user-scoped lists `dedupAgainst()` reads to score an email
+ *  against existing applied / saved jobs. User-scoped (no email
+ *  parameter) so the ingest pipeline can load this ONCE per chunk
+ *  instead of once per message — collapses 2-3 subrequests × N
+ *  messages into 2-3 subrequests per chunk total (gap #815). */
 export async function loadDedupContext(
-  repos: Pick<Repos, "jobs" | "externalEmailMessages">,
+  repos: Pick<Repos, "jobs">,
   userId: string,
-  email: NormalisedEmail,
 ): Promise<DedupContext> {
   const [applications, savedJobs] = await Promise.all([
     repos.jobs.findApplicationsForUser(userId),
@@ -98,28 +100,13 @@ export async function loadDedupContext(
     ...savedJobs.map((s) => s.jobId),
   ];
   const jobs = jobIds.length > 0 ? await repos.jobs.findJobsByIds(jobIds) : [];
-
-  // Carry forward link from earlier messages on the same Gmail thread /
-  // Graph conversation — saves a re-classification round trip.
-  let threadLinkedJobId: string | null = null;
-  if (email.providerThreadId) {
-    // We can't query by thread id without an index; the messages repo's
-    // findByAccount is bounded per account so the user's account-scoped
-    // count keeps this cheap in practice. P5 could index thread id.
-    // For now skip the cross-thread carry — limited downside.
-  }
-
-  return { applications, savedJobs, jobs, threadLinkedJobId };
+  return { applications, savedJobs, jobs };
 }
 
 export function dedupAgainst(
   email: NormalisedEmail,
   ctx: DedupContext,
 ): DedupResult {
-  if (ctx.threadLinkedJobId) {
-    return { jobId: ctx.threadLinkedJobId, score: 0.95, method: "thread_id" };
-  }
-
   // Strategy 1 — apply URL match.
   const urls = extractApplyUrls(email);
   if (urls.length > 0) {

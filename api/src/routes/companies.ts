@@ -8,7 +8,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import type { CompanyBenefits } from "../db/schema/companies.js";
 import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
 import { slugify } from "../../../shared/slugify.js";
-import { servicesProcessor } from "../domains/services-processing/services-processor.js";
+import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
 
 const {
   companyProfiles,
@@ -309,32 +309,14 @@ companyRoutes.post("/", async (c) => {
   // Closes gap-register #780: enforce Free-tier 50-companies/mo cap that
   // was previously declared in entitlement-catalog but never enforced at
   // the write site. SuperAdmins bypass automatically via isAdminRole.
-  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "company_db_write" });
-  if (!gate.allowed) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "ENTITLEMENT_EXCEEDED",
-          message: gate.reason ?? `Companies in your database limited to ${gate.cap} on the Free plan`,
-          upgradeUrl: "/pricing",
-          cap: gate.cap,
-          consumed: gate.consumed,
-        },
-      },
-      402,
-    );
-  }
+  const blocked = await enforceEntitlement(c, "company_db_write");
+  if (blocked) return blocked;
 
   const slug = String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const db = getDb();
   const [row] = await db.insert(companyProfiles).values({ ownerId: uid, name: body.name, slug, ...buildWritableFields(body) } as any).returning();
 
-  if (c.var.user?.sub) {
-    await servicesProcessor
-      .meter({ userId: c.var.user.sub, eventType: "company_db_write", metadata: { id: row?.id } })
-      .catch((err) => console.warn("[companies] meter company_db_write failed:", err));
-  }
+  meterEntitlement(c, "company_db_write", { id: row?.id });
 
   return c.json(success(rowToCompanyMeta(row)), 201);
 });
@@ -591,22 +573,8 @@ companyRoutes.post("/:id/clone", async (c) => {
   // Closes gap-register #780: clones create a new company_profiles row,
   // so they consume the same cap as POST /api/companies. Otherwise the
   // 50/mo Free cap is trivially bypassed via repeated clone calls.
-  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "company_db_write" });
-  if (!gate.allowed) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "ENTITLEMENT_EXCEEDED",
-          message: gate.reason ?? `Companies in your database limited to ${gate.cap} on the Free plan`,
-          upgradeUrl: "/pricing",
-          cap: gate.cap,
-          consumed: gate.consumed,
-        },
-      },
-      402,
-    );
-  }
+  const blocked = await enforceEntitlement(c, "company_db_write");
+  if (blocked) return blocked;
 
   // Slug is uniquely constrained — derive from the cloned name, then append
   // a numeric suffix until we land on an unused slug. Caps at 50 attempts
@@ -650,11 +618,7 @@ companyRoutes.post("/:id/clone", async (c) => {
     } as any)
     .returning();
 
-  if (c.var.user?.sub) {
-    await servicesProcessor
-      .meter({ userId: c.var.user.sub, eventType: "company_db_write", metadata: { id: clone?.id } })
-      .catch((err) => console.warn("[companies] meter company_db_write failed:", err));
-  }
+  meterEntitlement(c, "company_db_write", { id: clone?.id });
 
   return c.json(success(rowToCompanyMeta(clone!)), 201);
 });
@@ -841,22 +805,8 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
 
   // Closes gap-register #780: only the new-row branch consumes the cap —
   // the dedup-and-merge branch above is a PATCH equivalent, not a create.
-  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "company_db_write" });
-  if (!gate.allowed) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "ENTITLEMENT_EXCEEDED",
-          message: gate.reason ?? `Companies in your database limited to ${gate.cap} on the Free plan`,
-          upgradeUrl: "/pricing",
-          cap: gate.cap,
-          consumed: gate.consumed,
-        },
-      },
-      402,
-    );
-  }
+  const blocked = await enforceEntitlement(c, "company_db_write");
+  if (blocked) return blocked;
 
   // Create new company record
   const [created] = await db
@@ -874,11 +824,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
     } as any)
     .returning();
 
-  if (c.var.user?.sub) {
-    await servicesProcessor
-      .meter({ userId: c.var.user.sub, eventType: "company_db_write", metadata: { id: created?.id } })
-      .catch((err) => console.warn("[companies] meter company_db_write failed:", err));
-  }
+  meterEntitlement(c, "company_db_write", { id: created?.id });
 
   return c.json(success({
     company: created,

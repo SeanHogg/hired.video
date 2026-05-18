@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
-import { servicesProcessor } from "../domains/services-processing/services-processor.js";
+import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
 
 export const valuePropositionRoutes = new Hono<{ Variables: Variables }>();
 valuePropositionRoutes.use("*", attachTokenBudget());
@@ -38,33 +38,12 @@ async function generate(c: any) {
   // single cap (DRY); they all consume from the same `value_prop_pitch`
   // entitlement regardless of which job+resume identification shape they
   // accept.
-  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "value_prop_pitch" });
-  if (!gate.allowed) {
-    return c.json(
-      {
-        success: false as const,
-        error: {
-          code: "ENTITLEMENT_EXCEEDED",
-          message: gate.reason ?? `Value Proposition limited to ${gate.cap} runs on the Free plan`,
-          upgradeUrl: "/pricing",
-          cap: gate.cap,
-          consumed: gate.consumed,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      402,
-    );
-  }
+  const blocked = await enforceEntitlement(c, "value_prop_pitch");
+  if (blocked) return blocked;
 
   await c.req.json().catch(() => ({}));
   const response = c.json(success(buildResponse()), 200);
-  if (c.var.user?.sub) {
-    await servicesProcessor
-      .meter({ userId: c.var.user.sub, eventType: "value_prop_pitch" })
-      .catch((err: unknown) =>
-        console.warn("[value-proposition/generate] meter value_prop_pitch failed:", err),
-      );
-  }
+  meterEntitlement(c, "value_prop_pitch");
   return response;
 }
 

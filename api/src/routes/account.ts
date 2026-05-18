@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { checkTeamSize } from "../middleware/tierEnforcement.js";
-import { servicesProcessor } from "../domains/services-processing/index.js";
+import { meterEntitlement } from "../domains/services-processing/index.js";
 import {
   acceptInvitation,
   bulkInviteUsers,
@@ -52,9 +52,7 @@ accountRoutes.post("/invite", async (c) => {
   const result = await inviteAccountUser(request, userId);
   // Mirror to the central usage ledger so the Usage Statement panel shows
   // team-invite consumption alongside every other metered dimension.
-  await servicesProcessor
-    .meter({ userId, eventType: "team_invite", metadata: { route: "/invite" } })
-    .catch((err) => console.warn("[account] meter team_invite failed:", err));
+  meterEntitlement(c, "team_invite", { route: "/invite" });
   return c.json(result, 200);
 });
 
@@ -129,14 +127,7 @@ accountRoutes.post("/bulk-invite", async (c) => {
   const body = await c.req.json();
   const result = await bulkInviteUsers(userId, body);
   const invitedCount = Array.isArray(body?.invites) ? body.invites.length : 1;
-  await servicesProcessor
-    .meter({
-      userId,
-      eventType: "team_invite",
-      quantity: invitedCount,
-      metadata: { route: "/bulk-invite" },
-    })
-    .catch((err) => console.warn("[account] meter team_invite bulk failed:", err));
+  meterEntitlement(c, "team_invite", { route: "/bulk-invite" }, invitedCount);
   return c.json(result, 200);
 });
 

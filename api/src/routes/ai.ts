@@ -13,7 +13,7 @@ import {
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
-import { servicesProcessor } from "../domains/services-processing/services-processor.js";
+import { enforceEntitlement, meterEntitlement } from "../domains/services-processing/index.js";
 
 export const aiRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -133,23 +133,8 @@ aiRoutes.post("/chat", async (c) => {
   // Gate only fresh user turns; tool follow-ups are part of the same logical
   // message round and were already counted on the originating turn.
   if (!isToolFollowup) {
-    const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "career_coach_msg" });
-    if (!gate.allowed) {
-      return c.json(
-        {
-          success: false as const,
-          error: {
-            code: "ENTITLEMENT_EXCEEDED",
-            message: gate.reason ?? `Career Coach limited to ${gate.cap} messages on the Free plan`,
-            upgradeUrl: "/pricing",
-            cap: gate.cap,
-            consumed: gate.consumed,
-          },
-          timestamp: new Date().toISOString(),
-        },
-        402,
-      );
-    }
+    const blocked = await enforceEntitlement(c, "career_coach_msg");
+    if (blocked) return blocked;
   }
 
   const db = getDb();
@@ -280,9 +265,7 @@ aiRoutes.post("/chat", async (c) => {
   // Same `isToolFollowup` guard as the gate above so a multi-turn tool
   // exchange consumes one message, not three.
   if (!isToolFollowup) {
-    await servicesProcessor
-      .meter({ userId, eventType: "career_coach_msg", metadata: { sessionId } })
-      .catch((err) => console.warn("[ai/chat] meter career_coach_msg failed:", err));
+    meterEntitlement(c, "career_coach_msg", { sessionId });
   }
 
   return c.json(

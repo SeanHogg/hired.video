@@ -49,7 +49,14 @@ const PROVIDERS: Record<string, EmailProvider> = {
   outlook: outlookProvider,
 };
 
-const CHUNK_SIZE = 5;
+// 20 is the new ceiling now that #815 landed — the server-side ingest
+// pipeline batches every DB op (insert / patch / dedup-context load) so
+// per-chunk subrequests are flat in N for the DB side, only the LLM
+// calls scale 2N. At 20 messages that's still well under the Cloudflare
+// Worker 1000-subrequest cap with margin to spare for retries. The
+// server still enforces a hard 25 in `services/email-integration/ingest.ts`
+// (`MAX_CHUNK_SIZE`) so bumping past 25 here would 400 the chunk.
+const CHUNK_SIZE = 20;
 const BACKFILL_LIMIT = 30;
 
 interface AccessTokenResp {

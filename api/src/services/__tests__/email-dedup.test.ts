@@ -85,7 +85,6 @@ describe("dedupAgainst", () => {
           applyUrl: "https://boards.greenhouse.io/acme/jobs/123",
         } as any,
       ],
-      threadLinkedJobId: null,
     });
     assert.equal(result.jobId, "job-1");
     assert.equal(result.method, "apply_url");
@@ -101,7 +100,6 @@ describe("dedupAgainst", () => {
         { id: "job-1", title: "Senior Engineer", company: "Acme", applyUrl: null } as any,
         { id: "job-2", title: "Junior Engineer", company: "Globex", applyUrl: null } as any,
       ],
-      threadLinkedJobId: null,
     });
     assert.equal(result.jobId, "job-1");
     assert.equal(result.method, "company_title");
@@ -116,21 +114,9 @@ describe("dedupAgainst", () => {
       jobs: [
         { id: "job-1", title: "Senior Engineer", company: "Acme", applyUrl: null } as any,
       ],
-      threadLinkedJobId: null,
     });
     assert.equal(result.jobId, null);
     assert.equal(result.method, null);
   });
 
-  it("thread carry takes precedence", () => {
-    const email = mkEmail();
-    const result = dedupAgainst(email, {
-      applications: [],
-      savedJobs: [],
-      jobs: [],
-      threadLinkedJobId: "job-prior",
-    });
-    assert.equal(result.jobId, "job-prior");
-    assert.equal(result.method, "thread_id");
-  });
 });

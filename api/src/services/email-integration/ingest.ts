@@ -12,10 +12,24 @@
  * client couldn't classify, then runs dedup + auto-create.
  *
  * Why one-Worker-invocation-per-chunk: each POST is its own
- * Cloudflare Workers invocation with a fresh 50-subrequest budget,
+ * Cloudflare Workers invocation with a fresh subrequest budget,
  * so a 100-message backfill fans across N invocations instead of
  * clipping mid-sweep (the failure mode that made #755 / #757 retire
  * the old server-side cron sweep).
+ *
+ * Bulk-ops contract (gap #815 close): each chunk runs in three passes
+ * to keep the per-chunk Cloudflare Worker subrequest count flat in N:
+ *   1. PASS A — one batched INSERT (+ one batched conflict-backfill
+ *      SELECT) via `externalEmailMessages.insertMany()`.
+ *   2. PASS B — in-memory loop: Stage-1 rules + Stage-2 LLM +
+ *      summary + dedup (against ONE pre-loaded `DedupContext`) +
+ *      auto-create. The only per-message subrequests in this pass
+ *      are the LLM calls and the optional `insertJob` for
+ *      auto-create — every other op is in-memory.
+ *   3. PASS C — one batched UPDATE via `externalEmailMessages.patchMany()`.
+ * Result: chunk subrequests ≈ 4 fixed (account lookup, rules load,
+ * dedup load, insertMany) + 2N LLM calls + ≤N auto-create inserts +
+ * 1 patchMany + 1 cursor advance. Down from ~6N before.
  *
  * Idempotent on `(accountId, providerMessageId)` — re-posting the
  * same chunk is a no-op, and a transient Neon failure on the final
@@ -27,7 +41,10 @@
 import type { Repos } from "../../repositories/index.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import type { ExternalEmailAccountRow } from "../../repositories/externalEmailAccountsRepository.js";
-import type { ExternalEmailMessageInsert } from "../../repositories/externalEmailMessagesRepository.js";
+import type {
+  ExternalEmailMessageInsert,
+  ExternalEmailMessageRow,
+} from "../../repositories/externalEmailMessagesRepository.js";
 import { describeDbError, runWithNeonRetry } from "../../db/errors.js";
 import { classifyEmail, summariseEmail } from "./classify.js";
 import {
@@ -35,6 +52,7 @@ import {
   dedupAgainst,
   extractApplyUrls,
   loadDedupContext,
+  type DedupContext,
 } from "./dedup.js";
 import type { NormalisedEmail } from "./providers/types.js";
 import {
@@ -129,7 +147,6 @@ export async function ingestForAccount(
   if (!account) throw new Error("Account not found or not owned by user");
 
   const minScore = Number(account.minJobScore ?? "0.5");
-  const userRules = await deps.repos.emailUserRules.findEnabledForUser(account.userId);
 
   const result: IngestResult = {
     accountId: account.id,
@@ -142,10 +159,24 @@ export async function ingestForAccount(
     errorMessage: null,
   };
 
-  for (const wireMsg of request.messages) {
-    try {
+  if (request.messages.length === 0) {
+    await advanceCursor(deps, account, request.nextCursor ?? null, result);
+    return result;
+  }
+
+  // Pre-flight: load rules + dedup context ONCE for the entire chunk.
+  // Both lookups are user-scoped (not email-scoped) so paying for them
+  // per-message was pure waste — that was the #815 bug.
+  const [userRules, dedupCtx] = await Promise.all([
+    deps.repos.emailUserRules.findEnabledForUser(account.userId),
+    loadDedupContext({ jobs: deps.repos.jobs }, account.userId),
+  ]);
+
+  // ───── PASS A — bulk insert.
+  const insertPayloads: ExternalEmailMessageInsert[] = request.messages.map(
+    (wireMsg) => {
       const email = toServerNormalisedEmail(wireMsg);
-      const insertPayload: ExternalEmailMessageInsert = {
+      return {
         userId: account.userId,
         accountId: account.id,
         provider: account.provider,
@@ -157,30 +188,59 @@ export async function ingestForAccount(
         snippet: email.snippet,
         bodyHtml: email.bodyHtml,
         bodyText: email.bodyText,
-        // ISO → Date at the DB insert boundary (mirrors sync.ts).
         receivedAt: new Date(email.receivedAt),
         rawMetadata: email.rawMetadata as any,
-      } as any;
+      } as ExternalEmailMessageInsert;
+    },
+  );
 
-      const row = await deps.repos.externalEmailMessages.insert(insertPayload);
-      if (!row) continue;
+  let insertedRows: ExternalEmailMessageRow[];
+  try {
+    insertedRows = await deps.repos.externalEmailMessages.insertMany(
+      insertPayloads,
+    );
+  } catch (err) {
+    console.error("[email-ingest] bulk insert failed:", err);
+    result.errorMessage = describeDbError(err);
+    return result;
+  }
 
-      // Idempotency — same outcome as sync.ts: if the row already has
-      // category + dedup info, skip the LLM round-trip entirely.
+  // Map provider-message-id → row so the classification pass can pair
+  // each wire message with its persisted row in O(1).
+  const rowByProviderId = new Map<string, ExternalEmailMessageRow>();
+  for (const row of insertedRows) {
+    rowByProviderId.set(row.providerMessageId, row);
+  }
+
+  // ───── PASS B — in-memory classification + dedup + auto-create.
+  // Collect patches into one array; nothing here writes to the
+  // messages table — the final PASS C drains the whole array in one
+  // UPDATE.
+  const patches: Array<{
+    id: string;
+    patch: Partial<ExternalEmailMessageInsert>;
+  }> = [];
+
+  for (const wireMsg of request.messages) {
+    try {
+      const row = rowByProviderId.get(wireMsg.providerMessageId);
+      if (!row) continue; // insertMany dropped it — shouldn't happen, defensive.
+      const email = toServerNormalisedEmail(wireMsg);
+
+      // Idempotency — already-classified rows skip the LLM round-trip
+      // entirely. Mirrors the pre-bulk behaviour.
       if (row.category && (row.linkedJobId || row.dedupScore != null)) {
         result.messagesIngested += 1;
         const score = row.score == null ? 0 : Number(row.score);
-        if (isJobCategory(row.category as any) && score >= minScore) result.messagesJobRelated += 1;
-        else result.messagesExcluded += 1;
+        if (isJobCategory(row.category as any) && score >= minScore) {
+          result.messagesJobRelated += 1;
+        } else {
+          result.messagesExcluded += 1;
+        }
         continue;
       }
 
-      // Re-run Stage-1 server-side from the shared rules engine — never
-      // trust the client tag blindly, but the rules are the SAME code
-      // so we just confirm the classification. If Stage-1 returns
-      // null AND the client didn't supply a hint either, fall through
-      // to the LLM stage. This is the only place the server still
-      // makes an Anthropic subrequest during ingest.
+      // Stage-1 / Stage-2 classification.
       let classification: ClassificationResult;
       const stage1 = classifyByRules(email, userRules as any);
       if (stage1) {
@@ -193,20 +253,20 @@ export async function ingestForAccount(
           (result.rulesFired[classification.ruleName] ?? 0) + 1;
       }
 
-      // Junk shortcut — user authored a rule that says "this sender is
-      // spam". Skip summary + dedup + auto-create entirely and archive
-      // the row on insert so it never reaches the inbox feed. The
-      // (accountId, providerMessageId) unique key keeps re-sync from
-      // resurrecting it.
+      // Junk shortcut — archive on first persist; no summary / dedup
+      // / auto-create. Patch is collected into the bulk drain.
       const isUserJunk =
         classification.source === "user_rule" &&
         classification.category === "spam";
       if (isUserJunk) {
-        await deps.repos.externalEmailMessages.patch(row.id, {
-          category: classification.category,
-          score: String(classification.score) as any,
-          isArchived: true,
-        } as any);
+        patches.push({
+          id: row.id,
+          patch: {
+            category: classification.category,
+            score: String(classification.score) as any,
+            isArchived: true,
+          } as Partial<ExternalEmailMessageInsert>,
+        });
         result.messagesIngested += 1;
         result.messagesExcluded += 1;
         continue;
@@ -220,14 +280,13 @@ export async function ingestForAccount(
       let dedupScore: number | null = null;
       let dedupMethod: string | null = null;
 
-      const passed = isJobCategory(classification.category) && classification.score >= minScore;
+      const passed =
+        isJobCategory(classification.category) && classification.score >= minScore;
       if (passed) {
-        const ctx = await loadDedupContext(
-          { jobs: deps.repos.jobs, externalEmailMessages: deps.repos.externalEmailMessages },
-          account.userId,
-          email,
-        );
-        const dedup = dedupAgainst(email, ctx);
+        // Dedup against the chunk-scoped context. Auto-created jobs in
+        // the same chunk join `dedupCtx.jobs` immediately so the next
+        // message in this pass benefits from the freshly-created row.
+        const dedup = dedupAgainst(email, dedupCtx);
         if (dedup.jobId && dedup.score >= 0.6) {
           linkedJobId = dedup.jobId;
           dedupScore = dedup.score;
@@ -237,25 +296,42 @@ export async function ingestForAccount(
             { jobs: deps.repos.jobs },
             account.userId,
             email,
-            { classifierScore: classification.score, category: classification.category },
+            {
+              classifierScore: classification.score,
+              category: classification.category,
+            },
           );
           if (ac.jobId) {
             linkedJobId = ac.jobId;
             dedupScore = classification.score;
             dedupMethod = "auto_created";
+            // Fold the new job into the chunk's dedup context so the
+            // next message's `dedupAgainst()` can match it — keeps the
+            // bulk pass behaviour identical to the old per-message
+            // pass where each iteration re-loaded the context.
+            dedupCtx.jobs.push({
+              id: ac.jobId,
+              title: (email.subject ?? "").slice(0, 240),
+              company: email.fromName ?? null,
+              applyUrl,
+              sourceUrl: applyUrl,
+            } as DedupContext["jobs"][number]);
           }
         }
       }
 
-      await deps.repos.externalEmailMessages.patch(row.id, {
-        category: classification.category,
-        score: String(classification.score) as any,
-        summary,
-        applyUrl,
-        linkedJobId,
-        dedupScore: dedupScore == null ? null : (String(dedupScore) as any),
-        dedupMethod: dedupMethod as any,
-      } as any);
+      patches.push({
+        id: row.id,
+        patch: {
+          category: classification.category,
+          score: String(classification.score) as any,
+          summary,
+          applyUrl,
+          linkedJobId,
+          dedupScore: dedupScore == null ? null : (String(dedupScore) as any),
+          dedupMethod: dedupMethod as any,
+        } as Partial<ExternalEmailMessageInsert>,
+      });
 
       result.messagesIngested += 1;
       if (passed) result.messagesJobRelated += 1;
@@ -265,29 +341,47 @@ export async function ingestForAccount(
         else result.jobsLinked += 1;
       }
     } catch (err) {
-      console.error(`[email-ingest] message ${wireMsg.providerMessageId} failed:`, err);
+      console.error(
+        `[email-ingest] message ${wireMsg.providerMessageId} failed:`,
+        err,
+      );
       // Continue — one bad message shouldn't drop the rest of the chunk.
-      // describeDbError walks the cause chain so we surface the real
-      // SQLSTATE/detail instead of Drizzle's "Failed query: ..." wrapper.
       result.errorMessage = describeDbError(err);
     }
   }
 
-  // Advance the provider cursor if the client supplied one. The PWA
-  // is the source of truth on what was synced — losing this write is
-  // recoverable on the next sync (idempotent on
-  // (accountId, providerMessageId)). So a transient Neon HTTP blip
-  // here MUST NOT 400 the chunk back to the client when the messages
-  // were already persisted.
-  //
-  // Strategy: one retry on transient errors via runWithNeonRetry; any
-  // remaining failure is recorded on errorMessage but does not throw.
-  // (Gap #727: previously the wrapper text "Failed query: update ..."
-  // was the entire response body.)
-  const cursorPatch: Partial<ExternalEmailAccountRow> = { lastSyncedAt: new Date() };
-  if (request.nextCursor) {
-    if (account.provider === "gmail") cursorPatch.lastHistoryId = request.nextCursor;
-    else if (account.provider === "outlook") cursorPatch.lastDeltaLink = request.nextCursor;
+  // ───── PASS C — bulk patch + cursor advance.
+  if (patches.length > 0) {
+    try {
+      await deps.repos.externalEmailMessages.patchMany(patches);
+    } catch (err) {
+      console.error("[email-ingest] bulk patch failed:", err);
+      result.errorMessage = describeDbError(err);
+    }
+  }
+
+  await advanceCursor(deps, account, request.nextCursor ?? null, result);
+  return result;
+}
+
+/** Advance the provider cursor + last-synced timestamp on the account.
+ *  Losing this write is recoverable on the next sync (idempotent on
+ *  (accountId, providerMessageId)) so a transient Neon HTTP blip must
+ *  not 400 the chunk back to the client when messages already
+ *  persisted. One retry via `runWithNeonRetry`; any remaining failure
+ *  is recorded on `errorMessage` but doesn't throw (gap #727). */
+async function advanceCursor(
+  deps: IngestDeps,
+  account: ExternalEmailAccountRow,
+  nextCursor: string | null,
+  result: IngestResult,
+): Promise<void> {
+  const cursorPatch: Partial<ExternalEmailAccountRow> = {
+    lastSyncedAt: new Date(),
+  };
+  if (nextCursor) {
+    if (account.provider === "gmail") cursorPatch.lastHistoryId = nextCursor;
+    else if (account.provider === "outlook") cursorPatch.lastDeltaLink = nextCursor;
   }
   try {
     await runWithNeonRetry(
@@ -309,6 +403,4 @@ export async function ingestForAccount(
       ? `${result.errorMessage}; cursor-advance: ${reason}`
       : `cursor-advance: ${reason}`;
   }
-
-  return result;
 }
