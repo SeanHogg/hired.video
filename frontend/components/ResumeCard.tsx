@@ -25,6 +25,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { formatDate } from "@/lib/utils";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { buildTrackAction } from "@/lib/card-track-action";
+import { buildShareAction } from "@/lib/card-share-action";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { ResumePrivacy, ResumeWithOwnership } from "@/types/resume";
@@ -213,13 +214,17 @@ export default function ResumeCard({
       }),
     );
   }
-  fallbackActions.push({
-    id: "actions",
-    label: "Actions",
-    variant: "default",
-    icon: Eye,
-    onClick: () => onActions?.(),
-  });
+  // Share — always available, including for unauthenticated viewers.
+  // Platform-wide rule: every entity card lets a viewer share. Resume cards
+  // mounted through card-factory don't get individual handlers so this is
+  // the only path that surfaces Share for them.
+  fallbackActions.push(
+    buildShareAction({
+      entityUrl: `/resumes/${id}`,
+      onActions,
+      copySuccessDescription: "Resume link has been copied to your clipboard.",
+    }),
+  );
   const cardActions: DynamicCardAction[] = actions && actions.length > 0
     ? actions
     : fallbackActions.filter((a): a is DynamicCardAction => a !== null);

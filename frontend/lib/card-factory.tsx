@@ -36,11 +36,15 @@ import {
   getDefaultUserContext,
 } from "@/lib/user-context";
 
-import {
-  generateJobActions,
-  generateCompanyActions,
-  generateResumeActions,
-} from "@/lib/dynamic-actions";
+// Action authorship lives inside each card's native menu (`JobActionsMenu`,
+// `ResumeActionsMenu`, the `fallbackActions` cluster on CompanyCard /
+// PeopleCard). Those menus self-gate on ownership + auth and include the
+// platform-wide Share group. We deliberately don't synthesise an `actions`
+// array here — the previous `generateJobActions` / `generateCompanyActions` /
+// `generateResumeActions` helpers shipped stub Pause / Clone / Analytics
+// items with `console.log` handlers and never rendered Share, so cards
+// rendered through this factory surfaced unworkable owner actions and
+// hid Share from every viewer. Deleted with this pass.
 
 interface UseCardRendererProps {
   section: CardContext["section"];
@@ -87,22 +91,13 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          const jobActions = generateJobActions(
-            normalizedData,
-            effectiveUserContext,
-            jobOwnership,
-            interactions,
-          );
-
           return (
             <JobCard
               key={normalizedData.id}
               job={normalizedData}
-              actions={jobActions}
               userContext={effectiveUserContext}
               itemOwnership={jobOwnership}
               onView={() => interactions.onView?.(normalizedData)}
-              onActions={() => interactions.onActions?.(normalizedData)}
               onTrack={interactions.onTrack}
               onUntrack={interactions.onUntrack}
             />
@@ -115,18 +110,10 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          const companyActions = generateCompanyActions(
-            normalizedData,
-            effectiveUserContext,
-            companyOwnership,
-            interactions,
-          );
-
           return (
             <CompanyCard
               key={normalizedData.id}
               company={normalizedData}
-              actions={companyActions}
               userContext={effectiveUserContext}
               itemOwnership={companyOwnership}
               onView={() => interactions.onView?.(normalizedData)}
@@ -163,13 +150,6 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          const resumeActions = generateResumeActions(
-            normalizedData,
-            effectiveUserContext,
-            resumeOwnership,
-            interactions,
-          );
-
           return (
             <ResumeCard
               key={normalizedData.id}
@@ -181,7 +161,6 @@ export function useCardRenderer({
               views={normalizedData.views || 0}
               privacy={normalizedData.privacy}
               ownership={normalizedData.ownership}
-              actions={resumeActions}
               userContext={effectiveUserContext}
               itemOwnership={resumeOwnership}
               onView={() => interactions.onView?.(normalizedData)}

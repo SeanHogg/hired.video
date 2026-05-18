@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Sparkles, ArrowRight } from "lucide-react";
+import { Play, Pause, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
@@ -85,18 +85,6 @@ export default function HeroVideoSpotlight({
   // rotation advances. That naturally resets currentTime + retriggers
   // autoplay.
 
-  const goToResume = () => {
-    if (!hasRealVideo) {
-      navigate("/studio");
-      return;
-    }
-    if (current.resumeId) {
-      navigate(`/resumes/${current.resumeId}`);
-    } else {
-      navigate(`/v/${current.id}`);
-    }
-  };
-
   // Desktop autoplays the video as a "live thumbnail"; mobile/tablet shows
   // a poster+play overlay (saves cellular data, respects iOS Low Power
   // Mode, a tap still lands users on the detail page).
@@ -125,29 +113,17 @@ export default function HeroVideoSpotlight({
   const isAutoplaying = useStudioSurface || playerSource?.kind === "url" || playerSource?.kind === "youtube";
 
   // Overlay chrome stacked on top of the embed inside StudioVideoSurface's
-  // AspectFrame. Defined once so the same node renders for every branch.
+  // AspectFrame. The previous click-through capture + bottom metadata
+  // gradient + "Watch →" CTA were removed: the click-through blocked
+  // every native player control (you couldn't pause), and the bottom
+  // gradient occluded the shared <PlaybackControls/> bar the canvas
+  // surface now renders. The pause/play rotation control + top-left
+  // featured badge remain because they're rotation chrome, not video
+  // chrome — they don't fight the player.
   const overlay = (
     <>
-      {/* Click-through capture — covers the whole tile so user taps land
-          on the detail page rather than the iframe / video element. */}
-      <button
-        type="button"
-        onClick={goToResume}
-        aria-label={t("labels.openVideoResumeAria", { title: displayTitle })}
-        className="absolute inset-0 z-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      />
-
-      {/* Tap-to-play affordance on mobile/tablet — never on desktop autoplay. */}
-      {!isAutoplaying && hasRealVideo && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="h-16 w-16 rounded-full bg-black/60 group-hover:bg-black/75 group-active:scale-95 transition-all flex items-center justify-center backdrop-blur-sm shadow-xl">
-            <Play className="h-7 w-7 text-white fill-white ml-1" />
-          </div>
-        </div>
-      )}
-
       {/* Top-left badge */}
-      <div className="absolute top-3 left-3 z-10">
+      <div className="absolute top-3 left-3 z-10 pointer-events-none">
         <Badge className="bg-black/60 text-white border-0 backdrop-blur-sm gap-1">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -157,37 +133,19 @@ export default function HeroVideoSpotlight({
         </Badge>
       </div>
 
-      {/* Pause/play control — 44×44 touch target */}
+      {/* Rotation pause/play — controls the slide carousel, not the
+          underlying video. Top-right so it doesn't collide with the
+          player's own controls bar below. */}
       {slides.length > 1 && (
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setPaused((p) => !p);
-          }}
+          onClick={() => setPaused((p) => !p)}
           aria-label={paused ? t("actions.resumeRotation") : t("actions.pauseRotation")}
           className="absolute top-2 right-2 z-20 h-11 w-11 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
         >
           {paused ? <Play className="h-4 w-4 ml-0.5" /> : <Pause className="h-4 w-4" />}
         </button>
       )}
-
-      {/* Bottom gradient + metadata */}
-      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-12 pointer-events-none">
-        <p className="text-xs text-white/70 mb-1">
-          {isAutoplaying ? t("labels.nowPlaying") : t("labels.featured")}
-        </p>
-        <h3 className="text-white font-semibold text-base leading-snug line-clamp-2">
-          {displayTitle}
-        </h3>
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-white/80">{t("labels.byCreator", { name: current.ownerName })}</p>
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-white group-hover:text-primary transition-colors">
-            {hasRealVideo ? t("actions.watch") : t("actions.createYours")}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        </div>
-      </div>
     </>
   );
 
@@ -266,7 +224,7 @@ export default function HeroVideoSpotlight({
         </div>
       )}
 
-      {/* Secondary CTA under video */}
+      {/* Primary CTA under the video. */}
       <div className="mt-4 flex flex-col sm:flex-row gap-2 lg:justify-start justify-center">
         <Button
           size="sm"
@@ -275,17 +233,6 @@ export default function HeroVideoSpotlight({
         >
           <Sparkles className="h-4 w-4" />
           {t("actions.createYourVideoResume")}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate("/resumes")}
-        >
-          {videos.length > 0
-            ? t("actions.browseNumberVideoResumes", { count: videos.length })
-            : t("actions.browseVideoResumes")}
-          <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
     </div>
