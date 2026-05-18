@@ -15,23 +15,50 @@
  * inspecting the same registry.
  */
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { FileText } from "lucide-react";
+import { Briefcase, Building2, FileText, Newspaper, PlayCircle, User } from "lucide-react";
 import { resumeService } from "@/lib/services/resume-service";
+import { jobService } from "@/lib/services/job-service";
+import { articleService } from "@/lib/services/article-service";
+import { userService } from "@/lib/services/user-service";
+import { companyService } from "@/lib/services/company-service";
+import { studioService } from "@/lib/services/studio-service";
 
-// Per-kind inline body components are lazy-loaded — the resume body
-// pulls in `DeclarativeResumeRenderer` (heavy), which we don't want
-// on every page that imports `linked-content.ts` (e.g. the drag
-// protocol shared by every studio surface). Each kind ships its own
-// `<EntityInlineBody/>` under `components/studio/v2/inline-bodies/`.
+// Per-kind inline body components are lazy-loaded — each body pulls
+// in a heavy renderer (DeclarativeResumeRenderer / DeclarativeJobRenderer
+// / Markdown / Avatar etc.), which we don't want on every page that
+// imports `linked-content.ts` (e.g. the drag protocol shared by every
+// studio surface). Each kind ships its own `<EntityInlineBody/>`
+// under `components/studio/v2/inline-bodies/`.
 const ResumeInlineBody = lazy(
   () => import("@/components/studio/v2/inline-bodies/ResumeInlineBody"),
 );
+const JobInlineBody = lazy(
+  () => import("@/components/studio/v2/inline-bodies/JobInlineBody"),
+);
+const ArticleInlineBody = lazy(
+  () => import("@/components/studio/v2/inline-bodies/ArticleInlineBody"),
+);
+const ProfileInlineBody = lazy(
+  () => import("@/components/studio/v2/inline-bodies/ProfileInlineBody"),
+);
+const CompanyInlineBody = lazy(
+  () => import("@/components/studio/v2/inline-bodies/CompanyInlineBody"),
+);
+const VideoInlineBody = lazy(
+  () => import("@/components/studio/v2/inline-bodies/VideoInlineBody"),
+);
 
-/** Entity kinds that can be embedded as a card on the v2 canvas. Start
- *  with `resume`; future kinds (`job`, `profile`, `company`, `video`,
- *  `template`) bolt on by adding rows to `LINKED_CONTENT_REGISTRY` —
- *  no other file needs a switch update. */
-export type LinkedContentKind = "resume";
+/** Entity kinds that can be embedded as a card on the v2 canvas.
+ *  Adding a new kind = one entry in `LINKED_CONTENT_REGISTRY` + one
+ *  component under `components/studio/v2/inline-bodies/` — no other
+ *  file needs a switch update. */
+export type LinkedContentKind =
+  | "resume"
+  | "job"
+  | "article"
+  | "profile"
+  | "company"
+  | "video";
 
 /** Tile metadata for the palette section (one row per item the current
  *  user owns). Fetched from `LinkedContentMeta.listForUser` and rendered
@@ -90,6 +117,126 @@ export const LINKED_CONTENT_REGISTRY: Record<LinkedContentKind, LinkedContentMet
         }));
     },
     InlineBody: ResumeInlineBody,
+  },
+  job: {
+    label: "Job",
+    sectionLabel: "Your jobs",
+    icon: Briefcase,
+    viewUrl: (id) => `/jobs/${id}`,
+    ctaLabel: "View job",
+    listForUser: async () => {
+      // `getMyPostedJobs` is the owner-scoped list — `getUserJobs`
+      // mixes owned + saved + applied, which would surface jobs the
+      // user can't legitimately embed as "their" content.
+      const items = await jobService.getMyPostedJobs();
+      return items
+        .filter((j): j is typeof j & { id: string } => Boolean(j.id))
+        .map((j) => ({
+          kind: "job" as const,
+          id: j.id,
+          title: j.title || "Untitled job",
+          subtitle: [j.company, j.location].filter(Boolean).join(" · ") || undefined,
+        }));
+    },
+    InlineBody: JobInlineBody,
+  },
+  article: {
+    label: "Article",
+    sectionLabel: "Your articles",
+    icon: Newspaper,
+    viewUrl: (id) => `/articles/${id}`,
+    ctaLabel: "Read article",
+    listForUser: async () => {
+      const items = await articleService.listMine();
+      return items.map((a) => ({
+        kind: "article" as const,
+        id: a.id,
+        title: a.title || "Untitled article",
+        subtitle:
+          a.status === "published"
+            ? `Published${a.readMinutes ? ` · ${a.readMinutes} min` : ""}`
+            : a.status.charAt(0).toUpperCase() + a.status.slice(1),
+      }));
+    },
+    InlineBody: ArticleInlineBody,
+  },
+  profile: {
+    label: "Profile",
+    sectionLabel: "Your profile",
+    icon: User,
+    viewUrl: (id) => `/people/${id}`,
+    ctaLabel: "View profile",
+    // Singular — the palette section surfaces exactly one tile
+    // ("Your Profile") for the current user. Returns an empty list
+    // when the user isn't authenticated so the empty-state copy in
+    // `LinkedContentPaletteSection` fires.
+    listForUser: async () => {
+      try {
+        const me = await userService.getCurrentUser();
+        if (!me?.id) return [];
+        const fullName =
+          [me.firstName, me.lastName].filter(Boolean).join(" ").trim() ||
+          "Your profile";
+        return [
+          {
+            kind: "profile" as const,
+            id: me.id,
+            title: fullName,
+            subtitle: me.data?.headline ?? undefined,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    },
+    InlineBody: ProfileInlineBody,
+  },
+  company: {
+    label: "Company",
+    sectionLabel: "Your companies",
+    icon: Building2,
+    viewUrl: (id) => `/companies/${id}`,
+    ctaLabel: "View company",
+    listForUser: async () => {
+      const items = await companyService.getMyCompanies();
+      return items
+        .filter((c): c is typeof c & { id: string } => Boolean(c.id))
+        .map((c) => ({
+          kind: "company" as const,
+          id: c.id,
+          title: c.name || "Unnamed company",
+          subtitle:
+            c.activeJobCount && c.activeJobCount > 0
+              ? `${c.activeJobCount} open role${c.activeJobCount === 1 ? "" : "s"}`
+              : undefined,
+        }));
+    },
+    InlineBody: CompanyInlineBody,
+  },
+  video: {
+    label: "Video",
+    sectionLabel: "Your videos",
+    icon: PlayCircle,
+    viewUrl: (id) => `/studio/${id}`,
+    ctaLabel: "Watch video",
+    listForUser: async () => {
+      // No subject filter — list every project the user owns, mirrors
+      // the `/studio` landing's "Your Projects" surface.
+      const res = await studioService.getProjects();
+      const items = res.data ?? [];
+      return items
+        .filter((p): p is typeof p & { id: string } => Boolean(p.id))
+        .map((p) => ({
+          kind: "video" as const,
+          id: p.id,
+          title: p.title || "Untitled video",
+          subtitle:
+            p.isPublic && p.videoUrl
+              ? "Published"
+              : String(p.status).replace(/_/g, " "),
+        }));
+    },
+    InlineBody: VideoInlineBody,
   },
 };
 
