@@ -103,6 +103,13 @@ export interface IngestRequestMessage extends NormalisedEmailWire {
 export interface IngestRequest {
   accountId: string;
   messages: IngestRequestMessage[];
+  /** Provider-side delta cursor to persist on the account row once
+   *  the chunk lands — Gmail historyId or Outlook deltaLink. */
+  nextCursor?: string | null;
+  /** Client-generated UUID stamped on every chunk POST of a single
+   *  logical sync. Lets `email_sync_runs` aggregate per-session
+   *  rather than per-chunk (gap #811). */
+  syncSessionId?: string | null;
 }
 
 export interface IngestResult {
@@ -316,14 +323,13 @@ export async function ingestForAccount(
         continue;
       }
 
-      const summary = await summariseEmail({ llm: deps.llm }, email, classification);
       // Pull every anchor-with-apply-URL out of the body. Digest mail
       // (LinkedIn Job Alerts, Indeed weekly, Wellfound newsletter)
       // typically contains N jobs in one message — the array is what
       // powers the multi-Apply CTA list in the detail sheet. The
       // scalar `applyUrl` (first entry) is what dedup + auto-create
       // operate on (single-job-per-email for now; multi-job auto-create
-      // is tracked in the gap register).
+      // is tracked in the gap register). Cheap, in-memory.
       const jobLinks = extractJobLinks(email);
       const applyUrls = jobLinks.length > 0 ? jobLinks : null;
       const applyUrl = jobLinks[0]?.url ?? null;
@@ -334,6 +340,17 @@ export async function ingestForAccount(
 
       const passed =
         isJobCategory(classification.category) && classification.score >= minScore;
+
+      // Summary is only shown in the inbox detail sheet, and excluded
+      // messages don't surface there by default — gate the LLM call on
+      // `passed` so a chunk of 20 newsletters doesn't fan out into 20
+      // summary LLM subrequests (gap #826). For excluded rows the
+      // summary column stays null; the `Show dismissed` / `Junk` views
+      // render the snippet instead.
+      const summary = passed
+        ? await summariseEmail({ llm: deps.llm }, email, classification)
+        : null;
+
       if (passed) {
         // Dedup against the chunk-scoped context. Auto-created jobs in
         // the same chunk join `dedupCtx.jobs` immediately so the next
@@ -413,63 +430,84 @@ export async function ingestForAccount(
     }
   }
 
-  // ───── PASS D — sync-run upsert (gap #811).
-  // Aggregates per-chunk counters into one logical-sync row keyed on
-  // (accountId, syncSessionId). Best-effort: a failure here doesn't
-  // throw the chunk back to the client — the messages already
-  // persisted and the cursor still needs to advance.
-  if (request.syncSessionId) {
-    try {
-      await deps.repos.emailSyncRuns.upsertChunkResult({
-        userId: account.userId,
-        accountId: account.id,
-        syncSessionId: request.syncSessionId,
-        delta: {
-          messagesSynced: result.messagesIngested,
-          // `messagesClassified` mirrors `messagesIngested` for this
-          // path — every row inserted by the ingest chunk also gets a
-          // category assigned (Stage-1 or Stage-2 or the LLM-failure
-          // fallback). Kept as a distinct column for parity with the
-          // pre-cutover server-sweep shape that the Sync History sheet
-          // still renders.
-          messagesClassified: result.messagesIngested,
-          messagesExcluded: result.messagesExcluded,
-          messagesJobRelated: result.messagesJobRelated,
-          jobsLinked: result.jobsLinked,
-          jobsCreated: result.jobsCreated,
-          rulesFired: result.rulesFired,
-          errorMessage: result.errorMessage,
-          status: result.errorMessage ? "partial" : "success",
-        },
-      });
-    } catch (err) {
-      console.error("[email-ingest] sync-run upsert failed:", err);
-      // Don't poison the chunk response over an audit-row write.
-    }
-  }
-
-  await advanceCursor(deps, account, request.nextCursor ?? null, result);
   return result;
 }
 
-/** Advance the provider cursor + last-synced timestamp on the account.
- *  Losing this write is recoverable on the next sync (idempotent on
- *  (accountId, providerMessageId)) so a transient Neon HTTP blip must
- *  not 400 the chunk back to the client when messages already
- *  persisted. One retry via `runWithNeonRetry`; any remaining failure
- *  is recorded on `errorMessage` but doesn't throw (gap #727). */
-async function advanceCursor(
-  deps: IngestDeps,
-  account: ExternalEmailAccountRow,
-  nextCursor: string | null,
-  result: IngestResult,
-): Promise<void> {
+/** Trailing call for a logical sync — runs the `email_sync_runs`
+ *  audit upsert + provider cursor advance in a single tiny Worker
+ *  invocation, well clear of the per-chunk subrequest budget the
+ *  ingest path is competing for (gap #826).
+ *
+ *  Best-effort: a sync-run upsert failure must not throw, since the
+ *  underlying ingest chunks already persisted their messages. A
+ *  cursor-advance failure is recoverable on the next sync (idempotent
+ *  on (accountId, providerMessageId)) so it's also caught + reported
+ *  on the result; one retry via `runWithNeonRetry` (gap #727).
+ *
+ *  Returns success even on partial failure — the client uses
+ *  `errorMessage` to decide whether to surface a non-fatal warning. */
+export async function finalizeSyncSession(
+  deps: Pick<IngestDeps, "repos">,
+  userId: string,
+  request: FinalizeRequest,
+): Promise<FinalizeResult> {
+  const account = await deps.repos.externalEmailAccounts.findById(
+    request.accountId,
+    userId,
+  );
+  if (!account) throw new Error("Account not found or not owned by user");
+
+  const result: FinalizeResult = {
+    accountId: account.id,
+    syncSessionId: request.syncSessionId,
+    cursorAdvanced: false,
+    errorMessage: request.aggregate.errorMessage,
+  };
+
+  // Sync-run audit row (gap #811). Single INSERT since the chunks no
+  // longer write to this table — the upsert path is INSERT-on-empty.
+  try {
+    await deps.repos.emailSyncRuns.upsertChunkResult({
+      userId: account.userId,
+      accountId: account.id,
+      syncSessionId: request.syncSessionId,
+      delta: {
+        messagesSynced: request.aggregate.messagesIngested,
+        // `messagesClassified` mirrors `messagesIngested` for this
+        // path — every row inserted by ingest also gets a category
+        // assigned (Stage-1 or Stage-2 or the LLM-failure fallback).
+        // Kept as a distinct column for parity with the pre-cutover
+        // server-sweep shape the Sync History sheet renders.
+        messagesClassified: request.aggregate.messagesIngested,
+        messagesExcluded: request.aggregate.messagesExcluded,
+        messagesJobRelated: request.aggregate.messagesJobRelated,
+        jobsLinked: request.aggregate.jobsLinked,
+        jobsCreated: request.aggregate.jobsCreated,
+        rulesFired: request.aggregate.rulesFired,
+        errorMessage: request.aggregate.errorMessage,
+        status:
+          request.aggregate.status === "error"
+            ? "partial"
+            : request.aggregate.status,
+      },
+    });
+  } catch (err) {
+    console.error("[email-finalize] sync-run upsert failed:", err);
+    const reason = describeDbError(err);
+    result.errorMessage = result.errorMessage
+      ? `${result.errorMessage}; sync-run: ${reason}`
+      : `sync-run: ${reason}`;
+  }
+
+  // Cursor advance — the only write that the next sync depends on.
   const cursorPatch: Partial<ExternalEmailAccountRow> = {
     lastSyncedAt: new Date(),
   };
-  if (nextCursor) {
-    if (account.provider === "gmail") cursorPatch.lastHistoryId = nextCursor;
-    else if (account.provider === "outlook") cursorPatch.lastDeltaLink = nextCursor;
+  if (request.nextCursor) {
+    if (account.provider === "gmail")
+      cursorPatch.lastHistoryId = request.nextCursor;
+    else if (account.provider === "outlook")
+      cursorPatch.lastDeltaLink = request.nextCursor;
   }
   try {
     await runWithNeonRetry(
@@ -479,16 +517,19 @@ async function advanceCursor(
           account.userId,
           cursorPatch as any,
         ),
-      { label: "email-ingest:cursor-patch" },
+      { label: "email-finalize:cursor-patch" },
     );
+    result.cursorAdvanced = true;
   } catch (err) {
     const reason = describeDbError(err);
     console.error(
-      `[email-ingest] cursor-advance failed for account ${account.id} (messages already persisted):`,
+      `[email-finalize] cursor-advance failed for account ${account.id} (messages already persisted):`,
       err,
     );
     result.errorMessage = result.errorMessage
       ? `${result.errorMessage}; cursor-advance: ${reason}`
       : `cursor-advance: ${reason}`;
   }
+
+  return result;
 }

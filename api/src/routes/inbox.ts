@@ -18,7 +18,10 @@ import { getDb } from "../db/index.js";
 import { describeDbError } from "../db/errors.js";
 import { buildRepos } from "../repositories/index.js";
 import { decodeEmailCursor, getInboxFor } from "../services/messaging/inboxService.js";
-import { ingestForAccount } from "../services/email-integration/ingest.js";
+import {
+  finalizeSyncSession,
+  ingestForAccount,
+} from "../services/email-integration/ingest.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import type { FindInboxOptions } from "../repositories/externalEmailMessagesRepository.js";
 import { requirePro } from "../middleware/auth-gates.js";
@@ -272,7 +275,13 @@ inboxRoutes.post("/external-emails/bulk-archive", async (c) => {
  *  Gmail/Outlook (via the access-token vending route + CORS) and POSTs
  *  pre-classified chunks here. Each POST is its own Worker invocation
  *  → fresh subrequest budget per chunk, instead of one big sweep
- *  burning the 50/req budget across every account. See #755. */
+ *  burning the 50/req budget across every account. See #755.
+ *
+ *  After the final chunk the client calls `/external-emails/finalize`
+ *  (below) to advance the provider cursor + write the sync-run audit
+ *  row + meter the logical sync. Splitting those writes out of the
+ *  ingest path keeps the per-chunk subrequest budget free for
+ *  persistence + LLM (gap #826). */
 inboxRoutes.post("/external-emails/ingest", requirePro("Inbox Sync"), async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -298,36 +307,8 @@ inboxRoutes.post("/external-emails/ingest", requirePro("Inbox Sync"), async (c) 
     const result = await ingestForAccount(
       { repos, llm },
       uid,
-      {
-        accountId: body.accountId,
-        messages: body.messages,
-        nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
-        // Client-generated UUID stamped on every chunk POST of a single
-        // logical sync; the ingest service aggregates per-chunk counters
-        // into one `email_sync_runs` row on this key (gap #811).
-        syncSessionId:
-          typeof body.syncSessionId === "string" && body.syncSessionId.length > 0
-            ? body.syncSessionId
-            : null,
-      },
+      { accountId: body.accountId, messages: body.messages },
     );
-    // Meter one `email_sync` event per ingest chunk so the Usage
-    // Statement surfaces the user's mailbox-sync activity. Best-effort —
-    // ledger write failure must not poison the ingest result the client
-    // is about to advance its cursor against.
-    try {
-      await servicesProcessor.meter({
-        userId: uid,
-        eventType: "email_sync",
-        quantity: 1,
-        metadata: {
-          accountId: body.accountId,
-          messagesIngested: result.messagesIngested,
-        },
-      });
-    } catch (meterErr) {
-      console.error("[email-ingest] meter failed:", meterErr);
-    }
     return c.json(success(result), 200);
   } catch (err) {
     // Walk the Drizzle/Neon cause chain so the client sees an
@@ -335,5 +316,73 @@ inboxRoutes.post("/external-emails/ingest", requirePro("Inbox Sync"), async (c) 
     // see db/errors.ts and gap #727.
     console.error("[email-ingest] route failed:", err);
     return c.json(error("INGEST_FAILED", describeDbError(err)), 400);
+  }
+});
+
+/** Trailing call for a client-driven logical sync — writes the
+ *  `email_sync_runs` audit row (gap #811), advances the provider
+ *  cursor (gap #727), and meters one `email_sync` event for the whole
+ *  sync (closes the chunk-meter over-count side of gap #812).
+ *
+ *  Lives on its own route so the writes don't compete for budget
+ *  with the per-chunk LLM fan-out — see gap #826. */
+inboxRoutes.post("/external-emails/finalize", requirePro("Inbox Sync"), async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.accountId || typeof body.accountId !== "string") {
+    return c.json(error("VALIDATION_ERROR", "accountId required"), 400);
+  }
+  if (!body?.syncSessionId || typeof body.syncSessionId !== "string") {
+    return c.json(error("VALIDATION_ERROR", "syncSessionId required"), 400);
+  }
+  const agg = body.aggregate;
+  if (!agg || typeof agg !== "object") {
+    return c.json(error("VALIDATION_ERROR", "aggregate required"), 400);
+  }
+  const repos = buildRepos(getDb());
+  try {
+    const result = await finalizeSyncSession({ repos }, uid, {
+      accountId: body.accountId,
+      syncSessionId: body.syncSessionId,
+      nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
+      aggregate: {
+        messagesIngested: Number(agg.messagesIngested) || 0,
+        messagesExcluded: Number(agg.messagesExcluded) || 0,
+        messagesJobRelated: Number(agg.messagesJobRelated) || 0,
+        jobsLinked: Number(agg.jobsLinked) || 0,
+        jobsCreated: Number(agg.jobsCreated) || 0,
+        rulesFired:
+          agg.rulesFired && typeof agg.rulesFired === "object"
+            ? (agg.rulesFired as Record<string, number>)
+            : {},
+        status: agg.status === "error" || agg.status === "partial"
+          ? agg.status
+          : "success",
+        errorMessage:
+          typeof agg.errorMessage === "string" ? agg.errorMessage : null,
+      },
+    });
+    // One metered `email_sync` event per logical sync — gap #812. The
+    // chunk-loop used to meter per-chunk, over-counting backfills by N.
+    // Best-effort; ledger blip must not poison the cursor result.
+    try {
+      await servicesProcessor.meter({
+        userId: uid,
+        eventType: "email_sync",
+        quantity: 1,
+        metadata: {
+          accountId: body.accountId,
+          syncSessionId: body.syncSessionId,
+          messagesIngested: Number(agg.messagesIngested) || 0,
+        },
+      });
+    } catch (meterErr) {
+      console.error("[email-finalize] meter failed:", meterErr);
+    }
+    return c.json(success(result), 200);
+  } catch (err) {
+    console.error("[email-finalize] route failed:", err);
+    return c.json(error("FINALIZE_FAILED", describeDbError(err)), 400);
   }
 });
