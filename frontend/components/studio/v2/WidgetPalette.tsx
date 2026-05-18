@@ -7,6 +7,12 @@
  * The palette is the SINGLE source of widget metadata. The catalog
  * below is read by ToolPalette here AND by tests that assert every
  * `WidgetKind` has palette coverage.
+ *
+ * Linked-content kinds (resume / job / future entities) don't appear in
+ * `WIDGET_CATALOG` because they're not click-to-add-a-blank — each tile
+ * represents a specific user-owned entity. They render in their own
+ * `LinkedContentPaletteSection` below the static groups, with the same
+ * tile chrome so the two halves of the palette feel unified.
  */
 import {
   Type,
@@ -25,8 +31,10 @@ import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
+import LinkedContentPaletteSection from "./LinkedContentPaletteSection";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
+import type { LinkedContentKind } from "@/lib/studio/editor-v2/linked-content";
 
 export interface WidgetPaletteItem {
   kind: WidgetKind;
@@ -59,11 +67,19 @@ const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
 
 export interface WidgetPaletteProps {
   onInsert: (kind: WidgetKind) => void;
+  /** Insert a linked-content widget bound to a specific user-owned
+   *  entity. Receives `(entityKind, entityId)` so the parent can build
+   *  the widget via `makeLinkedContentWidget()` and append it to the
+   *  active scene. */
+  onInsertLinkedContent: (entityKind: LinkedContentKind, entityId: string) => void;
 }
 
 const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout", "data"];
 
-export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
+export default function WidgetPalette({
+  onInsert,
+  onInsertLinkedContent,
+}: WidgetPaletteProps) {
   // Same collapsible-multi-open behaviour as Design + Actions tabs so
   // all three left-rail panels feel identical. Default to all-open here
   // because widget palette items are the user's primary "add" path —
@@ -102,6 +118,7 @@ export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
           </LeftPanelSection>
         );
       })}
+      <LinkedContentPaletteSection onInsert={onInsertLinkedContent} />
     </LeftPanelScroller>
   );
 }

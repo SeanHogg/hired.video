@@ -12,18 +12,20 @@
  * All position math is fractional (0..1 of canvas dims) so widgets
  * survive zoom and resolution changes without re-mapping pixels.
  */
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   normalizeRotationDegrees,
   resolveCtaFontSizes,
+  type ChromaKeyParams,
   type ContainerStyle,
   type Scene,
   type Widget,
   type WidgetKind,
   type WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
+import { applyChromaKeyToPixels } from "@/lib/studio/chroma-key";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
 import { motionStyleAt } from "@/lib/studio/editor-v2/widget-motion";
@@ -37,7 +39,12 @@ import {
   readDragPayload,
   type DragKind,
 } from "@/lib/studio/editor-v2/drag-protocol";
+import {
+  parseLinkedContentRef,
+  type LinkedContentKind,
+} from "@/lib/studio/editor-v2/linked-content";
 import CanvasDropOverlay from "./CanvasDropOverlay";
+import LinkedContentBody from "./LinkedContentBody";
 import SceneBackgroundEffect from "@/components/studio/shared/SceneBackgroundEffect";
 
 // ChartRenderer is heavy (chart-drawing primitives); only load when a
@@ -77,6 +84,13 @@ export interface CanvasStageProps {
     mediaType: "image" | "video",
     atFraction: { x: number; y: number },
   ) => void;
+  /** Linked-content drag-drop → drop a card preview of a user-owned
+   *  entity (resume / job / future kinds) at the drop fraction. */
+  onLinkedContentDrop?: (
+    entityKind: LinkedContentKind,
+    entityId: string,
+    atFraction: { x: number; y: number },
+  ) => void;
   /** Seconds elapsed into the active scene during playback. `null` means
    *  preview is paused — show every widget regardless of visibleFrom /
    *  visibleTo so the editor stays useful while authoring. */
@@ -108,6 +122,7 @@ export default function CanvasStage({
   onThemeDrop,
   onBackgroundDrop,
   onMediaDrop,
+  onLinkedContentDrop,
   playheadInScene,
   defaultFontId,
   mode = "edit",
@@ -170,6 +185,11 @@ export default function CanvasStage({
       case "media-url":
         onMediaDrop?.(payload.data, payload.mediaType ?? "image", f);
         break;
+      case "linked-content": {
+        const ref = parseLinkedContentRef(payload.data);
+        if (ref) onLinkedContentDrop?.(ref.kind, ref.id, f);
+        break;
+      }
       case "font":
       case "music":
         // Targeted drops (font onto text widget / music onto timeline)
@@ -535,6 +555,7 @@ function WidgetBody({
         <VideoBody
           url={p.data.source.kind === "url" ? p.data.source.url : ""}
           muted={p.data.muted}
+          chromaKey={p.data.chromaKey ?? null}
         />
       );
     case "shape-rect":
@@ -602,6 +623,8 @@ function WidgetBody({
       return <ChipsBody data={p.data} />;
     case "cta":
       return <CtaBody data={p.data} mode={mode} onCtaActivate={onCtaActivate} />;
+    case "linked-content":
+      return <LinkedContentBody data={p.data} mode={mode} onCtaActivate={onCtaActivate} />;
   }
 }
 
@@ -752,13 +775,28 @@ function ImageBody({ url, fit }: { url: string; fit: "cover" | "contain" | "stre
   );
 }
 
-function VideoBody({ url, muted }: { url: string; muted: boolean }) {
+function VideoBody({
+  url,
+  muted,
+  chromaKey,
+}: {
+  url: string;
+  muted: boolean;
+  chromaKey: ChromaKeyParams | null;
+}) {
   if (!url) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted/40 text-xs text-muted-foreground">
         Drop video URL in properties
       </div>
     );
+  }
+  // Self-gate: a video without a chroma config renders through the
+  // plain <video> element (GPU-decoded, zero work). The keyed path
+  // only kicks in when the user has actually configured chromaKey, so
+  // every existing video widget continues at its current cost.
+  if (chromaKey) {
+    return <ChromaVideoBody url={url} muted={muted} chromaKey={chromaKey} />;
   }
   return (
     <video
@@ -768,6 +806,89 @@ function VideoBody({ url, muted }: { url: string; muted: boolean }) {
       playsInline
       controls={false}
     />
+  );
+}
+
+/** Editor-preview video body with chroma-key applied. Drives a hidden
+ *  <video> + visible <canvas>; on every RAF tick, snapshots the video
+ *  frame to the canvas, runs `applyChromaKeyToPixels` (same math the
+ *  registered effect uses), and blits the keyed frame for display.
+ *
+ *  Self-gating per DRY: the parent VideoBody decides whether to mount
+ *  this; this component just paints. No conditional path inside that
+ *  the consumer could compute itself. */
+function ChromaVideoBody({
+  url,
+  muted,
+  chromaKey,
+}: {
+  url: string;
+  muted: boolean;
+  chromaKey: ChromaKeyParams;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Stable per-render snapshot — the RAF loop closes over `chromaKey`
+  // via this ref so the effect dep list doesn't have to re-mount the
+  // loop every time the user nudges a slider.
+  const paramsRef = useRef(chromaKey);
+  useEffect(() => {
+    paramsRef.current = chromaKey;
+  }, [chromaKey]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    let raf = 0;
+    let cancelled = false;
+    function tick() {
+      if (cancelled || !video || !canvas) return;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      // Wait for metadata before we have meaningful dims to paint into.
+      if (w > 0 && h > 0) {
+        if (canvas.width !== w) canvas.width = w;
+        if (canvas.height !== h) canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (ctx) {
+          try {
+            ctx.drawImage(video, 0, 0, w, h);
+            const img = ctx.getImageData(0, 0, w, h);
+            applyChromaKeyToPixels(img.data, paramsRef.current);
+            ctx.putImageData(img, 0, 0);
+          } catch {
+            // Cross-origin video blocks getImageData. The plain <video>
+            // is hidden behind the canvas, so falling through here just
+            // shows the canvas frame from before the taint — acceptable
+            // for the editor preview.
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [url]);
+
+  return (
+    <div className="relative h-full w-full">
+      <video
+        ref={videoRef}
+        src={url}
+        muted={muted}
+        crossOrigin="anonymous"
+        autoPlay
+        loop
+        playsInline
+        controls={false}
+        style={{ position: "absolute", inset: 0, visibility: "hidden" }}
+      />
+      <canvas ref={canvasRef} className="h-full w-full object-cover" />
+    </div>
   );
 }
 

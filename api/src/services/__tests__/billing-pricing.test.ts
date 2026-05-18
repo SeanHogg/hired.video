@@ -25,8 +25,6 @@ import {
   PRO_AI_MONTHLY_TOKENS,
   FREE_AI_MONTHLY_LIMIT,
   FREE_TEAM_MEMBER_LIMIT,
-  FREE_MONTHLY_MATCHES,
-  FREE_MONTHLY_APPLICATIONS,
   FREE_PUBLISHED_VIDEOS_LIMIT,
   TOKEN_PACKS,
 } from "../../../../shared/pricing.js";
@@ -59,8 +57,6 @@ describe("Pricing constants", () => {
   it("Free tier has distinct per-feature limits", () => {
     assert.equal(FREE_AI_MONTHLY_LIMIT, 10);
     assert.equal(FREE_TEAM_MEMBER_LIMIT, 2);
-    assert.equal(FREE_MONTHLY_MATCHES, 5);
-    assert.equal(FREE_MONTHLY_APPLICATIONS, 10);
     assert.equal(FREE_PUBLISHED_VIDEOS_LIMIT, 1);
   });
 });

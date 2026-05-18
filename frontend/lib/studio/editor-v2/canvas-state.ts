@@ -31,7 +31,8 @@ export type WidgetKind =
   | "chart"
   | "webcam"
   | "chips"
-  | "cta";
+  | "cta"
+  | "linked-content";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -70,6 +71,30 @@ export interface ImageWidgetParams {
 export interface VideoWidgetParams {
   source: { kind: "sourceId"; id: string } | { kind: "url"; url: string };
   muted: boolean;
+  /** Chroma-key (green-screen) parameters. When set, the editor preview
+   *  and the render pipeline both knock matching pixels out so the
+   *  widget's video composites against whatever sits behind it.
+   *  `null` / undefined means no keying. Single source of truth for the
+   *  key math lives in `lib/studio/chroma-key.ts` so the editor preview
+   *  and the canvas-v2 video applier produce identical pixels. */
+  chromaKey?: ChromaKeyParams | null;
+}
+
+/** Chroma-key configuration. `keyColor` is the colour to knock out
+ *  (RGB hex, e.g. `#00ff00` for a green screen). `threshold` is the
+ *  normalized chrominance distance (0..1) under which a pixel becomes
+ *  fully transparent. `softness` widens the falloff above `threshold`
+ *  for edge feathering — pixels in `(threshold, threshold+softness]`
+ *  ramp linearly back to opaque. `spillSuppression` (0..1) desaturates
+ *  retained pixels' chroma toward neutral whenever they lean toward
+ *  the key colour, reducing the green halo around foreground subjects.
+ *  Mirrors the params accepted by the registered `chroma-key` effect
+ *  so widget-level data round-trips cleanly into the render pass. */
+export interface ChromaKeyParams {
+  keyColor: string;
+  threshold: number;
+  softness: number;
+  spillSuppression?: number;
 }
 
 export interface ShapeWidgetParams {
@@ -164,6 +189,23 @@ export function resolveCtaFontSizes(
   return { headline, subheadline, button };
 }
 
+/** Linked-content widget — embeds a card preview of a user-owned entity
+ *  (resume / job / profile / …) at a fractional position on the canvas.
+ *  The widget stores only the entity reference; the preview body
+ *  self-fetches via `LINKED_CONTENT_REGISTRY[entityKind].fetchPreview`
+ *  so the canvas, the inspector, and any future render-side applier all
+ *  read the same projection. Adding a new entity kind = one row in the
+ *  registry; no `WidgetKind` or `WidgetParams` change.
+ *
+ *  See `lib/studio/editor-v2/linked-content.ts` for the registry. */
+export interface LinkedContentWidgetParams {
+  entityKind: import("./linked-content").LinkedContentKind;
+  /** Stable id of the linked entity (resume id, job id, …). Empty
+   *  string means the widget hasn't been bound yet — the body renders
+   *  an empty state prompting the user to pick from the inspector. */
+  entityId: string;
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -173,7 +215,8 @@ export type WidgetParams =
   | { kind: "chart"; data: ChartWidgetParams }
   | { kind: "webcam"; data: WebcamWidgetParams }
   | { kind: "chips"; data: ChipsWidgetParams }
-  | { kind: "cta"; data: CtaWidgetParams };
+  | { kind: "cta"; data: CtaWidgetParams }
+  | { kind: "linked-content"; data: LinkedContentWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /
@@ -265,6 +308,14 @@ export interface Scene {
    *  default. Mirrors v1's `scene.transitionIn` so the import →
    *  edit → save round-trip is lossless (gap #616). */
   transitionIn?: import("../motion-presets").TransitionKind | null;
+  /** Director's notes — free-form text the director (or whoever is
+   *  shooting / supervising / reviewing) attaches to the scene: shot
+   *  intent, blocking, dailies feedback, talent direction, todos. Not
+   *  rendered into the final video; visible only in the editor. `null` /
+   *  undefined / empty means "no notes" — the ScenesRail badge + the
+   *  inspector section self-gate on emptiness so they cost nothing for
+   *  scenes without notes. */
+  directorNotes?: string | null;
 }
 
 /** Caption cue. Structurally compatible with the v1 CaptionEditor's
@@ -316,6 +367,17 @@ export interface CanvasAudioMix {
   musicMuted: boolean;
   voiceoverGain: number;
   voiceoverMuted: boolean;
+  /** Auto-duck music under voiceover so dialogue stays intelligible
+   *  without the user hand-sculpting per-segment gain. When true, the
+   *  music lane's effective gain drops to `musicGain * duckAmount` for
+   *  any time slice covered by a non-muted voiceover clip; when false
+   *  music plays at its full lane gain throughout. Optional for back-
+   *  compat — absence is read as `false`. */
+  duckMusicUnderVoiceover?: boolean;
+  /** Ducked music volume as a fraction of un-ducked (0..1). 0 = music
+   *  silent under voiceover, 1 = no actual ducking. Optional — absence
+   *  is read as 0.3 (the broadcast convention of -10dB ≈ 0.316). */
+  duckAmount?: number;
 }
 
 export const DEFAULT_AUDIO_MIX: CanvasAudioMix = {
@@ -324,7 +386,14 @@ export const DEFAULT_AUDIO_MIX: CanvasAudioMix = {
   musicMuted: false,
   voiceoverGain: 1,
   voiceoverMuted: false,
+  duckMusicUnderVoiceover: false,
+  duckAmount: 0.3,
 };
+
+/** Default ducked-music multiplier when `duckAmount` is unset. -10dB ≈
+ *  0.316; we round to 0.3 so the slider lands on a clean tick. Exported
+ *  so consumers that need the fallback don't redefine the constant. */
+export const DEFAULT_DUCK_AMOUNT = 0.3;
 
 export interface CanvasState {
   schemaVersion: number;
@@ -594,7 +663,26 @@ export function defaultWidget(kind: WidgetKind): Widget {
         visibleTo: null,
         motion: null,
       };
+    case "linked-content":
+      return makeLinkedContentWidget({ entityKind: "resume", entityId: "" });
   }
+}
+
+/** Build a linked-content widget bound to a specific entity. Used by
+ *  the palette's "Your content" section and the drag-drop pipeline so
+ *  both surfaces produce identical default geometry / params. */
+export function makeLinkedContentWidget(
+  params: LinkedContentWidgetParams,
+): Widget {
+  return {
+    id: makeId("w"),
+    kind: "linked-content",
+    position: { x: 0.1, y: 0.15, width: 0.42, height: 0.55, z: 1, rotation: 0 },
+    params: { kind: "linked-content", data: params },
+    visibleFrom: null,
+    visibleTo: null,
+    motion: null,
+  };
 }
 
 function makeId(prefix: string): string {

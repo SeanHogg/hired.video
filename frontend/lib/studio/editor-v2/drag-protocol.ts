@@ -18,7 +18,8 @@ export type DragKind =
   | "background"
   | "font"
   | "music"
-  | "media-url";
+  | "media-url"
+  | "linked-content";
 
 /**
  * Per-kind MIME type. Multiple types can be present on the same drag
@@ -32,10 +33,12 @@ export const DRAG_MIME: Record<DragKind, string> = {
   font: "application/x-studio-font-id",
   music: "application/x-studio-music-id",
   "media-url": "application/x-studio-media-url",
+  "linked-content": "application/x-studio-linked-content-ref",
 };
 
 const KIND_ORDER: DragKind[] = [
   "widget",
+  "linked-content",
   "media-url",
   "background",
   "theme",
@@ -51,7 +54,9 @@ export interface DragPayload {
    *   - background → BgPreset.value (the encoded "type:color:color" string)
    *   - font     → FontPreset.id
    *   - music    → MusicTrack.id
-   *   - media-url → URL string */
+   *   - media-url → URL string
+   *   - linked-content → `<entityKind>:<entityId>` (see
+   *     `lib/studio/editor-v2/linked-content.ts:encodeLinkedContentRef`) */
   data: string;
   /** Set for `media-url` drops so the canvas knows whether to drop an
    *  Image or Video widget. */
@@ -147,6 +152,7 @@ export const DRAG_KIND_META: Record<DragKind, DragKindMeta> = {
   font: { label: "Drop on a text widget", accent: "amber-500" },
   music: { label: "Drop on the timeline", accent: "rose-500" },
   "media-url": { label: "Drop to add media", accent: "sky-500" },
+  "linked-content": { label: "Drop to embed your content", accent: "indigo-500" },
 };
 
 // Re-export WidgetKind so consumers of the protocol that build widget

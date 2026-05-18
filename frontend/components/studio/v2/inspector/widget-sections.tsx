@@ -9,7 +9,7 @@
  * the user lands on the field they're most likely to edit (text body,
  * source URL, fill colour).
  */
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Camera } from "lucide-react";
 import type {
   TextWidgetParams,
@@ -21,9 +21,15 @@ import type {
   WebcamWidgetParams,
   ChipsWidgetParams,
   CtaWidgetParams,
+  LinkedContentWidgetParams,
   ContainerStyle,
   WidgetKind,
 } from "@/lib/studio/editor-v2/canvas-state";
+import {
+  LINKED_CONTENT_REGISTRY,
+  type LinkedContentKind,
+  type LinkedContentSummary,
+} from "@/lib/studio/editor-v2/linked-content";
 import {
   MOTION_KINDS,
   MOTION_KIND_LABELS,
@@ -45,8 +51,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { uploadRecording } from "@/lib/services/studio-features-service";
 import {
   AutoSizeTextarea,
   ColorInput,
@@ -63,13 +67,11 @@ import ContentLinkPicker from "@/components/studio/shared/ContentLinkPicker";
 import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import type { WidgetInspectorSection, WidgetSectionCtx } from "./types";
 
-// Lazy — keeps MediaRecorder + getUserMedia off the editor's initial
-// bundle; mirrors ActionsPanel's loading pattern so the WebcamRecorder
-// chunk is shared between both surfaces.
-const WebcamRecorder = lazy(() =>
-  import("@/components/studio/WebcamRecorder").then((m) => ({
-    default: m.WebcamRecorder,
-  })),
+// Lazy — keeps MediaRecorder + getUserMedia (and the upload helper) off
+// the editor's initial bundle. The wrapper owns the upload + fallback
+// toast so the inspector and ActionsPanel share one recorder pipeline.
+const WebcamRecorderWithUpload = lazy(
+  () => import("@/components/studio/WebcamRecorderWithUpload"),
 );
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -740,50 +742,14 @@ const WEBCAM_CONTENT_SECTION: WidgetInspectorSection = {
   },
 };
 
-// Open-on-click dialog hosting WebcamRecorder; uploads the captured
-// blob through the same /api/studio/recording/upload pipeline the
-// Actions panel uses so the URL survives a page refresh. Falls back to
-// an in-memory blob URL with a destructive toast when the upload fails
-// — the recording itself is still usable in this tab.
+// Open-on-click dialog hosting the shared recorder + upload wrapper.
+// The wrapper handles the /api/studio/recording/upload roundtrip and
+// shows its own failure toast — this trigger just owns the dialog
+// shell + writes the resulting URL back into `recordingUrl`.
 function WebcamRecordTrigger({ onCaptured }: { onCaptured: (url: string) => void }) {
   const [open, setOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const { toast } = useToast();
-
-  async function handleComplete(blob: Blob, durationMs: number) {
-    setUploading(true);
-    try {
-      const ext = (blob.type || "").includes("mp4") ? "mp4" : "webm";
-      const file = new File([blob], `webcam-${Date.now()}.${ext}`, {
-        type: blob.type || "video/webm",
-      });
-      const { videoUrl } = await uploadRecording(file, "webcam", undefined, durationMs);
-      if (videoUrl) {
-        onCaptured(videoUrl);
-        toast({ title: "Recording uploaded" });
-      } else {
-        onCaptured(URL.createObjectURL(blob));
-        toast({
-          title: "Saved locally only",
-          description: "Upload returned no URL — this clip will be lost on refresh.",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
-      onCaptured(URL.createObjectURL(blob));
-      toast({
-        title: "Upload failed — using local clip",
-        description: err instanceof Error ? err.message : undefined,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-      setOpen(false);
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={(next) => !uploading && setOpen(next)}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
           type="button"
@@ -810,11 +776,14 @@ function WebcamRecordTrigger({ onCaptured }: { onCaptured: (url: string) => void
             </div>
           }
         >
-          <WebcamRecorder mode="webcam" onRecordingComplete={handleComplete} />
+          <WebcamRecorderWithUpload
+            mode="webcam"
+            onCaptured={(url) => {
+              onCaptured(url);
+              setOpen(false);
+            }}
+          />
         </Suspense>
-        {uploading && (
-          <p className="text-xs text-muted-foreground">Uploading recording…</p>
-        )}
       </DialogContent>
     </Dialog>
   );
@@ -1001,6 +970,103 @@ const CTA_CONTENT_SECTION: WidgetInspectorSection = {
   },
 };
 
+// ───────────────────────────────────────────────────────────────────────────
+// Linked content — pick + switch the bound entity for a `linked-content`
+// widget. The body component self-fetches the preview; this section is
+// just an entity picker scoped to the user's owned items per kind.
+// ───────────────────────────────────────────────────────────────────────────
+
+const LINKED_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "linked-content",
+  title: "Linked content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "linked-content") return null;
+    return (
+      <LinkedContentInspector
+        data={widget.params.data}
+        onChange={(next) =>
+          onUpdateWidgetParams({ kind: "linked-content", data: next })
+        }
+      />
+    );
+  },
+};
+
+function LinkedContentInspector({
+  data,
+  onChange,
+}: {
+  data: LinkedContentWidgetParams;
+  onChange: (next: LinkedContentWidgetParams) => void;
+}) {
+  const kind: LinkedContentKind = data.entityKind;
+  const meta = LINKED_CONTENT_REGISTRY[kind];
+  const [items, setItems] = useState<LinkedContentSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setItems(null);
+    setError(null);
+    meta
+      .listForUser()
+      .then((list) => {
+        if (cancelled) return;
+        setItems(list);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setItems([]);
+        setError(err instanceof Error ? err.message : "Couldn't load items.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [meta]);
+
+  return (
+    <div className="space-y-3">
+      <Field label={meta.label}>
+        {items === null ? (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        ) : items.length === 0 ? (
+          <div className="text-xs text-muted-foreground">
+            {error ?? `You don't have any ${meta.label.toLowerCase()}s yet.`}
+          </div>
+        ) : (
+          <select
+            value={data.entityId}
+            onChange={(e) => onChange({ ...data, entityId: e.target.value })}
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+          >
+            <option value="">— Pick a {meta.label.toLowerCase()} —</option>
+            {items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
+                {item.subtitle ? ` (${item.subtitle})` : ""}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      {data.entityId && (
+        <div className="text-[11px] text-muted-foreground">
+          CTA opens{" "}
+          <a
+            href={meta.viewUrl(data.entityId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline"
+          >
+            {meta.viewUrl(data.entityId)}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   text: [LAYOUT_SECTION, textContentSection("text"), ...SHARED_TAIL],
   heading: [LAYOUT_SECTION, textContentSection("heading"), ...SHARED_TAIL],
@@ -1013,6 +1079,7 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   webcam: [LAYOUT_SECTION, WEBCAM_CONTENT_SECTION, ...SHARED_TAIL],
   chips: [LAYOUT_SECTION, CHIPS_CONTENT_SECTION, ...SHARED_TAIL],
   cta: [LAYOUT_SECTION, CTA_CONTENT_SECTION, ...SHARED_TAIL],
+  "linked-content": [LAYOUT_SECTION, LINKED_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -1031,4 +1098,5 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   webcam: "Webcam",
   chips: "Chips",
   cta: "CTA card",
+  "linked-content": "Linked content",
 };

@@ -551,7 +551,13 @@ registerEffect({
   defaults: { x: 0, y: 0, width: 0.5, height: 0.5, url: "", muted: false },
   apply(effect, { ctx, canvas, clipFrame, clipDurationFrames, fps, timelineFrame }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
-    const effects = widgetEffects(effect.params);
+    // Per-widget chromaKey is stored on the video widget's params as a
+    // typed field (see `VideoWidgetParams.chromaKey`) and emitted as a
+    // sibling param on the canvas-v2:video clip effect. We synthesize
+    // a `chroma-key` entry into the effect chain so the offscreen pixel
+    // pass below routes through the same registered effect every other
+    // chroma surface uses — no parallel keying path.
+    const effects = widgetEffectsWithChromaSynthesis(effect.params);
     const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
     if (!url) return;
@@ -576,6 +582,36 @@ registerEffect({
     applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
+
+/** Reads the standard `widget.effects[]` chain AND folds a `chroma-key`
+ *  effect entry in front of it when the video clip params carry a
+ *  typed `chromaKey` block. Keeps the schema clean (chroma is a video-
+ *  widget property, not a generic effect users add via the Effects
+ *  panel) while routing the actual keying through the shared registered
+ *  effect — one keying implementation, one pixel pass. */
+function widgetEffectsWithChromaSynthesis(
+  params: Record<string, unknown>,
+): ResolvedEffect[] {
+  const base = widgetEffects(params);
+  const ck = params.chromaKey;
+  if (!ck || typeof ck !== "object") return base;
+  const c = ck as Record<string, unknown>;
+  // Skip the synthesis if the keyColor isn't a string — the user hasn't
+  // really configured anything and the registered effect would default
+  // to bright green which would silently mangle the frame.
+  if (typeof c.keyColor !== "string") return base;
+  const synth: ResolvedEffect = {
+    kind: "chroma-key",
+    params: {
+      keyColor: c.keyColor,
+      threshold: typeof c.threshold === "number" ? c.threshold : 0.4,
+      softness: typeof c.softness === "number" ? c.softness : 0.1,
+      spillSuppression:
+        typeof c.spillSuppression === "number" ? c.spillSuppression : 0.5,
+    },
+  };
+  return [...base, synth];
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // canvas-v2:shape-rect / canvas-v2:shape-circle / canvas-v2:divider

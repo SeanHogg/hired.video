@@ -20,6 +20,10 @@ import type {
   VoiceoverClip,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { DEFAULT_AUDIO_MIX } from "@/lib/studio/editor-v2/canvas-state";
+import {
+  computeDuckingSegments,
+  type DuckingInterval,
+} from "@/lib/studio/editor-v2/audio-ducking";
 import { findMusicTrack } from "@/lib/studio/music-catalog";
 import type { AudioClip } from "@/types/video-script";
 
@@ -49,36 +53,49 @@ function effectiveGain(
   return (baseVolume ?? 1) * laneGain * mix.masterGain;
 }
 
-/** Build the music clip — single looping bed across the whole comp.
- *  Returns null when the project has no music selected. */
-function musicClipFor(state: CanvasState, totalSec: number, mix: CanvasAudioMix): AudioClip | null {
+/** Resolve `state.musicSource` to the `{track, label}` the scheduler
+ *  consumes. Returns null when no track is selected or the catalog
+ *  rejects the id. Shared by both single-clip and split-for-ducking
+ *  code paths so they can't disagree about what's playing. */
+function resolvedMusic(state: CanvasState): { track: string; label: string } | null {
   if (!state.musicSource) return null;
-  if (totalSec <= 0) return null;
-  // Stock tracks ride on their procedural preset key (the scheduler's
-  // `isUrlTrack` check routes them to AmbientPlayer). Custom tracks
-  // ride on their hosted URL. The scheduler picks the right driver.
-  let track: string;
-  let label = "Music";
   if (state.musicSource.kind === "stock") {
     const catalog = findMusicTrack(state.musicSource.trackId);
     if (!catalog || catalog.id === "none") return null;
-    // Prefer the static file URL when the catalog entry has one;
-    // otherwise let the scheduler resolve the preset id.
-    track = catalog.src || catalog.id;
-    label = catalog.label;
-  } else {
-    if (!state.musicSource.url) return null;
-    track = state.musicSource.url;
-    label = state.musicSource.label;
+    return { track: catalog.src || catalog.id, label: catalog.label };
   }
-  return {
-    id: "v2-music",
-    track,
-    label,
-    startSec: 0,
-    endSec: totalSec,
-    volume: effectiveGain(1, "music", mix),
-  };
+  if (!state.musicSource.url) return null;
+  return { track: state.musicSource.url, label: state.musicSource.label };
+}
+
+/** Build music clip(s) for the timeline. When ducking is off (or there
+ *  are no voiceovers) returns one full-span clip; when on, returns one
+ *  clip per ducking segment so the shared scheduler hears the correct
+ *  gain at every moment. Per DRY: the segment math lives in
+ *  `audio-ducking.ts` and is the same one `timeline-emit.ts` uses. */
+function musicClipsFor(
+  state: CanvasState,
+  totalSec: number,
+  mix: CanvasAudioMix,
+  voiceoverIntervals: DuckingInterval[],
+): AudioClip[] {
+  if (totalSec <= 0) return [];
+  const resolved = resolvedMusic(state);
+  if (!resolved) return [];
+  const baseGain = effectiveGain(1, "music", mix);
+  if (baseGain === 0) return [];
+  const segments = computeDuckingSegments(totalSec, voiceoverIntervals, {
+    enabled: Boolean(mix.duckMusicUnderVoiceover),
+    duckAmount: mix.duckAmount,
+  });
+  return segments.map((seg, i) => ({
+    id: segments.length === 1 ? "v2-music" : `v2-music-${i}`,
+    track: resolved.track,
+    label: resolved.label,
+    startSec: seg.startSec,
+    endSec: seg.endSec,
+    volume: baseGain * seg.gainMultiplier,
+  }));
 }
 
 function voiceoverClipFor(
@@ -101,17 +118,23 @@ function voiceoverClipFor(
 
 /** Convert v2 CanvasState into the flat AudioClip[] the shared
  *  `useMusicScheduler` / `scheduleClipsToDestination` consume. Includes
- *  music (looped bed) + every non-muted voiceover, with audioMix gains
- *  applied. */
+ *  music (auto-ducked under voiceover when the mixer is configured
+ *  for it) + every non-muted voiceover, with audioMix gains applied. */
 export function canvasStateToAudioClips(state: CanvasState): AudioClip[] {
   const totalSec = totalDurationSeconds(state);
   const mix = state.audioMix ?? DEFAULT_AUDIO_MIX;
   const out: AudioClip[] = [];
-  const music = musicClipFor(state, totalSec, mix);
-  if (music) out.push(music);
+  const voiceClips: AudioClip[] = [];
+  const duckingIntervals: DuckingInterval[] = [];
   for (const vo of state.voiceovers) {
     const clip = voiceoverClipFor(vo, state.scenes, mix);
-    if (clip) out.push(clip);
+    if (!clip) continue;
+    voiceClips.push(clip);
+    // Only audible voiceovers participate in ducking — a muted clip
+    // shouldn't be dropping the music gain.
+    duckingIntervals.push({ startSec: clip.startSec, endSec: clip.endSec });
   }
+  out.push(...musicClipsFor(state, totalSec, mix, duckingIntervals));
+  out.push(...voiceClips);
   return out;
 }

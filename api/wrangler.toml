@@ -10,6 +10,14 @@ routes = [
   "cdn.hired.video/*",
 ]
 
+# Cron triggers — the scheduled() handler in worker.ts dispatches every
+# registered cron tick into runScheduled(), which in turn fans out to the
+# follow-up drip processor, the job queue, the registered-worker dispatcher,
+# the monthly usage close, and the email-integration sweep. Each downstream
+# gates itself by date/time so a single /5 tick is enough.
+[triggers]
+crons = ["*/5 * * * *"]
+
 [observability]
 enabled = false
 head_sampling_rate = 1

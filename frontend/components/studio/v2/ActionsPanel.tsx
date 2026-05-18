@@ -56,11 +56,12 @@ import type {
 // Lazy-load every dialog so the editor's initial bundle doesn't pull
 // MediaRecorder / Web Audio / camera permissions when the user just
 // wants to drag a text widget. Each Suspense fallback keeps the sheet
-// open so click-to-open feels instant.
-const WebcamRecorder = lazy(() =>
-  import("@/components/studio/WebcamRecorder").then((m) => ({
-    default: m.WebcamRecorder,
-  })),
+// open so click-to-open feels instant. The webcam recorder is wrapped
+// by `WebcamRecorderWithUpload` so every "record → URL" surface in the
+// app (Actions panel here, Webcam widget inspector) shares one
+// upload + fallback pipeline.
+const WebcamRecorderWithUpload = lazy(
+  () => import("@/components/studio/WebcamRecorderWithUpload"),
 );
 const HeadshotGenerator = lazy(() => import("@/components/studio/HeadshotGenerator"));
 // MusicComposer is the shared "Step Sequencer / Piano" tab host — surfaces
@@ -371,11 +372,11 @@ function ActionSheet({
         <div className="mt-4">
           <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>}>
             {recordingMode && (
-              <WebcamRecorder
+              <WebcamRecorderWithUpload
                 mode={recordingMode}
-                onRecordingComplete={(blob, durationMs) => {
-                  const url = URL.createObjectURL(blob);
-                  onAddVideoWidget(url, durationMs / 1000);
+                projectId={persistedProjectId ?? undefined}
+                onCaptured={(url, durationSeconds) => {
+                  onAddVideoWidget(url, durationSeconds);
                   toast({ title: "Clip added to canvas" });
                   onClose();
                 }}

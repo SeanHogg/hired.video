@@ -21,10 +21,16 @@
 import {
   CANVAS_STATE_VERSION,
   type CanvasState,
+  type ChromaKeyParams,
   emptyCanvasState,
   type Scene,
   type Widget,
 } from "./canvas-state";
+import {
+  computeDuckingSegments,
+  type DuckingInterval,
+} from "./audio-ducking";
+import { isLinkedContentKind } from "./linked-content";
 import { resolveMusic, type MusicSource } from "../music-catalog";
 import {
   TIMELINE_SCHEMA_VERSION,
@@ -83,6 +89,11 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
               : {}),
             ...(scene.filters ? { sceneFilters: scene.filters } : {}),
             ...(scene.transitionIn ? { transitionIn: scene.transitionIn } : {}),
+            // Director's notes — preserved on the bg effect so the
+            // editor's "notes on this scene" badge survives a save →
+            // load cycle. Empty / nullish notes don't ride along to
+            // keep the saved payload minimal.
+            ...(scene.directorNotes ? { directorNotes: scene.directorNotes } : {}),
             // Stash audioMix on the FIRST scene's background only —
             // saves space and gives the read-side one obvious place
             // to look. The mix is canvas-scoped, not scene-scoped.
@@ -290,6 +301,11 @@ function widgetToEffect(widget: Widget): ClipEffect {
           url,
           sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
           muted: p.data.muted,
+          // Chroma-key — typed video-widget field that the
+          // canvas-v2:video applier reads + synthesises into a
+          // `chroma-key` effect for the pixel pass. Omitted when null
+          // so the round-trip payload stays minimal.
+          ...(p.data.chromaKey ? { chromaKey: p.data.chromaKey } : {}),
         },
       };
     }
@@ -374,6 +390,15 @@ function widgetToEffect(widget: Widget): ClipEffect {
           accentTextColor: p.data.accentTextColor,
           ...(p.data.cardFontPx !== undefined ? { cardFontPx: p.data.cardFontPx } : {}),
           ...(p.data.ctaFontPx !== undefined ? { ctaFontPx: p.data.ctaFontPx } : {}),
+        },
+      };
+    case "linked-content":
+      return {
+        kind: "canvas-v2:linked-content",
+        params: {
+          ...rect,
+          entityKind: p.data.entityKind,
+          entityId: p.data.entityId,
         },
       };
   }
@@ -721,6 +746,23 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
           },
         },
       };
+    case "canvas-v2:linked-content": {
+      const entityKindRaw = stringOr(params.entityKind, "resume");
+      const entityKind = isLinkedContentKind(entityKindRaw)
+        ? entityKindRaw
+        : "resume";
+      return {
+        ...base,
+        kind: "linked-content",
+        params: {
+          kind: "linked-content",
+          data: {
+            entityKind,
+            entityId: stringOr(params.entityId, ""),
+          },
+        },
+      };
+    }
     default:
       return null;
   }

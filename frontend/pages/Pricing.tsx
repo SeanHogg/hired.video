@@ -157,7 +157,7 @@ export default function Pricing() {
         "1 published AI video resume (unlimited drafts)",
         "ATS-friendly resume builder",
         "Chrome extension — job tracking & match scoring",
-        "AI assistance (10/mo) — token-metered",
+        "50K AI tokens / mo",
         "Career Home dashboard & community feed",
         "Unlimited networking — connections & followers",
         "Apply to jobs with video intros",
@@ -193,7 +193,7 @@ export default function Pricing() {
         "Visual Kanban hiring pipeline",
         "Basic interview scheduling",
         "Up to 2 team members",
-        "AI assistance (10/mo) — token-metered",
+        "50K AI tokens / mo",
       ],
       proFeatures: [
         "Unlimited talent pool & candidate imports",
@@ -223,7 +223,7 @@ export default function Pricing() {
         "Recruiter Chrome extension",
         "1 admin user",
         "Up to 2 employees",
-        "AI assistance (10/mo)",
+        "50K AI tokens / mo",
       ],
       proFeatures: [
         "Employee community (Engage / Inform / Inspire)",
@@ -682,7 +682,7 @@ export default function Pricing() {
                           Applicants & Contacts
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Limited
+                          Unlimited
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           Unlimited
@@ -874,10 +874,10 @@ export default function Pricing() {
                           Video resume templates & themes
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (5)
+                          Basic (3)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {TIER_COPY.proCollectionLabel("50+")}
+                          {TIER_COPY.proCollectionLabel("5+ Premium")}
                         </td>
                       </tr>
                       <tr>
@@ -1042,7 +1042,7 @@ export default function Pricing() {
                           Resume Optimization
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          AI-Powered (Limited)
+                          AI-Powered (3/mo)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           AI-Powered (Unlimited)
@@ -1100,7 +1100,7 @@ export default function Pricing() {
                           AI Interview Simulator
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (Limited)
+                          Basic (3/mo)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           Advanced
@@ -1112,7 +1112,7 @@ export default function Pricing() {
                           AI Resume Scoring & Feedback
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (Limited)
+                          Basic (preview only)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           Advanced (Unlimited)
@@ -1518,7 +1518,7 @@ export default function Pricing() {
                           AI Message Personalization
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (Limited)
+                          Basic (template only)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           Advanced (Unlimited)

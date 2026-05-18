@@ -67,8 +67,10 @@ import {
   defaultWidget,
   DEFAULT_AUDIO_MIX,
   emptyScene,
+  makeLinkedContentWidget,
   totalDurationSeconds,
 } from "@/lib/studio/editor-v2/canvas-state";
+import type { LinkedContentKind } from "@/lib/studio/editor-v2/linked-content";
 import {
   canvasStateToTimeline,
   timelineToCanvasState,
@@ -517,14 +519,34 @@ export default function StudioEditorV2() {
     });
   }, []);
 
-  const insertWidget = useCallback(
-    (kind: WidgetKind, atFraction?: { x: number; y: number }) => {
-      const widget: Widget = defaultWidget(kind);
+  // Place a fully-built widget at an optional drop fraction, append it
+  // to the active scene's widget list, and select it. Shared by every
+  // "add a widget" pathway (palette click, drag-drop, linked-content
+  // tile, media stamps) so anchor math + z-stack assignment + selection
+  // live in one place.
+  const placeWidget = useCallback(
+    (widget: Widget, atFraction?: { x: number; y: number }) => {
+      let placed = widget;
       if (atFraction) {
-        widget.position = {
-          ...widget.position,
-          x: Math.max(0, Math.min(1 - widget.position.width, atFraction.x - widget.position.width / 2)),
-          y: Math.max(0, Math.min(1 - widget.position.height, atFraction.y - widget.position.height / 2)),
+        placed = {
+          ...widget,
+          position: {
+            ...widget.position,
+            x: Math.max(
+              0,
+              Math.min(
+                1 - widget.position.width,
+                atFraction.x - widget.position.width / 2,
+              ),
+            ),
+            y: Math.max(
+              0,
+              Math.min(
+                1 - widget.position.height,
+                atFraction.y - widget.position.height / 2,
+              ),
+            ),
+          },
         };
       }
       setState((prev) => ({
@@ -535,15 +557,39 @@ export default function StudioEditorV2() {
                 ...s,
                 widgets: [
                   ...s.widgets,
-                  { ...widget, position: { ...widget.position, z: s.widgets.length + 1 } },
+                  {
+                    ...placed,
+                    position: { ...placed.position, z: s.widgets.length + 1 },
+                  },
                 ],
               }
             : s,
         ),
       }));
-      setSelection({ kind: "widget", sceneId: activeSceneId, widgetId: widget.id });
+      setSelection({ kind: "widget", sceneId: activeSceneId, widgetId: placed.id });
     },
     [activeSceneId],
+  );
+
+  const insertWidget = useCallback(
+    (kind: WidgetKind, atFraction?: { x: number; y: number }) => {
+      placeWidget(defaultWidget(kind), atFraction);
+    },
+    [placeWidget],
+  );
+
+  const insertLinkedContent = useCallback(
+    (
+      entityKind: LinkedContentKind,
+      entityId: string,
+      atFraction?: { x: number; y: number },
+    ) => {
+      placeWidget(
+        makeLinkedContentWidget({ entityKind, entityId }),
+        atFraction,
+      );
+    },
+    [placeWidget],
   );
 
   const updateWidgetPosition = useCallback(
@@ -626,56 +672,23 @@ export default function StudioEditorV2() {
       } else if (widget.params.kind === "video") {
         widget.params.data.source = { kind: "url", url };
       }
-      // When the caller supplied a drop coordinate (drag-drop from
-      // MediaPicker or stock results), centre the widget on it. Same
-      // anchor math as `insertWidget` so single source of truth for
-      // "drop fraction → widget position".
-      if (atFraction) {
-        widget.position = {
-          ...widget.position,
-          x: Math.max(
-            0,
-            Math.min(1 - widget.position.width, atFraction.x - widget.position.width / 2),
-          ),
-          y: Math.max(
-            0,
-            Math.min(1 - widget.position.height, atFraction.y - widget.position.height / 2),
-          ),
-        };
-      }
-      setState((prev) => {
-        const sceneId = activeSceneId;
-        return {
+      placeWidget(widget, atFraction);
+      // Extend the scene duration if the new media exceeds the scene
+      // length, so the user actually sees the clip play. Scene-duration
+      // extension is media-specific, so it stays here rather than in
+      // the shared `placeWidget` helper.
+      if (durationSeconds > 0) {
+        setState((prev) => ({
           ...prev,
           scenes: prev.scenes.map((s) =>
-            s.id === sceneId
-              ? {
-                  ...s,
-                  // Extend the scene duration if the new media exceeds the
-                  // scene length, so the user actually sees the clip play.
-                  durationSeconds:
-                    durationSeconds > s.durationSeconds
-                      ? durationSeconds
-                      : s.durationSeconds,
-                  widgets: [
-                    ...s.widgets,
-                    {
-                      ...widget,
-                      position: { ...widget.position, z: s.widgets.length + 1 },
-                    },
-                  ],
-                }
+            s.id === activeSceneId && durationSeconds > s.durationSeconds
+              ? { ...s, durationSeconds }
               : s,
           ),
-        };
-      });
-      setSelection({
-        kind: "widget",
-        sceneId: activeSceneId,
-        widgetId: widget.id,
-      });
+        }));
+      }
     },
-    [activeSceneId],
+    [activeSceneId, placeWidget],
   );
 
   const setCaptionsState = useCallback((captions: CanvasState["captions"]) => {
@@ -1227,7 +1240,12 @@ export default function StudioEditorV2() {
               {leftBottomOpen && (
                 <div className="min-h-0 flex-1 overflow-hidden">
                   {leftTab === "widgets" && (
-                    <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
+                    <WidgetPalette
+                      onInsert={(kind) => insertWidget(kind)}
+                      onInsertLinkedContent={(entityKind, entityId) =>
+                        insertLinkedContent(entityKind, entityId)
+                      }
+                    />
                   )}
                   {leftTab === "actions" && (
                     <ActionsPanel
@@ -1331,6 +1349,9 @@ export default function StudioEditorV2() {
                         addMediaWidget("image", url, 0, atFraction);
                       }
                     }}
+                    onLinkedContentDrop={(entityKind, entityId, atFraction) =>
+                      insertLinkedContent(entityKind, entityId, atFraction)
+                    }
                     playheadInScene={
                       playback.isPlaying &&
                       playback.activeSceneIdAtPlayhead === activeScene.id
