@@ -406,12 +406,19 @@ export function WebcamRecorder({
       let previewStream: MediaStream;
 
       if (isScreenMode) {
-        const screenStream = await acquireScreen();
         if (isPipMode) {
+          // PiP — acquire the WEBCAM first so a busy/missing camera
+          // fails before the user picks a screen. Picking a screen
+          // only to discover the camera is in use by another tab/app
+          // is a frustrating dead end. Webcam permission is remembered
+          // per-origin in Chrome, so this isn't a "wasted" prompt on
+          // success.
           const webcamStream = await acquireWebcam(resolution, facingMode);
+          const screenStream = await acquireScreen();
           previewStream = startCanvasComposite(screenStream, webcamStream);
         } else {
           // Screen-only — mic for narration only, no camera prompt.
+          const screenStream = await acquireScreen();
           const micStream = await acquireMicOnly();
           const combined = new MediaStream([
             ...screenStream.getVideoTracks(),
@@ -432,12 +439,37 @@ export function WebcamRecorder({
       startAudioAnalysis(previewStream);
       setRecordingState("previewing");
     } catch (err) {
-      const msg =
-        err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Camera/microphone permission denied. Please allow access and try again."
-          : err instanceof DOMException && err.name === "NotFoundError"
-            ? "No camera or microphone found. Please connect a device and try again."
-            : `Failed to access media devices: ${err instanceof Error ? err.message : String(err)}`;
+      // Map browser DOMExceptions to actionable copy. NotReadableError
+      // is the Windows/Chrome "camera is busy" case — the device is
+      // held by another tab or process (Zoom/Slack/OBS) — and the
+      // user needs to be told *what to do*, not just shown the raw
+      // browser message. AbortError covers the user dismissing the
+      // screen-share picker.
+      let msg: string;
+      if (err instanceof DOMException) {
+        switch (err.name) {
+          case "NotAllowedError":
+            msg = "Camera/microphone permission denied. Please allow access and try again.";
+            break;
+          case "NotFoundError":
+            msg = "No camera or microphone found. Please connect a device and try again.";
+            break;
+          case "NotReadableError":
+          case "TrackStartError":
+            msg = "Your camera is being used by another app or browser tab. Close other apps that use the camera (Zoom, Slack, OBS, other tabs) and try again.";
+            break;
+          case "OverconstrainedError":
+            msg = "Your camera doesn't support the requested resolution. Lower the resolution in Settings and try again.";
+            break;
+          case "AbortError":
+            msg = "Screen share was cancelled. Click \"Share Screen\" again to retry.";
+            break;
+          default:
+            msg = `Failed to access media devices: ${err.message || err.name}`;
+        }
+      } else {
+        msg = `Failed to access media devices: ${err instanceof Error ? err.message : String(err)}`;
+      }
       setError(msg);
       // Drop any half-acquired streams so a retry from idle starts
       // clean rather than sitting on a half-set composite ref.

@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chrome, Loader2 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
-import { FilterChip } from "@/components/FilterChip";
+import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -276,31 +276,19 @@ export default function VendorSync() {
 
         {!loading && !error && connectors.length > 0 && (
           <>
-            {/* Category filter chips — single horizontally-scrollable row.
-                Replaces the prior "one section per category" layout per
-                #438. Active chip uses the filled button variant; idle chips
-                use outline so the row reads as a control, not navigation. */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-              <FilterChip
-                label="All vendors"
-                count={connectors.length}
-                active={activeCategory === "all"}
-                onClick={() => setActiveCategory("all")}
-              />
-              {VENDOR_CATEGORY_ORDER.map((cat) => {
-                const count = categoryCounts.get(cat) ?? 0;
-                if (count === 0) return null;
-                return (
-                  <FilterChip
-                    key={cat}
-                    label={VENDOR_CATEGORY_LABEL[cat]}
-                    count={count}
-                    active={activeCategory === cat}
-                    onClick={() => setActiveCategory(cat)}
-                  />
-                );
-              })}
-            </div>
+            {/* Single horizontally-scrollable filter row. Replaces the
+                prior "one section per category" layout per #438. */}
+            <CategoryFilterBar
+              value={activeCategory}
+              onChange={setActiveCategory}
+              allLabel="All vendors"
+              allCount={connectors.length}
+              options={VENDOR_CATEGORY_ORDER.map((cat) => ({
+                value: cat,
+                label: VENDOR_CATEGORY_LABEL[cat],
+                count: categoryCounts.get(cat) ?? 0,
+              }))}
+            />
 
             {/* Single unified grid — every visible card in one place,
                 category surfaced via the in-card chip on <VendorCard>. */}

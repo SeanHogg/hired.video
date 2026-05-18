@@ -163,8 +163,8 @@ interface RowProps {
 function TemplateRow({ template: t, busy, onEdit, onChangeVisibility, onArchive }: RowProps) {
   const badge = VISIBILITY_BADGE[t.visibility];
   const listingUrl = t.listingSlug
-    ? `/templates/${t.listingSlug}`
-    : `/templates/${t.id}`;
+    ? `/marketplace/templates/${t.listingSlug}`
+    : `/marketplace/templates/${t.id}`;
 
   return (
     <div className="rounded-md border border-border bg-card overflow-hidden flex flex-col">

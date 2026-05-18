@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppShell } from "@/components/AppShell";
+import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import { BLOG_POSTS, type BlogPost } from "@/data/blog-posts";
+import { slugify } from "@shared/slugify";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Resume Tips": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -36,6 +38,22 @@ const sortedPosts = [...BLOG_POSTS].sort(
   (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
 );
 
+function categorySlug(category: string): string {
+  return slugify(category, { fallback: "uncategorized" });
+}
+
+// Stable category list derived from the post catalog. Ordered by first
+// appearance in `sortedPosts` so newest-publishing categories surface
+// earliest in the chip row.
+const CATEGORY_LIST: { slug: string; label: string }[] = (() => {
+  const seen = new Map<string, string>();
+  for (const p of sortedPosts) {
+    const slug = categorySlug(p.category);
+    if (!seen.has(slug)) seen.set(slug, p.category);
+  }
+  return Array.from(seen, ([slug, label]) => ({ slug, label }));
+})();
+
 function matchesQuery(post: BlogPost, q: string): boolean {
   if (!q) return true;
   const haystack = [
@@ -59,6 +77,13 @@ export default function BlogIndex() {
   const viewMode = (searchParams.get("view") === "list" ? "list" : "grid") as
     | "grid"
     | "list";
+  const rawCategory = searchParams.get("category");
+  // Treat any unknown slug as "all" so a hand-typed/stale URL still renders
+  // the full catalogue rather than an empty grid.
+  const categoryFilter: string = useMemo(() => {
+    if (!rawCategory) return "all";
+    return CATEGORY_LIST.some((c) => c.slug === rawCategory) ? rawCategory : "all";
+  }, [rawCategory]);
 
   const setViewMode = (mode: "grid" | "list") => {
     const next = new URLSearchParams(searchParams);
@@ -67,10 +92,38 @@ export default function BlogIndex() {
     setSearchParams(next, { replace: true });
   };
 
-  const posts = useMemo(
+  const setCategoryFilter = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("category");
+    else params.set("category", next);
+    setSearchParams(params, { replace: true });
+  };
+
+  // Posts after the text query only — drives the chip counts so the
+  // numbers always reflect what the user will see if they click that chip.
+  const postsAfterQuery = useMemo(
     () => sortedPosts.filter((p) => matchesQuery(p, query)),
     [query],
   );
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of postsAfterQuery) {
+      const slug = categorySlug(p.category);
+      counts.set(slug, (counts.get(slug) ?? 0) + 1);
+    }
+    return counts;
+  }, [postsAfterQuery]);
+
+  const posts = useMemo(() => {
+    if (categoryFilter === "all") return postsAfterQuery;
+    return postsAfterQuery.filter((p) => categorySlug(p.category) === categoryFilter);
+  }, [postsAfterQuery, categoryFilter]);
+
+  const activeCategoryLabel =
+    categoryFilter === "all"
+      ? null
+      : CATEGORY_LIST.find((c) => c.slug === categoryFilter)?.label ?? null;
 
   return (
     <AppShell bgClassName="bg-background">
@@ -88,6 +141,20 @@ export default function BlogIndex() {
               </p>
             </div>
 
+            {/* Category filter row — chip counts reflect the active text
+                query so a chip never claims more guides than the grid
+                will render after the user clicks it. */}
+            <CategoryFilterBar
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              allCount={postsAfterQuery.length}
+              options={CATEGORY_LIST.map((c) => ({
+                value: c.slug,
+                label: c.label,
+                count: categoryCounts.get(c.slug) ?? 0,
+              }))}
+            />
+
             {/* Toolbar: result count + view toggle */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <p className="text-sm text-muted-foreground">
@@ -100,6 +167,14 @@ export default function BlogIndex() {
                     <span className="font-medium text-foreground">
                       &quot;{query}&quot;
                     </span>
+                    {activeCategoryLabel && (
+                      <>
+                        {" "}in{" "}
+                        <span className="font-medium text-foreground">
+                          {activeCategoryLabel}
+                        </span>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -107,6 +182,14 @@ export default function BlogIndex() {
                       {posts.length}
                     </span>{" "}
                     guides
+                    {activeCategoryLabel && (
+                      <>
+                        {" "}in{" "}
+                        <span className="font-medium text-foreground">
+                          {activeCategoryLabel}
+                        </span>
+                      </>
+                    )}
                   </>
                 )}
               </p>

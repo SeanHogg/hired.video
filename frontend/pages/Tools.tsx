@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { ToolCard } from "@/components/ToolCard";
-import { FilterChip } from "@/components/FilterChip";
+import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import {
   TOOLS_CATALOG,
   audienceForRole,
@@ -485,32 +485,20 @@ export default function Tools() {
               description="Access powerful AI tools to enhance your career and optimize your job search."
             />
 
-            {/* Category chips — same horizontal-scroll filter row pattern
-                used on /tools/vendor-sync. Active = filled, idle = outline.
-                Per-chip count reflects the audience+tier+search filters
+            {/* Per-chip count reflects the audience+tier+search filters
                 applied above so the chips never claim a count the grid
                 won't honour. Categories with zero matches drop out. */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
-              <FilterChip
-                label="All"
-                count={toolsByCategory.length}
-                active={categoryFilter === "all"}
-                onClick={() => setCategoryFilter("all")}
-              />
-              {CATEGORY_ORDER.map((cat) => {
-                const count = categoryCounts.get(cat) ?? 0;
-                if (count === 0) return null;
-                return (
-                  <FilterChip
-                    key={cat}
-                    label={cat}
-                    count={count}
-                    active={categoryFilter === cat}
-                    onClick={() => setCategoryFilter(cat)}
-                  />
-                );
-              })}
-            </div>
+            <CategoryFilterBar
+              className="mb-4"
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              allCount={toolsByCategory.length}
+              options={CATEGORY_ORDER.map((cat) => ({
+                value: cat,
+                label: cat,
+                count: categoryCounts.get(cat) ?? 0,
+              }))}
+            />
 
             {isFiltering && (
               <div className="mb-4">
