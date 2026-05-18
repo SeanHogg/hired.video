@@ -193,9 +193,6 @@ export type {
 export type { NotificationRow, NotificationInsert } from "./notificationsRepository.js";
 export type { ConversationRow, ConversationInsert, ConversationParticipantRow, ConversationParticipantInsert, MessageRow, MessageInsert, AiChatSessionRow, AiChatMessageRow } from "./conversationsRepository.js";
 export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, FollowUpLogRow } from "./followUpsRepository.js";
-export type { ExternalEmailAccountRow, ExternalEmailAccountInsert, ExternalEmailAccountPatch } from "./externalEmailAccountsRepository.js";
-export type { ExternalEmailMessageRow, ExternalEmailMessageInsert, ExternalEmailInboxRow } from "./externalEmailMessagesRepository.js";
-export type { EmailUserRuleRow, EmailUserRuleInsert, EmailUserRulePatch } from "./emailUserRulesRepository.js";
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";

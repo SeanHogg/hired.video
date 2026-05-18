@@ -316,6 +316,25 @@ export default function Pricing() {
     openCart();
   };
 
+  // `/pricing?upgrade=<slug>` deep-links from gated features land here with
+  // a slug identifying which feature the user hit. Server-side gates that
+  // can't render a 402 envelope (top-level browser navigations like the
+  // email-integration OAuth `/connect`) redirect through this. Registry
+  // is intentionally local — there are only a few slugs in scope today;
+  // hoist to a shared module if it crosses ~5 entries.
+  const upgradeSlug = new URLSearchParams(location.search).get("upgrade");
+  const upgradeCopy: Record<string, { title: string; description: string }> = {
+    "inbox-sync": {
+      title: "Inbox Sync is a Pro feature",
+      description: `Pro plans include ${INBOX_SYNC_INCLUDED_ACCOUNTS} connected Gmail / Outlook mailboxes — classify every recruiter pitch, ATS reply, interview invite, and offer into your unified inbox.`,
+    },
+    "inbox-extra": {
+      title: "You've connected the included mailboxes",
+      description: `Pro plans include ${INBOX_SYNC_INCLUDED_ACCOUNTS} mailboxes. Extra inboxes are $${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo each — contact support to add more while the add-on checkout ships.`,
+    },
+  };
+  const upgradeBanner = upgradeSlug ? upgradeCopy[upgradeSlug] ?? null : null;
+
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
 <div className="pt-16">
@@ -330,6 +349,20 @@ export default function Pricing() {
                 crowdsourcing, and recruitment marketing.
               </p>
             </div>
+
+            {upgradeBanner && (
+              <Card className="border-2 border-primary/40 bg-primary/5 max-w-4xl mx-auto mb-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    {upgradeBanner.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  {upgradeBanner.description}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Persona + Billing controls in one row */}
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 mb-6">
