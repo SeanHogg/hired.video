@@ -169,12 +169,13 @@ describe("canvasState ↔ Timeline round-trip", () => {
     expect(idsAfter).toEqual(idsBefore);
   });
 
-  it("survives an external nest of widget-<id> tracks (pre-unification data)", () => {
-    // Simulate a Timeline produced by the post-#832, pre-unification emit:
-    // one track per widget. The unified reader doesn't look at these
-    // tracks, but it MUST not crash — the migration is responsible for
-    // converting persisted data to v2 before serving, but a stale cache
-    // or a hand-edited blob shouldn't blow up the editor on load.
+  it("normalises pre-unification `widget-<id>` tracks back into the v2 shape on read", () => {
+    // Simulate a Timeline produced by the post-#832, pre-unification
+    // emit: one track per widget. The reader is the normalisation seam
+    // — it has to fold these back into widgets so projects authored
+    // during that window still hydrate (migration 0096 cleans the
+    // storage layer permanently, but the JS reader covers the window
+    // before it runs in any given environment).
     const stale: Timeline = {
       schemaVersion: 1,
       fps: 30,
@@ -204,25 +205,40 @@ describe("canvasState ↔ Timeline round-trip", () => {
             },
           ],
         },
-        // Pre-unification per-widget track — ignored by the strict reader.
+        // Two widget-<id> tracks — order on disk is deliberately not
+        // z-sorted so the reader's z-merge ordering is exercised.
         {
-          id: "widget-x",
+          id: "widget-top",
           kind: "video",
           label: "text",
-          gain: 1,
-          pan: 0,
-          muted: false,
-          solo: false,
-          locked: false,
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
           clips: [
             {
-              id: "x",
+              id: "top",
               sourceId: "",
               startFrame: 0,
               durationFrames: 60,
               sourceInFrame: 0,
               effects: [
-                { kind: "canvas-v2:text", params: { x: 0.1, y: 0.1, width: 0.3, height: 0.1, text: "x" } },
+                { kind: "canvas-v2:text", params: { x: 0.1, y: 0.1, width: 0.3, height: 0.1, text: "top", z: 5 } },
+              ],
+            },
+          ],
+        },
+        {
+          id: "widget-bottom",
+          kind: "video",
+          label: "text",
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
+          clips: [
+            {
+              id: "bottom",
+              sourceId: "",
+              startFrame: 0,
+              durationFrames: 60,
+              sourceInFrame: 0,
+              effects: [
+                { kind: "canvas-v2:text", params: { x: 0.1, y: 0.2, width: 0.3, height: 0.1, text: "bottom", z: 1 } },
               ],
             },
           ],
@@ -230,12 +246,9 @@ describe("canvasState ↔ Timeline round-trip", () => {
       ],
       markers: [],
     };
-    expect(() => timelineToCanvasState(stale)).not.toThrow();
     const restored = timelineToCanvasState(stale);
-    // The bg clip yields a scene with no widgets — that's fine. The
-    // migration (drizzle/0096_…) is what makes widget-* tracks visible
-    // by folding them into v2; this test pins the "doesn't crash"
-    // contract for the pre-migration case.
     expect(restored.scenes).toHaveLength(1);
+    // Both widgets surface, lower-z drawn first → array order [bottom, top].
+    expect(restored.scenes[0].widgets.map((w) => w.id)).toEqual(["bottom", "top"]);
   });
 });

@@ -30,24 +30,27 @@ DECLARE
   v2_track jsonb;
   new_tracks jsonb := '[]'::jsonb;
   spliced boolean := false;
-  t jsonb;
+  cur_track jsonb;
 BEGIN
   IF spec IS NULL OR jsonb_typeof(spec->'tracks') <> 'array' THEN
     RETURN spec;
   END IF;
 
   -- Gather every widget clip (one per widget-<id> track), z-sorted via
-  -- the clip's first-effect params.z field that emit time set.
+  -- the clip's first-effect params.z field that the emit time set.
+  -- Aliases use `track_elem`/`cur_track` to avoid colliding with any
+  -- declared variable name (PG raises "column reference is ambiguous"
+  -- when a DECLARE-d identifier shadows a SELECT alias).
   SELECT jsonb_agg(
-           (t->'clips'->0)
+           (track_elem->'clips'->0)
            ORDER BY COALESCE(
-             ((t->'clips'->0)->'effects'->0->'params'->>'z')::numeric,
+             ((track_elem->'clips'->0)->'effects'->0->'params'->>'z')::numeric,
              1
            )
          )
     INTO v2_clips
-    FROM jsonb_array_elements(spec->'tracks') AS t
-   WHERE t->>'id' LIKE 'widget-%' AND t->>'kind' = 'video';
+    FROM jsonb_array_elements(spec->'tracks') AS track_elem
+   WHERE track_elem->>'id' LIKE 'widget-%' AND track_elem->>'kind' = 'video';
 
   -- No widget-* tracks → nothing to fold. Leave the row alone.
   IF v2_clips IS NULL THEN
@@ -70,15 +73,17 @@ BEGIN
   -- track; splice the new v2 track in at the position of the FIRST
   -- widget track we encountered so paint order stays after v1 + before
   -- v3 — same layering the renderer expects.
-  FOR t IN SELECT x FROM jsonb_array_elements(spec->'tracks') AS x
+  FOR cur_track IN
+    SELECT track_elem
+      FROM jsonb_array_elements(spec->'tracks') AS track_elem
   LOOP
-    IF t->>'id' LIKE 'widget-%' AND t->>'kind' = 'video' THEN
+    IF cur_track->>'id' LIKE 'widget-%' AND cur_track->>'kind' = 'video' THEN
       IF NOT spliced THEN
         new_tracks := new_tracks || jsonb_build_array(v2_track);
         spliced := true;
       END IF;
     ELSE
-      new_tracks := new_tracks || jsonb_build_array(t);
+      new_tracks := new_tracks || jsonb_build_array(cur_track);
     END IF;
   END LOOP;
 

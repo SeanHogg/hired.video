@@ -546,13 +546,34 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   const fps = timeline.fps;
   const v1 = timeline.tracks.find((t) => t.id === "v1") ?? timeline.tracks[0];
   const v3 = timeline.tracks.find((t) => t.id === "v3");
-  // Widgets live on the `v2` track — one track for every overlay
-  // clip in the composition. Paint order = clip-array order, baked in
-  // by `canvasStateToTimeline` (which sorts by z before emit). The
+  // Widgets live on the `v2` track — one track for every overlay clip
+  // in the composition. Paint order = clip-array order, baked in by
+  // `canvasStateToTimeline` (which sorts by z before emit). The
   // renderer iterates every active clip on `v2` per frame via
   // `activeClipsAt`, so simultaneous widgets all draw.
+  //
+  // Stored timelines authored between #832 and the unification used
+  // one dedicated `widget-<id>` track per widget. Migration 0096
+  // folds those back into v2 server-side, but until it runs in a
+  // given environment the JS reader normalises the input shape on
+  // the fly: any `widget-<id>` track's clips merge into `widgetClips`,
+  // z-sorted via the same `effects[0].params.z` field the emit uses
+  // for the v2 ordering. The first save after load re-emits as the
+  // canonical v2 shape, so data converges with or without the SQL
+  // migration. Reader stays the single normalisation seam — emit +
+  // render keep one shape end-to-end.
   const v2 = timeline.tracks.find((t) => t.id === "v2" && t.kind === "video");
-  const widgetClips = v2?.clips ?? [];
+  const legacyWidgetTrackClips = timeline.tracks
+    .filter((t) => t.kind === "video" && t.id.startsWith("widget-"))
+    .flatMap((t) => t.clips);
+  const widgetClips = [
+    ...(v2?.clips ?? []),
+    ...legacyWidgetTrackClips.slice().sort((a, b) => {
+      const az = Number(a.effects?.[0]?.params?.z ?? 1);
+      const bz = Number(b.effects?.[0]?.params?.z ?? 1);
+      return (Number.isFinite(az) ? az : 1) - (Number.isFinite(bz) ? bz : 1);
+    }),
+  ];
 
   const scenes: Scene[] = [];
   const v1Clips = (v1?.clips ?? []).slice().sort((a, b) => a.startFrame - b.startFrame);
