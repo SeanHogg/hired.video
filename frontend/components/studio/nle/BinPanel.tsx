@@ -15,8 +15,16 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Search, Folder, Tag as TagIcon, Pencil, Link2Off } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  Folder,
+  Tag as TagIcon,
+  Pencil,
+  Link2Off,
+  Upload,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +39,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { nleApi, type NleMediaSourceWithBin } from "@/lib/timeline/api";
 import { NLE_SOURCE_DRAG_MIME } from "@/lib/timeline/dnd";
+import { probeSource } from "@/lib/timeline/source-probe";
+import { useToast } from "@/hooks/use-toast";
 import RelinkSourceDialog from "./RelinkSourceDialog";
 
 interface Props {
@@ -51,6 +61,9 @@ export default function BinPanel({ initial, onPickSource }: Props) {
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<NleMediaSourceWithBin | null>(null);
   const [relinkTarget, setRelinkTarget] = useState<NleMediaSourceWithBin | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (loaded) return;
@@ -112,9 +125,85 @@ export default function BinPanel({ initial, onPickSource }: Props) {
     setSources((prev) => prev.map((s) => (s.id === next.id ? next : s)));
   };
 
+  // Probe + upload — shared by the Upload button and any future drop-
+  // file-into-panel handler. nleApi.uploadSource dedupes server-side by
+  // content hash, so a second upload of the same file returns the
+  // existing row instead of growing the bin.
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        try {
+          const probed = await probeSource(file);
+          const upload = await nleApi.uploadSource(file, {
+            kind: probed.kind,
+            durationFrames: probed.durationFrames,
+            fps: probed.fps,
+            width: probed.width ?? null,
+            height: probed.height ?? null,
+          });
+          // The server returns a plain MediaSource; the bin shape adds
+          // (folder, tags). Default to root/no-tags so the row appears
+          // immediately; the user can edit metadata via the pencil icon.
+          const row: NleMediaSourceWithBin = {
+            ...upload.source,
+            binFolder: null,
+            tags: [],
+          };
+          setSources((prev) =>
+            // Server dedupe means we may already have this id — replace
+            // to keep filename / metadata authoritative.
+            prev.some((s) => s.id === row.id)
+              ? prev.map((s) => (s.id === row.id ? row : s))
+              : [row, ...prev],
+          );
+          if (upload.deduped) {
+            toast({
+              title: "Already in your bin",
+              description: file.name,
+            });
+          }
+        } catch (err) {
+          toast({
+            title: `Couldn't add ${file.name}`,
+            description: err instanceof Error ? err.message : "Upload failed",
+            variant: "destructive",
+          });
+        }
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*,audio/*,image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => void handleFiles(e.target.files)}
+      />
       <div className="flex items-center gap-1.5 p-2 border-b">
+        <Button
+          size="sm"
+          variant="default"
+          className="h-7 px-2 text-[11px] gap-1"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          title="Upload media"
+        >
+          {uploading ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Upload className="h-3 w-3" />
+          )}
+          Upload
+        </Button>
         <div className="relative flex-1">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
@@ -173,7 +262,9 @@ export default function BinPanel({ initial, onPickSource }: Props) {
         )}
         {loaded && filtered.length === 0 && (
           <div className="text-[11px] text-muted-foreground text-center py-6">
-            {sources.length === 0 ? "No sources yet — drag in a video to start." : "No matches."}
+            {sources.length === 0
+              ? "No sources yet — click Upload to add a video, image, or audio file."
+              : "No matches."}
           </div>
         )}
         {filtered.map((src) => (
