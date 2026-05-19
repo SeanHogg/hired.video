@@ -9,6 +9,7 @@ import type { CompanyBenefits } from "../db/schema/companies.js";
 import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
 import { slugify } from "../../../shared/slugify.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
+import { withCacheHeaders } from "../utils/cache-headers.js";
 
 const {
   companyProfiles,
@@ -191,6 +192,11 @@ companyRoutes.get("/public", async (c) => {
   const total = countRow?.count ?? 0;
   const totalPages = Math.ceil(total / limit);
 
+  // CDN-cacheable: anonymous + no side effects. 60s browser / 5min edge
+  // means a new company shows up in the public list within a few minutes
+  // of being created, which is fine — the company already advertised
+  // itself via every other surface (their own profile URL, jobs feed).
+  withCacheHeaders(c, { scope: "public", maxAge: 60, sMaxAge: 300, swr: 600 });
   return c.json(success({ items: rows.map(rowToCompanyMeta), total, page, limit, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 }), 200);
 });
 

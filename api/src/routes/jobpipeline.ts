@@ -18,8 +18,15 @@ import {
 } from "../../../shared/recruiter-pipeline.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import * as pipelineService from "../services/pipeline/PipelineService.js";
+import { cacheMiddleware } from "../utils/cache-headers.js";
 
 export const jobPipelineRoutes = new Hono<{ Variables: Variables }>();
+
+// Pipeline reads are recruiter-scoped per-job kanban state. 30s is short
+// enough that drag-drop updates land via the optimistic mutation path
+// before the next refresh; the cache only short-circuits between page
+// navigations (Pipeline → Job → back).
+jobPipelineRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 30 }));
 
 const STAGE_ENUM = z.enum(PIPELINE_STAGES);
 

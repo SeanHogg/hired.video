@@ -26,6 +26,7 @@ import { getDb, schema } from "../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { slugify } from "../../../shared/slugify.js";
+import { withCacheHeaders } from "../utils/cache-headers.js";
 
 const { articles, users, userProfiles, creatorProfiles, feedPosts } = schema;
 
@@ -123,6 +124,11 @@ articleRoutes.get("/public", async (c) => {
         slug: r.authorProfile?.customUrlSlug ?? r.author.id,
       },
     }));
+    // CDN-cacheable: list response is identical for every anonymous
+    // caller with the same (limit) query and has no per-request side
+    // effects (the slug read below IS view-tracked — do NOT lift this
+    // header up to a wildcard `articleRoutes.use("/public/*")`).
+    withCacheHeaders(c, { scope: "public", maxAge: 60, sMaxAge: 300, swr: 600 });
     return c.json(success(items), 200);
   } catch (e) {
     return c.json(success([] as unknown[]), 200);

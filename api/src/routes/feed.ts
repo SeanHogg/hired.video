@@ -117,6 +117,12 @@ async function createMentionNotifications(
 
 export const feedRoutes = new Hono<{ Variables: Variables }>();
 
+// Feed reads are visibility-filtered per-user (privacy + recruiter role +
+// connection graph), so cache is `private` — never CDN-cached. 30s is
+// short enough that a new post lands in the timeline on the next refresh
+// without being noticeable, and saves a query every page transition.
+feedRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 30 }));
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DTO builder
 // ─────────────────────────────────────────────────────────────────────────────
