@@ -192,13 +192,22 @@ async function preloadNested(id: string, parent: RendererState): Promise<void> {
  * Order:
  *   1. Fill background.
  *   2. For each VIDEO track in array order (lower index = drawn first =
- *      under), find the active clip at this frame and draw it.
+ *      under), draw EVERY clip whose visible window contains this frame.
+ *      Within a track, clips are drawn in array order so the caller
+ *      (canvasStateToTimeline) can encode paint order by sorting clips
+ *      by z before emit. This is the only sane model for overlay tracks
+ *      where multiple widgets can be visible at the same instant — a
+ *      "one active clip per track per frame" rule would silently drop
+ *      every widget after the first.
  *   3. Audio tracks are ignored — they're rendered via a parallel audio
  *      path in the strategy.
  *
- * Cross-dissolve and fade-to-black transitions are honoured by reading
- * the outgoing clip's `outTransition` and blending against the next
- * clip on the same track for `durationFrames` of overlap.
+ * Cross-dissolve and fade-to-black transitions are honoured per active
+ * clip: each clip's `outTransition` blends against the next clip on the
+ * same track once the playhead enters the transition window. Tracks
+ * carrying sequential clips (a background track with one bg-per-scene)
+ * see the same behaviour as before; tracks carrying simultaneous clips
+ * just stack.
  */
 export async function renderTimelineFrame(
   canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -215,31 +224,33 @@ export async function renderTimelineFrame(
 
   for (const track of timeline.tracks) {
     if (track.kind !== "video") continue;
-    const active = activeClipAt(track.clips, frame);
-    if (!active) continue;
-    await drawClip(ctx, canvas, active, frame, timeline, state);
+    const actives = activeClipsAt(track.clips, frame);
+    if (actives.length === 0) continue;
+    for (const active of actives) {
+      await drawClip(ctx, canvas, active, frame, timeline, state);
 
-    // Cross-dissolve: when the active clip's out-transition overlaps
-    // the next clip's in-frame, draw the next clip on top with alpha
-    // proportional to how far we are through the transition.
-    const next = nextClipAfter(track.clips, active);
-    const tr = active.outTransition;
-    if (next && tr && tr.kind === "cross-dissolve" && tr.durationFrames > 0) {
-      const transitionStart = active.startFrame + active.durationFrames - tr.durationFrames;
-      if (frame >= transitionStart) {
-        const t = (frame - transitionStart) / tr.durationFrames;
-        const prevAlpha = ctx.globalAlpha;
-        ctx.globalAlpha = Math.max(0, Math.min(1, t));
-        await drawClip(ctx, canvas, next, frame, timeline, state);
-        ctx.globalAlpha = prevAlpha;
+      // Cross-dissolve: when this active clip's out-transition overlaps
+      // the next clip's in-frame, draw the next clip on top with alpha
+      // proportional to how far we are through the transition.
+      const next = nextClipAfter(track.clips, active);
+      const tr = active.outTransition;
+      if (next && tr && tr.kind === "cross-dissolve" && tr.durationFrames > 0) {
+        const transitionStart = active.startFrame + active.durationFrames - tr.durationFrames;
+        if (frame >= transitionStart) {
+          const t = (frame - transitionStart) / tr.durationFrames;
+          const prevAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = Math.max(0, Math.min(1, t));
+          await drawClip(ctx, canvas, next, frame, timeline, state);
+          ctx.globalAlpha = prevAlpha;
+        }
       }
-    }
-    if (tr && tr.kind === "fade-to-black" && tr.durationFrames > 0) {
-      const transitionStart = active.startFrame + active.durationFrames - tr.durationFrames;
-      if (frame >= transitionStart) {
-        const t = (frame - transitionStart) / tr.durationFrames;
-        ctx.fillStyle = "rgba(0,0,0," + Math.max(0, Math.min(1, t)) + ")";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (tr && tr.kind === "fade-to-black" && tr.durationFrames > 0) {
+        const transitionStart = active.startFrame + active.durationFrames - tr.durationFrames;
+        if (frame >= transitionStart) {
+          const t = (frame - transitionStart) / tr.durationFrames;
+          ctx.fillStyle = "rgba(0,0,0," + Math.max(0, Math.min(1, t)) + ")";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
       }
     }
   }
@@ -273,12 +284,20 @@ export function resolveClipSource(
   return { sourceId: angle.sourceId, syncOffsetFrames: angle.syncOffsetFrames };
 }
 
-/** Find the clip that contains `frame`, or null. Clips are sorted. */
-function activeClipAt(clips: Clip[], frame: number): Clip | null {
+/**
+ * Every clip whose visible window contains `frame`, in clip-array
+ * order. The caller (canvasStateToTimeline) sorts clips by z before
+ * emit so array order = paint order at render time. Returns [] when
+ * no clip is active.
+ */
+function activeClipsAt(clips: Clip[], frame: number): Clip[] {
+  const out: Clip[] = [];
   for (const c of clips) {
-    if (frame >= c.startFrame && frame < c.startFrame + c.durationFrames) return c;
+    if (frame >= c.startFrame && frame < c.startFrame + c.durationFrames) {
+      out.push(c);
+    }
   }
-  return null;
+  return out;
 }
 
 function nextClipAfter(clips: Clip[], clip: Clip): Clip | null {

@@ -48,23 +48,25 @@ import {
 
 /**
  * Emit a Timeline JSON document from canvas state. Each scene becomes a
- * background clip on `v1` plus one DEDICATED widget track per widget
- * (`widget-<widgetId>`). One-track-per-widget is the load-bearing
- * invariant: it gives every widget its own active-clip slot under
- * `renderTimelineFrame`'s "one active clip per track per frame" rule
- * — without this, simultaneous widgets in the same scene would
- * overlap on a shared track and fail `isRenderable()`. Track ordering
- * within the emitted timeline encodes paint order: lower index draws
- * first (further back), higher index draws on top. Widget tracks are
- * sorted by `widget.position.z` so the saved z-index reads correctly
- * at render time.
+ * background clip on `v1`; every widget across every scene is appended
+ * to `v2` as an overlay clip. There is ONE timeline shape: the same
+ * five tracks, the same clip semantics, the same paint order — no
+ * legacy/new branching anywhere. The render-side enforces the layering
+ * via `activeClipsAt` (returns every clip whose visible window contains
+ * the current frame, in clip-array order), so multiple simultaneous
+ * widgets all draw. Clips on v2 are sorted by `widget.position.z`
+ * before emit so array order = paint order at render time.
  */
 export function canvasStateToTimeline(state: CanvasState): Timeline {
   const fps = state.fps;
   let cursor = 0;
 
   const v1: Track = defaultTrack({ id: "v1", kind: "video", label: "Background" });
-  // `v3` ("scene-post") sits ABOVE every widget track so its sourceless
+  // `v2` ("widgets") carries every overlay clip in the composition.
+  // The renderer iterates every active clip on it per frame, in array
+  // order, so we sort the clips by z before final assembly.
+  const v2: Track = defaultTrack({ id: "v2", kind: "video", label: "Widgets" });
+  // `v3` ("scene-post") sits ABOVE the widget track so its sourceless
   // clips' effects run after every widget has been composited — that's
   // what lets scene-level blur / glow / vignette / film-grain see the
   // full frame instead of just the bg. Adding a clip is `{startFrame,
@@ -72,9 +74,9 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   const v3: Track = defaultTrack({ id: "v3", kind: "video", label: "Scene post" });
   const a1: Track = defaultTrack({ id: "a1", kind: "audio", label: "A1" });
   const a2: Track = defaultTrack({ id: "a2", kind: "audio", label: "A2" });
-  // One track per widget across the whole composition. Sorted by z
-  // before assembly so render-time paint order matches authoring intent.
-  const widgetEntries: Array<{ track: Track; z: number }> = [];
+  // Collect widget clips with their z so we can sort them globally
+  // before pushing into v2 (paint order = clip-array order).
+  const widgetEntries: Array<{ clip: Clip; z: number }> = [];
 
   for (const scene of state.scenes) {
     const sceneFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
@@ -121,13 +123,7 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     for (const widget of scene.widgets) {
       const clip = widgetToClip(widget, cursor, sceneFrames, fps);
       if (!clip) continue;
-      const track = defaultTrack({
-        id: `widget-${widget.id}`,
-        kind: "video",
-        label: widget.params.kind,
-      });
-      track.clips.push(clip);
-      widgetEntries.push({ track, z: widget.position.z });
+      widgetEntries.push({ clip, z: widget.position.z });
     }
 
     // Scene-level post-effects ride on v3 (sourceless clip with the
@@ -253,12 +249,13 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     });
   }
 
-  // Sort widget tracks by z so the renderer paints lower-z first and
-  // higher-z on top — same compositing order CanvasStage uses via
-  // CSS z-index. Two widgets in different scenes never share a frame
-  // (scenes are sequential), so a stable global sort is sufficient.
+  // Sort widget clips by z and push into v2 so the renderer paints
+  // lower-z first and higher-z on top — same compositing order
+  // CanvasStage uses via CSS z-index. Two widgets in different scenes
+  // never share a frame (scenes are sequential), so a stable global
+  // sort is sufficient.
   widgetEntries.sort((a, b) => a.z - b.z);
-  const widgetTracks = widgetEntries.map((e) => e.track);
+  for (const { clip } of widgetEntries) v2.clips.push(clip);
 
   const timeline: Timeline = {
     schemaVersion: TIMELINE_SCHEMA_VERSION,
@@ -266,7 +263,7 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     width: state.width,
     height: state.height,
     backgroundColor: "#000000",
-    tracks: [v1, ...widgetTracks, v3, a1, a2],
+    tracks: [v1, v2, v3, a1, a2],
     markers: state.scenes.map((scene, idx) => ({
       id: scene.id,
       frame: sceneStartFrame(state, idx, fps),
@@ -549,26 +546,13 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   const fps = timeline.fps;
   const v1 = timeline.tracks.find((t) => t.id === "v1") ?? timeline.tracks[0];
   const v3 = timeline.tracks.find((t) => t.id === "v3");
-  // Widgets live on per-widget tracks named `widget-<widgetId>` (one
-  // track per widget enforces the renderer's "one active clip per
-  // track per frame" rule). Collect every widget clip across the
-  // composition so the per-scene bucketing below sees them as a flat
-  // list. Paint order is the array order baked in by
-  // `canvasStateToTimeline` (which sorts by z before emit).
-  //
-  // Legacy `v2` track is read alongside the per-widget tracks so any
-  // timeline saved before the per-widget-track split (pre-#832 emit)
-  // still hydrates its widgets even before migration 0096 has been
-  // applied in a given environment. Without this safety net, opening
-  // a legacy project on an un-migrated DB hydrates an empty canvas
-  // state; saving from that state PERMANENTLY rewrites the project
-  // with zero widgets. Migration 0096 + this fallback are belt-and-
-  // suspenders for the cutover window.
-  const widgetClips = timeline.tracks
-    .filter(
-      (t) => t.kind === "video" && (t.id.startsWith("widget-") || t.id === "v2"),
-    )
-    .flatMap((t) => t.clips);
+  // Widgets live on the `v2` track — one track for every overlay
+  // clip in the composition. Paint order = clip-array order, baked in
+  // by `canvasStateToTimeline` (which sorts by z before emit). The
+  // renderer iterates every active clip on `v2` per frame via
+  // `activeClipsAt`, so simultaneous widgets all draw.
+  const v2 = timeline.tracks.find((t) => t.id === "v2" && t.kind === "video");
+  const widgetClips = v2?.clips ?? [];
 
   const scenes: Scene[] = [];
   const v1Clips = (v1?.clips ?? []).slice().sort((a, b) => a.startFrame - b.startFrame);
