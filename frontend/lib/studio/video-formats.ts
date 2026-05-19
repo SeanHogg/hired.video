@@ -38,8 +38,6 @@ export interface SafeZone {
   inset: { top: number; right: number; bottom: number; left: number };
 }
 
-export type FormatCategory = "social" | "billboard" | "classic";
-
 export interface VideoFormat {
   /** Stable id — used as the picker's `value`. */
   id: string;
@@ -50,9 +48,6 @@ export interface VideoFormat {
   height: number;
   aspect: AspectRatio;
   resolution: ResolutionTier;
-  /** Picker grouping. Drives the section header order: social → billboard →
-   *  classic. Defaults to "social" when omitted. */
-  category?: FormatCategory;
   /** Pro-only badge on the picker. 4K + portrait-4K are Pro per v1's
    *  existing gate (StudioSettings labels them with `qualityProSuffix`). */
   proOnly: boolean;
@@ -62,6 +57,23 @@ export interface VideoFormat {
    *  the format has no destination-specific safe area. */
   safeZones?: SafeZone[];
 }
+
+/** Shared 5% action / bleed safe inset — used by landscape-1080p (SMPTE
+ *  action-safe convention) and every billboard format (mounting bleed).
+ *  One declaration so a future tweak ("tighten to 7%?") changes every
+ *  consumer in one edit. */
+const BLEED_SAFE_INSET = {
+  top: 0.05,
+  right: 0.05,
+  bottom: 0.05,
+  left: 0.05,
+} as const;
+
+const BLEED_SAFE_ZONE: SafeZone = {
+  kind: "action-safe",
+  label: "Bleed safe (90%)",
+  inset: BLEED_SAFE_INSET,
+};
 
 export const VIDEO_FORMATS: VideoFormat[] = [
   {
@@ -77,13 +89,7 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     // convention. Useful for the "looks like a TV ad" social-marketing
     // use case so titles don't crowd the frame edge; the formal
     // BS.1770/EBU R128 broadcast pass is roadmap (#845).
-    safeZones: [
-      {
-        kind: "action-safe",
-        label: "Action safe (90%)",
-        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
-      },
-    ],
+    safeZones: [{ ...BLEED_SAFE_ZONE, label: "Action safe (90%)" }],
   },
   {
     id: "landscape-720p",
@@ -173,7 +179,6 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     height: 768,
     aspect: "4:3",
     resolution: "720p",
-    category: "classic",
     proOnly: false,
   },
   // Outdoor / digital-signage formats. Bleed-safe insets keep the message
@@ -189,15 +194,8 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     height: 480,
     aspect: "4:1",
     resolution: "1080p",
-    category: "billboard",
     proOnly: false,
-    safeZones: [
-      {
-        kind: "action-safe",
-        label: "Bleed safe (90%)",
-        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
-      },
-    ],
+    safeZones: [BLEED_SAFE_ZONE],
   },
   {
     id: "billboard-ultrawide-1080",
@@ -207,15 +205,8 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     height: 320,
     aspect: "6:1",
     resolution: "1080p",
-    category: "billboard",
     proOnly: false,
-    safeZones: [
-      {
-        kind: "action-safe",
-        label: "Bleed safe (90%)",
-        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
-      },
-    ],
+    safeZones: [BLEED_SAFE_ZONE],
   },
   {
     id: "billboard-tall-1080",
@@ -225,15 +216,8 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     height: 1080,
     aspect: "1:2",
     resolution: "1080p",
-    category: "billboard",
     proOnly: false,
-    safeZones: [
-      {
-        kind: "action-safe",
-        label: "Bleed safe (90%)",
-        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
-      },
-    ],
+    safeZones: [BLEED_SAFE_ZONE],
   },
 ];
 

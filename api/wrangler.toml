@@ -48,8 +48,8 @@ bucket_name = "hired-videos-temp"
 # then paste the returned ids into `id` / `preview_id` below.
 [[kv_namespaces]]
 binding = "KV_CACHE"
-id = "REPLACE_WITH_KV_CACHE_ID"
-preview_id = "REPLACE_WITH_KV_CACHE_PREVIEW_ID"
+id = "8be133d4c3554532bc42fa4587fbf260"
+preview_id = "e1b7ddb50cb14765bfb3a8375544ca55"
 
 [ai]
 binding = "AI"
@@ -124,7 +124,7 @@ bucket_name = "hired-videos-temp"
 
 [[env.production.kv_namespaces]]
 binding = "KV_CACHE"
-id = "REPLACE_WITH_KV_CACHE_PROD_ID"
+id = "8be133d4c3554532bc42fa4587fbf260"
 
 [env.production.ai]
 binding = "AI"
