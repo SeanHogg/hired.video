@@ -98,7 +98,6 @@ import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capt
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
-import BinPanel from "@/components/studio/nle/BinPanel";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
 import CanvasV2Preview from "@/components/studio/v2/CanvasV2Preview";
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
@@ -210,7 +209,7 @@ export default function StudioEditorV2() {
   // the Actions panel armed for recording. Override the default tab +
   // expansion when that's the case so the user lands directly in the
   // recorder sheet (#651).
-  const [leftTab, setLeftTab] = useState<LeftTabId>(
+  const [leftTab, setLeftTab] = useState<"widgets" | "actions">(
     urlCapture ? "actions" : "widgets",
   );
   // Whether the Widgets/Actions section (below the scenes rail) is
@@ -1249,45 +1248,6 @@ export default function StudioEditorV2() {
                       onCaptureScreenshot={() => placeScreenshot()}
                     />
                   )}
-                  {leftTab === "media" && (
-                    <BinPanel
-                      onPickSource={(src) => {
-                        // Bin sources land on the active scene as the
-                        // matching widget kind. Image/video go straight
-                        // into a canvas widget via the same addMediaWidget
-                        // path the MediaPicker + screenshot drops use.
-                        // Audio sources mount as a voiceover clip anchored
-                        // to the active scene so the existing audio
-                        // mixer + ducking pipeline picks them up.
-                        if (src.kind === "image") {
-                          addMediaWidget("image", src.url, 0);
-                        } else if (src.kind === "video") {
-                          addMediaWidget(
-                            "video",
-                            src.url,
-                            src.durationFrames / src.fps,
-                          );
-                        } else if (src.kind === "audio") {
-                          addVoiceoverClip({
-                            id:
-                              typeof crypto !== "undefined" && "randomUUID" in crypto
-                                ? crypto.randomUUID()
-                                : `vo_${Date.now()}`,
-                            url: src.url,
-                            durationSeconds: src.durationFrames / src.fps,
-                            anchorSceneId: activeSceneId,
-                            label: src.filename,
-                            gain: 1,
-                            muted: false,
-                          });
-                          toast({
-                            title: "Added as voiceover",
-                            description: src.filename,
-                          });
-                        }
-                      }}
-                    />
-                  )}
                   {leftTab === "actions" && (
                     <ActionsPanel
                       defaultOpenAction={urlCapture ?? undefined}
@@ -1794,7 +1754,6 @@ function EditorHeader({
 // section group — selecting nothing on the canvas surfaces it there.
 const LEFT_TABS = [
   { id: "widgets", label: "Widgets" },
-  { id: "media", label: "Media" },
   { id: "actions", label: "Actions" },
 ] as const;
 type LeftTabId = (typeof LEFT_TABS)[number]["id"];

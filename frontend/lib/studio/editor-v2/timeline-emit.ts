@@ -555,8 +555,19 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   // composition so the per-scene bucketing below sees them as a flat
   // list. Paint order is the array order baked in by
   // `canvasStateToTimeline` (which sorts by z before emit).
+  //
+  // Legacy `v2` track is read alongside the per-widget tracks so any
+  // timeline saved before the per-widget-track split (pre-#832 emit)
+  // still hydrates its widgets even before migration 0096 has been
+  // applied in a given environment. Without this safety net, opening
+  // a legacy project on an un-migrated DB hydrates an empty canvas
+  // state; saving from that state PERMANENTLY rewrites the project
+  // with zero widgets. Migration 0096 + this fallback are belt-and-
+  // suspenders for the cutover window.
   const widgetClips = timeline.tracks
-    .filter((t) => t.kind === "video" && t.id.startsWith("widget-"))
+    .filter(
+      (t) => t.kind === "video" && (t.id.startsWith("widget-") || t.id === "v2"),
+    )
     .flatMap((t) => t.clips);
 
   const scenes: Scene[] = [];
