@@ -339,9 +339,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: runtimeConfig.isProduction ? 3 : 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
-      refetchOnWindowFocus: runtimeConfig.isProduction,
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 15 * 60 * 1000, // 15 minutes
+      // Tab-switch refetch was firing every active query on focus return
+      // and was the single biggest source of avoidable API traffic.
+      // Hooks that need fresh data on focus opt in per-query.
+      refetchOnWindowFocus: false,
     },
     mutations: {
       retry: runtimeConfig.isProduction ? 2 : 0,

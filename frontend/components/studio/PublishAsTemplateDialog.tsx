@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Sparkles, Store, ShoppingBag, ExternalLink } from "lucide-react";
+import { ImageIcon, Loader2, Sparkles, Store, ShoppingBag, ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +39,7 @@ import {
   studioTemplatesService,
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 interface Props {
   open: boolean;
@@ -84,6 +85,7 @@ export default function PublishAsTemplateDialog({
   const [priceDollars, setPriceDollars] = useState<string>("0");
   const [visibility, setVisibility] = useState<"private" | "unlisted" | "public">("public");
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(defaultThumbnailUrl ?? null);
   const [submitting, setSubmitting] = useState(false);
 
   // Reset + refresh creator status whenever the dialog re-opens so we react
@@ -95,6 +97,7 @@ export default function PublishAsTemplateDialog({
     setPriceDollars("0");
     setVisibility("public");
     setConsentAccepted(false);
+    setThumbnailUrl(defaultThumbnailUrl ?? null);
     setCreatorState({ status: "loading" });
 
     let cancelled = false;
@@ -111,7 +114,7 @@ export default function PublishAsTemplateDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, defaultName]);
+  }, [open, defaultName, defaultThumbnailUrl]);
 
   const isVideoCreator =
     creatorState.status === "ready" && creatorState.profile?.videoActive === true;
@@ -151,7 +154,7 @@ export default function PublishAsTemplateDialog({
         sourceProjectId: projectId,
         name: name.trim(),
         description: description.trim() || null,
-        thumbnailUrl: defaultThumbnailUrl ?? null,
+        thumbnailUrl: thumbnailUrl ?? null,
         priceCents,
         visibility,
         consentAccepted: visibility === "public" ? consentAccepted : undefined,
@@ -234,6 +237,45 @@ export default function PublishAsTemplateDialog({
                 maxLength={4000}
                 rows={3}
               />
+            </div>
+
+            <div>
+              <Label>Thumbnail</Label>
+              <div className="mt-1 flex items-center gap-3">
+                {thumbnailUrl ? (
+                  <div className="relative w-24 h-24 rounded-md overflow-hidden border bg-muted shrink-0">
+                    <img
+                      src={thumbnailUrl}
+                      alt="Template thumbnail"
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                    <button
+                      type="button"
+                      aria-label="Remove thumbnail"
+                      onClick={() => setThumbnailUrl(null)}
+                      className="absolute top-0.5 right-0.5 rounded-full bg-background/80 hover:bg-background p-0.5 border"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-md border border-dashed flex items-center justify-center bg-muted/30 text-muted-foreground shrink-0">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <MediaPicker
+                    accept="image"
+                    title="Choose template thumbnail"
+                    triggerLabel={thumbnailUrl ? "Change image" : "Choose image"}
+                    onPick={(asset) => setThumbnailUrl(asset.url)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Shown in marketplace search and on your "My published templates" list.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

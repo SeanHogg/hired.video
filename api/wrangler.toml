@@ -37,6 +37,20 @@ head_sampling_rate = 1
 binding = "VIDEO_BUCKET"
 bucket_name = "hired-videos-temp"
 
+# Edge cache shared by BillingService.getSubscription and the generic
+# utils/edge-cache.ts `getOrSetCached` helper. Without this binding the
+# in-memory Map is the only cache layer, and it dies with each isolate —
+# meaning the 60s plan cache effectively never hit cross-request in prod.
+#
+# Create the namespace once with:
+#   wrangler kv:namespace create KV_CACHE
+#   wrangler kv:namespace create KV_CACHE --preview
+# then paste the returned ids into `id` / `preview_id` below.
+[[kv_namespaces]]
+binding = "KV_CACHE"
+id = "REPLACE_WITH_KV_CACHE_ID"
+preview_id = "REPLACE_WITH_KV_CACHE_PREVIEW_ID"
+
 [ai]
 binding = "AI"
 
@@ -107,6 +121,10 @@ PAYMENT_PROVIDER = "helcim"
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"
 bucket_name = "hired-videos-temp"
+
+[[env.production.kv_namespaces]]
+binding = "KV_CACHE"
+id = "REPLACE_WITH_KV_CACHE_PROD_ID"
 
 [env.production.ai]
 binding = "AI"

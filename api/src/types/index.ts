@@ -20,6 +20,10 @@ export interface Env {
   YOUTUBE_CLIENT_SECRET?: string;
   YOUTUBE_REFRESH_TOKEN?: string;
   VIDEO_BUCKET: R2Bucket;
+  // Edge cache binding consumed by utils/edge-cache.ts. Optional because
+  // local dev / preview deploys may run without a KV namespace attached;
+  // helpers fall through to the in-memory tier when this is missing.
+  KV_CACHE?: KVNamespace;
   AI?: { run: (model: string, inputs: Record<string, unknown>) => Promise<unknown> };
   // YouTube company OAuth
   YOUTUBE_COMPANY_CLIENT_ID?: string;

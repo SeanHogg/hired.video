@@ -8,8 +8,27 @@ import { getOnboardingTasksForUser } from "../lib/onboarding.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, checkAIUsage } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { withCacheHeaders } from "../utils/cache-headers.js";
+
+// Dashboard aggregates are user-scoped and run 6–8 parallel DB queries.
+// A 60s private cache lets the user's own browser short-circuit repeat
+// loads (back-button, route remount) without leaking data through the
+// CDN. Mutations don't need to invalidate — staleness is bounded.
+const DASHBOARD_CACHE_MAX_AGE = 60;
 
 export const dashboardRoutes = new Hono<{ Variables: Variables }>();
+
+// Every successful GET on /api/dashboard/* is user-scoped, expensive
+// (6–8 parallel DB queries), and tolerates 60s of staleness. Set the
+// private cache header once here so we don't sprinkle the same call
+// through every handler. Mutations short-circuit because we only
+// attach on GET / 200.
+dashboardRoutes.use("/*", async (c, next) => {
+  await next();
+  if (c.req.method === "GET" && c.res.status === 200) {
+    withCacheHeaders(c, { scope: "private", maxAge: DASHBOARD_CACHE_MAX_AGE });
+  }
+});
 
 const now = () => new Date().toISOString();
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);

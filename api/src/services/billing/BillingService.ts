@@ -14,6 +14,7 @@ import {
   type EffectivePlan,
   type PlanOverrideSnapshot,
 } from "../../domains/planOverride/resolver.js";
+import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -52,12 +53,8 @@ const {
 // active subscription, any admin override, and the user's role into one
 // resolver-applied snapshot. `getSubscription` and `getTokenBudgetSummary`
 // both project from this so they cannot disagree about the user's plan
-// or token cap.
-//
-// Two-layer: (1) in-process Map (survives within a Worker instance), (2)
-// Cloudflare KV when KV_CACHE binding is present (survives across instances,
-// 60s TTL). KV stores Date fields as ISO strings — see the read path for
-// the reverse coercion.
+// or token cap. Cached via the shared two-layer edge-cache helper
+// (utils/edge-cache.ts).
 // ---------------------------------------------------------------------------
 
 interface BillingFields {
@@ -73,14 +70,12 @@ interface EffectiveUserPlan {
   billing: BillingFields;
 }
 
-const _planCache = new Map<string, { value: EffectiveUserPlan; expiresAt: number }>();
-const PLAN_CACHE_TTL_MS = 60_000;
-// New KV namespace key — the `sub:` shape from the prior caching scheme is
-// incompatible, and bumping the prefix lets old entries expire without
-// poisoning reads on first deploy.
-const KV_PLAN_PREFIX = "plan:";
+const PLAN_CACHE_TTL_SECONDS = 60;
+// Bumped from `sub:` to `plan:` when the shape changed; the old keys
+// expire harmlessly under their own TTL.
+const planCacheKey = (userId: string) => `plan:${userId}`;
 
-function reviveCachedPlan(raw: unknown): EffectiveUserPlan | null {
+function revivePlan(raw: unknown): EffectiveUserPlan | null {
   if (!raw || typeof raw !== "object") return null;
   const v = raw as EffectiveUserPlan;
   // KV serialises Date → ISO string; coerce back so the resolver-shaped
@@ -92,112 +87,84 @@ function reviveCachedPlan(raw: unknown): EffectiveUserPlan | null {
   return v;
 }
 
-function getCachedPlan(userId: string): EffectiveUserPlan | null {
-  const entry = _planCache.get(userId);
-  if (entry && Date.now() < entry.expiresAt) return entry.value;
-  _planCache.delete(userId);
-  return null;
-}
-
-function setCachedPlan(userId: string, value: EffectiveUserPlan): void {
-  _planCache.set(userId, { value, expiresAt: Date.now() + PLAN_CACHE_TTL_MS });
-  const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
-  if (kv) {
-    kv.put(`${KV_PLAN_PREFIX}${userId}`, JSON.stringify(value), { expirationTtl: 60 })
-      .catch(() => undefined);
-  }
-}
-
 /** Bust the effective-plan cache for one user. Call after any write that
  *  affects the resolver inputs: subscription change, plan-override set or
  *  cleared, or a role flip. */
 export function invalidateSubscriptionCache(userId: string): void {
-  _planCache.delete(userId);
-  const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
-  if (kv) {
-    kv.delete(`${KV_PLAN_PREFIX}${userId}`).catch(() => undefined);
-  }
+  invalidateCachedKey(planCacheKey(userId));
 }
 
 /** Load the user's resolver-applied plan + raw billing fields. Internal —
  *  callers should use `getSubscription` or `getTokenBudgetSummary`. */
 async function loadEffectiveUserPlan(userId: string): Promise<EffectiveUserPlan> {
-  const cached = getCachedPlan(userId);
-  if (cached) return cached;
+  return getOrSetCached<EffectiveUserPlan>({
+    key: planCacheKey(userId),
+    ttlSeconds: PLAN_CACHE_TTL_SECONDS,
+    revive: revivePlan,
+    loader: async () => {
+      const db = getDb();
+      const repos = defaultApiDeps().repos;
 
-  const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
-  if (kv) {
-    const kvVal = await kv.get(`${KV_PLAN_PREFIX}${userId}`, "json").catch(() => null);
-    const revived = reviveCachedPlan(kvVal);
-    if (revived) {
-      setCachedPlan(userId, revived);
-      return revived;
-    }
-  }
+      const [userRow] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const isInternal =
+        userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
 
-  const db = getDb();
-  const repos = defaultApiDeps().repos;
+      const [subRow] = await db
+        .select({
+          planSlug: subscriptionPlans.slug,
+          planName: subscriptionPlans.name,
+          priceMonthly: subscriptionPlans.priceMonthly,
+          currency: subscriptionPlans.currency,
+          status: subscriptions.status,
+          billingInterval: subscriptions.billingInterval,
+          cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+        })
+        .from(subscriptions)
+        .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+        .where(and(eq(subscriptions.userId, userId), inArray(subscriptions.status, ["active", "trialing"])))
+        .limit(1);
 
-  const [userRow] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const isInternal =
-    userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
+      const overrideRow = await repos.subscriptions.findOverrideByUserId(userId);
+      const override: PlanOverrideSnapshot | null = overrideRow
+        ? {
+            planSlug: overrideRow.planSlug ?? null,
+            monthlyTokenLimit: overrideRow.monthlyTokenLimit ?? null,
+            expiresAt: overrideRow.expiresAt ?? null,
+            reason: overrideRow.reason,
+            grantedBy: overrideRow.grantedBy,
+            grantedAt: overrideRow.grantedAt,
+          }
+        : null;
 
-  const [subRow] = await db
-    .select({
-      planSlug: subscriptionPlans.slug,
-      planName: subscriptionPlans.name,
-      priceMonthly: subscriptionPlans.priceMonthly,
-      currency: subscriptionPlans.currency,
-      status: subscriptions.status,
-      billingInterval: subscriptions.billingInterval,
-      cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-    })
-    .from(subscriptions)
-    .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
-    .where(and(eq(subscriptions.userId, userId), inArray(subscriptions.status, ["active", "trialing"])))
-    .limit(1);
+      // A subscription on `trialing` that hasn't elapsed counts as paid; the
+      // resolver only sees plan slug + role, so reflect the trialing carve-out
+      // by promoting the snapshot's plan name. (Trial subs always have a
+      // non-free plan slug in this schema, so no slug surgery is needed.)
+      const effective = resolveEffectivePlan(
+        {
+          planSlug: subRow?.planSlug ?? null,
+          planName: subRow?.planName ?? null,
+          isInternal,
+        },
+        override,
+        new Date(),
+      );
 
-  const overrideRow = await repos.subscriptions.findOverrideByUserId(userId);
-  const override: PlanOverrideSnapshot | null = overrideRow
-    ? {
-        planSlug: overrideRow.planSlug ?? null,
-        monthlyTokenLimit: overrideRow.monthlyTokenLimit ?? null,
-        expiresAt: overrideRow.expiresAt ?? null,
-        reason: overrideRow.reason,
-        grantedBy: overrideRow.grantedBy,
-        grantedAt: overrideRow.grantedAt,
-      }
-    : null;
+      const billing: BillingFields = {
+        price: subRow ? Number(subRow.priceMonthly) : 0,
+        currency: subRow?.currency ?? "USD",
+        interval: subRow?.billingInterval === "yearly" ? "year" : "month",
+        status: (subRow?.status as SubscriptionSummaryDTO["status"]) ?? "active",
+        cancelAtPeriodEnd: subRow?.cancelAtPeriodEnd ?? false,
+      };
 
-  // A subscription on `trialing` that hasn't elapsed counts as paid; the
-  // resolver only sees plan slug + role, so reflect the trialing carve-out
-  // by promoting the snapshot's plan name. (Trial subs always have a
-  // non-free plan slug in this schema, so no slug surgery is needed.)
-  const effective = resolveEffectivePlan(
-    {
-      planSlug: subRow?.planSlug ?? null,
-      planName: subRow?.planName ?? null,
-      isInternal,
+      return { effective, billing };
     },
-    override,
-    new Date(),
-  );
-
-  const billing: BillingFields = {
-    price: subRow ? Number(subRow.priceMonthly) : 0,
-    currency: subRow?.currency ?? "USD",
-    interval: subRow?.billingInterval === "yearly" ? "year" : "month",
-    status: (subRow?.status as SubscriptionSummaryDTO["status"]) ?? "active",
-    cancelAtPeriodEnd: subRow?.cancelAtPeriodEnd ?? false,
-  };
-
-  const value: EffectiveUserPlan = { effective, billing };
-  setCachedPlan(userId, value);
-  return value;
+  });
 }
 
 export async function getSubscription(userId: string): Promise<SubscriptionSummaryDTO> {

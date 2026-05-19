@@ -2155,6 +2155,13 @@ export default function StudioLayout() {
             onOpenChange={setPublishTemplateOpen}
             projectId={state.projectId ?? null}
             defaultName={state.name}
+            onPublished={() => {
+              // Toast is easy to miss — auto-open the creator's catalog
+              // so the freshly-published template appears in the list
+              // (the unambiguous "it worked" indicator). Mirrors the V2
+              // wiring in ProjectChromeMenu.
+              setMyTemplatesOpen(true);
+            }}
           />
         </Suspense>
       )}

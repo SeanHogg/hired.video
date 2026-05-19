@@ -47,6 +47,7 @@ import {
 } from "@/lib/studio/editor-v2/linked-content";
 import CanvasDropOverlay from "./CanvasDropOverlay";
 import LinkedContentBody from "./LinkedContentBody";
+import SafeZoneOverlay from "./SafeZoneOverlay";
 import SceneBackgroundEffect from "@/components/studio/shared/SceneBackgroundEffect";
 
 // ChartRenderer is heavy (chart-drawing primitives); only load when a
@@ -261,6 +262,12 @@ export default function CanvasStage({
             animateInput={widgetAnimateInputForStartPose(widget, scene.durationSeconds)}
           />
         ))}
+        {/* Safe-zone overlay — dashed bands marking destination-specific
+            safe areas (TikTok/Reels caption band, SMPTE action-safe,
+            outdoor billboard bleed). Self-gates: returns null when the
+            active format has no `safeZones` declared, so it costs nothing
+            on classic 16:9 / 1:1 / 4:3 formats. */}
+        <SafeZoneOverlay canvasWidth={canvasWidth} canvasHeight={canvasHeight} />
       </div>
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
           gates: returns null when no drag is hovering. Lives OUTSIDE the

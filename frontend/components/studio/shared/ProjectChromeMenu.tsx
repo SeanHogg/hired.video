@@ -172,6 +172,13 @@ export default function ProjectChromeMenu({
             projectId={project.id}
             defaultName={project.title}
             getVideoScript={getVideoScript}
+            onPublished={() => {
+              // The dialog already closes on success and toasts. The toast
+              // is easy to miss, so we also auto-open the creator's catalog
+              // panel — the user immediately sees their template in the
+              // list, which is the unambiguous "it worked" indicator.
+              setMyTemplatesOpen(true);
+            }}
           />
         </Suspense>
       )}

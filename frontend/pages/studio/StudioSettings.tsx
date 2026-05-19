@@ -15,7 +15,10 @@ import { Slider } from "@/components/ui/slider";
 import type { StudioProjectState } from "@/types/studio";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import VideoFormatPicker from "@/components/studio/shared/VideoFormatPicker";
-import { findFormatByEnums } from "@/lib/studio/video-formats";
+import {
+  findFormatByEnums,
+  isLegacyAspectRatio,
+} from "@/lib/studio/video-formats";
 import CodecPicker from "@/components/studio/shared/CodecPicker";
 import MotionTransitionPicker from "@/components/studio/shared/MotionTransitionPicker";
 
@@ -76,12 +79,18 @@ export default function StudioSettings({ state, onStateChange }: Props) {
             activeFormatId={
               findFormatByEnums(state.aspectRatio, state.resolution)?.id ?? null
             }
-            onSelect={(format) =>
+            onSelect={(format) => {
+              // V1's persisted shape only carries the four legacy enum
+              // ratios. Billboard / kiosk presets (4:1 / 6:1 / 1:2) are
+              // V2-only — V1 is slated for deletion under #639, so we
+              // silently ignore them here rather than enhancing the V1
+              // schema.
+              if (!isLegacyAspectRatio(format.aspect)) return;
               onStateChange({
                 aspectRatio: format.aspect,
                 resolution: format.resolution,
-              })
-            }
+              });
+            }}
           />
         </div>
 

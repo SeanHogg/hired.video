@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Loader2, Eye, EyeOff, Globe, Trash2, Edit3, ExternalLink, Store } from "lucide-react";
+import { Loader2, Eye, EyeOff, Globe, Trash2, Edit3, ExternalLink, Store, ImagePlus } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -29,6 +29,7 @@ import {
   studioTemplatesService,
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 interface Props {
   open: boolean;
@@ -79,6 +80,19 @@ export default function CreatorTemplatesPanel({ open, onOpenChange, onEditTempla
       });
       setTemplates((prev) => (prev ?? []).map((row) => (row.id === t.id ? updated : row)));
       toast({ title: visibility === "public" ? "Republished" : `Set to ${visibility}` });
+    } catch (e) {
+      toast({ title: "Update failed", description: String(e), variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function changeThumbnail(t: StudioTemplate, url: string) {
+    setBusyId(t.id);
+    try {
+      const updated = await studioTemplatesService.update(t.id, { thumbnailUrl: url });
+      setTemplates((prev) => (prev ?? []).map((row) => (row.id === t.id ? updated : row)));
+      toast({ title: "Thumbnail updated" });
     } catch (e) {
       toast({ title: "Update failed", description: String(e), variant: "destructive" });
     } finally {
@@ -137,6 +151,7 @@ export default function CreatorTemplatesPanel({ open, onOpenChange, onEditTempla
               busy={busyId === t.id}
               onEdit={onEditTemplate ? () => onEditTemplate(t) : undefined}
               onChangeVisibility={(v) => changeVisibility(t, v)}
+              onChangeThumbnail={(url) => changeThumbnail(t, url)}
               onArchive={() => archive(t)}
             />
           ))}
@@ -151,6 +166,7 @@ interface RowProps {
   busy: boolean;
   onEdit?: () => void;
   onChangeVisibility: (v: StudioTemplate["visibility"]) => void;
+  onChangeThumbnail: (url: string) => void;
   onArchive: () => void;
 }
 
@@ -160,27 +176,53 @@ interface RowProps {
  * actions to render based on the template's current state — no upstream
  * canRepublish / canMakePrivate boolean drilling.
  */
-function TemplateRow({ template: t, busy, onEdit, onChangeVisibility, onArchive }: RowProps) {
+function TemplateRow({ template: t, busy, onEdit, onChangeVisibility, onChangeThumbnail, onArchive }: RowProps) {
   const badge = VISIBILITY_BADGE[t.visibility];
   const listingUrl = t.listingSlug
     ? `/marketplace/templates/${t.listingSlug}`
     : `/marketplace/templates/${t.id}`;
 
-  return (
-    <div className="rounded-md border border-border bg-card overflow-hidden flex flex-col">
-      <div className="flex items-start gap-3 p-3">
-        {t.thumbnailUrl ? (
+  // The thumbnail tile itself is the picker trigger — click to upload /
+  // change. Routes through MediaPicker so creators get upload + stock + AI
+  // image without each surface rolling its own file input (DRY rule).
+  const thumbnailTrigger = (
+    <button
+      type="button"
+      disabled={busy}
+      className="group relative w-16 h-16 rounded overflow-hidden bg-muted shrink-0 flex items-center justify-center border border-transparent hover:border-primary/40 transition-colors"
+      title={t.thumbnailUrl ? "Change thumbnail" : "Add thumbnail"}
+    >
+      {t.thumbnailUrl ? (
+        <>
           <img
             src={t.thumbnailUrl}
             alt={t.name}
-            className="w-16 h-16 rounded object-cover bg-muted shrink-0"
+            className="w-full h-full object-cover"
             crossOrigin="anonymous"
           />
-        ) : (
-          <div className="w-16 h-16 rounded bg-muted shrink-0 flex items-center justify-center">
-            <Store className="w-5 h-5 text-muted-foreground" />
-          </div>
-        )}
+          <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-medium">
+            Change
+          </span>
+        </>
+      ) : (
+        <span className="flex flex-col items-center gap-0.5 text-muted-foreground group-hover:text-foreground">
+          <ImagePlus className="w-4 h-4" />
+          <span className="text-[9px]">Add</span>
+        </span>
+      )}
+    </button>
+  );
+
+  return (
+    <div className="rounded-md border border-border bg-card overflow-hidden flex flex-col">
+      <div className="flex items-start gap-3 p-3">
+        <MediaPicker
+          accept="image"
+          title="Choose template thumbnail"
+          trigger={thumbnailTrigger}
+          onPick={(asset) => onChangeThumbnail(asset.url)}
+          disabled={busy}
+        />
         <div className="flex-1 min-w-0 flex flex-col gap-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-sm font-medium leading-tight truncate">{t.name}</h3>

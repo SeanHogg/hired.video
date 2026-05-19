@@ -11,8 +11,34 @@
  * picker / migrator / renderer picks it up.
  */
 
-export type AspectRatio = "16:9" | "9:16" | "1:1" | "4:3";
+export type AspectRatio =
+  | "16:9"
+  | "9:16"
+  | "1:1"
+  | "4:3"
+  // Billboard / outdoor-digital ratios. Reachable only via the v2 picker
+  // (v1's `findFormatByEnums(aspect, resolution)` pair-store stays on its
+  // historical four — v1 is slated for deletion per the deprecation memo).
+  | "4:1"
+  | "6:1"
+  | "1:2";
+
 export type ResolutionTier = "720p" | "1080p" | "4k";
+
+/** A rectangular region of the frame that should remain clear of important
+ *  content. Inset values are fractions of canvas width / height (0..1).
+ *  Drawn as a dashed outline by [SafeZoneOverlay](../../components/studio/v2/SafeZoneOverlay.tsx)
+ *  whenever the active format declares one. */
+export interface SafeZone {
+  /** Stable kind — drives the overlay's colour + label. */
+  kind: "action-safe" | "title-safe" | "platform-ui";
+  /** Human-readable label rendered at the top edge of the zone. */
+  label: string;
+  /** Fractional inset from the canvas edges (0..1 of each side). */
+  inset: { top: number; right: number; bottom: number; left: number };
+}
+
+export type FormatCategory = "social" | "billboard" | "classic";
 
 export interface VideoFormat {
   /** Stable id — used as the picker's `value`. */
@@ -24,9 +50,17 @@ export interface VideoFormat {
   height: number;
   aspect: AspectRatio;
   resolution: ResolutionTier;
+  /** Picker grouping. Drives the section header order: social → billboard →
+   *  classic. Defaults to "social" when omitted. */
+  category?: FormatCategory;
   /** Pro-only badge on the picker. 4K + portrait-4K are Pro per v1's
    *  existing gate (StudioSettings labels them with `qualityProSuffix`). */
   proOnly: boolean;
+  /** Optional safe-zone overlays — drawn over the authoring canvas so the
+   *  user keeps important content out of platform UI chrome (TikTok/Reels
+   *  caption band) or away from outdoor-billboard bleed edges. Omit when
+   *  the format has no destination-specific safe area. */
+  safeZones?: SafeZone[];
 }
 
 export const VIDEO_FORMATS: VideoFormat[] = [
@@ -39,6 +73,17 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     aspect: "16:9",
     resolution: "1080p",
     proOnly: false,
+    // Conservative action-safe 90% — matches the SMPTE / EBU action-safe
+    // convention. Useful for the "looks like a TV ad" social-marketing
+    // use case so titles don't crowd the frame edge; the formal
+    // BS.1770/EBU R128 broadcast pass is roadmap (#845).
+    safeZones: [
+      {
+        kind: "action-safe",
+        label: "Action safe (90%)",
+        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
+      },
+    ],
   },
   {
     id: "landscape-720p",
@@ -69,6 +114,16 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     aspect: "9:16",
     resolution: "1080p",
     proOnly: false,
+    // TikTok / Reels / Shorts overlay the bottom ~25% with username +
+    // caption + action rail, and the top ~8% with status + back nav.
+    // Keep titles + key text inside the inset band.
+    safeZones: [
+      {
+        kind: "platform-ui",
+        label: "Platform UI",
+        inset: { top: 0.08, right: 0.12, bottom: 0.25, left: 0.04 },
+      },
+    ],
   },
   {
     id: "portrait-720p",
@@ -118,9 +173,82 @@ export const VIDEO_FORMATS: VideoFormat[] = [
     height: 768,
     aspect: "4:3",
     resolution: "720p",
+    category: "classic",
     proOnly: false,
   },
+  // Outdoor / digital-signage formats. Bleed-safe insets keep the message
+  // away from the physical edge of the panel where mounting hardware
+  // typically cuts off ~5% on each side. True outdoor-broadcast specs
+  // (CEA-708 captioning, Rec.709 gamut clamp, loudness norm) stay roadmap
+  // under #845 — these presets just unlock the AUTHORING ratio.
+  {
+    id: "billboard-wide-1080",
+    label: "Billboard 4:1",
+    hint: "Roadside · outdoor",
+    width: 1920,
+    height: 480,
+    aspect: "4:1",
+    resolution: "1080p",
+    category: "billboard",
+    proOnly: false,
+    safeZones: [
+      {
+        kind: "action-safe",
+        label: "Bleed safe (90%)",
+        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
+      },
+    ],
+  },
+  {
+    id: "billboard-ultrawide-1080",
+    label: "Billboard 6:1",
+    hint: "Highway · digital signage",
+    width: 1920,
+    height: 320,
+    aspect: "6:1",
+    resolution: "1080p",
+    category: "billboard",
+    proOnly: false,
+    safeZones: [
+      {
+        kind: "action-safe",
+        label: "Bleed safe (90%)",
+        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
+      },
+    ],
+  },
+  {
+    id: "billboard-tall-1080",
+    label: "Kiosk 1:2",
+    hint: "Transit · mall portrait",
+    width: 540,
+    height: 1080,
+    aspect: "1:2",
+    resolution: "1080p",
+    category: "billboard",
+    proOnly: false,
+    safeZones: [
+      {
+        kind: "action-safe",
+        label: "Bleed safe (90%)",
+        inset: { top: 0.05, right: 0.05, bottom: 0.05, left: 0.05 },
+      },
+    ],
+  },
 ];
+
+/** The four aspect ratios v1's enum-pair store (`aspectRatio` +
+ *  `resolution`) understands. Billboards / kiosk formats are v2-only.
+ *  Used as a type guard at V1 boundaries while V1 is being retired. */
+export type LegacyAspectRatio = "16:9" | "9:16" | "1:1" | "4:3";
+
+export function isLegacyAspectRatio(
+  aspect: AspectRatio,
+): aspect is LegacyAspectRatio {
+  return (
+    aspect === "16:9" || aspect === "9:16" || aspect === "1:1" || aspect === "4:3"
+  );
+}
 
 /** Look up a format by id. Returns null when the id is unknown. */
 export function findFormatById(id: string | null | undefined): VideoFormat | null {
@@ -159,9 +287,10 @@ export function findFormatByEnums(
 }
 
 /**
- * Group formats by aspect ratio for picker layout. Order is
- * landscape → portrait → square → classic — matches user-frequency
- * priors (most users start with landscape).
+ * Group formats by aspect ratio for picker layout. Order is social
+ * (landscape → portrait → square) → classic → billboard (wide → ultra-wide
+ * → kiosk) — matches user-frequency priors (most users start landscape,
+ * billboards are an explicit minority destination).
  */
 export function groupFormatsByAspect(): Array<{
   aspect: AspectRatio;
@@ -173,10 +302,15 @@ export function groupFormatsByAspect(): Array<{
     { aspect: "9:16", label: "Portrait" },
     { aspect: "1:1", label: "Square" },
     { aspect: "4:3", label: "Classic" },
+    { aspect: "4:1", label: "Wide billboard" },
+    { aspect: "6:1", label: "Ultra-wide billboard" },
+    { aspect: "1:2", label: "Tall kiosk" },
   ];
-  return order.map(({ aspect, label }) => ({
-    aspect,
-    label,
-    formats: VIDEO_FORMATS.filter((f) => f.aspect === aspect),
-  }));
+  return order
+    .map(({ aspect, label }) => ({
+      aspect,
+      label,
+      formats: VIDEO_FORMATS.filter((f) => f.aspect === aspect),
+    }))
+    .filter((group) => group.formats.length > 0);
 }

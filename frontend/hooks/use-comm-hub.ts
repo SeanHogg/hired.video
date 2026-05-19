@@ -124,7 +124,11 @@ interface InboxResponse {
   nextEmailCursor: string | null;
 }
 
-const POLL_INTERVAL_MS = 60_000;
+// SignalR / SSE is the primary push channel for live notifications; this
+// poll is the safety-net refresh for the rest of the merged inbox
+// (conversations, pending requests, external emails) and reconciliation
+// when the push channel reconnects after a drop.
+const POLL_INTERVAL_MS = 35_000;
 
 const EMPTY_INBOX: InboxResponse = {
   conversations: [],
