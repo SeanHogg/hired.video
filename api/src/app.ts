@@ -254,7 +254,14 @@ export function createApp() {
 
   // Studio analytics events (view, CTA click) and embed code are public.
   // Route handlers use optional auth (c.var.user?.sub ?? null).
-  const STUDIO_PUBLIC_ROUTE = /^\/api\/studio\/videos\/[^/]+(\/view|\/cta-click|\/embed)$/;
+  // Both the legacy `/videos/<id>/…` callsites and the post-#665
+  // `/projects/<id>/…` callsites resolve here — keying view/CTA-click
+  // analytics on the studio project (not the rendered video row) is
+  // what makes pre-render telemetry possible, so `projects` is the
+  // branch all live frontends now hit. Without it, the public watch
+  // page's view-tracking POST returns 401 and the unauth visitor
+  // never gets counted.
+  const STUDIO_PUBLIC_ROUTE = /^\/api\/studio\/(videos|projects)\/[^/]+(\/view|\/cta-click|\/embed)$/;
 
   // Public interview session share links — no auth required.
   const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;
