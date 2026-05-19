@@ -1,13 +1,17 @@
 /**
- * LinkedContentBody — canvas-side preview for the `linked-content`
- * widget. Lives inside the EDIT canvas only — playback is now the
- * canvas-v2 renderer's job (`CanvasV2Preview` → `canvas-v2:linked-content`
- * applier), so this component never has to render a "playback CTA"
- * variant. Per-kind `<meta.InlineBody/>` paints the entity using its
- * OWN React renderer (e.g. `<DeclarativeResumeRenderer/>`) so the
- * authoring surface shows a faithful preview of the bound entity.
- * The floating CTA pill is always inert (a `<span>`) — clicks fall
- * through to the surrounding widget-selection handler.
+ * LinkedContentBody — DOM renderer for the `linked-content` widget.
+ * Mounted by `<CanvasStage>` in BOTH edit and playback modes (per the
+ * #840 unification) so `/studio` and `/v/<id>` show the same entity
+ * preview pixels. Per-kind `<meta.InlineBody/>` paints the entity using
+ * its OWN React renderer (e.g. `<DeclarativeResumeRenderer/>`) so the
+ * preview matches the real resume / job / company / article / profile
+ * layout instead of a stripped canvas-2D thumbnail. The headless
+ * export pipeline still uses the `canvas-v2:linked-content` applier
+ * (title + bullets + CTA pill) because there's no React in the export
+ * encoder; closing that fidelity gap is the future SSR / pixel-parity
+ * task. The floating CTA pill is always inert (a `<span>`) — clicks
+ * fall through to the surrounding widget-selection handler in edit
+ * mode and are pointer-events-none in playback mode.
  *
  * Empty state: `entityId === ""` means the widget hasn't been bound to
  * a specific item yet (legacy `defaultWidget("linked-content")` path

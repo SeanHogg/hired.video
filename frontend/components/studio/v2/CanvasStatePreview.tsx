@@ -1,30 +1,31 @@
 /**
- * CanvasStatePreview — fit-to-container live preview of a `CanvasState`.
+ * CanvasStatePreview — playback wrapper around `<CanvasStage/>`.
  *
  * Single source of truth for "how do we play a v2 canvas state on screen?"
- * Consumed by:
+ * Mounts the SAME `CanvasStage` the editor uses, just in `mode="playback"`
+ * with the active scene + playhead-derived time wired in. Consumed by:
  *   - {@link PreviewOverlay} (the in-editor fullscreen preview the user
  *     hits with the play button)
  *   - {@link components/templates/TemplatePlayer} (the marketplace
  *     `/marketplace/templates/<slug>` press-play preview)
+ *   - {@link StudioVideoSurface} → {@link PublicStudioCanvas} (the
+ *     public `/v/<id>` watch page)
  *
- * Per the DRY rule: both surfaces render the IDENTICAL pixel output for
- * the same `CanvasState`. Preview mounts `<CanvasV2Preview/>` — a real
- * HTML `<canvas>` running the same `canvas-v2:*` effect registry the
- * export pipeline uses (`renderTimelineFrame`). Player and export
- * therefore can't drift on widget rendering. The DOM-based
- * `<CanvasStage/>` is retained for edit-mode only (drag / select /
- * resize handles), not for playback.
+ * Per the unification: there is ONE on-screen renderer — `CanvasStage` —
+ * and editor edit + editor play + public watch all hit it through here.
+ * The canvas-2D pipeline (`renderTimelineFrame`) is reserved for headless
+ * export-to-WebM where there's no DOM available. No more DOM-vs-canvas
+ * divergence on text wrapping, font metrics, or linked-content fidelity.
  *
  * Branding watermark is rendered self-gated inside `<BrandWatermark/>` —
  * no prop drilling of "show branding?".
  */
 import { useEffect, useRef, useState } from "react";
 import BrandWatermark from "@/components/studio/shared/BrandWatermark";
-import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import { emptyScene, type CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { PreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { cn } from "@/lib/utils";
-import CanvasV2Preview from "./CanvasV2Preview";
+import CanvasStage from "./CanvasStage";
 
 export interface CanvasStatePreviewProps {
   state: CanvasState;
@@ -76,6 +77,19 @@ export default function CanvasStatePreview({
     );
   }
 
+  // Active scene at the current playhead. `usePreviewPlayback` already
+  // maps playhead → scene id, so consumers never recompute "what scene
+  // are we in?" — single source of truth.
+  const activeScene =
+    state.scenes.find((s) => s.id === playback.activeSceneIdAtPlayhead) ??
+    state.scenes[0] ??
+    emptyScene("Scene 1");
+
+  const zoom =
+    box.w > 0 && box.h > 0
+      ? Math.max(0.05, Math.min(box.w / state.width, box.h / state.height))
+      : 0.05;
+
   return (
     <div
       ref={wrapRef}
@@ -85,14 +99,15 @@ export default function CanvasStatePreview({
       )}
     >
       <div className="relative">
-        <CanvasV2Preview
-          state={state}
-          playback={playback}
-          zoom={
-            box.w > 0 && box.h > 0
-              ? Math.max(0.05, Math.min(box.w / state.width, box.h / state.height))
-              : 0.05
-          }
+        <CanvasStage
+          scene={activeScene}
+          canvasWidth={state.width}
+          canvasHeight={state.height}
+          zoom={zoom}
+          mode="playback"
+          currentTimeSec={playback.activeSceneElapsed}
+          selection={{ kind: "scene", sceneId: activeScene.id }}
+          defaultFontId={state.fontFamily}
         />
         {/* BrandWatermark self-gates (returns null for Pro users who've
             opted out via project state). Positioned bottom-right of the

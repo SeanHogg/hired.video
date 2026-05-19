@@ -100,7 +100,6 @@ import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
 import BinPanel from "@/components/studio/nle/BinPanel";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
-import CanvasV2Preview from "@/components/studio/v2/CanvasV2Preview";
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
@@ -1355,54 +1354,90 @@ export default function StudioEditorV2() {
                 className="absolute inset-0 overflow-auto bg-muted/30 p-6"
               >
                 <div className="flex min-h-full min-w-min items-center justify-center">
-                  {playback.isPlaying ? (
-                    // Playback uses the canvas-v2 effect registry — the
-                    // SAME compositor the export runs — so the user sees
-                    // exactly what the rendered MP4 will look like. Edit
-                    // chrome (handles, drop targets) doesn't belong here
-                    // since drag/select are suspended during playback
-                    // anyway.
-                    <CanvasV2Preview
-                      state={state}
-                      playback={playback}
-                      zoom={zoom}
-                    />
-                  ) : (
-                    <CanvasStage
-                      scene={activeScene}
-                      canvasWidth={state.width}
-                      canvasHeight={state.height}
-                      zoom={zoom}
-                      selection={selection}
-                      onSelect={setSelection}
-                      onWidgetDrop={(kind, at) => insertWidget(kind, at)}
-                      onWidgetMove={updateWidgetPosition}
-                      onThemeDrop={(themeId) => {
-                        const theme = VISUAL_THEMES.find((t) => t.id === themeId);
-                        if (!theme) return;
-                        setState((prev) => applyThemeToState(prev, theme));
-                        toast({ title: `Theme: ${theme.label}` });
-                      }}
-                      onBackgroundDrop={(bgValue) => {
-                        const preset = BG_PRESETS.find((p) => p.value === bgValue);
-                        if (!preset) return;
-                        updateScene(activeScene.id, scenePatchFromBgPreset(preset));
-                        toast({ title: `Background: ${preset.label}` });
-                      }}
-                      onMediaDrop={(url, mediaType, atFraction) => {
-                        if (mediaType === "video") {
-                          addMediaWidget("video", url, 0, atFraction);
-                        } else {
-                          addMediaWidget("image", url, 0, atFraction);
-                        }
-                      }}
-                      onLinkedContentDrop={(entityKind, entityId, atFraction) =>
-                        insertLinkedContent(entityKind, entityId, atFraction)
-                      }
-                      onScreenshotDrop={(atFraction) => placeScreenshot(atFraction)}
-                      defaultFontId={state.fontFamily}
-                    />
-                  )}
+                  {/* ONE renderer for both edit + playback: `<CanvasStage>`
+                      in `mode="edit"` honours selection/drag/resize chrome,
+                      in `mode="playback"` it filters widgets by the current
+                      playhead's visibility window and suppresses every edit
+                      affordance. Same DOM widgets, same text wrap, same
+                      linked-content fidelity — no DOM-vs-canvas-2D divergence
+                      between authoring and play. The canvas-2D
+                      `renderTimelineFrame` survives only as the export
+                      encoder for headless WebM output (#840 unification). */}
+                  <CanvasStage
+                    scene={
+                      playback.isPlaying
+                        ? state.scenes.find((s) => s.id === playback.activeSceneIdAtPlayhead) ?? activeScene
+                        : activeScene
+                    }
+                    canvasWidth={state.width}
+                    canvasHeight={state.height}
+                    zoom={zoom}
+                    mode={playback.isPlaying ? "playback" : "edit"}
+                    currentTimeSec={
+                      playback.isPlaying ? playback.activeSceneElapsed : undefined
+                    }
+                    selection={
+                      playback.isPlaying
+                        ? {
+                            kind: "scene",
+                            sceneId:
+                              playback.activeSceneIdAtPlayhead ?? activeScene.id,
+                          }
+                        : selection
+                    }
+                    onSelect={playback.isPlaying ? undefined : setSelection}
+                    onWidgetDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (kind, at) => insertWidget(kind, at)
+                    }
+                    onWidgetMove={
+                      playback.isPlaying ? undefined : updateWidgetPosition
+                    }
+                    onThemeDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (themeId) => {
+                            const theme = VISUAL_THEMES.find((t) => t.id === themeId);
+                            if (!theme) return;
+                            setState((prev) => applyThemeToState(prev, theme));
+                            toast({ title: `Theme: ${theme.label}` });
+                          }
+                    }
+                    onBackgroundDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (bgValue) => {
+                            const preset = BG_PRESETS.find((p) => p.value === bgValue);
+                            if (!preset) return;
+                            updateScene(activeScene.id, scenePatchFromBgPreset(preset));
+                            toast({ title: `Background: ${preset.label}` });
+                          }
+                    }
+                    onMediaDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (url, mediaType, atFraction) => {
+                            if (mediaType === "video") {
+                              addMediaWidget("video", url, 0, atFraction);
+                            } else {
+                              addMediaWidget("image", url, 0, atFraction);
+                            }
+                          }
+                    }
+                    onLinkedContentDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (entityKind, entityId, atFraction) =>
+                            insertLinkedContent(entityKind, entityId, atFraction)
+                    }
+                    onScreenshotDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (atFraction) => placeScreenshot(atFraction)
+                    }
+                    defaultFontId={state.fontFamily}
+                  />
                 </div>
               </div>
               {/* Floating canvas-stage chrome — edit toolbar (left) +

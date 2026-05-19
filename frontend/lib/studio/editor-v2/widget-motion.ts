@@ -3,11 +3,12 @@
  * over its visibility window. Distinct from `CanvasState.motion`, which
  * is a global intensity preset that the render pipeline applies uniformly.
  *
- * Authoring data only: the inspector UI in `widget-sections.tsx` writes
- * these structures onto each widget; the canvas-2D render pipeline
- * (`canvas-v2:*` effect registry) consumes them via `computeAnimateOutput`.
- * There is no DOM-side previewer of motion — playback runs through
- * `<CanvasV2Preview/>` against the same registry the export uses.
+ * Authoring data: the inspector UI in `widget-sections.tsx` writes these
+ * structures onto each widget. Both consumers run the same
+ * `computeAnimateOutput` math: the DOM screen renderer
+ * (`<CanvasStage mode="playback"/>` via `widgetEffectsToCss`) and the
+ * headless export pipeline (`canvas-v2:*` effect registry called from
+ * `renderTimelineFrame`) — single seam, no per-surface motion drift.
  */
 export type MotionKind =
   | "none"

@@ -1,10 +1,21 @@
 /**
- * The canvas stage — the central "video frame" AUTHORING surface.
- * Renders the active scene with its widgets, accepts drops from the
- * palette, and handles widget select / move / resize. Playback +
- * fullscreen preview + export all go through `CanvasV2Preview` /
- * `renderTimelineFrame` (canvas-2D); this component is DOM only and
- * exists solely so the author can interact with widgets while editing.
+ * The canvas stage — the central "video frame" surface. ONE renderer
+ * used by every screen surface: editor edit mode, editor play mode,
+ * the public watch page (`/v/<id>`), and the marketplace template
+ * player. Export-to-WebM keeps `renderTimelineFrame` (canvas-2D) for
+ * the headless encoding loop where there's no DOM available.
+ *
+ * Two modes:
+ *   - `mode="edit"` (default): selection chrome + drag/drop targets +
+ *     resize handles live. Widget animate effects render their authored
+ *     START pose (clipTimeSec=0) so the author sees the pre-fade /
+ *     pre-zoom layout.
+ *   - `mode="playback"`: `currentTimeSec` gates widget visibility against
+ *     each widget's `visibleFrom`/`visibleTo` window, animate effects
+ *     run at the real clip-local time, and edit chrome is suppressed.
+ *     The drag/drop handlers + onSelect prop are optional in this mode.
+ *
+ * Selection semantics (edit mode):
  *
  * Selection semantics:
  *   - Click an empty area of the canvas → frame selection (right panel
@@ -60,15 +71,32 @@ export type Selection =
   | { kind: "scene"; sceneId: string }
   | { kind: "widget"; sceneId: string; widgetId: string };
 
+export type CanvasStageMode = "edit" | "playback";
+
 export interface CanvasStageProps {
   scene: Scene;
   canvasWidth: number;
   canvasHeight: number;
   zoom: number;
+  /** Defaults to "edit". In "playback" mode, edit chrome (selection
+   *  outlines, resize handles, drop overlays) is suppressed and widget
+   *  visibility is gated against `currentTimeSec`. */
+  mode?: CanvasStageMode;
+  /** Seconds elapsed in the active scene. Required for playback mode;
+   *  ignored in edit mode (which always shows the authored start
+   *  pose). When set, animate-* effects run at the real clip-local
+   *  time and widgets outside their `visibleFrom`/`visibleTo` window
+   *  drop out of the render. */
+  currentTimeSec?: number;
+  /** Edit-mode selection. In playback mode pass a scene-level selection
+   *  with no widget selected — never renders any chrome. */
   selection: Selection;
-  onSelect: (selection: Selection) => void;
-  onWidgetDrop: (kind: WidgetKind, atFraction: { x: number; y: number }) => void;
-  onWidgetMove: (widgetId: string, position: WidgetPosition) => void;
+  /** Edit-mode handlers. Optional so playback callers can mount the
+   *  same component without supplying no-op stubs. The component
+   *  treats absent handlers as a hard "no edits allowed" gate. */
+  onSelect?: (selection: Selection) => void;
+  onWidgetDrop?: (kind: WidgetKind, atFraction: { x: number; y: number }) => void;
+  onWidgetMove?: (widgetId: string, position: WidgetPosition) => void;
   /** Theme drag-drop → apply visual theme to whole composition. */
   onThemeDrop?: (themeId: string) => void;
   /** Background drag-drop → apply preset to active scene. */
@@ -103,6 +131,8 @@ export default function CanvasStage({
   canvasWidth,
   canvasHeight,
   zoom,
+  mode = "edit",
+  currentTimeSec,
   selection,
   onSelect,
   onWidgetDrop,
@@ -114,6 +144,7 @@ export default function CanvasStage({
   onScreenshotDrop,
   defaultFontId,
 }: CanvasStageProps) {
+  const isPlayback = mode === "playback";
   const stageRef = useRef<HTMLDivElement>(null);
   // `dragKind` is null when no recognised drag is hovering. We track
   // the kind (not just a boolean) so the kind-aware drop overlay can
@@ -134,6 +165,7 @@ export default function CanvasStage({
   );
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (isPlayback) return;
     if (!hasRecognisedPayload(e.dataTransfer)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
@@ -144,11 +176,13 @@ export default function CanvasStage({
   }
 
   function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (isPlayback) return;
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setDragKind(null);
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    if (isPlayback) return;
     setDragKind(null);
     const payload = readDragPayload(e.dataTransfer);
     if (!payload) return;
@@ -159,7 +193,7 @@ export default function CanvasStage({
     // per-source pickers (DRY).
     switch (payload.kind) {
       case "widget":
-        onWidgetDrop(payload.data as WidgetKind, f);
+        onWidgetDrop?.(payload.data as WidgetKind, f);
         break;
       case "theme":
         onThemeDrop?.(payload.data);
@@ -191,8 +225,9 @@ export default function CanvasStage({
   }
 
   function handleBackgroundClick(e: React.MouseEvent | React.KeyboardEvent) {
+    if (isPlayback) return;
     if (e.currentTarget !== e.target) return;
-    onSelect({ kind: "scene", sceneId: scene.id });
+    onSelect?.({ kind: "scene", sceneId: scene.id });
   }
 
   // Zoom is applied via CSS transform on the inner stage (sized at the
@@ -247,21 +282,30 @@ export default function CanvasStage({
           effect={scene.backgroundEffect}
           baseColor={scene.backgroundColor}
         />
-        {scene.widgets.map((widget) => (
-          <WidgetView
-            key={widget.id}
-            widget={widget}
-            stageRef={stageRef}
-            selected={
-              selection.kind === "widget" && selection.widgetId === widget.id
-            }
-            onSelect={() =>
-              onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
-            }
-            onMove={(position) => onWidgetMove(widget.id, position)}
-            animateInput={widgetAnimateInputForStartPose(widget, scene.durationSeconds)}
-          />
-        ))}
+        {scene.widgets
+          .filter((widget) => isWidgetVisibleAt(widget, scene.durationSeconds, isPlayback ? currentTimeSec : undefined))
+          .map((widget) => (
+            <WidgetView
+              key={widget.id}
+              widget={widget}
+              stageRef={stageRef}
+              interactive={!isPlayback}
+              selected={
+                !isPlayback &&
+                selection.kind === "widget" &&
+                selection.widgetId === widget.id
+              }
+              onSelect={() =>
+                onSelect?.({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
+              }
+              onMove={(position) => onWidgetMove?.(widget.id, position)}
+              animateInput={widgetAnimateInputForPlayhead(
+                widget,
+                scene.durationSeconds,
+                isPlayback ? currentTimeSec : undefined,
+              )}
+            />
+          ))}
         {/* Safe-zone overlay — dashed bands marking destination-specific
             safe areas (TikTok/Reels caption band, SMPTE action-safe,
             outdoor billboard bleed). Self-gates: returns null when the
@@ -283,18 +327,26 @@ export default function CanvasStage({
 interface WidgetViewProps {
   widget: Widget;
   stageRef: React.RefObject<HTMLDivElement | null>;
+  /** When false, the widget renders as a pure visual element — no
+   *  pointer-event capture, no selection ring, no resize handles, no
+   *  move/resize/rotate drag logic. Playback callers pass false so the
+   *  same component that powers the editor also powers `/v/<id>` and
+   *  the editor's play-mode preview without any "is this clickable?"
+   *  branching at the parent. */
+  interactive: boolean;
   selected: boolean;
   onSelect: () => void;
   onMove: (position: WidgetPosition) => void;
-  /** Clip-local time + duration in seconds. Always `clipTimeSec=0` in
-   *  the edit canvas — the editor shows widgets in their authored
-   *  start pose so animate-* effects render their first frame. */
+  /** Clip-local time + duration in seconds. `clipTimeSec=0` in edit
+   *  mode (authored start pose); playback callers pass the real
+   *  playhead-derived time so animate-* effects run live. */
   animateInput: AnimateInput;
 }
 
 function WidgetView({
   widget,
   stageRef,
+  interactive,
   selected,
   onSelect,
   onMove,
@@ -379,23 +431,31 @@ function WidgetView({
   const containerCss = containerStyleToCss(widget.containerStyle);
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onPointerDown={(e) => beginDrag(e, "move")}
-      onPointerMove={handlePointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className="absolute cursor-move select-none"
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onPointerDown={interactive ? (e) => beginDrag(e, "move") : undefined}
+      onPointerMove={interactive ? handlePointerMove : undefined}
+      onPointerUp={interactive ? endDrag : undefined}
+      onPointerCancel={interactive ? endDrag : undefined}
+      onClick={
+        interactive
+          ? (e) => {
+              e.stopPropagation();
+              onSelect();
+            }
+          : undefined
+      }
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect();
+              }
+            }
+          : undefined
+      }
+      className={cn("absolute select-none", interactive ? "cursor-move" : "pointer-events-none")}
       style={{
         left: `${widget.position.x * 100}%`,
         top: `${widget.position.y * 100}%`,
@@ -426,7 +486,7 @@ function WidgetView({
       >
         <WidgetBody widget={widget} />
       </div>
-      {selected && (
+      {interactive && selected && (
         <div
           onPointerDown={(e) => beginDrag(e, "resize")}
           onPointerMove={handlePointerMove}
@@ -435,7 +495,7 @@ function WidgetView({
           aria-label="Resize widget"
         />
       )}
-      {selected && (
+      {interactive && selected && (
         <>
           {/* Stick — decorative line from the widget's top-left corner
               out to the rotation ball. transformOrigin "top center" +
@@ -917,18 +977,48 @@ function widgetEffectsToCss(
  * lifespan (matches what the renderer does — each widget compiles to
  * its own clip whose duration is `visibleTo - visibleFrom`).
  */
-/** Build the AnimateInput for the editor's authored-start pose:
- *  clipTimeSec = 0 so animate-* effects render their first frame
- *  (e.g. fade-in shows the pre-fade pose, zoom-in shows the start
- *  scale). Playback frames are produced by `<CanvasV2Preview/>` via
- *  the canvas-v2 effect registry — this helper is editor-only. */
-function widgetAnimateInputForStartPose(
+/**
+ * Build the AnimateInput for a widget at the current playhead position.
+ *
+ * - `currentTimeSec === undefined` → edit mode. Returns the authored
+ *   START pose (clipTimeSec = 0) so animate-* effects render their
+ *   first frame (e.g. fade-in shows the pre-fade pose, zoom-in shows
+ *   the start scale).
+ * - `currentTimeSec` set → playback. Returns clipTimeSec relative to
+ *   the widget's `visibleFrom`, clamped to [0, lifespan] so the
+ *   animation plays once per visibility window.
+ */
+function widgetAnimateInputForPlayhead(
   widget: Widget,
   sceneDurationSeconds: number,
+  currentTimeSec: number | undefined,
 ): AnimateInput {
   const from = widget.visibleFrom ?? 0;
   const to = widget.visibleTo ?? sceneDurationSeconds;
-  return { clipTimeSec: 0, clipDurationSec: Math.max(0, to - from) };
+  const lifespan = Math.max(0, to - from);
+  if (currentTimeSec === undefined) {
+    return { clipTimeSec: 0, clipDurationSec: lifespan };
+  }
+  const clipTimeSec = Math.max(0, Math.min(lifespan, currentTimeSec - from));
+  return { clipTimeSec, clipDurationSec: lifespan };
+}
+
+/**
+ * Decide whether a widget should be on-screen at the current scene
+ * playhead. Edit mode (no currentTimeSec) renders every widget — the
+ * author needs to see all of them to lay out the scene. Playback mode
+ * gates each widget against its [visibleFrom, visibleTo) window so a
+ * widget that hasn't entered yet (or has already exited) drops out.
+ */
+function isWidgetVisibleAt(
+  widget: Widget,
+  sceneDurationSeconds: number,
+  currentTimeSec: number | undefined,
+): boolean {
+  if (currentTimeSec === undefined) return true;
+  const from = widget.visibleFrom ?? 0;
+  const to = widget.visibleTo ?? sceneDurationSeconds;
+  return currentTimeSec >= from && currentTimeSec < to;
 }
 
 function numberParam(v: unknown, fallback: number): number {
