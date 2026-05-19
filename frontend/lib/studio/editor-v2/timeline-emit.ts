@@ -556,24 +556,36 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   // one dedicated `widget-<id>` track per widget. Migration 0096
   // folds those back into v2 server-side, but until it runs in a
   // given environment the JS reader normalises the input shape on
-  // the fly: any `widget-<id>` track's clips merge into `widgetClips`,
-  // z-sorted via the same `effects[0].params.z` field the emit uses
-  // for the v2 ordering. The first save after load re-emits as the
-  // canonical v2 shape, so data converges with or without the SQL
-  // migration. Reader stays the single normalisation seam — emit +
-  // render keep one shape end-to-end.
+  // the fly: any `widget-<id>` track's clips merge into `widgetClips`.
+  // First save after load re-emits as the canonical v2 shape, so data
+  // converges with or without the SQL migration.
+  //
+  // Dedup by clip.id is load-bearing: if a project's timeline_spec
+  // carries BOTH a v2 track AND `widget-<id>` tracks (transition-
+  // window layered saves, or an interrupted migration), the same
+  // widget id can appear twice — once on v2 and once on its dedicated
+  // widget track. Without dedup the canvas paints that widget twice
+  // (e.g. a duplicate heading or a stray shape that shouldn't be
+  // there). The first occurrence wins so v2-track ordering is honoured
+  // when it exists.
   const v2 = timeline.tracks.find((t) => t.id === "v2" && t.kind === "video");
   const legacyWidgetTrackClips = timeline.tracks
     .filter((t) => t.kind === "video" && t.id.startsWith("widget-"))
     .flatMap((t) => t.clips);
-  const widgetClips = [
-    ...(v2?.clips ?? []),
-    ...legacyWidgetTrackClips.slice().sort((a, b) => {
-      const az = Number(a.effects?.[0]?.params?.z ?? 1);
-      const bz = Number(b.effects?.[0]?.params?.z ?? 1);
-      return (Number.isFinite(az) ? az : 1) - (Number.isFinite(bz) ? bz : 1);
-    }),
-  ];
+  const seenClipIds = new Set<string>();
+  const widgetClips: Clip[] = [];
+  const dedupePush = (clip: Clip) => {
+    if (seenClipIds.has(clip.id)) return;
+    seenClipIds.add(clip.id);
+    widgetClips.push(clip);
+  };
+  for (const c of v2?.clips ?? []) dedupePush(c);
+  const sortedLegacy = legacyWidgetTrackClips.slice().sort((a, b) => {
+    const az = Number(a.effects?.[0]?.params?.z ?? 1);
+    const bz = Number(b.effects?.[0]?.params?.z ?? 1);
+    return (Number.isFinite(az) ? az : 1) - (Number.isFinite(bz) ? bz : 1);
+  });
+  for (const c of sortedLegacy) dedupePush(c);
 
   const scenes: Scene[] = [];
   const v1Clips = (v1?.clips ?? []).slice().sort((a, b) => a.startFrame - b.startFrame);

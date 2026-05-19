@@ -26,20 +26,21 @@
 CREATE OR REPLACE FUNCTION _unify_widget_tracks_to_v2(spec jsonb)
 RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $body$
 DECLARE
-  v2_clips jsonb;
+  legacy_clips jsonb;
+  existing_v2_clips jsonb;
+  merged_clips jsonb;
   v2_track jsonb;
   new_tracks jsonb := '[]'::jsonb;
-  spliced boolean := false;
+  v2_emitted boolean := false;
   cur_track jsonb;
 BEGIN
   IF spec IS NULL OR jsonb_typeof(spec->'tracks') <> 'array' THEN
     RETURN spec;
   END IF;
 
-  -- Gather every widget clip (one per widget-<id> track), z-sorted via
-  -- the clip's first-effect params.z field that the emit time set.
-  -- Aliases use `track_elem`/`cur_track` to avoid colliding with any
-  -- declared variable name (PG raises "column reference is ambiguous"
+  -- Collect every legacy widget-* clip, z-sorted (the emit-side ordering
+  -- contract). Aliases use `track_elem` / `cur_track` to avoid colliding
+  -- with declared variables (PG raises "column reference is ambiguous"
   -- when a DECLARE-d identifier shadows a SELECT alias).
   SELECT jsonb_agg(
            (track_elem->'clips'->0)
@@ -48,14 +49,40 @@ BEGIN
              1
            )
          )
-    INTO v2_clips
+    INTO legacy_clips
     FROM jsonb_array_elements(spec->'tracks') AS track_elem
    WHERE track_elem->>'id' LIKE 'widget-%' AND track_elem->>'kind' = 'video';
 
-  -- No widget-* tracks → nothing to fold. Leave the row alone.
-  IF v2_clips IS NULL THEN
+  -- If there are no widget-* tracks, there's nothing to fold. Skip.
+  IF legacy_clips IS NULL THEN
     RETURN spec;
   END IF;
+
+  -- Pre-existing v2 track's clips (if any) — preserved so a layered
+  -- save that left BOTH v2 and widget-* on disk merges cleanly instead
+  -- of overwriting one with the other.
+  SELECT (track_elem->'clips') INTO existing_v2_clips
+    FROM jsonb_array_elements(spec->'tracks') AS track_elem
+   WHERE track_elem->>'id' = 'v2' AND track_elem->>'kind' = 'video'
+   LIMIT 1;
+
+  -- Merge + dedupe by clip.id. v2 entries win order so an explicit
+  -- post-#832 save is preserved; legacy widget-* entries fill in the
+  -- gaps.
+  SELECT jsonb_agg(elem ORDER BY ord) INTO merged_clips
+  FROM (
+    SELECT DISTINCT ON (elem->>'id') elem, ord
+      FROM (
+        SELECT elem, ord
+          FROM jsonb_array_elements(COALESCE(existing_v2_clips, '[]'::jsonb))
+            WITH ORDINALITY AS x(elem, ord)
+        UNION ALL
+        SELECT elem, (1000000 + ord) AS ord
+          FROM jsonb_array_elements(legacy_clips)
+            WITH ORDINALITY AS y(elem, ord)
+      ) AS all_clips
+      ORDER BY elem->>'id', ord
+  ) AS deduped;
 
   v2_track := jsonb_build_object(
     'id',     'v2',
@@ -66,21 +93,21 @@ BEGIN
     'muted',  false,
     'solo',   false,
     'locked', false,
-    'clips',  v2_clips
+    'clips',  COALESCE(merged_clips, '[]'::jsonb)
   );
 
-  -- Rebuild tracks: keep v1/v3/a1/a2/other tracks; drop every widget-*
-  -- track; splice the new v2 track in at the position of the FIRST
-  -- widget track we encountered so paint order stays after v1 + before
-  -- v3 — same layering the renderer expects.
+  -- Rebuild tracks: drop every widget-* track AND any existing v2
+  -- track; splice the unified v2 in at the position of the first
+  -- replaced track so paint order stays v1 → v2 → v3 → audio.
   FOR cur_track IN
     SELECT track_elem
       FROM jsonb_array_elements(spec->'tracks') AS track_elem
   LOOP
-    IF cur_track->>'id' LIKE 'widget-%' AND cur_track->>'kind' = 'video' THEN
-      IF NOT spliced THEN
+    IF (cur_track->>'id' LIKE 'widget-%' OR cur_track->>'id' = 'v2')
+       AND cur_track->>'kind' = 'video' THEN
+      IF NOT v2_emitted THEN
         new_tracks := new_tracks || jsonb_build_array(v2_track);
-        spliced := true;
+        v2_emitted := true;
       END IF;
     ELSE
       new_tracks := new_tracks || jsonb_build_array(cur_track);

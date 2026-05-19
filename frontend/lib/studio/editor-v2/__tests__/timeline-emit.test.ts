@@ -169,6 +169,85 @@ describe("canvasState ↔ Timeline round-trip", () => {
     expect(idsAfter).toEqual(idsBefore);
   });
 
+  it("dedupes by clip.id when a project has BOTH v2 clips and widget-<id> tracks", () => {
+    // Transition-window layered saves can leave a timeline_spec carrying
+    // both shapes simultaneously: a v2 track with all widget clips AND
+    // per-widget `widget-<id>` tracks pointing at the same widget ids.
+    // Without dedup the reader paints every widget twice (the duplicate
+    // headings + stray decorative shapes the user saw on the public
+    // watch page). v2 entries win order (explicit post-#832 save) and
+    // legacy widget-* duplicates are dropped.
+    const dual: Timeline = {
+      schemaVersion: 1,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      backgroundColor: "#000000",
+      tracks: [
+        {
+          id: "v1",
+          kind: "video",
+          label: "Background",
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
+          clips: [
+            {
+              id: "s1_bg",
+              sourceId: "",
+              startFrame: 0,
+              durationFrames: 60,
+              sourceInFrame: 0,
+              effects: [
+                { kind: "canvas-v2:background", params: { color: "#000000", sceneId: "s1" } },
+              ],
+            },
+          ],
+        },
+        {
+          id: "v2",
+          kind: "video",
+          label: "Widgets",
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
+          clips: [
+            {
+              id: "alpha",
+              sourceId: "",
+              startFrame: 0,
+              durationFrames: 60,
+              sourceInFrame: 0,
+              effects: [
+                { kind: "canvas-v2:text", params: { x: 0.1, y: 0.1, width: 0.3, height: 0.1, text: "alpha", z: 1 } },
+              ],
+            },
+          ],
+        },
+        // Same clip id "alpha" reappears in a legacy widget-* track.
+        {
+          id: "widget-alpha",
+          kind: "video",
+          label: "text",
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
+          clips: [
+            {
+              id: "alpha",
+              sourceId: "",
+              startFrame: 0,
+              durationFrames: 60,
+              sourceInFrame: 0,
+              effects: [
+                { kind: "canvas-v2:text", params: { x: 0.1, y: 0.1, width: 0.3, height: 0.1, text: "alpha", z: 1 } },
+              ],
+            },
+          ],
+        },
+      ],
+      markers: [],
+    };
+    const restored = timelineToCanvasState(dual);
+    expect(restored.scenes).toHaveLength(1);
+    // Only ONE widget surfaces despite "alpha" appearing on both tracks.
+    expect(restored.scenes[0].widgets.map((w) => w.id)).toEqual(["alpha"]);
+  });
+
   it("normalises pre-unification `widget-<id>` tracks back into the v2 shape on read", () => {
     // Simulate a Timeline produced by the post-#832, pre-unification
     // emit: one track per widget. The reader is the normalisation seam
