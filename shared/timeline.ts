@@ -96,6 +96,15 @@ export interface Track {
    * (e.g. uniform LUT across an entire B-roll track).
    */
   effects?: ClipEffect[];
+  /**
+   * Overlay track — clips on this track may share frames. The renderer
+   * iterates `activeClipsAt` and paints every visible clip in
+   * clip-array order (= z-order). Set `true` on the canvas-state
+   * widget pool (`v2`) per the #840 unification; default `false`
+   * everywhere else (sequential tracks: bg / scene-post / music /
+   * voiceover). Honoured by `isRenderable` + `insertClip`.
+   */
+  allowsOverlap?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +270,7 @@ export function emptyTimeline(opts: {
   const tracks: Track[] = seed
     ? [
         defaultTrack({ id: "v1", kind: "video", label: "Background" }),
-        defaultTrack({ id: "v2", kind: "video", label: "Widgets" }),
+        defaultTrack({ id: "v2", kind: "video", label: "Widgets", allowsOverlap: true }),
         defaultTrack({ id: "v3", kind: "video", label: "Scene post" }),
         defaultTrack({ id: "a1", kind: "audio", label: "Music" }),
         defaultTrack({ id: "a2", kind: "audio", label: "Voiceover" }),
@@ -284,6 +293,7 @@ export function defaultTrack(opts: {
   id: string;
   kind: TrackKind;
   label: string;
+  allowsOverlap?: boolean;
 }): Track {
   return {
     id: opts.id,
@@ -295,6 +305,7 @@ export function defaultTrack(opts: {
     solo: false,
     locked: false,
     clips: [],
+    ...(opts.allowsOverlap ? { allowsOverlap: true } : {}),
   };
 }
 
@@ -339,9 +350,15 @@ export function clipsOverlap(a: Clip, b: Clip): boolean {
   return a.startFrame < bEnd && b.startFrame < aEnd;
 }
 
-/** True when no two clips on the same track overlap. */
+/** True when no two clips on the same sequential track overlap. Tracks
+ *  flagged `allowsOverlap` (the canvas-state widget pool on `v2` per the
+ *  #840 unification) are skipped — multiple simultaneous widgets are the
+ *  design, not an error. The legacy `v2` id is grandfathered in for
+ *  stored timelines that pre-date the flag so the renderer keeps
+ *  accepting them. */
 export function tracksHaveNoOverlap(timeline: Timeline): boolean {
   for (const track of timeline.tracks) {
+    if (isOverlapAllowedTrack(track)) continue;
     for (let i = 0; i < track.clips.length; i++) {
       for (let j = i + 1; j < track.clips.length; j++) {
         if (clipsOverlap(track.clips[i], track.clips[j])) return false;
@@ -349,6 +366,13 @@ export function tracksHaveNoOverlap(timeline: Timeline): boolean {
     }
   }
   return true;
+}
+
+/** A track that is permitted to carry overlapping clips. Either the
+ *  explicit `allowsOverlap` flag, or the canonical canvas-state widget
+ *  pool id (`v2`) — the architectural contract from #840 + #844. */
+export function isOverlapAllowedTrack(track: Track): boolean {
+  return track.allowsOverlap === true || track.id === "v2";
 }
 
 /**

@@ -64,8 +64,15 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   const v1: Track = defaultTrack({ id: "v1", kind: "video", label: "Background" });
   // `v2` ("widgets") carries every overlay clip in the composition.
   // The renderer iterates every active clip on it per frame, in array
-  // order, so we sort the clips by z before final assembly.
-  const v2: Track = defaultTrack({ id: "v2", kind: "video", label: "Widgets" });
+  // order, so we sort the clips by z before final assembly. Flag
+  // `allowsOverlap` so `isRenderable` skips the no-overlap invariant
+  // for this track — multiple simultaneous widgets are the design.
+  const v2: Track = defaultTrack({
+    id: "v2",
+    kind: "video",
+    label: "Widgets",
+    allowsOverlap: true,
+  });
   // `v3` ("scene-post") sits ABOVE the widget track so its sourceless
   // clips' effects run after every widget has been composited — that's
   // what lets scene-level blur / glow / vignette / film-grain see the

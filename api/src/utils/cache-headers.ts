@@ -1,4 +1,4 @@
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 
 /**
  * Cache-Control header helper. Centralises the policy choice so route
@@ -43,4 +43,22 @@ export function withCacheHeaders(c: Context, opts: CacheHeaderOptions): void {
   if (opts.scope === "private") {
     c.header("Vary", "Authorization, Cookie");
   }
+}
+
+/**
+ * Route-file middleware factory. Attach to a Hono sub-app to tag every
+ * successful GET response with the same cache policy without sprinkling
+ * `withCacheHeaders` calls through every handler. Mutations skip
+ * automatically because they're not GET.
+ *
+ * Usage:
+ *   dashboardRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 60 }));
+ */
+export function cacheMiddleware(opts: CacheHeaderOptions): MiddlewareHandler {
+  return async (c, next) => {
+    await next();
+    if (c.req.method === "GET" && c.res.status === 200) {
+      withCacheHeaders(c, opts);
+    }
+  };
 }

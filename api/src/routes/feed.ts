@@ -5,6 +5,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
+import { cacheMiddleware } from "../utils/cache-headers.js";
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.

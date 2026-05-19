@@ -13,6 +13,7 @@
 
 import {
   clipsOverlap,
+  isOverlapAllowedTrack,
   type Clip,
   type MulticamAngle,
   type MulticamGroup,
@@ -80,9 +81,11 @@ export function insertClip(
     ...(insertion.gain !== undefined ? { gain: insertion.gain } : {}),
     ...(insertion.nestedTimelineId ? { nestedTimelineId: insertion.nestedTimelineId } : {}),
   };
-  for (const existing of track.clips) {
-    if (clipsOverlap(newClip, existing)) {
-      throw new Error("Clip would overlap an existing clip on this track");
+  if (!isOverlapAllowedTrack(track)) {
+    for (const existing of track.clips) {
+      if (clipsOverlap(newClip, existing)) {
+        throw new Error("Clip would overlap an existing clip on this track");
+      }
     }
   }
   return {
