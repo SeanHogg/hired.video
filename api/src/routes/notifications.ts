@@ -5,6 +5,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
+import { etagMiddleware } from "../utils/etag.js";
 
 const { notifications } = schema;
 
@@ -13,8 +14,10 @@ export const notificationRoutes = new Hono<{ Variables: Variables }>();
 // Inbox polls /api/inbox every 35s (SignalR is the primary push channel);
 // the /api/notifications/* GETs share that cadence in places, so a 30s
 // private cache lets repeat reads within a tick come straight from the
-// browser. Mutations skip — the middleware only tags GET / 200.
+// browser. Mutations skip — the middleware only tags GET / 200. ETag
+// 304s polled responses that haven't changed across the window.
 notificationRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 30 }));
+notificationRoutes.use("/*", etagMiddleware());
 
 function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

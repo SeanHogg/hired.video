@@ -19,14 +19,17 @@ import {
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import * as pipelineService from "../services/pipeline/PipelineService.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
+import { etagMiddleware } from "../utils/etag.js";
 
 export const jobPipelineRoutes = new Hono<{ Variables: Variables }>();
 
 // Pipeline reads are recruiter-scoped per-job kanban state. 30s is short
 // enough that drag-drop updates land via the optimistic mutation path
 // before the next refresh; the cache only short-circuits between page
-// navigations (Pipeline → Job → back).
+// navigations (Pipeline → Job → back). ETag 304s the polled refresh
+// when the kanban hasn't changed.
 jobPipelineRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 30 }));
+jobPipelineRoutes.use("/*", etagMiddleware());
 
 const STAGE_ENUM = z.enum(PIPELINE_STAGES);
 

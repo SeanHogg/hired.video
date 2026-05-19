@@ -9,12 +9,18 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, checkAIUsage } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
+import { etagMiddleware } from "../utils/etag.js";
 
 export const dashboardRoutes = new Hono<{ Variables: Variables }>();
 
 // Every successful GET on /api/dashboard/* is user-scoped, expensive
-// (6–8 parallel DB queries), and tolerates 60s of staleness.
+// (6–8 parallel DB queries), and tolerates 60s of staleness. Pair the
+// max-age window with an ETag — when the same browser polls past the
+// window but nothing actually changed, the server still hashes (and
+// runs the queries — fixing that is #852) but returns 304 instead of
+// re-shipping the entire aggregate body.
 dashboardRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 60 }));
+dashboardRoutes.use("/*", etagMiddleware());
 
 const now = () => new Date().toISOString();
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);

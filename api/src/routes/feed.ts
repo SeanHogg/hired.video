@@ -6,6 +6,7 @@ import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
+import { etagMiddleware } from "../utils/etag.js";
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
@@ -121,7 +122,10 @@ export const feedRoutes = new Hono<{ Variables: Variables }>();
 // connection graph), so cache is `private` — never CDN-cached. 30s is
 // short enough that a new post lands in the timeline on the next refresh
 // without being noticeable, and saves a query every page transition.
+// ETag turns the "first poll after the window" into a 304 when nothing
+// actually changed.
 feedRoutes.use("/*", cacheMiddleware({ scope: "private", maxAge: 30 }));
+feedRoutes.use("/*", etagMiddleware());
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DTO builder
