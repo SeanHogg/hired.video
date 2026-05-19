@@ -128,18 +128,34 @@ export default function CanvasV2Preview({
     };
   }, [timeline, playback, preloadReady]);
 
+  // Wrap the canvas in a div whose LAYOUT box matches the visible scaled
+  // size. Without this wrapper the canvas's layout box stays at
+  // state.width × state.height even after `transform: scale(zoom)`
+  // shrinks it visually toward the top-left — so a flex/grid parent
+  // that tries to centre this component ends up centring the full
+  // un-scaled box and the visible content drifts into the upper-left
+  // corner. The wrapper's explicit `width / height = state.* × zoom`
+  // makes the layout box equal the visible region, so the parent's
+  // `items-center justify-center` actually centres the content.
+  const scaledW = Math.max(1, Math.round(state.width * zoom));
+  const scaledH = Math.max(1, Math.round(state.height * zoom));
   return (
-    <canvas
-      ref={canvasRef}
-      width={state.width}
-      height={state.height}
-      className={cn("block bg-black shadow-lg", className)}
-      style={{
-        width: state.width,
-        height: state.height,
-        transform: `scale(${zoom})`,
-        transformOrigin: "top left",
-      }}
-    />
+    <div
+      style={{ width: scaledW, height: scaledH }}
+      className={cn("relative", className)}
+    >
+      <canvas
+        ref={canvasRef}
+        width={state.width}
+        height={state.height}
+        className="block bg-black shadow-lg"
+        style={{
+          width: state.width,
+          height: state.height,
+          transform: `scale(${zoom})`,
+          transformOrigin: "top left",
+        }}
+      />
+    </div>
   );
 }

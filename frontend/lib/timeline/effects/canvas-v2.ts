@@ -1162,23 +1162,35 @@ registerEffect({
     ctx.textBaseline = "top";
     ctx.fillText(kindLabel.toUpperCase(), x + padding, y + padding, w - padding * 2);
 
-    // Title — bold, primary text colour.
+    // Title — bold, primary text colour. Cursor advances by the ACTUAL
+    // number of wrapped lines so the subtitle below never collides with
+    // a multi-line title.
     const titleFontPx = Math.max(18, Math.round(Math.min(w, h) * 0.11));
+    const titleLineH = titleFontPx * 1.2;
     ctx.font = `bold ${titleFontPx}px sans-serif`;
     ctx.fillStyle = textColor;
     const titleY = y + padding + kindFontPx + Math.round(kindFontPx * 0.4);
     const title = summary?.title ?? (entityId ? `Loading ${kindLabel.toLowerCase()}…` : `No ${kindLabel.toLowerCase()} selected`);
-    wrapText(ctx, title, x + padding, titleY + titleFontPx / 2, w - padding * 2, titleFontPx * 1.2);
+    const titleLines = wrapText(ctx, title, x + padding, titleY + titleFontPx / 2, w - padding * 2, titleLineH);
+    const titleBlockH = Math.max(1, titleLines) * titleLineH;
 
-    // Subtitle — muted, optional.
+    // Subtitle — muted, optional. Anchored below the actual title block,
+    // not its single-line projection.
     const subFontPx = Math.max(13, Math.round(titleFontPx * 0.55));
-    const subY = titleY + titleFontPx * 1.6;
-    let cursorY = subY;
+    const subLineH = subFontPx * 1.3;
+    let cursorY = titleY + titleBlockH + Math.round(subFontPx * 0.3);
     if (summary?.subtitle) {
       ctx.font = `${subFontPx}px sans-serif`;
       ctx.fillStyle = mutedColor;
-      wrapText(ctx, summary.subtitle, x + padding, cursorY + subFontPx / 2, w - padding * 2, subFontPx * 1.3);
-      cursorY += subFontPx * 1.6;
+      const subLines = wrapText(
+        ctx,
+        summary.subtitle,
+        x + padding,
+        cursorY + subFontPx / 2,
+        w - padding * 2,
+        subLineH,
+      );
+      cursorY += Math.max(1, subLines) * subLineH + Math.round(subFontPx * 0.4);
     }
 
     // CTA pill at bottom-right — computed first so body lines can stop
@@ -1193,7 +1205,13 @@ registerEffect({
     const ctaY = y + h - padding - ctaH;
 
     // Body bullets — drawn between subtitle and CTA. Each line wraps
-    // within the card width.
+    // within the card width. Cursor advances by the ACTUAL line count
+    // wrapText consumed (returned from the helper) so a bullet that
+    // wraps to N visual rows pushes the next bullet down by N rows
+    // instead of the previous `Math.ceil(width / maxWidth)` estimate,
+    // which underestimated whenever word boundaries forced an early
+    // wrap and caused the next bullet to overprint the last visual
+    // row of the previous one.
     const bodyFontPx = Math.max(12, Math.round(titleFontPx * 0.46));
     const bodyLineH = bodyFontPx * 1.35;
     const bodyMaxY = ctaY - padding * 0.8;
@@ -1204,8 +1222,15 @@ registerEffect({
       ctx.textBaseline = "top";
       for (const line of summary.body) {
         if (cursorY + bodyLineH > bodyMaxY) break;
-        wrapText(ctx, line, x + padding, cursorY + bodyFontPx / 2, w - padding * 2, bodyLineH);
-        cursorY += bodyLineH * Math.max(1, Math.ceil(ctx.measureText(line).width / (w - padding * 2)));
+        const usedLines = wrapText(
+          ctx,
+          line,
+          x + padding,
+          cursorY + bodyFontPx / 2,
+          w - padding * 2,
+          bodyLineH,
+        );
+        cursorY += Math.max(1, usedLines) * bodyLineH;
       }
     }
 
@@ -1332,6 +1357,14 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
+/**
+ * Greedy word-wrap onto the canvas. Returns the number of visual lines
+ * the text consumed so callers can advance their layout cursor by the
+ * actual amount (not a heuristic). The previous `Math.ceil(width/maxWidth)`
+ * estimate undercounted whenever wrapping broke earlier than perfect
+ * packing (long word didn't fit) — that's what made resume bullets
+ * overlap the next line in the linked-content card.
+ */
 function wrapText(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   text: string,
@@ -1339,21 +1372,28 @@ function wrapText(
   y: number,
   maxWidth: number,
   lineHeight: number,
-): void {
-  const words = text.split(/\s+/);
+): number {
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length === 0) return 0;
   let line = "";
   let cursorY = y;
+  let lineCount = 0;
   for (const word of words) {
     const candidate = line ? `${line} ${word}` : word;
     if (ctx.measureText(candidate).width > maxWidth && line) {
       ctx.fillText(line, x, cursorY);
+      lineCount++;
       line = word;
       cursorY += lineHeight;
     } else {
       line = candidate;
     }
   }
-  if (line) ctx.fillText(line, x, cursorY);
+  if (line) {
+    ctx.fillText(line, x, cursorY);
+    lineCount++;
+  }
+  return lineCount;
 }
 
 function numberOr(v: unknown, fallback: number): number {
