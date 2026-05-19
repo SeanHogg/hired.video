@@ -234,14 +234,25 @@ export interface RenderJob {
 // these checks inline — that's how branching gates drift across files.
 
 /**
- * Build a fresh Timeline with sensible defaults. Seeds 2 video + 2 audio
- * tracks so the editor opens to a usable layout instead of an empty
- * canvas. Callers that explicitly want an empty timeline pass
+ * Build a fresh Timeline with sensible defaults. Seeds the four
+ * universal tracks every composition needs:
+ *
+ *   v1   — background (one bg clip per scene authored by canvas-state)
+ *   v3   — scene-post effects (sourceless clips whose effects apply to
+ *          the fully composited frame: blur / glow / vignette / etc.)
+ *   a1   — music
+ *   a2   — voiceover
+ *
+ * Widget tracks (`widget-<widgetId>`) are not seeded — the canvas-state
+ * emit adds one per widget on save, sorted by z. The renderer's
+ * "one active clip per track per frame" invariant forbids pooling
+ * widgets on a single shared track, so there's nothing to pre-seed.
+ *
+ * Callers that explicitly want an empty timeline pass
  * `seedTracks: false`.
  *
- * Single source of truth — the backend NLE create route AND the
- * frontend "New film" handler both call this. Don't inline a parallel
- * default-Timeline object anywhere else.
+ * Single source of truth — every "new film" entry point calls this.
+ * Don't inline a parallel default-Timeline object anywhere else.
  */
 export function emptyTimeline(opts: {
   fps?: number;
@@ -252,10 +263,10 @@ export function emptyTimeline(opts: {
   const seed = opts.seedTracks !== false;
   const tracks: Track[] = seed
     ? [
-        defaultTrack({ id: "v1", kind: "video", label: "V1" }),
-        defaultTrack({ id: "v2", kind: "video", label: "V2" }),
-        defaultTrack({ id: "a1", kind: "audio", label: "A1" }),
-        defaultTrack({ id: "a2", kind: "audio", label: "A2" }),
+        defaultTrack({ id: "v1", kind: "video", label: "Background" }),
+        defaultTrack({ id: "v3", kind: "video", label: "Scene post" }),
+        defaultTrack({ id: "a1", kind: "audio", label: "Music" }),
+        defaultTrack({ id: "a2", kind: "audio", label: "Voiceover" }),
       ]
     : [];
   return {

@@ -555,18 +555,13 @@ authRoutes.post("/magic-link", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
   const redirect = typeof body.redirect === "string" ? body.redirect : "/dashboard";
-  const cfTurnstileToken = typeof body.cfTurnstileToken === "string" ? body.cfTurnstileToken : undefined;
   if (!email) return c.json(error("VALIDATION_ERROR", "email is required"), 400);
 
-  // #426 — captcha gate. Mirrors handleLogin: the port is `enforced=false`
-  // when `TURNSTILE_SECRET_KEY` is unset (dev/test), so we only fail closed
-  // when the secret IS set AND the token is missing or invalid. Always
-  // return 200 on rejection to avoid user enumeration.
-  const deps = buildAuthDeps(c);
-  if (deps.captcha.enforced) {
-    const ok = await deps.captcha.verify(cfTurnstileToken, deps.clientIp ?? undefined);
-    if (!ok) return c.json(success({ sent: true }), 200);
-  }
+  // No captcha gate here on purpose. This endpoint is the documented
+  // escape hatch from a TURNSTILE_FAIL on /login (see Login.tsx) — if a
+  // user can't solve the challenge, mailing them a one-shot link is the
+  // recovery path. authWriteRateLimiterMiddleware (20/10min/IP) is the
+  // abuse cap; per-email guards belong in [[project_emailRateLimit]].
 
   const db = getDb();
   const [user] = await db

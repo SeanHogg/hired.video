@@ -549,22 +549,14 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   const fps = timeline.fps;
   const v1 = timeline.tracks.find((t) => t.id === "v1") ?? timeline.tracks[0];
   const v3 = timeline.tracks.find((t) => t.id === "v3");
-  // Widgets now live on per-widget tracks named `widget-<widgetId>`.
-  // Collect every widget clip across the composition so the per-scene
-  // bucketing below sees them as a flat list, the same way the legacy
-  // single-v2-track shape did. Preserves the array-order paint order
-  // baked in by `canvasStateToTimeline` (which sorts by z before emit).
-  //
-  // Legacy `v2` track is read alongside the per-widget tracks so
-  // timelines saved before the one-track-per-widget split (pre-#832
-  // emit) still hydrate their widgets. Without this every pre-split
-  // project rendered the "Video is being processed" fallback because
-  // the canvas-state came back with zero widgets. Re-saving rewrites
-  // to the new shape; until then the legacy read keeps them playable.
+  // Widgets live on per-widget tracks named `widget-<widgetId>` (one
+  // track per widget enforces the renderer's "one active clip per
+  // track per frame" rule). Collect every widget clip across the
+  // composition so the per-scene bucketing below sees them as a flat
+  // list. Paint order is the array order baked in by
+  // `canvasStateToTimeline` (which sorts by z before emit).
   const widgetClips = timeline.tracks
-    .filter(
-      (t) => t.kind === "video" && (t.id.startsWith("widget-") || t.id === "v2"),
-    )
+    .filter((t) => t.kind === "video" && t.id.startsWith("widget-"))
     .flatMap((t) => t.clips);
 
   const scenes: Scene[] = [];
