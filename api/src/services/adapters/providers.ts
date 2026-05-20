@@ -132,14 +132,19 @@ const PAID_TERMINAL_MODEL = "cerebras/llama3.1-8b" as const;
  *  user-blocking foreground flows (resume tailoring, interview prep)
  *  where the user clicks and waits — same shape as the original 8.
  *  Excluded: low-interactivity / high-volume pipelines (autofill,
- *  email_*, vendor_extract, job_parser, etc.) where a deterministic
- *  503 + retry on next tick is fine and a paid call per item would
- *  explode cost. */
+ *  email_*, vendor_extract, etc.) where a deterministic 503 + retry on
+ *  next tick is fine and a paid call per item would explode cost.
+ *  `job_parser` was added on 2026-05-20: a single Track click is the
+ *  user-blocking gate to every downstream job-aware feature (match,
+ *  tailor, autofill), and the free chain was producing unusable
+ *  extracts often enough that users complained — promoting it to a
+ *  premium primary + paid terminal is worth the per-click cost. */
 const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase>([
   "career_360",
   "chat",
   "interview_analyze",
   "interview_questions",
+  "job_parser",
   "match",
   "match_insights",
   "match_tailor",
@@ -211,7 +216,19 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   recruiter_outreach: { model: "google/gemma-4-31b-it:free", temperature: 0.7 },
   dashboard_summary: { model: "google/gemma-4-31b-it:free", temperature: 0.4 },
   article_writer: { model: "meta-llama/llama-3.3-70b-instruct:free", temperature: 0.7 },
-  job_parser: { model: "qwen/qwen3-coder:free", temperature: 0.0 },
+  // Job extraction (Chrome extension Track click → /api/jobs/extract).
+  // One-shot, user-initiated, high-value: a bad extract makes the saved
+  // job unusable downstream (match scoring, tailor, autofill all read
+  // this row). Match `studio_script`'s premium shape — Claude Haiku for
+  // best JSON-from-markdown quality, free Qwen primary fallback, and
+  // withFallbackChain auto-pads the rest of the free pool.
+  job_parser: {
+    model: "anthropic/claude-3-haiku",
+    temperature: 0.0,
+    fallbacks: [
+      { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.0 },
+    ],
+  },
   resume_merge: { model: "qwen/qwen3-coder:free", temperature: 0.2 },
   resume_summary: { model: "google/gemma-4-31b-it:free", temperature: 0.5 },
   resume_consolidate_highlights: { model: "qwen/qwen3-coder:free", temperature: 0.4, maxTokens: 1200 },

@@ -44,9 +44,12 @@ export default function JobEditPage() {
       toast.success("Job updated successfully!");
       navigate(`/jobs/${id}`);
     } catch (error) {
+      // Don't toast here — JobEditForm catches and either maps Zod
+      // field errors to inline messages under each input or shows a
+      // generic toast itself. A page-level toast on top of that would
+      // double-up and hide which field actually broke (gap #876).
       console.error("Failed to update job:", error);
-      toast.error("Failed to update job. Please try again.");
-      throw error; // Re-throw to let the form handle it
+      throw error;
     } finally {
       setSaving(false);
     }

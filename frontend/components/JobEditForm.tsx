@@ -28,6 +28,38 @@ import {
   JobStatus,
 } from "@/lib/constants/enums";
 import MediaPicker from "@/components/shared/MediaPicker";
+import { ValidationError } from "@/lib/errors";
+
+/** Best-effort client-side URL check — mirrors the API's `optionalUrl`
+ *  Zod schema (treats "" as omitted). */
+function isValidOptionalUrl(value: string | undefined): boolean {
+  if (!value) return true;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Pull `{ field: "message" }` out of the API's
+ *  `VALIDATION_ERROR.details.issues.fieldErrors` shape so the form can
+ *  render the error inline next to the offending input instead of
+ *  showing only a generic "Failed to update" toast. */
+function fieldErrorsFromValidationError(
+  err: unknown,
+): Record<string, string> | null {
+  if (!(err instanceof ValidationError)) return null;
+  const issues = (err.context as { issues?: { fieldErrors?: Record<string, string[]> } } | undefined)
+    ?.issues;
+  const fieldErrors = issues?.fieldErrors;
+  if (!fieldErrors) return null;
+  const flat: Record<string, string> = {};
+  for (const [field, msgs] of Object.entries(fieldErrors)) {
+    if (Array.isArray(msgs) && msgs.length > 0) flat[field] = msgs[0];
+  }
+  return Object.keys(flat).length > 0 ? flat : null;
+}
 
 // Types
 interface JobFormData {
@@ -89,6 +121,7 @@ export default function JobEditForm({
 
   const [newRequirement, setNewRequirement] = useState("");
   const [newResponsibility, setNewResponsibility] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Initialize form with job data
   useEffect(() => {
@@ -129,6 +162,24 @@ export default function JobEditForm({
       ...prev,
       [field]: value,
     }));
+    // Clear the error for this field once the user edits it — it's
+    // stale until the next submit tells us otherwise.
+    setErrors((prev) => {
+      if (!prev[field as string]) return prev;
+      const next = { ...prev };
+      delete next[field as string];
+      return next;
+    });
+  };
+
+  const updateHeroImageUrl = (next: string) => {
+    setFormData((prev) => ({ ...prev, heroImageUrl: next }));
+    setErrors((prev) => {
+      if (!prev.heroImageUrl) return prev;
+      const copy = { ...prev };
+      delete copy.heroImageUrl;
+      return copy;
+    });
   };
 
   const addRequirement = () => {
@@ -165,26 +216,49 @@ export default function JobEditForm({
     }));
   };
 
+  const validateClientSide = (): Record<string, string> => {
+    const next: Record<string, string> = {};
+    if (!formData.title.trim()) next.title = t("errors.jobTitleRequired");
+    if (!formData.description.trim()) next.description = t("errors.jobDescriptionRequired");
+    if (!isValidOptionalUrl(formData.heroImageUrl)) {
+      next.heroImageUrl = "Hero image must be a full URL (https://…) or empty.";
+    }
+    if (!isValidOptionalUrl(formData.atsApplyUrl)) {
+      next.atsApplyUrl = "Application URL must be a full URL (https://…) or empty.";
+    }
+    return next;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title.trim()) {
-      toast.error(t("errors.jobTitleRequired"));
+    const clientErrors = validateClientSide();
+    if (Object.keys(clientErrors).length > 0) {
+      setErrors(clientErrors);
+      // Surface the first error in a toast too — useful when the offending
+      // field is below the fold (e.g. heroImageUrl with the description
+      // expanded). The inline message under the input is the canonical one.
+      toast.error(Object.values(clientErrors)[0]);
       return;
     }
 
-    if (!formData.description.trim()) {
-      toast.error(t("errors.jobDescriptionRequired"));
-      return;
-    }
+    setErrors({});
 
     try {
       await onSave(formData);
     } catch (error) {
       console.error("Error saving job:", error);
-      toast.error(t("errors.saveJobFailed"));
+      const fieldErrors = fieldErrorsFromValidationError(error);
+      if (fieldErrors) {
+        setErrors(fieldErrors);
+        toast.error(Object.values(fieldErrors)[0]);
+      } else {
+        toast.error(t("errors.saveJobFailed"));
+      }
     }
   };
+
+  const fieldErrorClass = "border-destructive focus-visible:ring-destructive";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -205,7 +279,12 @@ export default function JobEditForm({
               onChange={(e) => handleInputChange("title", e.target.value)}
               placeholder={t("fields.jobTitle.placeholder")}
               required
+              aria-invalid={Boolean(errors.title)}
+              className={errors.title ? fieldErrorClass : undefined}
             />
+            {errors.title ? (
+              <p className="mt-1 text-sm text-destructive">{errors.title}</p>
+            ) : null}
           </div>
 
           <div>
@@ -216,20 +295,20 @@ export default function JobEditForm({
                   <img
                     src={formData.heroImageUrl}
                     alt="Job hero preview"
-                    className="h-24 w-40 object-cover rounded-md border"
+                    className={`h-24 w-40 object-cover rounded-md border ${errors.heroImageUrl ? "border-destructive" : ""}`}
                   />
                   <div className="flex flex-col gap-2">
                     <MediaPicker
                       accept="image"
                       title="Choose job hero image"
                       triggerLabel="Replace"
-                      onPick={(asset) => setFormData((prev) => ({ ...prev, heroImageUrl: asset.url }))}
+                      onPick={(asset) => updateHeroImageUrl(asset.url)}
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setFormData((prev) => ({ ...prev, heroImageUrl: "" }))}
+                      onClick={() => updateHeroImageUrl("")}
                     >
                       Remove
                     </Button>
@@ -240,9 +319,12 @@ export default function JobEditForm({
                   accept="image"
                   title="Choose job hero image"
                   triggerLabel="Add hero image"
-                  onPick={(asset) => setFormData((prev) => ({ ...prev, heroImageUrl: asset.url }))}
+                  onPick={(asset) => updateHeroImageUrl(asset.url)}
                 />
               )}
+              {errors.heroImageUrl ? (
+                <p className="mt-1 text-sm text-destructive">{errors.heroImageUrl}</p>
+              ) : null}
             </div>
           </div>
 
@@ -255,7 +337,12 @@ export default function JobEditForm({
               placeholder={t("fields.jobDescription.placeholder")}
               rows={6}
               required
+              aria-invalid={Boolean(errors.description)}
+              className={errors.description ? fieldErrorClass : undefined}
             />
+            {errors.description ? (
+              <p className="mt-1 text-sm text-destructive">{errors.description}</p>
+            ) : null}
           </div>
 
           <div>
@@ -266,7 +353,12 @@ export default function JobEditForm({
               value={formData.atsApplyUrl}
               onChange={(e) => handleInputChange("atsApplyUrl", e.target.value)}
               placeholder={t("fields.applicationUrl.placeholder")}
+              aria-invalid={Boolean(errors.atsApplyUrl)}
+              className={errors.atsApplyUrl ? fieldErrorClass : undefined}
             />
+            {errors.atsApplyUrl ? (
+              <p className="mt-1 text-sm text-destructive">{errors.atsApplyUrl}</p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
