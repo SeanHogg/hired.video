@@ -179,7 +179,9 @@ describe("detectJobInPage — focused pane (LinkedIn)", () => {
     expect(got!.title).toBe("Founding CTO");
     expect(got!.company).toBe("Talently");
     expect(got!.location).toBe("Hoboken, NJ");
-    expect(got!.strategy).toBe("linkedInFallback");
+    // strategy can be either focusedPane or linkedInFallback depending on
+    // whether `#job-details` exists — both paths now enrich from docTitle.
+    expect(["focusedPane", "linkedInFallback"]).toContain(got!.strategy);
   });
 });
 

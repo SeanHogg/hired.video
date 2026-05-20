@@ -561,6 +561,18 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
         company = pickText(focused.el, FOCUSED_COMPANY_SELECTORS[focused.host]) || undefined;
         location = pickText(focused.el, FOCUSED_LOCATION_SELECTORS[focused.host]) || undefined;
       }
+      // LinkedIn-only: fill missing company/location from the docTitle parse
+      // ("{Company} hiring {Title} in {Location} | LinkedIn"). The unified-
+      // top-card classes aren't always present on the direct /jobs/view/{id}/
+      // layout — without this we'd return title but leave company empty,
+      // which triggers the HIRED_VIDEO_SEED_COMPANY fallback downstream.
+      if (focused.host === "linkedin.com" && (!company || !location)) {
+        const liDoc = parseLinkedInTitleString(doc.title);
+        if (liDoc) {
+          company = company || liDoc.company;
+          location = location || liDoc.location;
+        }
+      }
       const sourceUrl = canonicalizeJobUrl(currentUrl);
       return {
         title: title.slice(0, 250),
