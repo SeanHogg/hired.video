@@ -223,6 +223,31 @@ export interface LinkedContentWidgetParams {
   accentColor?: string;
   /** CTA button text (computed for contrast against accent). */
   accentTextColor?: string;
+  /** CTA pill text override. When set, replaces the kind-default label
+   *  (`"View resume"` / `"Read article"` / etc) baked into
+   *  `LINKED_CONTENT_REGISTRY[kind].ctaLabel`. Single seam: both the
+   *  DOM `<CtaPill>` in `LinkedContentBody.tsx` AND the canvas-2D
+   *  `canvas-v2:linked-content` applier read the override through the
+   *  shared `resolveLinkedContentCtaLabel(kind, data)` helper, so the
+   *  edit / playback / export surfaces never drift on what the button
+   *  says. Empty / undefined falls back to the kind default. */
+  ctaText?: string;
+  /** Explicit CTA font size in canvas pixels. The canvas-2D applier
+   *  used to size the pill purely from the widget's bounding box
+   *  (`min(w,h) * 0.06`) — fine on large cards, illegible on tall
+   *  narrow ones. When this field is set, both the DOM pill and the
+   *  canvas painter use the explicit size; otherwise the canvas falls
+   *  back to its bounding-box heuristic and the DOM pill uses its
+   *  inherited Tailwind `text-xs` size. */
+  ctaFontPx?: number;
+  /** CTA font weight. `"bold"` matches the historical default; the
+   *  toggle exists so a designer can dial the pill back to a normal-
+   *  weight token when the card already carries plenty of bold copy. */
+  ctaFontWeight?: "normal" | "bold";
+  /** Font family stack for the CTA pill. Passed verbatim to canvas
+   *  context.font + CSS font-family. Defaults to the surface's sans
+   *  stack on both renderers when unset. */
+  ctaFontFamily?: string;
 }
 
 export type WidgetParams =

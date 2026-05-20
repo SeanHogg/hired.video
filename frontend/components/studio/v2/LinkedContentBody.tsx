@@ -22,8 +22,10 @@ import { Suspense } from "react";
 import { ExternalLink } from "lucide-react";
 import {
   getLinkedContentMeta,
+  resolveLinkedContentCtaTypography,
   DEFAULT_LINKED_CONTENT_COLORS,
   type LinkedContentColors,
+  type LinkedContentCtaTypography,
 } from "@/lib/studio/editor-v2/linked-content";
 import type { LinkedContentWidgetParams } from "@/lib/studio/editor-v2/canvas-state";
 
@@ -36,6 +38,11 @@ export default function LinkedContentBody({ data }: LinkedContentBodyProps) {
   const Icon = meta.icon;
   const InlineBody = meta.InlineBody;
   const colors = resolveDataColors(data);
+  // Resolved CTA typography — same seam the canvas-2D applier uses, so
+  // an author who edits the label / font in the inspector sees the
+  // identical pill on the editor canvas, the public watch page, AND
+  // the exported MP4.
+  const cta = resolveLinkedContentCtaTypography(data.entityKind, data);
 
   if (!data.entityId) {
     return (
@@ -62,7 +69,7 @@ export default function LinkedContentBody({ data }: LinkedContentBodyProps) {
       >
         <InlineBody id={data.entityId} />
       </Suspense>
-      <CtaPill label={meta.ctaLabel} colors={colors} />
+      <CtaPill cta={cta} colors={colors} />
     </div>
   );
 }
@@ -70,13 +77,33 @@ export default function LinkedContentBody({ data }: LinkedContentBodyProps) {
 /** Inert floating CTA pill positioned over the inline body — clicks
  *  fall through to widget selection. The canvas-v2 renderer draws an
  *  interactive equivalent for the playback / export surface. */
-function CtaPill({ label, colors }: { label: string; colors: LinkedContentColors }) {
+function CtaPill({
+  cta,
+  colors,
+}: {
+  cta: LinkedContentCtaTypography;
+  colors: LinkedContentColors;
+}) {
+  // `fontPx` is the author's explicit pixel-size override; when null we
+  // fall back to the historical Tailwind `text-xs` (12px-ish) so an
+  // un-customised widget keeps its current look. Bold by default per
+  // `resolveLinkedContentCtaTypography` defaults.
   return (
     <span
-      className="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-md"
-      style={{ background: colors.accentColor, color: colors.accentTextColor }}
+      className="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 shadow-md"
+      style={{
+        background: colors.accentColor,
+        color: colors.accentTextColor,
+        fontFamily: cta.fontFamily,
+        fontWeight: cta.fontWeight === "bold" ? 700 : 400,
+        fontSize: cta.fontPx !== null ? `${cta.fontPx}px` : undefined,
+      }}
     >
-      {label}
+      {cta.fontPx === null ? (
+        <span className="text-xs">{cta.label}</span>
+      ) : (
+        cta.label
+      )}
       <ExternalLink className="h-3 w-3" />
     </span>
   );

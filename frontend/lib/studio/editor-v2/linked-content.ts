@@ -490,6 +490,69 @@ export function getLinkedContentMeta(kind: LinkedContentKind): LinkedContentMeta
   return LINKED_CONTENT_REGISTRY[kind];
 }
 
+/**
+ * Resolved CTA pill typography for a linked-content widget. The widget
+ * lets the author override the kind-default label + font; this helper
+ * is the single seam BOTH the DOM `<CtaPill>` AND the canvas-2D
+ * `canvas-v2:linked-content` applier consume so the pill renders the
+ * same text + font choice on every surface (editor, playback, export).
+ *
+ * Caller passes the per-widget overrides (`ctaText`, `ctaFontPx`,
+ * `ctaFontWeight`, `ctaFontFamily`) plus the resolved entity kind; we
+ * fall back to the kind-default `ctaLabel` and sensible typography
+ * defaults so an un-customised widget keeps its current look. Each
+ * field is required on the returned shape — neither renderer has to
+ * re-derive a fallback inline.
+ */
+export interface LinkedContentCtaTypography {
+  /** Final label rendered inside the pill. */
+  label: string;
+  /**
+   * Explicit pixel font size. When `null`, the canvas-2D applier falls
+   * back to its `min(w, h) * 0.06` bounding-box heuristic and the DOM
+   * pill inherits its parent's CSS size — the per-surface defaults the
+   * widget shipped with before #850. Numeric override pins the same
+   * size on both surfaces.
+   */
+  fontPx: number | null;
+  /** `"bold"` (default) or `"normal"`. */
+  fontWeight: "normal" | "bold";
+  /** Font-family stack. `"sans-serif"` on canvas; the DOM pill maps the
+   *  same value into its `style.fontFamily` so both surfaces resolve
+   *  the same glyph set. */
+  fontFamily: string;
+}
+
+export interface LinkedContentCtaOverrides {
+  ctaText?: string;
+  ctaFontPx?: number;
+  ctaFontWeight?: "normal" | "bold";
+  ctaFontFamily?: string;
+}
+
+export function resolveLinkedContentCtaTypography(
+  kind: LinkedContentKind,
+  overrides: LinkedContentCtaOverrides | null | undefined,
+): LinkedContentCtaTypography {
+  const meta = getLinkedContentMeta(kind);
+  const text = overrides?.ctaText?.trim();
+  return {
+    label: text && text.length > 0 ? text : meta.ctaLabel,
+    fontPx:
+      typeof overrides?.ctaFontPx === "number" &&
+      Number.isFinite(overrides.ctaFontPx) &&
+      overrides.ctaFontPx > 0
+        ? overrides.ctaFontPx
+        : null,
+    fontWeight: overrides?.ctaFontWeight === "normal" ? "normal" : "bold",
+    fontFamily:
+      typeof overrides?.ctaFontFamily === "string" &&
+      overrides.ctaFontFamily.trim().length > 0
+        ? overrides.ctaFontFamily.trim()
+        : "sans-serif",
+  };
+}
+
 /** Every kind registered in `LINKED_CONTENT_REGISTRY` — drives the
  *  palette's section ordering and the inspector's "switch kind" picker. */
 export const LINKED_CONTENT_KINDS = Object.keys(

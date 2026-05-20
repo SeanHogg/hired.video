@@ -536,6 +536,17 @@ function widgetToEffect(widget: Widget): ClipEffect {
           ...(p.data.accentTextColor !== undefined
             ? { accentTextColor: p.data.accentTextColor }
             : {}),
+          // CTA pill overrides (#850) — author-tunable label + font.
+          // Each field rides along only when set so an un-customised
+          // widget's saved payload stays minimal.
+          ...(p.data.ctaText !== undefined ? { ctaText: p.data.ctaText } : {}),
+          ...(p.data.ctaFontPx !== undefined ? { ctaFontPx: p.data.ctaFontPx } : {}),
+          ...(p.data.ctaFontWeight !== undefined
+            ? { ctaFontWeight: p.data.ctaFontWeight }
+            : {}),
+          ...(p.data.ctaFontFamily !== undefined
+            ? { ctaFontFamily: p.data.ctaFontFamily }
+            : {}),
         },
       };
   }
@@ -948,6 +959,19 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
             ...(typeof params.accentColor === "string" ? { accentColor: params.accentColor } : {}),
             ...(typeof params.accentTextColor === "string"
               ? { accentTextColor: params.accentTextColor }
+              : {}),
+            // CTA pill overrides (#850) — read the same set the emit
+            // wrote, with type guards so a malformed legacy blob can't
+            // crash the reader.
+            ...(typeof params.ctaText === "string" ? { ctaText: params.ctaText } : {}),
+            ...(typeof params.ctaFontPx === "number" && Number.isFinite(params.ctaFontPx)
+              ? { ctaFontPx: params.ctaFontPx }
+              : {}),
+            ...(params.ctaFontWeight === "normal" || params.ctaFontWeight === "bold"
+              ? { ctaFontWeight: params.ctaFontWeight }
+              : {}),
+            ...(typeof params.ctaFontFamily === "string"
+              ? { ctaFontFamily: params.ctaFontFamily }
               : {}),
           },
         },

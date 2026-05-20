@@ -26,6 +26,7 @@ import { resolveCtaFontSizes } from "@/lib/studio/editor-v2/canvas-state";
 import {
   getLinkedContentMeta,
   isLinkedContentKind,
+  resolveLinkedContentCtaTypography,
   type LinkedContentKind,
   type LinkedContentSummary,
 } from "@/lib/studio/editor-v2/linked-content";
@@ -1149,9 +1150,27 @@ registerEffect({
     const kindLabel = isLinkedContentKind(kindRaw)
       ? getLinkedContentMeta(kindRaw).label
       : "Linked content";
-    const ctaLabel = isLinkedContentKind(kindRaw)
-      ? getLinkedContentMeta(kindRaw).ctaLabel
-      : "Open";
+    // CTA typography goes through the shared resolver so the DOM
+    // `<CtaPill>` (LinkedContentBody.tsx) and this canvas-2D painter
+    // can't drift on what the pill says or what font it's set in.
+    const ctaTypography = isLinkedContentKind(kindRaw)
+      ? resolveLinkedContentCtaTypography(kindRaw, {
+          ctaText: stringOr(effect.params.ctaText, ""),
+          ctaFontPx:
+            typeof effect.params.ctaFontPx === "number"
+              ? effect.params.ctaFontPx
+              : undefined,
+          ctaFontWeight:
+            effect.params.ctaFontWeight === "normal" ? "normal" : "bold",
+          ctaFontFamily: stringOr(effect.params.ctaFontFamily, ""),
+        })
+      : {
+          label: stringOr(effect.params.ctaText, "Open"),
+          fontPx: null,
+          fontWeight: "bold" as const,
+          fontFamily: "sans-serif",
+        };
+    const ctaLabel = ctaTypography.label;
 
     // Kind label (small, muted) — anchors the card so viewers see
     // "Resume / Job / Article" before the title.
@@ -1194,9 +1213,15 @@ registerEffect({
     }
 
     // CTA pill at bottom-right — computed first so body lines can stop
-    // above it without overlap.
-    const ctaFontPx = Math.max(12, Math.round(Math.min(w, h) * 0.06));
-    ctx.font = `bold ${ctaFontPx}px sans-serif`;
+    // above it without overlap. Author override (ctaTypography.fontPx)
+    // wins; otherwise we fall back to the bounding-box heuristic so
+    // un-customised pills keep their current scale-with-card behaviour.
+    const ctaFontPx =
+      ctaTypography.fontPx ??
+      Math.max(12, Math.round(Math.min(w, h) * 0.06));
+    const ctaFontWeight = ctaTypography.fontWeight;
+    const ctaFontFamily = ctaTypography.fontFamily;
+    ctx.font = `${ctaFontWeight} ${ctaFontPx}px ${ctaFontFamily}`;
     const ctaPadX = ctaFontPx;
     const ctaH = ctaFontPx + Math.round(ctaFontPx * 1.1);
     const ctaTextW = ctx.measureText(ctaLabel).width;
@@ -1264,8 +1289,10 @@ registerEffect({
       }
     }
 
-    // Draw the CTA pill last so it sits over everything else.
-    ctx.font = `bold ${ctaFontPx}px sans-serif`;
+    // Draw the CTA pill last so it sits over everything else. Font is
+    // already set above when measuring; restore it here in case body
+    // bullets or badges reset the context.
+    ctx.font = `${ctaFontWeight} ${ctaFontPx}px ${ctaFontFamily}`;
     ctx.fillStyle = accentColor;
     drawRoundedRect(ctx, ctaX, ctaY, ctaW, ctaH, ctaH / 2);
     ctx.fill();

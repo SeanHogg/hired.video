@@ -1150,6 +1150,85 @@ function LinkedContentInspector({
           </a>
         </div>
       )}
+      {/* CTA pill customisation — the same fields the canvas-2D applier
+          and DOM `<CtaPill>` read through `resolveLinkedContentCtaTypography`.
+          Each input is uncontrolled-default: blank means "use the
+          kind default" so an author who hasn't customised anything
+          keeps the legacy look. */}
+      <Field label={`CTA text (default "${meta.ctaLabel}")`}>
+        <Input
+          value={data.ctaText ?? ""}
+          placeholder={meta.ctaLabel}
+          onChange={(e) => {
+            const next = e.target.value;
+            // Empty input → drop the override so the kind default
+            // takes back over. Saving an empty string would lock the
+            // pill into "" and render an invisible label.
+            if (next === "") {
+              const { ctaText: _drop, ...rest } = data;
+              onChange(rest);
+            } else {
+              onChange({ ...data, ctaText: next });
+            }
+          }}
+          className="h-8 text-xs"
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Font size (px)">
+          <Input
+            type="number"
+            min={8}
+            max={120}
+            value={data.ctaFontPx ?? ""}
+            placeholder="auto"
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === "") {
+                const { ctaFontPx: _drop, ...rest } = data;
+                onChange(rest);
+              } else {
+                const n = Number(raw);
+                if (Number.isFinite(n) && n > 0) {
+                  onChange({ ...data, ctaFontPx: n });
+                }
+              }
+            }}
+            className="h-8 text-xs"
+          />
+        </Field>
+        <Field label="Weight">
+          <select
+            value={data.ctaFontWeight ?? "bold"}
+            onChange={(e) =>
+              onChange({
+                ...data,
+                ctaFontWeight: e.target.value === "normal" ? "normal" : "bold",
+              })
+            }
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+          >
+            <option value="bold">Bold</option>
+            <option value="normal">Regular</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Font family">
+        <Input
+          value={data.ctaFontFamily ?? ""}
+          placeholder="sans-serif"
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === "") {
+              const { ctaFontFamily: _drop, ...rest } = data;
+              onChange(rest);
+            } else {
+              onChange({ ...data, ctaFontFamily: next });
+            }
+          }}
+          className="h-8 text-xs"
+        />
+      </Field>
     </div>
   );
 }
