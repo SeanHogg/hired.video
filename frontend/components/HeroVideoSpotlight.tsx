@@ -85,11 +85,10 @@ export default function HeroVideoSpotlight({
   // rotation advances. That naturally resets currentTime + retriggers
   // autoplay.
 
-  // Desktop autoplays the video as a "live thumbnail"; mobile/tablet shows
-  // a poster+play overlay (saves cellular data, respects iOS Low Power
-  // Mode, a tap still lands users on the detail page).
-  //
-  // Three desktop sources, picked in order:
+  // Hero autoplays a muted, looping "live thumbnail" on every viewport —
+  // mobile included. iOS/Android both allow muted-autoplay <video> +
+  // playsInline, and the embed iframe is identical bytes on either side.
+  // Sources picked in order:
   //   1. Baked CDN URL          → cheapest, native autoplay/loop/muted.
   //   2. Real YouTube id        → privacy-friendly iframe embed.
   //   3. Saved-but-unrendered   → fall through to <StudioVideoSurface/>
@@ -102,12 +101,12 @@ export default function HeroVideoSpotlight({
   //                               rendered yet still plays on the hero,
   //                               instead of stranding the rotation on
   //                               a static thumbnail.
-  const useStudioSurface = isDesktop && hasRealVideo && !current.videoUrl && !current.youtubeVideoId;
+  const useStudioSurface = hasRealVideo && !current.videoUrl && !current.youtubeVideoId;
   const playerSource: FlatVideoSource | null = !hasRealVideo || useStudioSurface
     ? null
-    : isDesktop && current.videoUrl
+    : current.videoUrl
       ? { kind: "url", url: current.videoUrl, poster: current.thumbnailUrl }
-      : isDesktop && current.youtubeVideoId
+      : current.youtubeVideoId
         ? { kind: "youtube", videoId: current.youtubeVideoId }
         : { kind: "thumbnail", thumbnailUrl: current.thumbnailUrl };
   const isAutoplaying = useStudioSurface || playerSource?.kind === "url" || playerSource?.kind === "youtube";

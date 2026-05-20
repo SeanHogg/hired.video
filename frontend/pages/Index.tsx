@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Brain,
   Users,
-  BarChart3,
   FileText,
 } from "lucide-react";
 import * as React from "react";
@@ -55,14 +54,9 @@ export default function Index() {
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
                 {t("marketing.index.heroTitle1")} <span className="text-primary">{t("marketing.index.heroTitle2")}</span>
               </h2>
-              <p className="text-muted-foreground text-base sm:text-lg mb-6 max-w-xl mx-auto lg:mx-0">
+              <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto lg:mx-0">
                 {t("marketing.index.heroSubtitle")}
               </p>
-
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-8">
-                <Brain className="w-3.5 h-3.5" />
-                {t("marketing.index.chroBadge")}
-              </div>
 
               <AIInputBox
                 onSubmit={(q) =>
@@ -86,11 +80,6 @@ export default function Index() {
                     icon: Users,
                     label: t("marketing.index.chroChip.sourceCandidates"),
                     q: t("marketing.index.chroChipQ.sourceCandidates"),
-                  },
-                  {
-                    icon: BarChart3,
-                    label: t("marketing.index.chroChip.salary"),
-                    q: t("marketing.index.chroChipQ.salary"),
                   },
                   {
                     icon: Brain,
