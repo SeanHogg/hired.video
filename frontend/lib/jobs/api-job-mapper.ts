@@ -71,6 +71,13 @@ export interface UIJob {
   /** Latest sentiment score from the Sentiment Analysis tool, null if
    *  the tool has not been run against this job. */
   sentimentScore?: number | null;
+  /** Backend-stamped "can the current viewer manage this job?" verdict —
+   *  owner / super-admin / company team member, computed via
+   *  `requireJobOwner` rules. Frontend gating (Edit Job button,
+   *  Candidates + Reports tabs) reads this flag instead of re-deriving
+   *  the rule from `user.role`, which silently drifted from the backend
+   *  and was leaking manage-UI to non-owners. */
+  viewerCanManage?: boolean;
   data: UIJobData;
 }
 
@@ -107,6 +114,7 @@ export function mapApiJobToUI(apiJob: any): UIJob {
     applications: j.applicationCount ?? 0,
     userId: j.createdBy || j.userId,
     sentimentScore: j.sentimentScore ?? null,
+    viewerCanManage: j.viewerCanManage === true,
     data: {
       title: j.title || parsed.title || "",
       description: j.description || parsed.description || "",

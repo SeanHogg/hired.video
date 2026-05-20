@@ -27,6 +27,55 @@ export interface JobAccess {
   companyId: string | null;
 }
 
+/**
+ * Pure boolean check used both by `requireJobOwner` (route gate) and by
+ * `JobService.getJobById` to stamp `viewerCanManage` onto the DTO so the
+ * frontend doesn't have to re-derive the same rule (which is how the Edit
+ * Job button / Candidates+Reports tabs were leaking to non-owners).
+ *
+ * Returns `null` if the job doesn't exist so the caller can surface a 404.
+ */
+export async function canViewerManageJob(
+  viewerUserId: string,
+  isSuperAdmin: boolean,
+  jobId: string,
+): Promise<{ canManage: boolean; access: JobAccess } | null> {
+  const db = getDb();
+  const [job] = await db
+    .select({
+      ownerId: schema.jobItems.postedByUserId,
+      companyId: schema.jobItems.companyId,
+    })
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, jobId))
+    .limit(1);
+
+  if (!job) return null;
+
+  const access: JobAccess = { jobId, ownerId: job.ownerId, companyId: job.companyId };
+
+  if (isSuperAdmin || job.ownerId === viewerUserId) {
+    return { canManage: true, access };
+  }
+
+  if (job.companyId) {
+    const [membership] = await db
+      .select({ id: schema.userCompanyRoleAssociations.id })
+      .from(schema.userCompanyRoleAssociations)
+      .where(
+        and(
+          eq(schema.userCompanyRoleAssociations.userId, viewerUserId),
+          eq(schema.userCompanyRoleAssociations.companyId, job.companyId),
+          eq(schema.userCompanyRoleAssociations.isActive, true),
+        ),
+      )
+      .limit(1);
+    if (membership) return { canManage: true, access };
+  }
+
+  return { canManage: false, access };
+}
+
 export async function requireJobOwner(
   c: AppCtx,
   jobId: string,
@@ -39,44 +88,18 @@ export async function requireJobOwner(
     };
   }
 
-  const db = getDb();
-  const [job] = await db
-    .select({
-      ownerId: schema.jobItems.postedByUserId,
-      companyId: schema.jobItems.companyId,
-    })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, jobId))
-    .limit(1);
+  const isSuperAdmin = c.var.user?.isSuperAdmin === true;
+  const result = await canViewerManageJob(userId, isSuperAdmin, jobId);
 
-  if (!job) {
+  if (!result) {
     return {
       denied: c.json(error("NOT_FOUND", "Job not found"), 404),
       access: null,
     };
   }
 
-  const isSuperAdmin = c.var.user?.isSuperAdmin === true;
-  const access: JobAccess = { jobId, ownerId: job.ownerId, companyId: job.companyId };
-
-  if (isSuperAdmin || job.ownerId === userId) {
-    return { denied: null, access };
-  }
-
-  // Company team co-management: any active company member can manage.
-  if (job.companyId) {
-    const [membership] = await db
-      .select({ id: schema.userCompanyRoleAssociations.id })
-      .from(schema.userCompanyRoleAssociations)
-      .where(
-        and(
-          eq(schema.userCompanyRoleAssociations.userId, userId),
-          eq(schema.userCompanyRoleAssociations.companyId, job.companyId),
-          eq(schema.userCompanyRoleAssociations.isActive, true),
-        ),
-      )
-      .limit(1);
-    if (membership) return { denied: null, access };
+  if (result.canManage) {
+    return { denied: null, access: result.access };
   }
 
   return {

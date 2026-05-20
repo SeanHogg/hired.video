@@ -175,7 +175,16 @@ jobRoutes.post("/:id/apply", async (c) => {
 
 /** GET /api/Job/slug/:slug — get job by slug */
 jobRoutes.get("/slug/:slug", async (c) => {
-  const job = await jobService.getJobBySlug(c.req.param("slug"));
+  const user = c.var.user;
+  const viewer = user?.sub
+    ? {
+        userId: user.sub,
+        isSuperAdmin:
+          user.isSuperAdmin === true ||
+          user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true,
+      }
+    : undefined;
+  const job = await jobService.getJobBySlug(c.req.param("slug"), viewer);
   if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
   return c.json(success(job));
 });
@@ -663,7 +672,20 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
 /** GET /api/jobs/:id — get a specific job */
 jobRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const job = await jobService.getJobById(id);
+  const user = c.var.user;
+  // Pass viewer context so the DTO carries the backend's `viewerCanManage`
+  // verdict. The frontend uses this flag (not its own role check) to gate
+  // Edit Job + Candidates/Reports — without it, the frontend rule drifts
+  // from `requireJobOwner` and non-owners see manage UI that 403s on use.
+  const viewer = user?.sub
+    ? {
+        userId: user.sub,
+        isSuperAdmin:
+          user.isSuperAdmin === true ||
+          user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true,
+      }
+    : undefined;
+  const job = await jobService.getJobById(id, undefined, viewer);
   if (!job) {
     return c.json(error("NOT_FOUND", "Job not found"), 404);
   }

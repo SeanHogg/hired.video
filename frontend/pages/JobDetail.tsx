@@ -29,7 +29,7 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { jobService } from "@/lib/services/job-service";
 import { isUuid } from "@shared/value-types";
 import { useAuth } from "@/lib/auth";
-import { useJobPermissions, useCanManageJobPipeline } from "@/hooks/use-job-permissions";
+import { useJobPermissions } from "@/hooks/use-job-permissions";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
@@ -150,11 +150,12 @@ export default function JobDetail() {
   const isOwner = user && job && job.userId === user.id;
   const permissions = useJobPermissions(job);
 
-  // Pipeline tabs (Candidates + Reports) only surface for users who can
-  // manage the job. Hook returns true for owners, recruiters, employers,
-  // admins, and SA — same predicate the panels self-gate on so the tab
-  // strip and the body stay in sync.
-  const canManagePipeline = useCanManageJobPipeline(job?.userId);
+  // Pipeline tabs (Candidates + Reports) gate on the same single source
+  // of truth as Edit / Delete (`useJobPermissions`), which mirrors the
+  // backend's `requireJobOwner` rule via the DTO's `viewerCanManage`
+  // flag. The panels self-gate on the same fact so the tab strip and
+  // the body can't disagree.
+  const canManagePipeline = permissions.canManagePipeline;
 
   const sectionParam = searchParams.get("section");
   const section: "overview" | "candidates" | "reports" =
@@ -281,11 +282,14 @@ export default function JobDetail() {
             {section === "candidates" ? (
               <JobPipelineKanban
                 jobId={job.id}
-                jobOwnerId={job.userId}
+                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
                 onCountChange={setPipelineCount}
               />
             ) : section === "reports" ? (
-              <JobPipelineReports jobId={job.id} jobOwnerId={job.userId} />
+              <JobPipelineReports
+                jobId={job.id}
+                jobOwner={{ userId: job.userId, viewerCanManage: job.viewerCanManage }}
+              />
             ) : (
               <>
             {/* Owner / viewer toolbar — sits above the declarative renderer.

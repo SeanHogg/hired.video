@@ -2,6 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import type { LLMClient } from "../adapters/llm-client.js";
+import { canViewerManageJob } from "../jobs/jobOwnership.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -317,6 +318,14 @@ export interface JobEntity extends JobSummaryDTO {
    *  (`useEntityOwnership`, `JobCard`, etc.) can derive ownership without
    *  every call site having to coalesce `createdBy || userId`. */
   userId?: string;
+  /** Backend-authoritative "can the requesting viewer manage this job?"
+   *  flag — stamped by `getJobById` when called with viewer context.
+   *  Mirrors `requireJobOwner` (owner / super-admin / company team
+   *  member) so the frontend can gate Edit / Delete / Candidates +
+   *  Reports without re-deriving the rule (and silently drifting from
+   *  the backend, which is how non-owners were getting the Edit Job
+   *  button + 403s on `/pipeline`). Absent on anonymous reads. */
+  viewerCanManage?: boolean;
 }
 
 function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
@@ -432,10 +441,20 @@ export async function getUserJobs(userId: string,
 }
 
 export async function getJobById(id: string,
-  deps?: Partial<JobServiceDeps>): Promise<JobEntity | null> {
+  deps?: Partial<JobServiceDeps>,
+  viewer?: { userId: string; isSuperAdmin: boolean }): Promise<JobEntity | null> {
   const d = resolveDeps(deps); const db = d.db;
   const [row] = await db.select().from(jobItems).where(eq(jobItems.id, id)).limit(1);
-  return row ? rowToJob(row) : null;
+  if (!row) return null;
+  const dto = rowToJob(row);
+  if (viewer) {
+    // Stamp the backend-authoritative manage flag so the frontend can
+    // gate Edit / Delete / Candidates + Reports without re-deriving the
+    // rule. See `canViewerManageJob` for the canonical rule.
+    const result = await canViewerManageJob(viewer.userId, viewer.isSuperAdmin, id);
+    dto.viewerCanManage = result?.canManage === true;
+  }
+  return dto;
 }
 
 export async function createJob(job: CreateJobDTO, userId: string,
@@ -1425,8 +1444,11 @@ export async function getApplications(userId: string) {
   }));
 }
 
-export async function getJobBySlug(slug: string): Promise<JobEntity | null> {
-  return getJobById(slug);
+export async function getJobBySlug(
+  slug: string,
+  viewer?: { userId: string; isSuperAdmin: boolean },
+): Promise<JobEntity | null> {
+  return getJobById(slug, undefined, viewer);
 }
 
 export async function getJobAlerts(userId: string) {

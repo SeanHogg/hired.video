@@ -28,20 +28,23 @@ import BulkAddToListDialog from "@/components/recruit/BulkAddToListDialog";
 
 interface JobPipelineKanbanProps {
   jobId: string;
-  /** Job owner — passed in so the panel can self-gate ownership without
-   *  refetching. The panel returns `null` when the viewer can't manage. */
-  jobOwnerId?: string | null;
+  /** Job ownership snapshot — passed in so the panel can self-gate
+   *  without refetching. `viewerCanManage` is the backend-authoritative
+   *  flag from the job DTO; the panel returns `null` when neither
+   *  owner-match nor that flag entitles the viewer. */
+  jobOwner?: { userId?: string | null; viewerCanManage?: boolean } | null;
   onCountChange?: (total: number) => void;
 }
 
 /**
- * Outer gate. Self-gates on viewer permissions (owner OR
- * recruiter/employer/admin) so JobDetail no longer prop-drills a
- * `canManagePipeline` boolean. Returning `null` here keeps every hook
- * inside the inner component on a stable order.
+ * Outer gate. Self-gates on the backend-stamped `viewerCanManage` flag
+ * (plus owner fast-path) so JobDetail no longer prop-drills a
+ * `canManagePipeline` boolean and the gate can't drift from the
+ * backend's `requireJobOwner` rule. Returning `null` here keeps every
+ * hook inside the inner component on a stable order.
  */
 export default function JobPipelineKanban(props: JobPipelineKanbanProps) {
-  const canManage = useCanManageJobPipeline(props.jobOwnerId);
+  const canManage = useCanManageJobPipeline(props.jobOwner);
   if (!canManage) return null;
   return <PipelineKanbanInner {...props} />;
 }

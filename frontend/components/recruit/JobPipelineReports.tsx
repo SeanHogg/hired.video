@@ -16,15 +16,16 @@ import {
 
 interface JobPipelineReportsProps {
   jobId: string;
-  /** Job owner — passed in so the panel can self-gate ownership without
-   *  refetching. The panel returns `null` when the viewer can't manage. */
-  jobOwnerId?: string | null;
+  /** Job ownership snapshot — passed in so the panel can self-gate
+   *  without refetching. `viewerCanManage` is the backend-authoritative
+   *  flag from the job DTO. */
+  jobOwner?: { userId?: string | null; viewerCanManage?: boolean } | null;
 }
 
-export default function JobPipelineReports({ jobId, jobOwnerId }: JobPipelineReportsProps) {
+export default function JobPipelineReports({ jobId, jobOwner }: JobPipelineReportsProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const canManage = useCanManageJobPipeline(jobOwnerId);
+  const canManage = useCanManageJobPipeline(jobOwner);
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<PipelineReport | null>(null);
 

@@ -1,6 +1,5 @@
 import { Video } from "lucide-react";
 import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
-import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import type { CreatorProfile } from "@/lib/services/creator-service";
 
 interface Props {
@@ -8,9 +7,9 @@ interface Props {
 }
 
 /**
- * Single source of truth for the Content Creator section. Composes the header,
- * the tabbed workspace (Profile / Payouts / Portfolio / Account) and the
- * template-earnings card. Mounted on /services (dashboard) and on /settings
+ * Single source of truth for the Content Creator section. Composes the header
+ * and the tabbed workspace (Profile / Marketplace Earnings / Payouts /
+ * Portfolio / Account). Mounted on /services (dashboard) and on /settings
  * (Content Creator → Account sidebar item). Inner forms self-gate on
  * enrollment, so this can be rendered unconditionally on /settings.
  */
@@ -22,7 +21,6 @@ export default function ContentCreatorSection({ onProfileChange }: Props = {}) {
         Content Creator
       </h2>
       <CreatorWorkspace onProfileChange={onProfileChange} />
-      <CreatorTemplateEarnings />
     </div>
   );
 }

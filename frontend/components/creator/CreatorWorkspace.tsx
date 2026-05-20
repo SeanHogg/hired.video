@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
 import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
+import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -107,6 +108,7 @@ export default function CreatorWorkspace({ onProfileChange }: Props = {}) {
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="earnings">Marketplace Earnings</TabsTrigger>
           <TabsTrigger value="payouts">Payouts</TabsTrigger>
           <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
@@ -115,6 +117,11 @@ export default function CreatorWorkspace({ onProfileChange }: Props = {}) {
         {/* Profile editor — self-fetches, mirrored on /settings → Content Creator → Profile */}
         <TabsContent value="profile">
           <CreatorProfileForm onProfileChange={onProfileChange} />
+        </TabsContent>
+
+        {/* Template marketplace revenue — self-gates to null when there are no published templates */}
+        <TabsContent value="earnings">
+          <CreatorTemplateEarnings />
         </TabsContent>
 
         {/* Payouts — same shared form rendered on /settings → Content Creator → Payouts */}
