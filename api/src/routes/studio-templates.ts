@@ -214,6 +214,17 @@ studioTemplatesRoutes.get("/templates/public", async (c) => {
   return c.json(success(rows));
 });
 
+// Per-creator public listing — every visibility='public' template authored
+// by :userId. Registered above /templates/:id so Hono's router doesn't
+// match the literal `public` segment as id="public".
+studioTemplatesRoutes.get("/templates/public/by-user/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const limitParam = c.req.query("limit");
+  const limit = limitParam ? Math.max(1, Math.min(200, Number(limitParam) || 100)) : undefined;
+  const rows = await svc().listPublicForCreator(userId, { limit });
+  return c.json(success(rows));
+});
+
 // Order matters in Hono — keep these specific routes BEFORE the generic
 // /templates/:id matcher so /templates/listing/... and /templates/licenses/...
 // don't get captured as id="listing".

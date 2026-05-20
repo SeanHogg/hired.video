@@ -60,6 +60,19 @@ function stripActiveContent(html: string): string {
     .replace(/(href\s*=\s*["'])\s*javascript:[^"']*(["'])/gi, '$1#$2');
 }
 
+/** Force every `<a href=…>` to open in a new tab and carry a safe
+ *  rel. Belt-and-braces with the `<base target="_blank">` in the
+ *  document head — some senders set their own `target` per-link
+ *  (often `_self`), which would override the base. */
+function forceLinksOpenInNewTab(html: string): string {
+  return html.replace(/<a\b([^>]*)>/gi, (_match, attrs: string) => {
+    let next = attrs;
+    next = next.replace(/\s+target\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    next = next.replace(/\s+rel\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    return `<a${next} target="_blank" rel="noopener noreferrer">`;
+  });
+}
+
 /** Replace `<img src="...">` with a placeholder. Stays a visible
  *  block so the user knows an image was here — clicking "Display
  *  images" re-renders with originals restored. */
@@ -84,22 +97,24 @@ export function sanitizeEmailHtml(
   options: SanitizeOptions = {},
 ): SanitizedBody {
   const stripped = stripActiveContent(rawHtml);
+  const withSafeLinks = forceLinksOpenInNewTab(stripped);
   const { html: imageGated, hadImages } = options.loadImages
-    ? { html: stripped, hadImages: /<img\b/i.test(rawHtml) }
-    : blockImages(stripped);
-  // `<base target="_blank">` makes every link open in a new tab when
-  // the user clicks. The sandbox attribute "" blocks top-level
-  // navigation by default; allowing it here would require
-  // `allow-popups allow-popups-to-escape-sandbox`, which we don't want
-  // — so links are rendered but not clickable from within the iframe.
-  // Acceptable tradeoff: the user has "Open in gmail" / "Open in
-  // outlook" for full interactivity, and copy-paste-link still works.
+    ? { html: withSafeLinks, hadImages: /<img\b/i.test(rawHtml) }
+    : blockImages(withSafeLinks);
+  // `<base target="_blank">` defaults every link to a new tab, and
+  // `forceLinksOpenInNewTab` belt-and-braces by overwriting per-link
+  // `target`/`rel` so a sender-supplied `target="_self"` can't escape
+  // it. The iframe is sandboxed with `allow-popups
+  // allow-popups-to-escape-sandbox` (set on the <iframe> in
+  // EmailBodyFrame) so clicks open in a new top-level tab without
+  // granting the document scripting / form / same-origin access.
   const body = `
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base target="_blank">
   ${HOST_STYLES}
 </head>
 <body>${imageGated}</body>
@@ -121,6 +136,7 @@ export function plainTextToIframeHtml(text: string): SanitizedBody {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base target="_blank">
   ${HOST_STYLES}
 </head>
 <body><pre>${escaped}</pre></body>

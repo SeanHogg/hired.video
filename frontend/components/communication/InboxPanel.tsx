@@ -33,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useCommHub, type HubItem, type HubItemKind } from "@/hooks/use-comm-hub";
+import type { HubItem, HubItemKind, UseCommHubReturn } from "@/hooks/use-comm-hub";
 
 const KIND_LABEL: Record<HubItemKind, string> = {
   message: "Message",
@@ -308,9 +308,11 @@ function InboxRow({
 }
 
 export interface InboxPanelProps {
-  /** Optional injected hub — lets callers share one `useCommHub()` instance
-   *  (e.g. Outreach page reusing counts on the Dashboard tab). */
-  hub?: ReturnType<typeof useCommHub>;
+  /** Hub providing the items + actions. The popover surface passes the
+   *  shared unfiltered hub; the page-tab passes its filter-aware hub.
+   *  Required so this component stays pure presentation — no implicit
+   *  fetch lives in here. */
+  hub: UseCommHubReturn;
   /** Called after a row action that should close the hosting surface
    *  (popover/sheet). Omit when rendering inline on a page. */
   onClose?: () => void;
@@ -336,7 +338,7 @@ export interface InboxPanelProps {
 }
 
 export function InboxPanel({
-  hub: injectedHub,
+  hub,
   onClose,
   heightClassName = "max-h-[70vh] md:max-h-[32rem]",
   hideHeader = false,
@@ -347,9 +349,6 @@ export function InboxPanel({
   highlightedId,
   toolbar,
 }: InboxPanelProps) {
-  const ownHub = useCommHub();
-  const hub = injectedHub ?? ownHub;
-
   const {
     items,
     unreadCount,

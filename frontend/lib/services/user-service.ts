@@ -151,6 +151,8 @@ export const PublicUserSchema = z.object({
       video: z.boolean(),
       voice: z.boolean(),
       services: z.boolean(),
+      articles: z.boolean(),
+      courses: z.boolean(),
     })
     .nullable()
     .transform((v) => (v === null ? undefined : v))

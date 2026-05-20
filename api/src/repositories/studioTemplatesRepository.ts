@@ -93,6 +93,10 @@ export interface IStudioTemplatesRepository {
   findById(id: string): Promise<StudioTemplateRow | null>;
   findBySlug(slug: string): Promise<StudioTemplateRow | null>;
   findForCreator(creatorId: string): Promise<StudioTemplateRow[]>;
+  /** Public-only subset of `findForCreator` — used by the creator's public
+   *  profile to surface their templates without leaking private/unlisted
+   *  drafts. */
+  listPublicForCreator(creatorId: string, opts?: { limit?: number }): Promise<StudioTemplateRow[]>;
   listPublic(opts?: { search?: string; limit?: number }): Promise<StudioTemplateRow[]>;
   /** Templates the user has acquired via `free` claim or paid `purchase`.
    *  Excludes `owner` licenses (those mirror `findForCreator`). */
@@ -184,6 +188,15 @@ export class StudioTemplatesRepository implements IStudioTemplatesRepository {
       )
       .orderBy(desc(sql`COALESCE(SUM(${templateLicenses.creatorCutCents}), 0)`))) as CreatorTemplateEarningsRow[];
     return rows;
+  }
+
+  async listPublicForCreator(creatorId: string, { limit = 100 }: { limit?: number } = {}): Promise<StudioTemplateRow[]> {
+    return (await this.db
+      .select()
+      .from(studioTemplates)
+      .where(and(eq(studioTemplates.creatorId, creatorId), eq(studioTemplates.visibility, "public")))
+      .orderBy(desc(studioTemplates.publishedAt))
+      .limit(limit)) as StudioTemplateRow[];
   }
 
   async listPublic({ search, limit = 100 }: { search?: string; limit?: number } = {}): Promise<StudioTemplateRow[]> {

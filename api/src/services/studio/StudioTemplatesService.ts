@@ -342,6 +342,10 @@ export class StudioTemplatesService {
     return this.deps.repos.studioTemplates.listPublic(opts);
   }
 
+  async listPublicForCreator(creatorUserId: string, opts?: { limit?: number }): Promise<StudioTemplateRow[]> {
+    return this.deps.repos.studioTemplates.listPublicForCreator(creatorUserId, opts);
+  }
+
   /** Per-template earnings rollup for the creator's marketplace dashboard
    *  (#631). Returns one row per owned template (including zero-sale rows)
    *  plus aggregate totals so the consumer doesn't recompute them. */

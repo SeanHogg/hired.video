@@ -97,6 +97,15 @@ export const articleService = {
     return res.data ?? [];
   },
 
+  async listPublishedByUser(userId: string, limit = 50): Promise<PublicArticleCard[]> {
+    const res = await apiClient.get<PublicArticleCard[]>(
+      `/api/articles/public/by-user/${userId}?limit=${limit}`,
+      undefined,
+      { suppressErrorEvent: true },
+    );
+    return res.data ?? [];
+  },
+
   async getPublic(userId: string, slug: string): Promise<{
     id: string;
     title: string;

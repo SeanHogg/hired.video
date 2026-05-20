@@ -27,19 +27,20 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
-import { useCommHub } from "@/hooks/use-comm-hub";
+import { useSharedCommHub } from "@/providers/CommHubProvider";
 import { InboxPanel } from "@/components/communication/InboxPanel";
 
 export default function CommunicationHub() {
   const { isAuthenticated } = useAuth();
-  // Self-gate: anonymous visitors never mount the inner component, so
-  // `useCommHub` (and its `/api/inbox` fetch) never runs without a token.
+  // Self-gate: anonymous visitors never mount the inner component, so the
+  // shared hub's data path is never touched without a token. The provider
+  // itself short-circuits via `useApiReady` regardless.
   if (!isAuthenticated) return null;
   return <AuthenticatedCommunicationHub />;
 }
 
 function AuthenticatedCommunicationHub() {
-  const hub = useCommHub();
+  const hub = useSharedCommHub();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 

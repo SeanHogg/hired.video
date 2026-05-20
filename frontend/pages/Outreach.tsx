@@ -60,7 +60,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { useCommHub } from "@/hooks/use-comm-hub";
+import { useSharedCommHub } from "@/providers/CommHubProvider";
 import { AdvertiseTab } from "@/components/outreach/tabs/AdvertiseTab";
 import { CampaignsTab } from "@/components/outreach/tabs/CampaignsTab";
 import { ContactsTab } from "@/components/outreach/tabs/ContactsTab";
@@ -116,9 +116,10 @@ export default function Outreach() {
     setSearchParams(params, { replace: false });
   }, [searchParams, setSearchParams]);
 
-  // Shared comm hub — used by both the Inbox tab and the Dashboard metric cards
-  // so we fetch once per page mount, not per consumer.
-  const commHub = useCommHub();
+  // Reads from the app-wide CommHubProvider — the same instance the header
+  // bell + global SignalR subscription use. Polling/fetching for the
+  // unfiltered aggregate happens once for the whole app, not per consumer.
+  const commHub = useSharedCommHub();
 
   // Local opt-in flag for the Featured Company Profile waitlist. Persisted in
   // localStorage so the CTA becomes a confirmation after first click and we
@@ -765,11 +766,12 @@ export default function Outreach() {
                     />
                   </TabsContent>
 
-                  {/* Inbox Tab — unified messages, notifications, connection requests.
-                      Same InboxPanel surface the header overlay uses; we pass the
-                      shared `commHub` so both tabs read from a single data source. */}
+                  {/* Inbox Tab — unified messages, notifications, connection
+                      requests. The tab owns a filter-aware hub so its chips
+                      don't affect the unfiltered bell badge; both surfaces
+                      share the same SignalR push channel underneath. */}
                   <TabsContent value="inbox" className="space-y-6">
-                    <InboxTab hub={commHub} />
+                    <InboxTab />
                   </TabsContent>
 
                   {/* My Content Tab — published videos & artifacts */}

@@ -175,6 +175,21 @@ export const studioTemplatesService = {
     return z.array(StudioTemplateSchema).parse(res.data ?? []);
   },
 
+  /** Public templates published by a specific creator. Backs the Video tab
+   *  on the public profile so visitors can browse a creator's templates
+   *  alongside their promo videos. */
+  async listPublicByCreator(userId: string, opts: { limit?: number } = {}): Promise<StudioTemplate[]> {
+    const params = new URLSearchParams();
+    if (opts.limit != null) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const res = await apiClient.get<StudioTemplate[]>(
+      `/api/studio/templates/public/by-user/${userId}${qs}`,
+      undefined,
+      { suppressErrorEvent: true },
+    );
+    return z.array(StudioTemplateSchema).parse(res.data ?? []);
+  },
+
   async getById(id: string): Promise<StudioTemplate> {
     const res = await apiClient.get<StudioTemplate>(`/api/studio/templates/${id}`);
     return StudioTemplateSchema.parse(res.data);

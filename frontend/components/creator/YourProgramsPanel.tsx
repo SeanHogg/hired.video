@@ -2,11 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Loader2,
-  Video,
-  Mic,
-  Briefcase,
-  FileText,
-  GraduationCap,
   X,
   Check,
   ExternalLink,
@@ -22,18 +17,11 @@ import {
   CREATOR_PROGRAMS,
   CREATOR_PROGRAM_LABEL,
   CREATOR_PROGRAM_HOME,
+  CREATOR_PROGRAM_ICON,
   CREATOR_PROGRAM_TERMS_KIND,
   type CreatorProgram,
   type CreatorProfile,
 } from "@/lib/services/creator-service";
-
-const PROGRAM_ICON: Record<CreatorProgram, typeof Video> = {
-  video: Video,
-  voice: Mic,
-  services: Briefcase,
-  articles: FileText,
-  courses: GraduationCap,
-};
 
 function programFlagOf(profile: CreatorProfile, program: CreatorProgram): boolean {
   return program === "video" ? profile.videoActive
@@ -101,7 +89,7 @@ export default function YourProgramsPanel({ profile, onProfileChange }: Props) {
         </div>
         <div className="grid sm:grid-cols-3 gap-3">
           {CREATOR_PROGRAMS.map((p) => {
-            const Icon = PROGRAM_ICON[p];
+            const Icon = CREATOR_PROGRAM_ICON[p];
             const isOn = programFlagOf(profile, p);
             const isLoading = programLoading === p;
             return (

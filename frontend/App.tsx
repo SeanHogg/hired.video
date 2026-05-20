@@ -23,6 +23,7 @@ import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvid
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
 import { PermissionDebuggerPanel } from "@/components/PermissionDebuggerPanel";
 import { CartProvider } from "@/lib/cart-context";
+import { CommHubProvider } from "@/providers/CommHubProvider";
 import { HeaderFiltersProvider } from "@/lib/header-filters";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
@@ -528,6 +529,7 @@ const App = () => (
                 <PWAUpdatePrompt />
                 <BrowserRouter>
                   <HeaderFiltersProvider>
+                  <CommHubProvider>
 	                  <ReferralCapture />
                   <GTMPageTracker />
 
@@ -893,6 +895,7 @@ const App = () => (
 
                   <GlobalChrome />
                   <PWAInstallPrompt />
+                  </CommHubProvider>
                   </HeaderFiltersProvider>
                 </BrowserRouter>
               </TooltipProvider>

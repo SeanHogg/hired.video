@@ -1320,6 +1320,41 @@ studioFeaturesRoutes.get("/voice-clones/marketplace", async (c) => {
   }));
 });
 
+// ── GET /voice-clones/public/by-user/:userId — every public voice clone
+// authored by :userId. Used by the public profile (Voice tab). Hidden
+// creators (#314 paywall) return an empty list so the consumer renders a
+// clean empty state. Same SAFE projection as the marketplace listing
+// (sampleAudioUrl/sampleAudioKey omitted — buyers get them after license).
+studioFeaturesRoutes.get("/voice-clones/public/by-user/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const db = getDb();
+  if (!(await isCreatorVisible(userId))) {
+    return c.json(ok({ items: [] as unknown[] }));
+  }
+  const rows = await db
+    .select({
+      id: studioVoiceClones.id,
+      name: studioVoiceClones.name,
+      description: studioVoiceClones.description,
+      previewAudioUrl: studioVoiceClones.previewAudioUrl,
+      priceCents: studioVoiceClones.priceCents,
+      currency: studioVoiceClones.currency,
+      language: studioVoiceClones.language,
+      gender: studioVoiceClones.gender,
+      accent: studioVoiceClones.accent,
+      listingSlug: studioVoiceClones.listingSlug,
+      playCount: studioVoiceClones.playCount,
+      purchaseCount: studioVoiceClones.purchaseCount,
+      createdAt: studioVoiceClones.createdAt,
+      creatorId: studioVoiceClones.userId,
+      platformFeeBps: studioVoiceClones.platformFeeBps,
+    })
+    .from(studioVoiceClones)
+    .where(and(eq(studioVoiceClones.userId, userId), eq(studioVoiceClones.visibility, "public")))
+    .orderBy(desc(studioVoiceClones.createdAt));
+  return c.json(ok({ items: rows }));
+});
+
 // ── GET /voice-clones/public/:id — anonymous-readable public listing ────────
 // Mirrors the public-prefix pattern used by /api/studio/public — needed so
 // shared marketplace links (`/marketplace/voices/:id`) resolve for users who

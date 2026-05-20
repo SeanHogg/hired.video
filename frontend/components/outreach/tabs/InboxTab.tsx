@@ -33,17 +33,9 @@ import {
   type EmailInboxFilters,
   type HubItem,
 } from "@/hooks/use-comm-hub";
+import { useSharedCommHub } from "@/providers/CommHubProvider";
 
-export interface InboxTabProps {
-  /** Accepted for back-compat with callers that pass the page-level
-   *  `commHub` (e.g. Outreach.tsx). Ignored — the tab always owns its
-   *  own filter-aware hub so the chips drive its data without
-   *  polluting the unfiltered hub the bell badge + Dashboard tile
-   *  rely on. */
-  hub?: ReturnType<typeof useCommHub>;
-}
-
-export function InboxTab(_props: InboxTabProps = {}) {
+export function InboxTab() {
   const [filters, setFilters] = useState<EmailInboxFilters>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
@@ -52,7 +44,12 @@ export function InboxTab(_props: InboxTabProps = {}) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Filter-aware hub for the list — the chips toggle its query so the
+  // page shows only what the user asked for. The shared hub stays
+  // unfiltered so the bell badge + Dashboard tile aren't affected when
+  // the user narrows to "Unread only" etc.
   const hub = useCommHub({ emailFilters: filters });
+  const sharedHub = useSharedCommHub();
 
   const externalEmailIds = useMemo(
     () =>
@@ -105,6 +102,15 @@ export function InboxTab(_props: InboxTabProps = {}) {
     setSelectedIds(new Set());
     setSelectionMode(false);
   }, []);
+
+  // Sync + settings-save refresh path. Pokes both hubs so the freshly
+  // ingested rows appear in this filtered surface AND the unfiltered
+  // header badge / Dashboard tile, instead of waiting up to one poll
+  // tick for the shared hub to catch up on its own.
+  const refreshBoth = useCallback(() => {
+    void hub.refresh();
+    void sharedHub.refresh();
+  }, [hub, sharedHub]);
 
   const handleItemSelect = useCallback((item: HubItem) => {
     setOpenItem(item);
@@ -217,7 +223,7 @@ export function InboxTab(_props: InboxTabProps = {}) {
               onClearSelection={handleClearSelection}
               onOpenHistory={() => setHistoryOpen(true)}
               onOpenSettings={() => setSettingsOpen(true)}
-              onRefresh={hub.refresh}
+              onRefresh={refreshBoth}
             />
           }
         />
@@ -239,9 +245,7 @@ export function InboxTab(_props: InboxTabProps = {}) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         accounts={hub.accounts}
-        onSaved={() => {
-          hub.refresh();
-        }}
+        onSaved={refreshBoth}
       />
     </Card>
   );

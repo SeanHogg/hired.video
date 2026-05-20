@@ -1,3 +1,11 @@
+import type { ComponentType } from "react";
+import {
+  Briefcase,
+  FileText,
+  GraduationCap,
+  Mic,
+  Video,
+} from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import {
   CREATOR_PROGRAMS,
@@ -35,6 +43,17 @@ export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   services: "Services",
   articles: "Articles",
   courses: "Courses",
+};
+
+// SSoT for the program → icon mapping. Imported by both the owner's
+// YourProgramsPanel (program toggle cards) and the public-profile tab
+// strip so a label/icon redesign lands in one place.
+export const CREATOR_PROGRAM_ICON: Record<CreatorProgram, ComponentType<{ className?: string }>> = {
+  video: Video,
+  voice: Mic,
+  services: Briefcase,
+  articles: FileText,
+  courses: GraduationCap,
 };
 
 // Per-program "home" — where a creator goes to actually do the work after

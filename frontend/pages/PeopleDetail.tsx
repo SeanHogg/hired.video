@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, Building2, Loader2, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Building2, Loader2, User as UserIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -24,7 +24,9 @@ import ContactSidebar from "@/components/profile/sections/ContactSidebar";
 import OpportunityPreferencesSection from "@/components/profile/sections/OpportunityPreferencesSection";
 import ProfileHeader from "@/components/profile/sections/ProfileHeader";
 import ProfileHeaderVideos from "@/components/profile/sections/ProfileHeaderVideos";
-import ProfileServicesPanel from "@/components/profile/sections/ProfileServicesPanel";
+import ProfileProgramPanel, {
+  PROGRAM_ICON,
+} from "@/components/profile/sections/programs/ProfileProgramPanel";
 import SkillsSection from "@/components/profile/sections/SkillsSection";
 import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
 import VideoResumeSection from "@/components/profile/sections/VideoResumeSection";
@@ -54,6 +56,11 @@ import {
   type AddToTalentPoolRequest,
 } from "@/lib/services/recruiter-service";
 import { servicesService, type ServiceOffering } from "@/lib/services/services-service";
+import {
+  CREATOR_PROGRAMS,
+  CREATOR_PROGRAM_LABEL,
+  type CreatorProgram,
+} from "@/lib/services/creator-service";
 import { userService } from "@/lib/services/user-service";
 import { generateStructuredData, useSEO } from "@/lib/seo";
 import { useProfileView, type ProfileViewTarget } from "@/hooks/useProfileView";
@@ -423,23 +430,31 @@ function PeopleDetailContent() {
   const dd = dashboard as any;
   const peopleAreaSlug = profile.slug ?? profile.id ?? "";
 
-  // Surface tabs (Profile / Services / Company) live in the page-level
-  // breadcrumb strip above the profile card so the user can pivot between
-  // surfaces without scrolling. Tab state lives in the URL (?tab=…) so
-  // refresh and back-button work like the rest of the site.
+  // Surface tabs (Profile / Company / one per active creator program) live
+  // in the page-level breadcrumb strip above the profile card so the user
+  // can pivot between surfaces without scrolling. Tab state lives in the
+  // URL (?tab=…) so refresh and back-button work like the rest of the site.
+  //
+  // The program tabs are derived from `profile.creatorPrograms` — visitors
+  // see exactly the programs the owner has enrolled in. Owners always see
+  // their enrolled tabs even when the content list is empty (the panel
+  // renders an "add first item" CTA).
   const isEmployerProfile = roleUtils.isEmployer((profile as any).role);
   const tabParam = searchParams.get("tab");
   const profileBaseUrl = `/people/${peopleAreaSlug}`;
-  const activeProfileTab: "profile" | "services" | "company" =
-    tabParam === "services"
-      ? "services"
-      : tabParam === "company" && isEmployerProfile
-        ? "company"
-        : tabParam === "profile"
-          ? "profile"
-          : isEmployerProfile
-            ? "company"
-            : "profile";
+
+  const activePrograms: CreatorProgram[] = CREATOR_PROGRAMS.filter(
+    (p) => ((profile as any).creatorPrograms?.[p] as boolean | undefined) === true,
+  );
+
+  const validTabKeys = new Set<string>([
+    "profile",
+    ...(isEmployerProfile ? ["company"] : []),
+    ...activePrograms,
+  ]);
+  const defaultTab = isEmployerProfile ? "company" : "profile";
+  const activeProfileTab: string =
+    tabParam && validTabKeys.has(tabParam) ? tabParam : defaultTab;
 
   const profileTabs: PageHeaderTab[] = [
     ...(isEmployerProfile
@@ -458,13 +473,12 @@ function PeopleDetailContent() {
       icon: UserIcon,
       to: `${profileBaseUrl}?tab=profile`,
     },
-    {
-      key: "services",
-      label: t("tabs.services"),
-      icon: Briefcase,
-      to: `${profileBaseUrl}?tab=services`,
-      badge: (profile as any).isCreator ? t("labels.creator") : undefined,
-    },
+    ...activePrograms.map<PageHeaderTab>((p) => ({
+      key: p,
+      label: CREATOR_PROGRAM_LABEL[p],
+      icon: PROGRAM_ICON[p],
+      to: `${profileBaseUrl}?tab=${p}`,
+    })),
   ];
 
   return (
@@ -577,26 +591,36 @@ function PeopleDetailContent() {
                   />
                 </TabsContent>
 
-                <TabsContent value="services" className="space-y-6 mt-0">
-                  {(profile as any).isCreator && (profile as any).creatorProfile && (
-                    <Alert>
-                      <AlertDescription>
-                        <strong>{(profile as any).creatorProfile.displayName ?? firstName}</strong>
-                        {(profile as any).creatorProfile.tagline ? ` — ${(profile as any).creatorProfile.tagline}` : ""}
-                        {(profile as any).creatorProfile.bio ? <p className="mt-2 text-sm">{(profile as any).creatorProfile.bio}</p> : null}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {profile?.id && (
-                    <ProfileServicesPanel
-                      userId={profile.id}
-                      isOwner={isOwner}
-                      providerFirstName={firstName || undefined}
-                      onAddToCart={handleAddServiceToCart}
-                      onRequestQuote={handleRequestQuote}
-                    />
-                  )}
-                </TabsContent>
+                {/* One TabsContent per active creator program — body is
+                    rendered by ProfileProgramPanel, which switches on
+                    program and delegates to a self-fetching child. The
+                    creator-profile blurb (display name + tagline + bio)
+                    sits above the first program's content so it's visible
+                    regardless of which program tab the visitor lands on
+                    via a deep link. */}
+                {activePrograms.map((p) => (
+                  <TabsContent key={p} value={p} className="space-y-6 mt-0">
+                    {(profile as any).isCreator && (profile as any).creatorProfile && (
+                      <Alert>
+                        <AlertDescription>
+                          <strong>{(profile as any).creatorProfile.displayName ?? firstName}</strong>
+                          {(profile as any).creatorProfile.tagline ? ` — ${(profile as any).creatorProfile.tagline}` : ""}
+                          {(profile as any).creatorProfile.bio ? <p className="mt-2 text-sm">{(profile as any).creatorProfile.bio}</p> : null}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    {profile?.id && (
+                      <ProfileProgramPanel
+                        program={p}
+                        userId={profile.id}
+                        isOwner={isOwner}
+                        providerFirstName={firstName || undefined}
+                        onAddServiceToCart={handleAddServiceToCart}
+                        onRequestServiceQuote={handleRequestQuote}
+                      />
+                    )}
+                  </TabsContent>
+                ))}
               </Tabs>
             </div>
 

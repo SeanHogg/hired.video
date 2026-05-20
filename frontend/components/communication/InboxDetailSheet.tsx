@@ -241,6 +241,12 @@ export function InboxDetailSheet({
                   </a>
                 </Button>
               )}
+              <JobMailCTAs
+                category={detail.category}
+                linkedJobId={detail.linkedJobId}
+                applyUrl={detail.applyUrl}
+                applyUrls={detail.applyUrls}
+              />
             </div>
 
             {/* Metadata header — compact block above the body. Allowed to
@@ -294,13 +300,6 @@ export function InboxDetailSheet({
                   <p className="text-sm">{detail.summary}</p>
                 </div>
               )}
-
-              <JobMailCTAs
-                category={detail.category}
-                linkedJobId={detail.linkedJobId}
-                applyUrl={detail.applyUrl}
-                applyUrls={detail.applyUrls}
-              />
 
               <div className="space-y-0.5">
                 <div className="text-xs text-muted-foreground">Subject</div>

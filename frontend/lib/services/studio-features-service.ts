@@ -488,6 +488,18 @@ export async function getVoiceCloneMarketplace(params?: {
   return res.data;
 }
 
+/** Every public voice clone authored by a specific creator. Used by the
+ *  public profile (Voice tab) to surface the creator's catalogue without
+ *  the search/pagination chrome of the global marketplace. */
+export async function getVoiceClonesByCreator(userId: string): Promise<VoiceCloneMarketplaceItem[]> {
+  const res = await apiClient.get<{ items: VoiceCloneMarketplaceItem[] }>(
+    `/api/studio/voice-clones/public/by-user/${userId}`,
+    undefined,
+    { suppressErrorEvent: true },
+  );
+  return res.data?.items ?? [];
+}
+
 export async function createVoiceClone(params: {
   name: string;
   audioFile: File;

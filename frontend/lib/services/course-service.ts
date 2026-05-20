@@ -49,9 +49,38 @@ export interface UpdateCourseInput extends Partial<CreateCourseInput> {
   slug?: string;
 }
 
+export interface PublicCourseCard {
+  id: string;
+  type: "course";
+  title: string;
+  slug: string;
+  summary: string | null;
+  coverImageUrl: string | null;
+  category: string | null;
+  tags: string[];
+  difficulty: CourseDifficulty | null;
+  estimatedMinutes: number | null;
+  priceCents: number | null;
+  issuesCertificate: boolean;
+  enrollmentCount: number;
+  averageRating: number | null;
+  ratingCount: number;
+  publishedAt: string | null;
+  author: { id: string; name: string; avatarUrl: string | null; slug: string };
+}
+
 export const courseService = {
   async listMine(): Promise<Course[]> {
     const res = await apiClient.get<Course[]>("/api/courses/me");
+    return res.data ?? [];
+  },
+
+  async listPublishedByUser(userId: string, limit = 50): Promise<PublicCourseCard[]> {
+    const res = await apiClient.get<PublicCourseCard[]>(
+      `/api/courses/public/by-user/${userId}?limit=${limit}`,
+      undefined,
+      { suppressErrorEvent: true },
+    );
     return res.data ?? [];
   },
 

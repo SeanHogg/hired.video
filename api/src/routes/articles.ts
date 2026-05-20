@@ -135,6 +135,60 @@ articleRoutes.get("/public", async (c) => {
   }
 });
 
+// Per-user public listing — every published article authored by :userId,
+// gated by the same paywall/email-verified rules as the global feed. Used
+// by the public profile (Articles tab) to render the creator's catalogue.
+// `:userId` is a UUID; slug-based resolution happens upstream on the
+// profile page (which already has the UUID by the time it calls this).
+articleRoutes.get("/public/by-user/:userId", async (c) => {
+  const db = getDb();
+  const userId = c.req.param("userId");
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
+  if (!(await isCreatorVisible(userId))) {
+    return c.json(success([] as unknown[]), 200);
+  }
+  try {
+    const rows = await db
+      .select({
+        article: articles,
+        author: { id: users.id, name: users.name },
+        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(articles)
+      .innerJoin(users, eq(articles.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(
+        eq(articles.userId, userId),
+        eq(articles.status, "published"),
+        eq(users.emailVerified, true),
+      ))
+      .orderBy(desc(articles.publishedAt))
+      .limit(limit);
+    const items = rows.map((r) => ({
+      id: r.article.id,
+      type: "article" as const,
+      title: r.article.title,
+      slug: r.article.slug,
+      summary: r.article.summary,
+      coverImageUrl: r.article.coverImageUrl,
+      category: r.article.category,
+      tags: r.article.tags,
+      readMinutes: r.article.readMinutes,
+      viewCount: r.article.viewCount,
+      publishedAt: r.article.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+    return c.json(success(items), 200);
+  } catch {
+    return c.json(success([] as unknown[]), 200);
+  }
+});
+
 articleRoutes.get("/public/:userId/:slug", async (c) => {
   const db = getDb();
   const [row] = await db

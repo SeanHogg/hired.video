@@ -201,6 +201,64 @@ courseRoutes.get("/public", async (c) => {
   }
 });
 
+// Per-user public listing — every published course authored by the given
+// UUID. Used by the public profile (Courses tab). Hidden creators
+// (paywall #314) and unverified accounts return an empty list rather
+// than a 404 so the calling component can render a clean empty state.
+courseRoutes.get("/public/by-user/:userId", async (c) => {
+  const db = getDb();
+  const userId = c.req.param("userId");
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
+  if (!(await isCreatorVisible(userId))) {
+    return c.json(success([] as unknown[]), 200);
+  }
+  try {
+    const rows = await db
+      .select({
+        course: courses,
+        author: { id: users.id, name: users.name },
+        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(courses)
+      .innerJoin(users, eq(courses.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(
+        eq(courses.userId, userId),
+        eq(courses.status, "published"),
+        eq(users.emailVerified, true),
+      ))
+      .orderBy(desc(courses.publishedAt))
+      .limit(limit);
+    const items = rows.map((r) => ({
+      id: r.course.id,
+      type: "course" as const,
+      title: r.course.title,
+      slug: r.course.slug,
+      summary: r.course.summary,
+      coverImageUrl: r.course.coverImageUrl,
+      category: r.course.category,
+      tags: r.course.tags,
+      difficulty: r.course.difficulty,
+      estimatedMinutes: r.course.estimatedMinutes,
+      priceCents: r.course.priceVisible ? r.course.priceCents : null,
+      issuesCertificate: r.course.issuesCertificate,
+      enrollmentCount: r.course.enrollmentCount,
+      averageRating: r.course.averageRating,
+      ratingCount: r.course.ratingCount,
+      publishedAt: r.course.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+    return c.json(success(items), 200);
+  } catch {
+    return c.json(success([] as unknown[]), 200);
+  }
+});
+
 courseRoutes.get("/public/:userIdOrSlug/:slug", async (c) => {
   const db = getDb();
   // The first URL segment is the author identifier — accept either a UUID

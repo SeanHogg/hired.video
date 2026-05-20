@@ -1,8 +1,14 @@
 // Sandboxed iframe renderer for one email body. The iframe carries
-// `sandbox=""` (no JS, no top-level nav, no form submit, no popups),
-// so even malicious HTML can't escape into the host app. Remote
-// images are stripped by default to defeat tracking pixels — the
-// per-message "Display images" toggle restores them.
+// `sandbox="allow-popups allow-popups-to-escape-sandbox"` — no JS,
+// no top-level nav of the iframe itself, no form submit, no
+// same-origin access; the only thing allowed is opening links in a
+// new top-level tab (escaping the sandbox so the new tab is a
+// regular browsing context, not an inherited sandbox). Combined with
+// the sanitiser's `<base target="_blank">` + per-link target rewrite,
+// every `<a href>` in the body opens in a fresh tab.
+//
+// Remote images are stripped by default to defeat tracking pixels —
+// the per-message "Display images" toggle restores them.
 //
 // The iframe stretches to fill its container — the inbox detail
 // sheet places this in a `flex-1 min-h-0 flex flex-col` slot, so the
@@ -79,7 +85,7 @@ export function EmailBodyFrame({
       )}
       <iframe
         title="Email body"
-        sandbox=""
+        sandbox="allow-popups allow-popups-to-escape-sandbox"
         srcDoc={html}
         referrerPolicy="no-referrer"
         className="w-full flex-1 min-h-0 border rounded bg-background"
