@@ -22,6 +22,7 @@ import {
   finalizeSyncSession,
   ingestForAccount,
 } from "../services/email-integration/ingest.js";
+import { extractJobLinks } from "../services/email-integration/dedup.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import type { FindInboxOptions } from "../repositories/externalEmailMessagesRepository.js";
 import { requirePro } from "../middleware/auth-gates.js";
@@ -66,6 +67,33 @@ inboxRoutes.get("/external-emails/:id", async (c) => {
     uid,
   );
   if (!row) return c.json(error("NOT_FOUND", "Email not found"), 404);
+
+  // Legacy rows ingested before the multi-job extractor (gap #786) — or
+  // before the patchMany jsonb-persist bug was fixed — have NULL
+  // apply_urls and only the scalar apply_url (first hit). Re-run the
+  // anchor-first extractor on the stored bodyHtml and persist back so
+  // a LinkedIn / Indeed / Wellfound digest opened today surfaces every
+  // role, not just the first one.
+  let applyUrls = (row as any).applyUrls ?? null;
+  if ((!applyUrls || applyUrls.length === 0) && (row.bodyHtml || row.bodyText)) {
+    const extracted = extractJobLinks({
+      bodyHtml: row.bodyHtml,
+      bodyText: row.bodyText,
+      snippet: row.snippet ?? "",
+    });
+    if (extracted.length > 0) {
+      applyUrls = extracted;
+      // Fire-and-forget persist. A failure here is non-fatal — the
+      // response still carries the freshly-extracted array, and the
+      // next view will re-extract.
+      void repos.externalEmailMessages
+        .patch(row.id, { applyUrls: extracted as any } as any)
+        .catch((err) => {
+          console.error(`[inbox] backfill apply_urls failed for ${row.id}:`, err);
+        });
+    }
+  }
+
   return c.json(
     success({
       id: row.id,
@@ -84,7 +112,7 @@ inboxRoutes.get("/external-emails/:id", async (c) => {
       summary: row.summary,
       linkedJobId: row.linkedJobId,
       applyUrl: row.applyUrl,
-      applyUrls: (row as any).applyUrls ?? null,
+      applyUrls,
       isRead: row.isRead,
       isArchived: row.isArchived,
       receivedAt:

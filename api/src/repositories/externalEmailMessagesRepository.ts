@@ -322,17 +322,27 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     // for `numeric` so JS floats don't lose precision) — the cast in
     // the VALUES row keeps the type narrow for the planner.
     const now = this.now();
-    const rows = patches.map(({ id, patch }) =>
-      sql`(${id}::uuid,
+    const rows = patches.map(({ id, patch }) => {
+      // jsonb columns travel as a JSON string in the wire — drizzle's
+      // raw `sql` template doesn't auto-serialise the value the way
+      // `.set()` does on a single-row update. Stringify explicitly so
+      // the multi-job apply_urls payload (gap #786 / migration 0094)
+      // actually lands in the column instead of being silently dropped.
+      const applyUrlsJson =
+        (patch as any).applyUrls != null
+          ? JSON.stringify((patch as any).applyUrls)
+          : null;
+      return sql`(${id}::uuid,
             ${patch.category ?? null},
             ${(patch as any).score ?? null}::numeric,
             ${patch.summary ?? null},
             ${patch.applyUrl ?? null},
+            ${applyUrlsJson}::jsonb,
             ${patch.linkedJobId ?? null}::uuid,
             ${(patch as any).dedupScore ?? null}::numeric,
             ${patch.dedupMethod ?? null},
-            ${patch.isArchived ?? null}::boolean)`,
-    );
+            ${patch.isArchived ?? null}::boolean)`;
+    });
     const values = sql.join(rows, sql`, `);
     await this.db.execute(sql`
       UPDATE ${externalEmailMessages} AS m
@@ -341,13 +351,14 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
         score = COALESCE(v.score, m.score),
         summary = COALESCE(v.summary, m.summary),
         apply_url = COALESCE(v.apply_url, m.apply_url),
+        apply_urls = COALESCE(v.apply_urls, m.apply_urls),
         linked_job_id = COALESCE(v.linked_job_id, m.linked_job_id),
         dedup_score = COALESCE(v.dedup_score, m.dedup_score),
         dedup_method = COALESCE(v.dedup_method, m.dedup_method),
         is_archived = COALESCE(v.is_archived, m.is_archived),
         updated_at = ${now}
       FROM (VALUES ${values}) AS v(
-        id, category, score, summary, apply_url,
+        id, category, score, summary, apply_url, apply_urls,
         linked_job_id, dedup_score, dedup_method, is_archived
       )
       WHERE m.id = v.id

@@ -73,7 +73,13 @@ function canonicalUrl(url: string): string {
   }
 }
 
-export function extractJobLinks(email: NormalisedEmail): ExtractedJobLink[] {
+/** Narrow input shape — the extractor only needs the body and a
+ *  snippet fallback, not the full NormalisedEmail. Lets callers that
+ *  hold a stored row (inbox detail re-extract / backfill) pass a
+ *  minimal object instead of stubbing 8 unrelated fields. */
+export type JobLinkSource = Pick<NormalisedEmail, "bodyHtml" | "bodyText" | "snippet">;
+
+export function extractJobLinks(email: JobLinkSource): ExtractedJobLink[] {
   const seen = new Map<string, ExtractedJobLink>();
   const html = email.bodyHtml ?? "";
   if (html.length > 0) {
