@@ -252,16 +252,20 @@ export function createApp() {
   // optional auth so logged-in Pro users get adsEnabled: false.
   const ADS_CONFIG_ROUTE = /^\/api\/ads\/config$/;
 
-  // Studio analytics events (view, CTA click) and embed code are public.
-  // Route handlers use optional auth (c.var.user?.sub ?? null).
-  // Both the legacy `/videos/<id>/…` callsites and the post-#665
-  // `/projects/<id>/…` callsites resolve here — keying view/CTA-click
-  // analytics on the studio project (not the rendered video row) is
-  // what makes pre-render telemetry possible, so `projects` is the
-  // branch all live frontends now hit. Without it, the public watch
-  // page's view-tracking POST returns 401 and the unauth visitor
-  // never gets counted.
-  const STUDIO_PUBLIC_ROUTE = /^\/api\/studio\/(videos|projects)\/[^/]+(\/view|\/cta-click|\/embed)$/;
+  // Studio analytics events (view, CTA click), embed code, and the
+  // per-second heatmap tracker are public. Route handlers use optional
+  // auth (c.var.user?.sub ?? null). Both the legacy `/videos/<id>/…`
+  // callsites and the post-#665 `/projects/<id>/…` callsites resolve
+  // here — keying view/CTA-click analytics on the studio project (not
+  // the rendered video row) is what makes pre-render telemetry
+  // possible, so `projects` is the branch all live frontends now hit.
+  // `/analytics/track` is the per-second watch heatmap (Wistia-style
+  // drop-off chart) the watch page fires on tick / beforeunload /
+  // ended; the handler is documented public, but until this entry was
+  // added the global authMiddleware 401'd anonymous viewers before the
+  // handler ran. Without it, the public watch page's view-tracking
+  // POST returns 401 and the unauth visitor never gets counted.
+  const STUDIO_PUBLIC_ROUTE = /^\/api\/studio\/(?:(?:videos|projects)\/[^/]+(?:\/view|\/cta-click|\/embed)|analytics\/track)$/;
 
   // Public interview session share links — no auth required.
   const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;

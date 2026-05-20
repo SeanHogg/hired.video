@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
+import { AppShell } from "@/components/AppShell";
 import StudioVideoSurface, {
   PublicVideoSchema,
   isReady,
@@ -93,21 +94,25 @@ export default function PublicVideoResume() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
+      <AppShell variant="public" bgClassName="bg-background">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      </AppShell>
     );
   }
 
   if (error || !video) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
-        <h1 className="text-2xl font-semibold text-foreground">Video Not Found</h1>
-        <p className="text-muted-foreground">{error || "This video resume is not available."}</p>
-        <Link to="/" className="text-primary hover:underline text-sm">
-          Back to hired.video
-        </Link>
-      </div>
+      <AppShell variant="public" bgClassName="bg-background">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
+          <h1 className="text-2xl font-semibold text-foreground">Video Not Found</h1>
+          <p className="text-muted-foreground">{error || "This video resume is not available."}</p>
+          <Link to="/" className="text-primary hover:underline text-sm">
+            Back to hired.video
+          </Link>
+        </div>
+      </AppShell>
     );
   }
 
@@ -119,25 +124,27 @@ export default function PublicVideoResume() {
   if (video.pending) {
     const ownerLabel = video.ownerName || "The creator";
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
-        {video.ownerAvatar && (
-          <img
-            src={video.ownerAvatar}
-            alt={ownerLabel}
-            className="w-14 h-14 rounded-full"
-          />
-        )}
-        <h1 className="text-2xl font-semibold text-foreground">
-          {video.title || "Video in progress"}
-        </h1>
-        <p className="text-muted-foreground max-w-md">
-          {ownerLabel} is still preparing this video. Check back in a few minutes — the link will work
-          once it's published.
-        </p>
-        <Link to="/" className="text-primary hover:underline text-sm">
-          Back to hired.video
-        </Link>
-      </div>
+      <AppShell variant="public" bgClassName="bg-background">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
+          {video.ownerAvatar && (
+            <img
+              src={video.ownerAvatar}
+              alt={ownerLabel}
+              className="w-14 h-14 rounded-full"
+            />
+          )}
+          <h1 className="text-2xl font-semibold text-foreground">
+            {video.title || "Video in progress"}
+          </h1>
+          <p className="text-muted-foreground max-w-md">
+            {ownerLabel} is still preparing this video. Check back in a few minutes — the link will work
+            once it's published.
+          </p>
+          <Link to="/" className="text-primary hover:underline text-sm">
+            Back to hired.video
+          </Link>
+        </div>
+      </AppShell>
     );
   }
 
@@ -147,18 +154,7 @@ export default function PublicVideoResume() {
   const ready = video;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="text-lg font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-          hired.video
-        </Link>
-        <Link to="/tools/resume-roast" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          Roast your resume →
-        </Link>
-      </header>
-
-      {/* Main content */}
+    <AppShell variant="public" bgClassName="bg-background">
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
         {/* Owner info */}
         <div className="flex items-center gap-4">
@@ -211,16 +207,8 @@ export default function PublicVideoResume() {
             Get Started Free
           </Link>
         </div>
-
-        {/* Footer attribution */}
-        <p className="text-center text-xs text-muted-foreground">
-          Powered by{" "}
-          <Link to="/" className="text-primary hover:underline">
-            hired.video
-          </Link>
-        </p>
       </main>
-    </div>
+    </AppShell>
   );
 }
 
