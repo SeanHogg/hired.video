@@ -340,6 +340,11 @@ export interface InboxPanelProps {
 export function InboxPanel({
   hub,
   onClose,
+  // Default is a content-driven cap suited to the header popover, where
+  // the host (Radix Popover) has no enforced height — the panel grows
+  // with content up to the cap, then scrolls inside. Page-tab callers
+  // pass an explicit `h-[…]` height because their card has no height
+  // ancestor for `h-full` to resolve against.
   heightClassName = "max-h-[70vh] md:max-h-[32rem]",
   hideHeader = false,
   onItemSelect,
@@ -367,7 +372,12 @@ export function InboxPanel({
   } = hub;
 
   return (
-    <div className={cn("flex flex-col h-full", heightClassName)}>
+    // No `h-full` here — the wrappers above (CardContent on the page-tab,
+    // Radix Popover on the header dropdown) don't fix a height for it to
+    // resolve against, so it would silently collapse to `auto` and leave
+    // the scroll area unable to constrain its children. Heights come
+    // from `heightClassName` instead.
+    <div className={cn("flex flex-col overflow-hidden", heightClassName)}>
       {!hideHeader && (
         <div className="flex items-center justify-between px-3 py-3 border-b shrink-0">
           <div className="flex items-center gap-2">
@@ -394,7 +404,7 @@ export function InboxPanel({
 
       {toolbar}
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {isLoading && items.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -424,50 +434,64 @@ export function InboxPanel({
                 onToggleSelected={onToggleSelected}
               />
             ))}
-            <LoadMoreEmailsSentinel
-              hasMore={hasMoreEmails}
-              isLoading={isLoadingMoreEmails}
-              onLoadMore={loadMoreEmails}
-            />
           </div>
         )}
       </ScrollArea>
+
+      <InboxPaginationFooter
+        loadedCount={items.length}
+        hasMore={hasMoreEmails}
+        isLoading={isLoadingMoreEmails}
+        onLoadMore={loadMoreEmails}
+      />
     </div>
   );
 }
 
-/** Sentinel row at the bottom of the inbox list that triggers the next
- *  page of the email stream. Self-gates on `hasMore` so consumers
- *  (InboxPanel + any future inbox surface) don't need a `{hasMore && …}`
- *  guard — they always mount it, and it returns null when nothing's
- *  left to load. */
-function LoadMoreEmailsSentinel({
+/** Fixed footer mounted below the scroll area — always visible so the
+ *  user never has to scroll to the bottom of a tall list to see (or
+ *  reach) the pagination control. Shows the loaded-row count on the
+ *  left and the cursor-paged "Older emails…" trigger on the right;
+ *  the button is disabled when there are no more pages so the
+ *  pagination state is always communicated either way. Returns null
+ *  only when the list is genuinely empty (the empty-state inside the
+ *  scroll area is already explanation enough). */
+function InboxPaginationFooter({
+  loadedCount,
   hasMore,
   isLoading,
   onLoadMore,
 }: {
+  loadedCount: number;
   hasMore: boolean;
   isLoading: boolean;
   onLoadMore: () => void;
 }) {
-  if (!hasMore) return null;
+  if (loadedCount === 0) return null;
   return (
-    <div className="px-3 py-3 border-t bg-muted/20">
+    <div className="flex items-center justify-between gap-2 px-3 py-2 border-t bg-muted/20 shrink-0">
+      <span className="text-[11px] text-muted-foreground">
+        {hasMore
+          ? `${loadedCount} loaded`
+          : `${loadedCount} ${loadedCount === 1 ? "item" : "items"}`}
+      </span>
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        className="w-full h-8 text-xs"
-        disabled={isLoading}
+        className="h-7 text-xs"
+        disabled={!hasMore || isLoading}
         onClick={() => onLoadMore()}
       >
         {isLoading ? (
           <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
-            Loading older emails…
+            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+            Loading…
           </>
+        ) : hasMore ? (
+          "Older emails →"
         ) : (
-          "Older emails…"
+          "No more"
         )}
       </Button>
     </div>

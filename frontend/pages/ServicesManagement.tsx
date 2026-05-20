@@ -1,15 +1,5 @@
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  DollarSign,
-  Eye,
-  EyeOff,
-  Clock,
-  Tag,
   Loader2,
-  CheckCircle,
-  AlertCircle,
   Inbox,
   Send,
   Check,
@@ -22,7 +12,9 @@ import {
   Users,
   Briefcase,
   TrendingUp,
-  Settings as SettingsIcon,
+  DollarSign,
+  Tag,
+  Clock,
   Link2,
   Video,
   Star,
@@ -32,7 +24,6 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import AddFirstServiceCTA from "@/components/services/AddFirstServiceCTA";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,72 +34,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import {
   servicesService,
   type ServiceOffering,
-  type CreateServiceInput,
   type InquiryWithDetails,
   type MyRequestWithDetails,
 } from "@/lib/services/services-service";
 import { toast } from "sonner";
-import { USER_ROLES } from "@shared/user-roles";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import affiliateService from "@/lib/services/affiliate-service";
-import { userService } from "@/lib/services/user-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
 import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
-import YourProgramsPanel from "@/components/creator/YourProgramsPanel";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import { recruitService } from "@/lib/services/recruit-service";
 import ServicesNav from "@/components/services/ServicesNav";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const SERVICE_CATEGORIES = [
-  "Resume Review",
-  "LinkedIn Optimization",
-  "Interview Coaching",
-  "Career Coaching",
-  "Cover Letter Writing",
-  "Job Search Strategy",
-  "Salary Negotiation",
-  "Personal Branding",
-  "Headhunting / Lead Generation",
-  "Recruitment Services",
-  "Other",
-];
-
-const defaultForm: CreateServiceInput = {
-  title: "",
-  description: "",
-  category: "",
-  priceCents: 0,
-  priceVisible: true,
-  deliveryDays: undefined,
-};
 
 const STATUS_CONFIG: Record<
   string,
@@ -141,6 +87,8 @@ function formatPrice(cents: number | null) {
   if (cents === null) return "Contact for pricing";
   return `$${(cents / 100).toFixed(2)}`;
 }
+
+type ActiveTab = "dashboard" | "creator" | "inquiries";
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -182,16 +130,18 @@ export default function ServicesManagement() {
   const [searchParams] = useSearchParams();
 
   // Top-level tab is driven by the URL path so each section is deep-linkable
-  // and the back button works. /services → dashboard, /services/offerings →
-  // services, /services/inquiries → inquiries. The legacy ?tab= query param
-  // is still honored for inbound links from older emails / docs.
+  // and the back button works. /services → dashboard, /services/creator →
+  // creator (with Offerings as the default sub-tab), /services/inquiries →
+  // inquiries. The legacy `/services/offerings` URL also lands on the creator
+  // tab (Offerings sub-tab is its first/default child). The legacy ?tab=
+  // query param is still honored for inbound links from older emails / docs.
   const location = useLocation();
   const tabParam = searchParams.get("tab");
-  const activeTab = useMemo<"dashboard" | "creator" | "services" | "inquiries">(() => {
+  const activeTab = useMemo<ActiveTab>(() => {
     if (location.pathname.startsWith("/services/creator")) return "creator";
-    if (location.pathname.startsWith("/services/offerings")) return "services";
+    if (location.pathname.startsWith("/services/offerings")) return "creator";
     if (location.pathname.startsWith("/services/inquiries")) return "inquiries";
-    if (tabParam === "services") return "services";
+    if (tabParam === "services") return "creator";
     if (tabParam === "inquiries") return "inquiries";
     return "dashboard";
   }, [location.pathname, tabParam]);
@@ -265,14 +215,10 @@ export default function ServicesManagement() {
   }
 
   // ── Services state ──────────────────────────────────────────────────────────
-  const [providesServices, setProviderServices] = useState(false);
+  // Owned here so the dashboard's "Active Services" metric stays in sync.
+  // OfferingsPanel (inside Content Creator) consumes + mutates via setServices.
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateServiceInput>(defaultForm);
 
   // ── Inquiries state ─────────────────────────────────────────────────────────
   const [incoming, setIncoming] = useState<InquiryWithDetails[]>([]);
@@ -302,12 +248,6 @@ export default function ServicesManagement() {
     try {
       const data = await servicesService.listMyServices();
       setServices(data);
-      try {
-        const profile = await userService.getCurrentUser();
-        setProviderServices(profile.providesServices ?? false);
-      } catch {
-        // ignore — verification gate or transient failure; toggle still works
-      }
     } catch {
       toast.error("Failed to load services");
     } finally {
@@ -328,86 +268,6 @@ export default function ServicesManagement() {
       toast.error("Failed to load inquiries");
     } finally {
       setInquiriesLoading(false);
-    }
-  }
-
-  // ── Service handlers ────────────────────────────────────────────────────────
-
-  async function openCreate() {
-    // First-time opt-in: clicking "Add Service" opts the user into providing
-    // services and (best-effort) push notifications. After they've created
-    // their first service, both can be managed in /settings → Lead Generation.
-    if (!providesServices) {
-      setSaving(true);
-      try {
-        await servicesService.toggleProvideServices(true);
-        setProviderServices(true);
-        toast.success("Lead generation enabled — your services will appear on your profile.");
-      } catch {
-        toast.error("Failed to enable lead generation");
-        setSaving(false);
-        return;
-      } finally {
-        setSaving(false);
-      }
-    }
-
-    setEditingId(null);
-    setForm(defaultForm);
-    setDialogOpen(true);
-  }
-
-  function openEdit(s: ServiceOffering) {
-    setEditingId(s.id);
-    setForm({
-      title:        s.title,
-      description:  s.description ?? "",
-      category:     s.category ?? "",
-      priceCents:   s.priceCents ?? 0,
-      priceVisible: s.priceVisible,
-      deliveryDays: s.deliveryDays ?? undefined,
-    });
-    setDialogOpen(true);
-  }
-
-  async function handleSave() {
-    if (!form.title.trim()) { toast.error("Title is required"); return; }
-    setSaving(true);
-    try {
-      if (editingId) {
-        const updated = await servicesService.updateService(editingId, form);
-        setServices((prev) => prev.map((s) => (s.id === editingId ? updated : s)));
-        toast.success("Service updated");
-      } else {
-        const created = await servicesService.createService(form);
-        setServices((prev) => [created, ...prev]);
-        toast.success("Service created");
-      }
-      setDialogOpen(false);
-    } catch {
-      toast.error("Failed to save service");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleToggleActive(s: ServiceOffering) {
-    try {
-      const updated = await servicesService.updateService(s.id, { isActive: !s.isActive });
-      setServices((prev) => prev.map((item) => (item.id === s.id ? updated : item)));
-    } catch {
-      toast.error("Failed to update service");
-    }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this service?")) return;
-    try {
-      await servicesService.deleteService(id);
-      setServices((prev) => prev.filter((s) => s.id !== id));
-      toast.success("Service deleted");
-    } catch {
-      toast.error("Failed to delete service");
     }
   }
 
@@ -600,34 +460,15 @@ export default function ServicesManagement() {
         <div className="pt-16">
         <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
-          <ServicesNav hasCompanyAccess={hasCompanyAccess} creatorEnrolled={creatorActive} />
+          <ServicesNav hasCompanyAccess={hasCompanyAccess} />
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">Services</h1>
-              <p className="text-muted-foreground mt-1">
-                Dashboard, offerings, and incoming leads
-              </p>
-            </div>
-            {activeTab === "services" && (
-              <div className="flex items-center gap-2">
-                <Link to="/settings?tab=lead-generation">
-                  <Button variant="outline">
-                    <SettingsIcon className="h-4 w-4 mr-2" />
-                    Lead Gen Settings
-                  </Button>
-                </Link>
-                <Button onClick={openCreate} disabled={saving}>
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4 mr-2" />
-                  )}
-                  Add Service
-                </Button>
-              </div>
-            )}
+          {/* Header — Add Service + Lead Gen Settings buttons moved into the
+              Offerings sub-tab (inside Content Creator) where they belong. */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold">Services</h1>
+            <p className="text-muted-foreground mt-1">
+              Dashboard, offerings, and incoming leads
+            </p>
           </div>
 
           <Tabs value={activeTab}>
@@ -798,113 +639,13 @@ export default function ServicesManagement() {
 
             {/* ── Content Creator ─────────────────────────────────────────── */}
             <TabsContent value="creator" className="space-y-4">
-              <ContentCreatorSection onProfileChange={handleCreatorProfileChange} />
-            </TabsContent>
-
-            {/* ── Services ────────────────────────────────────────────────── */}
-            <TabsContent value="services" className="space-y-4">
-              {/* Creator programs (Video Promo, Voice Clone, Services,
-                  Articles, Courses) sit alongside the user's custom services
-                  in this tab — both are offerings. */}
-              {creatorActive && creatorProfile && (
-                <YourProgramsPanel
-                  profile={creatorProfile}
-                  onProfileChange={handleCreatorProfileChange}
-                />
-              )}
-              {/* `#my-services` anchor — YourProgramsPanel's "Services" card
-                  deep-links here so the list scrolls into view. */}
-              <div id="my-services" className="scroll-mt-24 space-y-3">
-              {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : services.length === 0 ? (
-                <AddFirstServiceCTA onClick={openCreate} loading={saving} />
-              ) : (
-                <div className="space-y-3">
-                  {services.map((s) => (
-                    <Card key={s.id} className={!s.isActive ? "opacity-60" : undefined}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold truncate">{s.title}</h3>
-                              {s.category && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <Tag className="h-3 w-3 mr-1" />
-                                  {s.category}
-                                </Badge>
-                              )}
-                              {!s.isActive && (
-                                <Badge variant="outline" className="text-xs text-muted-foreground">
-                                  Inactive
-                                </Badge>
-                              )}
-                            </div>
-                            {s.description && (
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {s.description}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2 text-sm">
-                              <span className="flex items-center gap-1 font-medium text-violet-600">
-                                <DollarSign className="h-3.5 w-3.5" />
-                                {formatPrice(s.priceCents)}
-                              </span>
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                {s.priceVisible ? (
-                                  <><Eye className="h-3.5 w-3.5" /> Price visible</>
-                                ) : (
-                                  <><EyeOff className="h-3.5 w-3.5" /> Price on inquiry</>
-                                )}
-                              </span>
-                              {s.deliveryDays && (
-                                <span className="flex items-center gap-1 text-muted-foreground">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  {s.deliveryDays}d delivery
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              title={s.isActive ? "Deactivate" : "Activate"}
-                              onClick={() => handleToggleActive(s)}
-                            >
-                              {s.isActive ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openEdit(s)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => handleDelete(s.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-              </div>
+              <ContentCreatorSection
+                profile={creatorProfile}
+                services={services}
+                servicesLoading={loading}
+                setServices={setServices}
+                onProfileChange={handleCreatorProfileChange}
+              />
             </TabsContent>
 
             {/* ── Inquiries ────────────────────────────────────────────────── */}
@@ -1094,132 +835,6 @@ export default function ServicesManagement() {
         </div>
         <Footer />
       </div>
-
-      {/* Create / Edit dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Service" : "Add Service"}</DialogTitle>
-            <DialogDescription>
-              Define what you offer. Set a price and choose whether to show it publicly or
-              only after an inquiry.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="svc-title">Title *</Label>
-              <Input
-                id="svc-title"
-                placeholder="e.g. Resume Review & Feedback"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="svc-desc">Description</Label>
-              <Textarea
-                id="svc-desc"
-                rows={3}
-                placeholder="What's included, turnaround time, what you need from the client..."
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="svc-category">Category</Label>
-                <Select
-                  value={form.category || ""}
-                  onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
-                >
-                  <SelectTrigger id="svc-category">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SERVICE_CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="svc-delivery">Delivery (days)</Label>
-                <Input
-                  id="svc-delivery"
-                  type="number"
-                  min={1}
-                  placeholder="e.g. 3"
-                  value={form.deliveryDays ?? ""}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      deliveryDays: e.target.value ? parseInt(e.target.value) : undefined,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="svc-price">Price (USD)</Label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="svc-price"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    className="pl-8"
-                    placeholder="0.00"
-                    value={form.priceCents ? (form.priceCents / 100).toFixed(2) : ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        priceCents: e.target.value ? Math.round(parseFloat(e.target.value) * 100) : 0,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Price Visibility</Label>
-                <div className="flex items-center gap-3 h-10">
-                  <Switch
-                    checked={form.priceVisible}
-                    onCheckedChange={(v) => setForm((f) => ({ ...f, priceVisible: v }))}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {form.priceVisible ? (
-                      <span className="flex items-center gap-1">
-                        <Eye className="h-3.5 w-3.5" /> Publicly visible
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <EyeOff className="h-3.5 w-3.5" /> Inquiry only
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {editingId ? "Save Changes" : "Create Service"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <CreatorEnrollmentWizard
         open={wizardOpen}

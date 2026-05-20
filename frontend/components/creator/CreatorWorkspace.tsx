@@ -12,9 +12,11 @@ import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
+import OfferingsPanel from "@/components/services/OfferingsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import type { CreatorProfile } from "@/lib/services/creator-service";
+import type { ServiceOffering } from "@/lib/services/services-service";
 
 interface PortfolioItem {
   id: string;
@@ -27,11 +29,41 @@ interface PortfolioItem {
   isPublic?: boolean | null;
 }
 
+export type CreatorWorkspaceTab =
+  | "offerings"
+  | "profile"
+  | "earnings"
+  | "payouts"
+  | "portfolio"
+  | "account";
+
 interface Props {
   onProfileChange?: (next: CreatorProfile | null) => void;
+  /** Creator profile, when enrolled. Drives YourProgramsPanel inside Offerings. */
+  profile?: CreatorProfile | null;
+  /** Services list — owned by ServicesManagement so the dashboard's "Active Services" metric stays in sync. */
+  services?: ServiceOffering[];
+  servicesLoading?: boolean;
+  setServices?: React.Dispatch<React.SetStateAction<ServiceOffering[]>>;
+  /** Initial sub-tab. Defaults to "offerings" when services state is wired,
+   *  otherwise "profile" (e.g. on /settings where offerings isn't shown). */
+  defaultTab?: CreatorWorkspaceTab;
 }
 
-export default function CreatorWorkspace({ onProfileChange }: Props = {}) {
+export default function CreatorWorkspace({
+  onProfileChange,
+  profile = null,
+  services = [],
+  servicesLoading = false,
+  setServices,
+  defaultTab,
+}: Props = {}) {
+  // Offerings tab is only mounted when services state is wired in by the
+  // host (currently /services). On /settings it stays hidden so the original
+  // Profile/Earnings/… layout is preserved.
+  const offeringsEnabled = Boolean(setServices);
+  const resolvedDefaultTab: CreatorWorkspaceTab =
+    defaultTab ?? (offeringsEnabled ? "offerings" : "profile");
   const { toast } = useToast();
 
   // Portfolio state
@@ -105,14 +137,30 @@ export default function CreatorWorkspace({ onProfileChange }: Props = {}) {
         benefit="Subscribe to Pro ($9.95/mo) to publish your services, voice clones, courses, and articles to the marketplace."
       />
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      <Tabs defaultValue={resolvedDefaultTab} className="space-y-4">
         <TabsList>
+          {offeringsEnabled && <TabsTrigger value="offerings">Offerings</TabsTrigger>}
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="earnings">Marketplace Earnings</TabsTrigger>
           <TabsTrigger value="payouts">Payouts</TabsTrigger>
           <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
+
+        {/* Offerings — paid services + creator programs (Video Promo, Voice
+            Clone, Services, Articles, Courses). Moved here from a top-level
+            /services tab so the creator workflow is unified. */}
+        {offeringsEnabled && setServices && (
+          <TabsContent value="offerings">
+            <OfferingsPanel
+              services={services}
+              loading={servicesLoading}
+              setServices={setServices}
+              profile={profile}
+              onProfileChange={onProfileChange ?? (() => {})}
+            />
+          </TabsContent>
+        )}
 
         {/* Profile editor — self-fetches, mirrored on /settings → Content Creator → Profile */}
         <TabsContent value="profile">

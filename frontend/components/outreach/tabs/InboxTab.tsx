@@ -202,7 +202,7 @@ export function InboxTab() {
         <InboxPanel
           hub={hub}
           hideHeader
-          heightClassName="min-h-[32rem] max-h-[70vh]"
+          heightClassName="h-[70vh] min-h-[32rem]"
           onItemSelect={
             selectionMode ? undefined : (item) => {
               // Only synced emails have a useful detail view today.
