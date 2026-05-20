@@ -193,7 +193,6 @@ const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
 const CandidateDetail = lazy(() => import("./pages/services/CandidateDetail"));
 const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
 const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
-const ServicesSettings = lazy(() => import("./pages/services/ServicesSettings"));
 const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"));
 const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const TeamLeaderboard = lazy(() => import("./pages/services/TeamLeaderboard"));
@@ -764,9 +763,12 @@ const App = () => (
                         path="/services/scorecards"
                         element={<RequireVerified><ScorecardsPage /></RequireVerified>}
                       />
+                      {/* Folded into /settings as the Recruiter > Sharing & Branding tab.
+                          Keep this redirect alive so deep links from old emails / bookmarks
+                          land on the right place — see Settings.tsx remapLegacyTab. */}
                       <Route
                         path="/services/settings"
-                        element={<RequireVerified><ServicesSettings /></RequireVerified>}
+                        element={<Navigate to="/settings?tab=recruiter-sharing" replace />}
                       />
                       <Route path="/articles" element={<ArticlesManager />} />
                       <Route path="/articles/:authorSlug/:slug" element={<ArticleView />} />

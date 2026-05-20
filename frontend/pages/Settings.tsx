@@ -25,6 +25,7 @@ import {
   ToggleRight,
   Video,
   UserCircle,
+  Share2,
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
@@ -65,6 +66,7 @@ import { USER_ROLES } from "@shared/user-roles";
 
 import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
 import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
+import RecruitSharingSettings from "@/components/recruit/RecruitSharingSettings";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
@@ -82,6 +84,10 @@ import { useOpenToWorkToggle } from "@/lib/hooks/use-open-to-work";
 function remapLegacyTab(tab: string): string {
   if (tab === "payouts" || tab === "leave-creator") return "creator-profile";
   if (tab === "team-billing" || tab === "account" || tab === "billing") return "account-billing";
+  // `/services/settings` (the legacy agency sharing settings page) now
+  // redirects here with ?tab=recruiter-sharing; older bookmarks may still
+  // pass the redirect-side keys "services-settings" or "sharing".
+  if (tab === "services-settings" || tab === "sharing") return "recruiter-sharing";
   return tab;
 }
 
@@ -381,6 +387,17 @@ function SettingsContent() {
 
   // Check if user is superadmin (seanhogg@gmail.com)
   const isSuperAdmin = user?.email === "seanhogg@gmail.com" || user?.role === "super_admin";
+
+  // Show the agency-only "Sharing & Branding" tab to roles that can post or
+  // share candidates with hiring clients. SuperAdmin sees everything; the
+  // RecruitSharingSettings panel itself self-gates (renders an "available
+  // once you've joined a company" stub when scope is empty) so we don't
+  // need a second data-load just to decide visibility.
+  const hasRecruiterSurface =
+    user?.role === USER_ROLES.RECRUITER ||
+    user?.role === USER_ROLES.EMPLOYER ||
+    user?.role === USER_ROLES.ADMIN ||
+    user?.role === USER_ROLES.SUPER_ADMIN;
 
 
 
@@ -807,6 +824,12 @@ function SettingsContent() {
                         <Megaphone className="h-4 w-4" />
                         <span>{t("tabs.leadGeneration")}</span>
                       </TabsTrigger>
+                      {hasRecruiterSurface && (
+                        <TabsTrigger value="recruiter-sharing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                          <Share2 className="h-4 w-4" />
+                          <span>Sharing &amp; Branding</span>
+                        </TabsTrigger>
+                      )}
                       <TabsTrigger value="email" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Mail className="h-4 w-4" />
                         <span>Email</span>
@@ -908,6 +931,22 @@ function SettingsContent() {
                         <Megaphone className="h-4 w-4" />
                         <span>{t("tabs.leadGeneration")}</span>
                       </TabsTrigger>
+
+                      {hasRecruiterSurface && (
+                        <>
+                          <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Share2 className="h-3 w-3" />
+                            Recruiter
+                          </div>
+                          <TabsTrigger
+                            value="recruiter-sharing"
+                            className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                          >
+                            <Share2 className="h-4 w-4" />
+                            <span>Sharing &amp; Branding</span>
+                          </TabsTrigger>
+                        </>
+                      )}
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("labels.tabGroupConnections")}
@@ -1929,6 +1968,14 @@ function SettingsContent() {
                   enrollment, so non-creators get the enrollment CTA inline. */}
               <TabsContent value="creator-profile" className="space-y-6">
                 <ContentCreatorSection />
+              </TabsContent>
+
+              {/* Recruiter → Sharing & Branding. Folded in from the now-deleted
+                  /services/settings page so brand kits + redaction profiles
+                  live in the same Account settings hub as everything else.
+                  The panel self-gates when scope has no companies. */}
+              <TabsContent value="recruiter-sharing" className="space-y-6">
+                <RecruitSharingSettings />
               </TabsContent>
 
                 </div>

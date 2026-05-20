@@ -1,12 +1,14 @@
 // ServicesNav — top tab strip for the My Services hub.
 //
-// All sections share this nav. Pitch Decks / Settings / Team / Scorecards
-// are agency surfaces — gated behind `hasCompanyAccess` so a plain Job
-// Seeker doesn't see empty tabs they can't act on. (The Candidates entry
-// moved out of My Services and now lives at /resumes?tab=sourced — see
-// gap #400 + EntityHubShell.) The Offerings tab was folded into Content
-// Creator as a sub-tab — `/services/offerings` is still routable for legacy
-// deep-links but the top-level entry was removed.
+// All sections share this nav. Pitch Decks / Team / Scorecards are agency
+// surfaces — gated behind `hasCompanyAccess` so a plain Job Seeker doesn't
+// see empty tabs they can't act on. (The Candidates entry moved out of My
+// Services and now lives at /resumes?tab=sourced — see gap #400 +
+// EntityHubShell.) The Offerings tab was folded into Content Creator as a
+// sub-tab — `/services/offerings` is still routable for legacy deep-links
+// but the top-level entry was removed. The Settings tab was folded into
+// /settings as the "Recruiter → Sharing & Branding" tab; the old
+// `/services/settings` URL now redirects there.
 
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -14,7 +16,6 @@ import {
   ClipboardList,
   Inbox,
   LayoutPanelLeft,
-  Settings,
   Trophy,
   TrendingUp,
   Video,
@@ -50,7 +51,6 @@ const TABS: readonly Tab[] = [
   { to: "/services/pitch-decks", label: "Pitch Decks", icon: LayoutPanelLeft, agencyOnly: true },
   { to: "/services/hiring", label: "Hiring & Onboarding", icon: ClipboardList },
   { to: "/services/scorecards", label: "Scorecards", icon: ClipboardCheck, agencyOnly: true },
-  { to: "/services/settings", label: "Settings", icon: Settings, agencyOnly: true },
 ] as const;
 
 export default function ServicesNav({ hasCompanyAccess = false }: ServicesNavProps) {
