@@ -127,8 +127,13 @@ interface InboxResponse {
 // SignalR / SSE is the primary push channel for live notifications; this
 // poll is the safety-net refresh for the rest of the merged inbox
 // (conversations, pending requests, external emails) and reconciliation
-// when the push channel reconnects after a drop.
-const POLL_INTERVAL_MS = 35_000;
+// when the push channel reconnects after a drop. The provider mounts at
+// the App root, so every authenticated page (including pages that never
+// look at the inbox) inherits this poll. The base `useGatedResource`
+// pauses ticks while the tab is hidden and backs off on 5xx/429, so the
+// effective rate is much lower than the raw interval suggests — keep
+// the headline interval conservative to match.
+const POLL_INTERVAL_MS = 120_000;
 
 const EMPTY_INBOX: InboxResponse = {
   conversations: [],

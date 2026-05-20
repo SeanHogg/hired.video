@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApiReady } from "@/lib/auth";
 import { authService } from "@/lib/services/auth-service";
+import { NetworkError, RateLimitError } from "@/lib/errors";
+
+// On a transient failure (5xx / network drop / 429) we skip this many poll
+// cycles before retrying, doubling each consecutive failure up to the cap.
+// Resets on a successful fetch. Lets the client back off when the server
+// is struggling instead of hammering it every interval.
+const MAX_BACKOFF_CYCLES = 32;
 
 export interface UseGatedResourceOptions<T> {
   /** Fetch fn that runs when (and only when) the user is api-ready. */
@@ -58,6 +65,12 @@ export function useGatedResource<T>({
   // even when callers pass a new function reference each render.
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
+  // Backoff bookkeeping. `skipCycles` counts how many upcoming poll ticks
+  // to swallow; `nextBackoff` is the cycle-count we'll apply on the next
+  // failure (doubles each consecutive failure). Refs so changes don't
+  // re-render consumers just to throttle our own poll.
+  const skipCyclesRef = useRef(0);
+  const nextBackoffRef = useRef(1);
 
   const refresh = useCallback(async () => {
     if (!apiReady) return;
@@ -72,8 +85,19 @@ export function useGatedResource<T>({
     try {
       const next = await fetcherRef.current();
       setData(next);
-    } catch {
-      // Keep last-known state — 401/403/429 are recoverable on next tick.
+      skipCyclesRef.current = 0;
+      nextBackoffRef.current = 1;
+    } catch (err) {
+      // Throttle further polls when the server signals "back off" — 5xx
+      // / network drop / rate-limit. Other error classes (auth, validation)
+      // aren't transient, no point retrying faster.
+      if (err instanceof NetworkError || err instanceof RateLimitError) {
+        skipCyclesRef.current = nextBackoffRef.current;
+        nextBackoffRef.current = Math.min(
+          nextBackoffRef.current * 2,
+          MAX_BACKOFF_CYCLES,
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -87,11 +111,36 @@ export function useGatedResource<T>({
       return;
     }
     void refresh();
-    if (pollMs && pollMs > 0) {
-      const t = setInterval(() => void refresh(), pollMs);
-      return () => clearInterval(t);
+    if (!(pollMs && pollMs > 0)) return undefined;
+    const tick = () => {
+      // Hidden tabs don't need fresh data; browsers throttle to ~1/min
+      // anyway. Skip cleanly without consuming a backoff cycle.
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (skipCyclesRef.current > 0) {
+        skipCyclesRef.current -= 1;
+        return;
+      }
+      void refresh();
+    };
+    const t = setInterval(tick, pollMs);
+    // Returning from a hidden tab should feel live, not "wait up to the
+    // poll interval for fresh data" — refresh once and reset backoff so
+    // a transient outage that recovered while away doesn't keep us muted.
+    const onVisible = () => {
+      if (typeof document === "undefined" || document.hidden) return;
+      skipCyclesRef.current = 0;
+      nextBackoffRef.current = 1;
+      void refresh();
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisible);
     }
-    return undefined;
+    return () => {
+      clearInterval(t);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisible);
+      }
+    };
     // `defaults` is a value-typed reset target; intentionally not a dep so
     // a fresh object literal at the call site doesn't thrash the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps

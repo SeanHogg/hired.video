@@ -124,16 +124,25 @@ const FREE_TIER_FALLBACK_POOL = [
 const PAID_TERMINAL_MODEL = "cerebras/llama3.1-8b" as const;
 
 /** Use cases that should never bottom out at the free pool — when every
- *  free model fails, eat the paid call rather than 503 the user. Per
- *  gap #525 Part B's list. Excluded: low-interactivity / high-volume
- *  pipelines (autofill, email_*, vendor_extract, job_parser, etc.)
- *  where a deterministic 503 + retry on next tick is fine and a paid
- *  call per item would explode cost. */
+ *  free model fails, eat the paid call rather than 503 the user.
+ *  Originally gap #525 Part B's list (8 entries); widened on 2026-05-20
+ *  to include `match_tailor`, `interview_questions`, `interview_analyze`
+ *  after a tailor 503 reproduced the same 4-attempt all-free-tier
+ *  failure pattern (correlationId llm-a87dce60). These three are
+ *  user-blocking foreground flows (resume tailoring, interview prep)
+ *  where the user clicks and waits — same shape as the original 8.
+ *  Excluded: low-interactivity / high-volume pipelines (autofill,
+ *  email_*, vendor_extract, job_parser, etc.) where a deterministic
+ *  503 + retry on next tick is fine and a paid call per item would
+ *  explode cost. */
 const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase>([
   "career_360",
   "chat",
+  "interview_analyze",
+  "interview_questions",
   "match",
   "match_insights",
+  "match_tailor",
   "profile_audit",
   "resume_optimize",
   "resume_roast",

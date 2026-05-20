@@ -200,127 +200,135 @@ export default function OfferingsPanel({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end gap-2 flex-wrap">
-        <Link to="/settings?tab=lead-generation">
-          <Button variant="outline">
-            <SettingsIcon className="h-4 w-4 mr-2" />
-            Lead Gen Settings
+    <>
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+      {/* Left: user-created services */}
+      <div className="space-y-4 min-w-0">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
+          <Link to="/settings?tab=lead-generation">
+            <Button variant="outline">
+              <SettingsIcon className="h-4 w-4 mr-2" />
+              Lead Gen Settings
+            </Button>
+          </Link>
+          <Button onClick={openCreate} disabled={saving}>
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4 mr-2" />
+            )}
+            Add Service
           </Button>
-        </Link>
-        <Button onClick={openCreate} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        </div>
+
+        {/* `#my-services` anchor — YourProgramsPanel's "Services" card
+            deep-links here so the list scrolls into view. */}
+        <div id="my-services" className="scroll-mt-24 space-y-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : services.length === 0 ? (
+            <AddFirstServiceCTA onClick={openCreate} loading={saving} />
           ) : (
-            <Plus className="h-4 w-4 mr-2" />
-          )}
-          Add Service
-        </Button>
-      </div>
-
-      {profile && (
-        <YourProgramsPanel profile={profile} onProfileChange={onProfileChange} />
-      )}
-
-      {/* `#my-services` anchor — YourProgramsPanel's "Services" card
-          deep-links here so the list scrolls into view. */}
-      <div id="my-services" className="scroll-mt-24 space-y-3">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : services.length === 0 ? (
-          <AddFirstServiceCTA onClick={openCreate} loading={saving} />
-        ) : (
-          <div className="space-y-3">
-            {services.map((s) => (
-              <Card key={s.id} className={!s.isActive ? "opacity-60" : undefined}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold truncate">{s.title}</h3>
-                        {s.category && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {s.category}
-                          </Badge>
-                        )}
-                        {!s.isActive && (
-                          <Badge variant="outline" className="text-xs text-muted-foreground">
-                            Inactive
-                          </Badge>
-                        )}
-                      </div>
-                      {s.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {s.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 mt-2 text-sm">
-                        <span className="flex items-center gap-1 font-medium text-violet-600">
-                          <DollarSign className="h-3.5 w-3.5" />
-                          {formatPrice(s.priceCents)}
-                        </span>
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          {s.priceVisible ? (
-                            <>
-                              <Eye className="h-3.5 w-3.5" /> Price visible
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff className="h-3.5 w-3.5" /> Price on inquiry
-                            </>
+            <div className="space-y-3">
+              {services.map((s) => (
+                <Card key={s.id} className={!s.isActive ? "opacity-60" : undefined}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold truncate">{s.title}</h3>
+                          {s.category && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Tag className="h-3 w-3 mr-1" />
+                              {s.category}
+                            </Badge>
                           )}
-                        </span>
-                        {s.deliveryDays && (
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            {s.deliveryDays}d delivery
-                          </span>
+                          {!s.isActive && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              Inactive
+                            </Badge>
+                          )}
+                        </div>
+                        {s.description && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {s.description}
+                          </p>
                         )}
+                        <div className="flex items-center gap-4 mt-2 text-sm">
+                          <span className="flex items-center gap-1 font-medium text-violet-600">
+                            <DollarSign className="h-3.5 w-3.5" />
+                            {formatPrice(s.priceCents)}
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            {s.priceVisible ? (
+                              <>
+                                <Eye className="h-3.5 w-3.5" /> Price visible
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="h-3.5 w-3.5" /> Price on inquiry
+                              </>
+                            )}
+                          </span>
+                          {s.deliveryDays && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <Clock className="h-3.5 w-3.5" />
+                              {s.deliveryDays}d delivery
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title={s.isActive ? "Deactivate" : "Activate"}
+                          onClick={() => handleToggleActive(s)}
+                        >
+                          {s.isActive ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(s)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDelete(s.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title={s.isActive ? "Deactivate" : "Activate"}
-                        onClick={() => handleToggleActive(s)}
-                      >
-                        {s.isActive ? (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(s)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(s.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Right: creator programs */}
+      {profile && (
+        <div className="lg:sticky lg:top-4">
+          <YourProgramsPanel profile={profile} onProfileChange={onProfileChange} />
+        </div>
+      )}
+    </div>
+
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Service" : "Add Service"}</DialogTitle>
@@ -446,6 +454,6 @@ export default function OfferingsPanel({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

@@ -1,8 +1,8 @@
-// Job-related action buttons rendered into the InboxDetailSheet's
-// top action bar — surfaces the tools-catalog deep-links that make
-// sense for a synced job_opportunity / application_status /
-// interview_invite / offer email so the user doesn't have to leave
-// the inbox to act on it.
+// Job-actions card inside the InboxDetailSheet — surfaces the
+// tools-catalog deep-links that make sense for a synced
+// job_opportunity / application_status / interview_invite / offer
+// email AND one [Title] | [Apply] button group per role the body
+// listed, so the user doesn't have to leave the inbox to act on it.
 //
 // Self-gates: renders nothing when the category isn't a job-mail
 // category or when there's no actionable target (no linkedJobId AND
@@ -10,9 +10,16 @@
 // /tools/* pages bind to a job by id; rendering a "Tailor resume"
 // button with no jobId would land the user on an empty picker.
 //
-// Returns a Fragment of buttons (not a panel) so the parent's
-// flex-wrap action bar lays them out alongside Mark unread / Dismiss
-// / Mark as Junk / Open in gmail.
+// The emerald card visually separates "job actions" from the email
+// actions (Mark unread / Dismiss / Mark as Junk / Open in gmail) the
+// parent sheet renders at the very top.
+//
+// Anchor extraction can over-collect (Manage alerts, Edit alert,
+// "Your job alert for X" all link to /jobs/ paths) and digest emails
+// emit a title anchor + an Apply anchor for the same role — the
+// shared [groupJobLinks](../../lib/email-rendering/group-job-links.ts)
+// helper drops the admin anchors and pairs the title + Apply pair
+// into one group so each role renders as `[Title] | [Apply]`.
 //
 // Tool sourcing goes through `getCatalogToolsForEntity` so this stays
 // in lock-step with the Tools page and the entity action-menus — the
@@ -23,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Briefcase, ExternalLink, Wand2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { getCatalogToolsForEntity } from "@/data/tools-catalog";
+import { groupJobLinks } from "@/lib/email-rendering/group-job-links";
 
 /** Categories that warrant surfacing resume tools. Mirrors
  *  `JOB_INBOX_CATEGORIES` on the server but drops `rejection` — a
@@ -69,12 +77,14 @@ export function JobMailCTAs({
   // Coalesce the two URL sources. Prefer the labelled array (post-
   // migration 0094); fall back to the scalar applyUrl for legacy
   // rows so the panel keeps rendering one Apply button.
-  const links = (applyUrls && applyUrls.length > 0)
-    ? applyUrls
-    : applyUrl
-      ? [{ url: applyUrl, label: null }]
-      : [];
+  const rawLinks =
+    applyUrls && applyUrls.length > 0
+      ? applyUrls
+      : applyUrl
+        ? [{ url: applyUrl, label: null }]
+        : [];
 
+  const jobGroups = groupJobLinks(rawLinks);
   const hasJobContext = !!linkedJobId;
 
   const tools = hasJobContext
@@ -83,42 +93,76 @@ export function JobMailCTAs({
       )
     : [];
 
-  if (!hasJobContext && links.length === 0) return null;
+  if (!hasJobContext && jobGroups.length === 0) return null;
 
   return (
-    <>
+    <div className="rounded border bg-emerald-50/40 border-emerald-200 p-3 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-900">
+        <Briefcase className="h-3.5 w-3.5" />
+        {jobGroups.length > 1
+          ? `Job actions · ${jobGroups.length} roles in this message`
+          : "Job actions"}
+      </div>
+
       {hasJobContext && (
-        <>
-          <Button variant="outline" size="sm" asChild>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
             <Link to={`/jobs/${linkedJobId}`}>
               <Briefcase className="h-3.5 w-3.5 mr-1" />
-              View job
+              View tracked job
             </Link>
           </Button>
           {tools.map((tool) => (
-            <Button key={tool.id} variant="outline" size="sm" asChild>
+            <Button
+              key={tool.id}
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              asChild
+            >
               <Link to={tool.href}>
                 <Wand2 className="h-3.5 w-3.5 mr-1" />
                 {tool.title}
               </Link>
             </Button>
           ))}
-        </>
+        </div>
       )}
-      {links.map((link, idx) => (
-        <Button
-          key={`${link.url}-${idx}`}
-          variant="outline"
-          size="sm"
-          asChild
-        >
-          <a href={link.url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-3.5 w-3.5 mr-1" />
-            {link.label ? truncateLabel(link.label, 50) : "Apply"}
-          </a>
-        </Button>
-      ))}
-    </>
+
+      {/* Per-role button groups. The title button + Apply button
+          share a row so the user always sees which Apply belongs to
+          which role. Multi-line text (long titles) wraps inside the
+          title cell without expanding the Apply pill. */}
+      {jobGroups.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {jobGroups.map((group, idx) => (
+            <div
+              key={group.jobId ?? `${group.viewUrl}-${idx}`}
+              className="inline-flex rounded-md border border-emerald-200 bg-white overflow-hidden"
+            >
+              <a
+                href={group.viewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-900 hover:bg-emerald-50 break-words"
+              >
+                <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                <span className="break-words">{truncateLabel(group.title)}</span>
+              </a>
+              <a
+                href={group.applyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium border-l border-emerald-200 bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Apply
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -74,20 +74,18 @@ export default function YourProgramsPanel({ profile, onProfileChange }: Props) {
   return (
     <Card>
       <CardContent className="p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="font-semibold">Your programs</h2>
-            <p className="text-sm text-muted-foreground">
-              Enable or disable programs independently. Each has its own terms.
-            </p>
-          </div>
-          <Button variant="outline" asChild size="sm">
-            <Link to={`/people/${profile.userId}`}>
-              View public profile <ExternalLink className="h-4 w-4 ml-1" />
-            </Link>
-          </Button>
+        <div>
+          <h2 className="font-semibold">Your programs</h2>
+          <p className="text-sm text-muted-foreground">
+            Enable or disable programs independently. Each has its own terms.
+          </p>
         </div>
-        <div className="grid sm:grid-cols-3 gap-3">
+        <Button variant="outline" asChild size="sm" className="w-full">
+          <Link to={`/people/${profile.userId}`}>
+            View public profile <ExternalLink className="h-4 w-4 ml-1" />
+          </Link>
+        </Button>
+        <div className="grid grid-cols-1 gap-3">
           {CREATOR_PROGRAMS.map((p) => {
             const Icon = CREATOR_PROGRAM_ICON[p];
             const isOn = programFlagOf(profile, p);
