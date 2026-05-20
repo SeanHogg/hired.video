@@ -58,10 +58,17 @@ export const RECORDING_MODES: ReadonlyArray<{
    *  Camera" vs "Share Screen"). Keeps every label-vs-mode coupling
    *  in this single table. */
   startVerb: string;
+  /** Noun used in error copy ("Camera access was cancelled" vs
+   *  "Screen share was cancelled"). The AbortError surface used to
+   *  hard-code "Screen share" regardless of mode, so dismissing the
+   *  camera permission prompt in webcam mode showed a misleading
+   *  screen-share error. Single source — every error message that
+   *  varies by mode pulls from here. */
+  accessNoun: string;
 }> = [
-  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone",            idleHint: "Click “Start Camera” to begin",                                  startVerb: "Start Camera" },
-  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio",               idleHint: "Click “Share Screen” to begin",                                   startVerb: "Share Screen" },
-  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture", idleHint: "Click “Share Screen” to choose a screen and start your webcam", startVerb: "Share Screen" },
+  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone",            idleHint: "Click “Start Camera” to begin",                                  startVerb: "Start Camera", accessNoun: "Camera access" },
+  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio",               idleHint: "Click “Share Screen” to begin",                                   startVerb: "Share Screen", accessNoun: "Screen share" },
+  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture", idleHint: "Click “Share Screen” to choose a screen and start your webcam", startVerb: "Share Screen", accessNoun: "Screen share" },
 ];
 
 interface WebcamRecorderProps {
@@ -98,6 +105,42 @@ function formatTime(totalSeconds: number): string {
   const mins = Math.floor(totalSeconds / 60);
   const secs = totalSeconds % 60;
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+/**
+ * Maps a media-acquisition exception to user-facing copy that matches
+ * the current recording mode. Pure / framework-free so the unit
+ * tests can pin every mode × DOMException combination without
+ * mounting the component. The mode-varying nouns ("Camera access" vs
+ * "Screen share") and verbs ("Start Camera" vs "Share Screen") come
+ * from RECORDING_MODES so adding a fourth mode is one record, not a
+ * hunt through string literals.
+ */
+export function mapMediaAcquisitionError(
+  err: unknown,
+  mode: RecordingMode,
+): string {
+  const meta =
+    RECORDING_MODES.find((m) => m.id === mode) ?? RECORDING_MODES[0];
+
+  if (err instanceof DOMException) {
+    switch (err.name) {
+      case "NotAllowedError":
+        return "Camera/microphone permission denied. Please allow access and try again.";
+      case "NotFoundError":
+        return "No camera or microphone found. Please connect a device and try again.";
+      case "NotReadableError":
+      case "TrackStartError":
+        return "Your camera is being used by another app or browser tab. Close other apps that use the camera (Zoom, Slack, OBS, other tabs) and try again.";
+      case "OverconstrainedError":
+        return "Your camera doesn't support the requested resolution. Lower the resolution in Settings and try again.";
+      case "AbortError":
+        return `${meta.accessNoun} was cancelled. Click "${meta.startVerb}" again to retry.`;
+      default:
+        return `Failed to access media devices: ${err.message || err.name}`;
+    }
+  }
+  return `Failed to access media devices: ${err instanceof Error ? err.message : String(err)}`;
 }
 
 // Preferred MIME types in priority order
@@ -439,43 +482,13 @@ export function WebcamRecorder({
       startAudioAnalysis(previewStream);
       setRecordingState("previewing");
     } catch (err) {
-      // Map browser DOMExceptions to actionable copy. NotReadableError
-      // is the Windows/Chrome "camera is busy" case — the device is
-      // held by another tab or process (Zoom/Slack/OBS) — and the
-      // user needs to be told *what to do*, not just shown the raw
-      // browser message. AbortError covers the user dismissing the
-      // screen-share picker.
-      let msg: string;
-      if (err instanceof DOMException) {
-        switch (err.name) {
-          case "NotAllowedError":
-            msg = "Camera/microphone permission denied. Please allow access and try again.";
-            break;
-          case "NotFoundError":
-            msg = "No camera or microphone found. Please connect a device and try again.";
-            break;
-          case "NotReadableError":
-          case "TrackStartError":
-            msg = "Your camera is being used by another app or browser tab. Close other apps that use the camera (Zoom, Slack, OBS, other tabs) and try again.";
-            break;
-          case "OverconstrainedError":
-            msg = "Your camera doesn't support the requested resolution. Lower the resolution in Settings and try again.";
-            break;
-          case "AbortError":
-            msg = "Screen share was cancelled. Click \"Share Screen\" again to retry.";
-            break;
-          default:
-            msg = `Failed to access media devices: ${err.message || err.name}`;
-        }
-      } else {
-        msg = `Failed to access media devices: ${err instanceof Error ? err.message : String(err)}`;
-      }
-      setError(msg);
+      setError(mapMediaAcquisitionError(err, mode));
       // Drop any half-acquired streams so a retry from idle starts
       // clean rather than sitting on a half-set composite ref.
       stopAllStreams();
     }
   }, [
+    mode,
     isScreenMode,
     isPipMode,
     resolution,

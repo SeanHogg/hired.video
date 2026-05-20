@@ -305,13 +305,15 @@ export function CustomBannerGenerator({
 
   const size = sizes.find((s) => s.value === sizeKey) ?? sizes[0];
   const theme = THEMES.find((th) => th.value === themeKey) ?? THEMES[0];
-  const pills = pillsRaw.split(",").map((p) => p.trim()).filter(Boolean);
 
+  // Derive pills inside the memo — a fresh array on every render would invalidate
+  // useMemo's shallow ref check and re-trigger the preview effect in a loop.
   const spec: BannerSpec = useMemo(() => ({
     w: size.w, h: size.h, theme,
     eyebrow, headline, subhead,
-    showPills, pills,
-  }), [size, theme, eyebrow, headline, subhead, showPills, pills]);
+    showPills,
+    pills: pillsRaw.split(",").map((p) => p.trim()).filter(Boolean),
+  }), [size, theme, eyebrow, headline, subhead, showPills, pillsRaw]);
 
   // Re-render preview on any input change (debounced via the seq counter).
   useEffect(() => {
