@@ -101,6 +101,7 @@ import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capt
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
+import LayersPanel from "@/components/studio/v2/LayersPanel";
 import BinPanel from "@/components/studio/nle/BinPanel";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
@@ -673,6 +674,37 @@ export default function StudioEditorV2() {
             w.id === widgetId ? { ...w, ...patch } : w,
           ),
         })),
+      }));
+    },
+    [],
+  );
+
+  // Renumber widget z-indices on a scene from a front-to-back id list.
+  // `widgetIdsFrontToBack[0]` ends up with the highest z (front-most);
+  // the last id with z 0. Single seam for every "reorder layers" surface
+  // (Layers panel today, future inspector "Bring forward"/"Send back"
+  // buttons, future keyboard shortcuts) so undo/redo + autosave wrap
+  // the change in one history step.
+  const reorderLayers = useCallback(
+    (sceneId: string, widgetIdsFrontToBack: string[]) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((scene) => {
+          if (scene.id !== sceneId) return scene;
+          const total = widgetIdsFrontToBack.length;
+          const zFor = (id: string) => {
+            const idx = widgetIdsFrontToBack.indexOf(id);
+            if (idx < 0) return 0;
+            return total - 1 - idx;
+          };
+          return {
+            ...scene,
+            widgets: scene.widgets.map((w) => ({
+              ...w,
+              position: { ...w.position, z: zFor(w.id) },
+            })),
+          };
+        }),
       }));
     },
     [],
@@ -1268,6 +1300,24 @@ export default function StudioEditorV2() {
                       onCaptureScreenshot={() => placeScreenshot()}
                     />
                   )}
+                  {leftTab === "layers" && (
+                    <LayersPanel
+                      scene={activeScene}
+                      selectedWidgetId={
+                        selection.kind === "widget" ? selection.widgetId : null
+                      }
+                      onSelectWidget={(widgetId) =>
+                        setSelection({
+                          kind: "widget",
+                          sceneId: activeScene.id,
+                          widgetId,
+                        })
+                      }
+                      onReorderLayers={(widgetIds) =>
+                        reorderLayers(activeScene.id, widgetIds)
+                      }
+                    />
+                  )}
                   {leftTab === "media" && (
                     <BinPanel
                       onPickSource={(src) => {
@@ -1842,6 +1892,7 @@ function EditorHeader({
 // section group — selecting nothing on the canvas surfaces it there.
 const LEFT_TABS = [
   { id: "widgets", label: "Widgets" },
+  { id: "layers", label: "Layers" },
   { id: "media", label: "Media" },
   { id: "actions", label: "Actions" },
 ] as const;

@@ -29,7 +29,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   WebcamRecorder,
@@ -139,6 +139,24 @@ beforeEach(() => {
   (
     HTMLMediaElement.prototype as unknown as { play: () => Promise<void> }
   ).play = () => Promise.resolve();
+
+  // jsdom doesn't ship `MediaStream`. Screen-only mode builds one
+  // from the screen video tracks + mic audio tracks; before this
+  // shim that constructor threw "MediaStream is not defined" which
+  // dropped the recorder back to error state and made every screen-
+  // mode preview-state assertion impossible to reach.
+  class FakeMediaStream {
+    private tracks: Array<ReturnType<typeof makeTrack>>;
+    constructor(tracks: Array<ReturnType<typeof makeTrack>> = []) {
+      this.tracks = [...tracks];
+    }
+    getTracks() { return this.tracks; }
+    getAudioTracks() { return this.tracks.filter((t) => t.kind === "audio"); }
+    getVideoTracks() { return this.tracks.filter((t) => t.kind === "video"); }
+    addTrack(t: ReturnType<typeof makeTrack>) { this.tracks.push(t); }
+  }
+  (globalThis as unknown as { MediaStream: typeof FakeMediaStream }).MediaStream =
+    FakeMediaStream;
 
   // 2D canvas context is referenced by the PiP composite path.
   if (!HTMLCanvasElement.prototype.getContext) {
@@ -411,4 +429,127 @@ describe("WebcamRecorder idle render labels", () => {
       ).toBeInTheDocument();
     },
   );
+
+  it("every mode has a non-empty cancelPreviewLabel (drift guard)", () => {
+    for (const m of RECORDING_MODES) {
+      expect(m.cancelPreviewLabel.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("screen modes label the cancel button as 'Stop sharing' (matches the browser tray copy)", () => {
+    expect(
+      RECORDING_MODES.find((m) => m.id === "screen")!.cancelPreviewLabel,
+    ).toBe("Stop sharing");
+    expect(
+      RECORDING_MODES.find((m) => m.id === "screen+webcam")!.cancelPreviewLabel,
+    ).toBe("Stop sharing");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preview-state UX — the user-reported "I can't tell how to back out of a
+// screen share, or when sharing has stopped" thread.
+// ---------------------------------------------------------------------------
+
+describe("WebcamRecorder preview-state UX", () => {
+  it("SCREEN mode shows a visible 'Sharing screen' badge while previewing — no more guessing whether the capture is live", async () => {
+    getDisplayMediaMock.mockResolvedValue(makeScreenStream());
+    getUserMediaMock.mockResolvedValue(makeMicStream());
+    const user = userEvent.setup();
+
+    render(<WebcamRecorder onRecordingComplete={vi.fn()} mode="screen" />);
+    await user.click(screen.getByRole("button", { name: /share screen/i }));
+
+    expect(await screen.findByText(/sharing screen/i)).toBeInTheDocument();
+  });
+
+  it("WEBCAM mode does NOT show the 'Sharing screen' badge (badge is screen-only — webcam users have the camera light)", async () => {
+    getUserMediaMock.mockResolvedValue(makeWebcamStream());
+    const user = userEvent.setup();
+
+    render(<WebcamRecorder onRecordingComplete={vi.fn()} mode="webcam" />);
+    await user.click(screen.getByRole("button", { name: /start camera/i }));
+
+    expect(screen.queryByText(/sharing screen/i)).not.toBeInTheDocument();
+  });
+
+  it("SCREEN mode preview renders a 'Stop sharing' button that releases every stream and returns to idle", async () => {
+    const screenStream = makeScreenStream();
+    const micStream = makeMicStream();
+    getDisplayMediaMock.mockResolvedValue(screenStream);
+    getUserMediaMock.mockResolvedValue(micStream);
+    const user = userEvent.setup();
+
+    render(<WebcamRecorder onRecordingComplete={vi.fn()} mode="screen" />);
+    await user.click(screen.getByRole("button", { name: /share screen/i }));
+
+    const stop = await screen.findByRole("button", { name: /stop sharing/i });
+    await user.click(stop);
+
+    // Every track from every stream we acquired must be stopped — no
+    // leaking the browser's "sharing" tray or holding the mic open.
+    for (const track of [
+      ...screenStream.getTracks(),
+      ...micStream.getTracks(),
+    ]) {
+      expect((track as unknown as { stop: ReturnType<typeof vi.fn> }).stop)
+        .toHaveBeenCalled();
+    }
+    // Back to idle — the "Share Screen" affordance is visible again.
+    expect(
+      screen.getByRole("button", { name: /share screen/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/sharing screen/i)).not.toBeInTheDocument();
+  });
+
+  it("WEBCAM mode preview renders a 'Cancel' button (not 'Stop sharing' — there's no screen capture to release)", async () => {
+    getUserMediaMock.mockResolvedValue(makeWebcamStream());
+    const user = userEvent.setup();
+
+    render(<WebcamRecorder onRecordingComplete={vi.fn()} mode="webcam" />);
+    await user.click(screen.getByRole("button", { name: /start camera/i }));
+
+    expect(
+      await screen.findByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /stop sharing/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("browser-native 'Stop sharing' (track 'ended') during PREVIEW returns to idle with a clear notice — no stale frame, no dead-end UI", async () => {
+    const screenStream = makeScreenStream();
+    getDisplayMediaMock.mockResolvedValue(screenStream);
+    getUserMediaMock.mockResolvedValue(makeMicStream());
+    const user = userEvent.setup();
+
+    render(<WebcamRecorder onRecordingComplete={vi.fn()} mode="screen" />);
+    await user.click(screen.getByRole("button", { name: /share screen/i }));
+    // Wait for preview to settle.
+    await screen.findByText(/sharing screen/i);
+
+    // Locate the 'ended' listener the component registered on the
+    // screen video track and fire it — that's what Chrome does when
+    // the user clicks "Stop sharing" in the native tray.
+    const videoTrack = screenStream.getVideoTracks()[0] as unknown as {
+      addEventListener: ReturnType<typeof vi.fn>;
+    };
+    const endedListener = videoTrack.addEventListener.mock.calls.find(
+      ([evt]) => evt === "ended",
+    )?.[1] as (() => void) | undefined;
+    expect(endedListener).toBeDefined();
+    // Wrap the manual dispatch in act() — the listener flips React
+    // state (setRecordingState/setError) and without act() React
+    // logs an "update outside act" warning that masks real failures.
+    act(() => { endedListener!(); });
+
+    expect(
+      await screen.findByText(/screen sharing ended/i),
+    ).toBeInTheDocument();
+    // Back to idle — Share Screen button is visible again.
+    expect(
+      screen.getByRole("button", { name: /share screen/i }),
+    ).toBeInTheDocument();
+  });
+
 });

@@ -19,6 +19,7 @@ import {
   Mic,
   MicOff,
   Settings,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -65,10 +66,18 @@ export const RECORDING_MODES: ReadonlyArray<{
    *  screen-share error. Single source — every error message that
    *  varies by mode pulls from here. */
   accessNoun: string;
+  /** Label on the preview-state cancel button — "Stop sharing" for
+   *  screen modes (mirrors the browser's own tray copy so users know
+   *  the screen-share is the thing they're releasing), "Cancel" for
+   *  webcam. Without this button the preview state was a dead end:
+   *  the only forward action was Record, and the only "back out"
+   *  gesture was the browser's native Stop-sharing tray which left
+   *  the panel showing a frozen preview frame. */
+  cancelPreviewLabel: string;
 }> = [
-  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone",            idleHint: "Click “Start Camera” to begin",                                  startVerb: "Start Camera", accessNoun: "Camera access" },
-  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio",               idleHint: "Click “Share Screen” to begin",                                   startVerb: "Share Screen", accessNoun: "Screen share" },
-  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture", idleHint: "Click “Share Screen” to choose a screen and start your webcam", startVerb: "Share Screen", accessNoun: "Screen share" },
+  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone",            idleHint: "Click “Start Camera” to begin",                                  startVerb: "Start Camera", accessNoun: "Camera access", cancelPreviewLabel: "Cancel" },
+  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio",               idleHint: "Click “Share Screen” to begin",                                   startVerb: "Share Screen", accessNoun: "Screen share", cancelPreviewLabel: "Stop sharing" },
+  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture", idleHint: "Click “Share Screen” to choose a screen and start your webcam", startVerb: "Share Screen", accessNoun: "Screen share", cancelPreviewLabel: "Stop sharing" },
 ];
 
 interface WebcamRecorderProps {
@@ -210,6 +219,18 @@ export function WebcamRecorder({
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
+
+  // Mirror of recordingState readable from the screen-track 'ended'
+  // listener, which is attached at acquire-time and outlives every
+  // state transition. Reading the React state directly captured the
+  // value at *attach* time (always "idle" since acquisition happens
+  // before the transition to "previewing") — so the recording
+  // auto-stop never fired, and we had no way to react when the user
+  // hit the browser's native "Stop sharing" tray during preview.
+  const recordingStateRef = useRef<RecordingState>("idle");
+  useEffect(() => {
+    recordingStateRef.current = recordingState;
+  }, [recordingState]);
 
   // ---- Derived ----
   const isScreenMode = mode === "screen" || mode === "screen+webcam";
@@ -368,18 +389,37 @@ export function WebcamRecorder({
     }
     screenStreamRef.current = stream;
 
-    // If user stops sharing via browser UI, handle gracefully
+    // User clicked the browser's native "Stop sharing" tray. We have
+    // to react in BOTH preview and recording states — read the live
+    // state from the ref, since closure-captured `recordingState` is
+    // always "idle" at attach time (acquisition runs before the
+    // setRecordingState("previewing") call in startPreview).
     stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      const live = recordingStateRef.current;
       if (
-        recordingState === "recording" &&
+        live === "recording" &&
         mediaRecorderRef.current?.state === "recording"
       ) {
         mediaRecorderRef.current.stop();
+        return;
+      }
+      if (live === "previewing") {
+        // Preview is now a dead frame — release everything (the
+        // mic / webcam streams paired with the screen capture are
+        // useless without it) and surface a notice so the user
+        // knows why they're back at idle and how to re-arm.
+        stopAudioAnalysis();
+        stopCanvasComposite();
+        stopAllStreams();
+        setRecordingState("idle");
+        setError(
+          'Screen sharing ended. Click "Share Screen" to start again.',
+        );
       }
     });
 
     return stream;
-  }, [recordingState]);
+  }, [stopAudioAnalysis, stopCanvasComposite, stopAllStreams]);
 
   // ---- Composite canvas for screen+webcam PiP ----
   const startCanvasComposite = useCallback(
@@ -608,6 +648,19 @@ export function WebcamRecorder({
     }
   }, []);
 
+  // Release the preview without recording — backs the explicit
+  // "Stop sharing" / "Cancel" button in preview state. Without it
+  // the only way to escape a screen-share preview was via the
+  // browser's native tray (which left a stale frame on-screen) or
+  // by unmounting the panel entirely.
+  const stopSharing = useCallback(() => {
+    stopAudioAnalysis();
+    stopCanvasComposite();
+    stopAllStreams();
+    setError(null);
+    setRecordingState("idle");
+  }, [stopAudioAnalysis, stopCanvasComposite, stopAllStreams]);
+
   const retake = useCallback(() => {
     stopTimer();
     stopAudioAnalysis();
@@ -726,6 +779,18 @@ export function WebcamRecorder({
           <ModeHeaderIcon className="h-5 w-5 text-muted-foreground" />
           <span className="text-sm font-medium">{modeMeta.panelTitle}</span>
           <Badge variant="secondary">{resolution}</Badge>
+          {/* Sharing-screen indicator — without this the only sign
+              that the screen capture was live was the browser's own
+              tray, which is easy to miss on a multi-monitor setup.
+              Visible in BOTH preview and recording so users see the
+              share is hot even before they hit Record. */}
+          {isScreenMode &&
+            (recordingState === "previewing" || recordingState === "recording") && (
+              <Badge className="gap-1.5 bg-red-500/90 text-white hover:bg-red-500/90">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                Sharing screen
+              </Badge>
+            )}
           {recordingState === "recording" && (
             <Badge variant="destructive" className="animate-pulse">
               REC {formatTime(elapsedSec)}
@@ -923,14 +988,33 @@ export function WebcamRecorder({
         )}
 
         {recordingState === "previewing" && (
-          <Button
-            onClick={startRecording}
-            variant="destructive"
-            className="gap-2"
-          >
-            <Video className="h-4 w-4" />
-            Record
-          </Button>
+          <>
+            {/* Cancel out of preview without recording. For screen
+                modes this label is "Stop sharing" — the same words
+                the browser tray uses, so users know exactly what
+                they're releasing. */}
+            <Button
+              onClick={stopSharing}
+              variant="outline"
+              className="gap-2"
+              aria-label={modeMeta.cancelPreviewLabel}
+            >
+              {isScreenMode ? (
+                <StopCircle className="h-4 w-4" />
+              ) : (
+                <X className="h-4 w-4" />
+              )}
+              {modeMeta.cancelPreviewLabel}
+            </Button>
+            <Button
+              onClick={startRecording}
+              variant="destructive"
+              className="gap-2"
+            >
+              <Video className="h-4 w-4" />
+              Record
+            </Button>
+          </>
         )}
 
         {recordingState === "recording" && (
