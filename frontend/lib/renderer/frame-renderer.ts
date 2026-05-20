@@ -9,6 +9,7 @@
 import type { CompiledVideo, CompiledScene, SceneNode, Transform2D } from "../compiler/types";
 import { drawNode, measureNodeHeight } from "./canvas-nodes";
 import { applyEffects } from "../timeline/effects";
+import { drawWatermark as drawSharedWatermark } from "../timeline/watermark";
 
 // ─── Node classification ───────────────────────────────────────────────────────
 
@@ -130,51 +131,14 @@ function renderScene(
 }
 
 // ─── Watermark ────────────────────────────────────────────────────────────────
+// Pill geometry lives in `lib/timeline/watermark.ts` so the V1 scene-graph
+// renderer + the V2 timeline renderer + the on-screen `<BrandWatermark/>`
+// component all stay in pixel lock-step. Per the DRY rule there is one
+// pill, not one-per-render-path. V1 keeps its own preview-vs-export gate
+// (`isInFirstScenePreview`) below; the shared helper only paints.
 
 function drawWatermark(ctx: CanvasRenderingContext2D): void {
-  const { width, height } = ctx.canvas;
-  const fontSize = Math.max(11, Math.round(width / 58)); // ~22px at 1280, ~12px at 720
-  const label = "hired.video";
-  const padX = Math.round(fontSize * 1.1);
-  const padY = Math.round(fontSize * 0.55);
-
-  ctx.save();
-  ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-
-  const textW = ctx.measureText(label).width;
-  const pillW = textW + padX * 2;
-  const pillH = fontSize + padY * 2;
-  const margin = Math.round(width / 60);
-  const x = width - pillW - margin;
-  const y = height - pillH - margin;
-
-  // Dark pill background
-  ctx.globalAlpha = 0.52;
-  ctx.fillStyle = "#000000";
-  ctx.beginPath();
-  ctx.roundRect(x, y, pillW, pillH, pillH / 2);
-  ctx.fill();
-
-  // "hired.video" label — dot in accent colour
-  ctx.globalAlpha = 0.88;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Draw "hired" in white, ".video" in brand purple
-  const cx = x + pillW / 2;
-  const cy = y + pillH / 2;
-  const hiredW = ctx.measureText("hired").width;
-  const dotVideoW = ctx.measureText(".video").width;
-  const totalW = hiredW + dotVideoW;
-  const startX = cx - totalW / 2;
-
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "left";
-  ctx.fillText("hired", startX, cy);
-  ctx.fillStyle = "#a78bfa"; // brand purple
-  ctx.fillText(".video", startX + hiredW, cy);
-
-  ctx.restore();
+  drawSharedWatermark(ctx, { width: ctx.canvas.width, height: ctx.canvas.height });
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

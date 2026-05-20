@@ -37,6 +37,9 @@ import {
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { preloadStudioFonts } from "@/lib/studio/font-catalog";
+import { shouldShowBranding } from "@/lib/studio/branding-policy";
+import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import {
   VISUAL_THEMES,
   BG_PRESETS,
@@ -127,6 +130,13 @@ export default function StudioEditorV2() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  // Branding-policy inputs — `shouldShowBranding()` is the single seam
+  // every surface reads (DOM `<BrandWatermark/>` on screen, the encoder
+  // pill on export). Mounting the hooks here lets `renderToBlob()` pass
+  // the resolved flag into `renderTimeline()` so the MP4 carries the
+  // SAME pill the editor + /v/<id> show.
+  const subscription = useSubscription();
+  const { removeBranding } = useRemoveBrandingFlag();
 
   // Preload Google Fonts referenced by FONT_PRESETS (#581) so text widgets
   // render with their preset typography from first paint instead of falling
@@ -865,7 +875,17 @@ export default function StudioEditorV2() {
     const timeline = canvasStateToTimeline(state);
     const sources = await resolveTimelineAudioSources(state);
     const { renderTimeline } = await import("@/lib/timeline/render");
-    const result = await renderTimeline(timeline, sources);
+    // Branding-policy gate — same source of truth `<BrandWatermark/>`
+    // reads on the DOM screen renderer (`shouldShowBranding({ isPro,
+    // removeBrandingFlag })`). Threading the resolved boolean through
+    // `renderTimeline` is what makes the encoded MP4 carry the SAME
+    // pill the user sees in /studio + /v/<id>.
+    const result = await renderTimeline(timeline, sources, {
+      includeBranding: shouldShowBranding({
+        isPro: subscription.isPro,
+        removeBrandingFlag: removeBranding,
+      }),
+    });
     renderedBlobRef.current = result.blob;
     return result.blob;
   }

@@ -44,6 +44,14 @@ export interface RenderOptions {
    *  another studio_projects row composes correctly. Caller-supplied
    *  because DB / API access lives outside the render module. */
   resolveNestedTimeline?: NestedTimelineResolver;
+  /** When true, the encoder paints the hired.video corner watermark on
+   *  every frame — the SAME pill the on-screen renderer mounts via
+   *  `<BrandWatermark/>`. Caller resolves the branding-policy decision
+   *  (free vs Pro-opted-out) via `shouldShowBranding({ isPro,
+   *  removeBrandingFlag })` and threads the answer through here.
+   *  Defaulting to false would mean a free-user export skips branding,
+   *  so callers MUST pass the resolved boolean explicitly. */
+  includeBranding?: boolean;
 }
 
 export interface RenderResult {

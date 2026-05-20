@@ -26,6 +26,7 @@
 
 import type { Clip, MediaSource, Timeline } from "@shared/timeline";
 import { applyEffects, preloadCanvasV2Media } from "./effects";
+import { drawWatermark } from "./watermark";
 
 /**
  * Resolves a nested-timeline reference to its Timeline + MediaSource
@@ -209,11 +210,21 @@ async function preloadNested(id: string, parent: RendererState): Promise<void> {
  * see the same behaviour as before; tracks carrying simultaneous clips
  * just stack.
  */
+export interface RenderFrameOptions {
+  /** When true, paint the "hired.video" pill at the bottom-right of
+   *  the composite as the final step. Caller is responsible for the
+   *  branding-policy decision (free vs Pro-opted-out) — this flag
+   *  carries the resolved answer. Defaults to false so unit tests +
+   *  intermediate render passes don't accidentally stamp branding. */
+  includeBranding?: boolean;
+}
+
 export async function renderTimelineFrame(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   timeline: Timeline,
   state: RendererState,
   frame: number,
+  options: RenderFrameOptions = {},
 ): Promise<void> {
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   if (!ctx) throw new Error("2D canvas context unavailable");
@@ -253,6 +264,17 @@ export async function renderTimelineFrame(
         }
       }
     }
+  }
+
+  // Brand watermark — painted LAST so it sits above every track's
+  // composite and any fade-to-black transition. Mirrors the
+  // `<BrandWatermark/>` DOM pill (the screen renderer paints it on
+  // top of `<CanvasStage>`) so what the user previews matches what
+  // the encoded MP4 carries. The branding-policy decision (free vs
+  // Pro-opted-out) is made one level up and passed in via
+  // `options.includeBranding`.
+  if (options.includeBranding) {
+    drawWatermark(ctx, { width: canvas.width, height: canvas.height });
   }
 }
 

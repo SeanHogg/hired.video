@@ -99,7 +99,9 @@ export const webcodecsStrategy: RenderStrategy = {
           if (opts.signal?.aborted) {
             throw new DOMException("Render aborted", "AbortError");
           }
-          await renderTimelineFrame(canvas, timeline, state, frame);
+          await renderTimelineFrame(canvas, timeline, state, frame, {
+            includeBranding: opts.includeBranding === true,
+          });
           return canvas.transferToImageBitmap();
         },
         onProgress: (v) => opts.onProgress?.(v),
