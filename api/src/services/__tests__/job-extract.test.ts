@@ -239,6 +239,26 @@ describe("parseJobFromPage", () => {
     assert.equal(parsed.title, "Job from linkedin.com");
   });
 
+  it("parses LinkedIn '{Company} hiring {Title} in {Location} | LinkedIn' docTitle", () => {
+    // Real shape of the direct /jobs/view/{id}/ page when JSON-LD is absent.
+    // Before this parser was wired in, the title was being stamped as
+    // "Job from linkedin.com" — fallbackTitle leaking through. Now we
+    // pull title + company + location from the document title alone.
+    const html = `
+      <html><head>
+        <title>Talently hiring Founding CTO in Hoboken, NJ | LinkedIn</title>
+      </head><body><div>About the job. ${"x ".repeat(200)}</div></body></html>
+    `;
+    const parsed = parseJobFromPage({
+      url: "https://www.linkedin.com/jobs/view/4412168984/",
+      html,
+    });
+    assert.equal(parsed.confidence, "low");
+    assert.equal(parsed.title, "Founding CTO");
+    assert.equal(parsed.company, "Talently");
+    assert.equal(parsed.location, "Hoboken, NJ");
+  });
+
   it("ignores malformed JSON-LD blocks and falls through", () => {
     const html = `
       <script type="application/ld+json">{ broken json </script>
