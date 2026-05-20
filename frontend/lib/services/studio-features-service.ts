@@ -223,6 +223,10 @@ export interface VideoAnalytics {
    *  at view time. Bare hostnames; direct/in-app visits land under
    *  "Direct". Sum equals totalViews. */
   referrers: Array<{ source: string; views: number }>;
+  /** Country breakdown from Cloudflare's `cf-ipcountry` header captured
+   *  at view time. ISO-3166 alpha-2 codes; rows without a country land
+   *  under the "ZZ" sentinel ("Unknown"). Sum equals totalViews. */
+  countries: Array<{ country: string; views: number }>;
 }
 
 // ─── TTS ────────────────────────────────────────────────────────────────────

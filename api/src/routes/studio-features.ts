@@ -1886,6 +1886,17 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
     }
   }
 
+  // Cloudflare's edge resolves the viewer's country from the request IP
+  // and lands it in `cf-ipcountry`. Same pattern as the form-submission
+  // handler (line 2807) — see also services/auth/geo.ts for the wider
+  // detectCountry() helper used by signup gating. "XX" / "T1" are
+  // Cloudflare sentinels meaning "unknown" (Tor exit etc.) and should
+  // not be stored as if they were a real country.
+  const ipCountryRaw = c.req.header("cf-ipcountry") ?? null;
+  const ipCountry = ipCountryRaw && ipCountryRaw !== "XX" && ipCountryRaw !== "T1"
+    ? ipCountryRaw.toUpperCase()
+    : null;
+
   const db = getDb();
   const [heatmap] = await db.insert(studioVideoHeatmap).values({
     studioProjectId: parsed.data.projectId,
@@ -1898,6 +1909,7 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
     dropOffSecond: parsed.data.dropOffSecond ?? null,
     referrer: parsed.data.referrer ?? null,
     userAgent: parsed.data.userAgent ?? null,
+    ipCountry,
   } as any).returning();
 
   return c.json(ok({ id: heatmap.id }), 201);
@@ -1926,6 +1938,7 @@ studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics
       viewers: [],
       topDropOffSecond: null,
       referrers: [],
+      countries: [],
     }));
   }
 
@@ -2005,6 +2018,20 @@ studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics
     .map(([source, count]) => ({ source, views: count }))
     .sort((a, b) => b.views - a.views);
 
+  // Country rollup from the `cf-ipcountry` header captured at view time.
+  // Rows pre-deploy (or with header stripped by an intermediate proxy)
+  // have a null `ipCountry` and land in the "Unknown" bucket so the chart
+  // continues to sum to totalViews. ISO-3166 alpha-2 codes are uppercased
+  // at insert time, so we can safely group on the raw column value here.
+  const countryCounts = new Map<string, number>();
+  for (const view of views) {
+    const code = view.ipCountry ?? "ZZ"; // ZZ = "Unknown" sentinel (not a real ISO-3166 code)
+    countryCounts.set(code, (countryCounts.get(code) ?? 0) + 1);
+  }
+  const countries = Array.from(countryCounts.entries())
+    .map(([country, count]) => ({ country, views: count }))
+    .sort((a, b) => b.views - a.views);
+
   return c.json(ok({
     totalViews,
     avgWatchTimeSec,
@@ -2016,6 +2043,7 @@ studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics
       .sort((a, b) => b.views - a.views)
       .slice(0, 50),
     referrers,
+    countries,
   }));
 });
 
