@@ -40,6 +40,8 @@ import {
   findApplyLinkInHtml as findApplyLinkInHtmlShared,
   // URL canonicalization.
   normalizeJobUrl as normalizeJobUrlShared,
+  // LinkedIn-specific docTitle parser: "{Company} hiring {Title} in {Location} | LinkedIn".
+  parseLinkedInTitleString,
 } from "../../../../shared/scraping/index.js";
 
 // Re-export the shared primitives under their historical names so every
@@ -575,15 +577,22 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
   const ogSite = matchMeta(html, /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i);
   const docTitle = matchMeta(html, /<title[^>]*>([^<]+)<\/title>/i);
 
-  const title = ogTitle || docTitle || fallbackTitle(url);
+  // LinkedIn doesn't emit JSON-LD on /jobs/view/{id}/ but its <title>
+  // tag carries everything we need: "{Company} hiring {Title} in {Location} | LinkedIn".
+  // Parse it before falling back to og:title/docTitle so we land on the
+  // actual job title (and pick up company + location for free) instead of
+  // "Job from linkedin.com".
+  const liDocParse = parseLinkedInTitleString(docTitle);
+
+  const title = liDocParse?.title || ogTitle || docTitle || fallbackTitle(url);
   const markdown = htmlToMarkdownShared(html);
   const description = markdown || ogDesc || metaDesc || url;
 
   return {
     title: title.slice(0, 250),
     description: description.slice(0, 8000),
-    company: ogSite || undefined,
-    location: undefined,
+    company: liDocParse?.company || ogSite || undefined,
+    location: liDocParse?.location || undefined,
     isRemote: undefined,
     applyUrl: findApplyLinkInHtmlShared(html, url) || url || undefined,
     confidence: "low",

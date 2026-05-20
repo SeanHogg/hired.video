@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { detectJobInPage } from "@shared/scraping/jobExtract.ts";
+import { detectJobInPage, parseLinkedInTitleString } from "@shared/scraping/jobExtract.ts";
 
 function docFromHtml(html: string): Document {
   return new DOMParser().parseFromString(html, "text/html");
@@ -154,6 +154,75 @@ describe("detectJobInPage — focused pane (LinkedIn)", () => {
     `;
     const got = detectJobInPage(docFromHtml(html) as any, "https://www.linkedin.com/jobs/view/1/");
     expect(got!.title).toBe("Real Job Title");
+  });
+
+  // The direct `/jobs/view/{id}/` page (the one served when you click a
+  // LinkedIn email link) doesn't always include the search-results SPA
+  // chrome, doesn't ship JSON-LD, and may not have the
+  // `.job-details-jobs-unified-top-card__job-title` class wrapper. The
+  // document title — "{Company} hiring {Title} in {Location} | LinkedIn"
+  // — is the most reliable signal in that case.
+  it("falls back to docTitle parse on the direct /jobs/view/{id}/ layout", () => {
+    const html = `
+      <html><head>
+        <title>Talently hiring Founding CTO in Hoboken, NJ | LinkedIn</title>
+      </head><body>
+        <h1>LinkedIn</h1>
+        <div id="job-details">${"About the job. ".repeat(400)}</div>
+      </body></html>
+    `;
+    const got = detectJobInPage(
+      docFromHtml(html) as any,
+      "https://www.linkedin.com/jobs/view/4412168984/",
+    );
+    expect(got).toBeTruthy();
+    expect(got!.title).toBe("Founding CTO");
+    expect(got!.company).toBe("Talently");
+    expect(got!.location).toBe("Hoboken, NJ");
+    expect(got!.strategy).toBe("linkedInFallback");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseLinkedInTitleString — the docTitle parser used by detection + API
+// ---------------------------------------------------------------------------
+
+describe("parseLinkedInTitleString", () => {
+  it("parses '{Company} hiring {Title} in {Location} | LinkedIn'", () => {
+    expect(parseLinkedInTitleString("Talently hiring Founding CTO in Hoboken, NJ | LinkedIn")).toEqual({
+      title: "Founding CTO",
+      company: "Talently",
+      location: "Hoboken, NJ",
+    });
+  });
+
+  it("parses '{Company} hiring {Title} | LinkedIn' when no location is present", () => {
+    expect(parseLinkedInTitleString("Stripe hiring Senior Engineer | LinkedIn")).toEqual({
+      title: "Senior Engineer",
+      company: "Stripe",
+      location: undefined,
+    });
+  });
+
+  it("uses the LAST ' in ' as the location split — titles can contain ' in '", () => {
+    expect(parseLinkedInTitleString("Acme hiring Engineer in Test in San Francisco | LinkedIn")).toEqual({
+      title: "Engineer in Test",
+      company: "Acme",
+      location: "San Francisco",
+    });
+  });
+
+  it("returns null for non-LinkedIn titles", () => {
+    expect(parseLinkedInTitleString("Some Page | Indeed")).toBeNull();
+    expect(parseLinkedInTitleString("LinkedIn")).toBeNull();
+    expect(parseLinkedInTitleString("")).toBeNull();
+    expect(parseLinkedInTitleString(null)).toBeNull();
+    expect(parseLinkedInTitleString(undefined)).toBeNull();
+  });
+
+  it("requires the ' hiring ' anchor — feed/profile titles don't match", () => {
+    expect(parseLinkedInTitleString("Feed | LinkedIn")).toBeNull();
+    expect(parseLinkedInTitleString("(2) Sean Hogg | LinkedIn")).toBeNull();
   });
 });
 

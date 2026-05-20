@@ -72,6 +72,44 @@ describe("CreateJobSchema", () => {
       assert.deepEqual(r.data.skills, ["AWS", "Kubernetes", "TypeScript"]);
     }
   });
+
+  it("accepts heroImageUrl='' and normalises to undefined", () => {
+    // 2026-05-20 regression guard for gap #876. Every React form sends
+    // "" for an unset URL field — `z.string().url().optional()` rejects
+    // that, which is what made the JobEditForm save 400 with
+    // `heroImageUrl: ["Invalid URL"]`. The new optionalUrl schema must
+    // accept "" and downstream code must see `undefined`.
+    const r = CreateJobSchema.safeParse({
+      title: "x",
+      description: "x",
+      heroImageUrl: "",
+    });
+    assert.equal(r.success, true);
+    if (r.success) {
+      assert.equal(r.data.heroImageUrl, undefined);
+    }
+  });
+
+  it("accepts a valid heroImageUrl", () => {
+    const r = CreateJobSchema.safeParse({
+      title: "x",
+      description: "x",
+      heroImageUrl: "https://cdn.hired.video/hero.png",
+    });
+    assert.equal(r.success, true);
+    if (r.success) {
+      assert.equal(r.data.heroImageUrl, "https://cdn.hired.video/hero.png");
+    }
+  });
+
+  it("rejects a malformed heroImageUrl (still validated when non-empty)", () => {
+    const r = CreateJobSchema.safeParse({
+      title: "x",
+      description: "x",
+      heroImageUrl: "not-a-url",
+    });
+    assert.equal(r.success, false);
+  });
 });
 
 describe("UpdateJobSchema", () => {

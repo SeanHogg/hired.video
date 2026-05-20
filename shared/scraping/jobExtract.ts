@@ -209,6 +209,52 @@ function findFocusedPane(doc: DomDocument, host: string): { el: DomElement; host
 
 // ---- Title pickers --------------------------------------------------------
 
+/**
+ * Parse LinkedIn's canonical `<title>` string into {company, title, location}.
+ *
+ * LinkedIn job pages — both the SPA `/jobs/collections/?currentJobId=X` and
+ * direct `/jobs/view/{id}/` — set `document.title` to the format:
+ *
+ *   "{Company} hiring {Title} in {Location} | LinkedIn"
+ *   "{Company} hiring {Title} | LinkedIn"          (no location)
+ *
+ * This is the most reliable signal on LinkedIn: it survives DOM class
+ * renames, doesn't depend on the React tree being fully rendered, and is
+ * the same string the user sees in their browser tab. We use it as a
+ * tier-2 fallback after CSS selectors and a tier-3 input for the API's
+ * heuristic parser when no JSON-LD JobPosting exists.
+ */
+export function parseLinkedInTitleString(
+  raw: string | null | undefined,
+): { title: string; company?: string; location?: string } | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/\s+/g, " ").trim();
+  const stripSuffix = cleaned.match(/^(.+?)\s*\|\s*LinkedIn\s*$/i);
+  if (!stripSuffix) return null;
+  const stripped = stripSuffix[1].trim();
+  // Anchor on the FIRST " hiring " — companies don't typically contain
+  // the word "hiring" but job titles might ("Hiring Manager").
+  const hire = stripped.match(/^(.+?)\s+hiring\s+(.+)$/i);
+  if (!hire) return null;
+  const company = hire[1].trim();
+  const rest = hire[2].trim();
+  // The title can contain " in " (e.g. "Engineer in Test"), so anchor
+  // location to the LAST " in " before the LinkedIn suffix.
+  const inIdx = rest.lastIndexOf(" in ");
+  let title = rest;
+  let location: string | undefined;
+  if (inIdx > 0 && inIdx < rest.length - 4) {
+    title = rest.slice(0, inIdx).trim();
+    location = rest.slice(inIdx + 4).trim();
+  }
+  if (!title || title.length < 2) return null;
+  return {
+    title,
+    company: company || undefined,
+    location: location || undefined,
+  };
+}
+
 function linkedInPickTitle(doc: DomDocument, paneEl: DomElement): string {
   if (!paneEl) return "";
   for (const sel of FOCUSED_TITLE_SELECTORS["linkedin.com"] ?? []) {
@@ -243,6 +289,14 @@ function linkedInPickTitle(doc: DomDocument, paneEl: DomElement): string {
     const m = label.match(/^Dismiss\s+(.+?)\s+job$/i);
     if (m && m[1] && m[1].length > 3) return m[1];
   }
+
+  // `document.title` is the highest-precision fallback available when CSS
+  // selectors haven't matched (LinkedIn renamed classes, SPA still hydrating,
+  // direct /jobs/view/{id}/ layout differs from the search-pane layout).
+  // Sits BEFORE the heading walk because the heading walk can pick up
+  // unrelated h1s like "LinkedIn" or company-logo banners.
+  const fromDocTitle = parseLinkedInTitleString(doc.title);
+  if (fromDocTitle?.title) return fromDocTitle.title;
 
   const headings = Array.from(paneEl.querySelectorAll("h1, h2"));
   for (const h of headings) {
@@ -520,11 +574,25 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
     }
   }
 
-  // 3. LinkedIn-specific fallback — find the "About the job" anchor even
-  //    when the focused-pane heuristics failed.
+  // 3. LinkedIn-specific fallback — covers the direct /jobs/view/{id}/
+  //    layout (no `.scaffold-layout__detail` pane, no JSON-LD JobPosting)
+  //    and any SPA state where the focused-pane heuristic returned nothing.
   if (inclHost(host, "linkedin.com")) {
     const title = linkedInPickTitle(doc, doc.body);
     if (title) {
+      // Always run the docTitle parser too — it's the authoritative source
+      // for company + location on LinkedIn ("{Company} hiring {Title} in
+      // {Location} | LinkedIn"). Fills the gap left by the historical
+      // linkedInFallback path which only returned a title.
+      const docTitle = parseLinkedInTitleString(doc.title);
+      const company =
+        pickText(doc.body, FOCUSED_COMPANY_SELECTORS["linkedin.com"]) ||
+        docTitle?.company ||
+        undefined;
+      const location =
+        pickText(doc.body, FOCUSED_LOCATION_SELECTORS["linkedin.com"]) ||
+        docTitle?.location ||
+        undefined;
       let paneEl: DomElement = doc.getElementById("job-details") ?? doc.body;
       let walkUp: DomElement | null = paneEl;
       for (let i = 0; i < 6 && walkUp; i++) {
@@ -538,6 +606,8 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
       const sourceUrl = canonicalizeJobUrl(currentUrl);
       return {
         title: title.slice(0, 250),
+        company,
+        location,
         sourceUrl,
         applyUrl: domExtractApplyUrl(doc, currentUrl) || sourceUrl,
         strategy: "linkedInFallback",
