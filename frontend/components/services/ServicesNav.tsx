@@ -1,25 +1,18 @@
 // ServicesNav — top tab strip for the My Services hub.
 //
-// All sections share this nav. Pitch Decks / Team / Scorecards are agency
-// surfaces — gated behind `hasCompanyAccess` so a plain Job Seeker doesn't
-// see empty tabs they can't act on. (The Candidates entry moved out of My
-// Services and now lives at /resumes?tab=sourced — see gap #400 +
-// EntityHubShell.) The Offerings tab was folded into Content Creator as a
-// sub-tab — `/services/offerings` is still routable for legacy deep-links
-// but the top-level entry was removed. The Settings tab was folded into
-// /settings as the "Recruiter → Sharing & Branding" tab; the old
-// `/services/settings` URL now redirects there.
+// All sections share this nav. Team is an agency surface — gated behind
+// `hasCompanyAccess` so a plain Job Seeker doesn't see an empty tab.
+// (The Candidates entry moved out of My Services and now lives at
+// /resumes?tab=sourced — see gap #400 + EntityHubShell.) Pitch Decks /
+// Hiring & Onboarding / Scorecards moved out to /people/* — their nav
+// lives in `usePeopleTabs` now. The Offerings tab was folded into Content
+// Creator as a sub-tab — `/services/offerings` is still routable for
+// legacy deep-links but the top-level entry was removed. The Settings
+// tab was folded into /settings as the "Recruiter → Sharing & Branding"
+// tab; the old `/services/settings` URL now redirects there.
 
 import { Link, useLocation } from "react-router-dom";
-import {
-  ClipboardCheck,
-  ClipboardList,
-  Inbox,
-  LayoutPanelLeft,
-  Trophy,
-  TrendingUp,
-  Video,
-} from "lucide-react";
+import { Inbox, Trophy, TrendingUp, Video } from "lucide-react";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
 
 interface ServicesNavProps {
@@ -48,9 +41,6 @@ const TABS: readonly Tab[] = [
   },
   { to: "/services/inquiries", label: "Inquiries", icon: Inbox },
   { to: "/services/team", label: "Team", icon: Trophy, agencyOnly: true },
-  { to: "/services/pitch-decks", label: "Pitch Decks", icon: LayoutPanelLeft, agencyOnly: true },
-  { to: "/services/hiring", label: "Hiring & Onboarding", icon: ClipboardList },
-  { to: "/services/scorecards", label: "Scorecards", icon: ClipboardCheck, agencyOnly: true },
 ] as const;
 
 export default function ServicesNav({ hasCompanyAccess = false }: ServicesNavProps) {
@@ -58,9 +48,9 @@ export default function ServicesNav({ hasCompanyAccess = false }: ServicesNavPro
 
   // Dashboard is the index — only active when path is exactly /services or
   // /services/. Every other tab uses prefix-matching so detail pages
-  // (/services/candidates/:id, /services/pitch-decks/:id) keep their tab lit.
-  // `matchPrefixes` lets a tab claim additional paths (e.g. Content Creator
-  // owns both /services/creator and the legacy /services/offerings URL).
+  // (/services/candidates/:id) keep their tab lit. `matchPrefixes` lets a
+  // tab claim additional paths (e.g. Content Creator owns both
+  // /services/creator and the legacy /services/offerings URL).
   const isActive = (tab: Tab) => {
     if (tab.to === "/services") {
       return location.pathname === "/services" || location.pathname === "/services/";

@@ -156,8 +156,9 @@ export default function ServicesManagement() {
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
   const [wizardOpen, setWizardOpen] = useState(searchParams.get("wizard") === "open");
 
-  // Agency-only tabs (Candidates / Pitch Decks / Settings) appear in the nav
-  // when the caller belongs to at least one company.
+  // Agency-only tab (Team) appears in the nav when the caller belongs to
+  // at least one company. Pitch Decks / Hiring & Onboarding / Scorecards
+  // moved out to /people/* — see usePeopleTabs.
   const [hasCompanyAccess, setHasCompanyAccess] = useState(false);
 
   // Check standard service enrollment — re-runs when effective role changes

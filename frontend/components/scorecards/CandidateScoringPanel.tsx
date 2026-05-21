@@ -131,7 +131,7 @@ export function CandidateScoringPanel({
             </>
           ) : (
             <Button size="sm" variant="outline" asChild>
-              <a href="/services/scorecards">Create a template first</a>
+              <a href="/people/scorecards">Create a template first</a>
             </Button>
           )}
         </div>

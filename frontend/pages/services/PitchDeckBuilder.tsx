@@ -31,7 +31,8 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import ServicesNav from "@/components/services/ServicesNav";
+import PageHeader from "@/components/PageHeader";
+import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,7 @@ export default function PitchDeckBuilder() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+  const peopleTabs = usePeopleTabs();
 
   const [deck, setDeck] = useState<PitchDeckRow | null>(null);
   const [slides, setSlides] = useState<PitchDeckSlideRow[]>([]);
@@ -367,7 +369,7 @@ export default function PitchDeckBuilder() {
     try {
       await recruitService.deletePitchDeck(deck.id);
       toast({ title: "Deck deleted" });
-      navigate("/services/pitch-decks");
+      navigate("/people/pitch-decks");
     } catch (e) {
       toast({
         title: "Delete failed",
@@ -393,11 +395,11 @@ export default function PitchDeckBuilder() {
 
         <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
-            <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
+            <PageHeader tabs={peopleTabs} activeTabKey="pitch-decks" />
 
             <div className="mb-4">
               <Button variant="outline" size="sm" asChild>
-                <Link to="/services/pitch-decks">
+                <Link to="/people/pitch-decks">
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   All decks
                 </Link>

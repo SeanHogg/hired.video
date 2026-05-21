@@ -185,7 +185,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[800px] sm:max-w-[800px]">
+      <SheetContent className="w-[90%] sm:w-[800px] sm:max-w-[800px]">
         <SheetHeader>
           <SheetTitle>Payout Processing</SheetTitle>
           <SheetDescription>

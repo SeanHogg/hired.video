@@ -103,7 +103,8 @@ import { listsService } from "@/lib/services/lists-service";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { AppShell } from "@/components/AppShell";
-import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import PageHeader from "@/components/PageHeader";
+import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { UserRole } from "@shared/user-roles";
@@ -137,6 +138,9 @@ export default function People() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("labels.people"), url: "/people" }]);
   const { isAuthenticated, user } = useAuth();
+  // Shared tab strip — also rendered by /people/pitch-decks, /people/hiring,
+  // /people/scorecards so one nav definition drives every People surface.
+  const peopleTabs = usePeopleTabs();
   const urlQuery = searchParams.get("q") ?? "";
   const urlRole = searchParams.get("role") ?? "";
   const urlSkills = searchParams.get("skills") ?? "";
@@ -799,45 +803,6 @@ export default function People() {
         handleAddToTalentPool(personId);
       }
     };
-
-    // Top-level tabs follow the /services breadcrumb pattern. "browse"
-    // remains the canonical key for the People tab so existing
-    // ?tab=talent-pool / ?tab=submissions deep-links still work.
-    // Talent Pool + Submissions are visible to every hiring-side role
-    // (recruiter / employer / admin) — `talent_pool_candidates` is
-    // company-scoped, not recruiter-only, so widening matches the
-    // underlying data model. SA passes via `visibleTo` (#400 + #404).
-    const trackedCount = "tracked" in peopleData ? peopleData.tracked.length : 0;
-    const showHiringTabs = visibleTo(
-      [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
-      (user.role as UserRole),
-    );
-    const peopleTabs: PageHeaderTab[] = [
-      { key: "browse", label: "People", icon: Users, to: "/people" },
-      {
-        key: "connections",
-        label: "Connections",
-        icon: Eye,
-        to: "/people?tab=connections",
-        badge: trackedCount > 0 ? trackedCount : undefined,
-      },
-      ...(showHiringTabs
-        ? [
-            {
-              key: "talent-pool",
-              label: "Talent Pool",
-              icon: Briefcase,
-              to: "/people?tab=talent-pool",
-            } satisfies PageHeaderTab,
-            {
-              key: "submissions",
-              label: "Submissions",
-              icon: FileText,
-              to: "/people?tab=submissions",
-            } satisfies PageHeaderTab,
-          ]
-        : []),
-    ];
 
     return (
       <AppShell bgClassName="bg-background">

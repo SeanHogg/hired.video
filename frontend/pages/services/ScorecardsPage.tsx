@@ -1,12 +1,14 @@
 // ScorecardsPage — recruiter hub for managing scorecard templates and
-// interview kits. Slots into My Services as `/services/scorecards`.
+// interview kits. Lives at /people/scorecards alongside the rest of the
+// People surfaces.
 
 import { useLocation } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSEO } from "@/lib/seo";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { AppShell } from "@/components/AppShell";
-import ServicesNav from "@/components/services/ServicesNav";
+import PageHeader from "@/components/PageHeader";
+import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScorecardTemplateEditor } from "@/components/scorecards/ScorecardTemplateEditor";
 import { InterviewKitEditor } from "@/components/scorecards/InterviewKitEditor";
@@ -14,6 +16,7 @@ import { InterviewKitEditor } from "@/components/scorecards/InterviewKitEditor";
 export default function ScorecardsPage() {
   const location = useLocation();
   const { companyId, loading, hasNoCompany } = useCurrentCompanyScope();
+  const peopleTabs = usePeopleTabs();
 
   useSEO(location.pathname, {
     title: "Scorecards & Interview Kits — Hired.Video",
@@ -25,7 +28,7 @@ export default function ScorecardsPage() {
     <AppShell bgClassName="bg-background">
       <main className="px-4 sm:px-6 lg:px-8 pb-12">
         <div className="max-w-4xl mx-auto pt-6 space-y-6">
-          <ServicesNav hasCompanyAccess={!hasNoCompany} />
+          <PageHeader tabs={peopleTabs} activeTabKey="scorecards" />
 
           <div>
             <h1 className="text-2xl font-bold">Scorecards & Interview Kits</h1>

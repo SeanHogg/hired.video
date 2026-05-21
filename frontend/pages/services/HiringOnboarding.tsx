@@ -1,6 +1,6 @@
 // HiringOnboarding — Pro employer/recruiter surface for offer letters
-// and onboarding checklists. Lives at /services/hiring inside the My Services
-// hub.
+// and onboarding checklists. Lives at /people/hiring alongside the rest
+// of the People surfaces.
 //
 // Backed by /api/hiring (offers + checklists). Pro-gated server-side via
 // `requirePro("Hiring & Onboarding")` so a 402 on load means the user
@@ -22,7 +22,8 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import ServicesNav from "@/components/services/ServicesNav";
+import PageHeader from "@/components/PageHeader";
+import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,7 +51,6 @@ import {
   type OfferStatus,
   type OnboardingChecklist,
 } from "@/lib/services/hiring-service";
-import { recruitService } from "@/lib/services/recruit-service";
 
 const OFFER_STATUS_VARIANT: Record<
   OfferStatus,
@@ -122,7 +122,7 @@ export default function HiringOnboarding() {
     toggleSidebar,
   } = useSidebar();
 
-  const [hasCompanyAccess, setHasCompanyAccess] = useState(false);
+  const peopleTabs = usePeopleTabs();
 
   // Data
   const [offers, setOffers] = useState<OfferLetter[]>([]);
@@ -146,11 +146,6 @@ export default function HiringOnboarding() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
-    recruitService
-      .getMyScope()
-      .then((scope) => setHasCompanyAccess(scope.companies.length > 0))
-      .catch(() => setHasCompanyAccess(false));
 
     loadOffers();
     loadChecklists();
@@ -378,7 +373,7 @@ export default function HiringOnboarding() {
 
         <div className="pt-16">
           <div className="max-w-5xl mx-auto p-6">
-            <ServicesNav hasCompanyAccess={hasCompanyAccess} />
+            <PageHeader tabs={peopleTabs} activeTabKey="hiring" />
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>

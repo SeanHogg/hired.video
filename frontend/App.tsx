@@ -163,7 +163,11 @@ function RecruitCandidateRedirect() {
 }
 function RecruitPitchDeckRedirect() {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={`/services/pitch-decks/${id}`} replace />;
+  return <Navigate to={`/people/pitch-decks/${id}`} replace />;
+}
+function ServicesPitchDeckRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/people/pitch-decks/${id}`} replace />;
 }
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
@@ -664,13 +668,33 @@ const App = () => (
                       />
                       <Route path="/search" element={<SearchPage />} />
                       <Route path="/people" element={<People />} />
+                      {/* Hiring-side surfaces moved out of /services and now live
+                          under /people alongside Browse / Connections / Talent
+                          Pool / Submissions — one nav for everything
+                          people-related. Old /services/* URLs redirect below. */}
+                      <Route
+                        path="/people/pitch-decks"
+                        element={<RequireVerified><PitchDecksList /></RequireVerified>}
+                      />
+                      <Route
+                        path="/people/pitch-decks/:id"
+                        element={<RequireVerified><PitchDeckBuilder /></RequireVerified>}
+                      />
+                      <Route
+                        path="/people/hiring"
+                        element={<RequireVerified><HiringOnboarding /></RequireVerified>}
+                      />
+                      <Route
+                        path="/people/scorecards"
+                        element={<RequireVerified><ScorecardsPage /></RequireVerified>}
+                      />
                       <Route path="/people/:id" element={<PeopleDetail />} />
                       {/* Legacy /recruit/* paths — pool list moved to /resumes?tab=sourced;
                           per-candidate detail still lives at /services/candidates/:id. */}
                       <Route path="/recruit" element={<Navigate to="/resumes?tab=sourced" replace />} />
                       <Route path="/recruit/candidates" element={<Navigate to="/resumes?tab=sourced" replace />} />
                       <Route path="/recruit/candidates/:id" element={<RecruitCandidateRedirect />} />
-                      <Route path="/recruit/pitch-decks" element={<Navigate to="/services/pitch-decks" replace />} />
+                      <Route path="/recruit/pitch-decks" element={<Navigate to="/people/pitch-decks" replace />} />
                       <Route path="/recruit/pitch-decks/:id" element={<RecruitPitchDeckRedirect />} />
                       <Route path="/recruit/settings" element={<Navigate to="/services/settings" replace />} />
                       <Route path="/checkout" element={<Checkout />} />
@@ -747,17 +771,20 @@ const App = () => (
                         path="/services/candidates/:id"
                         element={<RequireVerified><CandidateDetail /></RequireVerified>}
                       />
+                      {/* Pitch Decks / Hiring & Onboarding / Scorecards moved
+                          to /people/*. Keep redirects alive so deep links from
+                          old emails + bookmarks still land. */}
                       <Route
                         path="/services/pitch-decks"
-                        element={<RequireVerified><PitchDecksList /></RequireVerified>}
+                        element={<Navigate to="/people/pitch-decks" replace />}
                       />
                       <Route
                         path="/services/pitch-decks/:id"
-                        element={<RequireVerified><PitchDeckBuilder /></RequireVerified>}
+                        element={<ServicesPitchDeckRedirect />}
                       />
                       <Route
                         path="/services/hiring"
-                        element={<RequireVerified><HiringOnboarding /></RequireVerified>}
+                        element={<Navigate to="/people/hiring" replace />}
                       />
                       <Route
                         path="/services/team"
@@ -765,7 +792,7 @@ const App = () => (
                       />
                       <Route
                         path="/services/scorecards"
-                        element={<RequireVerified><ScorecardsPage /></RequireVerified>}
+                        element={<Navigate to="/people/scorecards" replace />}
                       />
                       {/* Folded into /settings as the Recruiter > Sharing & Branding tab.
                           Keep this redirect alive so deep links from old emails / bookmarks
