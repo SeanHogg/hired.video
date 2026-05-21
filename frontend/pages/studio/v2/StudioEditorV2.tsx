@@ -1862,15 +1862,18 @@ function EditorHeader({
           saving={saving}
           onSave={onSave}
           hasContent={hasContent}
+          mediaKind={persistedProject?.mediaKind ?? "video"}
           projectId={persistedProjectId}
           slug={persistedProject?.slug ?? null}
           hasVideo={!!persistedProject?.videoUrl}
           isPublishedToProfile={persistedProject?.status === "Published"}
           onExport={onExport}
           exporting={exporting}
-          onPublishToYouTube={onPublishToYouTube}
-          onPublishToLinkedIn={onPublishToLinkedIn}
-          onPublishToProfile={onPublishToProfile}
+          publishHandlers={{
+            youtube: onPublishToYouTube,
+            linkedin: onPublishToLinkedIn,
+            profile: onPublishToProfile,
+          }}
         />
       </div>
     </header>

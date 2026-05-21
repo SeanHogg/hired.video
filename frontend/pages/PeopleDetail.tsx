@@ -439,17 +439,22 @@ function PeopleDetailContent() {
   // can pivot between surfaces without scrolling. Tab state lives in the
   // URL (?tab=…) so refresh and back-button work like the rest of the site.
   //
-  // The program tabs are derived from `profile.creatorPrograms` — visitors
-  // see exactly the programs the owner has enrolled in. Owners always see
-  // their enrolled tabs even when the content list is empty (the panel
-  // renders an "add first item" CTA).
+  // The program tabs are derived from `profile.creatorPrograms`. Owners
+  // always see every program tab — even ones they haven't formally
+  // enrolled in via /api/creators/opt-in — so the profile doubles as the
+  // navigation hub for managing each surface, and each panel renders its
+  // own "publish your first item" CTA. Visitors see only the programs
+  // the owner has actually enrolled in (per `creatorProfiles.*_active`)
+  // so empty tabs don't clutter someone else's profile.
   const isEmployerProfile = roleUtils.isEmployer((profile as any).role);
   const tabParam = searchParams.get("tab");
   const profileBaseUrl = `/people/${peopleAreaSlug}`;
 
-  const activePrograms: CreatorProgram[] = CREATOR_PROGRAMS.filter(
-    (p) => ((profile as any).creatorPrograms?.[p] as boolean | undefined) === true,
-  );
+  const activePrograms: CreatorProgram[] = isOwner
+    ? [...CREATOR_PROGRAMS]
+    : CREATOR_PROGRAMS.filter(
+        (p) => ((profile as any).creatorPrograms?.[p] as boolean | undefined) === true,
+      );
 
   const validTabKeys = new Set<string>([
     "profile",

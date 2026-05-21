@@ -47,6 +47,31 @@ export const UserProfileSchema = z.object({
   // for creators / service providers using their profile as a promotion
   // link. Persisted on privacy_preferences server-side.
   promoteWithoutAuth: nullableBoolean(),
+  // Creator program enrollment — drives the per-program tab strip on the
+  // public profile. SSoT is `creator_profiles.*_active`.
+  isCreator: nullableBoolean(),
+  creatorPrograms: z
+    .object({
+      video: z.boolean(),
+      voice: z.boolean(),
+      services: z.boolean(),
+      articles: z.boolean(),
+      courses: z.boolean(),
+      templates: z.boolean(),
+    })
+    .nullable()
+    .transform((v) => (v === null ? undefined : v))
+    .optional(),
+  creatorProfile: z
+    .object({
+      displayName: nullableString(),
+      tagline: nullableString(),
+      bio: nullableString(),
+      categories: z.array(z.string()).nullable().optional(),
+    })
+    .nullable()
+    .transform((v) => (v === null ? undefined : v))
+    .optional(),
   slug: nullableString(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
@@ -158,6 +183,7 @@ export const PublicUserSchema = z.object({
       services: z.boolean(),
       articles: z.boolean(),
       courses: z.boolean(),
+      templates: z.boolean(),
     })
     .nullable()
     .transform((v) => (v === null ? undefined : v))
@@ -310,6 +336,13 @@ export class UserService {
       openToWork: payload.openToWork ?? dataBlock.openToWork ?? undefined,
       providesServices: payload.providesServices ?? undefined,
       promoteWithoutAuth: payload.promoteWithoutAuth ?? undefined,
+      // Creator-program enrollment flags drive the per-program tabs on
+      // PeopleDetail. Without these, the tab strip silently collapses to
+      // just "Profile" even for fully-enrolled creators because the
+      // PeopleDetail filter reads `profile.creatorPrograms?.[p]`.
+      isCreator: payload.isCreator ?? undefined,
+      creatorPrograms: payload.creatorPrograms ?? undefined,
+      creatorProfile: payload.creatorProfile ?? undefined,
       slug: payload.slug || undefined,
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,

@@ -51,7 +51,6 @@ import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
-import { recruitService } from "@/lib/services/recruit-service";
 import ServicesNav from "@/components/services/ServicesNav";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -156,11 +155,6 @@ export default function ServicesManagement() {
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
   const [wizardOpen, setWizardOpen] = useState(searchParams.get("wizard") === "open");
 
-  // Agency-only tab (Team) appears in the nav when the caller belongs to
-  // at least one company. Pitch Decks / Hiring & Onboarding / Scorecards
-  // moved out to /people/* — see usePeopleTabs.
-  const [hasCompanyAccess, setHasCompanyAccess] = useState(false);
-
   // Check standard service enrollment — re-runs when effective role changes
   // (e.g. impersonation role switch, persona preview toggle)
   useEffect(() => {
@@ -169,12 +163,6 @@ export default function ServicesManagement() {
     // Reset loading states on role change
     setAffiliateLoading(true);
     setCreatorLoading(true);
-
-    // Recruiting scope — drives visibility of agency tabs
-    recruitService
-      .getMyScope()
-      .then((scope) => setHasCompanyAccess(scope.companies.length > 0))
-      .catch(() => setHasCompanyAccess(false));
 
     // Affiliate check — always service-based (affiliate is a service, not a role)
     affiliateService.getProfile()
@@ -461,7 +449,7 @@ export default function ServicesManagement() {
         <div className="pt-16">
         <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
-          <ServicesNav hasCompanyAccess={hasCompanyAccess} />
+          <ServicesNav />
 
           {/* Header — Add Service + Lead Gen Settings buttons moved into the
               Offerings sub-tab (inside Content Creator) where they belong.

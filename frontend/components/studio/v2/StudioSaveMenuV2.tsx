@@ -8,16 +8,22 @@
  *
  * The primary action is "Save" (persist draft — no rendering). The chevron
  * opens the dropdown of everything else the user might want to do with the
- * project, replacing the separate Export + Share + Publish buttons the v2
- * header used to surface:
+ * project: export (rendered output) + share + publish.
  *
- *   • Export MP4    — render + download locally
- *   • Copy link     — share the editor URL
- *   • Publish to YouTube / LinkedIn / Profile
+ * The dropdown is driven by `mediaKind` per the standing DRY rule
+ * (#894 / docs/prd/studio-media-kinds.md):
+ *   - Export row label reads `MEDIA_KIND_UI[mediaKind].exportVerb` so
+ *     podcast projects show "Export episode", animation shows
+ *     "Export loop", etc. — one verb table, every consumer reads it.
+ *   - Publish rows iterate `publishDestinationsFor(mediaKind)` and look
+ *     up each destination's handler in `publishHandlers`. Destinations
+ *     with no handler self-disable with a "soon" hint; destinations that
+ *     don't apply to this mediaKind don't render at all. ONE menu,
+ *     every kind self-gates from one record.
  *
  * Items self-disable: copy link is greyed until the project has been
- * persisted; publish items disable when their callback isn't supplied
- * ("Coming soon" hint). No prop-drilled `canX` booleans.
+ * persisted; publish items disable when their callback isn't supplied.
+ * No prop-drilled `canX` booleans.
  *
  * Per DRY: the primary visual is the shared <StudioSaveButton> primitive,
  * same as v1's SaveButton wrapper — busy/icon/label changes propagate to
@@ -46,11 +52,39 @@ import {
 import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  MEDIA_KIND_UI,
+  publishDestinationsFor,
+  type MediaKind,
+  type PublishDestinationId,
+} from "@shared/media-kinds";
 
-export interface StudioSaveMenuV2Props {
+/** Icon mapping per publish destination — kept here (next to the only
+ *  consumer) rather than in @shared/media-kinds because lucide is a
+ *  frontend-only dep. ONE record drives the menu visual. */
+const DESTINATION_ICON: Record<PublishDestinationId, React.ComponentType<{ className?: string }>> = {
+  youtube:                Upload,
+  linkedin:               Share2,
+  profile:                UserCheck,
+  rss:                    Upload,
+  "apple-podcasts":       Upload,
+  "spotify-creators":     Upload,
+  "voice-marketplace":    Share2,
+  "profile-audio-embed":  UserCheck,
+  giphy:                  Share2,
+  tenor:                  Share2,
+  "r2-host":              Share2,
+};
+
+type PublishHandlers = Partial<Record<PublishDestinationId, () => void>>;
+
+interface StudioSaveMenuV2Props {
   saving: boolean;
   onSave: () => void;
   hasContent: boolean;
+  /** Project's output axis (#894). Drives the export verb + which
+   *  publish rows render. ONE field, every visibility decision. */
+  mediaKind: MediaKind;
   /** Persisted project id — needed for the editor link. Null until the
    *  first save. */
   projectId: string | null;
@@ -60,18 +94,21 @@ export interface StudioSaveMenuV2Props {
    *  of slug-derived URLs (sitemap, OG worker, social cards) doesn't
    *  re-derive the rule. */
   slug?: string | null;
-  /** True once a rendered MP4 lives in the project row; affects publish
-   *  item hints. */
+  /** True once a rendered output (MP4 / MP3 / GIF) lives in the project
+   *  row; affects publish item hints. */
   hasVideo: boolean;
   isPublishedToProfile?: boolean;
-  /** Export = render + download MP4. */
+  /** Export = render + download the project's bound output (MP4 / MP3 /
+   *  GIF, per `mediaKind`). The picker for which profile within the kind
+   *  lives elsewhere (timeline.outputProfile / project codec setting). */
   onExport: () => void;
   exporting: boolean;
-  /** Publish callbacks. When ABSENT the matching item self-disables with
-   *  a "soon" hint — no prop-drilled `canPublish` boolean. */
-  onPublishToYouTube?: () => void;
-  onPublishToLinkedIn?: () => void;
-  onPublishToProfile?: () => void;
+  /** Publish handlers keyed by destination id. ANY destination not in
+   *  this map self-disables with a "soon" hint; destinations that don't
+   *  apply to this `mediaKind` don't render. Per DRY — caller doesn't
+   *  pass `canPublishToYouTube`; the menu derives from
+   *  `publishDestinationsFor(mediaKind)` and looks up handlers by id. */
+  publishHandlers?: PublishHandlers;
   className?: string;
 }
 
@@ -79,15 +116,14 @@ export default function StudioSaveMenuV2({
   saving,
   onSave,
   hasContent,
+  mediaKind,
   projectId,
   slug,
   hasVideo,
   isPublishedToProfile = false,
   onExport,
   exporting,
-  onPublishToYouTube,
-  onPublishToLinkedIn,
-  onPublishToProfile,
+  publishHandlers,
   className,
 }: StudioSaveMenuV2Props) {
   const { toast } = useToast();
@@ -109,8 +145,11 @@ export default function StudioSaveMenuV2({
     }
   }
 
+  const ui = MEDIA_KIND_UI[mediaKind];
+  const destinations = publishDestinationsFor(mediaKind);
+
   const publishHint = hasVideo
-    ? "Publishes the rendered video to the chosen destination."
+    ? `Publishes the rendered ${ui.badgeLabel.toLowerCase()} to the chosen destination.`
     : "Renders + uploads first, then publishes to the chosen destination.";
 
   // Busy state covers both the draft save and the render — either one in
@@ -150,14 +189,14 @@ export default function StudioSaveMenuV2({
               onExport();
             }}
             disabled={exporting || !hasContent}
-            title={hasContent ? "Render + download MP4" : "Add a widget to export"}
+            title={hasContent ? `Render + download ${ui.badgeLabel.toLowerCase()}` : "Add a widget to export"}
           >
             {exporting ? (
               <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
             ) : (
               <Download className="w-3.5 h-3.5 mr-2" />
             )}
-            {exporting ? "Exporting…" : "Export MP4"}
+            {exporting ? "Exporting…" : ui.exportVerb}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -214,24 +253,23 @@ export default function StudioSaveMenuV2({
             {publishHint}
           </p>
 
-          <PublishItem
-            icon={Upload}
-            label="Publish to YouTube"
-            onClick={onPublishToYouTube}
-            hasVideo={hasVideo}
-          />
-          <PublishItem
-            icon={Share2}
-            label="Publish to LinkedIn"
-            onClick={onPublishToLinkedIn}
-            hasVideo={hasVideo}
-          />
-          <PublishItem
-            icon={UserCheck}
-            label={isPublishedToProfile ? "Remove from profile" : "Publish to profile"}
-            onClick={onPublishToProfile}
-            hasVideo={hasVideo}
-          />
+          {destinations.map((dest) => {
+            // The Profile destination flips its verb based on the
+            // already-published state. Every other destination uses the
+            // registry's static label. ONE label-source per row.
+            const baseLabel = dest.id === "profile"
+              ? (isPublishedToProfile ? "Remove from profile" : "Publish to profile")
+              : `Publish to ${dest.label}`;
+            return (
+              <PublishItem
+                key={dest.id}
+                icon={DESTINATION_ICON[dest.id]}
+                label={baseLabel}
+                onClick={publishHandlers?.[dest.id]}
+                hasVideo={hasVideo}
+              />
+            );
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

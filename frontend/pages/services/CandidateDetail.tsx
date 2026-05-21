@@ -296,7 +296,7 @@ export default function CandidateDetail() {
 
         <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
-            <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
+            <ServicesNav />
 
             <div className="mb-4">
               <Button variant="outline" size="sm" asChild>

@@ -198,7 +198,6 @@ const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
 const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
 const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"));
 const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
-const TeamLeaderboard = lazy(() => import("./pages/services/TeamLeaderboard"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -788,7 +787,7 @@ const App = () => (
                       />
                       <Route
                         path="/services/team"
-                        element={<RequireVerified><TeamLeaderboard /></RequireVerified>}
+                        element={<Navigate to="/companies?tab=team" replace />}
                       />
                       <Route
                         path="/services/scorecards"

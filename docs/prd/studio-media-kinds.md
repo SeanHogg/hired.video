@@ -120,22 +120,34 @@ Diverges per kind. The editor's Details drawer renders a kind-specific section t
 - ✅ `mediaKind` plumbed through frontend `StudioProject` schema + `saveDraft()` helper
 - ✅ API + frontend typecheck clean
 
-### Phase 2 — Podcast MVP
+### Phase 2 — Podcast MVP (partially landed 2026-05-21)
 
 **Goal:** ship the first non-video kind end-to-end. Validates the foundation against the hardest case (audio-first, chapter authoring, RSS publish).
 
-- `TEMPLATE_CATALOG` gains `podcast_*` entries (intro/episode/trailer) with `mediaKind: 'podcast'` + `audiences: ['podcaster', 'educator', 'founder']`
-- Audio-only render strategy — new entry in `render.ts` facade that emits MP3/M4A/Opus/WAV without invoking the video encoder when no v-track has clips
-- `pickRenderEngine` gains an `audio-only` branch that selects this strategy when `timeline.outputProfile` is one of the audio-only profiles
-- Chapter editor — UI writes to `timeline.markers[]`; export attaches ID3 chapter frames (MP3) or `chap` boxes (M4A)
-- `StudioSaveMenuV2` reads `outputProfilesFor(project.mediaKind)` instead of the hardcoded "Export MP4" row — per DRY, ONE menu component, gates per-kind
-- `template-seeds.ts` gains podcast seeds (intro music + voiceover track + outro music + chapter markers)
+**Shipped:**
+- ✅ `TEMPLATE_CATALOG` gains `podcast_trailer / podcast_episode / podcast_interview` entries with `mediaKind: 'podcast'`
+- ✅ New `podcaster` + `educator` audiences in the taxonomy
+- ✅ Audio-only render strategy ([audio-only-render.ts](../../hired.video/frontend/lib/timeline/audio-only-render.ts)) — emits stereo 48 kHz WAV via the existing `renderTimelineAudio()` + `audioBufferToWav()` pipeline
+- ✅ `pickRenderEngine` gains an `audio-only` branch via `isAudioOnly(timeline)` (Timeline-shape predicate, not mediaKind-aware so a video project the user emptied of v-tracks falls through correctly)
+- ✅ `StudioSaveMenuV2` DRY-ified: reads `MEDIA_KIND_UI[mediaKind].exportVerb` for the export label + iterates `publishDestinationsFor(mediaKind)` for publish rows; caller passes a flat `publishHandlers: Partial<Record<PublishDestinationId, () => void>>` map (no prop-drilled `canPublishToYouTube` booleans)
+- ✅ `template-seeds.ts` gains podcast seeds — each scene label authored as a future chapter cue ("01 · Cold open", "02 · Welcome", …) so the canvas-to-timeline emitter can project them onto `timeline.markers[]` in the chapter-editor pass
+- ✅ `useCreateStudioDraft` carries `template.mediaKind` to `saveDraft` on first save so podcast projects persist as `media_kind = 'podcast'` from paint one
 
-### Phase 3 — Podcast publish
+**Deferred to Phase 2b (tracked as #907):**
+- Chapter editor UI — waveform-first audio timeline with chapter pins as clickable cues that write/read `timeline.markers[]`
+- ID3 chapter frames (MP3) + `chap` boxes (M4A) on export
+- MP3 / M4A / Opus transcode — needs the ffmpeg.wasm strategy to land first; until then every audio-only export ships as WAV regardless of the `OutputProfile` selected
+- Per-kind metadata sections in `ProjectDetailsSheet` — episode #, season, show notes, artwork
+- Audio-waveform thumbnail fallback for `VideoProjectThumbnail` (also benefits #906's project-card kind badge)
 
-- `/api/podcasts/feed/:show` — generates an RSS 2.0 + iTunes-namespace feed from published podcast projects sharing a `showId`
-- Apple Podcasts Connect OAuth flow + Spotify for Creators OAuth flow
-- `PublishItem` rows in `StudioSaveMenuV2` self-gate on `publishDestinationsFor(mediaKind)` — RSS / Apple / Spotify rows appear only for `mediaKind: 'podcast'` projects
+### Phase 3 — Podcast publish (tracked as #908)
+
+- `studio_shows` parent table — N podcast projects join via `show_id`; shows carry podcast-level metadata (categories, language, copyright, explicit flag, loudness target)
+- `/api/podcasts/feed/:show_slug` — generates an RSS 2.0 + iTunes-namespace feed from published podcast projects sharing a `show_id`; chapters from `timeline.markers[]` via `psc:chapters`
+- Apple Podcasts Connect OAuth flow (`POST /api/podcasts/show/:id/connect/apple`) + Spotify for Creators OAuth (same pattern)
+- ✅ `PublishItem` rows in `StudioSaveMenuV2` already self-gate on `publishDestinationsFor(mediaKind)` (Phase 2) — RSS / Apple / Spotify rows already appear for `mediaKind: 'podcast'` projects but disabled until handlers exist
+- Per-show analytics roll-up (listens, completion rate)
+- Audio normalization to −16 LUFS default (Apple target) with per-show override via `studio_shows.loudness_target` (Spotify wants −14)
 
 ### Phase 4 — Voice template
 
@@ -199,9 +211,79 @@ These are deferred decisions captured for Phase 2+ planning:
 
 ---
 
-## 6. Reference files
+## 6. `/studio` landing page changes (UI follow-on to the foundation)
 
-Foundation landed in:
+Phase 1 added the data axes but did not touch the chooser UI. The landing page at [/studio](../../hired.video/frontend/pages/studio/StudioLanding.tsx) still presents every template as a video. The follow-on UI pass is tracked as **Gap Register #906** and consists of the changes below — every one self-gates off `template.mediaKind` per the DRY rule (no prop-drilled `canShowPodcastFilter`-style booleans).
+
+### 6.1 Filter pill row — second axis
+
+Today the pill row carries a single filter axis: `TemplateFilter = "all" | TemplateCategory | "created" | "purchased"`. Adding a flat `"podcast" | "voice" | "animation"` set to the same row would mix two semantic axes (intent vs. output). Split into **two** pill rows:
+
+```
+Type:     [ All ] [ Video ] [ Podcast ] [ Voice ] [ Animation ]
+Use for:  [ All ] [ Promote ] [ Showcase ] [ Hiring ] [ Film ] [ Quick ] [ Created ] [ Purchased ]
+```
+
+- **Type row** reads `MEDIA_KINDS` from `@shared/media-kinds`. Labels come from `MEDIA_KIND_UI[kind].badgeLabel` so a kind-rename ripples once.
+- **Use-for row** is the existing `TemplateCategory` set unchanged.
+- Filter state: `{ mediaKind: MediaKind | "all"; category: TemplateFilter }`. The two axes AND together — picking `Podcast` + `Promote` shows podcast templates in the Promote bucket only.
+- Empty-state copy reads `MEDIA_KIND_UI[kind].badgeLabel`: *"No Podcast templates match your search yet — pick a Video template to start while we ship more."*
+
+### 6.2 Template cards — kind badge
+
+Both `BuiltinTemplateCard` and `OwnedTemplateCard` already render a category icon + label. Add a small kind chip in the top-left of the thumbnail (symmetric with the provenance pill on owned cards):
+
+```
+┌──────────────────────────────────┐
+│ [Podcast]              [Preview] │  ← kind badge top-left, preview top-right
+│                                  │
+│         (thumbnail)              │
+│                                  │
+└──────────────────────────────────┘
+   ▶ Sizzle Reel
+   Drop clips + a music bed…
+```
+
+Chip self-gates: returns `null` when `template.mediaKind === "video"` (so the existing surface doesn't gain a redundant "Video" badge on every card). The hide rule lives inside the chip component — consumers do not pass `showBadge`. Single component drives both the carousel card and the per-template landing page (#901) chip.
+
+### 6.3 `NewVideoSplitButton` — kind-aware verb
+
+Today the main label is `"New {lastUsedTemplate.label}"` ([NewVideoSplitButton.tsx:47](hired.video/frontend/components/studio/shared/NewVideoSplitButton.tsx#L47)) and the chevron menu lists every template flat. After podcast/voice/animation templates land, that flat list grows past the 60vh cap (#456 was already in tension). Two changes:
+
+- **Verb** — when the last-used template's mediaKind ≠ `video`, the verb swaps via `MEDIA_KIND_UI[kind].exportVerb`-symmetric reads. Example: `New Sizzle Reel`, `New Podcast Episode`, `New Voice Clip`, `New Logo Loop`. The verb table is the single source — same record drives the export menu, the new-button verb, and the project-card kind badge.
+- **Dropdown grouping** — group items by mediaKind with section headers. Each section header reads `MEDIA_KIND_UI[kind].badgeLabel`. Sections render only when the catalog has at least one template of that kind — section visibility self-gates inside the dropdown component (no caller-passed `hasPodcastTemplates` boolean).
+
+### 6.4 `StudioVideoCard` ("My videos" grid) — kind badge
+
+The "My videos" section already renders project-level chrome (visibility chip, hover edit/details/delete pills, inline rename). Add a kind badge to the top-left of the thumbnail symmetric with the template-card change above:
+
+- Read from `project.mediaKind` (already on the DTO post-Phase 1).
+- Self-gates: returns `null` when `mediaKind === "video"`.
+- Reuses the same chip component as the template card — ONE component, two consumers (`feedback_extract_on_duplication`).
+
+Workspace switcher + section header stay unchanged; the visual change is the badge only.
+
+### 6.5 Deep-link query params
+
+The chooser already accepts `?contentTemplate=<id>`, `?studioTemplate=<slug>`, `?subject=`, `?capture=`, `?new`. No new query param is needed — `template.mediaKind` is derivable from the template id, so a podcast template's `/studio?contentTemplate=podcast_trailer` deep-link works without parameter changes. Forwarder logic in `StudioLanding.tsx` is mediaKind-agnostic by construction.
+
+### 6.6 Audience pills (#900 dependency)
+
+The pill row in §6.1 deliberately does NOT add an audience axis — that lives on the public `/for/:audience` landing pages (#900) rather than inside the auth-gated `/studio` chooser, where users self-select intent + kind. If audience filtering ever moves into `/studio`, the pill row gains a third axis with the same DRY pattern (one source of truth: the catalog's `audiences[]` field).
+
+### 6.7 What stays unchanged
+
+To keep the scope tight:
+- `WizardLauncher` — opens the 3-step "create your first video" modal. The wizard already loads `TEMPLATE_CATALOG` and will inherit the new kinds without code changes.
+- `WorkspaceSwitcher` — workspace selection is orthogonal to mediaKind.
+- `ProjectDetailsSheet` — already kind-agnostic; per-kind metadata sections (episode # for podcast, etc.) land alongside the kind in Phase 2+.
+- `VideoProjectThumbnail` — already handles the `kind: 'nle' | 'scene'` discrimination via timeline preview; a podcast project with no v-tracks needs an audio-waveform fallback, which is a Phase 2 task tracked in #905's body.
+
+---
+
+## 7. Reference files
+
+Foundation (Phase 1) landed in:
 - [shared/media-kinds.ts](../../hired.video/shared/media-kinds.ts) — enum + output profiles + publish destinations + UI hints
 - [frontend/components/studio/templates/audiences.ts](../../hired.video/frontend/components/studio/templates/audiences.ts) — audience taxonomy
 - [frontend/components/studio/templates/catalog.tsx](../../hired.video/frontend/components/studio/templates/catalog.tsx) — `mediaKind` + `audiences[]` on every template
@@ -209,6 +291,15 @@ Foundation landed in:
 - [api/drizzle/0099_studio_projects_media_kind.sql](../../hired.video/api/drizzle/0099_studio_projects_media_kind.sql) — migration
 - [api/src/routes/studio.ts](../../hired.video/api/src/routes/studio.ts) — DTO + saveDraft accept mediaKind
 - [frontend/lib/services/studio-service.ts](../../hired.video/frontend/lib/services/studio-service.ts) — StudioProject schema + saveDraft client
+
+Podcast MVP (Phase 2) landed in:
+- [frontend/components/studio/templates/catalog.tsx](../../hired.video/frontend/components/studio/templates/catalog.tsx) — `podcast_trailer / podcast_episode / podcast_interview` entries
+- [frontend/lib/studio/editor-v2/template-seeds.ts](../../hired.video/frontend/lib/studio/editor-v2/template-seeds.ts) — chapter-shaped scene seeds for each podcast template
+- [shared/timeline.ts](../../hired.video/shared/timeline.ts) — `isAudioOnly()` predicate + `pickRenderEngine()` routes to `audio-only` strategy
+- [frontend/lib/timeline/audio-only-render.ts](../../hired.video/frontend/lib/timeline/audio-only-render.ts) — new strategy: stereo 48 kHz WAV via `renderTimelineAudio` + `audioBufferToWav`
+- [frontend/lib/timeline/render.ts](../../hired.video/frontend/lib/timeline/render.ts) — `loadStrategy()` registers the audio-only path
+- [frontend/components/studio/v2/StudioSaveMenuV2.tsx](../../hired.video/frontend/components/studio/v2/StudioSaveMenuV2.tsx) — DRY-ified to read `MEDIA_KIND_UI[kind].exportVerb` + `publishDestinationsFor(kind)`
+- [frontend/lib/studio/use-create-studio-draft.ts](../../hired.video/frontend/lib/studio/use-create-studio-draft.ts) — first-save persists `template.mediaKind`
 
 Adjacent (read-only context):
 - [shared/timeline.ts](../../hired.video/shared/timeline.ts) — kind-agnostic Timeline JSON spec

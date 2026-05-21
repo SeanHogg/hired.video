@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Loader2, Plus, Trash2, Star } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Loader2, Plus, Settings as SettingsIcon, Trash2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,10 @@ import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
+import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
 import CoursesManagerPanel from "@/components/creator/CoursesManagerPanel";
 import ArticlesManagerPanel from "@/components/creator/ArticlesManagerPanel";
-import OfferingsPanel from "@/components/services/OfferingsPanel";
+import OfferingsPanel, { type OfferingsPanelHandle } from "@/components/services/OfferingsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import type { CreatorProfile } from "@/lib/services/creator-service";
@@ -94,6 +95,11 @@ export default function CreatorWorkspace({
     ? { value: urlTab, onValueChange: (v: string) => navigate(`${basePath}/${v}`) }
     : { defaultValue: resolvedDefaultTab };
 
+  // Imperative handle to OfferingsPanel — lets the Add Service button in
+  // the tabs row trigger the same first-time-opt-in + open-dialog flow
+  // that lives inside OfferingsPanel.
+  const offeringsRef = useRef<OfferingsPanelHandle>(null);
+
   // Portfolio state
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
@@ -166,16 +172,37 @@ export default function CreatorWorkspace({
       />
 
       <Tabs {...tabsProps} className="space-y-4">
-        <TabsList>
-          {offeringsEnabled && <TabsTrigger value="offerings">Offerings</TabsTrigger>}
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="earnings">Marketplace Earnings</TabsTrigger>
-          <TabsTrigger value="payouts">Payouts</TabsTrigger>
-          <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
-          {profile?.coursesActive && <TabsTrigger value="courses">Courses</TabsTrigger>}
-          {profile?.articlesActive && <TabsTrigger value="articles">Articles</TabsTrigger>}
-          <TabsTrigger value="account">Account</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <TabsList>
+            {offeringsEnabled && <TabsTrigger value="offerings">Offerings</TabsTrigger>}
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="earnings">Marketplace Earnings</TabsTrigger>
+            <TabsTrigger value="payouts">Payouts</TabsTrigger>
+            <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            {profile?.coursesActive && <TabsTrigger value="courses">Courses</TabsTrigger>}
+            {profile?.articlesActive && <TabsTrigger value="articles">Articles</TabsTrigger>}
+            <TabsTrigger value="account">Account</TabsTrigger>
+          </TabsList>
+
+          {/* Tab-scoped actions. Offerings is the only tab that needs
+              header buttons today — Lead Gen Settings deep-links to the
+              global settings page, and Add Service triggers OfferingsPanel's
+              first-time-opt-in + dialog via the imperative ref handle. */}
+          {offeringsEnabled && urlTab === "offerings" && (
+            <div className="flex items-center gap-2 flex-wrap ml-auto">
+              <Link to="/settings?tab=lead-generation">
+                <Button variant="outline" size="sm">
+                  <SettingsIcon className="h-4 w-4 mr-2" />
+                  Lead Gen Settings
+                </Button>
+              </Link>
+              <Button size="sm" onClick={() => offeringsRef.current?.openCreate()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Service
+              </Button>
+            </div>
+          )}
+        </div>
 
         {/* Offerings — paid services + creator programs (Video Promo, Voice
             Clone, Services, Articles, Courses). Moved here from a top-level
@@ -183,6 +210,7 @@ export default function CreatorWorkspace({
         {offeringsEnabled && setServices && (
           <TabsContent value="offerings">
             <OfferingsPanel
+              ref={offeringsRef}
               services={services}
               loading={servicesLoading}
               setServices={setServices}
@@ -323,8 +351,11 @@ export default function CreatorWorkspace({
           </TabsContent>
         )}
 
-        {/* Leave program — self-fetches, mirrored on /settings → Content Creator → Leave program */}
-        <TabsContent value="account">
+        {/* Account — promotion privacy mirrored from Settings → Privacy so
+            creators can flip it from their own workspace, plus the Leave
+            program danger zone (self-gates when not enrolled). */}
+        <TabsContent value="account" className="space-y-4">
+          <PromoteWithoutAuthToggle asCard />
           <LeaveCreatorProgramCard onProfileChange={onProfileChange} />
         </TabsContent>
       </Tabs>

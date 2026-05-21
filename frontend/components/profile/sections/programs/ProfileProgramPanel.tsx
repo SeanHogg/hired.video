@@ -19,6 +19,7 @@ import ProfileArticlesPanel from "./ProfileArticlesPanel";
 import ProfileCoursesPanel from "./ProfileCoursesPanel";
 import ProfileVideoPanel from "./ProfileVideoPanel";
 import ProfileVoicePanel from "./ProfileVoicePanel";
+import EmptyProgramState from "./EmptyProgramState";
 
 /** Re-export so PageHeader tab-strip consumers don't reach across
  *  creator-service AND this module. PROGRAM_ICON keeps the legacy alias
@@ -69,5 +70,10 @@ export default function ProfileProgramPanel({
           onRequestQuote={onRequestServiceQuote}
         />
       );
+    case "templates":
+      // No dedicated ProfileTemplatesPanel yet — render the shared empty
+      // state so the tab body still has a CTA for owners and an empty
+      // card for visitors. See gap register entry for the real panel.
+      return <EmptyProgramState program="templates" isOwner={isOwner} />;
   }
 }

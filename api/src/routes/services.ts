@@ -639,7 +639,7 @@ serviceRoutes.patch("/inquiries/:id", async (c) => {
 // GET /api/services/team/leaderboard?companyId=X&days=30
 //
 // Per team-member rollup of pipeline activity for one company. Recruiters
-// see this on /services/team and pick the company they're scoped to.
+// see this on /companies?tab=team and pick the company they're scoped to.
 // Powers the "Performance dashboards & team leaderboards" Pricing claim.
 // ---------------------------------------------------------------------------
 serviceRoutes.get("/team/leaderboard", async (c) => {

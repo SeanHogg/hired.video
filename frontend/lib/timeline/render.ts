@@ -90,6 +90,10 @@ async function loadStrategy(id: RenderEngineId): Promise<RenderStrategy> {
     const mod = await import("./ffmpeg-render");
     return mod.ffmpegWasmStrategy;
   }
+  if (id === "audio-only") {
+    const mod = await import("./audio-only-render");
+    return mod.audioOnlyStrategy;
+  }
   throw new Error(`Unknown render engine: ${id satisfies never}`);
 }
 

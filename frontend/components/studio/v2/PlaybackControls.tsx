@@ -11,7 +11,7 @@
  * public watch page + every other consumer mount this directly — no
  * surface re-implements play/pause/scrub.
  */
-import { Pause, Play, SkipBack } from "lucide-react";
+import { Maximize2, Pause, Play, SkipBack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,12 @@ import { cn } from "@/lib/utils";
 export interface PlaybackControlsProps {
   playback: PreviewPlayback;
   className?: string;
+  /** When provided, renders an expand button that hands fullscreen
+   *  handling back to the parent (which mounts <PreviewOverlay/>).
+   *  Self-gates: the button only appears when this prop is passed, so
+   *  surfaces that ARE the fullscreen experience (the editor's
+   *  PreviewOverlay, the public watch page) simply omit it. */
+  onExpand?: () => void;
 }
 
 function formatTime(sec: number): string {
@@ -31,6 +37,7 @@ function formatTime(sec: number): string {
 export default function PlaybackControls({
   playback,
   className,
+  onExpand,
 }: PlaybackControlsProps) {
   return (
     <div
@@ -74,6 +81,17 @@ export default function PlaybackControls({
       <span className="shrink-0 min-w-[6rem] text-center text-xs tabular-nums opacity-80">
         {formatTime(playback.playhead)} / {formatTime(playback.duration)}
       </span>
+      {onExpand && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onExpand}
+          aria-label="Expand to fullscreen"
+          className="h-10 w-10 shrink-0 rounded-full p-0 text-white hover:bg-white/10"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }

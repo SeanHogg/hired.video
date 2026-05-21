@@ -3,9 +3,11 @@
 // Voice Clone, Services, Articles, Courses) when the user is enrolled as a
 // creator. This used to be a top-level tab at /services/offerings — see
 // ServicesManagement's path-to-subtab mapping for the legacy URL handling.
+//
+// `openCreate` is exposed via ref so the parent (CreatorWorkspace) can
+// trigger the Add-Service dialog from buttons rendered in the tabs row.
 
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import {
   AlertCircle,
   CheckCircle,
@@ -15,8 +17,6 @@ import {
   EyeOff,
   Loader2,
   Pencil,
-  Plus,
-  Settings as SettingsIcon,
   Tag,
   Trash2,
 } from "lucide-react";
@@ -89,13 +89,17 @@ interface Props {
   onProfileChange: (next: CreatorProfile | null) => void;
 }
 
-export default function OfferingsPanel({
+export interface OfferingsPanelHandle {
+  openCreate: () => void;
+}
+
+const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function OfferingsPanel({
   services,
   loading,
   setServices,
   profile,
   onProfileChange,
-}: Props) {
+}, ref) {
   const [providesServices, setProviderServices] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -141,6 +145,8 @@ export default function OfferingsPanel({
     setForm(defaultForm);
     setDialogOpen(true);
   }
+
+  useImperativeHandle(ref, () => ({ openCreate }), [openCreate]);
 
   function openEdit(s: ServiceOffering) {
     setEditingId(s.id);
@@ -202,25 +208,10 @@ export default function OfferingsPanel({
   return (
     <>
     <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-      {/* Left: user-created services */}
+      {/* Left: user-created services. Add Service / Lead Gen Settings
+          buttons live in the tabs row in CreatorWorkspace (triggered via
+          the imperative ref handle exposed below). */}
       <div className="space-y-4 min-w-0">
-        <div className="flex items-center justify-end gap-2 flex-wrap">
-          <Link to="/settings?tab=lead-generation">
-            <Button variant="outline">
-              <SettingsIcon className="h-4 w-4 mr-2" />
-              Lead Gen Settings
-            </Button>
-          </Link>
-          <Button onClick={openCreate} disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4 mr-2" />
-            )}
-            Add Service
-          </Button>
-        </div>
-
         {/* `#my-services` anchor — YourProgramsPanel's "Services" card
             deep-links here so the list scrolls into view. */}
         <div id="my-services" className="scroll-mt-24 space-y-3">
@@ -456,4 +447,6 @@ export default function OfferingsPanel({
       </Dialog>
     </>
   );
-}
+});
+
+export default OfferingsPanel;

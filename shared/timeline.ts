@@ -213,7 +213,7 @@ export interface MediaSource {
 // `studio_projects.video_id` to point at the new `videos` row. The
 // RenderJob shape below is for the in-memory editor state, not the DB.
 
-export type RenderEngineId = "webcodecs" | "ffmpeg-wasm";
+export type RenderEngineId = "webcodecs" | "ffmpeg-wasm" | "audio-only";
 
 export type RenderStatus = "queued" | "running" | "done" | "failed";
 
@@ -386,24 +386,42 @@ export function isRenderable(timeline: Timeline): boolean {
   return hasContent && tracksHaveNoOverlap(timeline);
 }
 
+/** True when the Timeline has zero clips on any video track. Used by
+ *  the render facade to route audio-only projects (podcasts, voice
+ *  templates) to the audio-only strategy without paying for the video
+ *  compositor. Single source of truth — both the engine picker and the
+ *  editor's preview chrome read this. */
+export function isAudioOnly(timeline: Timeline): boolean {
+  const hasAnyVideoContent = timeline.tracks.some(
+    (t) => t.kind === "video" && t.clips.length > 0,
+  );
+  return !hasAnyVideoContent;
+}
+
 /**
  * Pick the right render engine for a Timeline. Single source of truth so
  * the editor, the render button, and the render facade all agree.
  *
- * Routing rule: stay on WebCodecs as long as the per-frame compositor
- * can handle the work and the output codec is H.264/AAC. Per-clip
- * effects (color grading, masks, chroma key, etc.) modify canvas pixels
- * BEFORE the encoder consumes them, so they don't need ffmpeg — the
- * compositor in `frame-renderer.ts` runs the registry pass and the
- * encoder ingests the resulting bitmap.
- *
- * Routes to ffmpeg.wasm only when the encoder itself can't produce the
- * required output: ProRes / DNxHR exports, 4K-and-above where WebCodecs
- * support is patchy across browsers, advanced transitions that need
- * ffmpeg's filter_complex (the M5 catalog), and explicit codec asks
- * via Timeline.exportProfile (M5 custom-format support).
+ * Routing rule:
+ *   1. If the timeline has no video-track clips, route to the audio-only
+ *      strategy — emits MP3 / M4A / WAV without invoking the video
+ *      compositor. Driven by Timeline shape, not by `mediaKind`, so a
+ *      video project the user emptied of v-tracks still falls through to
+ *      the right path.
+ *   2. Otherwise: stay on WebCodecs as long as the per-frame compositor
+ *      can handle the work and the output codec is H.264/AAC. Per-clip
+ *      effects (color grading, masks, chroma key, etc.) modify canvas
+ *      pixels BEFORE the encoder consumes them, so they don't need
+ *      ffmpeg — the compositor in `frame-renderer.ts` runs the registry
+ *      pass and the encoder ingests the resulting bitmap.
+ *   3. Routes to ffmpeg.wasm only when the encoder itself can't produce
+ *      the required output: ProRes / DNxHR exports, 4K-and-above where
+ *      WebCodecs support is patchy across browsers, advanced transitions
+ *      that need ffmpeg's filter_complex (the M5 catalog), and explicit
+ *      codec asks via Timeline.exportProfile (M5 custom-format support).
  */
 export function pickRenderEngine(timeline: Timeline): RenderEngineId {
+  if (isAudioOnly(timeline)) return "audio-only";
   const hasComplexTransition = timeline.tracks.some((t) =>
     t.clips.some(
       (c) =>

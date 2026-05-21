@@ -38,6 +38,7 @@ import { z } from "zod";
 
 import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
 import PlaybackControls from "@/components/studio/v2/PlaybackControls";
+import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import AspectFrame from "@/components/AspectFrame";
 import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
 import { apiClient } from "@/lib/api-client";
@@ -561,6 +562,11 @@ function PublicStudioCanvas({
 }) {
   const playback = usePreviewPlayback(canvasState ?? emptyCanvasState());
   const [started, setStarted] = useState(Boolean(autoplay));
+  // Fullscreen handoff to the same <PreviewOverlay/> the studio editor
+  // uses. Shared `playback` means progress is continuous across the
+  // open/close transition — closing the overlay drops the viewer back
+  // onto the inline canvas at the frame they were watching.
+  const [expanded, setExpanded] = useState(false);
 
   // Auto-start once the canvas hydrates.
   useEffect(() => {
@@ -625,43 +631,62 @@ function PublicStudioCanvas({
   // Single source of truth: what you see here is what the editor shows.
   if (canvasState) {
     return (
-      <div
-        className={`overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
-      >
-        <div className="relative w-full" style={{ aspectRatio }}>
-          <CanvasStatePreview state={canvasState} playback={playback} />
-          {/* CTA-hotzones overlay — visible when the playhead enters
-              any zone's [startSec, endSec). Self-fires the cta-click
-              analytics call off `analyticsProjectId`. Pauses playback
-              on click so the user isn't bounced mid-frame. */}
-          <CtaHotzonesOverlay
-            hotzones={hotzones ?? []}
-            currentTimeSec={playback.playhead}
-            onActivate={() => playback.pause()}
-            analyticsProjectId={analyticsProjectId}
+      <>
+        <div
+          className={`overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
+        >
+          <div className="relative w-full" style={{ aspectRatio }}>
+            <CanvasStatePreview state={canvasState} playback={playback} />
+            {/* CTA-hotzones overlay — visible when the playhead enters
+                any zone's [startSec, endSec). Self-fires the cta-click
+                analytics call off `analyticsProjectId`. Pauses playback
+                on click so the user isn't bounced mid-frame. */}
+            <CtaHotzonesOverlay
+              hotzones={hotzones ?? []}
+              currentTimeSec={playback.playhead}
+              onActivate={() => playback.pause()}
+              analyticsProjectId={analyticsProjectId}
+            />
+            {!started && (
+              <button
+                type="button"
+                onClick={() => {
+                  playback.seek(0);
+                  playback.play();
+                  setStarted(true);
+                }}
+                aria-label="Play video"
+                className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 transition hover:bg-black/30"
+              >
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-slate-900 shadow-xl backdrop-blur">
+                  <Play className="ml-1 h-7 w-7 fill-current" />
+                </span>
+              </button>
+            )}
+          </div>
+          {/* Shared <PlaybackControls/> — identical chrome to the editor
+              preview overlay. Play/pause + scrubber + timecode in one
+              component so the surfaces can't drift. The expand button
+              hands fullscreen off to <PreviewOverlay/>; setting
+              `started` here keeps the cold-start Play overlay from
+              flashing back in when the viewer closes the overlay
+              mid-video. */}
+          <PlaybackControls
+            playback={playback}
+            onExpand={() => {
+              setStarted(true);
+              setExpanded(true);
+            }}
           />
-          {!started && (
-            <button
-              type="button"
-              onClick={() => {
-                playback.seek(0);
-                playback.play();
-                setStarted(true);
-              }}
-              aria-label="Play video"
-              className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 transition hover:bg-black/30"
-            >
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-slate-900 shadow-xl backdrop-blur">
-                <Play className="ml-1 h-7 w-7 fill-current" />
-              </span>
-            </button>
-          )}
         </div>
-        {/* Shared <PlaybackControls/> — identical chrome to the editor
-            preview overlay. Play/pause + scrubber + timecode in one
-            component so the surfaces can't drift. */}
-        <PlaybackControls playback={playback} />
-      </div>
+        {expanded && (
+          <PreviewOverlay
+            state={canvasState}
+            playback={playback}
+            onClose={() => setExpanded(false)}
+          />
+        )}
+      </>
     );
   }
 

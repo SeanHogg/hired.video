@@ -8,6 +8,7 @@
 // and the intake form component the wizard / editor should mount.
 
 import {
+  AudioWaveform,
   BarChart3,
   Briefcase,
   Building2,
@@ -16,10 +17,12 @@ import {
   FileText,
   Film,
   FilePlus2,
+  Headphones,
   Mic2,
   Megaphone,
   Monitor,
   Palette,
+  Podcast,
   ScrollText,
   Sparkles,
   Star,
@@ -64,7 +67,10 @@ export type ContentTemplate =
   | "monologue"
   | "showreel"
   | "director_pitch"
-  | "casting_call";
+  | "casting_call"
+  | "podcast_trailer"
+  | "podcast_episode"
+  | "podcast_interview";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
@@ -452,6 +458,64 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
       "Create a casting call: production title, role name + character description, shoot dates + location, union / non-union status, submission deadline, and explicit how-to-submit instructions for self-tapes.",
     firstTabLabel: "Casting call",
     IntakeForm: BasicIntake,
+  },
+  // ─── Podcast templates (Phase 2 of #894 / docs/prd/studio-media-kinds.md) ────
+  // Audio-first authoring — `mediaKind: "podcast"` gates the save-menu's
+  // export rows to MP3 / M4A / WAV (+ video-podcast MP4) per
+  // `outputProfilesFor("podcast")`. Reuses BasicIntake (the user
+  // describes the episode in prose); a podcast-specific intake with
+  // episode # / season / show notes fields lands when the chapter editor
+  // (#907) ships.
+  {
+    id: "podcast_trailer",
+    label: "Podcast trailer",
+    desc: "60-second show trailer — hook, what listeners get, where to subscribe.",
+    icon: AudioWaveform,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "promote",
+    mediaKind: "podcast",
+    audiences: ["podcaster", "creator", "founder"],
+    defaultName: "Podcast trailer",
+    defaultPrompt:
+      "Create a 60-second podcast trailer: cold-open hook, host introduction, what each episode delivers, three sample episode topics, and a clear call-to-subscribe with where to find the show.",
+    firstTabLabel: "Trailer",
+    IntakeForm: BasicIntake,
+    defaultRecordingMode: "webcam",
+  },
+  {
+    id: "podcast_episode",
+    label: "Podcast episode",
+    desc: "Full-length episode — intro music, chaptered segments, outro CTA.",
+    icon: Podcast,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "podcast",
+    audiences: ["podcaster", "educator", "founder", "creator"],
+    defaultName: "New episode",
+    defaultPrompt:
+      "Outline a podcast episode: cold-open hook, intro music bed, host welcome, three numbered chapters with topic and 1-line takeaway each, sponsor break placement, listener call-to-action, and outro music. Each chapter becomes a marker on the timeline.",
+    firstTabLabel: "Episode",
+    IntakeForm: BasicIntake,
+    defaultRecordingMode: "webcam",
+  },
+  {
+    id: "podcast_interview",
+    label: "Podcast interview",
+    desc: "Two-host / guest format — multi-track audio for guest, host, and music.",
+    icon: Headphones,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "podcast",
+    audiences: ["podcaster", "educator", "recruiter", "founder"],
+    defaultName: "Interview episode",
+    defaultPrompt:
+      "Outline a podcast interview: cold-open hook with a teaser quote, host intro of the guest (name + credential), three numbered topic chapters with a question prompt each, a rapid-fire segment, and an outro CTA with where to find the guest. Multi-track audio: separate host and guest channels for clean editing.",
+    firstTabLabel: "Interview",
+    IntakeForm: BasicIntake,
+    defaultRecordingMode: "webcam",
   },
 ];
 

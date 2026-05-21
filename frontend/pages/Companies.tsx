@@ -8,11 +8,13 @@ import {
   Plus,
   Search,
   Eye,
+  Trophy,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
+import TeamLeaderboardPanel from "@/components/companies/TeamLeaderboardPanel";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
@@ -486,6 +488,15 @@ export default function Companies() {
         description: "Companies you manage.",
         headerActions: mineActions,
         body: renderMineBody,
+      },
+      {
+        key: "team",
+        label: "Team",
+        icon: Trophy,
+        roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+        title: "Team leaderboard",
+        description: "Per-recruiter pipeline activity. Sourcing, stage moves, hires.",
+        body: () => <TeamLeaderboardPanel />,
       },
     ];
 

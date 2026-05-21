@@ -99,6 +99,11 @@ export function useCreateStudioDraft(opts: Opts = {}) {
         const res = await studioService.saveDraft({
           name: template.defaultName,
           kind: projectKind,
+          // Carry the template's mediaKind onto the row at first save so
+          // the export menu + publish destinations gate correctly from
+          // the very first paint. Default 'video' on the column would
+          // otherwise yield a podcast template that exports as MP4.
+          mediaKind: template.mediaKind,
           timelineSpec,
         });
         return finalise(res.data);

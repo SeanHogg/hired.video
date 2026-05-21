@@ -818,4 +818,216 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
       ]),
     ],
   }),
+
+  // ─── Podcast seeds (Phase 2 of #894) ─────────────────────────────────────
+  // Each scene becomes a chapter marker via `timeline.markers[]` once the
+  // chapter editor (#907) is wired. For now the scene labels themselves
+  // double as chapter cue points — the canvas-to-timeline emitter copies
+  // them across on save. Visual layout still authored on the canvas
+  // because the video-podcast export branch (MP4 with v-tracks) needs
+  // something to compose; audio-only export ignores the visuals.
+
+  podcast_trailer: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      makeScene("Cold open", "#0f172a", 8, [
+        makeText("[COLD OPEN]", { y: 0.05, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("\"The job market changed overnight.\"", {
+          y: 0.32, align: "center", color: "#ffffff", fontPx: 42, height: 0.25,
+        }),
+        makeText("A 5-second teaser quote that hooks the scroller.", {
+          y: 0.7, align: "center", fontPx: 18, color: "#64748b",
+        }),
+      ]),
+      makeScene("Show title", "#7c3aed", 6, [
+        makeHeading("HIRED.", { y: 0.18, align: "center", color: "#fafafa", fontPx: 96 }),
+        makeText("Conversations about work, careers, and the future of getting paid.", {
+          y: 0.5, align: "center", fontPx: 22, color: "#e9d5ff", height: 0.15,
+        }),
+        makeText("Hosted by Alex Rivera · new episodes weekly", {
+          y: 0.78, align: "center", fontPx: 18, color: "#c4b5fd",
+        }),
+      ]),
+      makeScene("What you get", "#1e1b4b", 10, [
+        makeHeading("Every Tuesday", { y: 0.08, fontPx: 44, color: "#ffffff" }),
+        makeChips(
+          [
+            "Founder + recruiter interviews",
+            "Hiring trend breakdowns",
+            "Career pivot case studies",
+            "Negotiation tactics",
+          ],
+          { y: 0.32, height: 0.5, fontPx: 24, chipColor: "rgba(167,139,250,0.25)", textColor: "#ddd6fe" },
+        ),
+      ]),
+      makeScene("Subscribe CTA", "#0f172a", 6, [
+        makeCta(
+          "Listen wherever you podcast",
+          "Open Apple Podcasts",
+          "https://podcasts.apple.com/show/hired",
+          {
+            subheadline: "Apple · Spotify · Overcast · RSS",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+            accentColor: "#fde68a",
+            accentTextColor: "#1e1b4b",
+          },
+        ),
+      ]),
+    ],
+  }),
+
+  podcast_episode: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      // Chapter 1 — Cold open + intro music bed.
+      makeScene("01 · Cold open", "#0f172a", 10, [
+        makeText("EPISODE 12", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("\"I quit a six-figure job to make ramen.\"", {
+          y: 0.3, align: "center", color: "#ffffff", fontPx: 38, height: 0.3,
+        }),
+        makeText("[Intro music — 8 seconds, fade under]", {
+          y: 0.78, align: "center", fontPx: 18, color: "#64748b",
+        }),
+      ]),
+      // Chapter 2 — Host welcome + guest intro.
+      makeScene("02 · Welcome", "#1e293b", 30, [
+        makeHeading("Today's guest", { y: 0.08, fontPx: 44, color: "#ffffff" }),
+        makeText("Maya Tanaka", { y: 0.3, fontPx: 36, color: "#fde68a" }),
+        makeText(
+          "Former Stripe PM · founder of Hoshi Ramen · raised $4.2M to scale a single shop into a chain.",
+          { y: 0.46, fontPx: 22, color: "#e2e8f0", height: 0.3 },
+        ),
+        makeChips(
+          ["Career pivot", "Founder story", "Negotiation"],
+          { y: 0.8, height: 0.15, fontPx: 18, chipColor: "rgba(253,224,71,0.2)", textColor: "#fde68a" },
+        ),
+      ]),
+      // Chapter 3 — Topic block 1.
+      makeScene("03 · The decision", "#0f172a", 240, [
+        makeHeading("Chapter 1 — The decision", { y: 0.1, fontPx: 40, color: "#ffffff" }),
+        makeText(
+          "How do you walk away from comp that's compounding? What did the math look like? What was the conversation at home?",
+          { y: 0.32, fontPx: 24, color: "#cbd5e1", height: 0.45 },
+        ),
+      ]),
+      // Chapter 4 — Topic block 2.
+      makeScene("04 · The first year", "#0f172a", 240, [
+        makeHeading("Chapter 2 — The first year", { y: 0.1, fontPx: 40, color: "#ffffff" }),
+        makeText(
+          "Real numbers. Burn, runway, the moment things almost broke. The mistake she'd never make again.",
+          { y: 0.32, fontPx: 24, color: "#cbd5e1", height: 0.45 },
+        ),
+      ]),
+      // Chapter 5 — Sponsor break.
+      makeScene("05 · Break", "#7c3aed", 30, [
+        makeText("[SPONSOR BREAK]", { y: 0.06, fontPx: 14, color: "#e9d5ff" }),
+        makeHeading("We'll be right back", { y: 0.4, align: "center", color: "#ffffff", fontPx: 48 }),
+      ]),
+      // Chapter 6 — Topic block 3.
+      makeScene("06 · The pivot", "#0f172a", 240, [
+        makeHeading("Chapter 3 — The pivot", { y: 0.1, fontPx: 40, color: "#ffffff" }),
+        makeText(
+          "When did the second shop happen? What unlocked the Series A? What's the playbook now?",
+          { y: 0.32, fontPx: 24, color: "#cbd5e1", height: 0.45 },
+        ),
+      ]),
+      // Chapter 7 — Listener CTA + outro music.
+      makeScene("07 · Outro", "#0f172a", 12, [
+        makeCta(
+          "If you liked this one",
+          "Subscribe & share",
+          "https://hired.video/podcast",
+          {
+            subheadline: "Apple · Spotify · Overcast · RSS · hired.video/podcast",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+            accentColor: "#fde68a",
+            accentTextColor: "#1e1b4b",
+          },
+        ),
+      ]),
+    ],
+  }),
+
+  podcast_interview: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      // Cold open — teaser pull-quote.
+      makeScene("Teaser", "#0f172a", 8, [
+        makeText("[COLD OPEN — guest quote]", { y: 0.05, fontPx: 14, color: "#94a3b8" }),
+        makeHeading(
+          "\"I told the board: I'm hiring engineers who can sell or I'm walking.\"",
+          { y: 0.28, align: "center", color: "#ffffff", fontPx: 34, height: 0.4 },
+        ),
+        makeText("— this week's guest, on the 1-year mark", {
+          y: 0.78, align: "center", fontPx: 18, color: "#64748b",
+        }),
+      ]),
+      // Host introduces show + guest.
+      makeScene("Intro", "#1e293b", 20, [
+        makeHeading("Today on Hired.", { y: 0.08, fontPx: 44, color: "#ffffff" }),
+        makeText("Sam Chen — founder of Vellum, ex-VP Eng at Stripe", {
+          y: 0.3, fontPx: 26, color: "#fde68a", height: 0.1,
+        }),
+        makeText(
+          "We talk through the hiring decisions that almost broke his Series B and what he'd tell his 1-year-younger self.",
+          { y: 0.5, fontPx: 22, color: "#e2e8f0", height: 0.35 },
+        ),
+      ]),
+      // Topic 1.
+      makeScene("Q1 · The early hires", "#0f172a", 180, [
+        makeHeading("Q1 — The first ten hires", { y: 0.1, fontPx: 40, color: "#ffffff" }),
+        makeText(
+          "How did you find them? Which ones do you still talk to? Which ones do you regret?",
+          { y: 0.32, fontPx: 24, color: "#cbd5e1", height: 0.45 },
+        ),
+      ]),
+      // Topic 2.
+      makeScene("Q2 · The bad year", "#0f172a", 180, [
+        makeHeading("Q2 — The bad year", { y: 0.1, fontPx: 40, color: "#ffffff" }),
+        makeText(
+          "Walk us through the cap-table meeting. What changed after? What stayed the same that shouldn't have?",
+          { y: 0.32, fontPx: 24, color: "#cbd5e1", height: 0.45 },
+        ),
+      ]),
+      // Topic 3.
+      makeScene("Q3 · The next bet", "#0f172a", 180, [
+        makeHeading("Q3 — The next bet", { y: 0.1, fontPx: 40, color: "#ffffff" }),
+        makeText(
+          "What does Vellum look like in 24 months? What hire are you afraid to make? What's the contrarian view inside your team right now?",
+          { y: 0.32, fontPx: 24, color: "#cbd5e1", height: 0.45 },
+        ),
+      ]),
+      // Rapid-fire round.
+      makeScene("Rapid fire", "#1e1b4b", 60, [
+        makeHeading("Rapid fire", { y: 0.1, fontPx: 44, color: "#ffffff" }),
+        makeChips(
+          [
+            "Best business book?",
+            "Last book you didn't finish?",
+            "City you'd move the company to?",
+            "One hire you'd un-do?",
+            "What replaces the resume in 5 years?",
+          ],
+          { y: 0.32, height: 0.55, fontPx: 22, chipColor: "rgba(167,139,250,0.25)", textColor: "#c4b5fd" },
+        ),
+      ]),
+      // Outro — guest CTA + show CTA.
+      makeScene("Where to find Sam", "#0f172a", 10, [
+        makeCta(
+          "Find Sam Chen",
+          "@samchen on X",
+          "https://x.com/samchen",
+          {
+            subheadline: "Vellum is hiring · vellum.dev/careers",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+            accentColor: "#fde68a",
+            accentTextColor: "#1e1b4b",
+          },
+        ),
+      ]),
+    ],
+  }),
 };

@@ -1,6 +1,6 @@
 // useCurrentCompanyScope — single source for the recruiter's current
 // company scope. Consolidates the duplicate `recruitService.getMyScope()`
-// fetches that were happening in CandidatesPanel, TeamLeaderboard, and
+// fetches that were happening in CandidatesPanel, TeamLeaderboardPanel, and
 // SourcingFeePanel.
 //
 // Returns the loaded scope plus the currently-selected companyId (which
