@@ -149,7 +149,6 @@ export default function HiringOnboarding() {
 
     loadOffers();
     loadChecklists();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   async function loadOffers() {

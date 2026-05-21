@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, ne, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
+import { eq, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -328,10 +328,6 @@ userRoutes.get("/public", async (c) => {
   const page = Number(c.req.query("page") ?? 1) || 1;
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
   const offset = (page - 1) * limit;
-  // When the request is authenticated, hide the viewer's own row from the
-  // Discover People grid server-side so paging counts match what the UI
-  // actually renders. Anonymous callers see everyone.
-  const viewerId = c.var.user?.sub;
 
   const baseConds = [
     eq(users.isActive, true),
@@ -345,7 +341,6 @@ userRoutes.get("/public", async (c) => {
       isNull(userProfiles.userId),
     )!,
   ];
-  if (viewerId) baseConds.push(ne(users.id, viewerId));
 
   const rows = await db
     .select({

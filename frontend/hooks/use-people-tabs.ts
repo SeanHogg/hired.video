@@ -24,7 +24,6 @@ import type { PageHeaderTab } from "@/components/PageHeader";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { visibleTo } from "@/lib/persona";
-import type { UserRole } from "@shared/user-roles";
 
 export interface UsePeopleTabsOptions {
   /** Optional badge count for the Connections tab (People page). */
@@ -39,7 +38,7 @@ export function usePeopleTabs({ connectionsCount }: UsePeopleTabsOptions = {}): 
   const showHiringSide = user
     ? visibleTo(
         [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
-        user.role as UserRole,
+        user.role,
       )
     : false;
 

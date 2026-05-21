@@ -42,6 +42,7 @@ import JobAdIntake from "./intake/JobAdIntake";
 import CompanyPromoIntake from "./intake/CompanyPromoIntake";
 import SizzleReelIntake from "./intake/SizzleReelIntake";
 import ToolPromoIntake from "./intake/ToolPromoIntake";
+import type { Audience } from "./audiences";
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -116,6 +117,10 @@ export interface TemplateDef {
   purpose: StudioPurpose;
   /** Category bucket for the /studio landing filter pills. */
   category: TemplateCategory;
+  /** Demographics this template serves. Single SoT for #900 audience pages
+   *  (`/for/:audience`) and #901 template-page "best for" chips. Filter the
+   *  catalog directly — no parallel `AUDIENCE_TO_TEMPLATES` lookup. */
+  audiences: Audience[];
   /** Default project name when this template is picked. */
   defaultName: string;
   /** Default AI prompt when this template is picked. */
@@ -157,6 +162,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // statement.
     purpose: "basic",
     category: "quick",
+    audiences: ["creator"],
     defaultName: "New Video",
     // Basic skips the LLM (#492) — it produces a single mock scene from
     // the user's description verbatim, so a pre-filled instructional
@@ -174,6 +180,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-profile",
     purpose: "personal_brand",
     category: "promote",
+    audiences: ["job_seeker", "creator", "founder", "recruiter"],
     defaultName: "Promote Yourself",
     defaultPrompt: "Create a 30-second video promoting my profile — my role, expertise, and what I offer.",
     firstTabLabel: "Profile",
@@ -187,6 +194,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-resume",
     purpose: "resume",
     category: "promote",
+    audiences: ["job_seeker"],
     defaultName: "New Video Resume",
     defaultPrompt: "Create a professional 28-second video resume",
     firstTabLabel: "Prompt",
@@ -200,6 +208,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "promote",
+    audiences: ["job_seeker", "creator", "founder"],
     defaultName: "Personal Brand Video",
     defaultPrompt: "Create a personal brand video that tells my story",
     firstTabLabel: "Prompt",
@@ -213,6 +222,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-resume",
     purpose: "resume",
     category: "promote",
+    audiences: ["job_seeker", "developer", "designer", "data_analyst"],
     defaultName: "Skills Demo",
     defaultPrompt: "Create a skills demonstration video showcasing technical expertise",
     firstTabLabel: "Setup",
@@ -226,6 +236,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "resume",
     category: "showcase",
+    audiences: ["developer"],
     defaultName: "Code Walkthrough",
     defaultPrompt: "Create a video walking through code architecture and decisions",
     firstTabLabel: "Setup",
@@ -239,6 +250,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-resume",
     purpose: "resume",
     category: "showcase",
+    audiences: ["designer"],
     defaultName: "Design Portfolio",
     defaultPrompt: "Create a video showcasing my design portfolio — projects, process, and outcomes",
     firstTabLabel: "Setup",
@@ -252,6 +264,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "resume",
     category: "showcase",
+    audiences: ["data_analyst", "job_seeker"],
     defaultName: "Data Analysis",
     defaultPrompt: "Create a video showing data insights, methodology, and visualizations",
     firstTabLabel: "Setup",
@@ -265,6 +278,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "pick-job",
     purpose: "job_ad",
     category: "hiring",
+    audiences: ["recruiter", "employer"],
     defaultName: "Job Ad Video",
     defaultPrompt: "Create a compelling 30-second job advertisement video",
     firstTabLabel: "Job Details",
@@ -278,6 +292,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "pick-company",
     purpose: "company_promo",
     category: "hiring",
+    audiences: ["employer", "recruiter"],
     defaultName: "Company Promo Video",
     defaultPrompt: "Create a 30-second video promoting my company — what we do, who we serve, and why we hire.",
     firstTabLabel: "Company Details",
@@ -291,6 +306,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "showcase",
+    audiences: ["athlete", "actor", "musician", "creator", "director"],
     defaultName: "Sizzle Reel",
     defaultPrompt: "Build a sizzle reel from my clips, cut to the music",
     firstTabLabel: "Reel Builder",
@@ -307,6 +323,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // shape, add a "tool_promo" StudioPurpose.
     purpose: "product_launch",
     category: "showcase",
+    audiences: ["creator", "founder", "developer"],
     defaultName: "Tool Promo",
     defaultPrompt: "Create a single-scene 30-second promo video for a tool from the hired.video catalog. Open with the problem, show the tool in use, end with a clear call to action.",
     firstTabLabel: "Pick Tool",
@@ -336,6 +353,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // for now personal_brand produces an actor-friendly script.
     purpose: "personal_brand",
     category: "film",
+    audiences: ["actor"],
     defaultName: "Self-tape audition",
     defaultPrompt:
       "Create a self-tape audition layout: a slate scene with the actor's name, role, and agent, a scene-read with the dialogue, and a clean outro thanking the casting team.",
@@ -353,6 +371,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "film",
+    audiences: ["actor"],
     defaultName: "Monologue",
     defaultPrompt:
       "Create a single-scene monologue layout — actor close-up, optional title card, captions on by default so the casting reviewer can read along.",
@@ -368,6 +387,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "film",
+    audiences: ["actor"],
     defaultName: "Actor showreel",
     defaultPrompt:
       "Create a 60-90 second actor showreel: title card with the actor's name + reps, three to five scene snippets with project / role chips, and an outro card with contact info.",
@@ -383,6 +403,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // product_launch prompt config — a film is a product being pitched.
     purpose: "product_launch",
     category: "film",
+    audiences: ["director"],
     defaultName: "Director's pitch",
     defaultPrompt:
       "Create a director's pitch deck: title + logline, tone reference, character beats, comparable films, the ask (budget / partnership / cast), and a closing scene with director contact info.",
@@ -400,6 +421,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // category keeps it visually separated from corporate Job Ad.
     purpose: "job_ad",
     category: "film",
+    audiences: ["director", "employer"],
     defaultName: "Casting call",
     defaultPrompt:
       "Create a casting call: production title, role name + character description, shoot dates + location, union / non-union status, submission deadline, and explicit how-to-submit instructions for self-tapes.",
