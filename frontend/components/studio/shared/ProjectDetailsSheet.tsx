@@ -349,6 +349,7 @@ export default function ProjectDetailsSheet({
                       label="Upload, pick stock, or AI-generate a social card image"
                     />
                   </UrlPickerInput>
+                  <SocialCardPreview url={socialCardImage} />
                   <p className="text-xs text-muted-foreground">
                     1200×630 PNG/JPG works best for LinkedIn, X, and Facebook
                     previews.
@@ -417,5 +418,33 @@ function SaveStatusBadge({ status }: { status: SaveStatus }) {
     <span className="text-xs font-normal text-destructive">
       Save failed
     </span>
+  );
+}
+
+// Self-gated thumbnail for the social-card field — returns null when the
+// URL is empty or fails to load, so the consumer doesn't have to compute
+// `canShow` itself. 1200×630 aspect (≈1.91:1) matches the LinkedIn/X/FB
+// crop the hint text below mentions.
+function SocialCardPreview({ url }: { url: string }) {
+  const [errored, setErrored] = useState(false);
+  useEffect(() => {
+    setErrored(false);
+  }, [url]);
+  if (!url || errored) return null;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="block w-full max-w-xs overflow-hidden rounded-md border bg-muted"
+      style={{ aspectRatio: "1200 / 630" }}
+    >
+      <img
+        src={url}
+        alt="Social card preview"
+        className="h-full w-full object-cover"
+        onError={() => setErrored(true)}
+      />
+    </a>
   );
 }

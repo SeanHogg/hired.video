@@ -1146,9 +1146,14 @@ studioRoutes.post("/save-draft", async (c) => {
     // so toProjectDto can lift them onto the DTO. All optional so a
     // legacy save-draft caller is unaffected.
     metaDescription:  z.string().max(300).optional(),
-    slug:             z.string().max(80).regex(SLUG_PATTERN, "slug must be kebab-case").optional(),
+    // Empty string is allowed: the downstream resolver below treats "" as
+    // "carry forward the prior slug" (clearing the field in the UI must
+    // not break validation with a misleading kebab-case error).
+    slug:             z.union([z.string().max(80).regex(SLUG_PATTERN, "slug must be kebab-case"), z.literal("")]).optional(),
     keywords:         z.array(z.string().max(40)).max(20).optional(),
-    socialCardImage:  z.string().url().max(500).optional(),
+    // Allow empty string so the author can clear a previously-set image
+    // from the Details drawer — `.url()` alone rejects "" and traps them.
+    socialCardImage:  z.union([z.string().url().max(500), z.literal("")]).optional(),
   }).safeParse(body);
 
   if (!parsed.success) {

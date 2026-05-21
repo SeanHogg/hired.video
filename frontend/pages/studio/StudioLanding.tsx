@@ -57,9 +57,15 @@ import {
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
 import { parseStudioSubject } from "@shared/studio-subject";
+import {
+  MEDIA_KINDS,
+  MEDIA_KIND_UI,
+  type MediaKind,
+} from "@shared/media-kinds";
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
+import MediaKindBadge from "@/components/studio/shared/MediaKindBadge";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
@@ -74,12 +80,19 @@ import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 // honours them on first paint. Non-listed params are dropped.
 const EDITOR_FORWARDED_PARAMS = ["capture"] as const;
 
-// Unified filter for the consolidated Templates section. "all" merges the
-// built-in catalog with the user's owned rows (created + claimed +
-// purchased). The built-in category ids filter the catalog alone; the
-// "created"/"purchased" ids filter the owned set alone — so a single pill
-// row covers both halves without a second "Your templates" section.
-type TemplateFilter = "all" | TemplateCategory | "created" | "purchased";
+// The chooser carries TWO orthogonal filter axes per #906 / PRD §6.1:
+//
+//   - `kindFilter` (Type)    — MediaKind | "all". Reads `MEDIA_KINDS` so
+//                              adding a kind doesn't touch this file.
+//   - `useForFilter` (Use-for) — TemplateCategory | created | purchased | "all".
+//                                The pre-existing single-axis filter.
+//
+// The two axes AND together: picking `Podcast` + `Promote` shows podcast
+// templates in the promote bucket only. "All" on a row disables that
+// axis. Per the standing DRY rule, both rows render their pills from
+// the canonical registries — no parallel pill arrays here.
+type UseForFilter = "all" | TemplateCategory | "created" | "purchased";
+type KindFilter = "all" | MediaKind;
 
 // Normalised shape the owned-template surfaces consume so the card +
 // carousel renderers don't branch on "is this a creator-published row or
@@ -106,7 +119,9 @@ export default function StudioLanding() {
   const [projects, setProjects] = useState<StudioProject[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<TemplateFilter>("all");
+  // Two orthogonal filter axes — see UseForFilter / KindFilter above.
+  const [useForFilter, setUseForFilter] = useState<UseForFilter>("all");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   // User's own published templates + claimed/purchased licensed templates.
   // Single source of truth feeding the unified Templates section — both
   // the "All" merged view and the dedicated Created/Purchased filters.
@@ -304,13 +319,14 @@ export default function StudioLanding() {
   // their library first. Category pills scope to built-ins;
   // Created/Purchased pills scope to owned.
   const filteredRows = useMemo<TemplateRow[]>(() => {
-    const showOwned = filter === "all" || filter === "created" || filter === "purchased";
-    const showBuiltins = filter === "all" || (filter !== "created" && filter !== "purchased");
+    const showOwned = useForFilter === "all" || useForFilter === "created" || useForFilter === "purchased";
+    const showBuiltins = useForFilter === "all" || (useForFilter !== "created" && useForFilter !== "purchased");
 
     const q = query.trim().toLowerCase();
     const builtinRows: TemplateRow[] = showBuiltins
       ? TEMPLATE_CATALOG.filter((t) => {
-          if (filter !== "all" && t.category !== filter) return false;
+          if (useForFilter !== "all" && t.category !== useForFilter) return false;
+          if (kindFilter !== "all" && t.mediaKind !== kindFilter) return false;
           if (!q) return true;
           return (
             t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)
@@ -321,15 +337,21 @@ export default function StudioLanding() {
     const ownedRows: TemplateRow[] = showOwned
       ? ownedTemplates
           .filter((o) => {
-            if (filter === "created") return o.provenance === "created";
-            if (filter === "purchased") return o.provenance !== "created";
+            if (useForFilter === "created") return o.provenance === "created";
+            if (useForFilter === "purchased") return o.provenance !== "created";
             return true;
           })
+          // Creator-published templates don't yet carry mediaKind on the
+          // row (#909) so they're implicitly `video`. When the kind filter
+          // is set to anything other than `all` or `video`, drop them so
+          // the carousel doesn't show stale video-shaped owned templates
+          // under "Podcast" / "Voice" / "Animation".
+          .filter(() => kindFilter === "all" || kindFilter === "video")
           .map((o) => ({ kind: "owned" as const, owned: o }))
       : [];
 
     return [...ownedRows, ...builtinRows];
-  }, [filter, query, ownedTemplates]);
+  }, [useForFilter, kindFilter, query, ownedTemplates]);
 
   function openTemplate(templateId: string) {
     // skipNavigate is set on the shared `create` so the deep-link
@@ -447,39 +469,72 @@ export default function StudioLanding() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          <CategoryPill
-            label="All"
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-          />
-          {TEMPLATE_CATEGORIES.map((c) => (
-            <CategoryPill
-              key={c.id}
-              label={c.label}
-              active={filter === c.id}
-              onClick={() => setFilter(c.id)}
-            />
-          ))}
-          {/* Owned-template filters — sit on the same pill row as the
-              built-in categories so the user has one consolidated filter
-              surface for every template visible on /studio. */}
-          <CategoryPill
-            label="Created"
-            active={filter === "created"}
-            onClick={() => setFilter("created")}
-          />
-          <CategoryPill
-            label="Purchased"
-            active={filter === "purchased"}
-            onClick={() => setFilter("purchased")}
-          />
-        </div>
+        {/* Type axis — MediaKind. Reads MEDIA_KINDS so adding a kind
+            (#894 phases 4/5) doesn't touch this file. Self-hides
+            entirely when the only kind in the catalog is `video` — no
+            point showing a one-option filter row. */}
+        <FilterPillRow
+          label="Type"
+          render={() => (
+            <>
+              <CategoryPill
+                label="All"
+                active={kindFilter === "all"}
+                onClick={() => setKindFilter("all")}
+              />
+              {MEDIA_KINDS.map((kind) => (
+                <CategoryPill
+                  key={kind}
+                  label={MEDIA_KIND_UI[kind].badgeLabel}
+                  active={kindFilter === kind}
+                  onClick={() => setKindFilter(kind)}
+                />
+              ))}
+            </>
+          )}
+        />
+        {/* Use-for axis — the pre-existing category + created/purchased
+            row. AND'd with the Type axis above so picking Podcast +
+            Promote shows podcast templates in the promote bucket. */}
+        <FilterPillRow
+          label="Use for"
+          render={() => (
+            <>
+              <CategoryPill
+                label="All"
+                active={useForFilter === "all"}
+                onClick={() => setUseForFilter("all")}
+              />
+              {TEMPLATE_CATEGORIES.map((c) => (
+                <CategoryPill
+                  key={c.id}
+                  label={c.label}
+                  active={useForFilter === c.id}
+                  onClick={() => setUseForFilter(c.id)}
+                />
+              ))}
+              {/* Owned-template filters — same row as the built-in
+                  categories so the user has one consolidated filter
+                  surface for every template visible on /studio. */}
+              <CategoryPill
+                label="Created"
+                active={useForFilter === "created"}
+                onClick={() => setUseForFilter("created")}
+              />
+              <CategoryPill
+                label="Purchased"
+                active={useForFilter === "purchased"}
+                onClick={() => setUseForFilter("purchased")}
+              />
+            </>
+          )}
+        />
 
         <UnifiedTemplateCarousel
           rows={filteredRows}
           loading={userTemplatesLoading}
-          filter={filter}
+          useForFilter={useForFilter}
+          kindFilter={kindFilter}
           onPickBuiltin={openTemplate}
           onPreviewBuiltin={previewTemplate}
           onPickOwned={openStudioTemplate}
@@ -674,6 +729,14 @@ function StudioVideoCard({
           <VisibilityIcon className="h-3 w-3" />
           {visibilityLabel}
         </button>
+        {/* Kind badge — bottom-left, mirrors the template-card position
+            so the chooser + "My videos" grid read symmetric. Self-hides
+            when `mediaKind === "video"` — the StudioProject DTO defaults
+            to 'video' for every pre-#894 row. */}
+        <MediaKindBadge
+          mediaKind={project.mediaKind ?? "video"}
+          className="absolute bottom-2 left-2 z-10"
+        />
         {/* Hover overlay — Edit pill takes the user straight into the
             editor; Details pill opens the side panel. The always-
             visible visibility badge above is also an opener but reads
@@ -761,6 +824,30 @@ function StudioVideoCard({
   );
 }
 
+/**
+ * Single-axis filter row with a left-rail label and a wrap of pills. ONE
+ * component renders both the Type (#894 mediaKind) and Use-for axes so
+ * a layout tweak (label position, spacing) lands in one place. Caller
+ * supplies the pill JSX via `render` — keeps the row dumb to which axis
+ * lives inside it.
+ */
+function FilterPillRow({
+  label,
+  render,
+}: {
+  label: string;
+  render: () => ReactNode;
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {label}
+      </span>
+      {render()}
+    </div>
+  );
+}
+
 function CategoryPill({
   label,
   active,
@@ -796,7 +883,8 @@ function CategoryPill({
 function UnifiedTemplateCarousel({
   rows,
   loading,
-  filter,
+  useForFilter,
+  kindFilter,
   onPickBuiltin,
   onPreviewBuiltin,
   onPickOwned,
@@ -804,7 +892,8 @@ function UnifiedTemplateCarousel({
 }: {
   rows: TemplateRow[];
   loading: boolean;
-  filter: TemplateFilter;
+  useForFilter: UseForFilter;
+  kindFilter: KindFilter;
   onPickBuiltin: (id: string) => void;
   onPreviewBuiltin: (id: ContentTemplate) => void;
   onPickOwned: (template: StudioTemplate) => void;
@@ -814,7 +903,7 @@ function UnifiedTemplateCarousel({
   // built-in catalog is static so it never reads from `loading`. Only
   // gate the skeleton on `loading` when the active filter actually needs
   // the owned set.
-  const dependsOnOwned = filter === "all" || filter === "created" || filter === "purchased";
+  const dependsOnOwned = useForFilter === "all" || useForFilter === "created" || useForFilter === "purchased";
   if (loading && dependsOnOwned) {
     return (
       <div className="flex gap-4 overflow-hidden pb-2">
@@ -828,13 +917,24 @@ function UnifiedTemplateCarousel({
     );
   }
   if (rows.length === 0) {
+    // Kind-aware empty-state copy. Driven by MEDIA_KIND_UI[kind].badgeLabel
+    // so the "No Podcast templates yet…" message rolls out automatically
+    // when the user filters to a kind that has no entries in the catalog.
+    const kindLabel = kindFilter !== "all" ? MEDIA_KIND_UI[kindFilter].badgeLabel : null;
+    const message = useForFilter === "created"
+      ? kindLabel
+        ? `You haven't published any ${kindLabel} templates yet.`
+        : "You haven't published any templates yet."
+      : useForFilter === "purchased"
+        ? kindLabel
+          ? `You haven't purchased or claimed any ${kindLabel} templates yet.`
+          : "You haven't purchased or claimed any templates yet."
+        : kindLabel
+          ? `No ${kindLabel} templates match your search yet — pick a Video template to start while we ship more.`
+          : "No templates match your search.";
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">
-        {filter === "created"
-          ? "You haven't published any templates yet."
-          : filter === "purchased"
-            ? "You haven't purchased or claimed any templates yet."
-            : "No templates match your search."}
+        {message}
       </div>
     );
   }
@@ -901,6 +1001,13 @@ function BuiltinTemplateCard({
               Use
             </span>
           </div>
+          {/* Kind badge — bottom-left, always visible, self-hides for
+              `mediaKind === "video"` so the existing video-only catalog
+              doesn't gain redundant "Video" chips. */}
+          <MediaKindBadge
+            mediaKind={template.mediaKind}
+            className="absolute bottom-2 left-2 z-10"
+          />
         </div>
         <div className="flex items-start gap-2 p-3">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-purple/10 text-brand-purple">
@@ -1043,6 +1150,17 @@ function OwnedTemplateCard({
               Use
             </span>
           </div>
+          {/* Kind badge — bottom-left, symmetric with BuiltinTemplateCard.
+              Self-hides when the template is `video` so the existing
+              owned-template surface stays clean. `studio_templates` does
+              not yet carry a `media_kind` column (#909), so every owned
+              template is implicitly `video` and the badge renders nothing.
+              Once #909 lands, swap the hardcoded `"video"` for the
+              template's own field. */}
+          <MediaKindBadge
+            mediaKind="video"
+            className="absolute bottom-2 left-2 z-10"
+          />
         </div>
         <div className="flex items-start gap-2 p-3">
           <div className={cn(
