@@ -94,7 +94,7 @@ export default function PublicVideoResume() {
 
   if (loading) {
     return (
-      <AppShell variant="public" bgClassName="bg-background">
+      <AppShell bgClassName="bg-background">
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
         </div>
@@ -104,7 +104,7 @@ export default function PublicVideoResume() {
 
   if (error || !video) {
     return (
-      <AppShell variant="public" bgClassName="bg-background">
+      <AppShell bgClassName="bg-background">
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
           <h1 className="text-2xl font-semibold text-foreground">Video Not Found</h1>
           <p className="text-muted-foreground">{error || "This video resume is not available."}</p>
@@ -124,7 +124,7 @@ export default function PublicVideoResume() {
   if (video.pending) {
     const ownerLabel = video.ownerName || "The creator";
     return (
-      <AppShell variant="public" bgClassName="bg-background">
+      <AppShell bgClassName="bg-background">
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
           {video.ownerAvatar && (
             <img
@@ -154,7 +154,7 @@ export default function PublicVideoResume() {
   const ready = video;
 
   return (
-    <AppShell variant="public" bgClassName="bg-background">
+    <AppShell bgClassName="bg-background">
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
         {/* Owner info */}
         <div className="flex items-center gap-4">
