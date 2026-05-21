@@ -387,10 +387,14 @@ function PeopleDetailContent() {
   // ---------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------
+  // Owners with `promoteWithoutAuth` opted in let unauth visitors view the
+  // full page (creator / service-provider promotion link). Everyone else
+  // still gets the AuthOverlay sign-in mask.
+  const showAuthOverlay = !isAuthenticated && !(profile as any)?.promoteWithoutAuth;
   const shell = (children: React.ReactNode) => (
     <AppShell bgClassName="bg-background">
-      <div className={!isAuthenticated ? "relative" : undefined}>
-        {!isAuthenticated && (
+      <div className={showAuthOverlay ? "relative" : undefined}>
+        {showAuthOverlay && (
           <AuthOverlay
             contentType="person"
             title={fullName || t("messages.userProfileFallback")}

@@ -195,6 +195,7 @@ function toUserProfileDto(
       showEmail?: boolean;
       showPhone?: boolean;
       showLocation?: boolean;
+      promoteWithoutAuth?: boolean;
     } | null;
   },
   creator?: {
@@ -220,6 +221,10 @@ function toUserProfileDto(
   const showEmail = privacyOptions?.privacy?.showEmail ?? false;
   const showPhone = privacyOptions?.privacy?.showPhone ?? false;
   const showLocation = privacyOptions?.privacy?.showLocation ?? false;
+  // Opt-in: when true, the frontend lets unauthenticated visitors view the
+  // full /people/:slug page (no AuthOverlay sign-in mask) so creators /
+  // service providers can share their profile as a promotion link.
+  const promoteWithoutAuth = privacyOptions?.privacy?.promoteWithoutAuth ?? false;
 
   const visibleEmail = isOwner || showEmail ? row.email : null;
   const visiblePhone = isOwner || showPhone ? (profile?.phone ?? "") : null;
@@ -236,6 +241,7 @@ function toUserProfileDto(
     showEmail,
     showPhone,
     showLocation,
+    promoteWithoutAuth,
     data: {
       firstName,
       lastName,
@@ -961,6 +967,7 @@ userRoutes.get("/:id", async (c) => {
       showEmail: privacyPreferences.showEmail,
       showPhone: privacyPreferences.showPhone,
       showLocation: privacyPreferences.showLocation,
+      promoteWithoutAuth: privacyPreferences.promoteWithoutAuth,
     })
       .from(privacyPreferences)
       .where(eq(privacyPreferences.userId, me.id))

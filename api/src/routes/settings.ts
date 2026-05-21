@@ -28,6 +28,7 @@ export const PRIVACY_FIELDS = [
   "showEmail",
   "showPhone",
   "showLocation",
+  "promoteWithoutAuth",
   "allowMessaging",
   "shareAnalyticsData",
   "shareUsageData",

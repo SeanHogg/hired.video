@@ -4100,6 +4100,8 @@
   "settings.notifications.weeklyLabel": "Resumen semanal",
   "settings.privacy.indexableDesc": "Permite que los motores de búsqueda indexen tu perfil",
   "settings.privacy.indexableLabel": "Indexación en motores de búsqueda",
+  "settings.privacy.promoteWithoutAuthDesc": "Permite que los visitantes no autenticados vean tu perfil completo: pensado para creadores y proveedores de servicios que usan su perfil como portafolio o enlace de promoción. Cuando está desactivado, los visitantes anónimos ven una pantalla de inicio de sesión.",
+  "settings.privacy.promoteWithoutAuthLabel": "Promocionar servicios y contenido sin autenticación",
   "settings.privacy.publicProfileDesc": "Haz que tu perfil sea visible para otros usuarios",
   "settings.privacy.publicProfileLabel": "Perfil público",
   "settings.privacy.showEmailDesc": "Muestra el correo electrónico en tu perfil público",

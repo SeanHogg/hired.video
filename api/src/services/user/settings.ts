@@ -27,6 +27,7 @@ export function defaultPrivacyPreferences() {
     showEmail: false,
     showPhone: false,
     showLocation: false,
+    promoteWithoutAuth: false,
     allowMessaging: true,
     shareAnalyticsData: true,
     shareUsageData: true,

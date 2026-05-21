@@ -4103,6 +4103,8 @@
   "settings.notifications.weeklyLabel": "Weekly Summary",
   "settings.privacy.indexableDesc": "Allow search engines to index your profile",
   "settings.privacy.indexableLabel": "Search Engine Indexing",
+  "settings.privacy.promoteWithoutAuthDesc": "Let unauthenticated visitors view your full profile — for creators and service providers using their profile as a portfolio or promotion link. When off, anonymous visitors see a sign-in prompt.",
+  "settings.privacy.promoteWithoutAuthLabel": "Promote Services & Content Without Authentication",
   "settings.privacy.publicProfileDesc": "Make your profile visible to other users",
   "settings.privacy.publicProfileLabel": "Public Profile",
   "settings.privacy.showEmailDesc": "Display email on your public profile",

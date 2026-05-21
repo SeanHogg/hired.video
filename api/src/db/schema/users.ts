@@ -238,6 +238,11 @@ export const privacyPreferences = pgTable("privacy_preferences", {
   showEmail: boolean("show_email").default(false).notNull(),
   showPhone: boolean("show_phone").default(false).notNull(),
   showLocation: boolean("show_location").default(false).notNull(),
+  // Opt-in promotion mode for creators / service providers: when true,
+  // unauthenticated visitors see the full /people/:slug page instead of
+  // the sign-in AuthOverlay. Default false so existing privacy behaviour
+  // is unchanged for everyone else. See migration 0097.
+  promoteWithoutAuth: boolean("promote_without_auth").default(false).notNull(),
   allowMessaging: boolean("allow_messaging").default(true).notNull(),
   shareAnalyticsData: boolean("share_analytics_data").default(true).notNull(),
   shareUsageData: boolean("share_usage_data").default(true).notNull(),

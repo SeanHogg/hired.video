@@ -42,6 +42,11 @@ export const UserProfileSchema = z.object({
     .optional(),
   openToWork: nullableBoolean(),
   providesServices: nullableBoolean(),
+  // When true, the owner has opted into a fully public profile that
+  // unauthenticated visitors can view directly (no AuthOverlay). Designed
+  // for creators / service providers using their profile as a promotion
+  // link. Persisted on privacy_preferences server-side.
+  promoteWithoutAuth: nullableBoolean(),
   slug: nullableString(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
@@ -176,6 +181,9 @@ export const PublicUserSchema = z.object({
   salaryCurrency: nullableString(),
   yearsOfExperience: nullableNumber(),
   providesServices: nullableBoolean(),
+  // See UserProfileSchema — opt-in flag that lets unauthenticated visitors
+  // view the full /people/:slug page.
+  promoteWithoutAuth: nullableBoolean(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
 });
@@ -301,6 +309,7 @@ export class UserService {
       skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
       openToWork: payload.openToWork ?? dataBlock.openToWork ?? undefined,
       providesServices: payload.providesServices ?? undefined,
+      promoteWithoutAuth: payload.promoteWithoutAuth ?? undefined,
       slug: payload.slug || undefined,
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,

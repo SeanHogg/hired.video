@@ -31,8 +31,8 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("PRIVACY_FIELDS", () => {
-  it("enumerates exactly the 14 privacy booleans the PUT handler accepts", () => {
-    assert.equal(PRIVACY_FIELDS.length, 14);
+  it("enumerates exactly the 15 privacy booleans the PUT handler accepts", () => {
+    assert.equal(PRIVACY_FIELDS.length, 15);
     const expected = new Set([
       "profileVisibleToPublic",
       "profileVisibleToRecruiters",
@@ -44,6 +44,7 @@ describe("PRIVACY_FIELDS", () => {
       "showEmail",
       "showPhone",
       "showLocation",
+      "promoteWithoutAuth",
       "allowMessaging",
       "shareAnalyticsData",
       "shareUsageData",

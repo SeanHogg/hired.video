@@ -31,6 +31,9 @@ const BackendPrivacyPreferencesSchema = z.object({
   showEmail: z.boolean().optional(),
   showPhone: z.boolean().optional(),
   showLocation: z.boolean().optional(),
+  // Creator / service-provider opt-in: when true, unauthenticated visitors
+  // can view the owner's full /people/:slug page (no AuthOverlay).
+  promoteWithoutAuth: z.boolean().optional(),
   allowMessaging: z.boolean().optional(),
   // Data sharing
   shareAnalyticsData: z.boolean().optional(),
@@ -62,6 +65,7 @@ export const PrivacySettingsSchema = z.object({
   showPhone: z.boolean(),
   showLocation: z.boolean().optional(),
   indexable: z.boolean(),
+  promoteWithoutAuth: z.boolean().optional(),
   allowMessages: z.boolean().optional(),
   showActivity: z.boolean().optional(),
 });
@@ -205,6 +209,7 @@ export class SettingsService {
       showPhone: dto.showPhone ?? false,
       showLocation: dto.showLocation ?? false,
       indexable: dto.allowSearchEngineIndexing ?? true,
+      promoteWithoutAuth: dto.promoteWithoutAuth ?? false,
       allowMessages: dto.allowMessaging ?? dto.allowDirectMessages ?? true,
       showActivity: dto.showActivityStatus ?? true,
     };
@@ -267,6 +272,9 @@ export class SettingsService {
     }
     if (typeof settings.showLocation === "boolean") {
       payload.showLocation = settings.showLocation;
+    }
+    if (typeof settings.promoteWithoutAuth === "boolean") {
+      payload.promoteWithoutAuth = settings.promoteWithoutAuth;
     }
     if (typeof settings.allowMessages === "boolean") {
       payload.allowDirectMessages = settings.allowMessages;

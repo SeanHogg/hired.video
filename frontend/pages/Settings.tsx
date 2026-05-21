@@ -117,6 +117,7 @@ function SettingsContent() {
     showPhone: false,
     showLocation: false,
     indexable: true,
+    promoteWithoutAuth: false,
     allowMessages: true,
     showActivity: true,
   });
@@ -229,6 +230,7 @@ function SettingsContent() {
           showEmail: p.showEmail ?? prev.showEmail,
           showPhone: p.showPhone ?? prev.showPhone,
           showLocation: p.showLocation ?? prev.showLocation,
+          promoteWithoutAuth: p.promoteWithoutAuth ?? prev.promoteWithoutAuth,
         }));
       })
       .catch((err) => {
@@ -369,8 +371,7 @@ function SettingsContent() {
       const updated = await settingsService.updatePrivacySettings({
         profileVisible: merged.profileVisible,
         indexable: merged.indexable,
-
-
+        promoteWithoutAuth: merged.promoteWithoutAuth,
         allowMessages: merged.allowMessages,
         showActivity: merged.showActivity,
       });
@@ -1102,6 +1103,24 @@ function SettingsContent() {
                         checked={privacy.profileVisible}
                         disabled={savingPrivacy}
                         onCheckedChange={(checked) => savePrivacyPatch({ profileVisible: checked })}
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          {t("settings.privacy.promoteWithoutAuthLabel")}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t("settings.privacy.promoteWithoutAuthDesc")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={privacy.promoteWithoutAuth ?? false}
+                        disabled={savingPrivacy}
+                        onCheckedChange={(checked) =>
+                          savePrivacyPatch({ promoteWithoutAuth: checked })
+                        }
                       />
                     </div>
                     <Separator />
