@@ -37,7 +37,7 @@ const KIND_VISUAL: Record<MediaKind, {
   animation: { Icon: Sparkles,       pillClassName: "bg-emerald-500/90 text-white" },
 };
 
-export interface MediaKindBadgeProps {
+interface MediaKindBadgeProps {
   mediaKind: MediaKind;
   /** Optional class for the wrapper — callers position the badge via
    *  absolute / inline classes here. The badge itself controls colour +

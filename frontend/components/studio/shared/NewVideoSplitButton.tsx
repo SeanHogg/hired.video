@@ -40,7 +40,7 @@ import {
   type MediaKind,
 } from "@shared/media-kinds";
 
-export interface NewVideoSplitButtonProps {
+interface NewVideoSplitButtonProps {
   /** Visual variant — "outline" for the editor toolbar; "primary" for
    *  the landing CTA. */
   variant?: "outline" | "primary";
