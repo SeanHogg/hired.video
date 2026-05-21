@@ -44,7 +44,7 @@ export default function PlaybackControls({
         size="sm"
         onClick={() => playback.seek(0)}
         aria-label="Back to start"
-        className="h-10 w-10 rounded-full p-0 text-white hover:bg-white/10"
+        className="h-10 w-10 shrink-0 rounded-full p-0 text-white hover:bg-white/10"
       >
         <SkipBack className="h-4 w-4" />
       </Button>
@@ -53,7 +53,7 @@ export default function PlaybackControls({
         size="sm"
         onClick={playback.toggle}
         aria-label={playback.isPlaying ? "Pause" : "Play"}
-        className="h-12 w-12 rounded-full p-0"
+        className="h-12 w-12 shrink-0 rounded-full p-0"
       >
         {playback.isPlaying ? (
           <Pause className="h-5 w-5" />
@@ -68,10 +68,10 @@ export default function PlaybackControls({
         step={0.05}
         value={playback.playhead}
         onChange={(e) => playback.seek(Number(e.target.value))}
-        className="h-1 flex-1 max-w-md cursor-pointer accent-brand-purple"
+        className="h-1 min-w-0 flex-1 max-w-md cursor-pointer accent-brand-purple"
         aria-label="Playhead"
       />
-      <span className="min-w-[6rem] text-center text-xs tabular-nums opacity-80">
+      <span className="shrink-0 min-w-[6rem] text-center text-xs tabular-nums opacity-80">
         {formatTime(playback.playhead)} / {formatTime(playback.duration)}
       </span>
     </div>
