@@ -561,7 +561,7 @@ function PeopleDetailContent() {
                   <VideoResumeSection videos={videos} isOwner={isOwner} />
 
                   {masterResume ? (
-                    <div className="-mx-6 [&_.max-w-6xl]:max-w-none">
+                    <div className="-mx-4 md:-mx-6 [&_.max-w-6xl]:max-w-none">
                       <DeclarativeResumeRenderer
                         resume={masterResume}
                         descriptor={resumeDescriptor}

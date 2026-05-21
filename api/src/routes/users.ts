@@ -933,6 +933,28 @@ userRoutes.get("/:id", async (c) => {
     caller?.isSuperAdmin === true ||
     caller?.roles?.includes(USER_ROLES.SUPER_ADMIN);
 
+  // Fetched up-front (not in the enrich Promise.all below) because two of
+  // these flags participate in the visibility gates that follow:
+  //   • profileVisibleToPublic — Settings → Privacy → "Public Profile"
+  //     toggle. When false, other authenticated users can't see the
+  //     profile (only owner / SuperAdmin / connections fall through).
+  //   • promoteWithoutAuth — Settings → Privacy → "Promote Services &
+  //     Content Without Authentication". When true, anonymous viewers can
+  //     also reach the page even if profileVisibleToPublic is true (the
+  //     anonymous gate is the page-level AuthOverlay, not the API).
+  const [privacyRow] = await db
+    .select({
+      showEmail: privacyPreferences.showEmail,
+      showPhone: privacyPreferences.showPhone,
+      showLocation: privacyPreferences.showLocation,
+      promoteWithoutAuth: privacyPreferences.promoteWithoutAuth,
+      profileVisibleToPublic: privacyPreferences.profileVisibleToPublic,
+    })
+    .from(privacyPreferences)
+    .where(eq(privacyPreferences.userId, me.id))
+    .limit(1);
+  const profileVisibleToPublic = privacyRow?.profileVisibleToPublic ?? true;
+
   // Private profiles are only visible to the owner (SuperAdmins bypass)
   if (visibility === "private" && !isOwner && !isSuperAdmin) {
     return c.json(error("FORBIDDEN", "This profile is private"), 403);
@@ -951,27 +973,27 @@ userRoutes.get("/:id", async (c) => {
     return c.json(error("UNAUTHORIZED", "Authentication required to view this profile"), 401);
   }
 
+  // "Public Profile" toggle off → hide from other authenticated users.
+  // Anonymous callers are governed by promoteWithoutAuth (the page-level
+  // AuthOverlay) and are not blocked here so a creator can keep their
+  // profile open to anonymous promotion traffic while keeping it hidden
+  // from random signed-in users — the two axes are independent.
+  if (!profileVisibleToPublic && caller && !isOwner && !isSuperAdmin) {
+    return c.json(error("FORBIDDEN", "This profile is private"), 403);
+  }
+
   // Enrich with public resume and video counts for "Hire Me" profile page.
   // The resume list goes through ResumeRepository; we filter to public
   // rows + project to ids in memory rather than widen the repo for this
   // one caller's shape.
   const resumeRepo = buildRepos(db).resumes;
-  const [publicResumes, publicVideos, privacyRow, creatorRow] = await Promise.all([
+  const [publicResumes, publicVideos, creatorRow] = await Promise.all([
     resumeRepo.findAllForOwner(me.id).then((rows) =>
       rows.filter((r) => r.privacyLevel <= 0).map((r) => ({ id: r.id })),
     ),
     db.select({ id: schema.videos.id, title: schema.videos.title, thumbnailUrl: schema.videos.thumbnailUrl, youtubeUrl: schema.videos.youtubeUrl, createdAt: schema.videos.createdAt })
       .from(schema.videos)
       .where(and(eq(schema.videos.userId, me.id), eq(schema.videos.privacyStatus, "public"))),
-    db.select({
-      showEmail: privacyPreferences.showEmail,
-      showPhone: privacyPreferences.showPhone,
-      showLocation: privacyPreferences.showLocation,
-      promoteWithoutAuth: privacyPreferences.promoteWithoutAuth,
-    })
-      .from(privacyPreferences)
-      .where(eq(privacyPreferences.userId, me.id))
-      .limit(1),
     db.select({
       isActive: creatorProfiles.isActive,
       endedAt: creatorProfiles.endedAt,
@@ -991,7 +1013,7 @@ userRoutes.get("/:id", async (c) => {
   ]);
 
   return c.json(success({
-    ...toUserProfileDto(me, profile ?? null, { isOwner, privacy: privacyRow[0] ?? null }, creatorRow[0] ?? null),
+    ...toUserProfileDto(me, profile ?? null, { isOwner, privacy: privacyRow ?? null }, creatorRow[0] ?? null),
     publicResumeCount: publicResumes.length,
     publicVideos,
   }), 200);
