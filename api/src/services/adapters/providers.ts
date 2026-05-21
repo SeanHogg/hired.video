@@ -15,10 +15,12 @@
  * Every chain is auto-padded by `withFallbackChain` below:
  *   1. Caller-supplied explicit fallbacks (paid + caller's free choice)
  *   2. Shared `FREE_TIER_FALLBACK_POOL` (qwen3-coder / gemma / hermes)
- *   3. `PAID_TERMINAL_MODEL` (cerebras/llama3.1-8b) — only for use
- *      cases in `INTERACTIVE_USE_CASES`. Restores cross-vendor
- *      diversity so an OpenRouter-wide free-pool outage doesn't 503
- *      user-facing features (closes gap #525 Part B).
+ *   3. `PAID_TERMINAL_POOL` (cerebras/llama3.1-8b → anthropic Haiku) —
+ *      only for use cases in `INTERACTIVE_USE_CASES`. Restores
+ *      cross-vendor diversity at the paid layer too, so neither an
+ *      OpenRouter free-pool outage nor a single-paid-vendor 429 can
+ *      503 user-facing features (closes gap #525 Part B, widened by
+ *      #888 after Cerebras itself returned 429).
  *
  * The Builderforce gateway (consumed via `@seanhogg/builderforce-sdk`
  * in llm-client.ts) is the single transport for every model; vendor
@@ -113,15 +115,21 @@ const FREE_TIER_FALLBACK_POOL = [
   "nousresearch/hermes-3-llama-3.1-405b:free",
 ] as const;
 
-/** Paid-tier terminal fallback for user-interactive use cases. Cerebras
- *  Llama 3.1-8B is the established paid model in the codebase
- *  (`match`'s primary) — sub-200ms TTFT, OpenAI-compatible JSON mode,
- *  on a vendor independent of OpenRouter. Closes gap #525 Part B: when
- *  OpenRouter's free pool has an incident, the whole free chain fails
- *  for the same reason; this terminal attempt restores provider
- *  diversity so the user sees a real answer instead of a 503. Real $;
- *  applied only to the use cases in INTERACTIVE_USE_CASES below. */
-const PAID_TERMINAL_MODEL = "cerebras/llama3.1-8b" as const;
+/** Paid-tier terminal fallback pool for user-interactive use cases.
+ *  Cerebras Llama 3.1-8B (sub-200ms TTFT, cheap) is the fast path;
+ *  Anthropic Claude 3 Haiku (already `studio_script`'s primary) is the
+ *  second vendor so the paid layer has the same cross-vendor diversity
+ *  we already give the free layer. Closes gap #525 Part B; widened
+ *  2026-05-21 (gap #888) after a tailor 503 (`correlationId
+ *  llm-4c95a353`) showed Cerebras itself can return 429 in <1s — a
+ *  single-vendor paid terminal is one outage away from useless. Ordered
+ *  cheapest-fastest first so the common-case cost stays low; Haiku only
+ *  kicks in when Cerebras itself rejects. Real $ on both; applied only
+ *  to the use cases in INTERACTIVE_USE_CASES below. */
+const PAID_TERMINAL_POOL = [
+  "cerebras/llama3.1-8b",
+  "anthropic/claude-3-haiku",
+] as const;
 
 /** Use cases that should never bottom out at the free pool — when every
  *  free model fails, eat the paid call rather than 503 the user.
@@ -174,10 +182,10 @@ function withFallbackChain(useCase: LLMUseCase, profile: UseCaseProfile): UseCas
     .filter((m) => !seen.has(m))
     .map(cloneForChain);
   freePool.forEach((p) => seen.add(p.model));
-  const paidTerminal =
-    INTERACTIVE_USE_CASES.has(useCase) && !seen.has(PAID_TERMINAL_MODEL)
-      ? [cloneForChain(PAID_TERMINAL_MODEL)]
-      : [];
+  const paidTerminal = INTERACTIVE_USE_CASES.has(useCase)
+    ? PAID_TERMINAL_POOL.filter((m) => !seen.has(m)).map(cloneForChain)
+    : [];
+  paidTerminal.forEach((p) => seen.add(p.model));
   return { ...profile, fallbacks: [...explicit, ...freePool, ...paidTerminal] };
 }
 
