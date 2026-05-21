@@ -3,6 +3,7 @@ import {
   Briefcase,
   FileText,
   GraduationCap,
+  LayoutTemplate,
   Mic,
   Video,
 } from "lucide-react";
@@ -43,6 +44,7 @@ export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   services: "Services",
   articles: "Articles",
   courses: "Courses",
+  templates: "Templates",
 };
 
 // SSoT for the program → icon mapping. Imported by both the owner's
@@ -54,6 +56,7 @@ export const CREATOR_PROGRAM_ICON: Record<CreatorProgram, ComponentType<{ classN
   services: Briefcase,
   articles: FileText,
   courses: GraduationCap,
+  templates: LayoutTemplate,
 };
 
 // Per-program "home" — where a creator goes to actually do the work after
@@ -65,14 +68,22 @@ export const CREATOR_PROGRAM_ICON: Record<CreatorProgram, ComponentType<{ classN
 // list scrolls into view (the creator is already on the page when they
 // see the program card). `voice` deep-links into the studio editor's
 // Voice Clones sub-tab — there is no standalone manager yet
-// (Gap #786). `courses` points at the lightweight CoursesManager stub
-// (Gap #785 tracks the full authoring surface).
+// (Gap #786). `articles` and `courses` open their sub-tab inside the
+// Content Creator workspace (ArticlesManagerPanel / CoursesManagerPanel
+// — Gap #785 tracks the full course authoring surface).
 export const CREATOR_PROGRAM_HOME: Record<CreatorProgram, string> = {
   video: "/studio",
   voice: "/studio?tab=voice-clones",
   services: "/services/offerings#my-services",
-  articles: "/articles",
-  courses: "/courses",
+  articles: "/services/creator/articles",
+  courses: "/services/creator/courses",
+  // Templates today reach the marketplace via /studio's "Publish as
+  // Marketplace Template" flow (studio video templates) and via the resume
+  // / job builders (first-party templates only — user-authored resume +
+  // job templates are tracked in the gap register). The marketplace
+  // category page is the closest existing landing surface for "my
+  // templates" until a dedicated manager ships.
+  templates: "/search?category=templates",
 };
 
 export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
@@ -81,6 +92,7 @@ export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
   services: "Offer career-coaching, resume reviews, and other services. Lead-gen inquiries land in My Services.",
   articles: "Publish long-form articles to the community feed and search. Markdown editor + AI quality review.",
   courses: "Author courses with optional certifications. Studio-built lessons + SCORM export. Sell once, earn 95%.",
+  templates: "Publish resume, job, and studio templates to the marketplace. Buyers fork your designs; you earn 95% of every sale.",
 };
 
 export interface CreatorProfile {
@@ -92,6 +104,7 @@ export interface CreatorProfile {
   servicesActive: boolean;
   articlesActive: boolean;
   coursesActive: boolean;
+  templatesActive: boolean;
   isActive: boolean;
   displayName: string | null;
   tagline: string | null;

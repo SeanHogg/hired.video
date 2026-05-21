@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Video, Mic, Briefcase, FileText, GraduationCap, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -16,19 +16,22 @@ import {
   CREATOR_PROGRAMS,
   CREATOR_PROGRAM_LABEL,
   CREATOR_PROGRAM_DESCRIPTION,
+  CREATOR_PROGRAM_ICON,
   CREATOR_PROGRAM_TERMS_KIND,
   type CreatorProgram,
   type CreatorProfile,
   type LegalDocument,
 } from "@/lib/services/creator-service";
 
-const PROGRAM_ICON: Record<CreatorProgram, typeof Video> = {
-  video: Video,
-  voice: Mic,
-  services: Briefcase,
-  articles: FileText,
-  courses: GraduationCap,
-};
+// Empty per-program records seeded from the SSoT program list so adding a
+// new program in shared/creator-programs.ts doesn't require touching this
+// file. Computed once at module load.
+function emptyDocsRecord(): Record<CreatorProgram, LegalDocument | null> {
+  return Object.fromEntries(CREATOR_PROGRAMS.map((p) => [p, null])) as Record<CreatorProgram, LegalDocument | null>;
+}
+function emptyAcceptedRecord(): Record<CreatorProgram, boolean> {
+  return Object.fromEntries(CREATOR_PROGRAMS.map((p) => [p, false])) as Record<CreatorProgram, boolean>;
+}
 
 type Step = "programs" | "terms" | "profile";
 
@@ -43,12 +46,8 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
   const { user } = useAuth();
   const [step, setStep] = useState<Step>("programs");
   const [selected, setSelected] = useState<Set<CreatorProgram>>(new Set());
-  const [docs, setDocs] = useState<Record<CreatorProgram, LegalDocument | null>>({
-    video: null, voice: null, services: null, articles: null, courses: null,
-  });
-  const [accepted, setAccepted] = useState<Record<CreatorProgram, boolean>>({
-    video: false, voice: false, services: false, articles: false, courses: false,
-  });
+  const [docs, setDocs] = useState<Record<CreatorProgram, LegalDocument | null>>(emptyDocsRecord);
+  const [accepted, setAccepted] = useState<Record<CreatorProgram, boolean>>(emptyAcceptedRecord);
   const [docsLoading, setDocsLoading] = useState(false);
 
   // Step 3 fields seed from the user's existing profile so they aren't
@@ -67,8 +66,8 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
     } else {
       setStep("programs");
       setSelected(new Set());
-      setAccepted({ video: false, voice: false, services: false, articles: false, courses: false });
-      setDocs({ video: null, voice: null, services: null, articles: null, courses: null });
+      setAccepted(emptyAcceptedRecord());
+      setDocs(emptyDocsRecord());
       setDisplayName("");
       setTagline("");
       setBio("");
@@ -83,7 +82,7 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
       const entries = await Promise.all(
         selectedList.map(async (p) => [p, await legalService.getCurrent(CREATOR_PROGRAM_TERMS_KIND[p])] as const),
       );
-      const next: Record<CreatorProgram, LegalDocument | null> = { video: null, voice: null, services: null, articles: null, courses: null };
+      const next: Record<CreatorProgram, LegalDocument | null> = emptyDocsRecord();
       for (const [p, d] of entries) next[p] = d;
       setDocs(next);
     } finally {
@@ -168,7 +167,7 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
         {step === "programs" && (
           <div className="space-y-3 py-2">
             {CREATOR_PROGRAMS.map((p) => {
-              const Icon = PROGRAM_ICON[p];
+              const Icon = CREATOR_PROGRAM_ICON[p];
               const isSelected = selected.has(p);
               return (
                 <button

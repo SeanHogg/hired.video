@@ -117,7 +117,7 @@ function toPublicUserCardDto(r: {
   profileVisibility?: string | null;
   customUrlSlug?: string | null;
   isCreator?: boolean | null;
-  creatorPrograms?: { video: boolean; voice: boolean; services: boolean; articles: boolean; courses: boolean } | null;
+  creatorPrograms?: { video: boolean; voice: boolean; services: boolean; articles: boolean; courses: boolean; templates: boolean } | null;
 }) {
   const { firstName, lastName } = splitName(r.name);
   return {
@@ -139,7 +139,7 @@ function toPublicUserCardDto(r: {
     emailConfirmed: r.emailVerified,
     slug: r.customUrlSlug ?? r.id,
     isCreator: r.isCreator === true,
-    creatorPrograms: r.creatorPrograms ?? { video: false, voice: false, services: false, articles: false, courses: false },
+    creatorPrograms: r.creatorPrograms ?? { video: false, voice: false, services: false, articles: false, courses: false, templates: false },
     createdAt: new Date(r.createdAt).toISOString(),
     updatedAt: new Date(r.updatedAt).toISOString(),
   };
@@ -206,6 +206,7 @@ function toUserProfileDto(
     servicesActive: boolean | null;
     articlesActive: boolean | null;
     coursesActive: boolean | null;
+    templatesActive: boolean | null;
     displayName: string | null;
     tagline: string | null;
     bio: string | null;
@@ -281,6 +282,7 @@ function toUserProfileDto(
       services: creator?.servicesActive === true,
       articles: creator?.articlesActive === true,
       courses: creator?.coursesActive === true,
+      templates: creator?.templatesActive === true,
     },
     creatorProfile: creator
       ? {
@@ -371,6 +373,7 @@ userRoutes.get("/public", async (c) => {
       creatorServicesActive: creatorProfiles.servicesActive,
       creatorArticlesActive: creatorProfiles.articlesActive,
       creatorCoursesActive: creatorProfiles.coursesActive,
+      creatorTemplatesActive: creatorProfiles.templatesActive,
     })
     .from(users)
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
@@ -391,6 +394,7 @@ userRoutes.get("/public", async (c) => {
       services: r.creatorServicesActive === true,
       articles: r.creatorArticlesActive === true,
       courses: r.creatorCoursesActive === true,
+      templates: r.creatorTemplatesActive === true,
     },
   }));
 
@@ -1002,6 +1006,7 @@ userRoutes.get("/:id", async (c) => {
       servicesActive: creatorProfiles.servicesActive,
       articlesActive: creatorProfiles.articlesActive,
       coursesActive: creatorProfiles.coursesActive,
+      templatesActive: creatorProfiles.templatesActive,
       displayName: creatorProfiles.displayName,
       tagline: creatorProfiles.tagline,
       bio: creatorProfiles.bio,

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2, Plus, Trash2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,8 @@ import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
+import CoursesManagerPanel from "@/components/creator/CoursesManagerPanel";
+import ArticlesManagerPanel from "@/components/creator/ArticlesManagerPanel";
 import OfferingsPanel from "@/components/services/OfferingsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -35,7 +38,11 @@ export type CreatorWorkspaceTab =
   | "earnings"
   | "payouts"
   | "portfolio"
-  | "account";
+  | "account"
+  | "courses"
+  | "articles";
+
+const TAB_VALUES = ["offerings", "profile", "earnings", "payouts", "portfolio", "account", "courses", "articles"] as const;
 
 interface Props {
   onProfileChange?: (next: CreatorProfile | null) => void;
@@ -48,6 +55,10 @@ interface Props {
   /** Initial sub-tab. Defaults to "offerings" when services state is wired,
    *  otherwise "profile" (e.g. on /settings where offerings isn't shown). */
   defaultTab?: CreatorWorkspaceTab;
+  /** When set, tabs become URL-driven: the active tab is read from
+   *  `<basePath>/<tab>` and switching tabs navigates. Pass `"/services/creator"`
+   *  on the My Services hub; omit on /settings where there is no per-tab URL. */
+  basePath?: string;
 }
 
 export default function CreatorWorkspace({
@@ -57,6 +68,7 @@ export default function CreatorWorkspace({
   servicesLoading = false,
   setServices,
   defaultTab,
+  basePath,
 }: Props = {}) {
   // Offerings tab is only mounted when services state is wired in by the
   // host (currently /services). On /settings it stays hidden so the original
@@ -65,6 +77,22 @@ export default function CreatorWorkspace({
   const resolvedDefaultTab: CreatorWorkspaceTab =
     defaultTab ?? (offeringsEnabled ? "offerings" : "profile");
   const { toast } = useToast();
+
+  // When `basePath` is provided, tabs become URL-driven (controlled mode):
+  // the active tab is the trailing path segment, and clicking a tab navigates.
+  // Otherwise Radix Tabs keeps its own state via `defaultValue` (used on
+  // /settings where there's no per-tab URL).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const urlTab = useMemo<CreatorWorkspaceTab>(() => {
+    if (!basePath || !location.pathname.startsWith(basePath)) return resolvedDefaultTab;
+    const tail = location.pathname.slice(basePath.length).replace(/^\//, "").split("/")[0];
+    if (!tail) return resolvedDefaultTab;
+    return (TAB_VALUES as readonly string[]).includes(tail) ? (tail as CreatorWorkspaceTab) : resolvedDefaultTab;
+  }, [basePath, location.pathname, resolvedDefaultTab]);
+  const tabsProps = basePath
+    ? { value: urlTab, onValueChange: (v: string) => navigate(`${basePath}/${v}`) }
+    : { defaultValue: resolvedDefaultTab };
 
   // Portfolio state
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
@@ -137,13 +165,15 @@ export default function CreatorWorkspace({
         benefit="Subscribe to Pro ($9.95/mo) to publish your services, voice clones, courses, and articles to the marketplace."
       />
 
-      <Tabs defaultValue={resolvedDefaultTab} className="space-y-4">
+      <Tabs {...tabsProps} className="space-y-4">
         <TabsList>
           {offeringsEnabled && <TabsTrigger value="offerings">Offerings</TabsTrigger>}
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="earnings">Marketplace Earnings</TabsTrigger>
           <TabsTrigger value="payouts">Payouts</TabsTrigger>
           <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+          {profile?.coursesActive && <TabsTrigger value="courses">Courses</TabsTrigger>}
+          {profile?.articlesActive && <TabsTrigger value="articles">Articles</TabsTrigger>}
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
@@ -271,6 +301,27 @@ export default function CreatorWorkspace({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Courses authoring — hosted at /services/creator/courses. Tab only
+            shown when the Courses program is enabled (gate matches the
+            "Manage" CTA in YourProgramsPanel). */}
+        {profile?.coursesActive && (
+          <TabsContent value="courses">
+            <CoursesManagerPanel
+              profile={profile}
+              onEnrollClick={basePath ? () => navigate(`${basePath}/offerings`) : undefined}
+            />
+          </TabsContent>
+        )}
+
+        {/* Articles authoring — hosted at /services/creator/articles. Tab
+            only shown when the Articles program is enabled; the panel
+            itself also self-gates so deep-links land on an enroll prompt. */}
+        {profile?.articlesActive && (
+          <TabsContent value="articles">
+            <ArticlesManagerPanel />
+          </TabsContent>
+        )}
 
         {/* Leave program — self-fetches, mirrored on /settings → Content Creator → Leave program */}
         <TabsContent value="account">

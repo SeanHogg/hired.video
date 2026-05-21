@@ -463,13 +463,17 @@ export default function ServicesManagement() {
           <ServicesNav hasCompanyAccess={hasCompanyAccess} />
 
           {/* Header — Add Service + Lead Gen Settings buttons moved into the
-              Offerings sub-tab (inside Content Creator) where they belong. */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold">Services</h1>
-            <p className="text-muted-foreground mt-1">
-              Dashboard, offerings, and incoming leads
-            </p>
-          </div>
+              Offerings sub-tab (inside Content Creator) where they belong.
+              Hidden on /services/creator since the Content Creator section
+              renders its own heading + program panel. */}
+          {activeTab !== "creator" && (
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold">Services</h1>
+              <p className="text-muted-foreground mt-1">
+                Dashboard, offerings, and incoming leads
+              </p>
+            </div>
+          )}
 
           <Tabs value={activeTab}>
 
@@ -645,6 +649,7 @@ export default function ServicesManagement() {
                 servicesLoading={loading}
                 setServices={setServices}
                 onProfileChange={handleCreatorProfileChange}
+                basePath="/services/creator"
               />
             </TabsContent>
 

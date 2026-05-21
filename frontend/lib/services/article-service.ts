@@ -1,6 +1,24 @@
 import { apiClient } from "@/lib/api-client";
 
-export type ArticleStatus = "draft" | "published" | "unlisted" | "flagged";
+export type ArticleKind = "article" | "faq" | "guide";
+
+export type ArticleStatus =
+  | "draft"
+  | "submitted"
+  | "published"
+  | "rejected"
+  | "unlisted"
+  | "flagged";
+
+export type ModerationSeverity = "low" | "medium" | "high" | "block";
+
+export interface ModerationFindings {
+  profanity: string[];
+  racism: string[];
+  tosViolations: string[];
+  severity: ModerationSeverity;
+  rationale?: string | null;
+}
 
 export interface Article {
   id: string;
@@ -12,11 +30,22 @@ export interface Article {
   coverImageUrl: string | null;
   category: string | null;
   tags: string[];
+  kind: ArticleKind;
   status: ArticleStatus;
+  submittedForReviewAt: string | null;
   publishedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectedBy: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
   qualityScore: number | null;
   qualityRationale: string | null;
   qualityCheckedAt: string | null;
+  moderationScore: number | null;
+  moderationFindings: ModerationFindings | null;
+  moderationScannedAt: string | null;
+  moderationScannedBy: string | null;
   viewCount: number;
   readMinutes: number;
   createdAt: string;
@@ -26,6 +55,7 @@ export interface Article {
 export interface PublicArticleCard {
   id: string;
   type: "article";
+  kind: ArticleKind;
   title: string;
   slug: string;
   summary: string | null;
@@ -45,10 +75,29 @@ export interface CreateArticleInput {
   coverImageUrl?: string;
   category?: string;
   tags?: string[];
+  kind?: ArticleKind;
 }
 
 export interface UpdateArticleInput extends Partial<CreateArticleInput> {
   slug?: string;
+}
+
+export interface AdminQueueEntry {
+  article: Article;
+  author: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    avatarUrl: string | null;
+    slug: string;
+  };
+}
+
+export interface AdminScanResultRow {
+  id: string;
+  score: number;
+  severity: ModerationSeverity;
+  recommendation: "approve" | "review" | "reject";
 }
 
 export const articleService = {
@@ -72,8 +121,13 @@ export const articleService = {
     return res.data;
   },
 
-  async publish(id: string): Promise<Article> {
-    const res = await apiClient.post<Article>(`/api/articles/${id}/publish`, {});
+  async submitForReview(id: string): Promise<Article> {
+    const res = await apiClient.post<Article>(`/api/articles/${id}/submit-for-review`, {});
+    return res.data;
+  },
+
+  async withdraw(id: string): Promise<Article> {
+    const res = await apiClient.post<Article>(`/api/articles/${id}/withdraw`, {});
     return res.data;
   },
 
@@ -86,11 +140,13 @@ export const articleService = {
     await apiClient.delete(`/api/articles/${id}`);
   },
 
-  async listPublished(limit = 20): Promise<PublicArticleCard[]> {
-    // Public optional endpoint — suppress the support-ticket toast if the
-    // endpoint is unavailable (e.g. mid-deploy / migration not yet applied).
+  async listPublished(opts: { limit?: number; kind?: ArticleKind } = {}): Promise<PublicArticleCard[]> {
+    const params = new URLSearchParams();
+    if (opts.limit) params.set("limit", String(opts.limit));
+    if (opts.kind) params.set("kind", opts.kind);
+    const qs = params.toString();
     const res = await apiClient.get<PublicArticleCard[]>(
-      `/api/articles/public?limit=${limit}`,
+      `/api/articles/public${qs ? `?${qs}` : ""}`,
       undefined,
       { suppressErrorEvent: true },
     );
@@ -108,6 +164,7 @@ export const articleService = {
 
   async getPublic(userId: string, slug: string): Promise<{
     id: string;
+    kind: ArticleKind;
     title: string;
     slug: string;
     bodyMd: string;
@@ -121,6 +178,46 @@ export const articleService = {
     author: { id: string; name: string; avatarUrl: string | null; slug: string };
   }> {
     const res = await apiClient.get<any>(`/api/articles/public/${userId}/${slug}`);
+    return res.data;
+  },
+};
+
+export const adminArticleService = {
+  async queue(
+    opts: { status?: "submitted" | "rejected" | "published"; kind?: ArticleKind; limit?: number } = {},
+  ): Promise<AdminQueueEntry[]> {
+    const params = new URLSearchParams();
+    if (opts.status) params.set("status", opts.status);
+    if (opts.kind) params.set("kind", opts.kind);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    const res = await apiClient.get<AdminQueueEntry[]>(
+      `/api/admin/articles/queue${qs ? `?${qs}` : ""}`,
+    );
+    return res.data ?? [];
+  },
+
+  async scan(ids: string[]): Promise<{ scanned: number; results: AdminScanResultRow[] }> {
+    const res = await apiClient.post<{ scanned: number; results: AdminScanResultRow[] }>(
+      `/api/admin/articles/scan`,
+      { ids },
+    );
+    return res.data;
+  },
+
+  async approve(ids: string[]): Promise<{ approved: number; ids: string[] }> {
+    const res = await apiClient.post<{ approved: number; ids: string[] }>(
+      `/api/admin/articles/approve`,
+      { ids },
+    );
+    return res.data;
+  },
+
+  async reject(ids: string[], reason: string): Promise<{ rejected: number; ids: string[] }> {
+    const res = await apiClient.post<{ rejected: number; ids: string[] }>(
+      `/api/admin/articles/reject`,
+      { ids, reason },
+    );
     return res.data;
   },
 };

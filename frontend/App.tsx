@@ -186,7 +186,6 @@ const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
 const ArticlesManager = lazy(() => import("./pages/ArticlesManager"));
 const ArticleView = lazy(() => import("./pages/ArticleView"));
-const CoursesManager = lazy(() => import("./pages/CoursesManager"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
@@ -734,6 +733,11 @@ const App = () => (
                       {/* My Services hub — see ServicesNav. Each top-level tab is its own route. */}
                       <Route path="/services" element={<ServicesManagement />} />
                       <Route path="/services/creator" element={<ServicesManagement />} />
+                      {/* Content Creator sub-tabs are URL-driven via CreatorWorkspace
+                          (basePath="/services/creator"). Every tab value the workspace
+                          knows about needs a matching route so deep-links + tab clicks
+                          resolve to the same component. */}
+                      <Route path="/services/creator/:subtab" element={<ServicesManagement />} />
                       <Route path="/services/offerings" element={<ServicesManagement />} />
                       <Route path="/services/inquiries" element={<ServicesManagement />} />
                       {/* Pool list moved to /resumes?tab=sourced (see EntityHubShell
@@ -772,7 +776,9 @@ const App = () => (
                       />
                       <Route path="/articles" element={<ArticlesManager />} />
                       <Route path="/articles/:authorSlug/:slug" element={<ArticleView />} />
-                      <Route path="/courses" element={<CoursesManager />} />
+                      {/* Folded into the Content Creator workspace as a sub-tab.
+                          Keep this redirect for legacy deep-links from emails / docs. */}
+                      <Route path="/courses" element={<Navigate to="/services/creator/courses" replace />} />
                       <Route path="/creators" element={<Navigate to="/search?category=creators" replace />} />
                       <Route path="/creators/dashboard" element={<Navigate to="/services" replace />} />
                       <Route path="/creators/:userId" element={<CreatorPublicProfileRedirect />} />

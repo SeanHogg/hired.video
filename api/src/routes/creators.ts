@@ -166,6 +166,7 @@ async function setProgramFlag(
     servicesActive: existing.servicesActive,
     articlesActive: existing.articlesActive,
     coursesActive: existing.coursesActive,
+    templatesActive: existing.templatesActive,
     [programFlagColumn(program)]: enable,
   };
   const [updated] = await db
@@ -248,6 +249,7 @@ creatorRoutes.post("/opt-in", async (c) => {
     servicesActive: programs.includes("services"),
     articlesActive: programs.includes("articles"),
     coursesActive: programs.includes("courses"),
+    templatesActive: programs.includes("templates"),
   };
 
   const [created] = await db
@@ -331,6 +333,7 @@ creatorRoutes.post("/me/cancel", async (c) => {
       servicesActive: false,
       articlesActive: false,
       coursesActive: false,
+      templatesActive: false,
       isActive: false,
       categories: [],
       updatedAt: now,

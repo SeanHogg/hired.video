@@ -1,21 +1,23 @@
 /**
- * Articles — creator-authored long-form content (#170 foundation).
+ * Articles — creator-authored long-form content (#196). Storage backs three
+ * kinds: article / faq / guide. SA review is required before anything goes
+ * public; submit-for-review runs the moderation scan inline.
  *
  * Routes:
  *   POST   /api/articles                       — create draft
  *   GET    /api/articles/me                    — list my articles (any status)
- *   GET    /api/articles/:id                   — get my article (any status, owner-only)
- *   PATCH  /api/articles/:id                   — update my article fields
- *   POST   /api/articles/:id/publish           — publish (runs AI quality classifier)
- *   POST   /api/articles/:id/unpublish         — back to draft / unlisted
- *   DELETE /api/articles/:id                   — soft-removal (status='flagged' until #152 admin triage)
+ *   GET    /api/articles/:id                   — get my article (owner-only)
+ *   PATCH  /api/articles/:id                   — update my article (draft / rejected only)
+ *   POST   /api/articles/:id/submit-for-review — submit; runs scan; status=submitted
+ *   POST   /api/articles/:id/withdraw          — pull from review; status=draft
+ *   POST   /api/articles/:id/unpublish         — back to draft
+ *   DELETE /api/articles/:id                   — hard delete by owner
  *
- *   GET    /api/articles/public                — list published articles (paginated)
- *   GET    /api/articles/public/:userId/:slug  — public read-by-slug; bumps view_count
+ *   GET    /api/articles/public                — list published (paginated)
+ *   GET    /api/articles/public/by-user/:uid   — published-by-user
+ *   GET    /api/articles/public/:userId/:slug  — public read-by-slug
  *
- * Engagement tracking (#171), claps, Partner Program payouts (#172–#175) are
- * NOT in scope here. The static editorial blog at frontend/data/blog-posts.ts
- * is unaffected — this is a separate user-authored surface.
+ * Engagement tracking + Partner Program payouts remain deferred (#171–#175).
  */
 import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -24,17 +26,15 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
-import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { scanContent } from "../services/moderation/contentScan.js";
 import { slugify } from "../../../shared/slugify.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
+import { ARTICLE_KINDS } from "../db/schema/articles.js";
 
-const { articles, users, userProfiles, creatorProfiles, feedPosts } = schema;
+const { articles, users, userProfiles, creatorProfiles } = schema;
 
 export const articleRoutes = new Hono<{ Variables: Variables }>();
 
-// Articles publishing is gated on enrollment in the Articles sub-program of
-// the Creator Program (#190). Returns the active enrollment row if the user
-// is enrolled in articles, null otherwise.
 async function getArticlesEnrollment(db: ReturnType<typeof getDb>, userId: string) {
   const [row] = await db.select()
     .from(creatorProfiles)
@@ -51,12 +51,12 @@ function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
 
-
 function readMinutes(bodyMd: string): number {
-  // ~225 words/min average reader. Round up.
   const words = bodyMd.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 225));
 }
+
+const KindSchema = z.enum(ARTICLE_KINDS);
 
 const CreateArticleSchema = z.object({
   title: z.string().min(1).max(255),
@@ -65,31 +65,28 @@ const CreateArticleSchema = z.object({
   coverImageUrl: z.string().url().optional(),
   category: z.string().max(100).optional(),
   tags: z.array(z.string().max(60)).max(20).optional(),
+  kind: KindSchema.default("article").optional(),
 });
 
 const UpdateArticleSchema = CreateArticleSchema.partial().extend({
   slug: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
 });
 
-const QualityResponseSchema = z.object({
-  score: z.number().min(0).max(1),
-  rationale: z.string().max(600),
-  isAcceptable: z.boolean(),
-});
-
 // ---------------------------------------------------------------------------
-// Public endpoints — MUST be registered before /:id so the literal `/public`
-// path doesn't get captured by the param route. Hono's router otherwise
-// matches `/api/articles/public` against `/:id` (id="public") and routes it
-// to the auth-required handler, which returns 401 ("Authentication required")
-// to anonymous callers and breaks /search rendering.
+// Public endpoints — registered before /:id so literal `/public` paths don't
+// match the param route.
 // ---------------------------------------------------------------------------
 
 articleRoutes.get("/public", async (c) => {
   const db = getDb();
   const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
-  // Defensive: degrades to empty if migration 0038 isn't applied yet.
+  const kindFilter = c.req.query("kind");
   try {
+    const where = and(
+      eq(articles.status, "published"),
+      eq(users.emailVerified, true),
+      kindFilter ? eq(articles.kind, kindFilter) : undefined,
+    );
     const rows = await db
       .select({
         article: articles,
@@ -99,47 +96,19 @@ articleRoutes.get("/public", async (c) => {
       .from(articles)
       .innerJoin(users, eq(articles.userId, users.id))
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .where(and(eq(articles.status, "published"), eq(users.emailVerified, true)))
+      .where(where)
       .orderBy(desc(articles.publishedAt))
       .limit(limit);
 
-    // #314 paywall — hide free creators' articles from the public list.
     const visible = await filterVisibleCreators(rows.map((r) => r.author.id));
-    const items = rows.filter((r) => visible.has(r.author.id)).map((r) => ({
-      id: r.article.id,
-      type: "article" as const,
-      title: r.article.title,
-      slug: r.article.slug,
-      summary: r.article.summary,
-      coverImageUrl: r.article.coverImageUrl,
-      category: r.article.category,
-      tags: r.article.tags,
-      readMinutes: r.article.readMinutes,
-      viewCount: r.article.viewCount,
-      publishedAt: r.article.publishedAt,
-      author: {
-        id: r.author.id,
-        name: r.author.name,
-        avatarUrl: r.authorProfile?.avatarUrl ?? null,
-        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
-      },
-    }));
-    // CDN-cacheable: list response is identical for every anonymous
-    // caller with the same (limit) query and has no per-request side
-    // effects (the slug read below IS view-tracked — do NOT lift this
-    // header up to a wildcard `articleRoutes.use("/public/*")`).
+    const items = rows.filter((r) => visible.has(r.author.id)).map(toPublicCard);
     withCacheHeaders(c, { scope: "public", maxAge: 60, sMaxAge: 300, swr: 600 });
     return c.json(success(items), 200);
-  } catch (e) {
+  } catch {
     return c.json(success([] as unknown[]), 200);
   }
 });
 
-// Per-user public listing — every published article authored by :userId,
-// gated by the same paywall/email-verified rules as the global feed. Used
-// by the public profile (Articles tab) to render the creator's catalogue.
-// `:userId` is a UUID; slug-based resolution happens upstream on the
-// profile page (which already has the UUID by the time it calls this).
 articleRoutes.get("/public/by-user/:userId", async (c) => {
   const db = getDb();
   const userId = c.req.param("userId");
@@ -164,26 +133,7 @@ articleRoutes.get("/public/by-user/:userId", async (c) => {
       ))
       .orderBy(desc(articles.publishedAt))
       .limit(limit);
-    const items = rows.map((r) => ({
-      id: r.article.id,
-      type: "article" as const,
-      title: r.article.title,
-      slug: r.article.slug,
-      summary: r.article.summary,
-      coverImageUrl: r.article.coverImageUrl,
-      category: r.article.category,
-      tags: r.article.tags,
-      readMinutes: r.article.readMinutes,
-      viewCount: r.article.viewCount,
-      publishedAt: r.article.publishedAt,
-      author: {
-        id: r.author.id,
-        name: r.author.name,
-        avatarUrl: r.authorProfile?.avatarUrl ?? null,
-        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
-      },
-    }));
-    return c.json(success(items), 200);
+    return c.json(success(rows.map(toPublicCard)), 200);
   } catch {
     return c.json(success([] as unknown[]), 200);
   }
@@ -208,12 +158,10 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
     ))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Article not found"), 404);
-  // #314 paywall — free creators' articles 404 on the public route.
   if (!(await isCreatorVisible(row.author.id))) {
     return c.json(error("NOT_FOUND", "Article not found"), 404);
   }
 
-  // Best-effort view count bump — fire-and-forget.
   db.update(articles)
     .set({ viewCount: sql`${articles.viewCount} + 1` } as any)
     .where(eq(articles.id, row.article.id))
@@ -221,6 +169,7 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
 
   return c.json(success({
     id: row.article.id,
+    kind: row.article.kind,
     title: row.article.title,
     slug: row.article.slug,
     bodyMd: row.article.bodyMd,
@@ -252,10 +201,6 @@ articleRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const db = getDb();
-
-  // Gate: must be enrolled in the Articles sub-program of the Creator Program.
-  // Frontend should send the user through the enrollment wizard at /services
-  // before letting them hit this endpoint.
   const enrollment = await getArticlesEnrollment(db, userId);
   if (!enrollment) {
     return c.json(
@@ -267,7 +212,6 @@ articleRoutes.post("/", async (c) => {
     );
   }
 
-  // Ensure unique slug per author by appending a counter on collision.
   let baseSlug = slugify(parsed.data.title, { fallback: () => `article-${Date.now()}` });
   let slug = baseSlug;
   let n = 1;
@@ -291,6 +235,7 @@ articleRoutes.post("/", async (c) => {
     coverImageUrl: parsed.data.coverImageUrl ?? null,
     category: parsed.data.category ?? null,
     tags: parsed.data.tags ?? [],
+    kind: parsed.data.kind ?? "article",
     status: "draft",
     readMinutes: readMinutes(parsed.data.bodyMd ?? ""),
   } as any).returning();
@@ -330,6 +275,15 @@ articleRoutes.patch("/:id", async (c) => {
     .where(and(eq(articles.id, c.req.param("id")), eq(articles.userId, userId)))
     .limit(1);
   if (!existing) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  // Editing is blocked while a submission is in the SA queue — creator must
+  // withdraw first. Published articles can still be edited (changes don't go
+  // live until a new submit-for-review + SA approval cycle).
+  if (existing.status === "submitted") {
+    return c.json(
+      error("LOCKED_FOR_REVIEW", "Withdraw from review before editing."),
+      409,
+    );
+  }
 
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (parsed.data.title !== undefined) patch.title = parsed.data.title;
@@ -342,26 +296,34 @@ articleRoutes.patch("/:id", async (c) => {
   if (parsed.data.category !== undefined) patch.category = parsed.data.category;
   if (parsed.data.tags !== undefined) patch.tags = parsed.data.tags;
   if (parsed.data.slug !== undefined) patch.slug = parsed.data.slug;
+  if (parsed.data.kind !== undefined) patch.kind = parsed.data.kind;
+
+  // A rejected article being edited bumps back to draft so the creator
+  // re-submits cleanly. Published edits leave status alone (they're a fresh
+  // revision of an already-live article until the next submit cycle).
+  if (existing.status === "rejected") {
+    patch.status = "draft";
+    patch.rejectionReason = null;
+    patch.rejectedAt = null;
+    patch.rejectedBy = null;
+  }
 
   const [updated] = await db.update(articles).set(patch as any)
     .where(eq(articles.id, existing.id)).returning();
   return c.json(success(updated), 200);
 });
 
-articleRoutes.post("/:id/publish", async (c) => {
+articleRoutes.post("/:id/submit-for-review", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
 
-  // Gate: enrolment must still be active at publish time. Existing drafts
-  // remain editable when a user disables the program, but they can't push
-  // anything new out to the feed until they re-enable.
   const enrollment = await getArticlesEnrollment(db, userId);
   if (!enrollment) {
     return c.json(
       error(
         "PROGRAM_NOT_ENROLLED",
-        "Re-enable the Articles Creator Program at /services to publish.",
+        "Re-enable the Articles Creator Program at /services to submit.",
       ),
       403,
     );
@@ -372,71 +334,66 @@ articleRoutes.post("/:id/publish", async (c) => {
     .limit(1);
   if (!existing) return c.json(error("NOT_FOUND", "Article not found"), 404);
   if (!existing.title.trim() || !existing.bodyMd.trim()) {
-    return c.json(error("VALIDATION_ERROR", "Title and body are required to publish"), 400);
+    return c.json(error("VALIDATION_ERROR", "Title and body are required to submit"), 400);
+  }
+  if (existing.status === "submitted") {
+    return c.json(error("ALREADY_SUBMITTED", "Already in the review queue."), 409);
   }
 
-  // AI quality classifier (#175). Best-effort — if no API key or model fails,
-  // we publish anyway and leave the score null. Rationale string is captured
-  // for admin review.
-  let qualityScore: number | null = null;
-  let qualityRationale: string | null = null;
-  let isAcceptable = true;
-  const env = { BUILDERFORCE_API_KEY: process.env.BUILDERFORCE_API_KEY };
-  if (hasAnyLLMProviderKey(env)) {
-    try {
-      const llm = createLLMClient(env, c.var.user);
-      const { data } = await llm.callJson("article_quality", {
-        useCase: "reviews",
-        systemPrompt:
-          "You are a content moderator scoring articles on quality, originality, and absence of spam/profanity. Respond with JSON only.",
-        userMessage: `Score this article. Return JSON: { "score": 0..1, "rationale": "<one sentence>", "isAcceptable": boolean }.\n\nTitle: ${existing.title}\n\nBody:\n${existing.bodyMd.slice(0, 6000)}`,
-      }, QualityResponseSchema);
-      qualityScore = data.score;
-      qualityRationale = data.rationale;
-      isAcceptable = data.isAcceptable;
-    } catch { /* keep null/true defaults */ }
+  // Inline scan — gives the creator immediate signal on hard-block content
+  // before it ever enters the SA queue. The same scan output is shown to the
+  // SA so they don't burn an LLM call on already-scanned rows.
+  const scan = await scanContent(
+    { title: existing.title, bodyMd: existing.bodyMd, kind: existing.kind as any },
+    c.var.user,
+  );
+
+  // Hard-block path: severity === 'block' (racial slurs detected by either
+  // floor or LLM) rejects automatically. Creator can edit and re-submit.
+  if (scan.findings.severity === "block") {
+    const [rejected] = await db.update(articles).set({
+      status: "rejected",
+      rejectionReason:
+        "Automatic rejection: prohibited content detected. " +
+        (scan.findings.rationale ?? "Please revise and re-submit."),
+      rejectedAt: new Date(),
+      moderationScore: scan.score,
+      moderationFindings: scan.findings,
+      moderationScannedAt: new Date(),
+      updatedAt: new Date(),
+    } as any).where(eq(articles.id, existing.id)).returning();
+    return c.json(success(rejected), 200);
   }
 
   const [updated] = await db.update(articles).set({
-    status: isAcceptable ? "published" : "flagged",
-    publishedAt: new Date(),
-    qualityScore,
-    qualityRationale,
-    qualityCheckedAt: qualityScore !== null ? new Date() : null,
+    status: "submitted",
+    submittedForReviewAt: new Date(),
+    moderationScore: scan.score,
+    moderationFindings: scan.findings,
+    moderationScannedAt: new Date(),
     updatedAt: new Date(),
   } as any).where(eq(articles.id, existing.id)).returning();
 
-  // Surface the article in the social feed (#90 polymorphic subjects).
-  // Only published — flagged articles stay quarantined until reviewed.
-  if (updated.status === "published") {
-    const author = (await db.select({ name: users.name })
-      .from(users).where(eq(users.id, userId)).limit(1))[0];
-    const profile = (await db.select({ slug: userProfiles.customUrlSlug, avatarUrl: userProfiles.avatarUrl })
-      .from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1))[0];
-    const authorSlug = profile?.slug ?? userId;
-    await db.insert(feedPosts).values({
-      userId,
-      content: `📝 New article: ${updated.title}${updated.summary ? ` — ${updated.summary}` : ""}`,
-      linkUrl: `/articles/${authorSlug}/${updated.slug}`,
-      linkTitle: updated.title,
-      linkDescription: updated.summary ?? null,
-      linkImageUrl: updated.coverImageUrl ?? null,
-      privacy: "Public",
-      subjectType: "article",
-      subjectId: updated.id,
-      embedPayload: {
-        title: updated.title,
-        slug: updated.slug,
-        summary: updated.summary,
-        coverImageUrl: updated.coverImageUrl,
-        readMinutes: updated.readMinutes,
-        category: updated.category,
-        tags: updated.tags,
-        author: { name: author?.name ?? null, slug: authorSlug, avatarUrl: profile?.avatarUrl ?? null },
-      },
-    } as any).catch(() => undefined);
-  }
+  return c.json(success(updated), 200);
+});
 
+articleRoutes.post("/:id/withdraw", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [updated] = await db.update(articles)
+    .set({
+      status: "draft",
+      submittedForReviewAt: null,
+      updatedAt: new Date(),
+    } as any)
+    .where(and(
+      eq(articles.id, c.req.param("id")),
+      eq(articles.userId, userId),
+      eq(articles.status, "submitted"),
+    ))
+    .returning();
+  if (!updated) return c.json(error("NOT_FOUND", "Article not found or not in review"), 404);
   return c.json(success(updated), 200);
 });
 
@@ -463,6 +420,32 @@ articleRoutes.delete("/:id", async (c) => {
   return c.json(success({ deleted: deleted.id }), 200);
 });
 
-// (Public endpoints above the owner block — registering /public after /:id
-// would let Hono's router match /api/articles/public against /:id with
-// id="public" and route it to the auth-required handler.)
+// ---------------------------------------------------------------------------
+// Shared row → public card mapper (used by /public + /public/by-user).
+// ---------------------------------------------------------------------------
+function toPublicCard(r: {
+  article: typeof articles.$inferSelect;
+  author: { id: string; name: string | null };
+  authorProfile: { avatarUrl: string | null; customUrlSlug: string | null } | null;
+}) {
+  return {
+    id: r.article.id,
+    type: "article" as const,
+    kind: r.article.kind,
+    title: r.article.title,
+    slug: r.article.slug,
+    summary: r.article.summary,
+    coverImageUrl: r.article.coverImageUrl,
+    category: r.article.category,
+    tags: r.article.tags,
+    readMinutes: r.article.readMinutes,
+    viewCount: r.article.viewCount,
+    publishedAt: r.article.publishedAt,
+    author: {
+      id: r.author.id,
+      name: r.author.name,
+      avatarUrl: r.authorProfile?.avatarUrl ?? null,
+      slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+    },
+  };
+}

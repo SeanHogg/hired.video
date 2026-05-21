@@ -275,7 +275,7 @@ async function fetchArticles(limit: number, page: number): Promise<TypedFetchRes
   let dynamicItems: RawApiItem[] = [];
   try {
     const { articleService } = await import("@/lib/services/article-service");
-    const published = await articleService.listPublished(50);
+    const published = await articleService.listPublished({ limit: 50 });
     dynamicItems = published.map((a) => ({
       type: "article",
       id: a.id,

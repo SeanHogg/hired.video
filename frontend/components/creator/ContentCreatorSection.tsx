@@ -12,6 +12,8 @@ interface Props {
   servicesLoading?: boolean;
   setServices?: React.Dispatch<React.SetStateAction<ServiceOffering[]>>;
   defaultTab?: CreatorWorkspaceTab;
+  /** Forwarded to CreatorWorkspace to enable URL-driven tabs. Pass `"/services/creator"` on the My Services hub. */
+  basePath?: string;
 }
 
 /**
@@ -29,6 +31,7 @@ export default function ContentCreatorSection({
   servicesLoading,
   setServices,
   defaultTab,
+  basePath,
 }: Props = {}) {
   return (
     <div className="space-y-4">
@@ -43,6 +46,7 @@ export default function ContentCreatorSection({
         servicesLoading={servicesLoading}
         setServices={setServices}
         defaultTab={defaultTab}
+        basePath={basePath}
       />
     </div>
   );

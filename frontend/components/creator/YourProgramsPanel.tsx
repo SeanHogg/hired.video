@@ -28,7 +28,8 @@ function programFlagOf(profile: CreatorProfile, program: CreatorProgram): boolea
     : program === "voice" ? profile.voiceActive
     : program === "services" ? profile.servicesActive
     : program === "articles" ? profile.articlesActive
-    : profile.coursesActive;
+    : program === "courses" ? profile.coursesActive
+    : profile.templatesActive;
 }
 
 interface Props {
