@@ -54,13 +54,15 @@ export default function OAuthProviders({ mode, redirect = "/dashboard" }: OAuthP
           key={p.key}
           type="button"
           variant="outline"
-          className="w-full flex items-center gap-2 min-h-[44px]"
+          aria-label={`${verb} ${p.name}`}
+          className="w-full flex items-center gap-2 min-h-[44px] px-2 sm:px-4"
           onClick={() => {
             window.location.href = `${API_BASE}/api/auth/oauth/${p.key}?redirect=${encodeURIComponent(redirect)}`;
           }}
         >
           {p.icon}
-          {verb} {p.name}
+          <span className="hidden sm:inline">{verb} </span>
+          {p.name}
         </Button>
       ))}
     </div>
