@@ -14,6 +14,7 @@ import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-co
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
 import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
+import { MEDIA_KINDS } from "../../../shared/media-kinds.js";
 import { isUuid } from "../../../shared/value-types.js";
 import {
   assertCanWrite,
@@ -971,6 +972,10 @@ function toProjectDto(
     // Pre-migration-0067 rows default to 'scene'; the new v2 canvas editor
     // writes 'nle' with a populated timelineSpec.
     kind: (project.kind as "scene" | "nle" | null) ?? "scene",
+    // Output axis (#894) — what the finished project becomes. See
+    // `shared/media-kinds.ts`. Pre-0099 rows fall back to 'video' so
+    // every legacy project keeps current export behaviour.
+    mediaKind: (project.mediaKind as "video" | "podcast" | "voice" | "animation" | null) ?? "video",
     timelineSpec: project.timelineSpec ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
@@ -1120,6 +1125,10 @@ studioRoutes.post("/save-draft", async (c) => {
     // every save so the row's kind reflects the surface that last
     // authored it.
     kind:           z.enum(["scene", "nle"]).optional(),
+    // Output axis (#894) — what the finished project becomes. Sent by
+    // the editor on first save when the user picked a non-video template.
+    // Default 'video' on the column keeps every pre-#894 client working.
+    mediaKind:      z.enum(MEDIA_KINDS).optional(),
     // Timeline JSON for kind='nle' projects. Validated by the client
     // before send (shape matches shared/timeline.ts); server persists
     // verbatim because the render facade is the schema authority.
@@ -1146,13 +1155,16 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, timelineSpec, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
+  // mediaKind is orthogonal (output axis) — patched separately when the
+  // client passes it.
   const editorKindPatch =
-    kind !== undefined || timelineSpec !== undefined
+    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
+          ...(mediaKind !== undefined ? { mediaKind } : {}),
           ...(timelineSpec !== undefined ? { timelineSpec } : {}),
         }
       : {};

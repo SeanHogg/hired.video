@@ -132,6 +132,13 @@ export const studioProjects = pgTable("studio_projects", {
   // `timelineSpec`. See migration 0067 + shared/timeline.ts. Default
   // 'scene' keeps every pre-0067 row pointed at the legacy editor.
   kind: varchar("kind", { length: 16 }).default("scene").notNull(),
+  // Output axis (#894) — orthogonal to `kind` (which is a STORAGE
+  // discriminator). Drives the export menu, publish destinations, and
+  // per-template "Exports as MP4 / MP3+RSS / GIF" panel. See
+  // `shared/media-kinds.ts` for the enum + per-kind output profiles.
+  // Default 'video' so every pre-migration row keeps today's behaviour.
+  // Migration 0099.
+  mediaKind: varchar("media_kind", { length: 16 }).default("video").notNull(),
   storyboard: jsonb("storyboard"),
   // Frame-accurate Timeline JSON for kind='nle' projects. See
   // shared/timeline.ts for the shape and isRenderable() for the

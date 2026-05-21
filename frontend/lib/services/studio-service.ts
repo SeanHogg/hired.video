@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import { STUDIO_PURPOSES, type StudioPurpose } from "@shared/studio-purposes";
+import { MEDIA_KINDS, type MediaKind } from "@shared/media-kinds";
 import type { VideoScript } from "../../types/video-script";
 
 export type { VideoScript };
@@ -230,6 +231,11 @@ export const StudioProjectSchema = z.object({
   // shared/timeline.ts. Default 'scene' so any pre-0067 row still routes
   // to the scene editor without explicit migration.
   kind: z.enum(["scene", "nle"]).default("scene").optional(),
+  // Output axis (#894) — what the finished project becomes. Drives the
+  // export menu, publish destinations, and per-template "Exports as
+  // MP4 / MP3+RSS / GIF" panel. See `@shared/media-kinds`. Default
+  // 'video' for every pre-#894 row.
+  mediaKind: z.enum(MEDIA_KINDS).default("video").optional(),
   // Frame-accurate Timeline JSON for kind='nle' projects. The shape is
   // validated client-side by callers that consume it (the NLE canvas);
   // server stores verbatim. See shared/timeline.ts.
@@ -562,6 +568,10 @@ export const studioService = {
       purpose?: StudioPurpose;
       subjects?: Array<{ kind: string; id: string }>;
       kind?: "scene" | "nle";
+      /** Output axis (#894). Sent on first save when the user picked a
+       *  non-video template — server defaults to 'video' so legacy
+       *  callers are unaffected. */
+      mediaKind?: MediaKind;
       timelineSpec?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
@@ -581,6 +591,7 @@ export const studioService = {
       ...(args.purpose ? { purpose: args.purpose } : {}),
       ...(args.subjects !== undefined ? { subjects: args.subjects } : {}),
       ...(args.kind ? { kind: args.kind } : {}),
+      ...(args.mediaKind ? { mediaKind: args.mediaKind } : {}),
       ...(args.timelineSpec !== undefined ? { timelineSpec: args.timelineSpec } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),

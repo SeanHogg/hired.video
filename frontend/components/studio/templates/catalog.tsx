@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import type { StudioProjectState } from "@/types/studio";
 import type { StudioPurpose } from "@/lib/services/studio-service";
+import type { MediaKind } from "@shared/media-kinds";
 
 import BasicIntake from "./intake/BasicIntake";
 import ProfileIntake from "./intake/ProfileIntake";
@@ -117,6 +118,13 @@ export interface TemplateDef {
   purpose: StudioPurpose;
   /** Category bucket for the /studio landing filter pills. */
   category: TemplateCategory;
+  /** Output axis (#894) — orthogonal to `purpose` (LLM prompt config) and
+   *  `category` (intent). Drives the export menu, publish destinations, and
+   *  per-template "Exports as MP4 / MP3+RSS / GIF" panel. SSoT for which
+   *  output profiles + publish rows light up; see `@shared/media-kinds`.
+   *  Every existing template is `"video"` — Podcast / Voice / Animation
+   *  kinds land alongside their first template entries. */
+  mediaKind: MediaKind;
   /** Demographics this template serves. Single SoT for #900 audience pages
    *  (`/for/:audience`) and #901 template-page "best for" chips. Filter the
    *  catalog directly — no parallel `AUDIENCE_TO_TEMPLATES` lookup. */
@@ -162,6 +170,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // statement.
     purpose: "basic",
     category: "quick",
+    mediaKind: "video",
     audiences: ["creator"],
     defaultName: "New Video",
     // Basic skips the LLM (#492) — it produces a single mock scene from
@@ -180,6 +189,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-profile",
     purpose: "personal_brand",
     category: "promote",
+    mediaKind: "video",
     audiences: ["job_seeker", "creator", "founder", "recruiter"],
     defaultName: "Promote Yourself",
     defaultPrompt: "Create a 30-second video promoting my profile — my role, expertise, and what I offer.",
@@ -194,6 +204,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-resume",
     purpose: "resume",
     category: "promote",
+    mediaKind: "video",
     audiences: ["job_seeker"],
     defaultName: "New Video Resume",
     defaultPrompt: "Create a professional 28-second video resume",
@@ -208,6 +219,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "promote",
+    mediaKind: "video",
     audiences: ["job_seeker", "creator", "founder"],
     defaultName: "Personal Brand Video",
     defaultPrompt: "Create a personal brand video that tells my story",
@@ -222,6 +234,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-resume",
     purpose: "resume",
     category: "promote",
+    mediaKind: "video",
     audiences: ["job_seeker", "developer", "designer", "data_analyst"],
     defaultName: "Skills Demo",
     defaultPrompt: "Create a skills demonstration video showcasing technical expertise",
@@ -236,6 +249,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "resume",
     category: "showcase",
+    mediaKind: "video",
     audiences: ["developer"],
     defaultName: "Code Walkthrough",
     defaultPrompt: "Create a video walking through code architecture and decisions",
@@ -250,6 +264,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "auto-resume",
     purpose: "resume",
     category: "showcase",
+    mediaKind: "video",
     audiences: ["designer"],
     defaultName: "Design Portfolio",
     defaultPrompt: "Create a video showcasing my design portfolio — projects, process, and outcomes",
@@ -264,6 +279,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "resume",
     category: "showcase",
+    mediaKind: "video",
     audiences: ["data_analyst", "job_seeker"],
     defaultName: "Data Analysis",
     defaultPrompt: "Create a video showing data insights, methodology, and visualizations",
@@ -278,6 +294,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "pick-job",
     purpose: "job_ad",
     category: "hiring",
+    mediaKind: "video",
     audiences: ["recruiter", "employer"],
     defaultName: "Job Ad Video",
     defaultPrompt: "Create a compelling 30-second job advertisement video",
@@ -292,6 +309,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "pick-company",
     purpose: "company_promo",
     category: "hiring",
+    mediaKind: "video",
     audiences: ["employer", "recruiter"],
     defaultName: "Company Promo Video",
     defaultPrompt: "Create a 30-second video promoting my company — what we do, who we serve, and why we hire.",
@@ -306,6 +324,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "showcase",
+    mediaKind: "video",
     audiences: ["athlete", "actor", "musician", "creator", "director"],
     defaultName: "Sizzle Reel",
     defaultPrompt: "Build a sizzle reel from my clips, cut to the music",
@@ -323,6 +342,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // shape, add a "tool_promo" StudioPurpose.
     purpose: "product_launch",
     category: "showcase",
+    mediaKind: "video",
     audiences: ["creator", "founder", "developer"],
     defaultName: "Tool Promo",
     defaultPrompt: "Create a single-scene 30-second promo video for a tool from the hired.video catalog. Open with the problem, show the tool in use, end with a clear call to action.",
@@ -353,6 +373,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // for now personal_brand produces an actor-friendly script.
     purpose: "personal_brand",
     category: "film",
+    mediaKind: "video",
     audiences: ["actor"],
     defaultName: "Self-tape audition",
     defaultPrompt:
@@ -371,6 +392,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "film",
+    mediaKind: "video",
     audiences: ["actor"],
     defaultName: "Monologue",
     defaultPrompt:
@@ -387,6 +409,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     importMode: "none",
     purpose: "personal_brand",
     category: "film",
+    mediaKind: "video",
     audiences: ["actor"],
     defaultName: "Actor showreel",
     defaultPrompt:
@@ -403,6 +426,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // product_launch prompt config — a film is a product being pitched.
     purpose: "product_launch",
     category: "film",
+    mediaKind: "video",
     audiences: ["director"],
     defaultName: "Director's pitch",
     defaultPrompt:
@@ -421,6 +445,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // category keeps it visually separated from corporate Job Ad.
     purpose: "job_ad",
     category: "film",
+    mediaKind: "video",
     audiences: ["director", "employer"],
     defaultName: "Casting call",
     defaultPrompt:
