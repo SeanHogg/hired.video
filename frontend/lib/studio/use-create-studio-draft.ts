@@ -116,6 +116,7 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           mediaKind: template.mediaKind,
           ...(seed.timelineSpec !== undefined ? { timelineSpec: seed.timelineSpec } : {}),
           ...(seed.gameState !== undefined ? { gameState: seed.gameState } : {}),
+          ...(seed.imageState !== undefined ? { imageState: seed.imageState } : {}),
         });
         return finalise(res.data);
       }
@@ -167,7 +168,7 @@ export function useCreateStudioDraft(opts: Opts = {}) {
       return finalise(res.data);
     } catch (err) {
       toast({
-        title: "Couldn't create video",
+        title: "Couldn't create project",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });

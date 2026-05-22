@@ -74,6 +74,40 @@ describe("buildComicPage()", () => {
     expect(bg.params.data.source).toEqual({ kind: "url", url: "/comics/hero/bg-skyline.svg" });
     // Background sits at z=0 — behind every other widget on the page.
     expect(bg.position.z).toBe(0);
+    // Background uses `cover` so a landscape SVG paints corner-to-corner
+    // without letterbox bars.
+    expect(bg.params.data.fit).toBe("cover");
+  });
+
+  it("uses fit=contain for foreground slots (character + prop) so silhouettes don't crop", () => {
+    // Regression guard for the user-reported "graphics don't render
+    // correctly" bug — character/prop SVGs were inheriting the
+    // background's `cover` default and getting cropped to the slot's
+    // aspect ratio (cape silhouettes lost their cape, compass needles
+    // lost their tip, etc.). Per-slot fit policy lives in
+    // `buildComicPage` — these assertions lock it.
+    const scene = buildComicPage(
+      content({
+        backgroundUrl: "/comics/hero/bg-skyline.svg",
+        characterUrl: "/comics/hero/char-cape.svg",
+        propUrl: "/comics/hero/prop-explosion.svg",
+      }),
+      HERO_PALETTE,
+      COMIC_DEFAULT_LAYOUT,
+    );
+    const images = scene.widgets.filter((w) => w.kind === "image");
+    expect(images).toHaveLength(3);
+    // Background → cover (full-bleed panel).
+    const bg = images.find((w) => w.position.z === 0);
+    if (!bg || bg.params.kind !== "image") throw new Error("bg missing");
+    expect(bg.params.data.fit).toBe("cover");
+    // Character + prop → contain (silhouettes preserved).
+    const foreground = images.filter((w) => w.position.z === 3);
+    expect(foreground).toHaveLength(2);
+    for (const w of foreground) {
+      if (w.params.kind !== "image") throw new Error("image kind narrow");
+      expect(w.params.data.fit).toBe("contain");
+    }
   });
 
   it("emits a thought-bubble when protagonistMode is 'thought'", () => {

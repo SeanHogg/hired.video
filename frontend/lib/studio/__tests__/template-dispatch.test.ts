@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { seedTemplate } from "@/lib/studio/template-dispatch";
 import type { TemplateDef } from "@/components/studio/templates/catalog";
+import { MEDIA_KINDS } from "@shared/media-kinds";
 import { FilePlus2 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -72,10 +73,85 @@ describe("seedTemplate", () => {
     const kinds = ["video", "podcast", "voice", "animation", "comic"] as const;
 
     for (const kind of kinds) {
-      it(`returns timelineSpec (not gameState) for ${kind}`, () => {
+      it(`returns timelineSpec (not gameState / imageState) for ${kind}`, () => {
         const result = seedTemplate(makeTemplate({ mediaKind: kind }));
         expect(result.timelineSpec).toBeDefined();
         expect(result.gameState).toBeUndefined();
+        expect(result.imageState).toBeUndefined();
+      });
+    }
+  });
+
+  // Regression: prior to this fix the switch had no `image` case, so
+  // selecting any `drawing_*` template from the chooser dropdown crashed
+  // with "Cannot read properties of undefined (reading 'name')". The
+  // dispatcher returned undefined and the caller dereferenced
+  // `seed.name`. These tests pin the image branch.
+  describe("image kind", () => {
+    it("returns imageState (not timelineSpec / gameState) so <CanvasRouter> mounts <DrawingStage>", () => {
+      const result = seedTemplate(
+        makeTemplate({ id: "drawing_blank" as TemplateDef["id"], mediaKind: "image" }),
+      );
+      expect(result.imageState).toBeDefined();
+      expect(result.timelineSpec).toBeUndefined();
+      expect(result.gameState).toBeUndefined();
+    });
+
+    it("uses the per-template dimensions registered in image-seeds.ts", () => {
+      // drawing_social_square = 1080×1080
+      const square = seedTemplate(
+        makeTemplate({ id: "drawing_social_square" as TemplateDef["id"], mediaKind: "image" }),
+      );
+      expect(square.imageState?.width).toBe(1080);
+      expect(square.imageState?.height).toBe(1080);
+
+      // drawing_og_card = 1200×630
+      const og = seedTemplate(
+        makeTemplate({ id: "drawing_og_card" as TemplateDef["id"], mediaKind: "image" }),
+      );
+      expect(og.imageState?.width).toBe(1200);
+      expect(og.imageState?.height).toBe(630);
+    });
+
+    it("falls back to a 1024×1024 blank canvas when the template id has no image seed", () => {
+      // Defensive — a future image template added to the catalog
+      // without a matching IMAGE_SEEDS entry still produces a usable
+      // project (same fallback the game-seed registry uses).
+      const result = seedTemplate(
+        makeTemplate({ id: "basic" as TemplateDef["id"], mediaKind: "image" }),
+      );
+      expect(result.imageState?.width).toBe(1024);
+      expect(result.imageState?.height).toBe(1024);
+    });
+
+    it("ships at least one fully-formed layer so the runtime renders on first paint", () => {
+      const result = seedTemplate(
+        makeTemplate({ id: "drawing_blank" as TemplateDef["id"], mediaKind: "image" }),
+      );
+      expect(result.imageState?.layers.length).toBeGreaterThan(0);
+      expect(result.imageState?.activeLayerId).toBeTruthy();
+    });
+  });
+
+  // Exhaustiveness regression: lock that EVERY mediaKind in MEDIA_KINDS
+  // produces a non-throwing dispatch with `name` populated. Prior to
+  // this fix, `image` was in `MEDIA_KINDS` but missing from the switch,
+  // so the dispatcher returned undefined → `seed.name` crashed in the
+  // caller. This test fails the build the next time someone adds a
+  // mediaKind without a matching dispatch branch.
+  describe("exhaustiveness — every shipping mediaKind must dispatch", () => {
+    for (const kind of MEDIA_KINDS) {
+      it(`does not crash + names the project for mediaKind=${kind}`, () => {
+        const result = seedTemplate(makeTemplate({ mediaKind: kind, defaultName: `Test ${kind}` }));
+        expect(result.name).toBe(`Test ${kind}`);
+        // At least one state-shaped field must be populated; which one
+        // depends on the kind. Asserting the OR-shape catches "switch
+        // returned bare { name }" regressions.
+        const hasSomePayload =
+          result.timelineSpec !== undefined ||
+          result.gameState !== undefined ||
+          result.imageState !== undefined;
+        expect(hasSomePayload).toBe(true);
       });
     }
   });

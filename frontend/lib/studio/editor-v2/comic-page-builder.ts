@@ -64,8 +64,16 @@ export function buildComicPage(
 ): Scene {
   const widgets: Widget[] = [];
 
+  // Per-slot `fit` policy — single SoT for "how does an asset fill its
+  // slot in a comic page". Background fills its panel full-bleed so a
+  // landscape SVG paints corner to corner; character + prop are
+  // silhouettes whose proportions must be preserved (cropping cuts off
+  // a hero's cape, a compass needle, etc.). Picking `contain` for
+  // foreground assets fixed the user-reported "graphics don't render
+  // correctly" bug — they were inheriting the previous `"cover"` default
+  // and getting cropped to the slot's aspect ratio.
   if (content.backgroundUrl) {
-    widgets.push(makeImageWidget(content.backgroundUrl, layout.bg, 0));
+    widgets.push(makeImageWidget(content.backgroundUrl, layout.bg, 0, "cover"));
   }
   widgets.push(makePanelFrameWidget(layout.panelFrame, palette.ink, 1));
 
@@ -73,10 +81,10 @@ export function buildComicPage(
     widgets.push(makeCaptionWidget(content.caption, layout.caption, palette, 4));
   }
   if (content.characterUrl) {
-    widgets.push(makeImageWidget(content.characterUrl, layout.character, 3));
+    widgets.push(makeImageWidget(content.characterUrl, layout.character, 3, "contain"));
   }
   if (content.propUrl) {
-    widgets.push(makeImageWidget(content.propUrl, layout.prop, 3));
+    widgets.push(makeImageWidget(content.propUrl, layout.prop, 3, "contain"));
   }
   if (content.protagonistLine) {
     widgets.push(
@@ -122,12 +130,19 @@ export function makeImageWidget(
   url: string,
   rect: { x: number; y: number; width: number; height: number },
   z: number,
+  /** Object-fit for the slot. Defaults to "cover" (the historical
+   *  behaviour). Comic foreground slots (character / prop) pass
+   *  "contain" so silhouettes don't crop to the slot's aspect ratio.
+   *  Backgrounds keep "cover" so a landscape SVG paints corner to
+   *  corner with no letterbox bars. Single SoT — `buildComicPage`
+   *  decides which slot gets which value; this helper just honours it. */
+  fit: "cover" | "contain" | "stretch" = "cover",
 ): Widget {
   const w = defaultWidget("image");
   if (w.params.kind !== "image") throw new Error("unreachable");
   w.position = { ...rect, z, rotation: 0 };
   w.params.data.source = { kind: "url", url };
-  w.params.data.fit = "cover";
+  w.params.data.fit = fit;
   return w;
 }
 
