@@ -123,36 +123,10 @@ function mapInputType(el: DomElement): FormField["type"] {
   return map[t] ?? "text";
 }
 
-function cssEscape(s: string): string {
-  return s.replace(/["\\]/g, "\\$&");
-}
-
-function buildSelector(doc: DomDocument, el: DomElement): string {
-  if (el.id) return `#${cssEscape(el.id)}`;
-  const nameAttr = el.getAttribute("name");
-  if (nameAttr) return `${el.tagName.toLowerCase()}[name="${cssEscape(nameAttr)}"]`;
-  const parts: string[] = [];
-  let current: DomElement | null = el;
-  while (current && current !== doc.body) {
-    if (current.id) {
-      parts.unshift(`#${cssEscape(current.id)}`);
-      break;
-    }
-    const parent: DomElement | null = current.parentElement ?? null;
-    if (parent) {
-      const children: DomElement[] = Array.from((parent.children ?? []) as ArrayLike<DomElement>);
-      const siblings = children.filter((c) => c.tagName === current!.tagName);
-      if (siblings.length > 1) {
-        const index = siblings.indexOf(current) + 1;
-        parts.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${index})`);
-      } else {
-        parts.unshift(current.tagName.toLowerCase());
-      }
-    }
-    current = parent;
-  }
-  return parts.join(" > ") || el.tagName.toLowerCase();
-}
+// cssEscape + buildSelector previously lived inline here. Both moved to
+// ./selector.ts so the interactive picker (hiredvideo-chrome-extension/
+// shared/content-script-picker.ts) consumes the same implementation.
+import { cssEscape, buildSelector } from "./selector.js";
 
 /**
  * Resolve the human label for a form element using multiple strategies.

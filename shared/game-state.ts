@@ -150,13 +150,9 @@ export function isPlayable(state: GameState): boolean {
   return state.levels.some((l) => l.id === state.startLevelId);
 }
 
-/** Resolve the start level. Returns the first level if `startLevelId`
- *  doesn't match (defensive — protects the editor from a corrupted
- *  reference). */
-export function findStartLevel(state: GameState): GameLevel | null {
-  if (state.levels.length === 0) return null;
-  return (
-    state.levels.find((l) => l.id === state.startLevelId) ??
-    state.levels[0]
-  );
-}
+// NOTE: `findStartLevel` used to live here, but every consumer is
+// runtime-side (the editor's <GameStage>, the in-app runtime, and the
+// IIFE-bundled exported runtime). To keep the dispatch logic single-source
+// across the in-app + exported paths, it now lives in
+// `frontend/lib/studio/game/runtime-core.js`. Import from there (or via
+// the TS shim at `frontend/lib/studio/game/runtime.ts`).

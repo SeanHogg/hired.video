@@ -146,13 +146,6 @@ export interface AiPromptHistoryEntry {
 export const DEFAULT_IMAGE_WIDTH = 1024;
 export const DEFAULT_IMAGE_HEIGHT = 1024;
 
-/** Hard cap on canvas dimensions. Above this, dataURL payloads bloat
- *  the studio_projects row past pg's practical jsonb size and the
- *  client browser starts hitting OffscreenCanvas memory limits. The
- *  editor enforces this when the user picks dimensions on project
- *  creation. */
-export const MAX_IMAGE_DIMENSION = 4096;
-
 /** Build a blank image state with one empty raster layer. Used by the
  *  StudioEditorV2 hydration path when a fresh `mediaKind: 'image'`
  *  project loads with `image_state IS NULL`. */
@@ -190,12 +183,3 @@ export function findLayer(state: ImageState, layerId: string): ImageLayer | null
   return state.layers.find((l) => l.id === layerId) ?? null;
 }
 
-/** True when the state has anything worth saving (a non-empty layer or
- *  a non-default background). The editor uses this to suppress
- *  "unsaved changes" warnings on an untouched fresh project. */
-export function imageStateHasContent(state: ImageState): boolean {
-  if (state.layers.some((l) => l.pixelsDataUrl !== null)) return true;
-  if (state.background.kind === "color" && state.background.color !== "#ffffff") return true;
-  if (state.aiPromptHistory.length > 0) return true;
-  return false;
-}

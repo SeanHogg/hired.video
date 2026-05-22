@@ -20,10 +20,10 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
 import { ok } from "../utils/response.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
+import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -58,46 +58,15 @@ const ErrorReportSchema = z.object({
 type ErrorReport = z.infer<typeof ErrorReportSchema>;
 
 // ── Rate limit ────────────────────────────────────────────────────────────────
+// 30/h per IP — generous for a real user, hostile for a bot. Built from
+// the shared createIpRateLimiter factory (middleware/rateLimiter.ts) so we
+// have ONE source of truth for the per-IP-bucket pattern across the API.
 
-interface BucketEntry {
-  count: number;
-  resetAt: number;
-}
-
-const reportBucket = new Map<string, BucketEntry>();
-const REPORT_WINDOW_MS = 60 * 60 * 1000; // 1h
-const REPORT_MAX_PER_HOUR = 30; // generous for a real user, hostile for a bot
-
-function reportClientIp(c: any): string {
-  const cf = c.req.header("CF-Connecting-IP");
-  if (cf) return cf.trim();
-  const xff = c.req.header("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return "unknown";
-}
-
-const reportRateLimiter: MiddlewareHandler = async (c, next) => {
-  const ip = reportClientIp(c);
-  const now = Date.now();
-  const entry = reportBucket.get(ip);
-  if (!entry || now > entry.resetAt) {
-    reportBucket.set(ip, { count: 1, resetAt: now + REPORT_WINDOW_MS });
-    return next();
-  }
-  entry.count += 1;
-  if (entry.count > REPORT_MAX_PER_HOUR) {
-    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-    c.res.headers.set("Retry-After", String(retryAfter));
-    return c.json(
-      { error: { code: "TOO_MANY_REQUESTS", message: "Too many error reports from this network." } },
-      429,
-    );
-  }
-  return next();
-};
+const reportRateLimiter = createIpRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  maxAttempts: 30,
+  message: "Too many error reports from this network.",
+});
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -175,7 +144,7 @@ errorsRoutes.post("/report", reportRateLimiter, async (c) => {
     );
   }
   const report = parsed.data;
-  const clientIp = reportClientIp(c);
+  const clientIp = getClientIp(c);
 
   // Email is best-effort: a failure is logged but does not fail the
   // request — the caller has done their part.

@@ -78,6 +78,48 @@ uploadRoutes.post("/", async (c) => {
   );
 });
 
+/**
+ * GET /api/upload/images — list the authenticated user's prior image
+ * uploads (closed-loop interop, Consolidated Gap Register #933).
+ *
+ * Powers the MediaPicker "Library" tab + any consumer that wants to
+ * surface a creator's prior assets without forcing a re-upload. Reads
+ * directly from R2 under the user's `uploads/<userId>/images/` prefix
+ * so every image landed via `POST /api/upload/image` (or via the
+ * DrawingStage "Save to library" action) shows up here automatically
+ * — no parallel `creator_assets` table needed for Phase 1.
+ *
+ * Per the DRY rule (`feedback_extract_on_duplication`): one prefix
+ * convention, one list endpoint, every uploader writes to the prefix
+ * and every consumer reads from this endpoint.
+ *
+ * Returns up to 100 most recent uploads, newest first (R2 stores
+ * `uploaded` timestamps on every object).
+ */
+uploadRoutes.get("/images", async (c) => {
+  const user = c.var.user;
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+
+  const listed = await bucket.list({
+    prefix: `uploads/${user.sub}/images/`,
+    limit: 100,
+  });
+
+  const items = listed.objects
+    .slice()
+    .sort((a, b) => +new Date(b.uploaded) - +new Date(a.uploaded))
+    .map((obj) => ({
+      key: obj.key,
+      url: cdnUrl(obj.key),
+      sizeBytes: obj.size,
+      uploadedAt: new Date(obj.uploaded).toISOString(),
+      contentType: obj.httpMetadata?.contentType ?? "image/png",
+    }));
+
+  return c.json(ok({ items, truncated: listed.truncated }));
+});
+
 /** POST /api/upload/image — multipart image upload used by company/profile UIs */
 uploadRoutes.post("/image", async (c) => {
   const user = c.var.user;

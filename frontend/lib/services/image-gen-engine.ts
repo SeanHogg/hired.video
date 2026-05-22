@@ -96,10 +96,6 @@ export function registerImageGenEngine(engine: ImageGenEngine): void {
   ENGINES.set(engine.id, engine);
 }
 
-export function listImageGenEngines(): ImageGenEngine[] {
-  return Array.from(ENGINES.values());
-}
-
 /** Engine ordering — WEB FIRST. The facade walks this list and picks
  *  the first available engine. Adding a new client-side path means a
  *  new entry at the top of this array (and a registration below). */

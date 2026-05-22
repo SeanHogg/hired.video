@@ -48,15 +48,19 @@ export function validateVideoFile(file: File): { valid: boolean; error?: string 
 }
 
 /**
- * Validate an image file before upload
+ * Validate an image file before upload. Accepts `Blob` (the wider type)
+ * so callers that produce raw blobs from `canvas.toBlob()` (e.g. the
+ * DrawingStage "Save to library" path) can share the same validation
+ * as picker uploads. `File` extends `Blob` so existing callers are
+ * unaffected.
  */
-export function validateImageFile(file: File): { valid: boolean; error?: string } {
-  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+export function validateImageFile(file: Blob): { valid: boolean; error?: string } {
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
 
   if (!allowedTypes.includes(file.type)) {
     return {
       valid: false,
-      error: "Invalid image format. Supported formats: JPG, PNG, GIF",
+      error: "Invalid image format. Supported formats: JPG, PNG, GIF, WebP",
     };
   }
 
@@ -99,16 +103,25 @@ export async function uploadCompanyLogo(file: File): Promise<string> {
 }
 
 /**
- * Upload an image file
+ * Upload an image to the user's R2 namespace. Accepts `Blob` (the
+ * wider type) so DOM-canvas exports (DrawingStage "Save to library"
+ * action) and picker file uploads share a single port. When `filename`
+ * is supplied the multipart part carries it (useful for human-readable
+ * R2 metadata + future download UX); otherwise FormData picks a
+ * default. Returns the durable CDN URL.
  */
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(
+  file: Blob,
+  filename?: string,
+): Promise<string> {
   const validation = validateImageFile(file);
   if (!validation.valid) {
     throw new Error(validation.error);
   }
 
   const formData = new FormData();
-  formData.append("file", file);
+  if (filename) formData.append("file", file, filename);
+  else formData.append("file", file);
 
   const response = await apiClient.post<FileUploadResponse>(
     "/api/upload/image",
@@ -116,6 +129,29 @@ export async function uploadImage(file: File): Promise<string> {
   );
 
   return response.data.url || "";
+}
+
+/** Single item returned by `listMyImages` — mirrors the shape of
+ *  `GET /api/upload/images`. */
+export interface MyImageEntry {
+  key: string;
+  url: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  contentType: string;
+}
+
+/**
+ * List the authenticated user's prior image uploads (closed-loop
+ * interop — Gap Register #933). Powers the MediaPicker "Library" tab
+ * and any consumer that wants to re-pick a previously-saved asset
+ * without forcing a re-upload.
+ */
+export async function listMyImages(): Promise<MyImageEntry[]> {
+  const response = await apiClient.get<{ items: MyImageEntry[]; truncated: boolean }>(
+    "/api/upload/images",
+  );
+  return response.data.items;
 }
 
 /**

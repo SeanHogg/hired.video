@@ -20,7 +20,6 @@
 
 import { z } from "zod";
 import {
-  COMIC_GENRES,
   getComicGenre,
   getNarrativeShape,
   pickStockAsset,
@@ -217,11 +216,3 @@ export async function scaffoldComic(
     rawTitle: data.title,
   };
 }
-
-// ─── Lookup re-exports ─────────────────────────────────────────────────────
-
-/** Re-exported so route handlers can validate `body.genreId` against
- *  the known set without re-importing the shared catalog directly. */
-export const KNOWN_GENRE_IDS: readonly ComicGenreId[] = COMIC_GENRES.map(
-  (g) => g.id,
-);

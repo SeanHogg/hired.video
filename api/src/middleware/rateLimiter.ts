@@ -22,8 +22,12 @@ const USER_MAX_REQUESTS = 600;
 
 /** Resolve the caller's IP from common proxy headers. CF-Connecting-IP
  *  takes precedence (single, trusted value at the Cloudflare edge);
- *  otherwise we fall back to the first hop in X-Forwarded-For. */
-function getClientIp(c: Context): string {
+ *  otherwise we fall back to the first hop in X-Forwarded-For.
+ *
+ *  Exported so adjacent surfaces (routes/errors.ts, routes/extension.ts,
+ *  any future client-side ingest endpoint) can use ONE source of truth
+ *  instead of each defining their own parallel copy. */
+export function getClientIp(c: Context): string {
   const cf = c.req.header("CF-Connecting-IP");
   if (cf) return cf.trim();
   const xff = c.req.header("x-forwarded-for");
@@ -32,6 +36,56 @@ function getClientIp(c: Context): string {
     if (first) return first;
   }
   return "unknown";
+}
+
+/**
+ * Factory for per-IP, fixed-window rate-limit middlewares.
+ *
+ * Use when you want a tight cap on an unauthenticated endpoint that
+ * doesn't fit the global limiter's anon/user-bucket model — typically
+ * a client-side ingest (errors, extension telemetry) or a per-action
+ * abuse cap (register, password reset, …).
+ *
+ * Replaces four ad-hoc copies of `Map<ip,{count,resetAt}>` + 429-with-
+ * Retry-After that lived in errors.ts, extension.ts, and the two
+ * specialised auth limiters below. Each caller passes its own
+ * `windowMs`, `maxAttempts`, and a custom 429 `message` for telemetry.
+ *
+ * Note: every call returns a NEW middleware with its OWN bucket Map.
+ * Two limiters never share state — share-state-by-accident was the
+ * original reason these were inlined rather than factored.
+ */
+export interface IpRateLimiterOptions {
+  windowMs: number;
+  maxAttempts: number;
+  /** Message shown in the 429 response body. */
+  message: string;
+  /** Override the key function — defaults to per-IP. */
+  keyOf?: (c: Context) => string;
+}
+
+export function createIpRateLimiter(opts: IpRateLimiterOptions): MiddlewareHandler {
+  const bucket = new Map<string, RateLimitEntry>();
+  const keyOf = opts.keyOf ?? ((c) => getClientIp(c));
+  return async (c, next) => {
+    const key = keyOf(c);
+    const now = Date.now();
+    const entry = bucket.get(key);
+    if (!entry || now > entry.resetAt) {
+      bucket.set(key, { count: 1, resetAt: now + opts.windowMs });
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > opts.maxAttempts) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      c.res.headers.set("Retry-After", String(retryAfter));
+      return c.json(
+        { error: { code: "TOO_MANY_REQUESTS", message: opts.message } },
+        429,
+      );
+    }
+    return next();
+  };
 }
 
 /**
@@ -94,85 +148,25 @@ export const rateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
 };
 
 // ---------------------------------------------------------------------------
-// Register endpoint limiter — separate, much tighter window. The global
-// limiter exempts /api/auth/* (legitimate users hammer login during sign-in
-// flows), but /register is a known spam vector and deserves its own gate.
-// 5 attempts per hour per IP is enough headroom for "I mistyped my email
-// and need to retry" without leaving the door open to bulk signup.
+// Per-endpoint limiters via the shared factory above.
+//
+//   register     — 5/h. /register is a known spam vector; the global limiter
+//                  exempts /api/auth/* (login bursts during recovery), so this
+//                  is the abuse cap.
+//   auth-write   — 20/10min. Covers /login, /magic-link, /forgot-password,
+//                  /reset-password. Per-IP rather than per-email so it
+//                  catches credential-stuffing bots walking many emails from
+//                  one origin. Defence-in-depth alongside Turnstile (#425).
 // ---------------------------------------------------------------------------
 
-const registerStore = new Map<string, RateLimitEntry>();
-const REGISTER_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const REGISTER_MAX_ATTEMPTS = 5;
+export const registerRateLimiterMiddleware: MiddlewareHandler = createIpRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  maxAttempts: 5,
+  message: "Too many signup attempts from this network. Please try again later.",
+});
 
-export const registerRateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
-  const ip = getClientIp(c);
-  const now = Date.now();
-  const entry = registerStore.get(ip);
-
-  if (!entry || now > entry.resetAt) {
-    registerStore.set(ip, { count: 1, resetAt: now + REGISTER_WINDOW_MS });
-    return next();
-  }
-
-  entry.count += 1;
-
-  if (entry.count > REGISTER_MAX_ATTEMPTS) {
-    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-    c.res.headers.set("Retry-After", String(retryAfter));
-    return c.json(
-      {
-        error: {
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many signup attempts from this network. Please try again later.",
-        },
-      },
-      429,
-    );
-  }
-
-  return next();
-};
-
-// ---------------------------------------------------------------------------
-// Auth-write endpoint limiter (#427) — covers /login, /magic-link,
-// /forgot-password, /reset-password. Per-IP rather than per-email so it
-// catches credential-stuffing bots that walk many emails from one origin.
-// Window + cap deliberately looser than /register since legitimate users
-// can fire 4-5 attempts on the same form during a mistyped-password
-// recovery. Defense-in-depth alongside #425's Turnstile gate (which the
-// FE may fail to mount on script-load drift).
-// ---------------------------------------------------------------------------
-
-const authWriteStore = new Map<string, RateLimitEntry>();
-const AUTH_WRITE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const AUTH_WRITE_MAX_ATTEMPTS = 20;
-
-export const authWriteRateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
-  const ip = getClientIp(c);
-  const now = Date.now();
-  const entry = authWriteStore.get(ip);
-
-  if (!entry || now > entry.resetAt) {
-    authWriteStore.set(ip, { count: 1, resetAt: now + AUTH_WRITE_WINDOW_MS });
-    return next();
-  }
-
-  entry.count += 1;
-
-  if (entry.count > AUTH_WRITE_MAX_ATTEMPTS) {
-    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-    c.res.headers.set("Retry-After", String(retryAfter));
-    return c.json(
-      {
-        error: {
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many auth attempts from this network. Please try again later.",
-        },
-      },
-      429,
-    );
-  }
-
-  return next();
-};
+export const authWriteRateLimiterMiddleware: MiddlewareHandler = createIpRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 20,
+  message: "Too many auth attempts from this network. Please try again later.",
+});

@@ -16,7 +16,7 @@
  */
 
 import { describe, it } from "node:test";
-import { strict as assert } from "node:assert";
+import assert from "node:assert/strict";
 import {
   COMIC_GENRES,
   COMIC_GENRE_IDS,

@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImageIcon, Loader2, Sparkles, Upload } from "lucide-react";
+import { FolderOpen, ImageIcon, Loader2, Sparkles, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -25,7 +25,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
-import { uploadImage, uploadVideo } from "@/lib/services/upload-service";
+import {
+  listMyImages,
+  uploadImage,
+  uploadVideo,
+  type MyImageEntry,
+} from "@/lib/services/upload-service";
 import { generateImage } from "@/lib/services/image-gen-engine";
 
 export interface PickedMedia {
@@ -59,8 +64,8 @@ export interface MediaPickerProps {
   /** Title shown at the top of the dialog. */
   title?: string;
   /** Tab to pre-select on open (#586). Useful for "Regenerate with AI"
-   *  callers that want to skip Upload + Stock and land on the AI tab. */
-  defaultTab?: "upload" | "stock" | "ai";
+   *  callers that want to skip Upload + Stock and land on a specific tab. */
+  defaultTab?: "upload" | "library" | "stock" | "ai";
 }
 
 const STOCK_HIDDEN_FOR: MediaAccept[] = []; // stock library covers all accept modes
@@ -79,7 +84,7 @@ export default function MediaPicker({
   // different tab inside the dialog their choice wins. Re-opens reseed
   // from defaultTab so a caller that targets "ai" never reopens on
   // "upload" without explicit user action.
-  const [tab, setTab] = useState<"upload" | "stock" | "ai">(defaultTab ?? "upload");
+  const [tab, setTab] = useState<"upload" | "library" | "stock" | "ai">(defaultTab ?? "upload");
   useEffect(() => {
     if (open) setTab(defaultTab ?? "upload");
   }, [open, defaultTab]);
@@ -94,8 +99,15 @@ export default function MediaPicker({
 
   const showStock = !STOCK_HIDDEN_FOR.includes(accept);
   const showAI = accept !== "video"; // AI image gen produces images only
+  // Library = user's prior R2 image uploads — surfaced for accept modes
+  // that accept images (so the Drawing studio's "Save to library" output,
+  // and any other prior upload, can be re-picked in Video / Game / Comic
+  // projects without manual re-upload). Closed-loop interop (#933).
+  const showLibrary = accept !== "video";
 
   const dialogTitle = title ?? (accept === "video" ? "Choose video" : "Choose media");
+  const visibleTabCount =
+    1 + (showLibrary ? 1 : 0) + (showStock ? 1 : 0) + (showAI ? 1 : 0);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
@@ -114,10 +126,15 @@ export default function MediaPicker({
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mt-2">
-          <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${1 + (showStock ? 1 : 0) + (showAI ? 1 : 0)}, minmax(0, 1fr))` }}>
+          <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleTabCount}, minmax(0, 1fr))` }}>
             <TabsTrigger value="upload">
               <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload
             </TabsTrigger>
+            {showLibrary && (
+              <TabsTrigger value="library">
+                <FolderOpen className="h-3.5 w-3.5 mr-1.5" /> Library
+              </TabsTrigger>
+            )}
             {showStock && (
               <TabsTrigger value="stock">
                 <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Stock
@@ -133,6 +150,12 @@ export default function MediaPicker({
           <TabsContent value="upload" className="mt-3">
             <UploadTab accept={accept} onPick={handlePick} />
           </TabsContent>
+
+          {showLibrary && (
+            <TabsContent value="library" className="mt-3 max-h-[60vh] overflow-y-auto">
+              <LibraryTab active={tab === "library"} onPick={handlePick} />
+            </TabsContent>
+          )}
 
           {showStock && (
             <TabsContent value="stock" className="mt-3 max-h-[60vh] overflow-y-auto">
@@ -186,7 +209,7 @@ export interface MediaIconPickerProps {
   label?: string;
   disabled?: boolean;
   /** Tab to pre-select on open. Passes through to MediaPicker (#586). */
-  defaultTab?: "upload" | "stock" | "ai";
+  defaultTab?: "upload" | "library" | "stock" | "ai";
   /** Custom trigger override — bypass the default square Image button.
    *  Useful for inline "Regenerate with AI" affordances (#586). */
   trigger?: React.ReactNode;
@@ -289,6 +312,89 @@ function UploadTab({ accept, onPick }: { accept: MediaAccept; onPick: (a: Picked
         )}
       </button>
       {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Library tab ────────────────────────────────────────────────────────────
+//
+// Lists the authenticated user's prior R2 image uploads — every drawing
+// saved via the DrawingStage "Save to library" action, plus every prior
+// MediaPicker upload, shows up here automatically. Closed-loop interop
+// per Gap Register #933.
+//
+// Per the standing DRY rule the panel self-fetches when activated; the
+// host doesn't pass anything except the active flag (so we lazy-load
+// only when the user clicks the tab — avoids hammering the list
+// endpoint on every picker mount).
+
+function LibraryTab({
+  active,
+  onPick,
+}: {
+  active: boolean;
+  onPick: (a: PickedMedia) => void;
+}) {
+  const [items, setItems] = useState<MyImageEntry[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!active || items !== null || busy) return;
+    setBusy(true);
+    setError(null);
+    listMyImages()
+      .then((rows) => setItems(rows))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load library"))
+      .finally(() => setBusy(false));
+  }, [active, items, busy]);
+
+  if (busy && items === null) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (error) {
+    return <p className="py-6 text-center text-sm text-destructive">{error}</p>;
+  }
+  if (!items || items.length === 0) {
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        <p>No saved images yet.</p>
+        <p className="mt-1 text-xs">
+          Save a drawing or upload an image; it lands here for re-use across
+          every studio kind.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-2 py-2 sm:grid-cols-4">
+      {items.map((entry) => (
+        <button
+          key={entry.key}
+          type="button"
+          className="group relative aspect-square overflow-hidden rounded-md border border-border bg-muted transition hover:border-primary"
+          onClick={() =>
+            onPick({
+              url: entry.url,
+              mediaType: "image",
+              source: "upload",
+            })
+          }
+          title={`${new Date(entry.uploadedAt).toLocaleString()} · ${Math.round(entry.sizeBytes / 1024)}KB`}
+        >
+          <img
+            src={entry.url}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </button>
+      ))}
     </div>
   );
 }

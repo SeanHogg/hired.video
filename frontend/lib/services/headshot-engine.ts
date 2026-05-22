@@ -24,6 +24,8 @@
  * available, WASM fallback when not.
  */
 
+import { coverRect } from "@/lib/utils/image-fit";
+
 export type HeadshotEngineId = "segformer-webgpu" | "segformer-wasm";
 
 export interface HeadshotInput {
@@ -350,19 +352,6 @@ function applyMaskToImageData(imgData: ImageData, mask: RawImageLike): void {
       px[i + 3] = px[i + 3] * m;
     }
   }
-}
-
-function coverRect(sw: number, sh: number, dw: number, dh: number) {
-  const sourceRatio = sw / sh;
-  const dstRatio = dw / dh;
-  if (sourceRatio > dstRatio) {
-    const drawH = dh;
-    const drawW = dh * sourceRatio;
-    return { dx: (dw - drawW) / 2, dy: 0, dw: drawW, dh: drawH };
-  }
-  const drawW = dw;
-  const drawH = dw / sourceRatio;
-  return { dx: 0, dy: (dh - drawH) / 2, dw: drawW, dh: drawH };
 }
 
 function blobToImage(blob: Blob): Promise<HTMLImageElement> {

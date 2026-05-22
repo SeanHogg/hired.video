@@ -8,21 +8,27 @@
  *     `<script>` tag that loads `runtime.js` then boots the game
  *     against the embedded state.
  *   - `state.json` — the `GameState` serialized verbatim.
- *   - `runtime.js` — a self-executing IIFE port of
- *     `lib/studio/game/runtime.ts` that runs without any module-loader
- *     dependency. Single-source the behavior interpreter so editor
- *     playtest + exported bundle behave identically. (Future passes
- *     can swap this for a pre-bundled Phaser core.)
+ *   - `runtime.js` — the SAME `runtime-core.js` module the editor's
+ *     `<GameStage>` runs (read here via Vite's `?raw` query and wrapped
+ *     in an IIFE so it works without a module loader). Single source of
+ *     truth → editor playtest + exported bundle execute identical code.
  *
- * Phase 1 ships a tiny standalone runtime literally inlined as a JS
- * string so the bundle has zero external deps and runs on any web
- * host (itch.io / GitHub Pages / S3 / local file://). When the Phaser
- * integration lands (#935 continuation), this module swaps the inlined
- * runtime for the Phaser-bundled equivalent, contract unchanged.
+ * The IIFE wrap is the ONE divergence between the two consumers:
+ *   - in-app: imports `runGame` from `./runtime` (ES modules)
+ *   - bundle: assigns `window.__hiredVideoGame = { runGame }` so the
+ *     loader script in `index.html` can call it from a non-module
+ *     `<script>` tag (works under file:// without a server).
+ *
+ * Per the DRY rule: ZERO duplication of behavior dispatch. Any change to
+ * behaviors / drawing / runtime shell lands in one place
+ * (`runtime-core.js`) and both surfaces pick it up.
  */
 
 import JSZip from "jszip";
 import type { GameState } from "@shared/game-state";
+// Vite's `?raw` returns the file source as a string. The file is plain JS
+// (no TS-only syntax) precisely so this raw text is browser-runnable.
+import runtimeCoreSource from "./runtime-core.js?raw";
 
 /** Build a ZIP Blob containing a self-contained playable game. The
  *  caller hands the Blob to the existing download / R2-upload paths
@@ -35,10 +41,32 @@ export async function bundleGame(
   const title = opts.title ?? "Game";
 
   zip.file("state.json", JSON.stringify(state, null, 2));
-  zip.file("runtime.js", STANDALONE_RUNTIME_JS);
+  zip.file("runtime.js", buildStandaloneRuntimeJs());
   zip.file("index.html", indexHtml(title, state.width, state.height));
 
   return zip.generateAsync({ type: "blob" });
+}
+
+/** Wrap the ES-module `runtime-core.js` source in an IIFE that exposes
+ *  `runGame` on `window.__hiredVideoGame`, so the exported bundle works
+ *  from a non-module `<script>` tag (which `index.html` uses so the ZIP
+ *  works under file:// without a server).
+ *
+ *  EXPORTED so unit tests can lock the wrap shape — the regex
+ *  transform is the only place runtime-core's source is reshaped, so a
+ *  regression here silently breaks the exported bundle. */
+export function buildStandaloneRuntimeJs(): string {
+  // Strip the leading `export ` keywords — the IIFE body lifts each
+  // exported declaration into IIFE scope. Source has no re-exports or
+  // wildcard exports, so the simple regex is sufficient.
+  const stripped = runtimeCoreSource.replace(/^export\s+/gm, "");
+  return (
+    "(function(){\n" +
+    '"use strict";\n' +
+    stripped +
+    "\nwindow.__hiredVideoGame = { runGame: runGame };\n" +
+    "})();\n"
+  );
 }
 
 function indexHtml(title: string, w: number, h: number): string {
@@ -90,138 +118,3 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Standalone runtime — a self-executing IIFE that exports `runGame` on
-// `window.__hiredVideoGame`. This is the PORTABLE twin of
-// `lib/studio/game/runtime.ts`; behaviors stay identical so editor
-// playtest + bundled play look the same. When the Phaser integration
-// lands (#935 continuation), this string gets replaced with the
-// Phaser-bundled equivalent and the bundle contract is unchanged.
-//
-// Kept as an inlined string (vs. a build step that compiles + ships
-// a separate JS file) so the export module has zero build-system
-// integration — `bundleGame()` runs entirely client-side via JSZip.
-// ────────────────────────────────────────────────────────────────────────────
-
-const STANDALONE_RUNTIME_JS = String.raw`(function(){
-"use strict";
-function findStartLevel(state){
-  if(!state.levels.length)return null;
-  return state.levels.find(function(l){return l.id===state.startLevelId;})||state.levels[0];
-}
-function tintForBehavior(b){
-  switch(b){
-    case "platformer-player": return {fill:"#fbbf24",text:"#78350f"};
-    case "scroll-left":       return {fill:"#ef4444",text:"#fff"};
-    case "static":            return {fill:"#475569",text:"#e2e8f0"};
-    case "quiz-answer":       return {fill:"#6366f1",text:"#e0e7ff"};
-    case "memory-card":       return {fill:"#10b981",text:"#fff"};
-    default:                  return {fill:"#64748b",text:"#fff"};
-  }
-}
-function updateSprite(s, dt, keys, worldWidth){
-  var b = s.source.behavior;
-  if(!b) return;
-  if(b==="platformer-player"){
-    var runSpeed = (s.source.params&&s.source.params.runSpeed)||200;
-    var jumpPower = (s.source.params&&s.source.params.jumpPower)||500;
-    var gravity = 1400;
-    var groundY = s.source.y;
-    if(keys.has("ArrowLeft")||keys.has("a")) s.x -= runSpeed*dt;
-    if(keys.has("ArrowRight")||keys.has("d")) s.x += runSpeed*dt;
-    var onGround = s.y >= groundY - 0.01;
-    if((keys.has("ArrowUp")||keys.has(" ")||keys.has("w")) && onGround) s.vy = -jumpPower;
-    s.vy += gravity*dt;
-    s.y += s.vy*dt;
-    if(s.y > groundY){ s.y = groundY; s.vy = 0; }
-    return;
-  }
-  if(b==="scroll-left"){
-    var speed = (s.source.params&&s.source.params.speed)||200;
-    s.x -= speed*dt;
-    if(s.x + s.source.width < 0) s.x = worldWidth;
-    return;
-  }
-}
-function drawFrame(ctx, level, sprites){
-  ctx.fillStyle = level.backgroundColor;
-  ctx.fillRect(0,0,ctx.canvas.width, ctx.canvas.height);
-  for(var i=0;i<sprites.length;i++){
-    var s = sprites[i];
-    var tint = tintForBehavior(s.source.behavior);
-    ctx.fillStyle = tint.fill;
-    if(s.source.behavior==="memory-card" && !s.flipped) ctx.fillStyle="#1e293b";
-    if(s.source.behavior==="quiz-answer" && s.picked) ctx.fillStyle = (s.source.params&&s.source.params.correct)?"#10b981":"#ef4444";
-    ctx.fillRect(s.x, s.y, s.source.width, s.source.height);
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(s.x, s.y, s.source.width, s.source.height);
-    ctx.fillStyle = tint.text;
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.fillText(s.source.id, s.x+8, s.y+6);
-    if(s.source.behavior){
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.fillText(s.source.behavior, s.x+8, s.y+22);
-    }
-  }
-}
-function runGame(canvas, state, opts){
-  var level = findStartLevel(state);
-  if(!level) return { cleanup: function(){} };
-  canvas.width = state.width;
-  canvas.height = state.height;
-  var ctx = canvas.getContext("2d");
-  if(!ctx) return { cleanup: function(){} };
-  var sprites = level.sprites.map(function(src){
-    return { source: src, x: src.x, y: src.y, vy: 0, flipped: false, picked: false };
-  });
-  var keys = new Set();
-  function onKeyDown(e){ keys.add(e.key); }
-  function onKeyUp(e){ keys.delete(e.key); }
-  function onClick(e){
-    var rect = canvas.getBoundingClientRect();
-    var sx = (e.clientX - rect.left)*(canvas.width/rect.width);
-    var sy = (e.clientY - rect.top)*(canvas.height/rect.height);
-    for(var i=sprites.length-1; i>=0; i--){
-      var s = sprites[i];
-      if(sx>=s.x && sx<=s.x+s.source.width && sy>=s.y && sy<=s.y+s.source.height){
-        if(s.source.behavior==="memory-card") s.flipped = !s.flipped;
-        if(s.source.behavior==="quiz-answer") s.picked = true;
-        break;
-      }
-    }
-  }
-  if(opts.mode === "play"){
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    canvas.addEventListener("click", onClick);
-  }
-  var rafId = 0;
-  var lastTs = performance.now();
-  function tick(ts){
-    var dt = Math.min(0.05, (ts-lastTs)/1000);
-    lastTs = ts;
-    if(opts.mode === "play"){
-      for(var i=0;i<sprites.length;i++) updateSprite(sprites[i], dt, keys, canvas.width);
-    }
-    drawFrame(ctx, level, sprites);
-    rafId = requestAnimationFrame(tick);
-  }
-  rafId = requestAnimationFrame(tick);
-  return {
-    cleanup: function(){
-      cancelAnimationFrame(rafId);
-      if(opts.mode === "play"){
-        window.removeEventListener("keydown", onKeyDown);
-        window.removeEventListener("keyup", onKeyUp);
-        canvas.removeEventListener("click", onClick);
-      }
-    }
-  };
-}
-window.__hiredVideoGame = { runGame: runGame };
-})();
-`;

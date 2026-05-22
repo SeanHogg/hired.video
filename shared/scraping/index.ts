@@ -13,5 +13,6 @@ export * from "./urls.js";
 export * from "./jsonLd.js";
 export * from "./applyLink.js";
 export * from "./siteConfigs.js";
+export * from "./selector.js";
 export * from "./formFields.js";
 export * from "./jobExtract.js";

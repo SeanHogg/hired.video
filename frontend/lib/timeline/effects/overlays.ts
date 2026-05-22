@@ -19,6 +19,7 @@
  */
 
 import { registerEffect } from "./registry";
+import { hexToRgbaString } from "@/lib/utils/color";
 
 // ── Snow ──────────────────────────────────────────────────────────────
 // Drifting white dots with a vertical bias and a wider radius range so
@@ -85,8 +86,8 @@ registerEffect({
     const radius = Math.hypot(w, h) * (0.4 + 0.2 * intensity);
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
     const alpha = (0.25 + intensity * 0.35).toFixed(2);
-    grad.addColorStop(0, hexToRgba(color, Number(alpha)));
-    grad.addColorStop(1, hexToRgba(color, 0));
+    grad.addColorStop(0, hexToRgbaString(color, Number(alpha)));
+    grad.addColorStop(1, hexToRgbaString(color, 0));
     ctx.save();
     // `lighter` is screen-additive — the leak brightens without the
     // hard-edge clipping a normal alpha composite would create.
@@ -182,11 +183,3 @@ function stringOr(v: unknown, fallback: string): string {
   return typeof v === "string" ? v : fallback;
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!m) return `rgba(255,255,255,${alpha})`;
-  const r = parseInt(m[1], 16);
-  const g = parseInt(m[2], 16);
-  const b = parseInt(m[3], 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}

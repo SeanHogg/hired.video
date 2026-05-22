@@ -30,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Undo2, Redo2, Download } from "lucide-react";
+import { Undo2, Redo2, Download, Library, Loader2 } from "lucide-react";
 import {
   type ImageState,
   type ImageLayer,
@@ -49,15 +49,19 @@ import {
 } from "@/lib/studio/drawing/drawing-types";
 import {
   compositeLayers,
-  createOffscreenCanvas,
+  drawBlobToCanvasFit,
+  flattenCanvasToBlob,
   floodFillAt,
   hydrateLayerCanvas,
   pickColorAt,
   serializeLayer,
   strokeBetween,
   stampBrushDab,
+  createOffscreenCanvas,
 } from "@/lib/studio/drawing/drawing-engine";
 import { type ImageGenResult } from "@/lib/services/image-gen-engine";
+import { uploadImage } from "@/lib/services/upload-service";
+import { useToast } from "@/hooks/use-toast";
 import DrawingToolPalette from "./DrawingToolPalette";
 import DrawingLayersPanel from "./DrawingLayersPanel";
 import DrawingAiPromptPanel from "./DrawingAiPromptPanel";
@@ -98,6 +102,8 @@ export default function DrawingStage({
   const [tool, setTool] = useState<DrawingTool>("brush");
   const [brush, setBrush] = useState<BrushSettings>(DEFAULT_BRUSH);
   const [recentColors, setRecentColors] = useState<string[]>([]);
+  const [savingToLibrary, setSavingToLibrary] = useState(false);
+  const { toast } = useToast();
 
   // Per-layer offscreen canvases — cached from state.layers[].pixelsDataUrl.
   // Keyed by layer id; rebuilt whenever a layer's pixelsDataUrl changes.
@@ -425,7 +431,7 @@ export default function DrawingStage({
       // Convert the result blob to a dataURL sized to the canvas. We
       // letterbox/cover-fit so the generated image fills the workspace
       // without distorting aspect.
-      const dataUrl = await drawBlobToLayerDataUrl(
+      const dataUrl = await drawBlobToCanvasFit(
         result.blob,
         state.width,
         state.height,
@@ -461,19 +467,47 @@ export default function DrawingStage({
   );
 
   // ─── Export (PNG download) ───────────────────────────────────────────
-  const handleExportPng = useCallback(() => {
+  const handleExportPng = useCallback(async () => {
     const visible = visibleCanvasRef.current;
     if (!visible) return;
-    visible.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `drawing-${Date.now()}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }, "image/png");
+    const blob = await flattenCanvasToBlob(visible, "image/png");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `drawing-${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
   }, []);
+
+  // ─── Save to media library ───────────────────────────────────────────
+  // Flattens the current composite to a PNG and uploads it to the
+  // user's R2 namespace via the SHARED `uploadImage()` port. Once
+  // uploaded the result appears in MediaPicker's "Library" tab, ready
+  // to drop onto Video / Game / Comic scenes — that's the closed-loop
+  // interop the user articulated ("Give them all the tools in 1
+  // studio"). Per Gap Register #933.
+  const handleSaveToLibrary = useCallback(async () => {
+    const visible = visibleCanvasRef.current;
+    if (!visible || savingToLibrary) return;
+    setSavingToLibrary(true);
+    try {
+      const blob = await flattenCanvasToBlob(visible, "image/png");
+      const url = await uploadImage(blob, `drawing-${Date.now()}.png`);
+      toast({
+        title: "Saved to your library",
+        description: "Pick it from MediaPicker → Library in any studio project.",
+      });
+      return url;
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingToLibrary(false);
+    }
+  }, [savingToLibrary, toast]);
 
   // ─── Render ──────────────────────────────────────────────────────────
   const cursorClass =
@@ -532,7 +566,22 @@ export default function DrawingStage({
               variant="outline"
               size="sm"
               className="h-7"
-              onClick={handleExportPng}
+              onClick={() => void handleSaveToLibrary()}
+              disabled={savingToLibrary}
+              title="Saved drawings appear in MediaPicker → Library across every studio project."
+            >
+              {savingToLibrary ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Library className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Save to library
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7"
+              onClick={() => void handleExportPng()}
             >
               <Download className="mr-1.5 h-3.5 w-3.5" />
               Export PNG
@@ -595,41 +644,3 @@ export default function DrawingStage({
   );
 }
 
-/** Letterbox-fit the generated blob onto a canvas of the project's
- *  dimensions + return as PNG dataURL. Centres the source; preserves
- *  its aspect ratio. */
-async function drawBlobToLayerDataUrl(
-  blob: Blob,
-  width: number,
-  height: number,
-): Promise<string> {
-  const img = new Image();
-  const url = URL.createObjectURL(blob);
-  try {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to decode generated image"));
-      img.src = url;
-    });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-  const canvas = createOffscreenCanvas(width, height);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2D canvas context unavailable");
-  const srcRatio = img.naturalWidth / img.naturalHeight;
-  const dstRatio = width / height;
-  let dw: number;
-  let dh: number;
-  if (srcRatio > dstRatio) {
-    dw = width;
-    dh = width / srcRatio;
-  } else {
-    dh = height;
-    dw = height * srcRatio;
-  }
-  const dx = (width - dw) / 2;
-  const dy = (height - dh) / 2;
-  ctx.drawImage(img, dx, dy, dw, dh);
-  return canvas.toDataURL("image/png");
-}

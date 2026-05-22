@@ -24,8 +24,8 @@
  */
 import { useEffect, useRef } from "react";
 import { Gamepad2, Sparkles } from "lucide-react";
-import { findStartLevel, type GameState } from "@shared/game-state";
-import { runGame } from "@/lib/studio/game/runtime";
+import type { GameState } from "@shared/game-state";
+import { runGame, findStartLevel } from "@/lib/studio/game/runtime";
 import { cn } from "@/lib/utils";
 
 interface GameStageProps {
