@@ -254,7 +254,7 @@ export const defaultExtensionSettings = () => ({
     autoDetect: true,
     autoScore: false,
     autoTailor: false,
-    wizardMode: false,
+    telemetryOptOut: false,
     downloadFormat: "pdf",
   },
   recruiter: {

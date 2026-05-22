@@ -97,10 +97,15 @@ import { deriveKindDefaults } from "@/lib/studio/editor-v2/kind-defaults";
 import {
   mediaKindHasAudio,
   mediaKindHasVideo,
-  mediaKindUsesTimelineRuntime,
   type MediaKind,
 } from "@shared/media-kinds";
 import GameStage from "@/components/studio/game/GameStage";
+import DrawingStage from "@/components/studio/drawing/DrawingStage";
+import CanvasRouter from "@/components/studio/v2/CanvasRouter";
+import {
+  type ImageState,
+  createBlankImageState,
+} from "@shared/image-state";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -135,6 +140,24 @@ const LinkedInPublisher = lazy(
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
+
+/** Per-template starter dimensions for the image canvas runtime (#932).
+ *  Keeps the editor in sync with each catalog entry's `desc` — the
+ *  user picked "Social post 1080×1080" so the seeded canvas is 1080²
+ *  out of the gate. Falls back to the default 1024² when the template
+ *  hint isn't recognised. Per the DRY rule this map is the single
+ *  source — adding a new image template means one entry in
+ *  `TEMPLATE_CATALOG` + one row here. */
+const IMAGE_TEMPLATE_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  drawing_blank: { width: 1024, height: 1024 },
+  drawing_social_square: { width: 1080, height: 1080 },
+  drawing_og_card: { width: 1200, height: 630 },
+};
+
+function createBlankImageStateForTemplate(templateHint: string | null) {
+  const dims = templateHint ? IMAGE_TEMPLATE_DIMENSIONS[templateHint] : undefined;
+  return createBlankImageState(dims?.width, dims?.height);
+}
 
 export default function StudioEditorV2() {
   const { id: routeId } = useParams<{ id: string }>();
@@ -270,6 +293,13 @@ export default function StudioEditorV2() {
   // first save creates a fresh project instead of trying to write under
   // the unreadable id.
   const [missingProject, setMissingProject] = useState(false);
+  // Image-runtime state for `mediaKind: "image"` projects (#932). Lives
+  // alongside the Timeline `state` (CanvasState) and the
+  // `persistedProject.gameState` — each canvas runtime owns its own
+  // state model per PRD §1.2. Hydrated from `persistedProject.imageState`
+  // when an existing image project loads; seeded with a blank canvas
+  // for new image projects. Null for non-image projects.
+  const [imageState, setImageState] = useState<ImageState | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
   const [selection, setSelection] = useState<Selection>({
     kind: "scene",
@@ -280,6 +310,13 @@ export default function StudioEditorV2() {
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(
     mountTimeDefaults.advancedTimelineOpen,
   );
+  // Playtest toggle for `mediaKind: "game"` projects — flips
+  // `<GameStage mode>` between "edit" (static layout, no game loop) and
+  // "play" (runtime running, input wired). Self-gates inline (the
+  // button only renders when `currentMediaKind === "game"`), no
+  // per-kind prop drilling. Same Phaser-replacement runtime backs
+  // both modes per the DRY commitment in PRD §1.2.
+  const [gamePlaying, setGamePlaying] = useState(false);
   // `?capture=` deep-links + audio-only template seeds both land the user
   // on the Actions tab so the recorder / voiceover panel is the first
   // thing they see. Single SoT via `deriveKindDefaults` (#651 + #894).
@@ -345,6 +382,25 @@ export default function StudioEditorV2() {
     // mount-time only; both are stable for the effect's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistedProject]);
+
+  // Hydrate / seed image-runtime state when the editor mounts on an
+  // image-kind project. Existing rows arrive with `persistedProject.imageState`
+  // populated; fresh rows arrive with it null and we seed a blank
+  // canvas at template-appropriate dimensions. For non-image projects
+  // we hold null so the Timeline path isn't paying ImageState memory
+  // cost.
+  useEffect(() => {
+    if (currentMediaKind !== "image") {
+      if (imageState !== null) setImageState(null);
+      return;
+    }
+    if (imageState !== null) return;
+    const serverImage = persistedProject?.imageState as ImageState | null | undefined;
+    setImageState(serverImage ?? createBlankImageStateForTemplate(templateHint));
+    // imageState is intentionally read once per mediaKind / persistedProject
+    // pair — we don't want a server round-trip to clobber in-flight edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMediaKind, persistedProject]);
 
   // Server-load when we have a real project id.
   useEffect(() => {
@@ -1035,27 +1091,59 @@ export default function StudioEditorV2() {
   }
 
   async function handleExport() {
-    if (state.scenes.length === 0) return;
     setExporting(true);
     await withRenderErrorRecovery("Export", async () => {
-      const blob = await renderToBlob();
+      // Per the canvas-runtime extensibility model (PRD §1.2), each
+      // mediaKind owns its own export pipeline. Game kind dispatches
+      // to the JSZip game-bundle exporter (`bundleGame()` builds a
+      // self-contained HTML5 ZIP); every other kind keeps the
+      // Timeline render path.
+      const blob = await renderProjectToBlob();
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      // `renderTimeline()` produces MP4 via WebCodecs (and ffmpeg-wasm
-      // for the rare codecs that need it); both branches emit an .mp4
-      // container. The legacy V1 exporter used .webm — extension flipped
-      // to match the new content type.
-      const ext = blob.type.includes("webm") ? "webm" : "mp4";
-      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "video"}.${ext}`;
+      // Each pipeline returns a Blob with the right MIME — derive the
+      // file extension from that so a podcast WAV doesn't get an .mp4
+      // suffix.
+      const ext = extForBlob(blob);
+      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "project"}.${ext}`;
       a.click();
-      // Let the click resolve before revoking — Safari otherwise drops
-      // the download.
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast({ title: "Exported", description: "Your video has been downloaded." });
+      toast({ title: "Exported", description: "Your project has been downloaded." });
     });
     setExporting(false);
+  }
+
+  /** Dispatch export per mediaKind. Game → JSZip bundle; everything
+   *  else → the existing Timeline render path. */
+  async function renderProjectToBlob(): Promise<Blob | null> {
+    if (currentMediaKind === "game") {
+      const game = persistedProject?.gameState as
+        | import("@shared/game-state").GameState
+        | null
+        | undefined;
+      if (!game) {
+        toast({
+          title: "Save the project first",
+          description: "Pick a game template + save before exporting.",
+          variant: "destructive",
+        });
+        return null;
+      }
+      const { bundleGame } = await import("@/lib/studio/game/game-export");
+      return bundleGame(game, { title });
+    }
+    if (state.scenes.length === 0) return null;
+    return renderToBlob();
+  }
+
+  function extForBlob(blob: Blob): string {
+    if (blob.type === "application/zip") return "zip";
+    if (blob.type.includes("webm")) return "webm";
+    if (blob.type.includes("wav")) return "wav";
+    if (blob.type.includes("mpeg")) return "mp3";
+    return "mp4";
   }
 
   // ───── ensureRendered — V2's parity for v1's `ensureRendered`. Used
@@ -1223,7 +1311,15 @@ export default function StudioEditorV2() {
   async function handleSave(): Promise<StudioProject | null> {
     setSaving(true);
     try {
-      const timeline = canvasStateToTimeline(state);
+      // Per the canvas-runtime extensibility model (#931 / PRD §1.2)
+      // each runtime persists its OWN state column — Timeline kinds
+      // (video / podcast / voice / animation / comic) write
+      // `timelineSpec`; image kind writes `imageState`; game kind
+      // writes `gameState`. The save-draft payload carries whichever
+      // is relevant; the server's editor-kind discriminator picks
+      // which JSONB column to update.
+      const isImageKind = currentMediaKind === "image";
+      const timeline = isImageKind ? null : canvasStateToTimeline(state);
       // #637 closed: V2 no longer mirrors a v1 VideoScript projection
       // onto the project row. Publish-as-template now accepts an
       // inline script from the dialog (computed via
@@ -1232,8 +1328,10 @@ export default function StudioEditorV2() {
       const res = await studioService.saveDraft({
         name: title,
         projectId: persistedProjectId ?? undefined,
-        kind: "nle",
-        timelineSpec: timeline,
+        kind: isImageKind ? "scene" : "nle",
+        mediaKind: currentMediaKind,
+        ...(timeline !== null ? { timelineSpec: timeline } : {}),
+        ...(isImageKind && imageState !== null ? { imageState } : {}),
         // First save of a `/studio/new?subject=...` deep-link binds the
         // freshly-created project row to the source entity. Subsequent
         // saves (persistedProjectId set) leave the subjects array alone
@@ -1322,7 +1420,15 @@ export default function StudioEditorV2() {
           persistedProject={persistedProject}
           onProjectChange={setPersistedProject}
           getVideoScript={() => canvasStateToScript(state)}
-          hasContent={state.scenes.some((s) => s.widgets.length > 0)}
+          hasContent={
+            // Per-kind content predicate — Timeline kinds need at
+            // least one widget on a scene; game kinds need a
+            // gameState with levels. The save-menu's "Export"
+            // button reads this single boolean.
+            currentMediaKind === "game"
+              ? !!persistedProject?.gameState
+              : state.scenes.some((s) => s.widgets.length > 0)
+          }
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
           exporting={exporting}
@@ -1510,38 +1616,52 @@ export default function StudioEditorV2() {
                   className="mb-3"
                 />
                 <div className="flex min-h-full min-w-min items-center justify-center">
-                  {/* Canvas-runtime dispatch (#931) — `mediaKind` selects
-                      which canvas runtime mounts. Timeline kinds (video /
-                      podcast / voice / animation / comic) use the
-                      existing `<CanvasStage>`; non-Timeline kinds mount
-                      their own runtime stage. Per the DRY rule the
-                      decision lives in ONE predicate
-                      (`mediaKindUsesTimelineRuntime`) so adding a new
-                      runtime is one entry there + one branch here.
-                      Full `<CanvasRouter>` factor-out (extracting the
-                      heavy `<CanvasStage>` prop bundle into a
-                      render-prop helper) is logged as #931 for a
-                      dedicated refactor pass. */}
-                  {!mediaKindUsesTimelineRuntime(currentMediaKind) ? (
-                    currentMediaKind === "game" ? (
-                      <GameStage
-                        gameState={
-                          (persistedProject?.gameState as
-                            | import("@shared/game-state").GameState
-                            | null
-                            | undefined) ?? null
-                        }
-                        zoom={zoom}
-                      />
-                    ) : (
-                      // comic (and future non-Timeline kinds) — their
-                      // own stages land alongside their runtime
-                      // implementations. Until then, render a
-                      // GameStage-shaped placeholder using the existing
-                      // null-state path so the user sees SOMETHING.
-                      <GameStage gameState={null} zoom={zoom} />
-                    )
-                  ) : (
+                  {/* Canvas-runtime dispatch (#931) — one router maps
+                      `mediaKind` to the runtime surface that mounts.
+                      Per the DRY rule the host doesn't know about
+                      per-runtime contracts; each surface is built here
+                      with the host-owned props it needs and the router
+                      picks. Adding a new runtime is one entry in
+                      `CanvasRuntimeSurfaces` + one surface assembled
+                      here (#931 / PRD §1.2). */}
+                  <CanvasRouter
+                    mediaKind={currentMediaKind}
+                    surfaces={{
+                      game: (
+                        <div className="relative">
+                          <GameStage
+                            gameState={
+                              (persistedProject?.gameState as
+                                | import("@shared/game-state").GameState
+                                | null
+                                | undefined) ?? null
+                            }
+                            zoom={zoom}
+                            mode={gamePlaying ? "play" : "edit"}
+                          />
+                          {/* Playtest toggle — overlaid on the GameStage so
+                              the user has the affordance right next to the
+                              canvas. Single button flips both directions;
+                              the verb tells the user what happens next. */}
+                          <button
+                            type="button"
+                            onClick={() => setGamePlaying((p) => !p)}
+                            className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-fuchsia-500"
+                          >
+                            {gamePlaying ? "■ Stop" : "▶ Playtest"}
+                          </button>
+                        </div>
+                      ),
+                      image: imageState ? (
+                        <div className="h-[calc(100vh-200px)] w-full">
+                          <DrawingStage
+                            state={imageState}
+                            onChange={setImageState}
+                            zoom={zoom}
+                          />
+                        </div>
+                      ) : null,
+                      timeline: (
                   <>
                   {/* ONE renderer for both edit + playback: `<CanvasStage>`
                       in `mode="edit"` honours selection/drag/resize chrome,
@@ -1628,7 +1748,9 @@ export default function StudioEditorV2() {
                     defaultFontId={state.fontFamily}
                   />
                   </>
-                  )}
+                      ),
+                    }}
+                  />
                 </div>
               </div>
               {/* Floating canvas-stage chrome — edit toolbar (left),

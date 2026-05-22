@@ -1,0 +1,201 @@
+/**
+ * Image state spec — the canonical JSON shape for `mediaKind: "image"`
+ * studio projects (Photoshop-shaped raster authoring, #932).
+ *
+ * Parallel to `shared/timeline.ts` (Timeline runtime), `shared/game-state.ts`
+ * (Game runtime), and the staged comic-state shape — each canvas runtime
+ * owns its own state model per PRD §1.2 canvas-runtime extensibility.
+ *
+ * SCENE SHAPE — image is SINGLE-SCENE. There is no time dimension and
+ * no state graph; the workspace IS the scene. The shared editor shell's
+ * scene rail collapses for image projects (the runtime decides whether
+ * to render it). All authoring lives on one canvas surface with N
+ * layers stacked back-to-front.
+ *
+ * STATE MODEL — layers + dimensions + history. Each layer carries its
+ * raster pixels as a base64 PNG dataURL (`pixelsDataUrl`) so the
+ * project round-trips cleanly through JSONB without an out-of-band
+ * blob store. Vector layers, adjustment layers, layer masks, and
+ * blend-modes-beyond-normal are tracked as separate roadmap items
+ * (see Consolidated Gap Register #932 follow-ons).
+ *
+ * Versioning: `schemaVersion` is bumped on any breaking change.
+ * Don't delete or rename existing fields — add new ones with defaults
+ * and migrate readers. The first version covers the MVP toolset
+ * (brush / eraser / fill / layers / color picker / undo-redo + AI
+ * prompt generation); follow-on tools layer onto the same shape.
+ *
+ * Persistence: `studio_projects.image_state` jsonb column (migration
+ * 0102). The editor's `<CanvasRouter mediaKind/>` mounts
+ * `<DrawingStage>` when the project is image-kind and the stage
+ * reads / writes this shape via the standard save-draft endpoint.
+ */
+
+export const IMAGE_STATE_SCHEMA_VERSION = 1;
+
+/** Blend mode applied when compositing a layer onto the layers below.
+ *  The MVP only ships `normal`; the others are reserved so a future
+ *  blend-mode picker can flip the field without a state-shape change. */
+export type LayerBlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "soft-light"
+  | "hard-light"
+  | "difference"
+  | "exclusion";
+
+/** What kind of content a layer carries. The MVP only ships `raster`;
+ *  `vector`, `text`, and `adjustment` layers ride later phases of #932
+ *  and are reserved here so readers can fall through cleanly when the
+ *  fields land. */
+export type LayerKind = "raster" | "vector" | "text" | "adjustment";
+
+export interface ImageLayer {
+  /** Stable id — referenced by the editor's selection state. */
+  id: string;
+  /** User-visible label in the layers panel. */
+  label: string;
+  /** Which content shape this layer holds. MVP raster only. */
+  kind: LayerKind;
+  /** 0..1. The layers panel surfaces this as a 0–100% slider. */
+  opacity: number;
+  /** When false the layer is skipped during compositing AND export. */
+  visible: boolean;
+  /** When true the layer is read-only (no brush strokes, no fill, no
+   *  move). Lets the user pin a reference image while painting above. */
+  locked: boolean;
+  /** Compositing blend mode. Defaults to `normal` — the MVP UI doesn't
+   *  expose other modes yet, but the field is here so a future picker
+   *  can flip it without migrating state. */
+  blendMode: LayerBlendMode;
+  /** Raster pixels as a base64 PNG dataURL. Null for empty layers
+   *  (a freshly inserted layer with no strokes yet). The dataURL is
+   *  sized to the canvas dimensions (no off-canvas pixels), keeping
+   *  exports straightforward and the JSONB rows bounded.
+   *
+   *  Trade-off: dataURL inflation (~33% over the raw bytes) is the
+   *  cost of round-tripping through JSONB; the cap on canvas
+   *  dimensions (see ImageState.width/height) plus PNG compression
+   *  keep the payload modest for the MVP. The "spill big layers to
+   *  R2" path is logged as a follow-on. */
+  pixelsDataUrl: string | null;
+}
+
+/** Background fill behind layer 0. `transparent` leaves the canvas
+ *  alpha=0 (PNG/WebP export preserves transparency; JPEG flattens to
+ *  white). `color` paints a solid fill. */
+export type CanvasBackground =
+  | { kind: "transparent" }
+  | { kind: "color"; color: string };
+
+export interface ImageState {
+  schemaVersion: number;
+  /** Canvas width in pixels. Capped at 4096 by the editor — keeps
+   *  per-layer dataURLs bounded. */
+  width: number;
+  /** Canvas height in pixels. Capped at 4096 by the editor. */
+  height: number;
+  /** Background fill behind layer 0. */
+  background: CanvasBackground;
+  /** Layers in z-order — index 0 is the BOTTOM-most layer (drawn first),
+   *  the last layer is the TOP (drawn last). The layers panel reverses
+   *  this for display (top of the list = top of the stack) to match
+   *  Photoshop convention. */
+  layers: ImageLayer[];
+  /** Which layer the brush / eraser / fill currently writes to. Must
+   *  match a `layers[].id`. The editor enforces "there is always an
+   *  active layer" — the constraint lives client-side. */
+  activeLayerId: string;
+  /** AI-prompt history — every successful "Generate" or "Refine" call
+   *  appends one entry. Surfaced in the prompt panel as a previous-prompt
+   *  picker so the user can iterate without retyping. Capped at 50
+   *  entries client-side; older entries fall off in FIFO order. */
+  aiPromptHistory: AiPromptHistoryEntry[];
+}
+
+export interface AiPromptHistoryEntry {
+  /** Stable id so the panel can key the list without index churn. */
+  id: string;
+  /** The prompt text the user submitted. */
+  prompt: string;
+  /** ISO timestamp the prompt was issued. */
+  at: string;
+  /** Which engine handled the request (`webgpu-sd-turbo` /
+   *  `server-cf-sdxl-lightning` / etc.). Surfaced so the user can see
+   *  which path their last call took, and so the support team can
+   *  diagnose engine-specific output quality issues. */
+  engineId: string;
+  /** R2 / object-store URL of the generated image. Optional — the
+   *  client-side WebGPU engine returns a Blob URL the user can choose
+   *  to keep ephemeral rather than persist. */
+  resultUrl?: string;
+}
+
+// ─── Factory + helpers (single source — every caller routes through here) ──
+
+/** Default canvas dimensions for a freshly created image project. 1024²
+ *  matches the standard social-media post + the AI generation default,
+ *  and keeps round-trip payloads small while still being usable for
+ *  most poster / cover / icon work. */
+export const DEFAULT_IMAGE_WIDTH = 1024;
+export const DEFAULT_IMAGE_HEIGHT = 1024;
+
+/** Hard cap on canvas dimensions. Above this, dataURL payloads bloat
+ *  the studio_projects row past pg's practical jsonb size and the
+ *  client browser starts hitting OffscreenCanvas memory limits. The
+ *  editor enforces this when the user picks dimensions on project
+ *  creation. */
+export const MAX_IMAGE_DIMENSION = 4096;
+
+/** Build a blank image state with one empty raster layer. Used by the
+ *  StudioEditorV2 hydration path when a fresh `mediaKind: 'image'`
+ *  project loads with `image_state IS NULL`. */
+export function createBlankImageState(
+  width: number = DEFAULT_IMAGE_WIDTH,
+  height: number = DEFAULT_IMAGE_HEIGHT,
+  background: CanvasBackground = { kind: "color", color: "#ffffff" },
+): ImageState {
+  const layerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
+  return {
+    schemaVersion: IMAGE_STATE_SCHEMA_VERSION,
+    width,
+    height,
+    background,
+    layers: [
+      {
+        id: layerId,
+        label: "Background",
+        kind: "raster",
+        opacity: 1,
+        visible: true,
+        locked: false,
+        blendMode: "normal",
+        pixelsDataUrl: null,
+      },
+    ],
+    activeLayerId: layerId,
+    aiPromptHistory: [],
+  };
+}
+
+/** Resolve a layer by id. Returns null when the id doesn't match — the
+ *  editor falls back to the top layer in that case. */
+export function findLayer(state: ImageState, layerId: string): ImageLayer | null {
+  return state.layers.find((l) => l.id === layerId) ?? null;
+}
+
+/** True when the state has anything worth saving (a non-empty layer or
+ *  a non-default background). The editor uses this to suppress
+ *  "unsaved changes" warnings on an untouched fresh project. */
+export function imageStateHasContent(state: ImageState): boolean {
+  if (state.layers.some((l) => l.pixelsDataUrl !== null)) return true;
+  if (state.background.kind === "color" && state.background.color !== "#ffffff") return true;
+  if (state.aiPromptHistory.length > 0) return true;
+  return false;
+}

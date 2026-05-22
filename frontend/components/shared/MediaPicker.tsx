@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import { uploadImage, uploadVideo } from "@/lib/services/upload-service";
-import { studioService } from "@/lib/services/studio-service";
+import { generateImage } from "@/lib/services/image-gen-engine";
 
 export interface PickedMedia {
   url: string;
@@ -305,9 +305,19 @@ function AITab({ onPick }: { onPick: (a: PickedMedia) => void }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await studioService.generateImage(prompt.trim());
-      const url = res.data?.imageUrl;
-      if (url) onPick({ url, mediaType: "image", source: "ai" });
+      // Routes through the pluggable image-gen engine facade — WebGPU
+      // client-side primary (when available), server fallback today.
+      // The server engine returns a durable CDN URL (`resultUrl`); the
+      // WebGPU engine returns a Blob (no URL — caller would need to
+      // upload to R2 if persistence is required). For the MediaPicker
+      // the URL is required (it's persisted in Timeline JSONB scenes),
+      // so we surface a clear error when only a Blob came back.
+      const result = await generateImage({ prompt });
+      if (result.resultUrl) {
+        onPick({ url: result.resultUrl, mediaType: "image", source: "ai" });
+      } else {
+        throw new Error("Generated image has no durable URL — upload to R2 not yet wired.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
     } finally {

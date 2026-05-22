@@ -874,6 +874,153 @@ studioRoutes.post("/storyboard", async (c) => {
   return c.json(ok(script), 201);
 });
 
+// ─── POST /api/studio/generate-comic ─────────────────────────────────────────
+// AI scaffolder for the Comic mediaKind. Reads the user's prompt +
+// genre + source kind, resolves the source artefact (resume / profile /
+// services), runs the LLM via `scaffoldComic()`, and returns a
+// ComicSpec the frontend mounts as a CanvasState. The frontend
+// (`useGenerateComic`) is the single consumer.
+//
+// Token metering: scaffoldComic runs through `LLMClient.callJson`,
+// which charges the user's ledger on success. No extra per-route
+// gating — `tokenLedger.ensureBudget` is called inside the client.
+const GenerateComicSchema = z.object({
+  prompt: z.string().max(2000).default(""),
+  genreId: z.string().max(40).optional(),
+  protagonistName: z.string().max(80).default(""),
+  sourceKind: z.enum(["resume", "profile", "services", "auto"]).default("auto"),
+  /** When the source is "auto" the route picks the richest artefact
+   *  available (resume > profile + services > prompt alone). The
+   *  client can pin a specific resume by id; otherwise the user's
+   *  master resume is loaded. */
+  resumeId: z.string().uuid().optional(),
+});
+
+studioRoutes.post("/generate-comic", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) {
+    return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = GenerateComicSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()),
+      400,
+    );
+  }
+  const input = parsed.data;
+
+  // ─── Resolve source artefact ─────────────────────────────────────
+  // Single read path — the route looks up exactly the artefact the
+  // user asked for. "auto" walks the priority chain (resume → profile
+  // → services → empty); the scaffolder accepts an empty source and
+  // falls back to the prompt-only path.
+  const db = getDb();
+  let sourceText = "";
+  let resolvedSourceKind = input.sourceKind;
+
+  const loadResume = async (): Promise<string> => {
+    const where = input.resumeId
+      ? and(eq(resumeInformation.id, input.resumeId), eq(resumeInformation.userId, user.sub))
+      : eq(resumeInformation.userId, user.sub);
+    const [row] = await db.select().from(resumeInformation).where(where).limit(1);
+    if (!row?.content) return "";
+    // Single source of truth for the JSONB → plaintext flattening
+    // lives in `services/resume/parse.ts` (`resumeContentToText`). It
+    // handles modern + legacy formats. We pass an 8000-char cap to
+    // match the storyboard route's existing slicing (the scaffolder
+    // additionally caps at 6000 before sending to the LLM).
+    const { resumeContentToText } = await import("../services/resume/parse.js");
+    return resumeContentToText(row.content, 8000);
+  };
+
+  const loadProfile = async (): Promise<string> => {
+    const [row] = await db
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, user.sub))
+      .limit(1);
+    if (!row) return "";
+    const lines: string[] = [];
+    if (row.firstName || row.lastName) lines.push(`Name: ${[row.firstName, row.lastName].filter(Boolean).join(" ")}`);
+    if (row.headline) lines.push(`Headline: ${row.headline}`);
+    if (row.bio)      lines.push(`Bio: ${row.bio}`);
+    if (row.location) lines.push(`Location: ${row.location}`);
+    return lines.join("\n");
+  };
+
+  const loadServices = async (): Promise<string> => {
+    const rows = await db
+      .select({
+        title: schema.serviceOfferings.title,
+        description: schema.serviceOfferings.description,
+        category: schema.serviceOfferings.category,
+        priceCents: schema.serviceOfferings.priceCents,
+      })
+      .from(schema.serviceOfferings)
+      .where(eq(schema.serviceOfferings.userId, user.sub))
+      .limit(20);
+    return rows
+      .map(
+        (s) =>
+          `• ${s.title}${s.category ? ` (${s.category})` : ""}: ${s.description ?? ""}${s.priceCents ? ` — $${(s.priceCents / 100).toFixed(0)}` : ""}`,
+      )
+      .join("\n");
+  };
+
+  if (resolvedSourceKind === "resume") {
+    sourceText = await loadResume();
+  } else if (resolvedSourceKind === "profile") {
+    sourceText = await loadProfile();
+  } else if (resolvedSourceKind === "services") {
+    sourceText = await loadServices();
+  } else {
+    // auto — try resume first, then profile + services
+    sourceText = await loadResume();
+    if (sourceText) {
+      resolvedSourceKind = "resume";
+    } else {
+      const [profileText, servicesText] = await Promise.all([
+        loadProfile(),
+        loadServices(),
+      ]);
+      sourceText = [profileText, servicesText].filter(Boolean).join("\n\n");
+      resolvedSourceKind = profileText
+        ? servicesText
+          ? "auto"
+          : "profile"
+        : servicesText
+          ? "services"
+          : "auto";
+    }
+  }
+
+  // ─── Run scaffolder ──────────────────────────────────────────────
+  const llm = createLLMClient(c.env, c.var.user);
+  try {
+    const { scaffoldComic } = await import("../services/comics/scaffolder.js");
+    const { spec } = await scaffoldComic(llm, {
+      prompt: input.prompt,
+      genreId: input.genreId,
+      protagonistName: input.protagonistName,
+      sourceText,
+      sourceKind: resolvedSourceKind,
+    });
+    return c.json(ok({ spec, sourceKindResolved: resolvedSourceKind }), 201);
+  } catch (err) {
+    console.error("[studio/generate-comic] scaffolder failed:", err);
+    return c.json(
+      fail(
+        "GENERATION_FAILED",
+        err instanceof Error ? err.message : "Comic generation failed",
+      ),
+      500,
+    );
+  }
+});
+
 function getS3Client(): S3Client {
   return new S3Client({
     endpoint: process.env.STORAGE_ENDPOINT,
@@ -976,12 +1123,16 @@ function toProjectDto(
     // Output axis (#894) — what the finished project becomes. See
     // `shared/media-kinds.ts`. Pre-0099 rows fall back to 'video' so
     // every legacy project keeps current export behaviour.
-    mediaKind: (project.mediaKind as "video" | "podcast" | "voice" | "animation" | "game" | null) ?? "video",
+    mediaKind: (project.mediaKind as "video" | "podcast" | "voice" | "animation" | "game" | "comic" | "image" | null) ?? "video",
     timelineSpec: project.timelineSpec ?? null,
     // Game runtime state for mediaKind='game' projects (#927). Null
     // for every other kind — Timeline kinds use `timelineSpec`. See
     // `shared/game-state.ts`.
     gameState: project.gameState ?? null,
+    // Image runtime state for mediaKind='image' projects (#932). Null
+    // for every other kind — same parallel-column pattern as `gameState`.
+    // See `shared/image-state.ts`.
+    imageState: project.imageState ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
@@ -1142,6 +1293,11 @@ studioRoutes.post("/save-draft", async (c) => {
     // client-side (shape matches shared/game-state.ts); server stores
     // verbatim because the game runtime is the schema authority.
     gameState:      z.any().optional(),
+    // Image state JSON for mediaKind='image' projects (#932). Same
+    // parallel-column pattern as gameState; validated client-side
+    // (shape matches shared/image-state.ts); server stores verbatim
+    // because the image runtime is the schema authority.
+    imageState:     z.any().optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics
@@ -1169,20 +1325,22 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
   // mediaKind is orthogonal (output axis) — patched separately when the
-  // client passes it. `gameState` is the runtime-specific state column
-  // for `mediaKind: 'game'` projects (#927); kept on the same patch
-  // object so save flows DRY-share the editor-kind branch.
+  // client passes it. `gameState` / `imageState` are the runtime-
+  // specific state columns for `mediaKind: 'game' | 'image'` projects
+  // (#927 / #932); each lives on its own JSONB column per the canvas-
+  // runtime extensibility model (PRD §1.2).
   const editorKindPatch =
-    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined
+    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
           ...(mediaKind !== undefined ? { mediaKind } : {}),
           ...(timelineSpec !== undefined ? { timelineSpec } : {}),
           ...(gameState !== undefined ? { gameState } : {}),
+          ...(imageState !== undefined ? { imageState } : {}),
         }
       : {};
   const db = getDb();

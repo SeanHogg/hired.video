@@ -54,6 +54,7 @@ export const MEDIA_KINDS = [
   "animation",
   "game",
   "comic",
+  "image",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -64,7 +65,8 @@ export const DEFAULT_MEDIA_KIND: MediaKind = "video";
  *  and almost always have sound — counted as `true` so the editor
  *  surfaces the audio asset workflow alongside sprite / level work.
  *  Comics carry optional narration / motion-comic voiceover so the same
- *  voiceover dialog the editor already ships works on them. */
+ *  voiceover dialog the editor already ships works on them. `image` is
+ *  a still raster — never audible. */
 export function mediaKindHasAudio(kind: MediaKind): boolean {
   return (
     kind === "video" ||
@@ -78,7 +80,11 @@ export function mediaKindHasAudio(kind: MediaKind): boolean {
 /** Whether the kind produces visible frames. Games render visually so
  *  this is `true`; only audio-only kinds (`podcast` without a video
  *  branch, `voice`) return `false`. Comics render visually (pages of
- *  panels) — the rasterized export is a sequence of frames. */
+ *  panels) — the rasterized export is a sequence of frames. `image` is
+ *  visible but static — a single frame, not a sequence — so it is NOT
+ *  in this set; downstream code that gates on `hasVideo` is asking
+ *  about time-based visual frames (video-track UI, scrubber, playhead),
+ *  none of which apply to a single still raster. */
 export function mediaKindHasVideo(kind: MediaKind): boolean {
   return kind === "video" || kind === "animation" || kind === "game" || kind === "comic";
 }
@@ -99,7 +105,7 @@ export function mediaKindCanHaveBoth(kind: MediaKind): boolean {
  *  preview / reader / export pipeline is a non-Timeline runtime (panel
  *  reveals on scroll, page turns, static-strip rasterizer). */
 export function mediaKindUsesTimelineRuntime(kind: MediaKind): boolean {
-  return kind !== "game" && kind !== "comic";
+  return kind !== "game" && kind !== "comic" && kind !== "image";
 }
 
 // ─── Output profiles ─────────────────────────────────────────────────────────
@@ -146,7 +152,13 @@ export type ContainerId =
   // existing animation containers (gif/webp/mp4) via separate profiles.
   | "png-strip"
   | "pdf"
-  | "cbz";
+  | "cbz"
+  // Image runtime — Photoshop-shaped raster authoring (#932). Single-
+  // frame static exports; the same OutputProfile shape lets the save
+  // menu render them without a per-kind branch.
+  | "png"
+  | "jpg"
+  | "svg";
 
 export interface OutputProfile {
   /** Stable id — referenced by `studio_projects.timeline_spec.outputProfile`
@@ -495,6 +507,47 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: false,
     fileExt: ".gif",
   },
+
+  // ─── Image (Photoshop-shaped raster authoring — #932) ──────────────────────
+  // Single static frame; no time axis, no audio. The DrawingStage
+  // composites the layered `ImageState` to a flat raster at export time
+  // via the standard browser canvas-2D → Blob path (no ffmpeg).
+  {
+    id: "image-png",
+    label: "PNG",
+    hint: "Lossless · transparent",
+    mediaKind: "image",
+    container: "png",
+    mime: "image/png",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".png",
+  },
+  {
+    id: "image-jpg",
+    label: "JPEG",
+    hint: "Smaller · no transparency",
+    mediaKind: "image",
+    container: "jpg",
+    mime: "image/jpeg",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".jpg",
+  },
+  {
+    id: "image-webp",
+    label: "WebP",
+    hint: "Smaller than PNG · supports alpha",
+    mediaKind: "image",
+    container: "webp",
+    mime: "image/webp",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".webp",
+  },
 ];
 
 /** Every profile registered for a given mediaKind, in declaration order. */
@@ -552,7 +605,13 @@ export type PublishDestinationId =
   // Comic
   | "comic-reader"
   | "webtoon-feed"
-  | "tapas-feed";
+  | "tapas-feed"
+  // Image (#932) — once exported the raster also lands in the creator's
+  // R2 asset library so it's one click away from any other studio
+  // project (the closed-loop interop tracked in #933). `profile-gallery`
+  // is the creator's public image gallery surface.
+  | "profile-gallery"
+  | "asset-library";
 
 export interface PublishDestination {
   id: PublishDestinationId;
@@ -593,6 +652,12 @@ export const PUBLISH_DESTINATIONS: PublishDestination[] = [
   { id: "comic-reader",         label: "Hired.video reader",      mediaKinds: ["comic"],            requiresRender: false },
   { id: "webtoon-feed",         label: "Webtoon (manual upload)", mediaKinds: ["comic"],            requiresRender: true  },
   { id: "tapas-feed",           label: "Tapas (manual upload)",   mediaKinds: ["comic"],            requiresRender: true  },
+  // Image (#932) — the gallery is the no-render-required default (the
+  // live canvas already renders); asset-library writes the flattened
+  // PNG into R2 under the creator's namespace so it can be picked up
+  // by any other studio project via MediaPicker (#933).
+  { id: "profile-gallery",      label: "Profile gallery",         mediaKinds: ["image"],            requiresRender: false },
+  { id: "asset-library",        label: "Save to asset library",   mediaKinds: ["image"],            requiresRender: true  },
 ];
 
 export function publishDestinationsFor(kind: MediaKind): PublishDestination[] {
@@ -621,4 +686,8 @@ export const MEDIA_KIND_UI: Record<MediaKind, MediaKindUiHints> = {
   animation: { exportVerb: "Export loop",    badgeLabel: "Animation", shortLabel: "L" },
   game:      { exportVerb: "Export game",    badgeLabel: "Game",      shortLabel: "G" },
   comic:     { exportVerb: "Export comic",   badgeLabel: "Comic",     shortLabel: "C" },
+  // `image` is the single-frame canvas runtime (#929) — single scene,
+  // no time axis, exports as PNG/JPG/SVG. The hint lives here so
+  // `Record<MediaKind, …>` typing is total even before the runtime ships.
+  image:     { exportVerb: "Export image",   badgeLabel: "Image",     shortLabel: "I" },
 };

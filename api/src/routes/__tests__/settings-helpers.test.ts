@@ -73,7 +73,7 @@ describe("defaultExtensionSettings", () => {
     assert.equal(d.jobseeker.autoDetect, true);
     assert.equal(d.jobseeker.autoScore, false);
     assert.equal(d.jobseeker.autoTailor, false);
-    assert.equal(d.jobseeker.wizardMode, false);
+    assert.equal(d.jobseeker.telemetryOptOut, false);
     assert.equal(d.jobseeker.downloadFormat, "pdf");
   });
 
@@ -126,7 +126,7 @@ describe("mergeExtensionSettings", () => {
     assert.equal(result.jobseeker.autoDetect, false, "override applied");
     assert.equal(result.jobseeker.autoScore, true);
     // Unspecified keys fall back to defaults
-    assert.equal(result.jobseeker.wizardMode, false);
+    assert.equal(result.jobseeker.telemetryOptOut, false);
     assert.equal(result.jobseeker.downloadFormat, "pdf");
     // recruiter surface untouched
     assert.equal(result.recruiter.autoDetectJobs, true);

@@ -38,6 +38,7 @@ const KIND_PALETTE: Record<MediaKind, { bg: string; bar: string; label: string }
   animation: { bg: "from-emerald-700/40 to-slate-900",  bar: "#34d399", label: "#a7f3d0" },
   game:      { bg: "from-fuchsia-700/40 to-slate-900",  bar: "#e879f9", label: "#f5d0fe" },
   comic:     { bg: "from-sky-700/40 to-slate-900",      bar: "#38bdf8", label: "#bae6fd" },
+  image:     { bg: "from-rose-700/40 to-slate-900",     bar: "#fb7185", label: "#fecdd3" },
 };
 
 const BAR_COUNT = 56;

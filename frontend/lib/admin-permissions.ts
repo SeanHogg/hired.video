@@ -28,7 +28,8 @@ export type AdminResource =
   | "workers"
   | "settings"
   | "moderation"
-  | "accountAnalytics";
+  | "accountAnalytics"
+  | "extensionTelemetry";
 
 /** CRUD grants per role per admin resource */
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
@@ -52,6 +53,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     // this gate so regular admins don't see reporter PII.
     moderation: ["read", "update"],
     accountAnalytics: ["read"],
+    extensionTelemetry: ["read"],
   },
   [USER_ROLES.ADMIN]: {
     dashboard: ["read"],
@@ -122,6 +124,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "settings",
   "moderation",
   "accountAnalytics",
+  "extensionTelemetry",
 ];
 
 export const CRUD_LABELS: Record<CrudAction, string> = {
@@ -148,4 +151,5 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   settings:   "Settings",
   moderation: "Moderation",
   accountAnalytics: "Account Analytics",
+  extensionTelemetry: "Extension Telemetry",
 };

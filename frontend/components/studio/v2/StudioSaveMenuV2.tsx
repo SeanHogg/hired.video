@@ -83,6 +83,11 @@ const DESTINATION_ICON: Record<PublishDestinationId, React.ComponentType<{ class
   "comic-reader":         UserCheck,
   "webtoon-feed":         Upload,
   "tapas-feed":           Upload,
+  // Image (#932) — profile-gallery is the in-app surface; asset-library
+  // is the closed-loop interop drop (#933 — image lands in user's R2
+  // assets, importable into any other studio project).
+  "profile-gallery":      UserCheck,
+  "asset-library":        UserCheck,
 };
 
 type PublishHandlers = Partial<Record<PublishDestinationId, () => void>>;

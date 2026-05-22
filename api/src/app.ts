@@ -18,6 +18,7 @@ import { nleRoutes } from "./routes/nle.js";
 
 import { authRoutes } from "./routes/auth.js";
 import { errorsRoutes } from "./routes/errors.js";
+import { extensionRoutes } from "./routes/extension.js";
 import { accountRoutes } from "./routes/account.js";
 import { userRoutes } from "./routes/users.js";
 import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
@@ -165,6 +166,11 @@ export function createApp() {
     "/api/auth/oauth",
     "/api/auth/magic-link",
     "/api/errors/report",
+    // Chrome extension telemetry — the optionalAuthMiddleware attaches
+    // the user if a JWT is present, but signed-out captures are accepted
+    // too (most valuable when detection fails on the LinkedIn signed-out
+    // public preview layout).
+    "/api/extension/sessions",
     "/api/chat/visitor",
     "/api/analytics/beacon",
     "/api/analytics/ads/impression",
@@ -400,6 +406,7 @@ export function createApp() {
   app.route("/api/security", securityRoutes);
   app.route("/api/admin/security", adminSecurityRoutes);
   app.route("/api/errors", errorsRoutes);
+  app.route("/api/extension", extensionRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);
   // Hono sub-router root path workaround: sub-router handlers registered at "/"

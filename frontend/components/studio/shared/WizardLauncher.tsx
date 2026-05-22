@@ -35,6 +35,7 @@ import {
 } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import {
+  getTemplate,
   type ContentTemplate,
 } from "@/components/studio/templates/catalog";
 import { studioService } from "@/lib/services/studio-service";
@@ -97,10 +98,39 @@ export default function WizardLauncher({
 
   /** Final step of the wizard — kick off generation, then create a
    *  draft + navigate to the editor. Errors stay in this scope so the
-   *  wizard sees an awaited promise and shows its own error UI. */
+   *  wizard sees an awaited promise and shows its own error UI.
+   *
+   *  Dispatches on the active template's `mediaKind`: comics route
+   *  through `studioService.generateComic` (returns a `ComicSpec`),
+   *  every other kind keeps the existing storyboard path. The branch
+   *  lives at the wizard level rather than inside the intake form per
+   *  the DRY rule — the intake is a dumb data collector; orchestration
+   *  belongs to whoever owns the lifecycle. */
   async function handleGenerate(): Promise<void> {
+    const template = getTemplate(contentTemplate);
     try {
       patchState({ status: "generating" });
+      if (template.mediaKind === "comic") {
+        // Genre id is encoded in the template id (`comic_<genreId>`)
+        // but the intake form lets the user override via the picker.
+        // ComicIntake writes the override to `state.comicGenreId`; we
+        // fall back to the template's encoded value when the form
+        // hasn't been touched.
+        const encodedGenre = contentTemplate.startsWith("comic_")
+          ? contentTemplate.slice("comic_".length)
+          : undefined;
+        const res = await studioService.generateComic({
+          prompt: state.prompt,
+          genreId: state.comicGenreId ?? encodedGenre,
+          protagonistName: state.comicProtagonistName,
+          sourceKind: state.comicSourceKind ?? "auto",
+          resumeId: state.resumeId,
+        });
+        if (!res.data) throw new Error("No data returned");
+        patchState({ status: "ready" });
+        await create({ kind: "comicSpec", spec: res.data.spec, name: state.name });
+        return;
+      }
       const res = await studioService.generateStoryboard({
         resumeText: state.resumeText,
         resumeId: state.resumeId,

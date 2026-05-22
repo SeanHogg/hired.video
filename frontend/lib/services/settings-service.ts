@@ -137,7 +137,10 @@ export const ExtensionJobseekerSettingsSchema = z.object({
   autoDetect: z.boolean(),
   autoScore: z.boolean(),
   autoTailor: z.boolean(),
-  wizardMode: z.boolean(),
+  // Replaced wizardMode (3-step wizard removed in 0103). Opt-out for
+  // anonymous telemetry that helps us learn new site selectors from the
+  // picker captures. Default false → opt-in collection.
+  telemetryOptOut: z.boolean().optional().default(false),
   downloadFormat: z.string(),
 });
 

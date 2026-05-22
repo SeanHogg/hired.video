@@ -248,6 +248,178 @@ describe("canvasState ↔ Timeline round-trip", () => {
     expect(restored.scenes[0].widgets.map((w) => w.id)).toEqual(["alpha"]);
   });
 
+  // ─── Comic widget round-trip (#938) ──────────────────────────────────────
+  //
+  // Regression guard against the bug found in the post-#938 audit: the
+  // emit-side gained cases for the 3 new widget kinds (speech-bubble /
+  // caption-box / sfx-burst) but the parse-side did not, so any saved
+  // comic project loaded with empty pages on public view + on re-open.
+  // These tests fail loudly if either side regresses.
+
+  it("round-trips a speech-bubble widget verbatim", () => {
+    const bubble = defaultWidget("speech-bubble");
+    if (bubble.params.kind !== "speech-bubble") throw new Error("setup");
+    bubble.params.data.text = "I can do this.";
+    bubble.params.data.shape = "thought";
+    bubble.params.data.tail = { anchorX: 0.3, anchorY: 0.55 };
+    bubble.params.data.bgColor = "#ffffff";
+    bubble.params.data.strokeColor = "#000000";
+    bubble.params.data.strokeWidth = 4;
+    bubble.params.data.fontPx = 24;
+    bubble.params.data.color = "#0a0a0a";
+
+    const state = stateWithWidgets([bubble]);
+    const timeline = canvasStateToTimeline(state);
+    const restored = timelineToCanvasState(timeline);
+    expect(restored.scenes).toHaveLength(1);
+    expect(restored.scenes[0].widgets).toHaveLength(1);
+    const w = restored.scenes[0].widgets[0];
+    expect(w.kind).toBe("speech-bubble");
+    if (w.params.kind !== "speech-bubble") throw new Error("kind narrow");
+    expect(w.params.data.text).toBe("I can do this.");
+    expect(w.params.data.shape).toBe("thought");
+    expect(w.params.data.tail).toEqual({ anchorX: 0.3, anchorY: 0.55 });
+    expect(w.params.data.bgColor).toBe("#ffffff");
+    expect(w.params.data.strokeColor).toBe("#000000");
+    expect(w.params.data.strokeWidth).toBe(4);
+    expect(w.params.data.fontPx).toBe(24);
+  });
+
+  it("round-trips a tail-less speech-bubble (caption-style float)", () => {
+    // Tail can be null when the bubble is used as a free-floating
+    // narration ribbon. Persistence must preserve the null — the
+    // editor's "remove tail" affordance writes it.
+    const bubble = defaultWidget("speech-bubble");
+    if (bubble.params.kind !== "speech-bubble") throw new Error("setup");
+    bubble.params.data.tail = null;
+    bubble.params.data.text = "Years later…";
+    const state = stateWithWidgets([bubble]);
+    const restored = timelineToCanvasState(canvasStateToTimeline(state));
+    const w = restored.scenes[0].widgets[0];
+    if (w.params.kind !== "speech-bubble") throw new Error("kind narrow");
+    expect(w.params.data.tail).toBeNull();
+    expect(w.params.data.text).toBe("Years later…");
+  });
+
+  it("round-trips a caption-box widget verbatim", () => {
+    const cap = defaultWidget("caption-box");
+    if (cap.params.kind !== "caption-box") throw new Error("setup");
+    cap.params.data.text = "MEANWHILE…";
+    cap.params.data.italic = true;
+    cap.params.data.bgColor = "#fef3c7";
+    cap.params.data.color = "#451a03";
+    cap.params.data.strokeColor = "#451a03";
+    cap.params.data.strokeWidth = 3;
+    cap.params.data.fontPx = 20;
+
+    const state = stateWithWidgets([cap]);
+    const restored = timelineToCanvasState(canvasStateToTimeline(state));
+    const w = restored.scenes[0].widgets[0];
+    expect(w.kind).toBe("caption-box");
+    if (w.params.kind !== "caption-box") throw new Error("kind narrow");
+    expect(w.params.data.text).toBe("MEANWHILE…");
+    expect(w.params.data.italic).toBe(true);
+    expect(w.params.data.bgColor).toBe("#fef3c7");
+    expect(w.params.data.strokeWidth).toBe(3);
+    expect(w.params.data.fontPx).toBe(20);
+  });
+
+  it("round-trips an sfx-burst widget verbatim", () => {
+    const sfx = defaultWidget("sfx-burst");
+    if (sfx.params.kind !== "sfx-burst") throw new Error("setup");
+    sfx.params.data.text = "DOKI!";
+    sfx.params.data.shape = "jagged";
+    sfx.params.data.bgColor = "#ec4899";
+    sfx.params.data.color = "#fff1f2";
+    sfx.params.data.strokeWidth = 5;
+    sfx.params.data.fontPx = 40;
+    sfx.position.rotation = -18;
+
+    const state = stateWithWidgets([sfx]);
+    const restored = timelineToCanvasState(canvasStateToTimeline(state));
+    const w = restored.scenes[0].widgets[0];
+    expect(w.kind).toBe("sfx-burst");
+    if (w.params.kind !== "sfx-burst") throw new Error("kind narrow");
+    expect(w.params.data.text).toBe("DOKI!");
+    expect(w.params.data.shape).toBe("jagged");
+    expect(w.params.data.bgColor).toBe("#ec4899");
+    expect(w.params.data.strokeWidth).toBe(5);
+    expect(w.params.data.fontPx).toBe(40);
+    expect(w.position.rotation).toBe(-18);
+  });
+
+  it("falls back to safe defaults on a malformed comic widget blob", () => {
+    // Parse path must not crash when a malformed / partial blob lands —
+    // every field has a type-guarded default. The case study is a
+    // saved comic with stripped-down params (e.g. a legacy migration
+    // dropped fields). The widget should still hydrate with usable
+    // fallbacks so the canvas isn't empty.
+    const stale: Timeline = {
+      schemaVersion: 1,
+      fps: 24,
+      width: 1080,
+      height: 1920,
+      backgroundColor: "#ffffff",
+      tracks: [
+        {
+          id: "v1",
+          kind: "video",
+          label: "Background",
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
+          clips: [
+            { id: "bg-1", sourceId: "", startFrame: 0, durationFrames: 60, sourceInFrame: 0, effects: [] },
+          ],
+        },
+        {
+          id: "v2",
+          kind: "video",
+          label: "Widgets",
+          gain: 1, pan: 0, muted: false, solo: false, locked: false,
+          clips: [
+            {
+              id: "bubble-1",
+              sourceId: "",
+              startFrame: 0,
+              durationFrames: 60,
+              sourceInFrame: 0,
+              effects: [
+                { kind: "canvas-v2:speech-bubble", params: { x: 0.5, y: 0.2, width: 0.4, height: 0.2 } },
+              ],
+            },
+            {
+              id: "sfx-1",
+              sourceId: "",
+              startFrame: 0,
+              durationFrames: 60,
+              sourceInFrame: 0,
+              effects: [
+                { kind: "canvas-v2:sfx-burst", params: { x: 0.6, y: 0.5, width: 0.2, height: 0.2, shape: "nonsense" } },
+              ],
+            },
+          ],
+        },
+        { id: "v3", kind: "video", label: "Scene FX",  gain: 1, pan: 0, muted: false, solo: false, locked: false, clips: [] },
+        { id: "a1", kind: "audio", label: "Music",     gain: 1, pan: 0, muted: false, solo: false, locked: false, clips: [] },
+        { id: "a2", kind: "audio", label: "Voiceover", gain: 1, pan: 0, muted: false, solo: false, locked: false, clips: [] },
+      ],
+      markers: [],
+    };
+    const restored = timelineToCanvasState(stale);
+    expect(restored.scenes).toHaveLength(1);
+    const widgets = restored.scenes[0].widgets;
+    expect(widgets).toHaveLength(2);
+    const bubble = widgets.find((w) => w.kind === "speech-bubble");
+    const sfx = widgets.find((w) => w.kind === "sfx-burst");
+    if (!bubble || bubble.params.kind !== "speech-bubble") throw new Error("bubble lost");
+    if (!sfx || sfx.params.kind !== "sfx-burst") throw new Error("sfx lost");
+    // Defaults applied where fields were missing.
+    expect(bubble.params.data.shape).toBe("speech");
+    expect(bubble.params.data.strokeWidth).toBeGreaterThan(0);
+    expect(bubble.params.data.tail).toBeNull(); // tail anchors missing → null
+    // Unknown shape value falls back to "star".
+    expect(sfx.params.data.shape).toBe("star");
+  });
+
   it("normalises pre-unification `widget-<id>` tracks back into the v2 shape on read", () => {
     // Simulate a Timeline produced by the post-#832, pre-unification
     // emit: one track per widget. The reader is the normalisation seam

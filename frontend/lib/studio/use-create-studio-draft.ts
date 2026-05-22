@@ -35,6 +35,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { StudioSubject } from "@shared/studio-subject";
+import type { ComicSpec } from "@shared/comic-spec";
 import { useToast } from "@/hooks/use-toast";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
@@ -44,6 +45,7 @@ import {
   type CanvasState,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
+import { comicSpecToCanvas } from "@/lib/studio/editor-v2/comic-spec-to-canvas";
 import { seedTemplate } from "@/lib/studio/template-dispatch";
 import {
   getTemplate,
@@ -55,6 +57,11 @@ import type { VideoScript } from "@/types/video-script";
 export type CreateStudioDraftInput =
   | { kind: "template"; templateId: ContentTemplate }
   | { kind: "script"; script: VideoScript; name?: string }
+  /** Comic AI scaffolder result. The hook converts the spec → CanvasState
+   *  via `comicSpecToCanvas()` then mints a new project with mediaKind:
+   *  "comic". Same downstream path as `template` / `script` from a
+   *  persistence standpoint — only the spec → canvas conversion differs. */
+  | { kind: "comicSpec"; spec: ComicSpec; name?: string }
   /** Empty draft — used by the chooser's `?subject=` / `?capture=` /
    *  `?new=1` deep-link forwarder so external entry points mint the
    *  project server-side and land users on `/studio/<real-id>` instead
@@ -125,6 +132,23 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           ...(input.subjects && input.subjects.length > 0
             ? { subjects: input.subjects }
             : {}),
+        });
+        return finalise(res.data);
+      }
+      if (input.kind === "comicSpec") {
+        // Comic AI scaffolder result. The spec already carries the
+        // canonical layout + palette so we only need to convert it to
+        // a CanvasState. mediaKind: "comic" tells the editor's
+        // <CanvasRouter> to mount the comic surface from first paint,
+        // and the save-menu's export rows filter to PNG-strip / PDF /
+        // CBZ / motion-MP4 automatically via `outputProfilesFor("comic")`.
+        const canvas = comicSpecToCanvas(input.spec);
+        const timelineSpec = canvasStateToTimeline(canvas);
+        const res = await studioService.saveDraft({
+          name: input.name || input.spec.title || "Comic pitch",
+          kind: projectKind,
+          mediaKind: "comic",
+          timelineSpec,
         });
         return finalise(res.data);
       }

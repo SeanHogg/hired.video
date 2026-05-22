@@ -34,7 +34,7 @@ import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
 import type { StudioProject } from "@/lib/services/studio-service";
 import SceneThumbnail from "./SceneThumbnail";
 import WaveformThumbnail from "./WaveformThumbnail";
-import { mediaKindUsesTimelineRuntime, mediaKindHasVideo } from "@shared/media-kinds";
+import { mediaKindHasVideo } from "@shared/media-kinds";
 import { cn } from "@/lib/utils";
 
 export interface VideoProjectThumbnailProps {
@@ -48,12 +48,16 @@ export default function VideoProjectThumbnail({
 }: VideoProjectThumbnailProps) {
   const mediaKind = project.mediaKind ?? "video";
 
-  // Non-Timeline canvas runtimes (game, comic) don't store their state
-  // in `timelineSpec`, so the canvas-thumb path can't render them.
-  // Fall through to the kind-palette placeholder — same path audio-only
-  // Timeline kinds use. Each runtime grows its own dedicated thumbnail
-  // (game sprite-grid, comic panel-grid) as part of #931's follow-on.
-  if (!mediaKindUsesTimelineRuntime(mediaKind)) {
+  // Game projects don't store their state in `timelineSpec` (it lives on
+  // `gameState` / `studio_projects.game_state`), so the canvas-thumb
+  // path can't render them. Fall through to the kind-palette
+  // placeholder. Each non-Timeline runtime grows its own dedicated
+  // thumbnail (game sprite-grid, etc.) as part of #931's follow-on.
+  // Comic uses CanvasState for authoring even though its EXPORT
+  // pipeline is non-Timeline, so comic projects DO have a timelineSpec
+  // the canvas-thumb path can render — `mediaKindUsesTimelineRuntime`
+  // would over-match here.
+  if (mediaKind === "game") {
     return (
       <div className={cn("h-full w-full", className)}>
         <WaveformThumbnail seed={project.id} mediaKind={mediaKind} />

@@ -164,11 +164,11 @@ export function ExtensionsSettings() {
             pro
           />
           <ToggleRow
-            id="js-wizard"
-            label={t("settings.extensions.wizardModeLabel")}
-            description={t("settings.extensions.wizardModeDesc")}
-            checked={js.wizardMode}
-            onChange={(v) => setJobseeker("wizardMode", v)}
+            id="js-telemetry-opt-out"
+            label={t("settings.extensions.telemetryOptOutLabel")}
+            description={t("settings.extensions.telemetryOptOutDesc")}
+            checked={!!js.telemetryOptOut}
+            onChange={(v) => setJobseeker("telemetryOptOut", v)}
           />
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">

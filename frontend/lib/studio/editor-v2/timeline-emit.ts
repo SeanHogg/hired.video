@@ -1036,6 +1036,77 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
         },
       };
     }
+    case "canvas-v2:speech-bubble":
+      return {
+        ...base,
+        kind: "speech-bubble",
+        params: {
+          kind: "speech-bubble",
+          data: {
+            text: stringOr(params.text, ""),
+            fontPx: numberOr(params.fontPx, 22),
+            fontFamily: stringOr(params.fontFamily, "") || undefined,
+            color: stringOr(params.color, "#0a0a0a"),
+            bgColor: stringOr(params.bgColor, "#ffffff"),
+            strokeColor: stringOr(params.strokeColor, "#0a0a0a"),
+            strokeWidth: numberOr(params.strokeWidth, 3),
+            shape:
+              params.shape === "thought" ||
+              params.shape === "shout" ||
+              params.shape === "whisper"
+                ? params.shape
+                : "speech",
+            tail:
+              typeof params.tailAnchorX === "number" &&
+              typeof params.tailAnchorY === "number" &&
+              Number.isFinite(params.tailAnchorX) &&
+              Number.isFinite(params.tailAnchorY)
+                ? { anchorX: params.tailAnchorX, anchorY: params.tailAnchorY }
+                : null,
+          },
+        },
+      };
+    case "canvas-v2:caption-box":
+      return {
+        ...base,
+        kind: "caption-box",
+        params: {
+          kind: "caption-box",
+          data: {
+            text: stringOr(params.text, ""),
+            fontPx: numberOr(params.fontPx, 18),
+            fontFamily: stringOr(params.fontFamily, "") || undefined,
+            color: stringOr(params.color, "#1c1917"),
+            bgColor: stringOr(params.bgColor, "#fef3c7"),
+            strokeColor: stringOr(params.strokeColor, "#1c1917"),
+            strokeWidth: numberOr(params.strokeWidth, 2),
+            italic: params.italic === true,
+          },
+        },
+      };
+    case "canvas-v2:sfx-burst":
+      return {
+        ...base,
+        kind: "sfx-burst",
+        params: {
+          kind: "sfx-burst",
+          data: {
+            text: stringOr(params.text, "POW!"),
+            fontPx: numberOr(params.fontPx, 48),
+            fontFamily: stringOr(params.fontFamily, "") || undefined,
+            color: stringOr(params.color, "#0a0a0a"),
+            bgColor: stringOr(params.bgColor, "#facc15"),
+            strokeColor: stringOr(params.strokeColor, "#0a0a0a"),
+            strokeWidth: numberOr(params.strokeWidth, 4),
+            shape:
+              params.shape === "jagged" ||
+              params.shape === "circle-jagged" ||
+              params.shape === "lightning"
+                ? params.shape
+                : "star",
+          },
+        },
+      };
     default:
       return null;
   }

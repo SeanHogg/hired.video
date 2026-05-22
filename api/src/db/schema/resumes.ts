@@ -155,6 +155,11 @@ export const studioProjects = pgTable("studio_projects", {
   // future `shared/comic-state.ts` alongside its canvas implementation
   // (#929). Migration 0101 / #929.
   comicState: jsonb("comic_state"),
+  // Image state JSON for mediaKind='image' projects. Parallel column
+  // for the Photoshop-shaped raster editor (#932); shape lives in
+  // `shared/image-state.ts` (layers + dimensions + history). Null for
+  // every non-image project. Migration 0102.
+  imageState: jsonb("image_state"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   // Project-level visibility. After the Save/Publish split (#665) the

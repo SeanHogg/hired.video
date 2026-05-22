@@ -8,6 +8,7 @@ import { auditRoutes } from "./audit.js";
 import { toolUsageRoutes } from "./tool-usage.js";
 import { securityRoutes } from "./security.js";
 import { aiVendorRoutes } from "./ai-vendors.js";
+import { extensionTelemetryRoutes } from "./extension.js";
 
 /**
  * SuperAdmin management router.
@@ -32,3 +33,4 @@ superadminRoutes.route("/audit", auditRoutes);
 superadminRoutes.route("/tool-usage", toolUsageRoutes);
 superadminRoutes.route("/security", securityRoutes);
 superadminRoutes.route("/ai", aiVendorRoutes);
+superadminRoutes.route("/extension", extensionTelemetryRoutes);

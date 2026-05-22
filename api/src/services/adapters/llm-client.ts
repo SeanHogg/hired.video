@@ -285,11 +285,13 @@ export interface LLMDispatchAttempt {
   kind: "rate_limit" | "timeout" | "auth" | "schema" | "empty" | "network" | "unknown";
   /** Upstream vendor that handled this attempt. Authoritative source is
    *  the gateway's failover trail (SDK ≥0.7 exposes vendor on each
-   *  failover entry); falls back to parsing the vendor prefix off the
-   *  model id (`openrouter/`, `cerebras/`, ...) when the gateway didn't
-   *  surface a cascade. Undefined when neither resolves (bare catalog
-   *  id + non-cascade failure). */
-  vendor?: string;
+   *  failover entry); falls back to `inferVendorFromModel` (vendor
+   *  prefix on the model id, or `openrouter` as the catch-all since
+   *  every non-cerebras/non-ollama profile in `providers.ts` routes
+   *  through OpenRouter). Always set so support tickets can spot
+   *  single-vendor saturation without a "vendor: undefined" gap that
+   *  hides which upstream actually rejected the call. */
+  vendor: string;
   /** Inner gateway-side cascade attempts that ran inside this single
    *  profile call before the gateway gave up — populated when the
    *  gateway returns `429 cascade_exhausted` with `details.failovers`.
@@ -301,14 +303,23 @@ export interface LLMDispatchAttempt {
 /** Known upstream vendor prefixes the gateway routes through. Mirrored
  *  from the SDK's `FailoverEvent.vendor` doc. Used to derive a vendor
  *  from the model id alone when the gateway didn't return a cascade
- *  trail (single-attempt 429s, timeouts, etc). */
+ *  trail (single-attempt 429s, timeouts, etc).
+ *
+ *  Every other prefix we dispatch (`qwen/`, `google/`, `anthropic/`,
+ *  `nousresearch/`, `meta-llama/`, `openai/`) is a MODEL-FAMILY prefix
+ *  routed through OpenRouter — see `RAW_USE_CASE_PROFILES` in
+ *  providers.ts. So we default unknown prefixes to `"openrouter"`
+ *  rather than `undefined` — support tickets see the actual vendor
+ *  that rejected, not a confusing gap that hides single-vendor
+ *  saturation. Tracked SDK improvement: gap #949 (vendor on
+ *  `BuilderforceApiError` directly so we don't have to guess). */
 const KNOWN_VENDOR_PREFIXES = ["openrouter", "cerebras", "nvidia", "ollama"] as const;
 
-function inferVendorFromModel(model: string): string | undefined {
+function inferVendorFromModel(model: string): string {
   const prefix = model.split("/")[0];
   return (KNOWN_VENDOR_PREFIXES as readonly string[]).includes(prefix)
     ? prefix
-    : undefined;
+    : "openrouter";
 }
 
 /** Thrown when the dispatch loop exhausts every profile in the chain

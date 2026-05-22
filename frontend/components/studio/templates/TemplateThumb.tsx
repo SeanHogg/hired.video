@@ -5,6 +5,7 @@
 
 import { cn } from "@/lib/utils";
 import type { ContentTemplate, TemplateDef } from "./catalog";
+import { COMIC_GENRES, type ComicGenreId } from "@shared/comic-genres";
 
 interface TemplateThumbProps {
   template: TemplateDef;
@@ -25,6 +26,16 @@ export default function TemplateThumb({ template, className }: TemplateThumbProp
 }
 
 function renderThumb(id: ContentTemplate) {
+  // Comic genre cards — one branch covers all 12 ids. Palette is read
+  // from the SSoT (`COMIC_GENRES`) so adding a 13th genre needs ZERO
+  // changes here — the per-id thumb shape is genre-derived. Per the
+  // DRY rule: one branch in this switch, one inline `<ComicThumb>` body,
+  // no per-genre case proliferation.
+  if (id.startsWith("comic_")) {
+    const genreId = id.slice("comic_".length) as ComicGenreId;
+    const genre = COMIC_GENRES.find((g) => g.id === genreId) ?? COMIC_GENRES[0];
+    return <ComicThumb genre={genre} />;
+  }
   switch (id) {
     case "basic":
       return (
@@ -563,6 +574,63 @@ function renderThumb(id: ContentTemplate) {
         </div>
       );
   }
+}
+
+/**
+ * Comic-genre thumbnail — a 6-panel mini comic page rendered from the
+ * genre's palette. All 12 comic templates share this component (per
+ * the DRY rule); palette differences make each genre's card visually
+ * distinct. The 6-panel grid mirrors the 6-page narrative arc the AI
+ * scaffolder produces, so the card visually previews what the user
+ * will land in the editor with.
+ */
+function ComicThumb({ genre }: { genre: (typeof COMIC_GENRES)[number] }) {
+  const p = genre.palette;
+  // Six tiny panels in a 3x2 grid — each gets a different accent dot
+  // so the page reads as varied even at thumbnail size. The last panel
+  // shows a CTA-shaped sliver to telegraph the closing-pitch beat.
+  return (
+    <div
+      className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-[3px] p-2"
+      style={{ backgroundColor: p.paper }}
+    >
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          className="relative overflow-hidden"
+          style={{
+            backgroundColor: i === 5 ? p.accent : i % 2 === 0 ? p.primary : p.secondary,
+            border: `1.5px solid ${p.ink}`,
+          }}
+        >
+          {/* Character silhouette — only on panels 0/2/4 so half the
+              page is "background-only" and half has a figure, the
+              cheapest possible "comic page" read. */}
+          {i % 2 === 0 && (
+            <div
+              className="absolute bottom-0 left-1/2 h-3/4 w-2/5 -translate-x-1/2 rounded-t-full"
+              style={{ backgroundColor: p.ink, opacity: 0.85 }}
+            />
+          )}
+          {/* Speech-bubble dot — top right of every panel except the
+              last (which is the CTA-shaped final beat). */}
+          {i !== 5 && (
+            <div
+              className="absolute right-1 top-1 h-1.5 w-2.5 rounded-full"
+              style={{ backgroundColor: p.paper, border: `1px solid ${p.ink}` }}
+            />
+          )}
+          {/* SFX dot on the climax beat (panel 4). */}
+          {i === 4 && (
+            <div
+              className="absolute right-1 bottom-1 h-2 w-2 rotate-12 rounded-sm"
+              style={{ backgroundColor: p.accent, border: `1px solid ${p.ink}` }}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**

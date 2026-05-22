@@ -435,7 +435,7 @@ describe("handleGetExtensionPreferences", () => {
     assert.equal(data.jobseeker.autoDetect, false);
     assert.equal(data.jobseeker.autoScore, true);
     // Defaults fill in for omitted keys
-    assert.equal(data.jobseeker.wizardMode, false);
+    assert.equal(data.jobseeker.telemetryOptOut, false);
     assert.equal(data.jobseeker.downloadFormat, "pdf");
     assert.equal(data.recruiter.autoScore, true);
     assert.equal(data.recruiter.autoDetectJobs, true);
@@ -448,7 +448,7 @@ describe("handleUpdateExtensionPreferences", () => {
       accountPreferences: [{
         id: "p1", userId: "user-1",
         extensionSettings: {
-          jobseeker: { autoDetect: false, wizardMode: true },
+          jobseeker: { autoDetect: false, telemetryOptOut: true },
           recruiter: { autoScore: true },
         },
       }],
@@ -462,7 +462,7 @@ describe("handleUpdateExtensionPreferences", () => {
     assert.equal(stored.jobseeker.autoScore, true);
     // Prior overrides preserved
     assert.equal(stored.jobseeker.autoDetect, false);
-    assert.equal(stored.jobseeker.wizardMode, true);
+    assert.equal(stored.jobseeker.telemetryOptOut, true);
     // Recruiter branch untouched
     assert.equal(stored.recruiter.autoScore, true);
   });

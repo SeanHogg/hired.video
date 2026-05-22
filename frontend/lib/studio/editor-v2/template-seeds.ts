@@ -34,6 +34,14 @@ import {
   type Scene,
   type Widget,
 } from "./canvas-state";
+import {
+  COMIC_GENRES,
+  getNarrativeShape,
+  pickStockAsset,
+  type ComicGenre,
+} from "@shared/comic-genres";
+import { buildComicPage } from "./comic-page-builder";
+import { COMIC_DEFAULT_LAYOUT } from "@shared/comic-spec";
 
 export function seedCanvasFromTemplate(
   templateId: string | null | undefined,
@@ -180,6 +188,59 @@ function makeCta(
   if (options.accentColor) w.params.data.accentColor = options.accentColor;
   if (options.accentTextColor) w.params.data.accentTextColor = options.accentTextColor;
   return w;
+}
+
+// ─── Comic seed adapter ────────────────────────────────────────────────────
+//
+// The static template seed for every genre. Thin adapter that translates
+// the genre's narrative-beat brief + stock-asset rotation into the
+// canonical `ComicPageContent` shape, then calls the single
+// `buildComicPage()` assembler (shared with the AI-spec hydrator in
+// `comic-spec-to-canvas.ts`). No widget defaults / layout / per-widget
+// stroke decisions live here — those are owned by `comic-page-builder.ts`.
+
+function comicSeedFor(genre: ComicGenre): CanvasState {
+  const beats = getNarrativeShape(genre);
+  const pages: Scene[] = beats.map((beat, idx) => {
+    const bg = pickStockAsset(genre.stockAssets.backgrounds, idx);
+    const character = pickStockAsset(genre.stockAssets.characters, idx);
+    const prop = pickStockAsset(genre.stockAssets.props, idx);
+    const sfxAsset = pickStockAsset(genre.stockAssets.sfx, idx);
+    const sfxText =
+      sfxAsset && (beat.beatId === "rising-action" || beat.beatId === "climax")
+        ? genre.sfxPalette[idx % Math.max(1, genre.sfxPalette.length)] ?? ""
+        : "";
+    return buildComicPage(
+      {
+        label: beat.label,
+        caption: beat.label.toUpperCase(),
+        protagonistLine: beat.brief,
+        protagonistMode: beat.beatId === "midpoint" ? "thought" : "speech",
+        // No second speaker in the seed — the seed is a single-voice
+        // placeholder. The AI path lights the second bubble up when
+        // the beat is a dialogue.
+        otherLine: "",
+        sfx: sfxText,
+        backgroundUrl: bg?.path ?? null,
+        characterUrl: character?.path ?? null,
+        // Prop only on odd-numbered pages so the layout doesn't get
+        // overcrowded — same rule the spec→canvas adapter applies via
+        // sfx-vs-prop trade-off.
+        propUrl: idx % 2 === 1 ? prop?.path ?? null : null,
+      },
+      genre.palette,
+      COMIC_DEFAULT_LAYOUT,
+    );
+  });
+
+  return {
+    // Comics author at portrait — vertical scroll is the dominant
+    // reading affordance (webtoon, social feeds, mobile reader).
+    // Genre-specific aspect overrides could land later via a per-
+    // genre `aspect` field in the catalog.
+    ...emptyCanvasState({ width: 1080, height: 1920, fps: 24 }),
+    scenes: pages,
+  };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1215,4 +1276,15 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
       ]),
     ],
   }),
+
+  // ─── Comic genre seeds (#894 / mediaKind === "comic") ─────────────────
+  // One seed per genre, all built from the shared `comicSeedFor()` helper.
+  // The helper reads the genre's palette + stock assets + narrative beats
+  // from `shared/comic-genres.ts` so adding a 13th genre needs zero
+  // changes here — the spread below picks it up.
+  ...Object.fromEntries(
+    COMIC_GENRES.map(
+      (g) => [`comic_${g.id}` as ContentTemplate, () => comicSeedFor(g)],
+    ),
+  ),
 };

@@ -11,6 +11,7 @@ import {
   AudioWaveform,
   BarChart3,
   BookOpen,
+  Brush,
   Briefcase,
   Brain,
   Building2,
@@ -19,8 +20,10 @@ import {
   FileText,
   Film,
   FilePlus2,
+  Frame,
   Gamepad2,
   Headphones,
+  Image as ImageIcon,
   Mic2,
   Megaphone,
   Monitor,
@@ -100,7 +103,14 @@ export type ContentTemplate =
   | "comic_comedy"
   | "comic_retro80s"
   | "comic_webtoon"
-  | "comic_adventure";
+  | "comic_adventure"
+  // ─── Image / drawing canvas (#932 / mediaKind === "image") ───────────
+  // Single-frame Photoshop-shaped raster authoring. Each entry seeds
+  // the DrawingStage with a starter canvas of the right dimensions for
+  // its use case; the user can change dimensions later via the editor.
+  | "drawing_blank"
+  | "drawing_social_square"
+  | "drawing_og_card";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
@@ -693,7 +703,104 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     firstTabLabel: "Setup",
     IntakeForm: BasicIntake,
   },
+
+  // ─── Image / drawing templates (#932 / mediaKind === "image") ─────────
+  // `mediaKind: "image"` routes `<CanvasRouter>` to mount `<DrawingStage>` —
+  // a Photoshop-shaped raster editor (brush, eraser, fill, layers,
+  // color picker, undo/redo, AI prompt). Each entry just seeds the
+  // starting canvas dimensions; the user can change them later. All
+  // reuse `BasicIntake` for the prose prompt; a drawing-specific
+  // intake (preset size picker, optional reference upload) is a
+  // follow-on tracked on the gap register.
+  {
+    id: "drawing_blank",
+    label: "Blank canvas",
+    desc: "Start from scratch — brush, eraser, fill, layers, AI prompt. 1024×1024.",
+    icon: Brush,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "quick",
+    mediaKind: "image",
+    audiences: ["creator", "designer", "developer"],
+    defaultName: "Untitled drawing",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "drawing_social_square",
+    label: "Social post (1:1)",
+    desc: "1080×1080 square — Instagram / LinkedIn / X. Layers + AI generation.",
+    icon: ImageIcon,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "promote",
+    mediaKind: "image",
+    audiences: ["creator", "founder", "recruiter", "employer"],
+    defaultName: "Social post",
+    defaultPrompt:
+      "Design a square social-media post for a launch announcement — bold headline, supporting subhead, accent color and a hero illustration. Keep critical content inside the 80% safe zone.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "drawing_og_card",
+    label: "OG / link preview card",
+    desc: "1200×630 — the link-preview thumbnail social sites scrape from your page.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "promote",
+    mediaKind: "image",
+    audiences: ["creator", "founder", "developer"],
+    defaultName: "OG card",
+    defaultPrompt:
+      "Generate an Open Graph link-preview card: title, brand mark, supporting glyph, brand palette. Centred content with breathing room — the social sites crop the edges on some platforms.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+
+  // ─── Comic templates (#894 / mediaKind === "comic") ───────────────────
+  // Twelve genre cards, each opening the same ComicIntake. The genre
+  // chosen is persisted on `state.comicGenreId` so the AI scaffolder +
+  // template-seeds.ts know which palette / tone / stock-pack to use.
+  // Generated programmatically from the COMIC_GENRES catalog so the
+  // template ids, default names, default prompts and stage names stay
+  // in sync with one source of truth (DRY rule).
+  ...COMIC_GENRES.map(comicGenreToTemplate),
 ];
+
+/** Map a `ComicGenre` to a `TemplateDef`. Keeps the catalog DRY — one
+ *  source of truth (`COMIC_GENRES` in `@shared/comic-genres`) feeds the
+ *  AI scaffolder, the intake form, the SVG asset path resolver, AND the
+ *  template catalog. Adding a 13th genre is one entry in COMIC_GENRES;
+ *  the catalog picks it up automatically. */
+function comicGenreToTemplate(genre: ComicGenre): TemplateDef {
+  return {
+    // `comic_<id>` matches the union member in `ContentTemplate`. The
+    // editor reads the trailing genre id off the template to seed
+    // `state.comicGenreId` (see `template-seeds.ts`).
+    id: `comic_${genre.id}` as ContentTemplate,
+    label: `${genre.label} comic`,
+    desc: genre.description,
+    icon: BookOpen,
+    // The intake form gathers the rest — no auto-import from resume /
+    // job / company. The user picks the source explicitly inside
+    // ComicIntake (resume / profile / services / auto).
+    importMode: "none",
+    // Reuses the personal_brand server-side prompt config; the comic-
+    // specific tone shaping happens in the dedicated comic scaffolder
+    // route (`/api/studio/generate-comic`), not by switching purposes.
+    purpose: "personal_brand",
+    category: "comic",
+    mediaKind: "comic",
+    audiences: ["job_seeker", "creator", "founder", "recruiter"],
+    defaultName: `${genre.label} pitch`,
+    defaultPrompt: `Turn my career story into a ${genre.label.toLowerCase()} comic — protagonist makes their pitch through ${genre.tone[0]} panels.`,
+    firstTabLabel: "Comic",
+    IntakeForm: ComicIntake,
+  };
+}
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 

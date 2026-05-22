@@ -213,6 +213,7 @@ const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const Workers = lazy(() => import("./pages/admin/Workers"));
 const Security = lazy(() => import("./pages/admin/Security"));
 const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
+const ExtensionTelemetry = lazy(() => import("./pages/admin/ExtensionTelemetry"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
 const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
 const AdminAccountAnalytics = lazy(() => import("./pages/admin/AccountAnalytics"));
@@ -832,6 +833,7 @@ const App = () => (
                       <Route path="/admin/workers"           element={<AdminLayout><Workers /></AdminLayout>} />
                       <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
                       <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
+                      <Route path="/admin/extension-telemetry" element={<AdminLayout><ExtensionTelemetry /></AdminLayout>} />
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
                       <Route path="/admin/moderation"        element={<AdminLayout><ModerationQueue /></AdminLayout>} />
                       <Route path="/admin/account-analytics" element={<AdminLayout><AdminAccountAnalytics /></AdminLayout>} />

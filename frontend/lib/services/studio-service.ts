@@ -246,6 +246,10 @@ export const StudioProjectSchema = z.object({
   // client-side by `<GameStage>`; server stores verbatim. See
   // shared/game-state.ts.
   gameState: z.unknown().nullish(),
+  // Image runtime state for mediaKind='image' projects (#932). Same
+  // parallel-column pattern as gameState. Validated client-side by
+  // <DrawingStage>; server stores verbatim. See shared/image-state.ts.
+  imageState: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
@@ -461,6 +465,28 @@ export const studioService = {
   },
 
   /**
+   * Generate a 6-page pitch comic from the user's intake fields.
+   * Single source of truth for the comic AI scaffolder; mounted by the
+   * comic template intake form's Generate button and by any external
+   * "Re-roll the comic" affordance that ships later. Returns the
+   * server's `GenerateComicResponse` envelope so the caller can show
+   * which artefact the scaffolder used ("Used your resume", "Used your
+   * profile", …).
+   */
+  async generateComic(params: {
+    prompt: string;
+    genreId?: string;
+    protagonistName?: string;
+    sourceKind?: "resume" | "profile" | "services" | "auto";
+    resumeId?: string;
+  }): Promise<ApiSuccessResponse<import("@shared/comic-spec").GenerateComicResponse>> {
+    return apiClient.post(
+      "/api/studio/generate-comic",
+      params,
+    ) as Promise<ApiSuccessResponse<import("@shared/comic-spec").GenerateComicResponse>>;
+  },
+
+  /**
    * Upload a recorded video blob (multipart/form-data).
    * Returns the newly created studio project.
    */
@@ -584,6 +610,10 @@ export const studioService = {
        *  `timelineSpec` (each canvas runtime writes to its own JSONB
        *  column). See `shared/game-state.ts`. */
       gameState?: unknown;
+      /** Image runtime state for mediaKind='image' projects (#932). Sent
+       *  by `<DrawingStage>` on save; same parallel-column pattern as
+       *  `gameState`. See `shared/image-state.ts`. */
+      imageState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -605,6 +635,7 @@ export const studioService = {
       ...(args.mediaKind ? { mediaKind: args.mediaKind } : {}),
       ...(args.timelineSpec !== undefined ? { timelineSpec: args.timelineSpec } : {}),
       ...(args.gameState !== undefined ? { gameState: args.gameState } : {}),
+      ...(args.imageState !== undefined ? { imageState: args.imageState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),
