@@ -1444,6 +1444,16 @@ export default function StudioEditorV2() {
               background / music pickers behind tabs so the v2 user has
               parity with v1's sidebar sections. Collapsible via the shared
               CollapsiblePanel (own state, persists to localStorage). */}
+          {/* Left panel (Scenes + Widget palette + Actions) is the entry
+              point for Timeline-runtime authoring. Self-hides for game /
+              image kinds per #936's `mediaKindUsesCanvasStateAuthoring`
+              predicate — those runtimes don't have scenes / widgets to
+              surface. Their canvas (`<GameStage>` / `<DrawingStage>`)
+              spans the full editor width when this panel is hidden,
+              which is the desired UX for a single-canvas-authoring
+              kind. Phase 2b (#939 for game / #940 for image) replaces
+              this slot with kind-specific tool panels. */}
+          {usesTimelineChrome && (
           <CollapsiblePanel
             side="left"
             label="Scenes"
@@ -1560,6 +1570,7 @@ export default function StudioEditorV2() {
               )}
             </div>
           </CollapsiblePanel>
+          )}
 
           {/* CENTER — canvas + timeline. `min-w-0` is critical: without it
               flex children default to `min-width: auto`, which lets the

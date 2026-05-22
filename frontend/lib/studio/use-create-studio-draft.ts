@@ -53,6 +53,7 @@ import {
 } from "@/components/studio/templates/catalog";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import type { VideoScript } from "@/types/video-script";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 
 export type CreateStudioDraftInput =
   | { kind: "template"; templateId: ContentTemplate }
@@ -88,6 +89,17 @@ export function useCreateStudioDraft(opts: Opts = {}) {
   async function create(input: CreateStudioDraftInput): Promise<StudioProject | null> {
     if (creating) return null;
     setCreating(true);
+    // Derive the kind that's being created so a failure toast can say
+    // "Couldn't create drawing" instead of the generic "Couldn't create
+    // project" — the generic phrasing was confusing users into thinking
+    // every kind was being treated as a video. Reads from the same
+    // MEDIA_KIND_UI single SoT every other surface uses.
+    const intendedKind: MediaKind | null =
+      input.kind === "template"
+        ? getTemplate(input.templateId).mediaKind
+        : input.kind === "comicSpec"
+          ? "comic"
+          : null;
     try {
       const projectKind = isV2 ? ("nle" as const) : ("scene" as const);
       if (input.kind === "template") {
@@ -167,8 +179,11 @@ export function useCreateStudioDraft(opts: Opts = {}) {
       });
       return finalise(res.data);
     } catch (err) {
+      const kindLabel = intendedKind
+        ? MEDIA_KIND_UI[intendedKind].badgeLabel.toLowerCase()
+        : "project";
       toast({
-        title: "Couldn't create project",
+        title: `Couldn't create ${kindLabel}`,
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
