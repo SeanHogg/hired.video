@@ -50,10 +50,10 @@ export interface LLMDiagnosticAttempt {
   requestId?: string;
   message: string;
   /** Upstream vendor that handled the attempt (openrouter / cerebras /
-   *  nvidia / ollama). Surfaced so support tickets can show vendor
-   *  concentration at a glance — always set on payloads emitted by
-   *  the current backend; kept optional only for legacy payloads cached
-   *  in older error events before the always-set rollout. */
+   *  nvidia / ollama / googleai / …). Surfaced so support tickets can
+   *  show vendor concentration at a glance. Undefined only for
+   *  pre-dispatch errors (auth, validation, plan-cap) where no
+   *  upstream was ever selected by the gateway. */
   vendor?: string;
   /** Inner gateway cascade trail when `429 cascade_exhausted`. */
   failovers?: ReadonlyArray<LLMDiagnosticFailover>;

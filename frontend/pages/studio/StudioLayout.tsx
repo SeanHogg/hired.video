@@ -195,13 +195,19 @@ function Landing() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — architecturally-true facts about the studio, not
+            unverified engagement claims. The format count derives from
+            `listShippableKindPitches()` so it ticks up automatically
+            when a new mediaKind ships. The other three describe the
+            studio's structural commitments (AI scaffold, in-browser
+            render, free first project) which are true regardless of
+            which kind a visitor cares about — no per-kind copy here. */}
         <div className="grid md:grid-cols-4 gap-6 mb-16">
           {[
-            { stat: "60s", label: "Average video creation time" },
-            { stat: "3×", label: "More likely to get a callback" },
-            { stat: "85%", label: "Higher recruiter response rate" },
-            { stat: "500K+", label: "Video resumes created" },
+            { stat: `${listShippableKindPitches().length}+`, label: "Creator formats in one studio" },
+            { stat: "60s", label: "AI scaffolds your first scene" },
+            { stat: "100%", label: "In-browser render — no install" },
+            { stat: "Free", label: "First project on every account" },
           ].map((s) => (
             <div key={s.stat} className="text-center">
               <div className="text-3xl font-bold text-primary mb-2">{s.stat}</div>

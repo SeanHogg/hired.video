@@ -163,31 +163,31 @@ export default function Pricing() {
     [USER_ROLES.JOB_SEEKER]: {
       label: "Job Seeker",
       freeDescription:
-        "Get started with AI video resumes, the Chrome extension, and your career home.",
+        "Get started with the AI Studio (video / comic / game / podcast), the Chrome extension, and your career home.",
       proDescription:
-        "Unlock 1M monthly AI tokens, voice cloning, Pro studio features, and priority matching.",
+        "Unlock 1M monthly AI tokens, voice cloning, every Pro export format (4K video, PDF / CBZ comics, motion-comic MP4), and priority matching.",
       freeFeatures: [
-        "1 published AI video resume (unlimited drafts)",
+        "1 published pitch — video, comic, game, or podcast (unlimited drafts)",
         "ATS-friendly resume builder",
         "Chrome extension — job tracking & match scoring",
         "50K AI tokens / mo",
         "Career Home dashboard & community feed",
         "Unlimited networking — connections & followers",
-        "Apply to jobs with video intros",
-        "AI Studio — 1080p export (with watermark)",
+        "Apply to jobs with video / comic intros",
+        "AI Studio — 1080p video, PNG-strip comic export (with watermark)",
         "AI interview practice (limited)",
         "Public profile hosting (hired.video branded)",
       ],
       proFeatures: [
-        "Unlimited AI video resumes",
-        "AI Studio — Brand Kits, 4K, watermark-free",
+        "Unlimited published projects across every format",
+        "AI Studio — Brand Kits, 4K video, PDF / CBZ comic, motion-comic MP4, watermark-free",
         "Voice cloning & full TTS voice marketplace",
-        "YouTube publishing + LinkedIn post AI",
+        "One-click publishing — YouTube, Webtoon, itch.io + LinkedIn post AI",
         "AI Assistance available (all tools)",
         "Resume Tailor — per-job variations",
         "AI interview practice",
         "Priority job matching & salary insights",
-        "Video & profile analytics",
+        "Project & profile analytics (every format)",
         inboxSyncFeature(),
       ],
       unitLabel: "per month",
@@ -1998,19 +1998,19 @@ export default function Pricing() {
               items={[
                 {
                   question: "How much does hired.video cost?",
-                  answer: `hired.video is free to start with generous limits — AI resume scoring, one published video resume, and 50K AI tokens per month. The Pro plan is $${basePrice}/month (or $${PRO_YEARLY_PRICE}/year with a 20% annual discount) and includes 1M AI tokens/month, 1080p video export, voice cloning, brand kits, and unlimited published videos. You can cancel anytime.`,
+                  answer: `hired.video is free to start with generous limits — AI resume scoring, one published Studio project (video, comic, game, or podcast), and 50K AI tokens per month. The Pro plan is $${basePrice}/month (or $${PRO_YEARLY_PRICE}/year with a 20% annual discount) and includes 1M AI tokens/month, 1080p + 4K video export, PDF / CBZ comic export, voice cloning, brand kits, and unlimited published projects across every format. You can cancel anytime.`,
                 },
                 {
                   question: "What's included in the free plan?",
-                  answer: "The free plan includes AI resume scoring, one published video resume, job-resume matching (5/month), 10 job applications/month, 50K AI tokens for tools like the resume optimizer and salary calculator, and access to the full tool suite. No credit card required.",
+                  answer: "The free plan includes AI resume scoring, one published Studio project (video, comic, game, or podcast), job-resume matching (5/month), 10 job applications/month, 50K AI tokens for tools like the resume optimizer and salary calculator, and access to the full tool suite. No credit card required.",
                 },
                 {
                   question: "Can I try Pro features before committing?",
-                  answer: "Yes — all AI tools are available on the free tier with a monthly token budget. You can score resumes, generate video resumes, and use every tool to see the quality before upgrading. Pro unlocks higher limits, 1080p export, voice cloning, and brand kits.",
+                  answer: "Yes — all AI tools are available on the free tier with a monthly token budget. You can generate videos, comics, games, and podcasts to see the quality before upgrading. Pro unlocks higher limits, 4K video export, PDF / CBZ comic export, voice cloning, and brand kits.",
                 },
                 {
                   question: "What are AI tokens and how do they work?",
-                  answer: "AI tokens are the currency that powers all AI features — resume scoring, video script generation, job matching, and more. Free users get 50K tokens/month; Pro users get 1M tokens/month. If you need more, top-up token packs start at $3.99 for 500K tokens.",
+                  answer: "AI tokens are the currency that powers every AI feature — resume scoring, Studio script generation (video / comic / game / podcast), job matching, and more. Free users get 50K tokens/month; Pro users get 1M tokens/month. If you need more, top-up token packs start at $3.99 for 500K tokens.",
                 },
                 {
                   question: "Do you offer team or recruiter pricing?",

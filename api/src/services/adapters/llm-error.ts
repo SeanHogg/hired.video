@@ -57,10 +57,12 @@ export interface LLMErrorAttempt {
   requestId?: string;
   message: string;
   /** Upstream vendor that handled this attempt (openrouter / cerebras /
-   *  nvidia / ollama). See `LLMDispatchAttempt.vendor` for resolution
-   *  rules — always set so support tickets never carry a
-   *  "vendor: undefined" gap that hides single-vendor saturation. */
-  vendor: string;
+   *  nvidia / ollama / googleai / …). See `LLMDispatchAttempt.vendor`
+   *  for resolution rules — sourced from the SDK so undefined ONLY for
+   *  pre-dispatch errors where no upstream was ever selected (auth,
+   *  validation, plan-cap). Surfaced so support can spot single-vendor
+   *  saturation without grepping logs. */
+  vendor?: string;
   /** Gateway-side cascade trail for this single profile call when
    *  `429 cascade_exhausted` was returned. Each entry carries vendor +
    *  status. */

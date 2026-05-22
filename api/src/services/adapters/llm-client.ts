@@ -283,43 +283,20 @@ export interface LLMDispatchAttempt {
   message: string;
   /** Classifier so callers can branch UX on it. */
   kind: "rate_limit" | "timeout" | "auth" | "schema" | "empty" | "network" | "unknown";
-  /** Upstream vendor that handled this attempt. Authoritative source is
-   *  the gateway's failover trail (SDK ≥0.7 exposes vendor on each
-   *  failover entry); falls back to `inferVendorFromModel` (vendor
-   *  prefix on the model id, or `openrouter` as the catch-all since
-   *  every non-cerebras/non-ollama profile in `providers.ts` routes
-   *  through OpenRouter). Always set so support tickets can spot
-   *  single-vendor saturation without a "vendor: undefined" gap that
-   *  hides which upstream actually rejected the call. */
-  vendor: string;
+  /** Upstream vendor that handled this attempt (`openrouter` / `cerebras` /
+   *  `nvidia` / `ollama` / `googleai` / …). Sourced from
+   *  `BuilderforceApiError.vendor` (SDK ≥0.8) for dispatch errors, or
+   *  `_builderforce.resolvedVendor` from the success response when a
+   *  post-success local validator (schema/empty) threw. Unset only for
+   *  pre-dispatch failures where no vendor was ever selected (401/403
+   *  auth, 400 validation, `plan_token_limit_exceeded`, `claw_token_limit_exceeded`). */
+  vendor?: string;
   /** Inner gateway-side cascade attempts that ran inside this single
    *  profile call before the gateway gave up — populated when the
    *  gateway returns `429 cascade_exhausted` with `details.failovers`.
    *  Each entry carries vendor info so SA can spot single-vendor
    *  saturation across the whole chain. */
   failovers?: ReadonlyArray<LLMFailoverEvent>;
-}
-
-/** Known upstream vendor prefixes the gateway routes through. Mirrored
- *  from the SDK's `FailoverEvent.vendor` doc. Used to derive a vendor
- *  from the model id alone when the gateway didn't return a cascade
- *  trail (single-attempt 429s, timeouts, etc).
- *
- *  Every other prefix we dispatch (`qwen/`, `google/`, `anthropic/`,
- *  `nousresearch/`, `meta-llama/`, `openai/`) is a MODEL-FAMILY prefix
- *  routed through OpenRouter — see `RAW_USE_CASE_PROFILES` in
- *  providers.ts. So we default unknown prefixes to `"openrouter"`
- *  rather than `undefined` — support tickets see the actual vendor
- *  that rejected, not a confusing gap that hides single-vendor
- *  saturation. Tracked SDK improvement: gap #949 (vendor on
- *  `BuilderforceApiError` directly so we don't have to guess). */
-const KNOWN_VENDOR_PREFIXES = ["openrouter", "cerebras", "nvidia", "ollama"] as const;
-
-function inferVendorFromModel(model: string): string {
-  const prefix = model.split("/")[0];
-  return (KNOWN_VENDOR_PREFIXES as readonly string[]).includes(prefix)
-    ? prefix
-    : "openrouter";
 }
 
 /** Thrown when the dispatch loop exhausts every profile in the chain
@@ -391,13 +368,15 @@ function classifyAttemptError(
       vendor: f.vendor,
       code: f.code,
     }));
-    // Prefer the LAST failover entry's vendor — that's the model the
-    // gateway most recently tried before giving up on us. For non-
-    // cascade errors (single-attempt 429) failovers is undefined and
-    // the caller falls back to parsing the model id.
-    const vendor = failovers && failovers.length > 0
-      ? failovers[failovers.length - 1].vendor
-      : undefined;
+    // Prefer the SDK's top-level `vendor` (always set on dispatch errors
+    // in ≥0.8 — sourced from the gateway's catalog so consumers never
+    // parse model ids). Fall back to the last cascade-trail entry only
+    // if the SDK ever omits the top-level field (e.g. pre-dispatch errors
+    // where no upstream was ever selected — auth, validation, plan-cap).
+    const vendor = err.vendor
+      ?? (failovers && failovers.length > 0
+        ? failovers[failovers.length - 1].vendor
+        : undefined);
     return {
       kind,
       status,
@@ -632,6 +611,12 @@ export function createLLMClient(
       const isFreeTier = profile.model.endsWith(":free");
       const perAttemptTimeoutMs =
         opts.callOpts.timeoutMs ?? (isFreeTier ? 25_000 : undefined);
+      // Captures `_builderforce.resolvedVendor` after a successful SDK
+      // call so the catch block can attribute a post-success local
+      // failure (schema/empty validator throw) to the upstream that
+      // actually served us. Stays undefined when the SDK call itself
+      // throws (BuilderforceApiError carries its own `vendor`).
+      let resolvedVendor: string | undefined;
       try {
         const res = await sdk.chat.completions.create({
           model: profile.model,
@@ -654,6 +639,7 @@ export function createLLMClient(
             : {}),
         });
 
+        resolvedVendor = res._builderforce?.resolvedVendor;
         const choice = res.choices?.[0];
         const message = choice?.message;
         const content = typeof message?.content === "string" ? message.content : "";
@@ -692,7 +678,7 @@ export function createLLMClient(
           model: profile.model,
           durationMs: Date.now() - startedAt,
           ...cls,
-          vendor: cls.vendor ?? inferVendorFromModel(profile.model),
+          vendor: cls.vendor ?? resolvedVendor,
         };
         attempts.push(attempt);
         if (i < opts.chain.length - 1) {

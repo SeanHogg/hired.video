@@ -163,8 +163,8 @@ export default function WizardLauncher({
           size="sm"
           variant="ghost"
           onClick={() => setOpen(true)}
-          aria-label="Open new video wizard"
-          title="Open new video wizard"
+          aria-label="Open new project wizard"
+          title="Open new project wizard"
           className={cn("h-8 w-8 p-0", className)}
         >
           <Wand2 className="h-4 w-4" />
