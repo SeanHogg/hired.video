@@ -47,6 +47,8 @@ import {
 import { TIER_COPY } from "@shared/tier-copy";
 import { pricingConfigService } from "@/lib/services/pricing-config-service";
 import { TRUST_SIGNALS } from "@/lib/constants";
+import { listShippableKindPitches } from "@/lib/studio/kind-marketing";
+import type { ComponentType, ReactNode } from "react";
 
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -104,12 +106,14 @@ export default function Pricing() {
     structuredData: generatePricingSchema([
       {
         name: "Free",
-        description: "Free career tools — AI resume scorer, video resume, job matching, and more.",
+        description:
+          "Free career tools — AI resume scorer, AI Studio for video / comic / game / podcast creation, job matching, and more.",
         monthlyPrice: 0,
       },
       {
         name: "Pro",
-        description: "Full access to hired.video — 1M AI tokens/mo, 1080p video, voice cloning, brand kits, unlimited published videos.",
+        description:
+          "Full access to hired.video — 1M AI tokens/mo, 1080p + 4K video, PDF / CBZ comic export, voice cloning, brand kits, unlimited published projects.",
         monthlyPrice: basePrice,
         annualPrice: PRO_YEARLY_PRICE,
       },
@@ -868,219 +872,124 @@ export default function Pricing() {
                         </td>
                       </tr>
 
-                      {/* AI Video Studio */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          AI Video Studio
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                          AI Video Script Generation (4-scene)
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                          AI-generated video resume drafts
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Share2 className="h-4 w-4 text-muted-foreground" />
-                          Published / downloadable video resumes
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          1 published
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                          Video resume templates & themes
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (3)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {TIER_COPY.proCollectionLabel("5+ Premium")}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
-                          Animated scenes & motion presets
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Minimal only
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Minimal / Moderate / Cinematic
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Palette className="h-4 w-4 text-muted-foreground" />
-                          Brand Kits — colors, logo, fonts
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Download className="h-4 w-4 text-muted-foreground" />
-                          720p MP4 export
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Download className="h-4 w-4 text-muted-foreground" />
-                          1080p MP4 export
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Download className="h-4 w-4 text-muted-foreground" />
-                          4K MP4 export
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                          Vertical 9:16 export (TikTok, Reels, LinkedIn)
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-muted-foreground" />
-                          Watermark
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          hired.video watermark
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Watermark-free
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Mic className="h-4 w-4 text-muted-foreground" />
-                          AI voice cloning (your own voice)
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Mic className="h-4 w-4 text-muted-foreground" />
-                          Voice Marketplace (Kokoro, Piper, VibeVoice)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          1 free voice (Web Speech)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Full marketplace + creator revenue share
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Share2 className="h-4 w-4 text-muted-foreground" />
-                          One-click YouTube publishing
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-muted-foreground" />
-                          LinkedIn Post AI (hook, caption, hashtags)
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Share2 className="h-4 w-4 text-muted-foreground" />
-                          Public share link, embed code & QR code
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Video view analytics & engagement
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (views only)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced (heatmaps, CTA clicks, campaigns)
-                        </td>
-                      </tr>
+                      {/* AI Studio — multi-format (video / comics / games /
+                          podcasts / voice / animation). Section header reads
+                          from MEDIA_KIND_UI labels via listShippableKindPitches
+                          so adding a kind ripples into the per-kind capability
+                          rows below automatically. Each row uses the shared
+                          <FeatureRow> helper (DRY anchor for the whole
+                          comparison table) — adding a feature is one line. */}
+                      <SectionRow label="AI Studio (Video, Comics, Games, Podcasts)" />
+
+                      <FeatureRow
+                        icon={Sparkles}
+                        label="AI script & storyboard generation (every format)"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Sparkles}
+                        label="AI-generated drafts (videos, comics, games, podcasts)"
+                        free="Unlimited (token budget gated)"
+                        pro="Unlimited"
+                      />
+                      <FeatureRow
+                        icon={Share2}
+                        label="Published / downloadable projects"
+                        free="1 published"
+                        pro="Unlimited"
+                      />
+                      <FeatureRow
+                        icon={LayoutGrid}
+                        label="Built-in templates & themes (every format)"
+                        free="Basic (3 video + starter comic / game / podcast)"
+                        pro={TIER_COPY.proCollectionLabel("Full library + premium")}
+                      />
+
+                      {/* Per-kind capability rows — one per shippable
+                          mediaKind, driven by `KIND_MARKETING` so adding a
+                          7th kind ripples here automatically. The blurb
+                          comes from the kind-marketing SoT used by the
+                          /studio landing page (single source of truth for
+                          "what does this kind do"). */}
+                      {listShippableKindPitches().map((pitch) => (
+                        <FeatureRow
+                          key={pitch.kind}
+                          icon={pitch.icon}
+                          label={pitch.title}
+                          free
+                          pro="All templates + Pro export options"
+                        />
+                      ))}
+
+                      <FeatureRow
+                        icon={Zap}
+                        label="Animated scenes & motion presets (video / animation)"
+                        free="Minimal only"
+                        pro="Minimal / Moderate / Cinematic"
+                      />
+                      <FeatureRow
+                        icon={Palette}
+                        label="Brand Kits — colors, logo, fonts"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow icon={Download} label="720p video export" free pro />
+                      <FeatureRow icon={Download} label="1080p video export" free pro />
+                      <FeatureRow
+                        icon={Download}
+                        label="4K video + PDF / CBZ comic export"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Video}
+                        label="Vertical 9:16 export (TikTok, Reels, LinkedIn)"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Shield}
+                        label="Watermark"
+                        free="hired.video watermark"
+                        pro="Watermark-free"
+                      />
+                      <FeatureRow
+                        icon={Mic}
+                        label="AI voice cloning (your own voice)"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Mic}
+                        label="Voice Marketplace (Kokoro, Piper, VibeVoice)"
+                        free="1 free voice (Web Speech)"
+                        pro="Full marketplace + creator revenue share"
+                      />
+                      <FeatureRow
+                        icon={Share2}
+                        label="One-click publishing — YouTube, Webtoon, itch.io"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Sparkles}
+                        label="LinkedIn Post AI (hook, caption, hashtags)"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Share2}
+                        label="Public share link, embed code & QR code"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={BarChart3}
+                        label="View analytics & engagement (every format)"
+                        free="Basic (views only)"
+                        pro="Advanced (heatmaps, CTA clicks, campaigns)"
+                      />
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
@@ -2145,5 +2054,74 @@ export default function Pricing() {
           </div>
 </div>
 </AppShell>
+  );
+}
+
+// ─── Shared feature-row helpers ───────────────────────────────────────────────
+//
+// The pricing comparison table used to hand-roll a ~20-line `<tr>` block for
+// every feature row (icon + label, free cell, pro cell). Per the DRY rule
+// (`feedback_extract_on_duplication`), one helper now owns the row shape:
+// adding a feature is a single `<FeatureRow …>` declaration. Free/Pro cells
+// accept either a string ("Unlimited", "1 published") OR `true` / `false`
+// (rendered as a green check / em-dash) so callers don't repeat the
+// inline-check JSX. The shared CellValue helper renders both shapes — one
+// place owns the visual contract for the whole table.
+
+interface FeatureRowProps {
+  icon: ComponentType<{ className?: string }>;
+  label: ReactNode;
+  free: ReactNode | boolean;
+  pro: ReactNode | boolean;
+}
+
+function FeatureRow({ icon: Icon, label, free, pro }: FeatureRowProps) {
+  return (
+    <tr>
+      <td className="p-4 flex items-center gap-2">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        {label}
+      </td>
+      <CellValue value={free} />
+      <CellValue value={pro} />
+    </tr>
+  );
+}
+
+/** Single source of truth for "what does a feature-cell look like". A boolean
+ *  `true` renders the green check; `false` renders the em-dash placeholder
+ *  (the visual idiom every row in the table already used hand-rolled). Any
+ *  other value renders as muted text. */
+function CellValue({ value }: { value: ReactNode | boolean }) {
+  if (value === true) {
+    return (
+      <td className="text-center p-4">
+        <Check className="h-5 w-5 text-green-600 mx-auto" />
+      </td>
+    );
+  }
+  if (value === false) {
+    return (
+      <td className="text-center p-4">
+        <span className="text-muted-foreground">—</span>
+      </td>
+    );
+  }
+  return <td className="text-center p-4 text-sm text-muted-foreground">{value}</td>;
+}
+
+/** Section heading row spanning all three table columns. One helper so the
+ *  font / color / spacing of every section header in the comparison table
+ *  stays in lockstep. */
+function SectionRow({ label }: { label: string }) {
+  return (
+    <tr className="bg-muted/20">
+      <td
+        className="p-4 font-semibold text-sm uppercase tracking-wide"
+        colSpan={3}
+      >
+        {label}
+      </td>
+    </tr>
   );
 }

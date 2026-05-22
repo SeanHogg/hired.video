@@ -8,9 +8,7 @@
 // StudioLayout + StudioEditorV2).
 
 import { useParams, Navigate, Link, useLocation } from "react-router-dom";
-import { ArrowRight, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSEO } from "@/lib/seo";
@@ -18,7 +16,9 @@ import { MEDIA_KIND_UI } from "@shared/media-kinds";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { OutputProfilePanel } from "@/components/studio/templates/OutputProfilePanel";
 import { StudioTemplateLinkCard } from "@/components/studio/templates/StudioTemplateLinkCard";
+import { StudioOpenCTA } from "@/components/studio/templates/StudioOpenCTA";
 import { getAudience } from "@/components/studio/templates/audiences";
+import { relatedTemplatesFor } from "@/components/studio/templates/templates-by-audience";
 
 export default function TemplateLandingPage(): JSX.Element {
   const { slug } = useParams<{ slug: string }>();
@@ -45,10 +45,7 @@ export default function TemplateLandingPage(): JSX.Element {
   const ui = MEDIA_KIND_UI[template.mediaKind];
   const audienceDefs = template.audiences.map(getAudience);
 
-  // Related = templates sharing any audience, excluding self. First 4 win.
-  const related = TEMPLATE_CATALOG.filter(
-    (t) => t.id !== template.id && t.audiences.some((a) => template.audiences.includes(a)),
-  ).slice(0, 4);
+  const related = relatedTemplatesFor(template, 4);
 
   return (
     <AppShell bgClassName="bg-background">
@@ -68,13 +65,7 @@ export default function TemplateLandingPage(): JSX.Element {
               <div className="flex-1">
                 <h1 className="mb-3 text-4xl font-bold">{template.label}</h1>
                 <p className="mb-6 text-lg text-muted-foreground">{template.desc}</p>
-                <Button asChild size="lg">
-                  <Link to={`/studio?template=${template.id}`}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Open in studio
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <StudioOpenCTA templateId={template.id} withArrow />
               </div>
             </div>
           </div>
@@ -154,12 +145,7 @@ export default function TemplateLandingPage(): JSX.Element {
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="mb-4 text-3xl font-bold">Make your {template.label.toLowerCase()}</h2>
             <p className="mb-6 text-lg text-muted-foreground">{template.desc}</p>
-            <Button asChild size="lg">
-              <Link to={`/studio?template=${template.id}`}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Open in studio
-              </Link>
-            </Button>
+            <StudioOpenCTA templateId={template.id} />
           </div>
         </section>
       </div>

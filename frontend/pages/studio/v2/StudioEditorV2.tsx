@@ -106,6 +106,7 @@ import {
   type ImageState,
   createBlankImageState,
 } from "@shared/image-state";
+import { getDrawingTemplatePreset } from "@/lib/studio/drawing/drawing-template-presets";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -141,22 +142,13 @@ const LinkedInPublisher = lazy(
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
-/** Per-template starter dimensions for the image canvas runtime (#932).
- *  Keeps the editor in sync with each catalog entry's `desc` — the
- *  user picked "Social post 1080×1080" so the seeded canvas is 1080²
- *  out of the gate. Falls back to the default 1024² when the template
- *  hint isn't recognised. Per the DRY rule this map is the single
- *  source — adding a new image template means one entry in
- *  `TEMPLATE_CATALOG` + one row here. */
-const IMAGE_TEMPLATE_DIMENSIONS: Record<string, { width: number; height: number }> = {
-  drawing_blank: { width: 1024, height: 1024 },
-  drawing_social_square: { width: 1080, height: 1080 },
-  drawing_og_card: { width: 1200, height: 630 },
-};
-
 function createBlankImageStateForTemplate(templateHint: string | null) {
-  const dims = templateHint ? IMAGE_TEMPLATE_DIMENSIONS[templateHint] : undefined;
-  return createBlankImageState(dims?.width, dims?.height);
+  // Per the DRY rule: the per-template dimensions live in ONE record
+  // (`drawing-template-presets.ts`) read by both this seeding path AND
+  // the catalog thumbnail. Adding a new drawing template touches only
+  // that file + the catalog entry — never this seam.
+  const preset = getDrawingTemplatePreset(templateHint);
+  return createBlankImageState(preset?.width, preset?.height);
 }
 
 export default function StudioEditorV2() {

@@ -329,6 +329,9 @@
   <url><loc>https://hired.video/for/data_analysts</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/for/podcasters</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/for/educators</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/voice_actors</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/game_devs</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/illustrators</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
 
   <!-- ===== Studio per-template landing pages (#901) ===== -->
   <!-- One per TEMPLATE_CATALOG entry (id is the slug). weekly/0.7 — high
@@ -354,6 +357,32 @@
   <url><loc>https://hired.video/templates/podcast_trailer</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/podcast_episode</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/podcast_interview</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <!-- Voice (3) -->
+  <url><loc>https://hired.video/templates/voice_audition_reel</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/voice_ivr_prompt</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/voice_audiobook_chapter</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <!-- Generic promo + games (4) -->
+  <url><loc>https://hired.video/templates/product_promo</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/endless_runner</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/quiz_game</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/memory_match</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <!-- Image / drawing (3) -->
+  <url><loc>https://hired.video/templates/drawing_blank</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/drawing_social_square</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/drawing_og_card</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <!-- Comic genres (12) — generated from COMIC_GENRES; keep in sync per #920 -->
+  <url><loc>https://hired.video/templates/comic_hero</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_noir</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_scifi</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_fantasy</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_romance</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_slice</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_manga</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_horror</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_comedy</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_retro80s</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_webtoon</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/comic_adventure</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
 
   <!-- ===== Legal ===== -->
   <url>

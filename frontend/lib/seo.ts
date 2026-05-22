@@ -156,11 +156,16 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "career dashboard, job search tracker, career community, resume tracking, professional network",
   },
   "/studio": {
-    title: "AI Video Resume Studio — hired.video",
+    // Multi-format studio per the canvas-runtime extensibility model
+    // (#894 / #927 / #938) — every supported `mediaKind` belongs in
+    // the keywords list so we rank for the new formats alongside the
+    // legacy "video resume" queries. SEO copy mirrors the Landing's
+    // "what you can make" grid (single SoT: `kind-marketing.ts`).
+    title: "AI Studio for Videos, Comics, Games & Podcasts — hired.video",
     description:
-      "Generate a polished AI video resume in 60 seconds. Paste your resume, our AI writes the script, and you export a 1080p video — no camera, no editing required.",
+      "One AI studio for every format. Turn your resume into a video pitch, a 6-page interactive comic, a podcast trailer, or a browser game — AI writes the script and renders the finished piece in 60 seconds.",
     keywords:
-      "AI video resume, video resume generator, video resume maker, AI video studio, video resume creator, video resume template",
+      "AI video resume, AI comic generator, AI podcast generator, AI game maker, video resume generator, comic resume, interactive comic, podcast trailer, browser game builder, AI studio",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
@@ -168,7 +173,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web Browser",
       description:
-        "AI-powered video resume studio — turns any resume into a 60-second video with AI-generated scripts, animated scenes, and one-click export to MP4 or YouTube.",
+        "AI-powered creator studio — turn any resume into a video pitch, an interactive comic, a podcast trailer, or a browser game. AI writes the script, picks the art direction, and renders the finished piece.",
       offers: {
         "@type": "Offer",
         price: "0",

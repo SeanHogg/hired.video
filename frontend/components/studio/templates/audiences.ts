@@ -27,7 +27,9 @@ export type Audience =
   | "data_analyst"
   | "podcaster"
   | "educator"
-  | "voice_actor";
+  | "voice_actor"
+  | "game_dev"
+  | "illustrator";
 
 export interface AudienceDef {
   id: Audience;
@@ -115,6 +117,16 @@ export const AUDIENCES: AudienceDef[] = [
     id: "voice_actor",
     label: "Voice actors",
     blurb: "Audition reels, character demos, narration samples, and ID spots — script-driven, voice-clone-friendly.",
+  },
+  {
+    id: "game_dev",
+    label: "Game developers",
+    blurb: "Browser-playable game prototypes — endless runners, quizzes, memory games — that publish to itch.io or your own page.",
+  },
+  {
+    id: "illustrator",
+    label: "Illustrators",
+    blurb: "Comics, drawing canvases, social posts, and OG cards — raster + vector tools with AI generation alongside.",
   },
 ];
 

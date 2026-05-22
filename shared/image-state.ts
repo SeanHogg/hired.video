@@ -183,3 +183,23 @@ export function findLayer(state: ImageState, layerId: string): ImageLayer | null
   return state.layers.find((l) => l.id === layerId) ?? null;
 }
 
+/** Return the first layer (bottom-up) that has any pixel content —
+ *  the cheapest "show me something" preview for thumbnail surfaces
+ *  (`<VideoProjectThumbnail>` for image projects, `<ProjectPlayer>`'s
+ *  image branch, future entity-card grids). Returns null when no
+ *  layer has been drawn on yet so callers can fall through to a
+ *  kind-palette placeholder.
+ *
+ *  Per the DRY rule the layer-lookup lives ONCE here — every preview
+ *  surface reads from this function instead of hand-rolling
+ *  `state.layers.find((l) => l.pixelsDataUrl != null)` inline. */
+export function firstLayerPixels(
+  state: ImageState | null | undefined,
+): string | null {
+  if (!state) return null;
+  for (const layer of state.layers) {
+    if (layer.pixelsDataUrl != null) return layer.pixelsDataUrl;
+  }
+  return null;
+}
+

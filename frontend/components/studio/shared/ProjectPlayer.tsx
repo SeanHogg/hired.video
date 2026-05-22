@@ -30,6 +30,7 @@
 import { lazy, Suspense } from "react";
 import type { StudioProject } from "@/lib/services/studio-service";
 import type { GameState } from "@shared/game-state";
+import { firstLayerPixels, type ImageState } from "@shared/image-state";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 
 const GameStage = lazy(() => import("@/components/studio/game/GameStage"));
@@ -64,6 +65,30 @@ export default function ProjectPlayer({
         />
       </Suspense>
     );
+  }
+
+  // Image projects (#932) are static rasters — no time axis, no audio,
+  // no playback runtime. The consumer-side play surface is a plain
+  // `<img>` showing the first drawn layer (DRY: same `firstLayerPixels`
+  // helper VideoProjectThumbnail uses). For full multi-layer composite
+  // a future server-side flatten endpoint would render the project to
+  // a single PNG at render-time — until then the bottom layer is the
+  // honest preview.
+  if (mediaKind === "image") {
+    const pixels = firstLayerPixels(project.imageState as ImageState | null | undefined);
+    if (pixels) {
+      return (
+        <img
+          src={pixels}
+          alt={project.title ?? "Drawing"}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
+      );
+    }
+    // Fall through to the video surface poster fallback when the
+    // image project has no layer pixels yet — surfaces a "Open in
+    // studio" affordance via the existing poster path.
   }
 
   // Every Timeline-runtime kind (and comic, which authors via

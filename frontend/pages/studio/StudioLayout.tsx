@@ -7,7 +7,6 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { parseStudioSubject, type StudioSubject } from "@shared/studio-subject";
 import {
   Sparkles,
-  Video,
   ArrowRight,
   Star,
   Zap,
@@ -61,6 +60,7 @@ import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
+import { listShippableKindPitches } from "@/lib/studio/kind-marketing";
 import { compile } from "@/lib/compiler/video-compiler";
 import { migrateScriptToElements } from "@/lib/compiler/legacy-to-elements";
 import { exportVideo } from "@/lib/renderer/video-exporter";
@@ -147,25 +147,30 @@ function Landing() {
     <div className="pt-16">
       <div className="max-w-6xl mx-auto px-4 py-16">
 
-        {/* Hero */}
+        {/* Hero — kind-agnostic copy. The studio ships multiple media
+            kinds (video / podcast / voice / animation / game / comic);
+            the hero used to hardcode "Video Studio" + "Video Resume"
+            which read as a single-format product. Headline now mirrors
+            the "What you can make" grid below — DRY anchor for the
+            multi-format identity is `listShippableKindPitches()`. */}
         <div className="grid lg:grid-cols-5 gap-8 lg:gap-10 items-center mb-16">
           <div className="lg:col-span-3 text-center lg:text-left">
             <div className="inline-flex items-center space-x-2 mb-6">
               <div className="relative">
-                <Video className="h-12 w-12 text-primary" />
-                <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                <Sparkles className="h-12 w-12 text-primary" />
+                <Star className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
               </div>
               <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                Video Studio
+                Creator Studio
               </span>
             </div>
             <h1 className="text-4xl lg:text-5xl font-bold mb-6">
-              AI Video Creation for Candidates, Recruiters &amp; Companies
+              AI Studio for Videos, Comics, Games, Podcasts &amp; More
             </h1>
             <p className="text-lg lg:text-xl text-muted-foreground mb-8">
-              Whether you're a job seeker building a video resume, a recruiter promoting an open role,
-              or a company showcasing your brand — our AI writes the script and creates a polished video
-              in 60 seconds. No camera, no editing, no experience required.
+              One studio, every format. Turn your resume into a video pitch, a 6-page comic, a
+              podcast trailer, or a browser game — AI writes the script, picks the art direction,
+              and renders the finished piece. No camera, no editing, no experience required.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link to="/signup">
@@ -173,7 +178,7 @@ function Landing() {
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                 >
-                  Create Your Video Resume
+                  Start Creating
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
@@ -205,7 +210,13 @@ function Landing() {
           ))}
         </div>
 
-        {/* Features */}
+        {/* Features — kind-neutral. Wording reflects the canvas-runtime
+            extensibility model: the studio is one canvas surface that
+            mounts the right runtime per `mediaKind` and exports to the
+            right format. Per-kind copy + icons live in
+            [kind-marketing.ts](frontend/lib/studio/kind-marketing.ts);
+            this grid pitches the studio's shared capabilities, not
+            individual kinds. */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">
             Everything You Need to Stand Out
@@ -214,17 +225,18 @@ function Landing() {
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Zap className="h-10 w-10 text-brand-purple mb-4" />
-                <CardTitle>AI Script Generation</CardTitle>
+                <CardTitle>AI Script &amp; Scaffold</CardTitle>
                 <CardDescription>
-                  Our AI reads your resume and writes a compelling video script highlighting your
-                  achievements, skills, and personality — tailored to the role you're targeting.
+                  Paste a resume, job description, or prompt. The AI writes the script for whatever
+                  format you pick — video scenes, podcast segments, comic panels, game levels,
+                  voiceover beats — and grounds the story in your real material.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Job-description-aware personalisation</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />4-scene narrative structure</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Edit any scene with plain English</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Format-aware scaffolding (scenes, panels, levels, beats)</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Grounded in your resume / job / company brief</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Edit any scene or panel with plain English</div>
                 </div>
               </CardContent>
             </Card>
@@ -232,17 +244,18 @@ function Landing() {
             <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
               <CardHeader>
                 <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
-                <CardTitle>Professional Video Output</CardTitle>
+                <CardTitle>One Canvas, Every Format</CardTitle>
                 <CardDescription>
-                  Export a polished 720p or 1080p video with animated scenes, smooth transitions,
-                  and professional typography — all rendered directly in your browser.
+                  The same editor surface mounts the right runtime per format. Render in your
+                  browser — MP4 / MP3 / GIF / PNG / PDF / CBZ / HTML5 game bundle — and re-import
+                  any export back into a new project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />720p & 1080p export</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Minimal, moderate & cinematic motion</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />MP4 download or YouTube publish</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Video, podcast, voice, animation, game, comic in one studio</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />MP4 720p / 1080p, MP3, GIF, PDF / CBZ, HTML5 ZIP</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Closed-loop interop — exports land in your asset library</div>
                 </div>
               </CardContent>
             </Card>
@@ -250,18 +263,18 @@ function Landing() {
             <Card className="border-primary/20 hover:border-primary/40 transition-colors">
               <CardHeader>
                 <Share2 className="h-10 w-10 text-primary mb-4" />
-                <CardTitle>Share Everywhere</CardTitle>
+                <CardTitle>Publish Where It Belongs</CardTitle>
                 <CardDescription>
-                  Publish directly to YouTube, copy a shareable link, or embed your video resume
-                  on LinkedIn and personal websites to reach more recruiters.
+                  Each format ships with the right destinations — YouTube + LinkedIn for video,
+                  RSS / Apple / Spotify for podcasts, itch.io / GitHub Pages for games, your
+                  Profile gallery for images. One click, the right pipeline.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />One-click YouTube publishing</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Public shareable link + embed code</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Per-kind publish menu — destinations gate themselves</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Public shareable link + embed code on every project</div>
                   <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />AI LinkedIn post generator — hook, caption, hashtags</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />One-click "Post to LinkedIn" intent</div>
                 </div>
               </CardContent>
             </Card>
@@ -274,9 +287,13 @@ function Landing() {
           <div className="grid md:grid-cols-4 gap-8">
             {[
               { icon: Upload, step: "1. Paste Your Resume", desc: "Drop in your resume text or upload a PDF" },
-              { icon: Sparkles, step: "2. AI Writes the Script", desc: "AI generates a 4-scene video script in seconds" },
-              { icon: Eye, step: "3. Preview & Edit", desc: "Tweak any scene with plain-English instructions" },
-              { icon: TrendingUp, step: "4. Export & Share", desc: "Download as MP4 or publish to YouTube" },
+              { icon: Sparkles, step: "2. AI Writes the Script", desc: "AI generates a script in the format you pick — scenes, panels, beats" },
+              { icon: Eye, step: "3. Preview & Edit", desc: "Tweak any scene or panel with plain-English instructions" },
+              // Step 4 is kind-agnostic — the studio exports MP4 (video /
+              // animation / motion comic), MP3 (podcast / voice), PNG / PDF /
+              // CBZ (comic), HTML5 ZIP (game), etc. Single line of marketing
+              // copy covers them all rather than a per-kind enumeration.
+              { icon: TrendingUp, step: "4. Export & Share", desc: "Download or publish — every format exports to the right destination" },
             ].map(({ icon: Icon, step, desc }) => (
               <div key={step} className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -289,20 +306,31 @@ function Landing() {
           </div>
         </div>
 
-        {/* Use cases */}
+        {/* What you can make — kind grid. Single SoT is
+            `listShippableKindPitches()` so adding a new mediaKind to
+            `shared/media-kinds.ts` + `frontend/lib/studio/kind-marketing.ts`
+            ripples into this grid automatically. No per-kind branch
+            anywhere in this component. */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">One Studio, Every Use Case</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { emoji: "🎓", title: "Video Resume", desc: "Stand out from the stack with an AI-generated video that tells your story in 30 seconds." },
-              { emoji: "📢", title: "Job Ad", desc: "Promote open roles with a compelling 30-second video ad — higher click-through than text." },
-              { emoji: "🏢", title: "Company Promo", desc: "Showcase your culture, values, and brand story to attract top talent and customers." },
-              { emoji: "🎯", title: "Recruiter Brand", desc: "Build your personal brand as a recruiter with a polished video that showcases your track record." },
-            ].map((item) => (
-              <div key={item.title} className="p-5 rounded-xl border border-border hover:border-primary/30 transition-colors text-center">
-                <span className="text-4xl mb-3 block">{item.emoji}</span>
-                <h3 className="font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-muted-foreground">{item.desc}</p>
+          <h2 className="text-3xl font-bold text-center mb-3">What you can make</h2>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+            One studio canvas, every output. Pick the format that fits the moment — the studio
+            handles the AI scripting, the rendering, and the publish destinations for each.
+          </p>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listShippableKindPitches().map((pitch) => (
+              <div
+                key={pitch.kind}
+                className="p-6 rounded-xl border border-border hover:border-primary/30 transition-colors"
+              >
+                <div className={cn(
+                  "w-12 h-12 rounded-lg flex items-center justify-center mb-4",
+                  pitch.accentClass,
+                )}>
+                  <pitch.icon className="h-6 w-6" />
+                </div>
+                <h3 className="font-semibold mb-2">{pitch.title}</h3>
+                <p className="text-sm text-muted-foreground">{pitch.blurb}</p>
               </div>
             ))}
           </div>
@@ -310,23 +338,23 @@ function Landing() {
 
         {/* Advertising extras */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">Built for Advertising, Not Just Resumes</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">Built for Every Format — Resumes, Promos, Podcasts, Games &amp; More</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Users className="h-10 w-10 text-brand-purple mb-4" />
                 <CardTitle>Brand Kits</CardTitle>
                 <CardDescription>
-                  Save your colours, logo, and font once. Every video automatically applies your brand identity.
+                  Save your colours, logo, and font once. Every new project automatically applies your brand — videos, podcasts, comics, games, all of it.
                 </CardDescription>
               </CardHeader>
             </Card>
             <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
               <CardHeader>
                 <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
-                <CardTitle>Video Analytics</CardTitle>
+                <CardTitle>Project Analytics</CardTitle>
                 <CardDescription>
-                  Track views and CTA clicks per video. Group into campaigns and measure performance across channels.
+                  Track views, plays, and CTA clicks per project. Group into campaigns and measure performance across formats and channels.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -344,7 +372,7 @@ function Landing() {
                 <Share2 className="h-10 w-10 text-green-600 mb-4" />
                 <CardTitle>LinkedIn Post AI</CardTitle>
                 <CardDescription>
-                  AI generates a hook, caption, and hashtags for your video. One click posts it to LinkedIn — ready in seconds.
+                  AI generates a hook, caption, and hashtags for your project. One click posts it to LinkedIn — ready in seconds.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -395,50 +423,60 @@ function Landing() {
 
       </div>
 
-      {/* FAQ */}
+      {/* FAQ — kind-aware. The "What can I make?" question reads from
+          `listShippableKindPitches()` so the answer stays accurate as new
+          runtimes ship. Other questions describe shared studio behaviour
+          rather than per-kind specifics. */}
       <MarketingFAQ
         schemaId="studio"
-        subheading="The quick answers to what creators ask before they generate their first AI video resume."
+        subheading="The quick answers to what creators ask before they generate their first studio project."
         items={[
+          {
+            question: "What can I make in the Studio?",
+            answer:
+              `Pick a format and start: ${listShippableKindPitches()
+                .map((p) => p.title.toLowerCase())
+                .join(", ")}. Each format mounts its own canvas runtime inside the same editor — switching kinds is as simple as picking a different template.`,
+          },
           {
             question: "Do I need to record myself on camera?",
             answer:
-              "No. Our AI generates a polished animated video from your written resume — no camera, microphone, or editing skills required. If you'd rather record yourself, you can upload a selfie-style video and the Studio will cut it into your scenes.",
+              "No. The AI generates a polished result from your written brief — no camera, microphone, or editing skills required. If you'd rather record yourself, video and podcast projects accept selfie-style recordings that the Studio will cut into your scenes.",
           },
           {
-            question: "How long does it take to make a video resume?",
+            question: "How long does it take to make a project?",
             answer:
-              "Most people finish their first video in about 60 seconds of wall-clock time. Paste your resume, pick a theme, and the AI handles the script, timing, and scene transitions. You can then edit anything you like before exporting.",
+              "Most creators finish their first project in about 60 seconds of wall-clock time. Paste your brief, pick a template, and the AI handles the script + scaffolding for the format you picked (scenes, panels, levels, episode chapters). Edit anything you like before exporting.",
           },
           {
             question: "What does the AI actually generate?",
             answer:
-              "The AI writes a 4-scene script — hook, experience, achievements, and call-to-action — tailored to your role and target job. It also chooses typography, motion intensity, and scene timing. You can tweak any scene with plain-English instructions.",
+              "The AI writes a format-aware scaffold — video / podcast scripts get a hook → middle → CTA arc; comics get a 6-page narrative with panel art direction; games get level layouts with starter sprites + behaviors. The brief grounds the output in your real material (resume, job spec, company info).",
           },
           {
             question: "Can I use my own branding?",
             answer:
-              "Yes. Save your colors, logo, and font once in a Brand Kit and every new video automatically applies your brand identity. Great for recruiters, creators, and companies producing multiple videos.",
+              "Yes. Save your colours, logo, and font once in a Brand Kit and every new project automatically applies your brand identity — across every format, not just video. Great for recruiters, creators, and companies producing multiple pieces.",
           },
           {
-            question: "Where can I publish my video?",
+            question: "Where can I publish my work?",
             answer:
-              "One click publishes directly to YouTube, or you can export MP4 and share manually. We also generate a public link with an embed snippet you can drop into LinkedIn, personal websites, or email signatures. Our AI LinkedIn post generator writes the hook, caption, and hashtags for you.",
+              "Each format ships with the right destinations: video → YouTube / LinkedIn / public link + embed; podcast → RSS feed, Apple Podcasts, Spotify for Creators; game → itch.io, GitHub Pages, embed on hired.video; comic → hired.video reader, Webtoon, Tapas; voice → marketplace + profile embed; image → profile gallery + asset library. The publish menu self-gates per format.",
           },
           {
             question: "Is the Studio free?",
             answer:
-              "Your first AI-generated video is free on every account. Paid plans unlock unlimited generations, premium themes, 1080p export without watermark, voice cloning, brand kits, and video analytics. See the pricing page for current tiers.",
+              "Your first AI-generated project is free on every account. Paid plans unlock unlimited generations, premium themes, 1080p / lossless export without watermark, voice cloning, brand kits, and analytics. See the pricing page for current tiers.",
           },
           {
-            question: "What video formats and resolutions do you support?",
+            question: "What formats and resolutions do you support?",
             answer:
-              "Export as MP4 in 720p or 1080p. Minimal, moderate, and cinematic motion presets. 16:9 landscape and 9:16 vertical (for TikTok, Reels, and LinkedIn short-form) are both supported.",
+              "Video exports as MP4 in 720p or 1080p (16:9 landscape and 9:16 vertical). Podcasts export as MP3 / M4A / OGG / WAV with chapter markers. Animations export as GIF / WebP. Comics export as PDF / CBZ / PNG strip / motion MP4. Games export as a self-contained HTML5 ZIP that runs on any web host. Voice exports as MP3 / WAV. Images export as PNG / JPG / WebP / SVG.",
           },
           {
             question: "Can recruiters and companies use the Studio too?",
             answer:
-              "Yes — the Studio is designed for candidates, recruiters, and companies. Use it to create video resumes, video job ads, company promos, or recruiter personal-brand videos. Every use case uses the same AI engine with different templates.",
+              "Yes — the Studio is designed for candidates, recruiters, and companies across every format. Video resumes, podcast trailers, recruiter personal-brand promos, company sizzle reels, hiring-themed games, employer-brand comics, voiceover demos. Same AI engine, the right template for each use case.",
           },
         ]}
       />
@@ -447,10 +485,11 @@ function Landing() {
       <div className="max-w-4xl mx-auto px-4 pb-16">
         <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
           <h3 className="text-3xl font-bold mb-4">
-            Ready to Create Your Video Resume?
+            Ready to Make Something?
           </h3>
           <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of professionals who have transformed their job search with video.
+            One studio. Videos, podcasts, games, comics, voice clips, animations — every format
+            you need to stand out, all in one place.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/signup">
@@ -2229,8 +2268,12 @@ export default function StudioLayout() {
       {onboardingStep >= 0 && (() => {
         const steps = [
           {
-            title: "Welcome to Video Studio!",
-            body: "Create a professional video resume in minutes. Start by pasting your resume or job description in the Prompt tab.",
+            // First-time onboarding overlay — kind-agnostic so the same
+            // step renders whether the user picked a video / comic /
+            // podcast / game template. Specific output verbs stay on
+            // the per-template intake form (`firstTabLabel`).
+            title: "Welcome to the Studio!",
+            body: "Create a professional pitch in minutes — video, comic, podcast, or game. Start by pasting your resume or job description in the first tab.",
             icon: <Sparkles className="h-8 w-8 text-primary" />,
           },
           {

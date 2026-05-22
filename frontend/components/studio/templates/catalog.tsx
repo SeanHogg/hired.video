@@ -664,7 +664,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "showcase",
     mediaKind: "game",
-    audiences: ["creator", "developer", "designer"],
+    audiences: ["game_dev", "creator", "developer", "designer"],
     defaultName: "Endless runner",
     defaultPrompt:
       "Design an endless runner game: a player sprite that jumps, scrolling ground, three obstacle types, score counter, and a game-over screen with restart. Pick a music bed; the engine spawns obstacles on the beat.",
@@ -680,7 +680,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "showcase",
     mediaKind: "game",
-    audiences: ["creator", "educator", "employer", "recruiter"],
+    audiences: ["game_dev", "creator", "educator", "employer", "recruiter"],
     defaultName: "Quiz game",
     defaultPrompt:
       "Build a multiple-choice quiz game: title screen, 10 questions with 4 answer options each, instant feedback per answer, running score, and a final screen with shareable result. Pick a topic; we seed example questions.",
@@ -696,7 +696,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "quick",
     mediaKind: "game",
-    audiences: ["creator", "educator", "designer"],
+    audiences: ["game_dev", "creator", "educator", "designer"],
     defaultName: "Memory match",
     defaultPrompt:
       "Build a memory-match card game: 4×4 grid of cards, flip two at a time, match pairs to clear them, timer + move counter, win screen with the player's stats. Pick the card-face artwork or upload your own.",
@@ -721,7 +721,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "quick",
     mediaKind: "image",
-    audiences: ["creator", "designer", "developer"],
+    audiences: ["illustrator", "creator", "designer", "developer"],
     defaultName: "Untitled drawing",
     defaultPrompt: "",
     firstTabLabel: "Setup",
@@ -736,7 +736,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "promote",
     mediaKind: "image",
-    audiences: ["creator", "founder", "recruiter", "employer"],
+    audiences: ["illustrator", "designer", "creator", "founder", "recruiter", "employer"],
     defaultName: "Social post",
     defaultPrompt:
       "Design a square social-media post for a launch announcement — bold headline, supporting subhead, accent color and a hero illustration. Keep critical content inside the 80% safe zone.",
@@ -752,7 +752,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "promote",
     mediaKind: "image",
-    audiences: ["creator", "founder", "developer"],
+    audiences: ["illustrator", "designer", "creator", "founder", "developer"],
     defaultName: "OG card",
     defaultPrompt:
       "Generate an Open Graph link-preview card: title, brand mark, supporting glyph, brand palette. Centred content with breathing room — the social sites crop the edges on some platforms.",
@@ -794,7 +794,7 @@ function comicGenreToTemplate(genre: ComicGenre): TemplateDef {
     purpose: "personal_brand",
     category: "comic",
     mediaKind: "comic",
-    audiences: ["job_seeker", "creator", "founder", "recruiter"],
+    audiences: ["illustrator", "job_seeker", "creator", "founder", "recruiter"],
     defaultName: `${genre.label} pitch`,
     defaultPrompt: `Turn my career story into a ${genre.label.toLowerCase()} comic — protagonist makes their pitch through ${genre.tone[0]} panels.`,
     firstTabLabel: "Comic",

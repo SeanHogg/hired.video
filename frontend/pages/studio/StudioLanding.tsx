@@ -65,6 +65,7 @@ import {
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
+import { AudienceQuickLinks } from "@/components/studio/templates/AudienceQuickLinks";
 import MediaKindBadge from "@/components/studio/shared/MediaKindBadge";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
@@ -447,7 +448,7 @@ export default function StudioLanding() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Studio</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Start a new video from a template or continue editing an existing one.
+            Start a new project from a template — videos, podcasts, voice, animations, games, comics, images — or pick up where you left off.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -465,12 +466,17 @@ export default function StudioLanding() {
         </div>
       </header>
 
+      {/* Audience discovery — links the in-app chooser to the public
+          marketing pages (#900). Self-iterates AUDIENCES so new audiences
+          land here without touching StudioLanding. */}
+      <AudienceQuickLinks className="mb-8" />
+
       <section className="mb-12">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-medium">Templates</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Start a new video from a preset, or reuse one you've published or purchased.
+              Pick a preset — every kind the studio supports ships its own templates — or reuse one you've published or purchased.
             </p>
           </div>
           <div className="relative w-full sm:w-72">
@@ -946,7 +952,7 @@ function UnifiedTemplateCarousel({
           ? `You haven't purchased or claimed any ${kindLabel} templates yet.`
           : "You haven't purchased or claimed any templates yet."
         : kindLabel
-          ? `No ${kindLabel} templates match your search yet — pick a Video template to start while we ship more.`
+          ? `No ${kindLabel} templates match your search yet — try a different kind or refine your search.`
           : "No templates match your search.";
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">

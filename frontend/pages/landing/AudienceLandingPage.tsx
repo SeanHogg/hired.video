@@ -9,16 +9,15 @@
 // inline — no parallel `AUDIENCE_TO_TEMPLATES` lookup, no prop-drilled
 // `templates[]` from a parent.
 
-import { useParams, Navigate, Link, useLocation } from "react-router-dom";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { useParams, Navigate, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSEO } from "@/lib/seo";
 import { MEDIA_KIND_UI, MEDIA_KINDS } from "@shared/media-kinds";
-import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { StudioTemplateLinkCard } from "@/components/studio/templates/StudioTemplateLinkCard";
+import { StudioOpenCTA } from "@/components/studio/templates/StudioOpenCTA";
 import { AUDIENCE_BY_ID, type Audience } from "@/components/studio/templates/audiences";
+import { templatesForAudience } from "@/components/studio/templates/templates-by-audience";
 
 export default function AudienceLandingPage(): JSX.Element {
   const { audience: slug } = useParams<{ audience: string }>();
@@ -39,7 +38,7 @@ export default function AudienceLandingPage(): JSX.Element {
 
   if (!audience) return <Navigate to="/studio" replace />;
 
-  const templates = TEMPLATE_CATALOG.filter((t) => t.audiences.includes(audience.id));
+  const templates = templatesForAudience(audience.id);
   if (templates.length === 0) return <Navigate to="/studio" replace />;
 
   // MEDIA_KINDS imposes a stable display order (video → podcast → voice →
@@ -57,13 +56,7 @@ export default function AudienceLandingPage(): JSX.Element {
             </Badge>
             <h1 className="mb-4 text-5xl font-bold">{audience.label}</h1>
             <p className="mb-8 text-xl text-muted-foreground">{audience.blurb}</p>
-            <Button asChild size="lg">
-              <Link to="/studio">
-                <Sparkles className="mr-2 h-4 w-4" />
-                Open the studio
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            <StudioOpenCTA withArrow />
           </div>
         </section>
 
@@ -113,12 +106,7 @@ export default function AudienceLandingPage(): JSX.Element {
               {templates.length} template{templates.length === 1 ? "" : "s"} built for {audience.label.toLowerCase()}. Pick one,
               fill the prompt, and the studio renders it in your browser.
             </p>
-            <Button asChild size="lg">
-              <Link to="/studio">
-                <Sparkles className="mr-2 h-4 w-4" />
-                Open the studio
-              </Link>
-            </Button>
+            <StudioOpenCTA />
           </div>
         </section>
       </div>

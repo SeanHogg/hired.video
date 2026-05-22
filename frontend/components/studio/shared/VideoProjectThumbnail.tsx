@@ -35,6 +35,7 @@ import type { StudioProject } from "@/lib/services/studio-service";
 import SceneThumbnail from "./SceneThumbnail";
 import WaveformThumbnail from "./WaveformThumbnail";
 import { mediaKindHasVideo } from "@shared/media-kinds";
+import { firstLayerPixels, type ImageState } from "@shared/image-state";
 import { cn } from "@/lib/utils";
 
 export interface VideoProjectThumbnailProps {
@@ -58,6 +59,34 @@ export default function VideoProjectThumbnail({
   // the canvas-thumb path can render — `mediaKindUsesTimelineRuntime`
   // would over-match here.
   if (mediaKind === "game") {
+    return (
+      <div className={cn("h-full w-full", className)}>
+        <WaveformThumbnail seed={project.id} mediaKind={mediaKind} />
+      </div>
+    );
+  }
+
+  // Image projects (#932) render the FIRST non-empty layer's
+  // pixelsDataUrl as a flat `<img>` preview — captures the actual
+  // drawing the user sees in the editor. Full multi-layer composite
+  // would need the drawing-engine compositor running in an offscreen
+  // canvas (heavy per thumbnail); deferred to a future
+  // <ImageProjectThumbnail/> when the chooser grid needs it. Until a
+  // layer has content we fall through to the kind-palette placeholder.
+  if (mediaKind === "image") {
+    const pixels = firstLayerPixels(project.imageState as ImageState | null | undefined);
+    if (pixels) {
+      return (
+        <div className={cn("h-full w-full bg-slate-100", className)}>
+          <img
+            src={pixels}
+            alt=""
+            className="h-full w-full object-contain"
+            draggable={false}
+          />
+        </div>
+      );
+    }
     return (
       <div className={cn("h-full w-full", className)}>
         <WaveformThumbnail seed={project.id} mediaKind={mediaKind} />
