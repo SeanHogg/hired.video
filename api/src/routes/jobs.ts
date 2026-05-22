@@ -11,25 +11,17 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { OptionalUrlSchema } from "../../../shared/validation.js";
 
 // ============================================================================
 // SCHEMAS
 // ============================================================================
 
-/** Optional URL: treats "" the same as omitted. The JobEditForm (and
- *  every other React form sending an "" placeholder for an unset URL)
- *  would otherwise be rejected by `z.string().url().optional()` because
- *  Zod's URL validator runs on empty strings (gap #876, 2026-05-20). */
-const optionalUrl = z
-  .union([z.string().url(), z.literal("")])
-  .optional()
-  .transform((v) => (v === "" ? undefined : v));
-
 export const CreateJobSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   location: z.string().optional(),
-  heroImageUrl: optionalUrl,
+  heroImageUrl: OptionalUrlSchema,
   /** Required-skills list. Persisted to `job_items.skills_required` (jsonb).
    *  The wire field is `skills` to match the read shape (`rowToJob`
    *  exposes `row.skillsRequired` as `skills`). The 2026-05-04 fix:

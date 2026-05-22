@@ -29,6 +29,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 
@@ -55,6 +56,13 @@ export const studioTemplates = pgTable(
     /** Source studio project the template was forked from. Soft-link only —
      *  templates remain valid if the source project is later deleted. */
     sourceProjectId: uuid("source_project_id"),
+    /** Output axis — mirrors `studio_projects.media_kind` (#894). The
+     *  publish flow snapshots the source project's mediaKind so a buyer
+     *  who applies a `'podcast'` template gets a podcast-shaped project
+     *  back, not a silently-mismatched video. Default `'video'` matches
+     *  the projects-side default so pre-#894 templates keep behaviour.
+     *  See migration 0100. */
+    mediaKind:       varchar("media_kind", { length: 16 }).default("video").notNull(),
     name:            varchar("name", { length: 200 }).notNull(),
     description:     text("description"),
     /** Optional preview thumbnail (frame from the source render or uploaded). */
@@ -96,6 +104,11 @@ export const studioTemplates = pgTable(
     index("idx_studio_templates_company").on(t.companyId),
     index("idx_studio_templates_visibility").on(t.visibility),
     index("idx_studio_templates_slug").on(t.listingSlug),
+    // Mirror the studio_projects pattern: filter on non-default kinds
+    // for the upcoming per-kind chooser surface in /studio.
+    index("idx_studio_templates_media_kind")
+      .on(t.mediaKind)
+      .where(sql`${t.mediaKind} <> 'video'`),
   ],
 );
 

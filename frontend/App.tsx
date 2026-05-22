@@ -73,6 +73,8 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const People = lazy(() => import("./pages/People"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Competitors = lazy(() => import("./pages/Competitors"));
+const AudienceLandingPage = lazy(() => import("./pages/landing/AudienceLandingPage"));
+const TemplateLandingPage = lazy(() => import("./pages/landing/TemplateLandingPage"));
 const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
 const SearchPage = lazy(() => import("./pages/Search"));
@@ -577,6 +579,8 @@ const App = () => (
                       />
                       <Route path="/pricing" element={<Pricing />} />
                       <Route path="/vs-competitors" element={<Competitors />} />
+                      <Route path="/for/:audience" element={<AudienceLandingPage />} />
+                      <Route path="/templates/:slug" element={<TemplateLandingPage />} />
                       <Route
                         path="/compare"
                         element={<Navigate to="/vs-competitors" replace />}

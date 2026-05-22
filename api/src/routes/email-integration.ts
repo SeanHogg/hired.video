@@ -339,6 +339,23 @@ emailIntegrationRoutes.get("/accounts/:id/access-token", requirePro("Inbox Sync"
     } catch {
       // Diagnostic write failure shouldn't mask the underlying refresh error.
     }
+    // `invalid_grant` from Google / Microsoft means the stored refresh token
+    // is no longer accepted (user revoked, password change, 7-day Testing-app
+    // expiry, 6-month inactivity). That's user state, not a server fault, so
+    // return 400 with a dedicated code the frontend can silently catch and
+    // surface as a "Reconnect this mailbox" affordance instead of a red
+    // 502 toast. The account row is already flipped to `status: "error"`
+    // above so the inbox surfaces can decide their own visibility.
+    if (/invalid_grant/i.test(message)) {
+      return c.json(
+        error("MAILBOX_REAUTH_REQUIRED", message, {
+          accountId: account.id,
+          provider: account.provider,
+          accountEmail: account.accountEmail,
+        }),
+        400,
+      );
+    }
     return c.json(error("REFRESH_FAILED", message), 502);
   }
 });

@@ -49,6 +49,7 @@ function makeTemplate(overrides: Partial<StudioTemplate> = {}): StudioTemplate {
     id: overrides.id ?? "t1",
     creatorId: "u1",
     sourceProjectId: "p1",
+    mediaKind: "video",
     name: overrides.name ?? "Resume — minimal",
     description: "A clean dark template.",
     thumbnailUrl: null,

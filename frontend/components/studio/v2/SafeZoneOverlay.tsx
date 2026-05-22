@@ -2,10 +2,11 @@
  * SafeZoneOverlay — dashed rectangles drawn over the authoring canvas
  * marking destination-specific safe areas (TikTok/Reels caption band,
  * SMPTE 90% action-safe, outdoor-billboard bleed-safe). Per the standing
- * DRY rule, the component self-gates: it looks up the active format from
- * `(canvasWidth, canvasHeight)` and returns null when the format has no
- * `safeZones` declared. Consumers always mount it and never write a
- * `{hasZones && …}` guard.
+ * DRY rule, the component self-gates: it returns null when the active
+ * canvas mode is playback (the overlay is an editor-only affordance and
+ * must never leak into rendered output / `/v/<id>` / template previews)
+ * or when the active format has no `safeZones` declared. Consumers
+ * always mount it and never write a `{isEditing && hasZones && …}` guard.
  *
  * Pointer events are off so the overlay never interferes with widget
  * drag / select / resize. The zones are presentation-only — there is no
@@ -14,12 +15,17 @@
  */
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
 
-export interface SafeZoneOverlayProps {
+interface SafeZoneOverlayProps {
   /** Unscaled canvas dimensions in pixels. The overlay positions zones as
    *  fractional insets so it scales with the surrounding `transform:
    *  scale(zoom)` wrapper without per-zoom math here. */
   canvasWidth: number;
   canvasHeight: number;
+  /** Active canvas mode. The overlay only paints in `"edit"` — in
+   *  `"playback"` it returns null so the dashed guide never appears in
+   *  rendered output, the editor's play-mode preview, the public watch
+   *  page, or the marketplace template player. */
+  mode: "edit" | "playback";
 }
 
 const ZONE_COLOR: Record<string, string> = {
@@ -31,7 +37,9 @@ const ZONE_COLOR: Record<string, string> = {
 export default function SafeZoneOverlay({
   canvasWidth,
   canvasHeight,
+  mode,
 }: SafeZoneOverlayProps) {
+  if (mode === "playback") return null;
   const format = findFormatByDimensions(canvasWidth, canvasHeight);
   if (!format?.safeZones || format.safeZones.length === 0) return null;
 

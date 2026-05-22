@@ -50,6 +50,17 @@ function metaTypeFromAsset(asset: PickedMedia): MetaType {
   return asset.mediaType === "image" ? MetaType.Image : metaTypeFromVideoUrl(asset.url);
 }
 
+/** What kind of inline preview the UrlPickerInput should render for a
+ *  given metaType — kept next to the MetaType helpers so the mapping
+ *  stays with the rest of the type plumbing. YouTube + Hyperlink return
+ *  `undefined` (no inline preview — YouTube needs an iframe and a
+ *  plain link can point anywhere). */
+function previewKindFromMetaType(t: MetaType): "image" | "video" | undefined {
+  if (t === MetaType.Image) return "image";
+  if (t === MetaType.VideoMP4 || t === MetaType.VideoWebM) return "video";
+  return undefined;
+}
+
 export default function MetadataModal({
   open,
   onOpenChange,
@@ -273,6 +284,7 @@ export default function MetadataModal({
                         placeholder="https://..."
                         className="min-h-[44px]"
                         containerClassName="gap-2"
+                        previewKind={previewKindFromMetaType(m.metaType)}
                       >
                         <Button
                           type="button"

@@ -40,6 +40,7 @@ import {
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
 import MediaPicker from "@/components/shared/MediaPicker";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 
 interface Props {
   open: boolean;
@@ -48,6 +49,13 @@ interface Props {
   projectId: string | null;
   /** Pre-fill the listing name with the project name. */
   defaultName?: string;
+  /** Source project's output axis (#894 / #913). The backend snapshots
+   *  this from the source project at publish time so the listed
+   *  template is the same kind as what the creator authored — the
+   *  dialog just surfaces it as a read-only "Publishing as a {Podcast}
+   *  template" line. Defaults to `video` for callers that don't have
+   *  it yet (legacy V1 path). */
+  mediaKind?: MediaKind;
   /** Optional thumbnail to attach (e.g. last rendered frame). */
   defaultThumbnailUrl?: string | null;
   /** Optional inline VideoScript getter. V2 callers pass
@@ -68,6 +76,7 @@ export default function PublishAsTemplateDialog({
   onOpenChange,
   projectId,
   defaultName,
+  mediaKind = "video",
   defaultThumbnailUrl,
   getVideoScript,
   onPublished,
@@ -215,6 +224,21 @@ export default function PublishAsTemplateDialog({
 
         {creatorState.status === "ready" && isVideoCreator && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* Kind annotation — read-only. Self-hides for `video` so the
+                existing video-only publish flow stays unchanged. The
+                backend snapshots `media_kind` from the source project at
+                publish time (#913) so there's no input field — the
+                creator just sees what they're publishing as. */}
+            {mediaKind !== "video" && (
+              <div className="rounded-md border border-brand-purple/20 bg-brand-purple/5 px-3 py-2 text-xs text-foreground">
+                Publishing as a{" "}
+                <span className="font-semibold">
+                  {MEDIA_KIND_UI[mediaKind].badgeLabel}
+                </span>{" "}
+                template — same kind as your source project.
+              </div>
+            )}
+
             <div>
               <Label htmlFor="tpl-name">Template name</Label>
               <Input

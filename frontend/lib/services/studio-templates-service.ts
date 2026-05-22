@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { MEDIA_KINDS } from "@shared/media-kinds";
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,11 @@ export const StudioTemplateSchema = z.object({
    *  getHiredVideoCommunityCompanyId(). */
   firstParty: z.boolean().optional(),
   sourceProjectId: z.string().nullable().optional(),
+  /** Output axis (#894 / #913) — snapshotted at publish time from the
+   *  source project. The /studio chooser reads this to gate the Type
+   *  filter pill row + the kind badge on `OwnedTemplateCard`. Default
+   *  'video' for pre-#913 rows. */
+  mediaKind: z.enum(MEDIA_KINDS).default("video"),
   name: z.string(),
   description: z.string().nullable().optional(),
   thumbnailUrl: z.string().nullable().optional(),

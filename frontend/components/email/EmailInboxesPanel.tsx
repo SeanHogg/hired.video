@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ConnectMailboxButtons } from "@/components/email/ConnectMailboxButtons";
+import { ReconnectMailboxButton } from "@/components/email/ReconnectMailbox";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -277,6 +278,10 @@ function AccountRow({ account, selected, onToggle, onDisconnect }: AccountRowPro
           {account.lastError && <span className="text-destructive ml-2">— {account.lastError}</span>}
         </div>
       </div>
+      {/* `ReconnectMailboxButton` returns null when status !== "error",
+          so the consumer doesn't compute the visibility flag — the
+          shared component decides its own visibility (DRY rule). */}
+      <ReconnectMailboxButton account={account} redirect="/settings?tab=email" />
       <Button variant="ghost" size="sm" onClick={() => onDisconnect(account.id)}>
         <Trash2 className="h-4 w-4" />
       </Button>

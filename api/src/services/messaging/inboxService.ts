@@ -106,6 +106,11 @@ export interface InboxAccountDto {
   status: string;
   minJobScore: number;
   lastSyncedAt: string | null;
+  /** Last refresh / sync error from the account row — present whenever
+   *  `status === "error"`. The Inbox tab uses this to render an inline
+   *  "Reconnect <provider>" banner instead of a red global toast when
+   *  Google/Microsoft revokes the refresh token. */
+  lastError: string | null;
 }
 
 export interface InboxResponse {
@@ -220,6 +225,7 @@ function toAccountDto(row: ExternalEmailAccountRow): InboxAccountDto {
     status: row.status,
     minJobScore: Number(row.minJobScore ?? "0.5"),
     lastSyncedAt: row.lastSyncedAt ? new Date(row.lastSyncedAt).toISOString() : null,
+    lastError: row.lastError ?? null,
   };
 }
 

@@ -341,12 +341,11 @@ export default function StudioLanding() {
             if (useForFilter === "purchased") return o.provenance !== "created";
             return true;
           })
-          // Creator-published templates don't yet carry mediaKind on the
-          // row (#909) so they're implicitly `video`. When the kind filter
-          // is set to anything other than `all` or `video`, drop them so
-          // the carousel doesn't show stale video-shaped owned templates
-          // under "Podcast" / "Voice" / "Animation".
-          .filter(() => kindFilter === "all" || kindFilter === "video")
+          // Kind axis applies to owned rows too post-#913 — the
+          // `studio_templates.media_kind` column lets a creator's
+          // podcast template show up under the Podcast filter and not
+          // the Video filter.
+          .filter((o) => kindFilter === "all" || o.template.mediaKind === kindFilter)
           .map((o) => ({ kind: "owned" as const, owned: o }))
       : [];
 
@@ -1151,14 +1150,11 @@ function OwnedTemplateCard({
             </span>
           </div>
           {/* Kind badge — bottom-left, symmetric with BuiltinTemplateCard.
-              Self-hides when the template is `video` so the existing
-              owned-template surface stays clean. `studio_templates` does
-              not yet carry a `media_kind` column (#909), so every owned
-              template is implicitly `video` and the badge renders nothing.
-              Once #909 lands, swap the hardcoded `"video"` for the
-              template's own field. */}
+              Reads `template.mediaKind` post-#913; pre-#913 rows
+              default to 'video' via the zod schema default so this is
+              safe for legacy templates too. Self-hides for video. */}
           <MediaKindBadge
-            mediaKind="video"
+            mediaKind={template.mediaKind}
             className="absolute bottom-2 left-2 z-10"
           />
         </div>

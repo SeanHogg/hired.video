@@ -124,6 +124,14 @@ function extractLooseErrorEnvelope(
 function isExpectedSilentError(error: AppError): boolean {
   if (error instanceof UnverifiedAccountError) return true;
   if (error instanceof AuthenticationError && !localStorage.getItem("auth_token")) return true;
+  // `MAILBOX_REAUTH_REQUIRED` is user-state, not a server fault — Google /
+  // Microsoft rejected the stored refresh token (revoked, password change,
+  // Testing-app 7-day expiry). The route already flipped the account row
+  // to `status: "error"` and the Inbox / Settings surfaces render their
+  // own "Reconnect" CTA off that, so suppressing the red global toast
+  // avoids a "Support Ticket" prompt for what's a one-click reconnect.
+  const serverCode = (error.context as { serverCode?: string } | undefined)?.serverCode;
+  if (serverCode === "MAILBOX_REAUTH_REQUIRED") return true;
   return false;
 }
 

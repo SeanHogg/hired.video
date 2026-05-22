@@ -25,6 +25,24 @@ export const EmailSchema = z.string().email("Invalid email format");
 export const UrlSchema = z.string().url("Invalid URL format");
 
 /**
+ * Optional URL that accepts the empty string as "cleared". `z.string().url()`
+ * rejects `""`, which traps every form that ships an "" placeholder for an
+ * unset URL field — and every `UrlPickerInput` consumer does (frontend
+ * `value` is `string`, not `string | null`). Use this anywhere a URL field
+ * is optional and the UI lets the user clear it back to empty.
+ * Empty string normalises to `undefined` so the storage / persistence layer
+ * doesn't have to special-case both `""` and `undefined`.
+ *
+ * `max=2000` is a generous abuse-cap that comfortably covers every real
+ * URL form (browsers themselves cap around 2048). Callers that want a
+ * tighter cap can enforce it after parse — but in practice 2000 is fine.
+ */
+export const OptionalUrlSchema = z
+  .union([z.string().url("Invalid URL format").max(2000), z.literal("")])
+  .optional()
+  .transform((v) => (v === "" ? undefined : v));
+
+/**
  * Date Schema (ISO string)
  */
 export const DateSchema = z.string().datetime("Invalid date format");

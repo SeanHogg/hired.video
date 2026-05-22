@@ -133,12 +133,20 @@ Diverges per kind. The editor's Details drawer renders a kind-specific section t
 - ✅ `template-seeds.ts` gains podcast seeds — each scene label authored as a future chapter cue ("01 · Cold open", "02 · Welcome", …) so the canvas-to-timeline emitter can project them onto `timeline.markers[]` in the chapter-editor pass
 - ✅ `useCreateStudioDraft` carries `template.mediaKind` to `saveDraft` on first save so podcast projects persist as `media_kind = 'podcast'` from paint one
 
-**Deferred to Phase 2b (tracked as #907):**
+**Phase 2b — secondary polish (partially landed 2026-05-21)**
+
+Shipped:
+- ✅ `studio_templates.media_kind` column + migration + zod + publish-dialog annotation (#913)
+- ✅ `<WaveformThumbnail/>` + `VideoProjectThumbnail` audio-only fallback driven by `mediaKindHasVideo()` (#914)
+- ✅ Shared `lib/audio/peaks.ts` (`syntheticPeaks`) — deterministic project-id-keyed waveform generator
+- ✅ Scene labels project onto `timeline.markers[]` in `canvasStateToTimeline` — every podcast seed's "01 · Cold open" / "02 · Welcome" scene label is a chapter cue automatically
+
+Still deferred (tracked as #907):
 - Chapter editor UI — waveform-first audio timeline with chapter pins as clickable cues that write/read `timeline.markers[]`
 - ID3 chapter frames (MP3) + `chap` boxes (M4A) on export
 - MP3 / M4A / Opus transcode — needs the ffmpeg.wasm strategy to land first; until then every audio-only export ships as WAV regardless of the `OutputProfile` selected
 - Per-kind metadata sections in `ProjectDetailsSheet` — episode #, season, show notes, artwork
-- Audio-waveform thumbnail fallback for `VideoProjectThumbnail` (also benefits #906's project-card kind badge)
+- Real `audioPeaks(AudioBuffer, …)` decoding helper (re-add when the chapter editor lands)
 
 ### Phase 3 — Podcast publish (tracked as #908)
 
@@ -300,6 +308,16 @@ Podcast MVP (Phase 2) landed in:
 - [frontend/lib/timeline/render.ts](../../hired.video/frontend/lib/timeline/render.ts) — `loadStrategy()` registers the audio-only path
 - [frontend/components/studio/v2/StudioSaveMenuV2.tsx](../../hired.video/frontend/components/studio/v2/StudioSaveMenuV2.tsx) — DRY-ified to read `MEDIA_KIND_UI[kind].exportVerb` + `publishDestinationsFor(kind)`
 - [frontend/lib/studio/use-create-studio-draft.ts](../../hired.video/frontend/lib/studio/use-create-studio-draft.ts) — first-save persists `template.mediaKind`
+
+Phase 2b (#913 + #914) landed in:
+- [api/drizzle/0100_studio_templates_media_kind.sql](../../hired.video/api/drizzle/0100_studio_templates_media_kind.sql) + [api/src/db/schema/studiotemplates.ts](../../hired.video/api/src/db/schema/studiotemplates.ts) — `media_kind` column mirrors `studio_projects`
+- [api/src/services/studio/StudioTemplatesService.ts](../../hired.video/api/src/services/studio/StudioTemplatesService.ts) — publish snapshots `mediaKind` from the source project
+- [frontend/lib/services/studio-templates-service.ts](../../hired.video/frontend/lib/services/studio-templates-service.ts) — `mediaKind` on `StudioTemplateSchema`
+- [frontend/components/studio/PublishAsTemplateDialog.tsx](../../hired.video/frontend/components/studio/PublishAsTemplateDialog.tsx) — read-only kind annotation
+- [frontend/lib/audio/peaks.ts](../../hired.video/frontend/lib/audio/peaks.ts) — `syntheticPeaks(seed, bucketCount)` deterministic generator
+- [frontend/components/studio/shared/WaveformThumbnail.tsx](../../hired.video/frontend/components/studio/shared/WaveformThumbnail.tsx) — kind-palette SVG waveform
+- [frontend/components/studio/shared/VideoProjectThumbnail.tsx](../../hired.video/frontend/components/studio/shared/VideoProjectThumbnail.tsx) — routes to waveform via `mediaKindHasVideo()`
+- [frontend/lib/studio/editor-v2/timeline-emit.ts](../../hired.video/frontend/lib/studio/editor-v2/timeline-emit.ts) — scene labels project onto `timeline.markers[]` (comment updated to call out podcast-chapter projection)
 
 Adjacent (read-only context):
 - [shared/timeline.ts](../../hired.video/shared/timeline.ts) — kind-agnostic Timeline JSON spec

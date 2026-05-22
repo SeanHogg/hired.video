@@ -2,10 +2,15 @@
  * Thumbnail for a StudioProject — single source of truth for "what
  * thumbnail should I show for this project tile?".
  *
- * Renders the first scene of the project's `timelineSpec` via the
- * shared `<SceneThumbnail/>` (the same v2 widget renderer the editor
- * canvas uses), so what consumers see ALWAYS matches the project's
- * current canvas — no stale baked PNG/JPG drift after an edit.
+ * Two paths:
+ *   1. Video projects (or any project with at least one v-track clip)
+ *      render the first scene of the project's `timelineSpec` via the
+ *      shared `<SceneThumbnail/>` (the same v2 widget renderer the editor
+ *      canvas uses), so what consumers see ALWAYS matches the project's
+ *      current canvas — no stale baked PNG/JPG drift after an edit.
+ *   2. Audio-only projects (podcast, voice) render `<WaveformThumbnail/>`
+ *      so the chooser's "My videos" grid distinguishes a podcast row
+ *      from a video one at a glance (#914).
  *
  * Falls back to a neutral gradient placeholder when there's nothing to
  * render (brand-new draft with an empty timeline, or a malformed spec).
@@ -22,6 +27,8 @@ import { Sparkles } from "lucide-react";
 import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
 import type { StudioProject } from "@/lib/services/studio-service";
 import SceneThumbnail from "./SceneThumbnail";
+import WaveformThumbnail from "./WaveformThumbnail";
+import { mediaKindHasVideo } from "@shared/media-kinds";
 import { cn } from "@/lib/utils";
 
 export interface VideoProjectThumbnailProps {
@@ -33,6 +40,18 @@ export default function VideoProjectThumbnail({
   project,
   className,
 }: VideoProjectThumbnailProps) {
+  const mediaKind = project.mediaKind ?? "video";
+  // Audio-only kinds (podcast, voice) render the waveform regardless of
+  // whether the project has v-track clips — the kind is the canonical
+  // signal. Video + animation try the canvas thumbnail first.
+  if (!mediaKindHasVideo(mediaKind)) {
+    return (
+      <div className={cn("h-full w-full", className)}>
+        <WaveformThumbnail seed={project.id} mediaKind={mediaKind} />
+      </div>
+    );
+  }
+
   const previewScene = project.timelineSpec
     ? safeFirstScene(project.timelineSpec)
     : null;

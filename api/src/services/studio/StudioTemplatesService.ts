@@ -222,10 +222,18 @@ export class StudioTemplatesService {
     // creator user (the canActFor check honours both).
     const ownerCompanyId = (project as any).companyId ?? null;
 
+    // Snapshot the source project's mediaKind so the template is the
+    // same kind as what the creator authored. Per the standing DRY rule
+    // there is no separate "what kind is this template?" form field;
+    // the publish dialog reads project.mediaKind read-only. Defaults to
+    // 'video' if the column is null (legacy pre-#894 rows).
+    const sourceMediaKind = (project as any).mediaKind ?? "video";
+
     const inserted = await repos.studioTemplates.insert({
       creatorId: input.creatorUserId,
       companyId: ownerCompanyId,
       sourceProjectId: input.sourceProjectId,
+      mediaKind: sourceMediaKind,
       name: input.name.trim().slice(0, 200),
       description: input.description ?? null,
       thumbnailUrl: input.thumbnailUrl ?? null,

@@ -311,6 +311,50 @@
     <priority>0.7</priority>
   </url>
 
+  <!-- ===== Studio audience landing pages (#900) ===== -->
+  <!-- One per Audience in audiences.ts; weekly/0.8 — these are the
+       primary demographic capture surfaces. Drift risk: when audiences.ts
+       changes, hand-edit here too until #920 auto-generation lands. -->
+  <url><loc>https://hired.video/for/athletes</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/actors</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/directors</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/musicians</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/creators</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/job_seekers</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/recruiters</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/employers</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/founders</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/developers</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/designers</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/data_analysts</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/podcasters</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/educators</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+
+  <!-- ===== Studio per-template landing pages (#901) ===== -->
+  <!-- One per TEMPLATE_CATALOG entry (id is the slug). weekly/0.7 — high
+       SEO intent ("sizzle reel maker", "self-tape app", "podcast trailer
+       generator"). Drift risk: same as above until #920. -->
+  <url><loc>https://hired.video/templates/basic</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/profile</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/resume</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/personal_brand</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/skills_demo</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/code_walkthrough</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/design_portfolio</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/data_analysis</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/job_ad</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/company_promo</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/sizzle_reel</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/tool_promo</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/self_tape</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/monologue</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/showreel</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/director_pitch</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/casting_call</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/podcast_trailer</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/podcast_episode</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/podcast_interview</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
   <!-- ===== Legal ===== -->
   <url>
     <loc>https://hired.video/privacy-policy</loc>

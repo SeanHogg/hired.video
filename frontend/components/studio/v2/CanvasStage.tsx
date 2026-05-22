@@ -308,10 +308,15 @@ export default function CanvasStage({
           ))}
         {/* Safe-zone overlay — dashed bands marking destination-specific
             safe areas (TikTok/Reels caption band, SMPTE action-safe,
-            outdoor billboard bleed). Self-gates: returns null when the
+            outdoor billboard bleed). Self-gates: returns null in playback
+            mode (the guide is an editor-only affordance) and when the
             active format has no `safeZones` declared, so it costs nothing
             on classic 16:9 / 1:1 / 4:3 formats. */}
-        <SafeZoneOverlay canvasWidth={canvasWidth} canvasHeight={canvasHeight} />
+        <SafeZoneOverlay
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
+          mode={mode}
+        />
       </div>
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
           gates: returns null when no drag is hovering. Lives OUTSIDE the

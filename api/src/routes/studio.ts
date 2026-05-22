@@ -29,6 +29,7 @@ import { slugify, SLUG_PATTERN, isValidSlug } from "../../../shared/slugify.js";
 import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
 import type { Timeline } from "../../../shared/timeline.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
+import { OptionalUrlSchema } from "../../../shared/validation.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns, resumeInformation } = schema;
 
@@ -1151,9 +1152,9 @@ studioRoutes.post("/save-draft", async (c) => {
     // not break validation with a misleading kebab-case error).
     slug:             z.union([z.string().max(80).regex(SLUG_PATTERN, "slug must be kebab-case"), z.literal("")]).optional(),
     keywords:         z.array(z.string().max(40)).max(20).optional(),
-    // Allow empty string so the author can clear a previously-set image
-    // from the Details drawer — `.url()` alone rejects "" and traps them.
-    socialCardImage:  z.union([z.string().url().max(500), z.literal("")]).optional(),
+    // Empty string normalised to undefined by `OptionalUrlSchema` so the
+    // author can clear a previously-set image from the Details drawer.
+    socialCardImage:  OptionalUrlSchema,
   }).safeParse(body);
 
   if (!parsed.success) {

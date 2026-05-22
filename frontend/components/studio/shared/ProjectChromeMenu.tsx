@@ -171,6 +171,7 @@ export default function ProjectChromeMenu({
             onOpenChange={setPublishOpen}
             projectId={project.id}
             defaultName={project.title}
+            mediaKind={project.mediaKind ?? "video"}
             getVideoScript={getVideoScript}
             onPublished={() => {
               // The dialog already closes on success and toasts. The toast

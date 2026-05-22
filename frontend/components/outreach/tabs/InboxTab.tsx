@@ -28,6 +28,7 @@ import { InboxToolbar } from "@/components/communication/InboxToolbar";
 import { InboxDetailSheet } from "@/components/communication/InboxDetailSheet";
 import { InboxSyncHistorySheet } from "@/components/communication/InboxSyncHistorySheet";
 import { InboxSettingsSheet } from "@/components/communication/InboxSettingsSheet";
+import { ReconnectMailboxBanner } from "@/components/email/ReconnectMailbox";
 import {
   useCommHub,
   type EmailInboxFilters,
@@ -199,6 +200,14 @@ export function InboxTab() {
         )}
       </CardHeader>
       <CardContent className="p-0">
+        {/* Self-gating: renders only when at least one mailbox has flipped
+            to status: "error" (Google/Microsoft rejected the refresh token).
+            Lives inside the same Card as the inbox list so the affordance
+            is adjacent to the rows it affects. */}
+        <ReconnectMailboxBanner
+          accounts={hub.accounts}
+          redirect="/outreach?tab=inbox"
+        />
         <InboxPanel
           hub={hub}
           hideHeader

@@ -271,6 +271,12 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     height: state.height,
     backgroundColor: "#000000",
     tracks: [v1, v2, v3, a1, a2],
+    // Every scene becomes a marker at its start frame. For video
+    // projects these are chapter/cue points the editor can navigate to;
+    // for podcast projects (#894 Phase 2) these are the timeline chapter
+    // markers that the chapter editor (#907) reads/writes and the
+    // future ID3-chapter export muxes into MP3/M4A files. ONE record,
+    // ONE projection — no separate podcast-chapter array.
     markers: state.scenes.map((scene, idx) => ({
       id: scene.id,
       frame: sceneStartFrame(state, idx, fps),

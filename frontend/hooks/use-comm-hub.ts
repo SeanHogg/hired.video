@@ -31,7 +31,10 @@ export type HubItemKind = "message" | "notification" | "request" | "external_ema
 export type ExternalEmailProvider = "gmail" | "outlook";
 
 /** Connected mailbox metadata — surfaced to the inbox filter UI so the
- *  page-tab toolbar can render account chips without a second fetch. */
+ *  page-tab toolbar can render account chips without a second fetch.
+ *  `lastError` is populated whenever a token-refresh or sync failure
+ *  flipped `status` to "error"; the Inbox surfaces use it to render
+ *  an inline "Reconnect" affordance. */
 export interface InboxAccount {
   id: string;
   provider: string;
@@ -40,6 +43,7 @@ export interface InboxAccount {
   status: string;
   minJobScore: number;
   lastSyncedAt: string | null;
+  lastError: string | null;
 }
 
 /** Filters the page-tab Inbox surface applies to the external-email
