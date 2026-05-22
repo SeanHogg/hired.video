@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <polygon points="100,4 130,80 200,100 130,120 100,196 70,120 0,100 70,80" fill="#f472b6" stroke="#f0abfc" stroke-width="4"/>
+  <circle cx="100" cy="100" r="10" fill="#fbbf24"/>
+
+</svg>

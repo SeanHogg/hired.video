@@ -43,8 +43,8 @@ import {
   emptyCanvasState,
   type CanvasState,
 } from "@/lib/studio/editor-v2/canvas-state";
-import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
+import { seedTemplate } from "@/lib/studio/template-dispatch";
 import {
   getTemplate,
   type ContentTemplate,
@@ -88,23 +88,27 @@ export function useCreateStudioDraft(opts: Opts = {}) {
         // Carousel + dropdown both flow through here so they stay in sync.
         setDefaultTemplate(input.templateId);
         const template = getTemplate(input.templateId);
-        // The marketplace press-play preview mounts seedCanvasFromTemplate(id)
-        // through the same canvas pipeline; passing the same seed into
-        // saveDraft means the editor opens with the exact composition the
-        // visitor just watched.
-        const canvasSeed = seedCanvasFromTemplate(input.templateId);
-        const timelineSpec = isV2
-          ? canvasStateToTimeline(canvasSeed)
-          : undefined;
+        // Per the canvas-runtime extensibility model (PRD §1.2), every
+        // mediaKind has its own seed registry. `seedTemplate()` is the
+        // single SoT dispatcher — Timeline kinds get `timelineSpec`,
+        // game gets `gameState`, future kinds add their own field. No
+        // `if (template.mediaKind === "game")` branching here (DRY).
+        const seed = seedTemplate(template);
         const res = await studioService.saveDraft({
-          name: template.defaultName,
-          kind: projectKind,
+          name: seed.name,
+          // For Timeline-runtime kinds we stamp `kind: 'nle'` so the row
+          // points at the v2 canvas surface. Game projects don't use
+          // the legacy `kind` discriminator — their canvas is selected
+          // by `mediaKind` via `<CanvasRouter>`; leave `kind` as the
+          // server default ('scene') so old read paths don't choke.
+          ...(isV2 && seed.timelineSpec !== undefined ? { kind: projectKind } : {}),
           // Carry the template's mediaKind onto the row at first save so
           // the export menu + publish destinations gate correctly from
           // the very first paint. Default 'video' on the column would
           // otherwise yield a podcast template that exports as MP4.
           mediaKind: template.mediaKind,
-          timelineSpec,
+          ...(seed.timelineSpec !== undefined ? { timelineSpec: seed.timelineSpec } : {}),
+          ...(seed.gameState !== undefined ? { gameState: seed.gameState } : {}),
         });
         return finalise(res.data);
       }

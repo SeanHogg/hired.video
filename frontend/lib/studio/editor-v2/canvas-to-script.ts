@@ -279,6 +279,14 @@ function widgetToElement(widget: Widget): SceneElement | null {
       // applier (once it lands; gap-registered) is the source of truth
       // for how linked content paints.
       return null;
+    case "speech-bubble":
+    case "caption-box":
+    case "sfx-burst":
+      // Comic-native widgets — V1 has no SceneElement equivalent for
+      // bubbles / captions / SFX bursts. The v1 emit path is video-only
+      // and the comic kind never compiles down to V1. Dropping is
+      // correct here; the V2 timeline-emit path carries them.
+      return null;
     case "shape-rect":
     case "shape-circle":
     case "divider":

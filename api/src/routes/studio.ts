@@ -976,8 +976,12 @@ function toProjectDto(
     // Output axis (#894) — what the finished project becomes. See
     // `shared/media-kinds.ts`. Pre-0099 rows fall back to 'video' so
     // every legacy project keeps current export behaviour.
-    mediaKind: (project.mediaKind as "video" | "podcast" | "voice" | "animation" | null) ?? "video",
+    mediaKind: (project.mediaKind as "video" | "podcast" | "voice" | "animation" | "game" | null) ?? "video",
     timelineSpec: project.timelineSpec ?? null,
+    // Game runtime state for mediaKind='game' projects (#927). Null
+    // for every other kind — Timeline kinds use `timelineSpec`. See
+    // `shared/game-state.ts`.
+    gameState: project.gameState ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
@@ -1134,6 +1138,10 @@ studioRoutes.post("/save-draft", async (c) => {
     // before send (shape matches shared/timeline.ts); server persists
     // verbatim because the render facade is the schema authority.
     timelineSpec:   z.any().optional(),
+    // Game state JSON for mediaKind='game' projects (#927). Validated
+    // client-side (shape matches shared/game-state.ts); server stores
+    // verbatim because the game runtime is the schema authority.
+    gameState:      z.any().optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics
@@ -1161,17 +1169,20 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
   // mediaKind is orthogonal (output axis) — patched separately when the
-  // client passes it.
+  // client passes it. `gameState` is the runtime-specific state column
+  // for `mediaKind: 'game'` projects (#927); kept on the same patch
+  // object so save flows DRY-share the editor-kind branch.
   const editorKindPatch =
-    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined
+    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
           ...(mediaKind !== undefined ? { mediaKind } : {}),
           ...(timelineSpec !== undefined ? { timelineSpec } : {}),
+          ...(gameState !== undefined ? { gameState } : {}),
         }
       : {};
   const db = getDb();

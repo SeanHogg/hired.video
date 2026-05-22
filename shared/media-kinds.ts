@@ -52,26 +52,54 @@ export const MEDIA_KINDS = [
   "podcast",
   "voice",
   "animation",
+  "game",
+  "comic",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
 
 export const DEFAULT_MEDIA_KIND: MediaKind = "video";
 
-/** Whether the kind produces audible output (vs. silent animation export). */
+/** Whether the kind produces audible output. Games are runtime-rendered
+ *  and almost always have sound — counted as `true` so the editor
+ *  surfaces the audio asset workflow alongside sprite / level work.
+ *  Comics carry optional narration / motion-comic voiceover so the same
+ *  voiceover dialog the editor already ships works on them. */
 export function mediaKindHasAudio(kind: MediaKind): boolean {
-  return kind === "video" || kind === "podcast" || kind === "voice";
+  return (
+    kind === "video" ||
+    kind === "podcast" ||
+    kind === "voice" ||
+    kind === "game" ||
+    kind === "comic"
+  );
 }
 
-/** Whether the kind produces visible frames (vs. audio-only). */
+/** Whether the kind produces visible frames. Games render visually so
+ *  this is `true`; only audio-only kinds (`podcast` without a video
+ *  branch, `voice`) return `false`. Comics render visually (pages of
+ *  panels) — the rasterized export is a sequence of frames. */
 export function mediaKindHasVideo(kind: MediaKind): boolean {
-  return kind === "video" || kind === "animation";
+  return kind === "video" || kind === "animation" || kind === "game" || kind === "comic";
 }
 
 /** Whether the kind permits both audio + video tracks (a podcast may
- *  optionally carry a video feed — the "video podcast" branch). */
+ *  optionally carry a video feed — the "video podcast" branch). Games
+ *  are NOT in this set because game audio doesn't live on Timeline a1/a2
+ *  tracks — it's runtime-loaded asset playback via the game engine. */
 export function mediaKindCanHaveBoth(kind: MediaKind): boolean {
   return kind === "video" || kind === "podcast";
+}
+
+/** Whether the kind's canvas runtime is the Timeline (the default for
+ *  time-based composition kinds). Game / comic / image / cad return
+ *  `false` because they mount their own canvas runtime via the
+ *  `<CanvasRouter mediaKind/>` dispatch — see PRD §1.2. Comics reuse
+ *  the V2 editor's `CanvasState` for authoring (scenes = pages) but the
+ *  preview / reader / export pipeline is a non-Timeline runtime (panel
+ *  reveals on scroll, page turns, static-strip rasterizer). */
+export function mediaKindUsesTimelineRuntime(kind: MediaKind): boolean {
+  return kind !== "game" && kind !== "comic";
 }
 
 // ─── Output profiles ─────────────────────────────────────────────────────────
@@ -104,7 +132,21 @@ export type ContainerId =
   | "ogg"
   | "gif"
   | "webp"
-  | "apng";
+  | "apng"
+  // Game runtime bundles — not media containers per se, but they ride
+  // the same OutputProfile shape so the save-menu doesn't need a
+  // per-kind branch. The export facade reads the profile id to
+  // dispatch to the game-export pipeline.
+  | "html5-bundle"
+  | "web-embed"
+  // Comic exports — same OutputProfile shape so the save-menu code path
+  // stays uniform. `png-strip` is a tall vertical strip (one PNG, every
+  // page stacked); `pdf` is a paginated PDF; `cbz` is the comic-archive
+  // ZIP format readers understand. Motion comics also export to the
+  // existing animation containers (gif/webp/mp4) via separate profiles.
+  | "png-strip"
+  | "pdf"
+  | "cbz";
 
 export interface OutputProfile {
   /** Stable id — referenced by `studio_projects.timeline_spec.outputProfile`
@@ -343,6 +385,116 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: true,
     fileExt: ".mp4",
   },
+
+  // ─── Game ──────────────────────────────────────────────────────────────────
+  // Container/codec fields don't map onto game outputs — they're runtime
+  // bundles, not media files. We still expose them via the same
+  // `OutputProfile` shape so the save-menu and publish surfaces don't
+  // need a per-kind branch; videoCodec/audioCodec stay null and the
+  // container carries the bundle format. The render facade reads the
+  // `id` to dispatch to the game-export pipeline once it ships.
+  {
+    id: "game-html5-bundle",
+    label: "HTML5 bundle (ZIP)",
+    hint: "Self-contained · drop on any web host",
+    mediaKind: "game",
+    container: "html5-bundle",
+    mime: "application/zip",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".zip",
+  },
+  {
+    id: "game-itch-zip",
+    label: "itch.io ZIP",
+    hint: "Pre-formatted for itch.io HTML5 upload",
+    mediaKind: "game",
+    container: "html5-bundle",
+    mime: "application/zip",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".zip",
+  },
+  {
+    id: "game-web-embed",
+    label: "Web embed (iframe URL)",
+    hint: "Hosted on hired.video · embeddable anywhere",
+    mediaKind: "game",
+    container: "web-embed",
+    mime: "text/html",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: "",
+  },
+
+  // ─── Comic ─────────────────────────────────────────────────────────────────
+  // Comics render as a sequence of pages of panels. The static exports
+  // are the canonical artefacts (PNG strip / PDF / CBZ); motion-comic
+  // exports reuse the animation containers (MP4 / GIF / WebP) since the
+  // page-reveal pipeline is structurally an animation.
+  {
+    id: "comic-png-strip",
+    label: "PNG strip",
+    hint: "Tall vertical · social-ready · scrollable",
+    mediaKind: "comic",
+    container: "png-strip",
+    mime: "image/png",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".png",
+  },
+  {
+    id: "comic-pdf",
+    label: "PDF (paginated)",
+    hint: "One page per comic page · printable",
+    mediaKind: "comic",
+    container: "pdf",
+    mime: "application/pdf",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".pdf",
+  },
+  {
+    id: "comic-cbz",
+    label: "CBZ archive",
+    hint: "Comic-reader format · Pro",
+    mediaKind: "comic",
+    container: "cbz",
+    mime: "application/vnd.comicbook+zip",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: true,
+    fileExt: ".cbz",
+  },
+  {
+    id: "comic-motion-mp4",
+    label: "Motion comic (MP4)",
+    hint: "Panel reveals + narration · share on socials",
+    mediaKind: "comic",
+    container: "mp4",
+    mime: "video/mp4",
+    videoCodec: "h264",
+    audioCodec: "aac",
+    proOnly: false,
+    fileExt: ".mp4",
+  },
+  {
+    id: "comic-motion-gif",
+    label: "Motion comic (GIF)",
+    hint: "Looping reveal · no audio · universal",
+    mediaKind: "comic",
+    container: "gif",
+    mime: "image/gif",
+    videoCodec: "gif",
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".gif",
+  },
 ];
 
 /** Every profile registered for a given mediaKind, in declaration order. */
@@ -392,7 +544,15 @@ export type PublishDestinationId =
   // Animation
   | "giphy"
   | "tenor"
-  | "r2-host";
+  | "r2-host"
+  // Game
+  | "itch-io"
+  | "github-pages"
+  | "game-web-embed"
+  // Comic
+  | "comic-reader"
+  | "webtoon-feed"
+  | "tapas-feed";
 
 export interface PublishDestination {
   id: PublishDestinationId;
@@ -409,7 +569,7 @@ export const PUBLISH_DESTINATIONS: PublishDestination[] = [
   // Video — the existing surfaces.
   { id: "youtube",              label: "YouTube",                 mediaKinds: ["video", "podcast"], requiresRender: true  },
   { id: "linkedin",             label: "LinkedIn",                mediaKinds: ["video", "podcast"], requiresRender: true  },
-  { id: "profile",              label: "Profile",                 mediaKinds: ["video", "podcast", "voice", "animation"], requiresRender: false },
+  { id: "profile",              label: "Profile",                 mediaKinds: ["video", "podcast", "voice", "animation", "comic"], requiresRender: false },
   // Podcast.
   { id: "rss",                  label: "RSS feed",                mediaKinds: ["podcast"],          requiresRender: true  },
   { id: "apple-podcasts",       label: "Apple Podcasts Connect",  mediaKinds: ["podcast"],          requiresRender: true  },
@@ -421,6 +581,18 @@ export const PUBLISH_DESTINATIONS: PublishDestination[] = [
   { id: "giphy",                label: "Giphy",                   mediaKinds: ["animation"],        requiresRender: true  },
   { id: "tenor",                label: "Tenor",                   mediaKinds: ["animation"],        requiresRender: true  },
   { id: "r2-host",              label: "Hosted CDN link",         mediaKinds: ["animation"],        requiresRender: true  },
+  // Game.
+  { id: "itch-io",              label: "itch.io",                 mediaKinds: ["game"],             requiresRender: true  },
+  { id: "github-pages",         label: "GitHub Pages",            mediaKinds: ["game"],             requiresRender: true  },
+  { id: "game-web-embed",       label: "Embed on hired.video",    mediaKinds: ["game"],             requiresRender: true  },
+  // Comic — `comic-reader` hosts a scrollable reader on hired.video and
+  // is the no-render-required default (the live canvas IS the reader).
+  // The Webtoon / Tapas rows ride the same publish pipeline as the
+  // social-share surfaces; the editor maps each id to its destination
+  // adapter at the call site.
+  { id: "comic-reader",         label: "Hired.video reader",      mediaKinds: ["comic"],            requiresRender: false },
+  { id: "webtoon-feed",         label: "Webtoon (manual upload)", mediaKinds: ["comic"],            requiresRender: true  },
+  { id: "tapas-feed",           label: "Tapas (manual upload)",   mediaKinds: ["comic"],            requiresRender: true  },
 ];
 
 export function publishDestinationsFor(kind: MediaKind): PublishDestination[] {
@@ -446,5 +618,7 @@ export const MEDIA_KIND_UI: Record<MediaKind, MediaKindUiHints> = {
   video:     { exportVerb: "Export video",   badgeLabel: "Video",     shortLabel: "V" },
   podcast:   { exportVerb: "Export episode", badgeLabel: "Podcast",   shortLabel: "P" },
   voice:     { exportVerb: "Export audio",   badgeLabel: "Voice",     shortLabel: "A" },
-  animation: { exportVerb: "Export loop",    badgeLabel: "Animation", shortLabel: "G" },
+  animation: { exportVerb: "Export loop",    badgeLabel: "Animation", shortLabel: "L" },
+  game:      { exportVerb: "Export game",    badgeLabel: "Game",      shortLabel: "G" },
+  comic:     { exportVerb: "Export comic",   badgeLabel: "Comic",     shortLabel: "C" },
 };

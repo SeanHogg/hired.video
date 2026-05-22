@@ -240,6 +240,12 @@ export const StudioProjectSchema = z.object({
   // validated client-side by callers that consume it (the NLE canvas);
   // server stores verbatim. See shared/timeline.ts.
   timelineSpec: z.unknown().nullish(),
+  // Game runtime state for mediaKind='game' projects (#927). Parallel
+  // to `timelineSpec` — each canvas runtime owns its own JSONB column
+  // per the canvas-runtime extensibility model (PRD §1.2). Validated
+  // client-side by `<GameStage>`; server stores verbatim. See
+  // shared/game-state.ts.
+  gameState: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
@@ -573,6 +579,11 @@ export const studioService = {
        *  callers are unaffected. */
       mediaKind?: MediaKind;
       timelineSpec?: unknown;
+      /** Game runtime state for mediaKind='game' projects (#927). Sent
+       *  by `<GameStage>` on save; mutually exclusive in practice with
+       *  `timelineSpec` (each canvas runtime writes to its own JSONB
+       *  column). See `shared/game-state.ts`. */
+      gameState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -593,6 +604,7 @@ export const studioService = {
       ...(args.kind ? { kind: args.kind } : {}),
       ...(args.mediaKind ? { mediaKind: args.mediaKind } : {}),
       ...(args.timelineSpec !== undefined ? { timelineSpec: args.timelineSpec } : {}),
+      ...(args.gameState !== undefined ? { gameState: args.gameState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),

@@ -144,6 +144,17 @@ export const studioProjects = pgTable("studio_projects", {
   // shared/timeline.ts for the shape and isRenderable() for the
   // precondition the render facade asserts.
   timelineSpec: jsonb("timeline_spec"),
+  // Game state JSON for mediaKind='game' projects. Parallel to
+  // `timelineSpec` — each canvas runtime owns its own state column
+  // per the canvas-runtime extensibility model in PRD §1.2. Null for
+  // non-game projects (Timeline runtime uses `timelineSpec`). See
+  // `shared/game-state.ts` for the shape. Migration 0101 / #927.
+  gameState: jsonb("game_state"),
+  // Comic state JSON for mediaKind='comic' projects. Same parallel-
+  // column pattern as `gameState`; the comic runtime shape lands in a
+  // future `shared/comic-state.ts` alongside its canvas implementation
+  // (#929). Migration 0101 / #929.
+  comicState: jsonb("comic_state"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   // Project-level visibility. After the Save/Publish split (#665) the

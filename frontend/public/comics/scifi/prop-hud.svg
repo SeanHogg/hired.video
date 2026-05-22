@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <g stroke="#22d3ee" stroke-width="3" fill="none" opacity="0.9">
+    <circle cx="100" cy="100" r="80"/>
+    <circle cx="100" cy="100" r="60"/>
+    <line x1="20" y1="100" x2="40" y2="100"/>
+    <line x1="160" y1="100" x2="180" y2="100"/>
+    <line x1="100" y1="20" x2="100" y2="40"/>
+    <line x1="100" y1="160" x2="100" y2="180"/>
+  </g>
+  <circle cx="100" cy="100" r="6" fill="#fde047"/>
+
+</svg>

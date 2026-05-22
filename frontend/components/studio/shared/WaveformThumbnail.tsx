@@ -27,12 +27,17 @@ interface WaveformThumbnailProps {
 }
 
 const KIND_PALETTE: Record<MediaKind, { bg: string; bar: string; label: string }> = {
-  // Video should never reach this component (the canvas thumbnail wins),
-  // but we still define a palette so a typecheck of the table stays exhaustive.
+  // Kinds that produce visible frames (video / animation / game / comic)
+  // should never reach this component — their thumbnail surfaces have
+  // their own kind-aware renderers in `VideoProjectThumbnail`. We still
+  // define a palette so the Record<MediaKind,…> stays exhaustive and
+  // typecheck doesn't break when new kinds land.
   video:     { bg: "from-slate-800 to-slate-900",       bar: "#94a3b8", label: "#cbd5e1" },
   podcast:   { bg: "from-violet-900 to-slate-900",      bar: "#a78bfa", label: "#ddd6fe" },
   voice:     { bg: "from-amber-700/40 to-slate-900",    bar: "#fbbf24", label: "#fde68a" },
   animation: { bg: "from-emerald-700/40 to-slate-900",  bar: "#34d399", label: "#a7f3d0" },
+  game:      { bg: "from-fuchsia-700/40 to-slate-900",  bar: "#e879f9", label: "#f5d0fe" },
+  comic:     { bg: "from-sky-700/40 to-slate-900",      bar: "#38bdf8", label: "#bae6fd" },
 };
 
 const BAR_COUNT = 56;

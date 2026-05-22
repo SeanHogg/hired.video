@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <g fill="#dc2626" opacity="0.85">
+    <ellipse cx="60"  cy="120" rx="36" ry="20"/>
+    <ellipse cx="110" cy="100" rx="50" ry="28"/>
+    <ellipse cx="160" cy="130" rx="32" ry="18"/>
+    <ellipse cx="100" cy="160" rx="60" ry="14"/>
+  </g>
+
+</svg>

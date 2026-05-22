@@ -54,6 +54,14 @@ function widgetToText(widget: Widget): string {
       // the entity kind label — useful for ATS readers who want to
       // know "Resume embedded here".
       return `[${p.data.entityKind} embedded]`;
+    case "speech-bubble":
+    case "caption-box":
+    case "sfx-burst":
+      // Comic dialogue + caption + SFX text — extract the spoken /
+      // narrated string so the AI rewriter can act on the comic the
+      // same way it acts on any other widget's text. SFX bursts are
+      // short ("POW!") but still count as authored content.
+      return p.data.text.trim();
     case "image":
     case "video":
     case "shape-rect":

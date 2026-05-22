@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <g fill="#f43f5e">
+    <path d="M 50,80 Q 50,60 70,60 Q 90,60 90,80 Q 90,100 70,120 Q 50,100 50,80 Z" transform="rotate(-12 70 90)"/>
+    <path d="M 110,40 Q 110,20 130,20 Q 150,20 150,40 Q 150,60 130,80 Q 110,60 110,40 Z"/>
+    <path d="M 60,150 Q 60,130 80,130 Q 100,130 100,150 Q 100,170 80,190 Q 60,170 60,150 Z"/>
+    <path d="M 130,140 Q 130,120 150,120 Q 170,120 170,140 Q 170,160 150,180 Q 130,160 130,140 Z" transform="rotate(20 150 150)"/>
+  </g>
+
+</svg>

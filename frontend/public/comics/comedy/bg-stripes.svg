@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#ecfeff"/>
+  <polygon points="-60,0 -20,0 -260,450 -300,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="0,0 40,0 -200,450 -240,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="60,0 100,0 -140,450 -180,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="120,0 160,0 -80,450 -120,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="180,0 220,0 -20,450 -60,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="240,0 280,0 40,450 0,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="300,0 340,0 100,450 60,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="360,0 400,0 160,450 120,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="420,0 460,0 220,450 180,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="480,0 520,0 280,450 240,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="540,0 580,0 340,450 300,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="600,0 640,0 400,450 360,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="660,0 700,0 460,450 420,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="720,0 760,0 520,450 480,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="780,0 820,0 580,450 540,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="840,0 880,0 640,450 600,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="900,0 940,0 700,450 660,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="960,0 1000,0 760,450 720,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="1020,0 1060,0 820,450 780,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="1080,0 1120,0 880,450 840,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="1140,0 1180,0 940,450 900,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="1200,0 1240,0 1000,450 960,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="1260,0 1300,0 1060,450 1020,450" fill="#a855f7" opacity="0.55"/>
+  <polygon points="1320,0 1360,0 1120,450 1080,450" fill="#f97316" opacity="0.85"/>
+  <polygon points="1380,0 1420,0 1180,450 1140,450" fill="#a855f7" opacity="0.55"/>
+
+</svg>

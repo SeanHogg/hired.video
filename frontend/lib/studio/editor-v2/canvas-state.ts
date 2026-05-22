@@ -37,7 +37,14 @@ export type WidgetKind =
   | "webcam"
   | "chips"
   | "cta"
-  | "linked-content";
+  | "linked-content"
+  // Comic-native widgets (mediaKind === "comic"). They're available to
+  // every kind in principle (a video can drop a speech bubble on a
+  // talking head), but the picker surfaces them only when the active
+  // project is a comic so the palette doesn't bloat for the video flow.
+  | "speech-bubble"
+  | "caption-box"
+  | "sfx-burst";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -250,6 +257,80 @@ export interface LinkedContentWidgetParams {
   ctaFontFamily?: string;
 }
 
+/** Speech-bubble widget — the dialogue / thought balloon. The bubble
+ *  body is rendered by both the DOM stage and the (future) canvas-2D
+ *  applier from a single `shape` enum so the editor preview and the
+ *  exported pixels can't drift. `tail` carries the pointer direction
+ *  and anchor — at render time the tail draws as a small triangle out
+ *  of the bubble toward the anchor point. Anchor coordinates are
+ *  fractional within the canvas (same convention as `WidgetPosition`),
+ *  not relative to the bubble — so dragging the speaker doesn't break
+ *  the tail. */
+export interface SpeechBubbleWidgetParams {
+  text: string;
+  fontPx: number;
+  fontFamily?: string;
+  color: string;
+  /** Bubble fill colour. */
+  bgColor: string;
+  /** Bubble border colour — the comic "ink". */
+  strokeColor: string;
+  /** Bubble border width in canvas pixels. */
+  strokeWidth: number;
+  /** "speech": rounded ovoid with a triangular tail (dialogue).
+   *  "thought": cloud-shaped with circle puffs trailing to the speaker.
+   *  "shout": jagged starburst (yelling).
+   *  "whisper": dashed outline (whisper). */
+  shape: "speech" | "thought" | "shout" | "whisper";
+  /** Pointer tail. Null = no tail (a free-floating caption-style
+   *  balloon, useful for narration set above a panel). */
+  tail: {
+    /** Fractional canvas coordinates of the tail tip — usually the
+     *  speaker's mouth. Stored as a separate point so the bubble can
+     *  move without losing its anchor. */
+    anchorX: number;
+    anchorY: number;
+  } | null;
+}
+
+/** Caption box widget — the rectangular narration block at the top or
+ *  bottom of a panel ("Meanwhile, across town…"). Distinct from a
+ *  speech-bubble so the picker can surface it as a separate primitive
+ *  and the scaffolder can place it deterministically (top vs bottom of
+ *  the panel) without authoring a bubble shape. */
+export interface CaptionBoxWidgetParams {
+  text: string;
+  fontPx: number;
+  fontFamily?: string;
+  color: string;
+  bgColor: string;
+  strokeColor: string;
+  strokeWidth: number;
+  /** Italic narration vs straight caption — affects the body font
+   *  style only; everything else is shared. */
+  italic: boolean;
+}
+
+/** Sound-effect widget — the chunky "POW!" / "BAM!" / "DOKI" type that
+ *  reads as part of the comic art, not as dialogue. Renders as text
+ *  inside a starburst or jagged-outline shape. */
+export interface SfxBurstWidgetParams {
+  text: string;
+  fontPx: number;
+  fontFamily?: string;
+  /** Text fill colour. */
+  color: string;
+  /** Burst fill colour. */
+  bgColor: string;
+  /** Burst stroke (the heavy outline). */
+  strokeColor: string;
+  strokeWidth: number;
+  /** Burst silhouette. "star": classic 12-point star.
+   *  "jagged": jagged irregular polygon. "circle-jagged": rounded
+   *  bumpy circle (impact). "lightning": lightning-bolt outline. */
+  shape: "star" | "jagged" | "circle-jagged" | "lightning";
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -260,7 +341,10 @@ export type WidgetParams =
   | { kind: "webcam"; data: WebcamWidgetParams }
   | { kind: "chips"; data: ChipsWidgetParams }
   | { kind: "cta"; data: CtaWidgetParams }
-  | { kind: "linked-content"; data: LinkedContentWidgetParams };
+  | { kind: "linked-content"; data: LinkedContentWidgetParams }
+  | { kind: "speech-bubble"; data: SpeechBubbleWidgetParams }
+  | { kind: "caption-box"; data: CaptionBoxWidgetParams }
+  | { kind: "sfx-burst"; data: SfxBurstWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /
@@ -709,6 +793,73 @@ export function defaultWidget(kind: WidgetKind): Widget {
       };
     case "linked-content":
       return makeLinkedContentWidget({ entityKind: "resume", entityId: "" });
+    case "speech-bubble":
+      return {
+        id,
+        kind,
+        position: { x: 0.55, y: 0.1, width: 0.4, height: 0.22, z: 5, rotation: 0 },
+        params: {
+          kind: "speech-bubble",
+          data: {
+            text: "I knew this case would catch up with me.",
+            fontPx: 22,
+            color: "#0a0a0a",
+            bgColor: "#ffffff",
+            strokeColor: "#0a0a0a",
+            strokeWidth: 3,
+            shape: "speech",
+            // Default anchor sits below the bubble pointing down-left
+            // at a typical character spot. The user drags the dot in
+            // the inspector to retarget.
+            tail: { anchorX: 0.4, anchorY: 0.55 },
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "caption-box":
+      return {
+        id,
+        kind,
+        position: { x: 0.05, y: 0.05, width: 0.9, height: 0.1, z: 4, rotation: 0 },
+        params: {
+          kind: "caption-box",
+          data: {
+            text: "MEANWHILE, ACROSS TOWN…",
+            fontPx: 18,
+            color: "#1c1917",
+            bgColor: "#fef3c7",
+            strokeColor: "#1c1917",
+            strokeWidth: 2,
+            italic: false,
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "sfx-burst":
+      return {
+        id,
+        kind,
+        position: { x: 0.35, y: 0.3, width: 0.25, height: 0.25, z: 6, rotation: -12 },
+        params: {
+          kind: "sfx-burst",
+          data: {
+            text: "POW!",
+            fontPx: 48,
+            color: "#0a0a0a",
+            bgColor: "#facc15",
+            strokeColor: "#0a0a0a",
+            strokeWidth: 4,
+            shape: "star",
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
   }
 }
 

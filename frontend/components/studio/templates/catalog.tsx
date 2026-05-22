@@ -10,19 +10,23 @@
 import {
   AudioWaveform,
   BarChart3,
+  BookOpen,
   Briefcase,
+  Brain,
   Building2,
   Clapperboard,
   Code2,
   FileText,
   Film,
   FilePlus2,
+  Gamepad2,
   Headphones,
   Mic2,
   Megaphone,
   Monitor,
   Palette,
   Podcast,
+  Rabbit,
   ScrollText,
   Sparkles,
   Star,
@@ -46,6 +50,8 @@ import JobAdIntake from "./intake/JobAdIntake";
 import CompanyPromoIntake from "./intake/CompanyPromoIntake";
 import SizzleReelIntake from "./intake/SizzleReelIntake";
 import ToolPromoIntake from "./intake/ToolPromoIntake";
+import ComicIntake from "./intake/ComicIntake";
+import { COMIC_GENRES, type ComicGenre } from "@shared/comic-genres";
 import type { Audience } from "./audiences";
 
 // ─── Public types ────────────────────────────────────────────────────────────
@@ -74,20 +80,49 @@ export type ContentTemplate =
   | "voice_audition_reel"
   | "voice_ivr_prompt"
   | "voice_audiobook_chapter"
-  | "product_promo";
+  | "product_promo"
+  | "endless_runner"
+  | "quiz_game"
+  | "memory_match"
+  // ─── Comic genres (#894 / mediaKind === "comic") ──────────────────────
+  // One template per genre — every genre ships its own palette + stock
+  // SVG pack + AI tone-shaping prompt. All share the single ComicIntake
+  // form (per `feedback_extract_on_duplication`); the wizard picks the
+  // active genre via `state.comicGenreId` which the card click sets.
+  | "comic_hero"
+  | "comic_noir"
+  | "comic_scifi"
+  | "comic_fantasy"
+  | "comic_romance"
+  | "comic_slice"
+  | "comic_manga"
+  | "comic_horror"
+  | "comic_comedy"
+  | "comic_retro80s"
+  | "comic_webtoon"
+  | "comic_adventure";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
  *  "film" pill clusters Director / Actor surfaces (self-tapes, monologues,
  *  showreels, director pitches, casting calls) so the demographic finds
  *  its templates in one place. */
-export type TemplateCategory = "promote" | "showcase" | "hiring" | "quick" | "film";
+export type TemplateCategory =
+  | "promote"
+  | "showcase"
+  | "hiring"
+  | "quick"
+  | "film"
+  | "comic";
 
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: "promote", label: "Promote Yourself" },
   { id: "showcase", label: "Showcase Work" },
   { id: "hiring", label: "Hiring" },
   { id: "film", label: "Film & Acting" },
+  // Comic mediaKind (#894). Twelve genre templates live in this bucket so
+  // the landing page can surface the whole comic shelf with one click.
+  { id: "comic", label: "Comics" },
   { id: "quick", label: "Quick" },
 ];
 
@@ -601,6 +636,61 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultPrompt:
       "Create a 30-second promotional video: open with the problem your customer has, show the product / service in use, list one or two key benefits with proof, then end with a clear call to action (offer + deadline + where to act).",
     firstTabLabel: "Promo",
+    IntakeForm: BasicIntake,
+  },
+  // ─── Game templates (#927 / Phase 1 — runtime is placeholder) ─────────
+  // `mediaKind: "game"` routes the editor's `<CanvasRouter>` to mount
+  // `<GameStage>` instead of `<CanvasStage>`. Seeds live in
+  // `lib/studio/game/game-seeds.ts` (parallel to `template-seeds.ts`
+  // for Timeline kinds). All three reuse `BasicIntake` for the prose
+  // prompt; a game-specific intake (sprite picker + behavior chips)
+  // lands with the Phaser integration in a follow-on pass.
+  {
+    id: "endless_runner",
+    label: "Endless runner",
+    desc: "Side-scrolling jump-and-dodge game — your sprite, your obstacles, your music.",
+    icon: Rabbit,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "game",
+    audiences: ["creator", "developer", "designer"],
+    defaultName: "Endless runner",
+    defaultPrompt:
+      "Design an endless runner game: a player sprite that jumps, scrolling ground, three obstacle types, score counter, and a game-over screen with restart. Pick a music bed; the engine spawns obstacles on the beat.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "quiz_game",
+    label: "Quiz game",
+    desc: "Multiple-choice trivia — title screen, questions, scoring, leaderboard.",
+    icon: Brain,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "game",
+    audiences: ["creator", "educator", "employer", "recruiter"],
+    defaultName: "Quiz game",
+    defaultPrompt:
+      "Build a multiple-choice quiz game: title screen, 10 questions with 4 answer options each, instant feedback per answer, running score, and a final screen with shareable result. Pick a topic; we seed example questions.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "memory_match",
+    label: "Memory match",
+    desc: "Card-matching memory game — flip pairs, beat the clock, share your time.",
+    icon: Gamepad2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "quick",
+    mediaKind: "game",
+    audiences: ["creator", "educator", "designer"],
+    defaultName: "Memory match",
+    defaultPrompt:
+      "Build a memory-match card game: 4×4 grid of cards, flip two at a time, match pairs to clear them, timer + move counter, win screen with the player's stats. Pick the card-face artwork or upload your own.",
+    firstTabLabel: "Setup",
     IntakeForm: BasicIntake,
   },
 ];

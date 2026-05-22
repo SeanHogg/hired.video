@@ -1246,6 +1246,13 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   chips: [LAYOUT_SECTION, CHIPS_CONTENT_SECTION, ...SHARED_TAIL],
   cta: [LAYOUT_SECTION, CTA_CONTENT_SECTION, ...SHARED_TAIL],
   "linked-content": [LAYOUT_SECTION, LINKED_CONTENT_SECTION, ...SHARED_TAIL],
+  // Comic widget primitives (#929) — share the generic layout +
+  // tail sections until kind-specific inspector sections land with
+  // the comic runtime build-out. Text + colour + position are all the
+  // user can usefully edit pre-runtime.
+  "speech-bubble": [LAYOUT_SECTION, ...SHARED_TAIL],
+  "caption-box":   [LAYOUT_SECTION, ...SHARED_TAIL],
+  "sfx-burst":     [LAYOUT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -1265,4 +1272,7 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   chips: "Chips",
   cta: "CTA card",
   "linked-content": "Linked content",
+  "speech-bubble": "Speech bubble",
+  "caption-box": "Caption box",
+  "sfx-burst": "SFX burst",
 };

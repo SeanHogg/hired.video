@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+
+  <ellipse cx="220" cy="120" rx="44" ry="48" fill="#1c1917"/>
+  <path d="M 150,180 L 280,180 L 310,360 L 130,360 Z" fill="#b45309"/>
+  <path d="M 130,360 L 80,520 L 110,540 L 180,380 Z" fill="#1c1917"/>
+  <path d="M 280,360 L 340,500 L 310,520 L 250,380 Z" fill="#1c1917"/>
+  <path d="M 150,200 L 70,280 L 90,300 L 170,240 Z" fill="#1c1917"/>
+  <path d="M 280,200 L 360,260 L 340,280 L 260,240 Z" fill="#1c1917"/>
+
+</svg>

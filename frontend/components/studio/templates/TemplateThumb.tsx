@@ -472,6 +472,96 @@ function renderThumb(id: ContentTemplate) {
           </div>
         </div>
       );
+
+    // ─── Game templates (#927) ────────────────────────────────────────────
+    case "endless_runner":
+      // Side-scrolling parallax with a player sprite hop + ground tiles +
+      // obstacle silhouette. Reads as "platformer game".
+      return (
+        <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-sky-400 to-sky-600">
+          {/* Mountain silhouette */}
+          <svg className="absolute inset-x-0 bottom-6 h-8 w-full" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+            <polygon points="0,30 20,8 35,18 55,4 75,16 100,6 100,30" fill="#475569" opacity="0.7" />
+          </svg>
+          {/* Ground */}
+          <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-b from-emerald-600 to-emerald-800" />
+          {/* Player sprite — a happy box with eyes */}
+          <div className="absolute bottom-6 left-4 h-5 w-5 rounded-sm bg-amber-300 ring-1 ring-amber-900">
+            <div className="absolute left-1 top-1 h-1 w-1 rounded-full bg-amber-950" />
+            <div className="absolute right-1 top-1 h-1 w-1 rounded-full bg-amber-950" />
+          </div>
+          {/* Obstacle */}
+          <div className="absolute bottom-6 right-8 h-4 w-2 rounded-t-sm bg-rose-700" />
+          <div className="absolute bottom-1 left-2 text-[7px] font-bold tracking-widest text-white">
+            ENDLESS RUNNER
+          </div>
+          <div className="absolute right-2 top-2 rounded-sm bg-black/40 px-1.5 py-0.5 text-[7px] font-bold text-white">
+            SCORE 0
+          </div>
+        </div>
+      );
+
+    case "quiz_game":
+      // Question card + 4 answer buttons grid.
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-slate-900 p-2 text-white">
+          <div className="text-[6px] tracking-widest text-indigo-300">QUIZ · QUESTION 1 / 10</div>
+          <div className="mt-1 rounded-sm bg-white/10 px-2 py-1.5 text-[9px] font-bold leading-tight">
+            Which planet has the most moons?
+          </div>
+          <div className="mt-1.5 grid grid-cols-2 gap-1">
+            {[
+              { label: "A Jupiter", correct: false },
+              { label: "B Saturn",  correct: true  },
+              { label: "C Mars",    correct: false },
+              { label: "D Venus",   correct: false },
+            ].map((opt) => (
+              <div
+                key={opt.label}
+                className={cn(
+                  "rounded-sm px-1 py-1 text-[7px] font-semibold",
+                  opt.correct ? "bg-emerald-500/30" : "bg-white/10",
+                )}
+              >
+                {opt.label}
+              </div>
+            ))}
+          </div>
+          <div className="absolute bottom-1 right-1 rounded-full bg-indigo-400 px-1.5 py-0.5 text-[7px] font-bold text-indigo-950">
+            ★ 0
+          </div>
+        </div>
+      );
+
+    case "memory_match":
+      // 4×4 grid of card backs with one flipped pair revealed.
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 to-emerald-950 p-2 text-emerald-50">
+          <div className="text-[6px] tracking-widest text-emerald-300">MEMORY MATCH · 00:32</div>
+          <div className="mt-1.5 grid grid-cols-4 gap-0.5">
+            {Array.from({ length: 16 }).map((_, i) => {
+              // Reveal one pair (cards 5 + 10) as a teaser.
+              const isFlipped = i === 5 || i === 10;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex aspect-square items-center justify-center rounded-sm text-[8px] font-bold",
+                    isFlipped
+                      ? "bg-amber-300 text-emerald-950"
+                      : "bg-emerald-600 ring-1 ring-emerald-400/40",
+                  )}
+                >
+                  {isFlipped ? "★" : ""}
+                </div>
+              );
+            })}
+          </div>
+          <div className="absolute bottom-1 right-1 rounded-full bg-emerald-400 px-1.5 py-0.5 text-[7px] font-bold text-emerald-950">
+            8 MOVES
+          </div>
+        </div>
+      );
   }
 }
 

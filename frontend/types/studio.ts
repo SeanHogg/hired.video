@@ -57,6 +57,29 @@ export interface StudioProjectState {
    *  the storyboard endpoint replaces the script's colour palette + font +
    *  logo with the kit's values. Null = no kit selected (default). */
   brandKitId?: string | null;
+
+  // ─── Comic-specific intake (mediaKind === "comic") ────────────────────
+  // Only populated when the active template is one of the comic genres.
+  // Other templates leave them undefined and the AI scaffolder ignores
+  // them. Stored on `StudioProjectState` rather than a parallel comic-
+  // state slice so the existing save / load / dirty-tracking pipeline
+  // carries them for free.
+  /** Selected genre id (`hero`, `noir`, `scifi`, …). Single source of
+   *  truth read by `ComicIntake`, the catalog's per-template seed
+   *  picker, and the `/api/studio/generate-comic` route. */
+  comicGenreId?: import("@shared/comic-genres").ComicGenreId;
+  /** The protagonist's display name. Defaults to the user's first name
+   *  on load if blank. */
+  comicProtagonistName?: string;
+  /** Which source artefact powers the scaffolder: the user's resume,
+   *  their profile bio + services, or just the free-form prompt.
+   *  `auto` = "use whichever is richest" — the scaffolder picks. */
+  comicSourceKind?: "resume" | "profile" | "services" | "auto";
+  /** When set, the scaffolder calls `/api/studio/generate-image` once
+   *  to produce a protagonist headshot, then uses it as the character
+   *  image on every page. Off by default (free SVG silhouettes); on
+   *  trades tokens for a personalised hero portrait. */
+  comicGenerateCharacterPortrait?: boolean;
 }
 
 export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemplate" | "compiledVideo" | "videoBlob" | "videoUrl" | "thumbnailUrl" | "projectId" | "youtubeVideoId"> = {

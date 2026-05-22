@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice">
+
+  <rect width="800" height="450" fill="#0a0a0a"/>
+  <ellipse cx="180" cy="380" rx="240" ry="80" fill="#fafafa" opacity="0.18"/>
+  <ellipse cx="500" cy="320" rx="280" ry="60" fill="#fafafa" opacity="0.22"/>
+  <ellipse cx="650" cy="400" rx="200" ry="80" fill="#fafafa" opacity="0.16"/>
+  <ellipse cx="300" cy="250" rx="200" ry="50" fill="#fafafa" opacity="0.12"/>
+
+</svg>

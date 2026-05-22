@@ -555,6 +555,59 @@ function widgetToEffect(widget: Widget): ClipEffect {
             : {}),
         },
       };
+    case "speech-bubble":
+      // The canvas-2D applier for `canvas-v2:speech-bubble` ships with
+      // the static-comic strip exporter (gap #944 — comic export
+      // pipeline). Until it lands, motion-comic exports render the
+      // bubble as a no-op rect in the encoded MP4 / GIF but the data
+      // round-trips through save / re-open without loss.
+      return {
+        kind: "canvas-v2:speech-bubble",
+        params: {
+          ...rect,
+          text: p.data.text,
+          fontPx: p.data.fontPx,
+          fontFamily: p.data.fontFamily ?? "",
+          color: p.data.color,
+          bgColor: p.data.bgColor,
+          strokeColor: p.data.strokeColor,
+          strokeWidth: p.data.strokeWidth,
+          shape: p.data.shape,
+          ...(p.data.tail
+            ? { tailAnchorX: p.data.tail.anchorX, tailAnchorY: p.data.tail.anchorY }
+            : {}),
+        },
+      };
+    case "caption-box":
+      return {
+        kind: "canvas-v2:caption-box",
+        params: {
+          ...rect,
+          text: p.data.text,
+          fontPx: p.data.fontPx,
+          fontFamily: p.data.fontFamily ?? "",
+          color: p.data.color,
+          bgColor: p.data.bgColor,
+          strokeColor: p.data.strokeColor,
+          strokeWidth: p.data.strokeWidth,
+          italic: p.data.italic,
+        },
+      };
+    case "sfx-burst":
+      return {
+        kind: "canvas-v2:sfx-burst",
+        params: {
+          ...rect,
+          text: p.data.text,
+          fontPx: p.data.fontPx,
+          fontFamily: p.data.fontFamily ?? "",
+          color: p.data.color,
+          bgColor: p.data.bgColor,
+          strokeColor: p.data.strokeColor,
+          strokeWidth: p.data.strokeWidth,
+          shape: p.data.shape,
+        },
+      };
   }
 }
 

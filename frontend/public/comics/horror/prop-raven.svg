@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <ellipse cx="100" cy="120" rx="60" ry="30" fill="#e7e5e4"/>
+  <ellipse cx="130" cy="100" rx="30" ry="26" fill="#e7e5e4"/>
+  <circle cx="138" cy="96" r="4" fill="#a3e635"/>
+  <polygon points="150,100 174,96 158,108" fill="#a3e635"/>
+  <path d="M 60,110 L 40,150 L 70,140 Z" fill="#e7e5e4"/>
+  <path d="M 100,140 L 90,170 L 110,160 Z" fill="#e7e5e4"/>
+
+</svg>

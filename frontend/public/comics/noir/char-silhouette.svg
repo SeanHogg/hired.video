@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+
+  <ellipse cx="200" cy="130" rx="48" ry="50" fill="#fafafa"/>
+  <ellipse cx="200" cy="90" rx="70" ry="22" fill="#fafafa"/>
+  <rect x="160" y="84" width="80" height="22" fill="#fafafa"/>
+  <path d="M 130,190 Q 200,170 270,190 L 300,560 L 100,560 Z" fill="#fafafa"/>
+
+</svg>

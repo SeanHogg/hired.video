@@ -74,6 +74,15 @@ const DESTINATION_ICON: Record<PublishDestinationId, React.ComponentType<{ class
   giphy:                  Share2,
   tenor:                  Share2,
   "r2-host":              Share2,
+  // Game (#927) — itch.io / GitHub Pages / embed on hired.video.
+  "itch-io":              Upload,
+  "github-pages":         Upload,
+  "game-web-embed":       Share2,
+  // Comic (#929) — hired.video reader is the canonical surface;
+  // Webtoon / Tapas are platform-specific distribution channels.
+  "comic-reader":         UserCheck,
+  "webtoon-feed":         Upload,
+  "tapas-feed":           Upload,
 };
 
 type PublishHandlers = Partial<Record<PublishDestinationId, () => void>>;

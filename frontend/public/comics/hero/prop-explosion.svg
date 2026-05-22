@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid slice">
+
+  <polygon points="100,4 116,60 172,40 138,90 196,108 138,118 168,170 110,138 100,196 90,138 32,170 62,118 4,108 62,90 28,40 84,60" fill="#facc15" stroke="#1c1917" stroke-width="5"/>
+  <polygon points="100,40 110,80 144,72 122,100 150,116 116,118 130,150 100,130 90,160 84,130 60,150 78,116 50,108 80,98 56,72 90,82" fill="#dc2626"/>
+
+</svg>

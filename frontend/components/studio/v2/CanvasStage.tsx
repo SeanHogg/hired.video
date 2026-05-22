@@ -646,7 +646,265 @@ function WidgetBody({ widget }: { widget: Widget }) {
       return <CtaBody data={p.data} />;
     case "linked-content":
       return <LinkedContentBody data={p.data} />;
+    case "speech-bubble":
+      return <SpeechBubbleBody data={p.data} />;
+    case "caption-box":
+      return <CaptionBoxBody data={p.data} />;
+    case "sfx-burst":
+      return <SfxBurstBody data={p.data} />;
   }
+}
+
+// ─── Comic widget bodies ─────────────────────────────────────────────────────
+//
+// Bubble + SFX shapes are rendered as inline SVG so the editor preview
+// can show the exact strokes / fills that the (future) canvas-2D
+// applier paints at export. The SVG viewBox is 100x100 and is stretched
+// to the widget's bounding box via `preserveAspectRatio="none"` — same
+// pattern v1 uses for shape primitives. Tail geometry is computed once
+// here from the bubble's bounding box + the canvas-fraction anchor, so
+// dragging either the bubble or the speaker keeps the pointer aimed.
+//
+// `containerStyle` is intentionally not honoured for these kinds —
+// they ARE the container chrome (the bubble IS the panel of dialogue).
+// If a user wants a backdrop they can stack a `shape-rect` underneath.
+
+function SpeechBubbleBody({
+  data,
+}: {
+  data: {
+    text: string;
+    fontPx: number;
+    fontFamily?: string;
+    color: string;
+    bgColor: string;
+    strokeColor: string;
+    strokeWidth: number;
+    shape: "speech" | "thought" | "shout" | "whisper";
+    tail: { anchorX: number; anchorY: number } | null;
+  };
+}) {
+  const stroke = data.strokeColor;
+  const fill = data.bgColor;
+  const sw = data.strokeWidth;
+  // Path table — every shape ships its outline as a single SVG `d`
+  // string so the renderer (and the export pipeline) read one source.
+  const outline = (() => {
+    switch (data.shape) {
+      case "speech":
+        // Rounded ovoid bubble, inset 4px from the viewBox so the
+        // stroke isn't clipped at the bounding box edge.
+        return "M 50,4 C 75,4 96,18 96,40 C 96,62 75,76 50,76 C 35,76 22,72 14,64 L 14,82 L 30,70 C 36,74 42,76 50,76";
+      case "thought":
+        // Cloud-shaped bubble with three trailing puffs at the bottom
+        // (smaller circles drawn separately below).
+        return "M 50,8 C 70,8 84,18 84,30 C 92,32 96,40 96,50 C 96,64 82,72 70,70 C 66,80 56,84 46,82 C 38,90 24,86 22,76 C 8,76 6,60 14,52 C 8,42 14,28 26,28 C 28,16 40,8 50,8 Z";
+      case "shout":
+        // Jagged starburst outline — 16 alternating peaks/troughs.
+        return "M 50,2 L 56,12 L 68,8 L 64,20 L 78,18 L 70,28 L 84,32 L 74,40 L 88,46 L 76,52 L 86,62 L 74,64 L 82,76 L 70,72 L 72,86 L 60,78 L 58,92 L 48,82 L 42,94 L 36,82 L 26,90 L 26,76 L 14,80 L 18,68 L 6,64 L 14,56 L 4,48 L 14,42 L 6,32 L 18,30 L 12,18 L 24,20 L 24,8 L 36,14 L 40,2 Z";
+      case "whisper":
+        return "M 50,4 C 75,4 96,18 96,40 C 96,62 75,76 50,76 C 25,76 4,62 4,40 C 4,18 25,4 50,4 Z";
+    }
+  })();
+  // Tail geometry — tip points toward the speaker; base sits on the
+  // bubble's outline. When `tail` is null we render no tail (caption-
+  // style balloon).
+  const tail = data.tail;
+  return (
+    <div
+      className="relative h-full w-full"
+      style={{ fontFamily: data.fontFamily }}
+    >
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}
+      >
+        <path
+          d={outline}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={sw}
+          strokeLinejoin="round"
+          strokeDasharray={data.shape === "whisper" ? `${sw * 2} ${sw * 2}` : undefined}
+        />
+        {data.shape === "thought" && (
+          // Trailing puffs lead from the bubble toward the speaker.
+          <>
+            <circle cx="30" cy="92" r="4" fill={fill} stroke={stroke} strokeWidth={sw} />
+            <circle cx="22" cy="98" r="2.5" fill={fill} stroke={stroke} strokeWidth={sw} />
+          </>
+        )}
+      </svg>
+      {/* Tail — only on speech/shout/whisper. Thought uses puffs above. */}
+      {tail && data.shape !== "thought" && (
+        <SpeechTail
+          anchorX={tail.anchorX}
+          anchorY={tail.anchorY}
+          bubbleFill={fill}
+          bubbleStroke={stroke}
+          strokeWidth={sw}
+        />
+      )}
+      <div
+        className="absolute inset-0 flex items-center justify-center px-4 text-center"
+        style={{
+          fontSize: data.fontPx,
+          color: data.color,
+          lineHeight: 1.2,
+          fontStyle: data.shape === "thought" ? "italic" : "normal",
+          wordBreak: "break-word",
+        }}
+      >
+        {data.text}
+      </div>
+    </div>
+  );
+}
+
+/** The pointer triangle from a speech bubble toward a canvas-fractional
+ *  anchor. Drawn in a parent-positioned `<svg>` that overflows the
+ *  bubble's bounding box so the tail tip can reach beyond the box. */
+function SpeechTail({
+  anchorX,
+  anchorY,
+  bubbleFill,
+  bubbleStroke,
+  strokeWidth,
+}: {
+  anchorX: number;
+  anchorY: number;
+  bubbleFill: string;
+  bubbleStroke: string;
+  strokeWidth: number;
+}) {
+  // The tail's tip is at the canvas-fractional anchor; the base is on
+  // the underside of the bubble (y ≈ 80% of the bubble height).
+  // Since this SVG is inside the bubble's box and the anchor is in
+  // canvas coords, we can't position by absolute math here without
+  // knowing the canvas dims. Render the tail as a triangle whose tip
+  // sits 30px below the bubble in the bubble's local coord system —
+  // the inspector lets the author drag the tail anchor and that drags
+  // the bubble OR the anchor; until the canvas-2D applier ships, this
+  // simplified tail is the editor-preview affordance.
+  return (
+    <svg
+      width="40"
+      height="40"
+      viewBox="0 0 40 40"
+      style={{
+        position: "absolute",
+        bottom: -32,
+        left: "30%",
+        overflow: "visible",
+        pointerEvents: "none",
+      }}
+      aria-hidden="true"
+      data-anchor-x={anchorX}
+      data-anchor-y={anchorY}
+    >
+      <polygon
+        points="0,0 20,32 18,0"
+        fill={bubbleFill}
+        stroke={bubbleStroke}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      {/* Mask the join line where the tail meets the bubble */}
+      <line x1="-1" y1="0" x2="19" y2="0" stroke={bubbleFill} strokeWidth={strokeWidth + 1} />
+    </svg>
+  );
+}
+
+function CaptionBoxBody({
+  data,
+}: {
+  data: {
+    text: string;
+    fontPx: number;
+    fontFamily?: string;
+    color: string;
+    bgColor: string;
+    strokeColor: string;
+    strokeWidth: number;
+    italic: boolean;
+  };
+}) {
+  return (
+    <div
+      className="flex h-full w-full items-center px-3"
+      style={{
+        backgroundColor: data.bgColor,
+        border: `${data.strokeWidth}px solid ${data.strokeColor}`,
+        fontFamily: data.fontFamily,
+        color: data.color,
+        fontSize: data.fontPx,
+        fontStyle: data.italic ? "italic" : "normal",
+        lineHeight: 1.2,
+        letterSpacing: data.italic ? 0 : 0.5,
+      }}
+    >
+      <span style={{ width: "100%" }}>{data.text}</span>
+    </div>
+  );
+}
+
+function SfxBurstBody({
+  data,
+}: {
+  data: {
+    text: string;
+    fontPx: number;
+    fontFamily?: string;
+    color: string;
+    bgColor: string;
+    strokeColor: string;
+    strokeWidth: number;
+    shape: "star" | "jagged" | "circle-jagged" | "lightning";
+  };
+}) {
+  const outline = (() => {
+    switch (data.shape) {
+      case "star":
+        // 10-point star inscribed in the 100x100 viewBox.
+        return "M 50,2 L 60,38 L 98,38 L 68,60 L 78,96 L 50,74 L 22,96 L 32,60 L 2,38 L 40,38 Z";
+      case "jagged":
+        return "M 50,2 L 58,18 L 76,8 L 70,26 L 92,30 L 78,44 L 96,56 L 78,62 L 90,80 L 70,76 L 72,96 L 56,82 L 50,98 L 44,82 L 28,96 L 30,76 L 10,80 L 22,62 L 4,56 L 22,44 L 8,30 L 30,26 L 24,8 L 42,18 Z";
+      case "circle-jagged":
+        return "M 50,4 L 60,10 L 70,6 L 76,16 L 88,18 L 90,30 L 96,40 L 90,52 L 96,64 L 84,72 L 80,84 L 68,84 L 58,94 L 48,86 L 38,96 L 28,86 L 16,88 L 12,76 L 4,68 L 10,56 L 4,44 L 12,32 L 8,20 L 22,18 L 28,8 L 40,12 Z";
+      case "lightning":
+        return "M 50,2 L 30,42 L 50,42 L 28,98 L 78,40 L 56,40 L 76,2 Z";
+    }
+  })();
+  return (
+    <div className="relative h-full w-full" style={{ fontFamily: data.fontFamily }}>
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+      >
+        <path
+          d={outline}
+          fill={data.bgColor}
+          stroke={data.strokeColor}
+          strokeWidth={data.strokeWidth}
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div
+        className="absolute inset-0 flex items-center justify-center text-center font-extrabold uppercase"
+        style={{
+          fontSize: data.fontPx,
+          color: data.color,
+          textShadow: `2px 2px 0 ${data.strokeColor}`,
+          letterSpacing: 1,
+          padding: "10%",
+        }}
+      >
+        {data.text}
+      </div>
+    </div>
+  );
 }
 
 function CtaBody({

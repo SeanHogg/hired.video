@@ -27,6 +27,9 @@ import {
   MonitorUp,
   Tags,
   Megaphone,
+  MessageCircle,
+  Captions,
+  Zap,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
@@ -41,7 +44,12 @@ export interface WidgetPaletteItem {
   kind: WidgetKind;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  group: "text" | "media" | "shape" | "layout" | "data";
+  group: "text" | "media" | "shape" | "layout" | "data" | "comic";
+  /** When set, only show the tile when the active project's mediaKind
+   *  is in this list. Keeps the comic-native primitives out of the
+   *  Video palette so the surface doesn't bloat for the dominant flow.
+   *  Omitted = show everywhere. */
+  mediaKinds?: readonly string[];
 }
 
 export const WIDGET_CATALOG: WidgetPaletteItem[] = [
@@ -56,6 +64,13 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "divider", label: "Divider", icon: Minus, group: "layout" },
   { kind: "chart", label: "Chart", icon: BarChart3, group: "data" },
   { kind: "cta", label: "CTA card", icon: Megaphone, group: "layout" },
+  // Comic-native primitives — only surface in the palette when the
+  // active project is a comic. They're functional on any mediaKind (a
+  // talking-head video can drop a speech bubble) but the picker stays
+  // focused per kind to keep the surface uncluttered.
+  { kind: "speech-bubble", label: "Speech bubble", icon: MessageCircle, group: "comic", mediaKinds: ["comic"] },
+  { kind: "caption-box",   label: "Caption",       icon: Captions,       group: "comic", mediaKinds: ["comic"] },
+  { kind: "sfx-burst",     label: "SFX burst",     icon: Zap,            group: "comic", mediaKinds: ["comic"] },
 ];
 
 const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
@@ -64,6 +79,7 @@ const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
   shape: "Shapes",
   layout: "Layout",
   data: "Data",
+  comic: "Comic",
 };
 
 export interface WidgetPaletteProps {
@@ -78,14 +94,21 @@ export interface WidgetPaletteProps {
    *  and — via the canvas drop handler — to the drop case, so capture
    *  logic lives in exactly one hook. */
   onCaptureScreenshot: () => void;
+  /** Active project's mediaKind. Controls which palette groups are
+   *  visible — comic-native primitives only render when the project is
+   *  a comic. Optional for back-compat with callers that haven't been
+   *  updated yet; absent = behave as before (show every non-mediaKind-
+   *  gated tile). */
+  mediaKind?: string;
 }
 
-const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout", "data"];
+const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "comic", "layout", "data"];
 
 export default function WidgetPalette({
   onInsert,
   onInsertLinkedContent,
   onCaptureScreenshot,
+  mediaKind,
 }: WidgetPaletteProps) {
   // Same collapsible-multi-open behaviour as Design + Actions tabs so
   // all three left-rail panels feel identical. Default to all-open here
@@ -98,7 +121,17 @@ export default function WidgetPalette({
   return (
     <LeftPanelScroller>
       {GROUPS.map((group) => {
-        const items = WIDGET_CATALOG.filter((i) => i.group === group);
+        // Self-gating per the DRY rule — the palette knows which tiles
+        // belong on which mediaKind; consumers don't pass a `canShowX`
+        // boolean. A tile with no `mediaKinds` field renders for every
+        // kind; one with `mediaKinds: ["comic"]` only renders when the
+        // active project is a comic.
+        const items = WIDGET_CATALOG.filter(
+          (i) =>
+            i.group === group &&
+            (!i.mediaKinds || (mediaKind !== undefined && i.mediaKinds.includes(mediaKind))),
+        );
+        if (items.length === 0 && group !== "media") return null;
         return (
           <LeftPanelSection
             key={group}

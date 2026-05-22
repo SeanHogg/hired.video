@@ -94,7 +94,13 @@ import {
 import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { deriveKindDefaults } from "@/lib/studio/editor-v2/kind-defaults";
-import { mediaKindHasAudio, mediaKindHasVideo, type MediaKind } from "@shared/media-kinds";
+import {
+  mediaKindHasAudio,
+  mediaKindHasVideo,
+  mediaKindUsesTimelineRuntime,
+  type MediaKind,
+} from "@shared/media-kinds";
+import GameStage from "@/components/studio/game/GameStage";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -1504,6 +1510,39 @@ export default function StudioEditorV2() {
                   className="mb-3"
                 />
                 <div className="flex min-h-full min-w-min items-center justify-center">
+                  {/* Canvas-runtime dispatch (#931) — `mediaKind` selects
+                      which canvas runtime mounts. Timeline kinds (video /
+                      podcast / voice / animation / comic) use the
+                      existing `<CanvasStage>`; non-Timeline kinds mount
+                      their own runtime stage. Per the DRY rule the
+                      decision lives in ONE predicate
+                      (`mediaKindUsesTimelineRuntime`) so adding a new
+                      runtime is one entry there + one branch here.
+                      Full `<CanvasRouter>` factor-out (extracting the
+                      heavy `<CanvasStage>` prop bundle into a
+                      render-prop helper) is logged as #931 for a
+                      dedicated refactor pass. */}
+                  {!mediaKindUsesTimelineRuntime(currentMediaKind) ? (
+                    currentMediaKind === "game" ? (
+                      <GameStage
+                        gameState={
+                          (persistedProject?.gameState as
+                            | import("@shared/game-state").GameState
+                            | null
+                            | undefined) ?? null
+                        }
+                        zoom={zoom}
+                      />
+                    ) : (
+                      // comic (and future non-Timeline kinds) — their
+                      // own stages land alongside their runtime
+                      // implementations. Until then, render a
+                      // GameStage-shaped placeholder using the existing
+                      // null-state path so the user sees SOMETHING.
+                      <GameStage gameState={null} zoom={zoom} />
+                    )
+                  ) : (
+                  <>
                   {/* ONE renderer for both edit + playback: `<CanvasStage>`
                       in `mode="edit"` honours selection/drag/resize chrome,
                       in `mode="playback"` it filters widgets by the current
@@ -1588,6 +1627,8 @@ export default function StudioEditorV2() {
                     }
                     defaultFontId={state.fontFamily}
                   />
+                  </>
+                  )}
                 </div>
               </div>
               {/* Floating canvas-stage chrome — edit toolbar (left),
