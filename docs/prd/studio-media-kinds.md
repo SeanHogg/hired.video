@@ -13,18 +13,37 @@
 
 ## 0. Strategic framing
 
-The studio editor was originally built to produce one output: an MP4 video for a hired.video profile. Every layer below the Timeline JSON spec hardcodes that assumption — the codec catalog, the save menu, the publish destinations, the render facade. The product surface has since grown to want **four distinct authoring contexts** that share most of the editor primitives but diverge sharply on save / export / publish:
+The studio is a **canvas product**, not a video product. Its architectural primitive is "open a canvas runtime, give the user kind-appropriate tools, persist the work, render to a kind-appropriate output." The Timeline + CanvasState happens to be the runtime for time-based composition (video / audio / animation) — but the `mediaKind` axis is the first-class extensibility hook for ANY canvas runtime the studio grows to host.
 
-| Kind | Primary output | Primary audience | Existing reuse |
-|---|---|---|---|
-| `video` | MP4 / MOV / WebM | Job seekers, creators, recruiters | The whole current studio |
-| `podcast` | MP3 / M4A + RSS feed (optional video podcast branch) | Podcasters, educators, founders | Audio mixer, voiceover track, markers (chapters), multicam (multi-host) |
-| `voice` | MP3 / WAV (audio-only) | Voice artists, voice marketplace | Voice clone marketplace, WebGPU TTS engines |
-| `animation` | GIF / WebP / APNG / transparent MP4 | Designers, creators, marketers | Canvas, motion presets, transition catalog |
+Each kind self-describes FOUR things — the same four-tuple the user articulated as the architectural commitment:
 
-The user's request that surfaced this PRD: *"users are wanting to be able to manage a new template type for podcasts. ultimately the same structure as a user who wants to manage voice and then have voice templates. they want to create podcasts and manage audio and do overlays."*
+1. **Canvas runtime** — what editor surface mounts (Timeline + widgets for video kinds; game engine / CAD viewer / page-graph for non-linear kinds)
+2. **Actions / tools** — the toolset the canvas exposes (place widget vs place sprite vs draw dimensioned line vs add choice node)
+3. **Metadata** — what's persisted on the project row (episode # for podcast, build target for game, units + tolerances for CAD)
+4. **Save / export / publish** — the output pipeline (MP4 for video, HTML5 bundle for game, STL/STEP for CAD, EPUB3 for interactive comic)
 
-Translation: introduce a single `mediaKind` axis (not a per-kind editor fork) so the same Studio surface handles every output while the save / export / publish contexts diverge cleanly.
+The currently-shipping kinds + a sampling of kinds the architecture supports as future canvas runtimes:
+
+| Kind | Canvas runtime | Scene shape | Primary output | Status |
+|---|---|---|---|---|
+| `video` | Timeline + CanvasState widgets | N scenes = N time slices | MP4 / MOV / WebM | ✅ Shipping |
+| `podcast` | Timeline (audio-first view) | N scenes = N chapters | MP3 / M4A + RSS | ✅ Shipping (Phase 2) |
+| `voice` | Timeline (audio-only) | N scenes = N reads / sections | MP3 / WAV / Opus | ✅ Shipping (Phase 4) |
+| `animation` | Timeline (loop-aware) | N scenes = N keyframe groups | GIF / WebP / APNG / transparent MP4 | 🟡 Phase 5 |
+| **`image`** | Raster editor (canvas + layers) | **1 scene** (the workspace) | PNG / JPG / WebP / SVG | 🔵 Future canvas runtime (#932) |
+| **`game`** | Game engine surface (Phaser / Three.js) | N scenes = N levels / state-graph nodes | HTML5 bundle / itch.io ZIP / web embed | 🔵 Future canvas runtime (#927) |
+| **`cad`** | 3D viewer (Three.js / replicad) OR 2D drafting (Konva) | **1 scene** (the workspace) | STL / STEP / DXF / PDF | 🔵 Future canvas runtime (#930) |
+| **`interactive_comic`** | Page-graph editor | N scenes = N pages (branching edges between) | EPUB3 / CBR / hosted reader | 🔵 Future canvas runtime (#929) |
+| **`animated_film`** | Rig-aware editor (Spine / DragonBones) | N scenes = N shots | MP4 / MOV | 🔵 Future canvas runtime (#928) |
+| **`xr_scene`** / **`3d_model`** | A-Frame / mesh editor | varies | glTF / USDZ / OBJ / FBX | 🔵 Future canvas runtime |
+
+The user's framing that locked this in: *"Games should not be out of scope. It's a studio, it has a canvas, our type definition should load the appropriate canvas. … The type defines the actions, the metadata, etc. The publication/save/export/publish is the rendered output."* Plus the follow-on: *"The scene would be 1 scene and the center canvas would be a CAD canvas. Users also want the ability to create images like photoshop … Give them all the tools in 1 studio."*
+
+Three commitments that flow from this:
+
+1. **Scene shape rebases per runtime.** Today's "scene" semantics (one time slice) is Timeline-specific. Static-output kinds (image, CAD) degenerate to a single workspace scene. Interactive kinds use scenes as state-graph nodes. The shared shell (title / save / export / AI Assistant / Layers chrome) stays — the center swaps.
+2. **`image` is a first-class canvas kind.** Photoshop-shaped raster authoring inside the studio, not a separate product. Closes the "asset author" gap that today forces users to leave for Photoshop / Figma / Procreate.
+3. **Closed-loop asset interop.** Assets authored in ANY canvas (a generated image, a CAD part, a voice clone, a music bed) land in the user's R2 asset library and are importable into any other canvas project via the existing `MediaPicker`. "All tools in 1 studio" means the asset flow is internal — no leave-the-app trip for sourcing.
 
 ---
 
@@ -36,8 +55,8 @@ Studio projects now carry **three** axes that consumers may filter or branch on.
 
 | Axis | Field | Values | Meaning |
 |---|---|---|---|
-| Storage | `studio_projects.kind` | `'scene' \| 'nle'` | Which editor surface authored the row + which JSONB column to read (`storyboard` vs `timeline_spec`). Internal detail. |
-| Output | `studio_projects.media_kind` | `'video' \| 'podcast' \| 'voice' \| 'animation'` | What the finished project becomes. Drives the export menu, publish destinations, per-template "Exports as…" panel. |
+| Storage | `studio_projects.kind` | `'scene' \| 'nle'` | Which editor surface authored the row + which JSONB column to read (`storyboard` vs `timeline_spec`). Internal detail; future non-Timeline canvas runtimes (game, CAD, comic) will add their own values here pointing at new JSONB columns (`game_state`, `cad_state`, etc.). |
+| **Canvas / output kind** | `studio_projects.media_kind` | `'video' \| 'podcast' \| 'voice' \| 'animation'` *(today)* — extensible to `'game' \| 'cad' \| 'interactive_comic' \| 'xr_scene' \| '3d_model' \| …` | **First-class extensibility hook.** Drives FOUR things: which canvas runtime mounts in the editor, which toolset the runtime exposes, which metadata the project row carries, and which export / publish pipelines run. Single SoT every layer reads (editor, save menu, marketing landing pages, project-card badges). |
 | Purpose | `_purpose` in storyboard JSONB | `STUDIO_PURPOSES` enum | LLM prompt config for the script generator (resume / job_ad / personal_brand / etc.). |
 
 Existing axes that remain orthogonal too:
@@ -47,9 +66,9 @@ Existing axes that remain orthogonal too:
 
 **Per the standing DRY rule:** consumers self-gate by reading these fields directly. Never pass `canPublishToYouTube` or `canExportMp3` booleans through component props — the export menu calls `outputProfilesFor(mediaKind)` and the publish list calls `publishDestinationsFor(mediaKind)`. Shared components decide their own visibility.
 
-### 1.2 Why the Timeline JSON spec doesn't need to fork
+### 1.2 Canvas runtimes — Timeline is ONE of N
 
-[shared/timeline.ts](../../hired.video/shared/timeline.ts) is already media-kind-agnostic and was designed this way for the M1-M5 NLE roadmap (`project_nle_decision.md`). It carries:
+Today the studio ships exactly one canvas runtime — the Timeline + CanvasState widget composer at [shared/timeline.ts](../../hired.video/shared/timeline.ts). It hosts every currently-shipping kind because video / podcast / voice / animation all share the same time-based-composition shape:
 
 - **v1 / v2 / v3** video tracks (background / widget overlays / scene-post effects)
 - **a1 / a2** audio tracks (music + voiceover)
@@ -57,7 +76,16 @@ Existing axes that remain orthogonal too:
 - **`multicamGroups`** — multi-host video podcast comes for free
 - **`ClipEffect`** registry — `audio-eq / audio-compressor / audio-limiter` from the M2/M5 effect catalog ARE the podcast audio chain
 
-The render facade ([render.ts](../../hired.video/frontend/lib/timeline/render.ts)) already routes between WebCodecs and ffmpeg.wasm via [`pickRenderEngine`](../../hired.video/shared/timeline.ts). The new `mediaKind` axis adds a third branch (audio-only) and an output profile lookup — the facade contract stays the same: `Timeline → output Blob`.
+The render facade ([render.ts](../../hired.video/frontend/lib/timeline/render.ts)) routes between WebCodecs / ffmpeg.wasm / audio-only strategies via [`pickRenderEngine`](../../hired.video/shared/timeline.ts) — but its contract is `Timeline → output Blob`, which is Timeline-runtime-specific.
+
+**Future canvas runtimes** plug in at the SAME extensibility seam as the Timeline does today. Each runtime owns:
+
+- Its own state model (game state graph, CAD BREP, comic page-graph) — persisted to a kind-specific JSONB column on `studio_projects` parallel to today's `timeline_spec`
+- Its own editor surface (a `<GameStage/>`, `<CADStage/>`, `<ComicStage/>` component that swaps in for `<CanvasStage/>` when `mediaKind` selects it)
+- Its own render / export facade (Phaser → HTML5 bundle, Three.js → glTF / STL, page-graph → EPUB3) — alongside today's Timeline render facade
+- Its own `outputProfilesFor(kind)` + `publishDestinationsFor(kind)` entries in `@shared/media-kinds`
+
+The kind axis is the dispatch table. Nothing else needs to know whether a project is "linear Timeline" or "branching game graph" — that's the canvas runtime's internal detail.
 
 ---
 
