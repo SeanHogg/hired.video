@@ -101,12 +101,23 @@ export default function WizardLauncher({
    *  draft + navigate to the editor. Errors stay in this scope so the
    *  wizard sees an awaited promise and shows its own error UI.
    *
-   *  Dispatches on the active template's `mediaKind`: comics route
-   *  through `studioService.generateComic` (returns a `ComicSpec`),
-   *  every other kind keeps the existing storyboard path. The branch
-   *  lives at the wizard level rather than inside the intake form per
-   *  the DRY rule — the intake is a dumb data collector; orchestration
-   *  belongs to whoever owns the lifecycle. */
+   *  Dispatches on the active template's `mediaKind`:
+   *    • comic → `studioService.generateComic` → `kind: "comicSpec"`
+   *    • CanvasState-authoring kinds (video / podcast / voice /
+   *      animation) → `generateStoryboard` → `kind: "script"`. The
+   *      `mediaKindUsesCanvasStateAuthoring` predicate (#936) gates
+   *      this so adding a new non-CanvasState runtime doesn't quietly
+   *      take the storyboard path.
+   *    • Non-CanvasState kinds (game, image) → seed the project from
+   *      the template registry via `kind: "template"` — no AI
+   *      storyboard generation; these kinds bring their own state
+   *      shape (`gameState` / `imageState`) and runtime-specific
+   *      tooling. Skipping the storyboard call was the root cause of
+   *      the "Couldn't create project" toast for drawing templates.
+   *
+   *  The branch lives at the wizard level rather than inside the
+   *  intake form per the DRY rule — the intake is a dumb data
+   *  collector; orchestration belongs to whoever owns the lifecycle. */
   async function handleGenerate(): Promise<void> {
     const template = getTemplate(contentTemplate);
     try {
@@ -130,6 +141,18 @@ export default function WizardLauncher({
         if (!res.data) throw new Error("No data returned");
         patchState({ status: "ready" });
         await create({ kind: "comicSpec", spec: res.data.spec, name: state.name });
+        return;
+      }
+      // Non-CanvasState authoring kinds (game / image / future cad /
+      // 3d_model) don't have a Timeline-shaped storyboard the
+      // AI can scaffold — they're seeded directly from the per-kind
+      // template registry (`seedTemplate()` in `template-dispatch.ts`).
+      // Routing them through the storyboard generator would either
+      // fail or mint a wrong-shaped project; route them through the
+      // template seed branch instead.
+      if (!mediaKindUsesCanvasStateAuthoring(template.mediaKind)) {
+        patchState({ status: "ready" });
+        await create({ kind: "template", templateId: contentTemplate });
         return;
       }
       const res = await studioService.generateStoryboard({

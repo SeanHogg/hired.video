@@ -103,11 +103,8 @@ import {
 import GameStage from "@/components/studio/game/GameStage";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
-import {
-  type ImageState,
-  createBlankImageState,
-} from "@shared/image-state";
-import { getDrawingTemplatePreset } from "@/lib/studio/drawing/drawing-template-presets";
+import { type ImageState } from "@shared/image-state";
+import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -142,15 +139,6 @@ const LinkedInPublisher = lazy(
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
-
-function createBlankImageStateForTemplate(templateHint: string | null) {
-  // Per the DRY rule: the per-template dimensions live in ONE record
-  // (`drawing-template-presets.ts`) read by both this seeding path AND
-  // the catalog thumbnail. Adding a new drawing template touches only
-  // that file + the catalog entry — never this seam.
-  const preset = getDrawingTemplatePreset(templateHint);
-  return createBlankImageState(preset?.width, preset?.height);
-}
 
 export default function StudioEditorV2() {
   const { id: routeId } = useParams<{ id: string }>();
@@ -272,6 +260,18 @@ export default function StudioEditorV2() {
   // (which is when the post-load effect flips leftTab to "actions" for
   // existing audio-only projects opened via direct URL).
   const currentMediaKind: MediaKind = persistedProject?.mediaKind ?? mountTimeTemplateKind;
+  // Single gate for every Timeline-runtime chrome surface (ScenesRail /
+  // WidgetPalette / TimelineDock / playback scrubber / Preview overlay
+  // / PropertiesPanel). Closes #936 by routing the editor's "should I
+  // mount CanvasStage chrome?" decision through ONE predicate instead
+  // of per-surface `=== "game"` branches. Game + image self-host their
+  // own canvas runtimes and own their own UIs; mounting the Timeline
+  // shell around them surfaced misleading "Scene 1 / Duration /
+  // Widgets / Timeline scrubber / Preview" chrome (the bug the user
+  // reported on a memory_match game). Comic stays on the Timeline
+  // shell because it authors via CanvasState even though its export
+  // pipeline is non-Timeline.
+  const usesTimelineChrome = mediaKindUsesCanvasStateAuthoring(currentMediaKind);
   const currentDefaults = useMemo(
     () => deriveKindDefaults(currentMediaKind, urlCapture),
     // urlCapture is stable across the editor's lifetime (read once on
@@ -389,7 +389,7 @@ export default function StudioEditorV2() {
     }
     if (imageState !== null) return;
     const serverImage = persistedProject?.imageState as ImageState | null | undefined;
-    setImageState(serverImage ?? createBlankImageStateForTemplate(templateHint));
+    setImageState(serverImage ?? seedImageFromTemplate(templateHint));
     // imageState is intentionally read once per mediaKind / persistedProject
     // pair — we don't want a server round-trip to clobber in-flight edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1428,6 +1428,7 @@ export default function StudioEditorV2() {
           onPublishToYouTube={handlePublishToYouTube}
           onPublishToLinkedIn={handlePublishToLinkedIn}
           onPublishToProfile={handlePublishToProfile}
+          usesTimelineChrome={usesTimelineChrome}
         />
         {missingProject && (
           <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
@@ -1971,6 +1972,7 @@ function EditorHeader({
   onPublishToYouTube,
   onPublishToLinkedIn,
   onPublishToProfile,
+  usesTimelineChrome,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -1989,6 +1991,10 @@ function EditorHeader({
   onPublishToYouTube: () => void;
   onPublishToLinkedIn: () => void;
   onPublishToProfile: () => void;
+  /** Drives whether the playback scrubber + Preview button render — the
+   *  shared gate (#936) so non-Timeline kinds (game / image) don't see
+   *  scene-shaped controls that don't apply to their runtime. */
+  usesTimelineChrome: boolean;
 }) {
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
@@ -2049,57 +2055,75 @@ function EditorHeader({
       {/* Playback controls — Play/Pause + scrubber + timecode. Drives the
           shared `usePreviewPlayback` hook so the canvas/widgets/scenes
           all see the same playhead (DRY). */}
-      <div className="flex flex-1 items-center justify-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => playback.seek(0)}
-          aria-label="Back to start"
-          className="h-8 w-8 p-0"
-        >
-          <SkipBack className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={playback.toggle}
-          aria-label={playback.isPlaying ? "Pause preview" : "Play preview"}
-          className="h-8 w-8 p-0"
-        >
-          {playback.isPlaying ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-        </Button>
-        <input
-          type="range"
-          min={0}
-          max={Math.max(0.1, playback.duration)}
-          step={0.05}
-          value={playback.playhead}
-          onChange={(e) => playback.seek(Number(e.target.value))}
-          className="h-1 w-40 cursor-pointer accent-brand-purple"
-          aria-label="Playhead"
-        />
-        <span className="min-w-[5.5rem] text-center text-[10px] tabular-nums text-muted-foreground">
-          {fmt(playback.playhead)} / {fmt(playback.duration)}
-        </span>
-      </div>
+      {/* Playback scrubber self-hides for non-Timeline-authoring kinds
+          (game / image) per #936's predicate. Those runtimes own their
+          own play affordance (`<GameStage>`'s Playtest button /
+          `<DrawingStage>`'s toolbar) so a global timeline scrubber
+          would be a misleading control. The empty flex-1 spacer keeps
+          the title block + right actions visually balanced. */}
+      {usesTimelineChrome ? (
+        <div className="flex flex-1 items-center justify-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => playback.seek(0)}
+            aria-label="Back to start"
+            className="h-8 w-8 p-0"
+          >
+            <SkipBack className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={playback.toggle}
+            aria-label={playback.isPlaying ? "Pause preview" : "Play preview"}
+            className="h-8 w-8 p-0"
+          >
+            {playback.isPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </Button>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(0.1, playback.duration)}
+            step={0.05}
+            value={playback.playhead}
+            onChange={(e) => playback.seek(Number(e.target.value))}
+            className="h-1 w-40 cursor-pointer accent-brand-purple"
+            aria-label="Playhead"
+          />
+          <span className="min-w-[5.5rem] text-center text-[10px] tabular-nums text-muted-foreground">
+            {fmt(playback.playhead)} / {fmt(playback.duration)}
+          </span>
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
       <div className="flex items-center gap-2">
         {/* "+ New Video" + Wizard live on the Studio landing (`/studio`,
             reachable via the ← Back arrow). Putting them on the per-
             project header conflated "make ANOTHER project" with "do
-            something to THIS project". */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1"
-          onClick={onOpenPreview}
-        >
-          <Eye className="h-4 w-4" />
-          Preview
-        </Button>
+            something to THIS project".
+            Preview self-hides for non-Timeline-authoring kinds — the
+            `PreviewOverlay` it opens renders Timeline-shaped playback
+            which doesn't apply to game (uses GameStage's Playtest
+            toggle) or image (no playback). Closes the duplicate-button
+            half of the user's report on the memory-match game where
+            the header Preview AND the canvas Playtest both surfaced. */}
+        {usesTimelineChrome && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={onOpenPreview}
+          >
+            <Eye className="h-4 w-4" />
+            Preview
+          </Button>
+        )}
         {/* Single overflow `…` for project + template actions (clone,
             delete, publish-as-template, my-published-templates).
             Self-gates: returns null when no project has been persisted

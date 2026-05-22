@@ -196,6 +196,14 @@ function Landing() {
           </div>
         </div>
 
+        {/* Browse-by-audience discovery — orthogonal to the kind-based
+            "What you can make" grid below. Reads `AUDIENCES` directly
+            (#900), so adding an audience lights it up here automatically.
+            Marketing-only surface: never mount on the authenticated
+            chooser ([StudioLanding.tsx]) — that's an in-app workspace,
+            not a demographic-discovery moment. */}
+        <AudienceQuickLinks className="mb-16" />
+
         {/* Stats — architecturally-true facts about the studio, not
             unverified engagement claims. The format count derives from
             `listShippableKindPitches()` so it ticks up automatically
