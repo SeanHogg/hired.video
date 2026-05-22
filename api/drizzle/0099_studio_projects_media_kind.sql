@@ -7,26 +7,25 @@
 -- — has no column and is hardcoded to MP4 everywhere downstream.
 --
 -- This migration adds the column with a 'video' default so every existing
--- row keeps its current behaviour. The new Podcast / Voice / Animation
--- mediaKinds land alongside their first template entries (#894 phasing,
--- step 2+). The frontend / API derive output profiles + publish
--- destinations from this column via `shared/media-kinds.ts`.
+-- row keeps its current behaviour. The new Podcast / Voice / Animation /
+-- Game / Comic / Image mediaKinds land alongside their first template
+-- entries (#894 phasing). The frontend / API derive output profiles +
+-- publish destinations from this column via `shared/media-kinds.ts`.
 --
--- Allowed values today: 'video' | 'podcast' | 'voice' | 'animation'. The
--- check constraint enforces the union at the DB level so a buggy client
--- can't write garbage. Adding a kind = ALTER the constraint in the same
--- changeset that lands the new TEMPLATE_CATALOG entry.
+-- HISTORICAL NOTE (2026-05-22, gap #960): this migration originally
+-- shipped a CHECK constraint hardcoding the 4 kinds known at the time
+-- ('video' | 'podcast' | 'voice' | 'animation'). Production gained
+-- 'game' / 'comic' / 'image' kinds via the application path before
+-- this migration was re-applied against a fresh DB snapshot, and the
+-- constraint addition failed with "violated by some row". The CHECK
+-- statements have been removed here; validation is enforced at the
+-- API boundary via Zod parsing against `MEDIA_KINDS` from
+-- `@shared/media-kinds.ts` (single source of truth). Migration 0104
+-- drops the constraints originally added by 0100/0101/0102 to
+-- eliminate the same drift class permanently.
 
 ALTER TABLE "studio_projects"
   ADD COLUMN IF NOT EXISTS "media_kind" varchar(16) DEFAULT 'video' NOT NULL;
-
--- Constrain the column to the registered union. Failing fast at the DB
--- boundary beats a stray string sneaking through every consumer.
-ALTER TABLE "studio_projects"
-  DROP CONSTRAINT IF EXISTS "studio_projects_media_kind_check";
-ALTER TABLE "studio_projects"
-  ADD CONSTRAINT "studio_projects_media_kind_check"
-  CHECK ("media_kind" IN ('video', 'podcast', 'voice', 'animation'));
 
 -- Filtered listings ("show me my podcast projects") will be a common
 -- query path for the upcoming per-kind landing surfaces; partial index
