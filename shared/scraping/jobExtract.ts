@@ -16,7 +16,7 @@ import {
   GOOGLE_JOBS_NOISE_HEADINGS,
   GENERIC_TITLE_NOISE,
 } from "./siteConfigs.js";
-import { canonicalizeJobUrl, detectJobBoard, looksLikeJobUrl } from "./urls.js";
+import { canonicalizeJobUrl, looksLikeJobUrl } from "./urls.js";
 
 // Minimal structural typing — keeps this file buildable without the DOM
 // type library, and lets tests pass in jsdom's shaped-like nodes.
@@ -628,12 +628,13 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
     }
   }
 
-  // 4. Generic <h1>/title fallback — but ONLY for unknown hosts. For known
-  // job boards (amazon.jobs, linkedin.com, indeed.com, …) we have explicit
-  // URL shapes for real jobs; if we got here without a JSON-LD or
-  // focused-pane hit, the page isn't a job posting (it's a search page,
-  // marketing landing, /content/* page, etc.) and the generic h1 fallback
-  // would surface noise like "Artificial Intelligence" as a fake title.
-  if (detectJobBoard(currentUrl) && !looksLikeJobUrl(currentUrl)) return null;
+  // 4. Generic <h1>/title fallback — only on URLs that look like job
+  // listings. Without this gate the detector treats the first non-noise
+  // <h1> on ANY page as a job title (npm package pages, GitHub repos,
+  // Stack Overflow questions, blog posts, …). looksLikeJobUrl already
+  // covers both shapes the generic path is meant to serve: known job
+  // boards on a real listing URL, and unknown-host pages whose path
+  // contains a careers/jobs/hiring/role keyword.
+  if (!looksLikeJobUrl(currentUrl)) return null;
   return genericExtract(doc, currentUrl);
 }

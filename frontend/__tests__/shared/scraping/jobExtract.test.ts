@@ -327,6 +327,22 @@ describe("detectJobInPage — generic fallback", () => {
     const got = detectJobInPage(docFromHtml(html) as any, "https://example.com/home");
     expect(got).toBeNull();
   });
+
+  it("returns null on an npm package page (h1 is the package name, URL has no career keyword)", () => {
+    // Regression: extension was treating any unknown-host page with an
+    // <h1> as a job. npmjs.com/package/* surfaced "@seanhogg/builderforce-sdk"
+    // as a fake job title. The generic fallback is now gated on the URL
+    // looking like a job listing.
+    const html = `<html><body>
+      <h1>@seanhogg/builderforce-sdk</h1>
+      <p>Typed TypeScript SDK for the Builderforce.ai LLM gateway.</p>
+    </body></html>`;
+    const got = detectJobInPage(
+      docFromHtml(html) as any,
+      "https://www.npmjs.com/package/@seanhogg/builderforce-sdk",
+    );
+    expect(got).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
