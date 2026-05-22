@@ -40,6 +40,7 @@ import {
 } from "@/components/studio/templates/catalog";
 import { studioService } from "@/lib/services/studio-service";
 import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
+import { mediaKindUsesCanvasStateAuthoring } from "@shared/media-kinds";
 import { cn } from "@/lib/utils";
 
 export interface WizardLauncherProps {

@@ -65,7 +65,6 @@ import {
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
-import { AudienceQuickLinks } from "@/components/studio/templates/AudienceQuickLinks";
 import MediaKindBadge from "@/components/studio/shared/MediaKindBadge";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
@@ -465,11 +464,6 @@ export default function StudioLanding() {
           <NewVideoSplitButton variant="primary" />
         </div>
       </header>
-
-      {/* Audience discovery — links the in-app chooser to the public
-          marketing pages (#900). Self-iterates AUDIENCES so new audiences
-          land here without touching StudioLanding. */}
-      <AudienceQuickLinks className="mb-8" />
 
       <section className="mb-12">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

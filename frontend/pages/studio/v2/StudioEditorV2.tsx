@@ -97,6 +97,7 @@ import { deriveKindDefaults } from "@/lib/studio/editor-v2/kind-defaults";
 import {
   mediaKindHasAudio,
   mediaKindHasVideo,
+  mediaKindUsesCanvasStateAuthoring,
   type MediaKind,
 } from "@shared/media-kinds";
 import GameStage from "@/components/studio/game/GameStage";

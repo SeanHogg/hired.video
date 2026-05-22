@@ -103,9 +103,47 @@ export function mediaKindCanHaveBoth(kind: MediaKind): boolean {
  *  `<CanvasRouter mediaKind/>` dispatch — see PRD §1.2. Comics reuse
  *  the V2 editor's `CanvasState` for authoring (scenes = pages) but the
  *  preview / reader / export pipeline is a non-Timeline runtime (panel
- *  reveals on scroll, page turns, static-strip rasterizer). */
+ *  reveals on scroll, page turns, static-strip rasterizer).
+ *
+ *  @deprecated The name conflates the export-pipeline question with the
+ *  authoring-surface question (#936). Use `mediaKindUsesTimelineExport`
+ *  for the former and `mediaKindUsesCanvasStateAuthoring` for the
+ *  latter. Kept as a thin alias for the existing call sites until they
+ *  migrate. */
 export function mediaKindUsesTimelineRuntime(kind: MediaKind): boolean {
+  return mediaKindUsesTimelineExport(kind);
+}
+
+/** Whether the kind's render facade emits a Timeline-shaped output
+ *  (frames per second + audio track → MP4 / MP3 / GIF / WebM). Closes
+ *  the export-pipeline half of the predicate split tracked in #936:
+ *  game / comic / image bundle their own export pipelines (HTML5 ZIP,
+ *  PDF / CBZ / PNG strip, PNG / JPG / SVG) — they do NOT ride the
+ *  ffmpeg.wasm / WebCodecs path the Timeline runtime uses. */
+export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
   return kind !== "game" && kind !== "comic" && kind !== "image";
+}
+
+/** Whether the kind authors via the v2 editor's `CanvasState` shape
+ *  (scenes + widgets) and therefore needs the v2 editor's Timeline-
+ *  shaped chrome: ScenesRail, WidgetPalette, TimelineDock, playback
+ *  scrubber + Preview overlay, Properties panel. Closes the authoring-
+ *  surface half of the predicate split tracked in #936.
+ *
+ *  Returns:
+ *   - `true`  for video / podcast / voice / animation / comic — comics
+ *               author via CanvasState (pages = scenes, panels =
+ *               widgets) even though their export pipeline is non-
+ *               Timeline. This is the asymmetry that motivated #936.
+ *   - `false` for game / image — these kinds mount their own canvas
+ *               runtimes (`<GameStage>` / `<DrawingStage>`) which own
+ *               their own state shape, inspectors, and toolbars. The
+ *               Timeline shell is irrelevant chrome and was confusing
+ *               users (Scene 1 / Duration / Widgets palette / Timeline
+ *               scrubber all surfaced for a memory-match game).
+ *  Future runtimes (cad / 3d_model) → false. */
+export function mediaKindUsesCanvasStateAuthoring(kind: MediaKind): boolean {
+  return kind !== "game" && kind !== "image";
 }
 
 // ─── Output profiles ─────────────────────────────────────────────────────────

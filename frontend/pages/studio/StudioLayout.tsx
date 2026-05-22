@@ -61,6 +61,7 @@ import { cn } from "@/lib/utils";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
 import { listShippableKindPitches } from "@/lib/studio/kind-marketing";
+import { AudienceQuickLinks } from "@/components/studio/templates/AudienceQuickLinks";
 import { compile } from "@/lib/compiler/video-compiler";
 import { migrateScriptToElements } from "@/lib/compiler/legacy-to-elements";
 import { exportVideo } from "@/lib/renderer/video-exporter";
