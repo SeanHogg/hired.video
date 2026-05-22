@@ -70,7 +70,10 @@ export type ContentTemplate =
   | "casting_call"
   | "podcast_trailer"
   | "podcast_episode"
-  | "podcast_interview";
+  | "podcast_interview"
+  | "voice_audition_reel"
+  | "voice_ivr_prompt"
+  | "voice_audiobook_chapter";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
@@ -481,7 +484,9 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
       "Create a 60-second podcast trailer: cold-open hook, host introduction, what each episode delivers, three sample episode topics, and a clear call-to-subscribe with where to find the show.",
     firstTabLabel: "Trailer",
     IntakeForm: BasicIntake,
-    defaultRecordingMode: "webcam",
+    // No `defaultRecordingMode` — V2 derives the primary recorder
+    // (voiceover for audio-only kinds) via `deriveKindDefaults`. V1
+    // doesn't surface podcast templates.
   },
   {
     id: "podcast_episode",
@@ -498,7 +503,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
       "Outline a podcast episode: cold-open hook, intro music bed, host welcome, three numbered chapters with topic and 1-line takeaway each, sponsor break placement, listener call-to-action, and outro music. Each chapter becomes a marker on the timeline.",
     firstTabLabel: "Episode",
     IntakeForm: BasicIntake,
-    defaultRecordingMode: "webcam",
+    // Audio-only — V2 auto-arms Voiceover via `deriveKindDefaults`.
   },
   {
     id: "podcast_interview",
@@ -515,7 +520,65 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
       "Outline a podcast interview: cold-open hook with a teaser quote, host intro of the guest (name + credential), three numbered topic chapters with a question prompt each, a rapid-fire segment, and an outro CTA with where to find the guest. Multi-track audio: separate host and guest channels for clean editing.",
     firstTabLabel: "Interview",
     IntakeForm: BasicIntake,
-    defaultRecordingMode: "webcam",
+    // Audio-only — V2 auto-arms Voiceover via `deriveKindDefaults`.
+  },
+  // ─── Voice templates (Phase 4 of #894 / docs/prd/studio-media-kinds.md) ─────
+  // Audio-only authoring like podcasts but optimised for short script-
+  // driven cuts (auditions, IVR prompts, audiobook chapters). All three
+  // reuse `BasicIntake` (the user describes the read in prose); a voice-
+  // specific intake with script-input + voice-clone picker is a follow-
+  // on (#915). `mediaKind: "voice"` routes the save-menu's publish row to
+  // the voice marketplace destination (already in PUBLISH_DESTINATIONS).
+  {
+    id: "voice_audition_reel",
+    label: "Voice audition reel",
+    desc: "30–60 sec multi-style demo for casting agents — characters, tones, accents.",
+    icon: AudioWaveform,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "promote",
+    mediaKind: "voice",
+    audiences: ["voice_actor", "actor", "creator"],
+    defaultName: "Voice audition reel",
+    defaultPrompt:
+      "Create a 45-second voice audition reel: slate with the actor's name + reps, three short reads each in a distinct style (warm narrator / energetic commercial / character voice), and an outro card with contact info. Keep cuts tight — no music bed beneath the reads.",
+    firstTabLabel: "Reel",
+    IntakeForm: BasicIntake,
+    // Audio-only — V2 auto-arms Voiceover via `deriveKindDefaults`.
+  },
+  {
+    id: "voice_ivr_prompt",
+    label: "IVR / voicemail prompt",
+    desc: "Short business prompt — greeting, menu options, hold message.",
+    icon: Mic2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "quick",
+    mediaKind: "voice",
+    audiences: ["voice_actor", "founder", "employer"],
+    defaultName: "Voicemail prompt",
+    defaultPrompt:
+      "Write a 20-second business voicemail / IVR prompt: warm greeting with the company name, two short menu options (sales / support) or a 'leave your name and number' line, and a polite hold-music handoff. Tone: professional, friendly, no jokes.",
+    firstTabLabel: "Prompt",
+    IntakeForm: BasicIntake,
+    // Audio-only — V2 auto-arms Voiceover via `deriveKindDefaults`.
+  },
+  {
+    id: "voice_audiobook_chapter",
+    label: "Audiobook chapter",
+    desc: "Long-form chapter read — chapter title slate, paced narration, soft outro.",
+    icon: Headphones,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "voice",
+    audiences: ["voice_actor", "creator", "educator"],
+    defaultName: "Audiobook chapter",
+    defaultPrompt:
+      "Outline an audiobook chapter recording: book title + chapter number slate (read aloud), paced narration of the chapter text the user pastes in, and a 3-second silence outro before the next chapter join. Production note: leave a clean 2-second pre-roll for engineer trim.",
+    firstTabLabel: "Chapter",
+    IntakeForm: BasicIntake,
+    // Audio-only — V2 auto-arms Voiceover via `deriveKindDefaults`.
   },
 ];
 

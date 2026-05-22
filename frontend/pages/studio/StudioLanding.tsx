@@ -78,7 +78,13 @@ import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 // project state). When the chooser forwards a deep-link to the freshly-
 // minted /studio/<id> URL, these survive as query params so the editor
 // honours them on first paint. Non-listed params are dropped.
-const EDITOR_FORWARDED_PARAMS = ["capture"] as const;
+//
+// `contentTemplate` is forwarded so the editor can resolve `mediaKind`
+// synchronously at mount via the catalog lookup — eliminates the
+// "flash of video defaults" before the post-load effect kicks in for
+// audio-only kinds (podcast / voice). Server is still SoT for
+// `studio_projects.media_kind`; this is a UI hint.
+const EDITOR_FORWARDED_PARAMS = ["capture", "contentTemplate"] as const;
 
 // The chooser carries TWO orthogonal filter axes per #906 / PRD §6.1:
 //
@@ -357,9 +363,20 @@ export default function StudioLanding() {
     // forwarder can append UI-state seed params (?capture=) onto the
     // destination URL. Carousel clicks don't need that, so route the
     // user straight to /studio/<id> here.
+    //
+    // Forward `?contentTemplate=<id>` on the destination URL so the
+    // editor knows the project's mediaKind synchronously at mount —
+    // without this, audio-only kinds (podcast / voice) briefly flash
+    // the video defaults (Widgets tab + collapsed timeline) before
+    // the post-load effect re-applies the kind-aware defaults. Pure
+    // UI hint, server is the SoT for `studio_projects.media_kind`.
     void create({ kind: "template", templateId: templateId as ContentTemplate })
       .then((created) => {
-        if (created) navigate(`/studio/${encodeURIComponent(created.id)}`);
+        if (created) {
+          navigate(
+            `/studio/${encodeURIComponent(created.id)}?contentTemplate=${encodeURIComponent(templateId)}`,
+          );
+        }
       });
   }
 

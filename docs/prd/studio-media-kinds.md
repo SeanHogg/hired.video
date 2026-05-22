@@ -157,12 +157,21 @@ Still deferred (tracked as #907):
 - Per-show analytics roll-up (listens, completion rate)
 - Audio normalization to −16 LUFS default (Apple target) with per-show override via `studio_shows.loudness_target` (Spotify wants −14)
 
-### Phase 4 — Voice template
+### Phase 4 — Voice template (partially landed 2026-05-21)
 
-- `TEMPLATE_CATALOG` gains `voice_*` entries (voicemail / audiobook chapter / audition reel) with `mediaKind: 'voice'`
-- Voice editor surface — script-input + voice-picker + simple waveform visualizer; mounts on top of the existing voice-clone marketplace (`project_voice_marketplace.md`) and WebGPU TTS engines
-- Render path = `OfflineAudioContext → WAV → ffmpeg.wasm transcode` (no new engine; reuses the audio-mixer pipeline)
-- Voice marketplace listing as a publish destination (already exists; just needs the new mediaKind → destination wiring)
+**Shipped:**
+- ✅ `TEMPLATE_CATALOG` gains `voice_audition_reel / voice_ivr_prompt / voice_audiobook_chapter` entries with `mediaKind: 'voice'`
+- ✅ `voice_actor` audience added; existing voice templates audience-tagged
+- ✅ `template-seeds.ts` gains voice seeds — section-shaped scenes (slate / read-1 / read-2 / outro etc.) that project onto `timeline.markers[]` so a future chapter editor finds the section breaks pre-populated
+- ✅ Render path: voice projects route through the existing `audio-only` strategy (zero v-track clips → emits WAV) — no new engine needed, reuses the Phase-2 pipeline
+- ✅ Save menu: `publishDestinationsFor("voice")` already returns `voice-marketplace / profile-audio-embed / profile` from the registry — the row renders, disabled until a handler ships
+
+**Still deferred (tracked as #923):**
+- Voice-specific intake — script-input field (with character-count + WPM estimate) + voice-clone picker reading the existing voice marketplace library; replaces the generic `BasicIntake` reuse with a kind-shaped form
+- Voice-clone listing wiring — `publishHandlers["voice-marketplace"]` callback that creates a marketplace listing from the finished render
+- Profile audio embed — `publishHandlers["profile-audio-embed"]` callback that attaches the WAV to the user's profile as an embeddable audio block
+
+**Also closed in the same pass (#921):** `TemplateThumb` switch gained 11 new cases — 5 film + 3 podcast + 3 voice — so every card in the chooser and on the marketing landing pages paints with a recognisable thumbnail instead of a blank box.
 
 ### Phase 5 — Animation template
 
@@ -318,6 +327,12 @@ Phase 2b (#913 + #914) landed in:
 - [frontend/components/studio/shared/WaveformThumbnail.tsx](../../hired.video/frontend/components/studio/shared/WaveformThumbnail.tsx) — kind-palette SVG waveform
 - [frontend/components/studio/shared/VideoProjectThumbnail.tsx](../../hired.video/frontend/components/studio/shared/VideoProjectThumbnail.tsx) — routes to waveform via `mediaKindHasVideo()`
 - [frontend/lib/studio/editor-v2/timeline-emit.ts](../../hired.video/frontend/lib/studio/editor-v2/timeline-emit.ts) — scene labels project onto `timeline.markers[]` (comment updated to call out podcast-chapter projection)
+
+Phase 4 (voice templates) + #921 landed in:
+- [frontend/components/studio/templates/audiences.ts](../../hired.video/frontend/components/studio/templates/audiences.ts) — `voice_actor` audience added
+- [frontend/components/studio/templates/catalog.tsx](../../hired.video/frontend/components/studio/templates/catalog.tsx) — `voice_audition_reel / voice_ivr_prompt / voice_audiobook_chapter` entries
+- [frontend/lib/studio/editor-v2/template-seeds.ts](../../hired.video/frontend/lib/studio/editor-v2/template-seeds.ts) — voice seeds (section-shaped scenes that project onto chapter markers)
+- [frontend/components/studio/templates/TemplateThumb.tsx](../../hired.video/frontend/components/studio/templates/TemplateThumb.tsx) — 11 new `case` branches (5 film + 3 podcast + 3 voice) so every card has a recognisable thumbnail; shared `<ThumbWaveformBars/>` helper
 
 Adjacent (read-only context):
 - [shared/timeline.ts](../../hired.video/shared/timeline.ts) — kind-agnostic Timeline JSON spec

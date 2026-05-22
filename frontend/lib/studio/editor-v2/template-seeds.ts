@@ -1030,4 +1030,133 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
       ]),
     ],
   }),
+
+  // ─── Voice seeds (Phase 4 of #894) ──────────────────────────────────────
+  // Audio-only kinds — scenes act as section cues the user records into
+  // (voiceover lives on a2). Scene labels project onto `timeline.markers[]`
+  // so a chapter editor (#907) finds these section breaks pre-populated.
+  // Visual canvas content is minimal because audio-only export ignores it,
+  // but the editor's preview surface needs something to paint — keep the
+  // backdrops + labels recognisable so the user knows which read they're in.
+
+  voice_audition_reel: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      makeScene("Slate", "#0f172a", 6, [
+        makeText("VOICE AUDITION", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Jamie Bell", { y: 0.32, align: "center", color: "#ffffff", fontPx: 56 }),
+        makeText("Bell & Co Voice · jamie@bellco.agency", {
+          y: 0.55, align: "center", fontPx: 22, color: "#fbbf24",
+        }),
+      ]),
+      makeScene("Read 1 · Warm narrator", "#1e293b", 15, [
+        makeText("STYLE 1", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Warm narrator", { y: 0.3, align: "center", color: "#ffffff", fontPx: 40 }),
+        makeText(
+          "\"Some stories you carry. Others carry you. This is the second kind.\"",
+          { y: 0.55, align: "center", fontPx: 22, color: "#e2e8f0", height: 0.3 },
+        ),
+      ]),
+      makeScene("Read 2 · Energetic spot", "#1e1b4b", 15, [
+        makeText("STYLE 2", { y: 0.06, fontPx: 14, color: "#c4b5fd" }),
+        makeHeading("Energetic commercial", { y: 0.3, align: "center", color: "#ffffff", fontPx: 40 }),
+        makeText(
+          "\"Friday night. Game on. Half-price wings until ten. Tag a friend who's hungry.\"",
+          { y: 0.55, align: "center", fontPx: 22, color: "#ddd6fe", height: 0.3 },
+        ),
+      ]),
+      makeScene("Read 3 · Character voice", "#1e293b", 15, [
+        makeText("STYLE 3", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Character — gruff veteran", { y: 0.3, align: "center", color: "#ffffff", fontPx: 36 }),
+        makeText(
+          "\"I told 'em the bridge wouldn't hold. They said: we'll cross when we get there.\"",
+          { y: 0.55, align: "center", fontPx: 22, color: "#e2e8f0", height: 0.3 },
+        ),
+      ]),
+      makeScene("Contact", "#0f172a", 5, [
+        makeCta("Bell & Co Voice", "reps@bellco.agency", "mailto:reps@bellco.agency", {
+          subheadline: "jamie@bellco.agency · 555-0142",
+          bgColor: "#fbbf24",
+          textColor: "#0f172a",
+          accentColor: "#0f172a",
+          accentTextColor: "#fbbf24",
+        }),
+      ]),
+    ],
+  }),
+
+  voice_ivr_prompt: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      makeScene("Greeting", "#0f172a", 5, [
+        makeText("IVR · GREETING", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Greeting", { y: 0.28, align: "center", color: "#ffffff", fontPx: 40 }),
+        makeText(
+          "\"Thanks for calling Acme Co. We're glad you're here.\"",
+          { y: 0.5, align: "center", fontPx: 22, color: "#e2e8f0", height: 0.25 },
+        ),
+        makeText("Tone: warm, unhurried", {
+          y: 0.82, align: "center", fontPx: 16, color: "#64748b",
+        }),
+      ]),
+      makeScene("Menu options", "#1e293b", 12, [
+        makeText("IVR · MENU", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Menu", { y: 0.16, align: "center", color: "#ffffff", fontPx: 36 }),
+        makeText(
+          "\"Press 1 for sales. Press 2 for support. Press 0 to reach a person.\"",
+          { y: 0.36, align: "center", fontPx: 22, color: "#e2e8f0", height: 0.3 },
+        ),
+        makeText("Pause 1 second between options for the touch-tone capture window.", {
+          y: 0.78, align: "center", fontPx: 16, color: "#64748b", height: 0.15,
+        }),
+      ]),
+      makeScene("Hold handoff", "#0f172a", 4, [
+        makeText("IVR · HOLD", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Handoff", { y: 0.28, align: "center", color: "#ffffff", fontPx: 40 }),
+        makeText(
+          "\"One moment — connecting you now.\"",
+          { y: 0.52, align: "center", fontPx: 22, color: "#e2e8f0", height: 0.18,
+          },
+        ),
+      ]),
+    ],
+  }),
+
+  voice_audiobook_chapter: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      // 2-second pre-roll silence for engineer trim.
+      makeScene("Pre-roll", "#000000", 2, [
+        makeText("[2-second silence — engineer trim point]", {
+          y: 0.46, align: "center", fontPx: 18, color: "#475569", height: 0.1,
+        }),
+      ]),
+      // Chapter slate — read aloud.
+      makeScene("Chapter slate", "#0f172a", 6, [
+        makeText("AUDIOBOOK", { y: 0.05, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("The Last Ferry", { y: 0.25, align: "center", color: "#ffffff", fontPx: 48 }),
+        makeText("Chapter Four · The crossing", {
+          y: 0.5, align: "center", fontPx: 26, color: "#fde68a",
+        }),
+        makeText("Read aloud as the chapter slate.", {
+          y: 0.78, align: "center", fontPx: 16, color: "#64748b",
+        }),
+      ]),
+      // Body — paced narration.
+      makeScene("Narration", "#1e293b", 180, [
+        makeText("NARRATION", { y: 0.05, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Body", { y: 0.16, fontPx: 36, color: "#ffffff" }),
+        makeText(
+          "Paste the chapter text here. Pace at roughly 150 words/min for audiobook delivery. Vary cadence on dialogue. Breath between paragraphs.",
+          { y: 0.3, fontPx: 22, color: "#e2e8f0", height: 0.6 },
+        ),
+      ]),
+      // 3-second silence outro — clean join point.
+      makeScene("Outro silence", "#000000", 3, [
+        makeText("[3-second silence — chapter join point]", {
+          y: 0.46, align: "center", fontPx: 18, color: "#475569", height: 0.1,
+        }),
+      ]),
+    ],
+  }),
 };

@@ -60,7 +60,7 @@ export default function FloatingLayersPanel({
   const count = scene.widgets.length;
 
   return (
-    <div className={cn("pointer-events-auto flex flex-col items-start", className)}>
+    <div className={cn("pointer-events-auto flex flex-col items-center", className)}>
       {open && (
         <div className="mb-1 w-64 overflow-hidden rounded-md border border-border bg-card/95 shadow-md backdrop-blur">
           <div className="max-h-72 overflow-hidden">

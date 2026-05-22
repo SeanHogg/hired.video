@@ -234,5 +234,269 @@ function renderThumb(id: ContentTemplate) {
           <div className="mt-1 text-[6px] opacity-80">30-second demo</div>
         </div>
       );
+
+    // ─── Film templates (#921) ────────────────────────────────────────────
+    case "self_tape":
+      // Slate-shaped card — black background, clapboard top strip, role
+      // metadata stack mid, take-number bottom.
+      return (
+        <div className="absolute inset-0 bg-slate-900 p-2 text-white">
+          <div className="flex gap-0.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "h-2 flex-1 -skew-x-12",
+                  i % 2 === 0 ? "bg-white" : "bg-slate-900",
+                )}
+              />
+            ))}
+          </div>
+          <div className="mt-3 text-[10px] font-bold tracking-wide">SELF-TAPE</div>
+          <div className="mt-0.5 text-[7px] opacity-80">Role · Lead</div>
+          <div className="text-[7px] opacity-80">Project · Indie feature</div>
+          <div className="mt-2 inline-block rounded-sm bg-white/20 px-1.5 py-0.5 text-[7px]">
+            TAKE 1
+          </div>
+        </div>
+      );
+
+    case "monologue":
+      // Single centred microphone silhouette, deep stage backdrop.
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-800 to-black text-white">
+          <svg viewBox="0 0 24 24" className="h-10 w-10 opacity-90" aria-hidden="true">
+            <rect x="9" y="3" width="6" height="12" rx="3" fill="#fbbf24" />
+            <path d="M5 11 a7 7 0 0 0 14 0" fill="none" stroke="#fbbf24" strokeWidth="1.5" />
+            <line x1="12" y1="18" x2="12" y2="22" stroke="#fbbf24" strokeWidth="1.5" />
+            <line x1="9" y1="22" x2="15" y2="22" stroke="#fbbf24" strokeWidth="1.5" />
+          </svg>
+          <div className="mt-1 text-[8px] tracking-[0.3em] text-slate-300">MONOLOGUE</div>
+        </div>
+      );
+
+    case "showreel":
+      // Filmstrip border with three "frames" + reel title.
+      return (
+        <div className="absolute inset-0 bg-black p-2 text-white">
+          <div className="absolute inset-y-0 left-0 flex w-2 flex-col justify-between py-1">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-1.5 w-1.5 rounded-sm bg-white/70" />
+            ))}
+          </div>
+          <div className="absolute inset-y-0 right-0 flex w-2 flex-col justify-between py-1">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-1.5 w-1.5 rounded-sm bg-white/70" />
+            ))}
+          </div>
+          <div className="mx-3 grid h-full grid-cols-3 gap-1">
+            <div className="rounded-sm bg-gradient-to-br from-amber-700 to-amber-900" />
+            <div className="rounded-sm bg-gradient-to-br from-rose-700 to-rose-900" />
+            <div className="rounded-sm bg-gradient-to-br from-violet-700 to-violet-900" />
+          </div>
+          <div className="absolute bottom-1 left-3 right-3 text-center text-[8px] font-bold tracking-[0.3em]">
+            ACTOR SHOWREEL
+          </div>
+        </div>
+      );
+
+    case "director_pitch":
+      // Treatment-style card — bold logline at top, comp-titles row,
+      // signature line.
+      return (
+        <div className="absolute inset-0 bg-[#1e1b4b] p-2 text-white">
+          <div className="text-[6px] tracking-widest text-violet-300">LOGLINE</div>
+          <div className="mt-0.5 text-[8px] font-bold leading-tight">
+            A grieving cartographer races her sister
+          </div>
+          <div className="mt-0.5 text-[8px] font-bold leading-tight opacity-90">
+            back to the last island
+          </div>
+          <div className="mt-2 flex gap-0.5">
+            <span className="rounded-full bg-violet-500/30 px-1 py-0.5 text-[6px]">Drama</span>
+            <span className="rounded-full bg-violet-500/30 px-1 py-0.5 text-[6px]">Coastal</span>
+          </div>
+          <div className="mt-2 text-[6px] opacity-70">— Lin Carrow, director</div>
+        </div>
+      );
+
+    case "casting_call":
+      // Role-listing card — title slate + bulleted role spec.
+      return (
+        <div className="absolute inset-0 bg-violet-700 p-2 text-white">
+          <div className="text-[6px] tracking-widest text-amber-200">CASTING</div>
+          <div className="mt-0.5 text-[10px] font-bold tracking-tight">JUNE — supporting lead</div>
+          <div className="mt-2 space-y-0.5 text-[7px] opacity-90">
+            <div>• 30-38 · any ethnicity</div>
+            <div>• Stonington, ME · Sept 2026</div>
+            <div>• SAG-AFTRA MLB</div>
+          </div>
+          <div className="absolute bottom-1 right-2 rounded-sm bg-amber-300 px-1 py-0.5 text-[7px] font-bold text-slate-900">
+            DUE JUNE 19
+          </div>
+        </div>
+      );
+
+    // ─── Podcast templates (#921) ─────────────────────────────────────────
+    case "podcast_trailer":
+      // Subscribe-button + waveform — looks like a podcast directory card.
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-900 to-slate-900 p-2 text-white">
+          <div className="text-[6px] tracking-widest text-violet-300">PODCAST TRAILER</div>
+          <div className="mt-0.5 text-[12px] font-extrabold leading-tight">HIRED.</div>
+          <ThumbWaveformBars accent="#c4b5fd" bars={36} />
+          <div className="absolute bottom-1 right-2 rounded-full bg-violet-400 px-1.5 py-0.5 text-[7px] font-bold text-violet-950">
+            ▶ TRAILER
+          </div>
+        </div>
+      );
+
+    case "podcast_episode":
+      // Chapter-marked waveform — recognizable Apple Podcasts chapter cue.
+      return (
+        <div className="absolute inset-0 bg-slate-900 p-2 text-white">
+          <div className="text-[6px] tracking-widest text-slate-400">EPISODE 12</div>
+          <div className="mt-0.5 text-[9px] font-bold leading-tight">
+            "I quit a six-figure job to make ramen."
+          </div>
+          <ThumbWaveformBars accent="#a78bfa" bars={40} chapters={[0.15, 0.45, 0.75]} />
+          <div className="absolute bottom-1 left-2 right-2 flex justify-between text-[7px] opacity-70">
+            <span>00:00</span>
+            <span>42:18</span>
+          </div>
+        </div>
+      );
+
+    case "podcast_interview":
+      // Two-mic icon — clearly distinct from the solo-mic monologue card.
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-violet-800 to-slate-900 p-2 text-white">
+          <div className="flex gap-3">
+            {[0, 1].map((i) => (
+              <svg key={i} viewBox="0 0 24 24" className="h-8 w-8" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="12" rx="3" fill={i === 0 ? "#fde68a" : "#a78bfa"} />
+                <path d="M5 11 a7 7 0 0 0 14 0" fill="none" stroke={i === 0 ? "#fde68a" : "#a78bfa"} strokeWidth="1.5" />
+              </svg>
+            ))}
+          </div>
+          <div className="mt-1 text-[8px] tracking-[0.25em] text-slate-300">INTERVIEW</div>
+        </div>
+      );
+
+    // ─── Voice templates (#921 + Phase 4) ─────────────────────────────────
+    case "voice_audition_reel":
+      // Three stacked mini-waveforms — three reads in the reel.
+      return (
+        <div className="absolute inset-0 bg-slate-900 p-2 text-white">
+          <div className="text-[6px] tracking-widest text-amber-300">VOICE AUDITION</div>
+          <div className="mt-0.5 text-[8px] font-bold leading-tight">Jamie Bell · Bell &amp; Co</div>
+          <div className="mt-1.5 flex flex-col gap-1">
+            {[{ label: "Warm", bars: 14 }, { label: "Energetic", bars: 16 }, { label: "Character", bars: 12 }].map(
+              (read, idx) => (
+                <div key={idx} className="flex items-center gap-1">
+                  <span className="w-12 text-[6px] opacity-70">{read.label}</span>
+                  <ThumbWaveformBars
+                    accent="#fbbf24"
+                    bars={read.bars}
+                    height="h-2"
+                    inline
+                  />
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      );
+
+    case "voice_ivr_prompt":
+      // Phone receiver + numbered menu lines.
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-200 to-amber-50 p-2 text-slate-900">
+          <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+            <path
+              d="M5 4a2 2 0 0 1 2-2h2.5l1.5 4-2 1.5a14 14 0 0 0 6 6L16.5 11l4 1.5V15a2 2 0 0 1-2 2h-1A14 14 0 0 1 4 6V5z"
+              fill="#92400e"
+            />
+          </svg>
+          <div className="mt-1 text-[7px] font-bold tracking-widest text-amber-900">IVR PROMPT</div>
+          <div className="mt-1 space-y-0.5 text-[7px] text-slate-800">
+            <div>1 · Sales</div>
+            <div>2 · Support</div>
+            <div>0 · Reach a person</div>
+          </div>
+        </div>
+      );
+
+    case "voice_audiobook_chapter":
+      // Book spine + headphones overlay — distinctly "audiobook".
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-stone-950 p-2 text-stone-100">
+          <div className="text-[6px] tracking-widest text-amber-300">AUDIOBOOK</div>
+          <div className="mt-0.5 text-[10px] font-bold leading-tight">The Last Ferry</div>
+          <div className="text-[7px] opacity-70">Chapter Four · The crossing</div>
+          <svg viewBox="0 0 24 24" className="absolute bottom-1 right-1 h-7 w-7 opacity-90" aria-hidden="true">
+            <path
+              d="M4 13a8 8 0 0 1 16 0v5h-3v-5a5 5 0 0 0-10 0v5H4z"
+              fill="none"
+              stroke="#fde68a"
+              strokeWidth="1.5"
+            />
+            <rect x="4" y="14" width="3" height="6" rx="1" fill="#fde68a" />
+            <rect x="17" y="14" width="3" height="6" rx="1" fill="#fde68a" />
+          </svg>
+        </div>
+      );
   }
+}
+
+/**
+ * Small inline waveform bar set — used by podcast / voice thumbnails.
+ * Self-contained (no caller-passed peaks) so each thumbnail stays a
+ * one-line render.
+ */
+function ThumbWaveformBars({
+  accent,
+  bars,
+  chapters,
+  height = "h-6",
+  inline = false,
+}: {
+  accent: string;
+  bars: number;
+  chapters?: number[];
+  height?: string;
+  inline?: boolean;
+}) {
+  // Deterministic bar heights — fixed pattern so every render is stable
+  // and the visual reads as "envelope" rather than uniform.
+  const bar = (i: number) => {
+    const wave = Math.sin(i * 0.7) * 0.5 + 0.5;
+    return 0.25 + wave * 0.7;
+  };
+  return (
+    <div
+      className={cn(
+        "mt-1 flex items-end gap-[1px]",
+        height,
+        inline ? "flex-1" : "w-full",
+      )}
+    >
+      {Array.from({ length: bars }).map((_, i) => {
+        const heightPct = `${Math.round(bar(i) * 100)}%`;
+        const isChapter = chapters?.some((c) => Math.abs(i / bars - c) < 1 / (bars * 2));
+        return (
+          <div
+            key={i}
+            className="flex-1 rounded-[1px]"
+            style={{
+              height: heightPct,
+              backgroundColor: accent,
+              opacity: isChapter ? 1 : 0.7,
+              boxShadow: isChapter ? `0 0 0 1px ${accent}` : undefined,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
 }

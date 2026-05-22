@@ -93,6 +93,10 @@ import {
 } from "@shared/studio-subject";
 import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
+import { deriveKindDefaults } from "@/lib/studio/editor-v2/kind-defaults";
+import { mediaKindHasAudio, mediaKindHasVideo, type MediaKind } from "@shared/media-kinds";
+import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
+import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
 import { useCanvasClipboard } from "@/lib/studio/editor-v2/use-canvas-clipboard";
@@ -111,6 +115,7 @@ import CanvasEditToolbar from "@/components/studio/v2/CanvasEditToolbar";
 import SubjectSeedBanner from "@/components/studio/v2/SubjectSeedBanner";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
+import AudioEmptyHint from "@/components/studio/v2/AudioEmptyHint";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveMenuV2 from "@/components/studio/v2/StudioSaveMenuV2";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
@@ -185,6 +190,44 @@ export default function StudioEditorV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Kind-aware editor defaults — landing tab + advanced-timeline open +
+  // ActionsPanel auto-arm. Resolved via the shared `deriveKindDefaults`
+  // helper in `kind-defaults.ts` (single SoT, DRY).
+  //
+  // We resolve TWICE because the useState initialisers below need a
+  // synchronous mount-time value (can't await server-load), but the
+  // ActionsPanel auto-arm needs the LIVE kind (otherwise an existing
+  // podcast project opened via direct `/studio/:id` URL falls back to
+  // video defaults at mount and never re-arms when the post-load
+  // effect flips `leftTab` to "actions"):
+  //
+  //   - mountTimeTemplateKind: kind from URL `?contentTemplate=` if
+  //     present, else `'video'`. Used for the useState initialisers
+  //     so freshly-from-template flow lands on the right tab from
+  //     first paint when the chooser forwards the template id.
+  //   - currentMediaKind: the persisted project's kind once server-load
+  //     completes, else the mount-time kind. ActionsPanel reads its
+  //     `defaultOpenAction` from this so it auto-arms the correct
+  //     sub-sheet for existing podcast / voice projects.
+  const mountTimeTemplateKind = useMemo<MediaKind>(() => {
+    if (!templateHint) return "video";
+    // `templateHint` may be either the raw `ContentTemplate` id
+    // (`podcast_episode`) or the URL-friendly kebab slug
+    // (`podcast-episode`) depending on the caller. Normalise via
+    // `slugToBuiltinId` (single SoT in `lib/templates/registry`)
+    // so the editor accepts both forms identically.
+    const resolvedId = slugToBuiltinId(templateHint) ?? templateHint;
+    const tpl = TEMPLATE_CATALOG.find((t) => t.id === resolvedId);
+    return tpl?.mediaKind ?? "video";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const mountTimeDefaults = useMemo(
+    () => deriveKindDefaults(mountTimeTemplateKind, urlCapture),
+    // Mount-time only — `urlCapture` + templateHint are read once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   // Canvas state lives behind the history wrapper so every mutator
   // call participates in undo/redo. The (state, setState) pair is the
   // same shape useState would give us, so the rest of the editor
@@ -201,6 +244,19 @@ export default function StudioEditorV2() {
   // around for the shared <ProjectChromeMenu>. Updated on every server
   // round-trip (load, save, clone, visibility toggle).
   const [persistedProject, setPersistedProject] = useState<StudioProject | null>(null);
+  // Live kind derivation — re-runs when persistedProject's mediaKind
+  // changes. Drives ActionsPanel.defaultOpenAction + the AudioEmptyHint
+  // banner so the sub-sheet auto-arms at the moment the panel mounts
+  // (which is when the post-load effect flips leftTab to "actions" for
+  // existing audio-only projects opened via direct URL).
+  const currentMediaKind: MediaKind = persistedProject?.mediaKind ?? mountTimeTemplateKind;
+  const currentDefaults = useMemo(
+    () => deriveKindDefaults(currentMediaKind, urlCapture),
+    // urlCapture is stable across the editor's lifetime (read once on
+    // mount via the searchParams.get inside the useMemo above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentMediaKind],
+  );
   // Sticky banner shown when the route id resolves to nothing the caller
   // can read — the API returns 404 for both "doesn't exist" and "no
   // access" (deliberate, see studio.ts comment), so the message stays
@@ -215,21 +271,26 @@ export default function StudioEditorV2() {
   });
   const [zoom, setZoom] = useState<number>(0.56);
   const [saving, setSaving] = useState(false);
-  const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
-  // `?capture=` deep-links arrive on a fresh editor session expecting
-  // the Actions panel armed for recording. Override the default tab +
-  // expansion when that's the case so the user lands directly in the
-  // recorder sheet (#651).
-  const [leftTab, setLeftTab] = useState<LeftTabId>(
-    urlCapture ? "actions" : "widgets",
+  const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(
+    mountTimeDefaults.advancedTimelineOpen,
   );
+  // `?capture=` deep-links + audio-only template seeds both land the user
+  // on the Actions tab so the recorder / voiceover panel is the first
+  // thing they see. Single SoT via `deriveKindDefaults` (#651 + #894).
+  const [leftTab, setLeftTab] = useState<LeftTabId>(mountTimeDefaults.leftTab);
+  // Tracks whether the kind-aware post-load defaults have been applied
+  // yet — flipped on first server-load to avoid clobbering manual
+  // tab/timeline toggles on subsequent project refreshes.
+  const kindDefaultsAppliedRef = useRef(false);
   // Whether the Widgets/Actions section (below the scenes rail) is
   // expanded. When collapsed it shrinks to a thin strip at the bottom
   // of the left panel so the scenes rail can use the full vertical
   // space. Persisted via localStorage so the user's choice survives
   // reload — same pattern as the CollapsiblePanel chrome.
   const [leftBottomOpen, setLeftBottomOpen] = useState<boolean>(() => {
-    if (urlCapture) return true;
+    // Auto-arming an action (capture deep-link OR audio-only template
+    // seed) needs the Actions section open so the user lands inside it.
+    if (mountTimeDefaults.defaultAction) return true;
     if (typeof window === "undefined") return true;
     try {
       const raw = window.localStorage.getItem("studio.v2.left.bottom");
@@ -255,6 +316,29 @@ export default function StudioEditorV2() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   const stageContainerRef = useRef<HTMLDivElement>(null);
+
+  // Apply kind-aware defaults ONCE the server-loaded project arrives —
+  // covers the case where the user opens a /studio/:id URL directly
+  // (no templateHint at mount) for a podcast / voice project. The
+  // mount-time defaults already handled the freshly-from-template case
+  // via templateHint, so this effect only fires when the server's
+  // `mediaKind` disagrees with the mount-time assumption. Guarded by a
+  // ref so subsequent reloads / autosave round-trips don't clobber the
+  // user's manual tab + timeline toggles.
+  useEffect(() => {
+    if (kindDefaultsAppliedRef.current) return;
+    if (!persistedProject) return;
+    kindDefaultsAppliedRef.current = true;
+    const serverKind: MediaKind = persistedProject.mediaKind ?? "video";
+    if (serverKind === mountTimeTemplateKind) return; // already applied
+    const defaults = deriveKindDefaults(serverKind, urlCapture);
+    setLeftTab(defaults.leftTab);
+    setAdvancedTimelineOpen(defaults.advancedTimelineOpen);
+    if (defaults.defaultAction) setLeftBottomOpen(true);
+    // urlCapture is read-once on mount; mountTimeTemplateKind is also
+    // mount-time only; both are stable for the effect's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistedProject]);
 
   // Server-load when we have a real project id.
   useEffect(() => {
@@ -1334,7 +1418,7 @@ export default function StudioEditorV2() {
                   )}
                   {leftTab === "actions" && (
                     <ActionsPanel
-                      defaultOpenAction={urlCapture ?? undefined}
+                      defaultOpenAction={currentDefaults.defaultAction ?? undefined}
                       currentTimeSec={playback.playhead}
                       state={state}
                       activeScene={activeScene}
@@ -1405,6 +1489,20 @@ export default function StudioEditorV2() {
                 ref={stageContainerRef}
                 className="absolute inset-0 overflow-auto bg-muted/30 p-6"
               >
+                {/* Audio-only-project hint banner — self-gates on
+                    `mediaKind` + voiceover count so it returns null for
+                    video projects + once the user records anything. Per
+                    DRY: ONE component owns the visibility decision; the
+                    host just supplies the recorder-arming callback. */}
+                <AudioEmptyHint
+                  mediaKind={currentMediaKind}
+                  state={state}
+                  onRecordVoiceover={() => {
+                    setLeftTab("actions");
+                    setLeftBottomOpen(true);
+                  }}
+                  className="mb-3"
+                />
                 <div className="flex min-h-full min-w-min items-center justify-center">
                   {/* ONE renderer for both edit + playback: `<CanvasStage>`
                       in `mode="edit"` honours selection/drag/resize chrome,
@@ -1492,13 +1590,19 @@ export default function StudioEditorV2() {
                   />
                 </div>
               </div>
-              {/* Floating canvas-stage chrome — edit toolbar + layers
-                  (left) + zoom (right). Lives next to the canvas rather
-                  than in the header / left rail so scene-scoped ops
-                  (edit, layer order) sit beside the surface they act
-                  on (#647). Layers stacks above the edit toolbar; its
-                  popover opens upward so the canvas isn't covered. */}
-              <div className="pointer-events-none absolute left-3 bottom-3 z-10 flex flex-col items-start gap-1">
+              {/* Floating canvas-stage chrome — edit toolbar (left),
+                  layers (center), zoom (right). Lives next to the
+                  canvas rather than in the header / left rail so
+                  scene-scoped ops sit beside the surface they act on
+                  (#647). The layers popover opens upward so the canvas
+                  isn't covered when expanded. */}
+              <div className="pointer-events-none absolute left-3 bottom-3 z-10">
+                <CanvasEditToolbar
+                  history={{ undo, redo, canUndo, canRedo }}
+                  clipboard={clipboard}
+                />
+              </div>
+              <div className="pointer-events-none absolute left-1/2 bottom-3 z-10 -translate-x-1/2">
                 <FloatingLayersPanel
                   scene={activeScene}
                   selectedWidgetId={
@@ -1514,10 +1618,6 @@ export default function StudioEditorV2() {
                   onReorderLayers={(widgetIds) =>
                     reorderLayers(activeScene.id, widgetIds)
                   }
-                />
-                <CanvasEditToolbar
-                  history={{ undo, redo, canUndo, canRedo }}
-                  clipboard={clipboard}
                 />
               </div>
               <div className="pointer-events-none absolute right-3 bottom-3 z-10">

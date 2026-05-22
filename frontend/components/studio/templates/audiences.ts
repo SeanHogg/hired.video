@@ -7,11 +7,10 @@
 // Do NOT introduce a parallel `AUDIENCE_TO_TEMPLATES` map — filter the
 // catalog directly: `TEMPLATE_CATALOG.filter(t => t.audiences.includes(id))`.
 //
-// Podcaster + educator landed alongside the Phase 2 podcast templates
-// (#894 / docs/prd/studio-media-kinds.md §3). voice_actor and animator
-// remain deferred to their respective Phase 4 / Phase 5 template entries —
-// they keep this list anchored to populated audiences (no empty-state
-// landings).
+// Podcaster + educator landed alongside the Phase 2 podcast templates.
+// voice_actor landed alongside the Phase 4 voice templates. animator
+// remains deferred to its Phase 5 template entries — keeping the list
+// anchored to populated audiences (no empty-state landings).
 
 export type Audience =
   | "athlete"
@@ -27,7 +26,8 @@ export type Audience =
   | "designer"
   | "data_analyst"
   | "podcaster"
-  | "educator";
+  | "educator"
+  | "voice_actor";
 
 export interface AudienceDef {
   id: Audience;
@@ -110,6 +110,11 @@ export const AUDIENCES: AudienceDef[] = [
     id: "educator",
     label: "Educators",
     blurb: "Course trailers, lesson openers, and explainer episodes that meet learners on audio or video.",
+  },
+  {
+    id: "voice_actor",
+    label: "Voice actors",
+    blurb: "Audition reels, character demos, narration samples, and ID spots — script-driven, voice-clone-friendly.",
   },
 ];
 
