@@ -1159,4 +1159,60 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
       ]),
     ],
   }),
+
+  // ─── Generic Promo seed (#926) ─────────────────────────────────────────
+  // Closes the customer ask "why can't I make a promo video?". 4-scene
+  // marketing arc: Problem → Product → Proof → Call-to-action. Realistic
+  // placeholder copy so the press-play preview reads as a credible promo.
+  product_promo: () => ({
+    ...emptyCanvasState(),
+    scenes: [
+      makeScene("Problem", "#0f172a", 5, [
+        makeText("THE PROBLEM", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("Your team writes the same emails every week.", {
+          y: 0.34, align: "center", color: "#ffffff", fontPx: 38, height: 0.3,
+        }),
+        makeText("Hours every Friday — gone.", {
+          y: 0.72, align: "center", fontPx: 22, color: "#fbbf24",
+        }),
+      ]),
+      makeScene("Product", "#1e1b4b", 7, [
+        makeHeading("Meet Inboxly.", { y: 0.1, align: "center", color: "#ffffff", fontPx: 56 }),
+        makeText(
+          "One-click reply suggestions trained on your past responses.",
+          { y: 0.42, align: "center", fontPx: 24, color: "#e0e7ff", height: 0.3 },
+        ),
+        makeChips(
+          ["Gmail · Outlook · Apple Mail", "Reads your tone", "Sends in 1 click"],
+          { y: 0.74, height: 0.2, fontPx: 18, chipColor: "rgba(167,139,250,0.25)", textColor: "#ddd6fe" },
+        ),
+      ]),
+      makeScene("Proof", "#0f172a", 6, [
+        makeText("WHAT USERS SAY", { y: 0.06, fontPx: 14, color: "#94a3b8" }),
+        makeHeading("\"6 hours back every week.\"", {
+          y: 0.3, align: "center", color: "#ffffff", fontPx: 36, height: 0.3,
+        }),
+        makeText("— Priya R., Head of Sales · Lumen", {
+          y: 0.62, align: "center", fontPx: 20, color: "#fde68a",
+        }),
+        makeText("4.9 ★ · 1,400 reviews", {
+          y: 0.8, align: "center", fontPx: 18, color: "#cbd5e1",
+        }),
+      ]),
+      makeScene("Call to action", "#0f172a", 6, [
+        makeCta(
+          "Try Inboxly free for 14 days",
+          "Start free trial",
+          "https://inboxly.app/start",
+          {
+            subheadline: "No card · Cancel anytime · 30-second setup",
+            bgColor: "#7c3aed",
+            textColor: "#ffffff",
+            accentColor: "#fde68a",
+            accentTextColor: "#1e1b4b",
+          },
+        ),
+      ]),
+    ],
+  }),
 };

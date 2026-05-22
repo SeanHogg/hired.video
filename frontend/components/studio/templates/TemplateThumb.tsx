@@ -446,6 +446,32 @@ function renderThumb(id: ContentTemplate) {
           </svg>
         </div>
       );
+
+    case "product_promo":
+      // Problem → Product → Proof → CTA arc — render as a 4-card mini
+      // storyboard with a megaphone accent so it reads as "marketing".
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-700 to-violet-800 p-2 text-white">
+          <div className="text-[6px] tracking-widest text-fuchsia-200">PROMO</div>
+          <div className="mt-0.5 text-[10px] font-bold leading-tight">
+            New product launch
+          </div>
+          <div className="mt-1.5 grid grid-cols-4 gap-0.5">
+            {["P", "P", "P", "★"].map((label, i) => (
+              <div
+                key={i}
+                className="flex aspect-square items-center justify-center rounded-sm bg-white/15 text-[8px] font-bold"
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 text-[6px] opacity-80">Problem · Product · Proof · CTA</div>
+          <div className="absolute bottom-1 right-1 rounded-full bg-fuchsia-300 px-1.5 py-0.5 text-[7px] font-bold text-fuchsia-950">
+            30 SEC
+          </div>
+        </div>
+      );
   }
 }
 

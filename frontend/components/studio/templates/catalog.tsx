@@ -73,7 +73,8 @@ export type ContentTemplate =
   | "podcast_interview"
   | "voice_audition_reel"
   | "voice_ivr_prompt"
-  | "voice_audiobook_chapter";
+  | "voice_audiobook_chapter"
+  | "product_promo";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
@@ -579,6 +580,28 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     firstTabLabel: "Chapter",
     IntakeForm: BasicIntake,
     // Audio-only — V2 auto-arms Voiceover via `deriveKindDefaults`.
+  },
+  // ─── Generic Promo template (#926) ────────────────────────────────────
+  // Closes the customer ask "why can't I make a promo video?" — the
+  // catalog already had tool_promo (software-only) and company_promo
+  // (employer-brand-only). product_promo is the generic shape for any
+  // product / service / event / sale promo. Reuses the existing
+  // `product_launch` StudioPurpose so backend prompt config doesn't fork.
+  {
+    id: "product_promo",
+    label: "Product / service promo",
+    desc: "30-second promotional video for any product, service, event, or sale.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "product_launch",
+    category: "showcase",
+    mediaKind: "video",
+    audiences: ["creator", "founder", "employer", "recruiter"],
+    defaultName: "Promo video",
+    defaultPrompt:
+      "Create a 30-second promotional video: open with the problem your customer has, show the product / service in use, list one or two key benefits with proof, then end with a clear call to action (offer + deadline + where to act).",
+    firstTabLabel: "Promo",
+    IntakeForm: BasicIntake,
   },
 ];
 
