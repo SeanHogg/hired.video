@@ -385,47 +385,13 @@ function Landing() {
           </div>
         </div>
 
-        {/* Testimonials */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">What Candidates Are Saying</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: "I got 5 interview requests within a week of sharing my video resume. Recruiters actually watched the whole thing. A text resume never did that.",
-                name: "Sarah Chen",
-                title: "Software Engineer",
-              },
-              {
-                quote: "As a career changer it was hard to explain my transition in writing. The video let me tell my story in a way that finally resonated with hiring managers.",
-                name: "Michael Rodriguez",
-                title: "Marketing Manager",
-              },
-              {
-                quote: "Landed a Fortune 500 role after posting my video on LinkedIn. Two recruiters messaged me within 24 hours saying it was the most impressive application they'd seen.",
-                name: "Emma Johnson",
-                title: "Product Designer",
-              },
-            ].map((t) => (
-              <Card key={t.name}>
-                <CardContent className="p-6">
-                  <div className="flex items-center mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    ))}
-                  </div>
-                  <p className="text-sm mb-4">"{t.quote}"</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
-                    <div>
-                      <p className="font-medium text-sm">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.title}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+        {/* Social proof intentionally omitted — real customer quotes go
+            here when we have them. The hero already showcases real
+            public videos via `HeroVideoSpotlight` (SA-curated feed), so
+            anonymous visitors see actual creator output without us
+            fabricating quotes. Per the standing rule against unverified
+            marketing claims. Logged as #954 in the Gap Register until
+            multi-kind beta testimonials land. */}
 
       </div>
 
