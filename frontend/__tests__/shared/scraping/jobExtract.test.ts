@@ -140,6 +140,30 @@ describe("detectJobInPage — focused pane (LinkedIn)", () => {
     expect(got!.focusedPaneHtml).toBeDefined();
   });
 
+  it("does NOT surface nav-counter headings ('0 notifications', '16 messages', 'LinkedIn') as job titles when docTitle is mid-navigation", () => {
+    // Regression for #897 (2026-05-22): on /jobs/view/{id}/ pages, if
+    // docTitle hadn't settled into "{Co} hiring {Title} | LinkedIn" yet,
+    // linkedInPickTitle fell through to a body-wide heading walk and
+    // surfaced LinkedIn's global-nav counter label ("0 notifications") as
+    // the job title.
+    const html = `
+      <html><head>
+        <title>(0) Notifications | LinkedIn</title>
+      </head><body>
+        <nav>
+          <h2>0 notifications</h2>
+          <h2>16 messages</h2>
+          <h1>LinkedIn</h1>
+        </nav>
+      </body></html>
+    `;
+    const got = detectJobInPage(
+      docFromHtml(html) as any,
+      "https://www.linkedin.com/jobs/view/4416913834/",
+    );
+    expect(got).toBeNull();
+  });
+
   it("does NOT pick up section heading 'About the job' as the title", () => {
     const html = `
       <html><body>

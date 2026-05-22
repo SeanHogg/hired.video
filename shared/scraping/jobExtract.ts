@@ -16,7 +16,7 @@ import {
   GOOGLE_JOBS_NOISE_HEADINGS,
   GENERIC_TITLE_NOISE,
 } from "./siteConfigs.js";
-import { canonicalizeJobUrl, looksLikeJobUrl } from "./urls.js";
+import { canonicalizeJobUrl, detectJobBoard, looksLikeJobUrl } from "./urls.js";
 
 // Minimal structural typing — keeps this file buildable without the DOM
 // type library, and lets tests pass in jsdom's shaped-like nodes.
@@ -255,6 +255,33 @@ export function parseLinkedInTitleString(
   };
 }
 
+// LinkedIn's global nav surfaces counter-labelled headings ("0 notifications",
+// "16 messages", "5 invitations", "LinkedIn"). When the focused-pane walk
+// falls through to a body-wide heading scan we used to surface these as the
+// job title — see #897 (2026-05-22, npm/LinkedIn detection bug). A single
+// predicate keeps the rule co-located with the noise list and applies to
+// every heading-walk path inside this file.
+function isLinkedInNavHeading(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (LINKEDIN_NOISE_HEADINGS.has(lower)) return true;
+  if (/^\d+\s+(notifications?|messages?|invitations?|requests?|unread|connections?|new\s+jobs?|results?)$/.test(lower)) {
+    return true;
+  }
+  if (/^(notifications?|messages?|invitations?|my\s+network|home|search results?|linkedin|jobs?)$/.test(lower)) {
+    return true;
+  }
+  if (
+    lower.startsWith("about ") ||
+    lower.startsWith("how your") ||
+    lower.startsWith("people ") ||
+    lower.startsWith("benefits") ||
+    lower.startsWith("skills")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function linkedInPickTitle(doc: DomDocument, paneEl: DomElement): string {
   if (!paneEl) return "";
   for (const sel of FOCUSED_TITLE_SELECTORS["linkedin.com"] ?? []) {
@@ -262,7 +289,7 @@ function linkedInPickTitle(doc: DomDocument, paneEl: DomElement): string {
       const el = paneEl.querySelector(sel);
       if (el && el.textContent) {
         const txt = el.textContent.replace(/\s+/g, " ").trim();
-        if (txt.length > 3 && !LINKEDIN_NOISE_HEADINGS.has(txt.toLowerCase())) return txt;
+        if (txt.length > 3 && !isLinkedInNavHeading(txt)) return txt;
       }
     } catch {
       // ignore
@@ -293,26 +320,20 @@ function linkedInPickTitle(doc: DomDocument, paneEl: DomElement): string {
   // `document.title` is the highest-precision fallback available when CSS
   // selectors haven't matched (LinkedIn renamed classes, SPA still hydrating,
   // direct /jobs/view/{id}/ layout differs from the search-pane layout).
-  // Sits BEFORE the heading walk because the heading walk can pick up
-  // unrelated h1s like "LinkedIn" or company-logo banners.
   const fromDocTitle = parseLinkedInTitleString(doc.title);
   if (fromDocTitle?.title) return fromDocTitle.title;
+
+  // Body-wide heading walks bleed nav text ("0 notifications", "LinkedIn",
+  // "16 messages") as fake job titles. Only walk when we have a properly
+  // scoped focused pane — when the caller hands us doc.body, return empty
+  // and let the detector report "no job" instead of guessing.
+  if (paneEl === doc.body) return "";
 
   const headings = Array.from(paneEl.querySelectorAll("h1, h2"));
   for (const h of headings) {
     const txt = (h.textContent || "").replace(/\s+/g, " ").trim();
     if (txt.length < 4 || txt.length > 200) continue;
-    if (LINKEDIN_NOISE_HEADINGS.has(txt.toLowerCase())) continue;
-    const lower = txt.toLowerCase();
-    if (
-      lower.startsWith("about ") ||
-      lower.startsWith("how your") ||
-      lower.startsWith("people ") ||
-      lower.startsWith("benefits") ||
-      lower.startsWith("skills")
-    ) {
-      continue;
-    }
+    if (isLinkedInNavHeading(txt)) continue;
     return txt;
   }
 
@@ -628,13 +649,17 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
     }
   }
 
-  // 4. Generic <h1>/title fallback — only on URLs that look like job
-  // listings. Without this gate the detector treats the first non-noise
-  // <h1> on ANY page as a job title (npm package pages, GitHub repos,
-  // Stack Overflow questions, blog posts, …). looksLikeJobUrl already
-  // covers both shapes the generic path is meant to serve: known job
-  // boards on a real listing URL, and unknown-host pages whose path
-  // contains a careers/jobs/hiring/role keyword.
+  // 4. Generic <h1>/title fallback — for UNKNOWN-host employer career
+  // pages only. Two layered gates:
+  //
+  //   - Known job boards (LinkedIn, Indeed, …) never reach this branch.
+  //     Their per-host paths above are the only signals we trust;
+  //     falling through to genericExtract leaks DOM noise as fake titles
+  //     ("LinkedIn", "0 notifications", "Search results" — #897).
+  //   - Unknown hosts need a careers/jobs/hiring/role keyword in the URL
+  //     so we don't false-positive every <h1> on the web (npm packages,
+  //     GitHub repos, blog posts — original npm-bug regression).
+  if (detectJobBoard(currentUrl)) return null;
   if (!looksLikeJobUrl(currentUrl)) return null;
   return genericExtract(doc, currentUrl);
 }
