@@ -101,6 +101,7 @@ import {
   type MediaKind,
 } from "@shared/media-kinds";
 import GameStage from "@/components/studio/game/GameStage";
+import GameInspectorPlaceholder from "@/components/studio/game/GameInspectorPlaceholder";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState } from "@shared/image-state";
@@ -1792,6 +1793,11 @@ export default function StudioEditorV2() {
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
             </div>
+            {/* Bottom Timeline rail — Timeline-runtime scene/widget
+                strip. Self-hides for game / image kinds per #936's
+                predicate; their canvases don't have a time axis to
+                surface here. */}
+            {usesTimelineChrome && (
             <CollapsiblePanel
               side="bottom"
               label="Timeline"
@@ -1817,13 +1823,24 @@ export default function StudioEditorV2() {
                 onWidgetWindowChange={updateWidgetWindow}
               />
             </CollapsiblePanel>
+            )}
           </section>
 
           {/* RIGHT — properties panel. Also hosts the previously-DESIGN-tab
               configuration (themes / fonts / palette / motion / music /
               format / export) under a "Canvas" section group, surfaced
               when no widget is selected. Selecting a widget swaps the
-              panel to that widget's meta. */}
+              panel to that widget's meta.
+
+              Self-hides for non-Timeline-authoring kinds (game / image)
+              per #936's predicate. Game-kind shows the dedicated
+              `<GameInspectorPlaceholder>` instead — a small info-panel
+              that surfaces canvas dimensions, level / sprite counts,
+              and a pointer to the Phase 2b (#939) gap for the actual
+              sprite-placement / behavior-chip editor. Image-kind
+              `<DrawingStage>` owns its own inline inspector so the
+              right rail is empty for that kind. */}
+          {usesTimelineChrome ? (
           <CollapsiblePanel
             side="right"
             label="Properties"
@@ -1892,6 +1909,23 @@ export default function StudioEditorV2() {
               }
             />
           </CollapsiblePanel>
+          ) : currentMediaKind === "game" ? (
+            <CollapsiblePanel
+              side="right"
+              label="Game"
+              storageKey="studio.v2.panel.right"
+              expandedClassName="w-72"
+            >
+              <GameInspectorPlaceholder
+                gameState={
+                  (persistedProject?.gameState as
+                    | import("@shared/game-state").GameState
+                    | null
+                    | undefined) ?? null
+                }
+              />
+            </CollapsiblePanel>
+          ) : null}
         </div>
       </div>
       {previewOpen && (
