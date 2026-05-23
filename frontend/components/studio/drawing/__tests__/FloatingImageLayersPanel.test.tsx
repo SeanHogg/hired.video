@@ -37,7 +37,7 @@ function makeHandlers() {
 describe("FloatingImageLayersPanel — chrome", () => {
   it("renders the 'Layers' pill with the layer count", () => {
     const state = createBlankImageState(1080, 1080);
-    render(<FloatingImageLayersPanel state={state} {...makeHandlers()} />);
+    renderWithProviders(<FloatingImageLayersPanel state={state} {...makeHandlers()} />);
     expect(screen.getByText("Layers")).toBeTruthy();
     // Blank state seeds one layer.
     expect(screen.getByText("1")).toBeTruthy();
@@ -45,7 +45,7 @@ describe("FloatingImageLayersPanel — chrome", () => {
 
   it("defaults to OPEN for image kind (the layers panel is primary on drawing)", () => {
     const state = createBlankImageState(1080, 1080);
-    render(<FloatingImageLayersPanel state={state} {...makeHandlers()} />);
+    renderWithProviders(<FloatingImageLayersPanel state={state} {...makeHandlers()} />);
     // Background layer row should be rendered when expanded.
     expect(screen.getByText("Background")).toBeTruthy();
   });
@@ -77,7 +77,7 @@ describe("FloatingImageLayersPanel — chrome", () => {
         },
       ],
     };
-    render(<FloatingImageLayersPanel state={state} {...makeHandlers()} />);
+    renderWithProviders(<FloatingImageLayersPanel state={state} {...makeHandlers()} />);
     expect(screen.getByText("Background")).toBeTruthy();
     expect(screen.getByText("Extra layer")).toBeTruthy();
     // Count chip in the pill shows 2.
