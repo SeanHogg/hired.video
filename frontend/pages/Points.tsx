@@ -28,14 +28,14 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   pointsService,
+  isPointsEligible,
   type PointsCatalog,
   type PointsSummary,
 } from "@/lib/services/points-service";
-import { USER_ROLES } from "@shared/user-roles";
 
 export default function PointsPage() {
   const { user } = useAuth();
-  const isEligible = user?.roles?.includes(USER_ROLES.JOB_SEEKER) ?? false;
+  const isEligible = isPointsEligible(user);
 
   const summary = useQuery<PointsSummary>({
     queryKey: ["points", "me"],

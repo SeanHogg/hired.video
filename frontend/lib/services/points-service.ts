@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
+import { USER_ROLES } from "@shared/user-roles";
+
+/** SSoT for points eligibility. V1 = job_seeker only; widens when the
+ *  catalog gains recruiter / employer SKUs. Consumers (widget + page +
+ *  any future surface) check this — never re-implement the role test. */
+export function isPointsEligible(user: { role?: string | null } | null | undefined): boolean {
+  return user?.role === USER_ROLES.JOB_SEEKER;
+}
 
 /**
  * Gamification client. Mirrors the /api/points and
@@ -27,7 +35,7 @@ const ActivityItemSchema = z.object({
   action: z.string(),
   label: z.string(),
   at: z.string(),
-  metadata: z.record(z.unknown()).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   source: z.string().optional(),
   refId: z.string().nullable().optional(),
   refType: z.string().nullable().optional(),

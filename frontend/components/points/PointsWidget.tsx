@@ -15,8 +15,7 @@ import { Flame, Trophy, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
-import { pointsService, type PointsSummary } from "@/lib/services/points-service";
-import { USER_ROLES } from "@shared/user-roles";
+import { pointsService, isPointsEligible, type PointsSummary } from "@/lib/services/points-service";
 
 const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
 
@@ -27,7 +26,7 @@ function nextMilestone(current: number): number | null {
 
 export function PointsWidget({ variant = "compact" }: { variant?: "compact" | "expanded" }) {
   const { user } = useAuth();
-  const isEligible = user?.roles?.includes(USER_ROLES.JOB_SEEKER) ?? false;
+  const isEligible = isPointsEligible(user);
 
   const { data, isLoading } = useQuery<PointsSummary>({
     queryKey: ["points", "me"],
