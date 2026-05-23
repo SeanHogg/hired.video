@@ -206,34 +206,65 @@ export default function InterviewQuestions() {
       <div className="space-y-6 mt-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">1. Pick your source</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              1. Pick your source
+              <span className="text-xs font-normal text-muted-foreground">(Choose one)</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={mode} onValueChange={(v) => setMode(v as SourceMode)}>
-              <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                <TabsTrigger value="resume">Resume</TabsTrigger>
-                <TabsTrigger value="job">Job</TabsTrigger>
-                <TabsTrigger value="text">Paste text</TabsTrigger>
-                <TabsTrigger value="target-only">Role only</TabsTrigger>
+              <TabsList className="grid grid-cols-4 w-full max-w-2xl bg-muted/50">
+                <TabsTrigger
+                  value="resume"
+                  className="data-[state=active]:bg-brand-purple data-[state=active]:text-white data-[state=active]:shadow"
+                >
+                  Resume
+                </TabsTrigger>
+                <TabsTrigger
+                  value="job"
+                  className="data-[state=active]:bg-brand-purple data-[state=active]:text-white data-[state=active]:shadow"
+                >
+                  Job
+                </TabsTrigger>
+                <TabsTrigger
+                  value="text"
+                  className="data-[state=active]:bg-brand-purple data-[state=active]:text-white data-[state=active]:shadow"
+                >
+                  Paste text
+                </TabsTrigger>
+                <TabsTrigger
+                  value="target-only"
+                  className="data-[state=active]:bg-brand-purple data-[state=active]:text-white data-[state=active]:shadow"
+                >
+                  Role only
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="resume" className="space-y-3 pt-4">
-                <Label>Saved resume</Label>
-                <Select value={resumeId} onValueChange={setResumeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a resume" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {resumes.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.title ?? "Untitled resume"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Skills are extracted from the resume; questions probe them in the target-role context.
-                </p>
+                <div className="space-y-1.5">
+                  <Label>Saved resume</Label>
+                  <Select value={resumeId} onValueChange={setResumeId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a resume" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {resumes.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.title ?? "Untitled resume"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Skills come from the resume; the target role tells the LLM what to interview them for.
+                  </p>
+                </div>
+                <TargetRoleFields
+                  targetRole={targetRole}
+                  seniority={seniority}
+                  onTargetRoleChange={setTargetRole}
+                  onSeniorityChange={setSeniority}
+                />
               </TabsContent>
 
               <TabsContent value="job" className="space-y-3 pt-4">
@@ -251,7 +282,7 @@ export default function InterviewQuestions() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Skills are extracted from the JD; questions reference the exact responsibilities required.
+                  Skills and the target role both come from the JD — no extra fields needed.
                 </p>
               </TabsContent>
 
@@ -274,6 +305,14 @@ export default function InterviewQuestions() {
                   placeholder="Paste a job description or resume…"
                   rows={8}
                 />
+                {pastedKind === "resume" && (
+                  <TargetRoleFields
+                    targetRole={targetRole}
+                    seniority={seniority}
+                    onTargetRoleChange={setTargetRole}
+                    onSeniorityChange={setSeniority}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="target-only" className="space-y-3 pt-4">
@@ -283,6 +322,13 @@ export default function InterviewQuestions() {
                     expectations for that role and seniority.
                   </AlertDescription>
                 </Alert>
+                <TargetRoleFields
+                  targetRole={targetRole}
+                  seniority={seniority}
+                  onTargetRoleChange={setTargetRole}
+                  onSeniorityChange={setSeniority}
+                  required
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -292,25 +338,7 @@ export default function InterviewQuestions() {
           <CardHeader>
             <CardTitle className="text-base">2. Tune the question set</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="iq-role">Target role</Label>
-              <Input
-                id="iq-role"
-                value={targetRole}
-                onChange={(e) => setTargetRole(e.target.value)}
-                placeholder="e.g. Senior Backend Engineer"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="iq-seniority">Seniority</Label>
-              <Input
-                id="iq-seniority"
-                value={seniority}
-                onChange={(e) => setSeniority(e.target.value)}
-                placeholder="e.g. Senior, Lead"
-              />
-            </div>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Style</Label>
               <Select value={style} onValueChange={(v) => setStyle(v as QuestionStyle)}>
@@ -446,6 +474,54 @@ export default function InterviewQuestions() {
         />
       </div>
     </ToolShell>
+  );
+}
+
+// ─── Shared target-role + seniority pair ────────────────────────────────────
+// Used wherever the LLM needs an explicit role to interview the candidate for
+// (resume tab, paste-resume tab, role-only tab). The Job tab doesn't render
+// this — the JD already encodes the target role.
+
+interface TargetRoleFieldsProps {
+  targetRole: string;
+  seniority: string;
+  onTargetRoleChange: (v: string) => void;
+  onSeniorityChange: (v: string) => void;
+  /** When true, the target role field is marked required + the placeholder
+   *  hints that it's the sole input. Used by the role-only tab. */
+  required?: boolean;
+}
+
+function TargetRoleFields({
+  targetRole,
+  seniority,
+  onTargetRoleChange,
+  onSeniorityChange,
+  required = false,
+}: TargetRoleFieldsProps) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="iq-role">
+          Target role{required && <span className="text-destructive ml-0.5">*</span>}
+        </Label>
+        <Input
+          id="iq-role"
+          value={targetRole}
+          onChange={(e) => onTargetRoleChange(e.target.value)}
+          placeholder="e.g. Senior Backend Engineer"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="iq-seniority">Seniority</Label>
+        <Input
+          id="iq-seniority"
+          value={seniority}
+          onChange={(e) => onSeniorityChange(e.target.value)}
+          placeholder="e.g. Senior, Lead"
+        />
+      </div>
+    </div>
   );
 }
 
