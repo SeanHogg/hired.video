@@ -80,6 +80,11 @@ export default function PageHeader({
    *      cleanly), the rest of the page's existing params survive.
    * Cross-route tab Links (different pathname) bypass the merge so a
    * page transition doesn't inherit unrelated query state.
+   *
+   * `tab` is special: the destination's tab state always wins, including
+   * its absence. EntityHubShell omits `?tab=` on the default tab, so
+   * clicking "My Resumes" from `?tab=sourced` must clear it — otherwise
+   * the click navigates to the same URL and the tab doesn't change.
    */
   const buildTo = (to: string): string => {
     const [pathPart, queryPart] = to.split("?");
@@ -88,6 +93,7 @@ export default function PageHeader({
     if (targetPath !== location.pathname) return to;
     const merged = new URLSearchParams(searchParams);
     const tabParams = new URLSearchParams(queryPart ?? "");
+    merged.delete("tab");
     tabParams.forEach((value, key) => merged.set(key, value));
     const queryString = merged.toString();
     return queryString ? `${targetPath}?${queryString}` : targetPath;

@@ -95,8 +95,6 @@ import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { deriveKindDefaults } from "@/lib/studio/editor-v2/kind-defaults";
 import {
-  mediaKindHasAudio,
-  mediaKindHasVideo,
   mediaKindUsesCanvasStateAuthoring,
   type MediaKind,
 } from "@shared/media-kinds";
@@ -134,7 +132,6 @@ import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capt
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
 import FloatingLayersPanel from "@/components/studio/v2/FloatingLayersPanel";
-import BinPanel from "@/components/studio/nle/BinPanel";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
@@ -1913,38 +1910,12 @@ export default function StudioEditorV2() {
                         insertLinkedContent(entityKind, entityId)
                       }
                       onCaptureScreenshot={() => placeScreenshot()}
-                    />
-                  )}
-                  {leftTab === "media" && (
-                    <BinPanel
-                      onPickSource={(src) => {
-                        if (src.kind === "image") {
-                          addMediaWidget("image", src.url, 0);
-                        } else if (src.kind === "video") {
-                          addMediaWidget(
-                            "video",
-                            src.url,
-                            src.durationFrames / src.fps,
-                          );
-                        } else if (src.kind === "audio") {
-                          addVoiceoverClip({
-                            id:
-                              typeof crypto !== "undefined" && "randomUUID" in crypto
-                                ? crypto.randomUUID()
-                                : `vo_${Date.now()}`,
-                            url: src.url,
-                            durationSeconds: src.durationFrames / src.fps,
-                            anchorSceneId: activeSceneId,
-                            label: src.filename,
-                            gain: 1,
-                            muted: false,
-                          });
-                          toast({
-                            title: "Added as voiceover",
-                            description: src.filename,
-                          });
-                        }
-                      }}
+                      onAddImageWidget={(url) => addMediaWidget("image", url)}
+                      onAddVideoWidget={(url, durationSeconds) =>
+                        addMediaWidget("video", url, durationSeconds)
+                      }
+                      onAddVoiceover={addVoiceoverClip}
+                      activeSceneId={activeSceneId}
                     />
                   )}
                   {leftTab === "actions" && (
@@ -1962,6 +1933,8 @@ export default function StudioEditorV2() {
                       }
                       persistedProjectId={persistedProjectId}
                       videoId={persistedProject?.youtubeVideoId ?? persistedProject?.id ?? null}
+                      onInsertWidget={insertWidget}
+                      onCaptureScreenshot={() => placeScreenshot()}
                       onAddVideoWidget={(url, durationSeconds) =>
                         addMediaWidget("video", url, durationSeconds)
                       }
@@ -2720,14 +2693,14 @@ function EditorHeader({
 // ───────────────────────────────────────────────────────────────────────────
 
 // Tab selector for the bottom half of the left rail. Widgets = the
-// drag-and-drop palette; Actions = recording / AI tools / captions /
+// drag-and-drop palette (which now hosts the shared `MediaSection` with
+// the embedded source bin); Actions = recording / AI tools / captions /
 // engagement (v1 dialogs mounted via ActionsPanel adapters). Project-
 // wide configuration (themes / fonts / palette / motion / music /
 // format / export) now lives in the right inspector under the "Canvas"
 // section group — selecting nothing on the canvas surfaces it there.
 const LEFT_TABS = [
   { id: "widgets", label: "Widgets" },
-  { id: "media", label: "Media" },
   { id: "actions", label: "Actions" },
 ] as const;
 type LeftTabId = (typeof LEFT_TABS)[number]["id"];

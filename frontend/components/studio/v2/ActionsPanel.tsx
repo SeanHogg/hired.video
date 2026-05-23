@@ -19,15 +19,10 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import {
   Camera,
   Captions,
-  Image as ImageIcon,
-  ListOrdered,
   Mic,
   Music,
-  Pencil,
-  Search,
   Sparkles,
   TvMinimalPlay,
-  UserSquare,
   WandSparkles,
 } from "lucide-react";
 import {
@@ -41,7 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
-import MediaPicker from "@/components/shared/MediaPicker";
+import MediaSection from "./MediaSection";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import type {
   CanvasAudioMix,
@@ -51,6 +46,7 @@ import type {
   Scene,
   VoiceoverClip,
   Widget,
+  WidgetKind,
 } from "@/lib/studio/editor-v2/canvas-state";
 
 // Lazy-load every dialog so the editor's initial bundle doesn't pull
@@ -113,6 +109,13 @@ export interface ActionsPanelProps {
   onAddVideoWidget: (url: string, durationSeconds: number) => void;
   onAddImageWidget: (url: string) => void;
   onAddVoiceover: (clip: VoiceoverClip) => void;
+  /** Drops a blank widget (image / video / webcam) onto the active
+   *  scene — threaded into the shared `MediaSection` so the Actions-tab
+   *  mount has feature parity with the Widgets-tab mount. */
+  onInsertWidget: (kind: WidgetKind) => void;
+  /** Capture-screen-then-place-as-Image flow. Wired into the shared
+   *  `MediaSection`'s Screenshot tile. */
+  onCaptureScreenshot: () => void;
   onSetCaptions: (captions: CanvasCaptions) => void;
   onSetMusicFromBlob: (blob: Blob, durationSeconds: number, label: string) => void;
   onUpdateWidgetText: (widgetId: string, nextText: string) => void;
@@ -188,46 +191,23 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         />
       </LeftPanelSection>
 
-      <LeftPanelSection
-        title="Media"
+      {/* Shared MediaSection — same component the Widgets tab mounts.
+          Owns the Image / Video / Webcam blank tiles, Screenshot, the
+          Upload / Stock / AI picker dialog, AI Headshot, AND the
+          embedded source bin (the former "Media" left-rail tab). */}
+      <MediaSection
         open={sections.isOpen("media")}
         onToggle={() => sections.toggle("media")}
-        contentClassName="grid grid-cols-2 gap-2"
-      >
-        {/* MediaPicker is the SAME unified dialog v1 mounts elsewhere
-            in the app (StudioSidebar, profile editor, job editor, etc).
-            It owns the Upload / Stock / AI-image tabs, so we don't need
-            three separate buttons here. Result is dropped onto the
-            active scene as an Image or Video widget — caller doesn't
-            care which tab the user picked from. */}
-        <MediaPicker
-          accept="image+video"
-          title="Add media to canvas"
-          onPick={(asset) => {
-            if (asset.mediaType === "video") {
-              // PickedMedia doesn't carry duration; widget defaults to
-              // 0 and the scene stays at its existing length.
-              props.onAddVideoWidget(asset.url, 0);
-            } else {
-              props.onAddImageWidget(asset.url);
-            }
-          }}
-          trigger={
-            <LeftPanelTile
-              label="Media"
-              icon={Search}
-              onClick={() => {
-                /* MediaPicker opens itself via DialogTrigger asChild. */
-              }}
-            />
-          }
-        />
-        <LeftPanelTile
-          label="AI Headshot"
-          icon={UserSquare}
-          onClick={() => setOpenAction("ai-headshot")}
-        />
-      </LeftPanelSection>
+        onInsertImage={() => props.onInsertWidget("image")}
+        onInsertVideo={() => props.onInsertWidget("video")}
+        onInsertWebcam={() => props.onInsertWidget("webcam")}
+        onCaptureScreenshot={props.onCaptureScreenshot}
+        onAddImageWidget={props.onAddImageWidget}
+        onAddVideoWidget={props.onAddVideoWidget}
+        onAddVoiceover={props.onAddVoiceover}
+        activeSceneId={props.activeScene.id}
+        onOpenAiHeadshot={() => setOpenAction("ai-headshot")}
+      />
 
       <LeftPanelSection
         title="AI Tools"

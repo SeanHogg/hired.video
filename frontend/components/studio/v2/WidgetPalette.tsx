@@ -4,9 +4,11 @@
  * dataTransfer (handled by `<CanvasStage onWidgetDrop>`). Click also
  * inserts the widget at a default position.
  *
- * The palette is the SINGLE source of widget metadata. The catalog
- * below is read by ToolPalette here AND by tests that assert every
- * `WidgetKind` has palette coverage.
+ * `WIDGET_CATALOG` is the single source of widget metadata (kind →
+ * icon + label) — also read by `LayersPanel` to look up per-widget
+ * icons, so media kinds (image / video / webcam) stay in the catalog
+ * even though their tiles render from the shared `MediaSection` rather
+ * than from the catalog-driven loop here.
  *
  * Linked-content kinds (resume / job / future entities) don't appear in
  * `WIDGET_CATALOG` because they're not click-to-add-a-blank — each tile
@@ -24,7 +26,6 @@ import {
   Minus,
   BarChart3,
   Camera,
-  MonitorUp,
   Tags,
   Megaphone,
   MessageCircle,
@@ -32,10 +33,11 @@ import {
   Zap,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
+import type { WidgetKind, VoiceoverClip } from "@/lib/studio/editor-v2/canvas-state";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
 import LinkedContentPaletteSection from "./LinkedContentPaletteSection";
+import MediaSection from "./MediaSection";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
 import type { LinkedContentKind } from "@/lib/studio/editor-v2/linked-content";
@@ -56,6 +58,9 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "heading", label: "Heading", icon: Heading1, group: "text" },
   { kind: "text", label: "Text", icon: Type, group: "text" },
   { kind: "chips", label: "Chips", icon: Tags, group: "text" },
+  // Media-group entries stay in the catalog so `LayersPanel` can look
+  // up icons for image / video / webcam widgets by kind. The tiles
+  // themselves now render from `MediaSection` (shared with ActionsPanel).
   { kind: "image", label: "Image", icon: ImageIcon, group: "media" },
   { kind: "video", label: "Video", icon: VideoIcon, group: "media" },
   { kind: "webcam", label: "Webcam", icon: Camera, group: "media" },
@@ -73,9 +78,10 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "sfx-burst",     label: "SFX burst",     icon: Zap,            group: "comic", mediaKinds: ["comic"] },
 ];
 
-const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
+type CatalogGroup = Exclude<WidgetPaletteItem["group"], "media">;
+
+const GROUP_LABEL: Record<CatalogGroup, string> = {
   text: "Text",
-  media: "Media",
   shape: "Shapes",
   layout: "Layout",
   data: "Data",
@@ -94,6 +100,14 @@ export interface WidgetPaletteProps {
    *  and — via the canvas drop handler — to the drop case, so capture
    *  logic lives in exactly one hook. */
   onCaptureScreenshot: () => void;
+  /** Picker / bin handlers — threaded into the shared `MediaSection` so
+   *  the Widgets-tab mount has feature parity with the Actions-tab
+   *  mount (Upload / Stock / AI, plus the embedded source bin). */
+  onAddImageWidget: (url: string) => void;
+  onAddVideoWidget: (url: string, durationSeconds: number) => void;
+  onAddVoiceover: (clip: VoiceoverClip) => void;
+  /** Scene a new voiceover anchors to (bin → audio source path). */
+  activeSceneId: string;
   /** Active project's mediaKind. Controls which palette groups are
    *  visible — comic-native primitives only render when the project is
    *  a comic. Optional for back-compat with callers that haven't been
@@ -102,97 +116,87 @@ export interface WidgetPaletteProps {
   mediaKind?: string;
 }
 
-const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "comic", "layout", "data"];
+const PRE_MEDIA_GROUPS: readonly CatalogGroup[] = ["text"];
+const POST_MEDIA_GROUPS: readonly CatalogGroup[] = ["shape", "comic", "layout", "data"];
+// Section ids used by the collapsible-state hook. "media" lives next to
+// the catalog groups so the user's open/closed preference for the Media
+// section persists across reloads alongside the others.
+const SECTION_IDS = [...PRE_MEDIA_GROUPS, "media" as const, ...POST_MEDIA_GROUPS];
 
 export default function WidgetPalette({
   onInsert,
   onInsertLinkedContent,
   onCaptureScreenshot,
+  onAddImageWidget,
+  onAddVideoWidget,
+  onAddVoiceover,
+  activeSceneId,
   mediaKind,
 }: WidgetPaletteProps) {
   // Same collapsible-multi-open behaviour as Design + Actions tabs so
   // all three left-rail panels feel identical. Default to all-open here
   // because widget palette items are the user's primary "add" path —
   // hiding them on first paint would be a regression.
-  const sections = useCollapsibleSections(GROUPS, {
+  const sections = useCollapsibleSections(SECTION_IDS, {
     storageKey: "studio.v2.left.widgets.sections",
   });
 
+  const renderCatalogGroup = (group: CatalogGroup) => {
+    // Self-gating per the DRY rule — the palette knows which tiles
+    // belong on which mediaKind; consumers don't pass a `canShowX`
+    // boolean. A tile with no `mediaKinds` field renders for every
+    // kind; one with `mediaKinds: ["comic"]` only renders when the
+    // active project is a comic.
+    const items = WIDGET_CATALOG.filter(
+      (i) =>
+        i.group === group &&
+        (!i.mediaKinds || (mediaKind !== undefined && i.mediaKinds.includes(mediaKind))),
+    );
+    if (items.length === 0) return null;
+    return (
+      <LeftPanelSection
+        key={group}
+        title={GROUP_LABEL[group]}
+        open={sections.isOpen(group)}
+        onToggle={() => sections.toggle(group)}
+        contentClassName="grid grid-cols-2 gap-2"
+      >
+        {items.map((item) => (
+          <LeftPanelTile
+            key={item.kind}
+            label={item.label}
+            icon={item.icon}
+            onClick={() => onInsert(item.kind)}
+            draggable
+            onDragStart={(e) =>
+              writeDragPayload(e.dataTransfer, {
+                kind: "widget",
+                data: item.kind,
+              })
+            }
+          />
+        ))}
+      </LeftPanelSection>
+    );
+  };
+
   return (
     <LeftPanelScroller>
-      {GROUPS.map((group) => {
-        // Self-gating per the DRY rule — the palette knows which tiles
-        // belong on which mediaKind; consumers don't pass a `canShowX`
-        // boolean. A tile with no `mediaKinds` field renders for every
-        // kind; one with `mediaKinds: ["comic"]` only renders when the
-        // active project is a comic.
-        const items = WIDGET_CATALOG.filter(
-          (i) =>
-            i.group === group &&
-            (!i.mediaKinds || (mediaKind !== undefined && i.mediaKinds.includes(mediaKind))),
-        );
-        if (items.length === 0 && group !== "media") return null;
-        return (
-          <LeftPanelSection
-            key={group}
-            title={GROUP_LABEL[group]}
-            open={sections.isOpen(group)}
-            onToggle={() => sections.toggle(group)}
-            contentClassName="grid grid-cols-2 gap-2"
-          >
-            {items.map((item) => (
-              <LeftPanelTile
-                key={item.kind}
-                label={item.label}
-                icon={item.icon}
-                onClick={() => onInsert(item.kind)}
-                draggable
-                onDragStart={(e) =>
-                  writeDragPayload(e.dataTransfer, {
-                    kind: "widget",
-                    data: item.kind,
-                  })
-                }
-              />
-            ))}
-            {group === "media" && (
-              <ScreenshotTile onCapture={onCaptureScreenshot} />
-            )}
-          </LeftPanelSection>
-        );
-      })}
+      {PRE_MEDIA_GROUPS.map(renderCatalogGroup)}
+      <MediaSection
+        open={sections.isOpen("media")}
+        onToggle={() => sections.toggle("media")}
+        onInsertImage={() => onInsert("image")}
+        onInsertVideo={() => onInsert("video")}
+        onInsertWebcam={() => onInsert("webcam")}
+        onCaptureScreenshot={onCaptureScreenshot}
+        onAddImageWidget={onAddImageWidget}
+        onAddVideoWidget={onAddVideoWidget}
+        onAddVoiceover={onAddVoiceover}
+        activeSceneId={activeSceneId}
+      />
+      {POST_MEDIA_GROUPS.map(renderCatalogGroup)}
       <LinkedContentPaletteSection onInsert={onInsertLinkedContent} />
     </LeftPanelScroller>
-  );
-}
-
-/**
- * Screenshot palette tile. Self-gates per the DRY rule: when the
- * browser doesn't expose `getDisplayMedia` (older Safari, WebView, …)
- * the tile returns null instead of forcing every parent to thread a
- * `canCaptureScreenshot` boolean through.
- *
- * Both click and drag fire the same shared Control in `useScreenshotCapture`
- * (wired by the parent into `onCapture` here and into the canvas's
- * `onScreenshotDrop` handler) — no parallel capture logic anywhere.
- */
-function ScreenshotTile({ onCapture }: { onCapture: () => void }) {
-  if (
-    typeof navigator === "undefined" ||
-    typeof navigator.mediaDevices?.getDisplayMedia !== "function"
-  ) {
-    return null;
-  }
-  return (
-    <LeftPanelTile
-      label="Screenshot"
-      icon={MonitorUp}
-      onClick={onCapture}
-      draggable
-      onDragStart={(e) =>
-        writeDragPayload(e.dataTransfer, { kind: "screenshot", data: "1" })
-      }
-      hint="Pick a window, tab, or screen and a snapshot lands on the canvas"
-    />
   );
 }

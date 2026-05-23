@@ -63,6 +63,18 @@ export default function VideoCard({
     return `${Math.floor(diffDays / 30)} months ago`;
   };
 
+  // Single open-video handler so the card body, play overlay, and the
+  // footer "View" action all route through the same path. CardActions
+  // stops propagation on its buttons, so the card-level onClick won't
+  // double-fire when the footer button is used.
+  const handleView = () => {
+    if (onView) {
+      onView();
+    } else {
+      window.location.href = `/v/${id}`;
+    }
+  };
+
   // Use passed actions or fallback to default actions.
   // Share routes through the shared `buildShareAction` helper so the
   // copy-link + toast UX matches every other entity card on the platform.
@@ -75,13 +87,7 @@ export default function VideoCard({
             label: "View",
             variant: "outline",
             icon: Eye,
-            onClick: () => {
-              if (onView) {
-                onView();
-              } else {
-                window.location.href = `/v/${id}`;
-              }
-            },
+            onClick: handleView,
           },
           buildShareAction({
             entityUrl: `/v/${id}`,
@@ -90,7 +96,7 @@ export default function VideoCard({
         ];
 
   return (
-    <BaseCard className="group cursor-pointer overflow-hidden">
+    <BaseCard className="group overflow-hidden" onClick={handleView}>
       <CardContent className="p-0">
         {/* Video Thumbnail Section */}
         <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
@@ -110,6 +116,11 @@ export default function VideoCard({
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">
             <Button
               size="icon"
+              aria-label={`Play ${title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleView();
+              }}
               className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12"
             >
               <Play className="h-6 w-6 fill-current ml-1" />
