@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   ChevronRight,
+  ClipboardCheck,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -112,7 +113,17 @@ export function TargetRoadmap({
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={`/tools/interview-questions?source=career-360&targetRole=${encodeURIComponent(
+                    selected.title,
+                  )}${selected.seniority ? `&seniority=${encodeURIComponent(selected.seniority)}` : ""}`}
+                >
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  Generate interview questions
+                </Link>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

@@ -40,6 +40,7 @@ export default function AICoach() {
   const showAuthOverlay = !isAuthenticated;
 
   const profileAuditTool = getCatalogTool("profile-audit");
+  const interviewQuestionsTool = getCatalogTool("interview-questions");
 
   const coachingFeatures = [
     {
@@ -113,43 +114,51 @@ export default function AICoach() {
               )}
             </div>
 
-            {/* Featured Tool: Profile Audit */}
-            {profileAuditTool && (
-              <Card className="mb-8 border-brand-purple/30 bg-gradient-to-r from-brand-purple/5 to-brand-blue/5">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex items-start gap-4">
-                      <div
-                        className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${profileAuditTool.iconBgClassName}`}
-                      >
-                        <profileAuditTool.icon
-                          className={`h-6 w-6 ${profileAuditTool.iconColorClassName}`}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <CardTitle className="text-xl">{profileAuditTool.title}</CardTitle>
-                          {profileAuditTool.statusBadge && (
-                            <Badge className={profileAuditTool.statusBadge.className}>
-                              {profileAuditTool.statusBadge.label}
-                            </Badge>
-                          )}
+            {/* Featured tools — kept DRY across Profile Audit, Interview
+                Questions, and any future "primary AI-Coach handoff" entry
+                by mapping over the catalog refs. */}
+            {[profileAuditTool, interviewQuestionsTool]
+              .filter((t): t is NonNullable<typeof t> => Boolean(t))
+              .map((tool) => (
+                <Card
+                  key={tool.id}
+                  className="mb-4 border-brand-purple/30 bg-gradient-to-r from-brand-purple/5 to-brand-blue/5"
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-start gap-4">
+                        <div
+                          className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${tool.iconBgClassName}`}
+                        >
+                          <tool.icon className={`h-6 w-6 ${tool.iconColorClassName}`} />
                         </div>
-                        <CardDescription className="text-base">
-                          {profileAuditTool.description}
-                        </CardDescription>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-xl">{tool.title}</CardTitle>
+                            {tool.statusBadge && (
+                              <Badge className={tool.statusBadge.className}>
+                                {tool.statusBadge.label}
+                              </Badge>
+                            )}
+                          </div>
+                          <CardDescription className="text-base">
+                            {tool.description}
+                          </CardDescription>
+                        </div>
                       </div>
+                      <Button
+                        asChild
+                        className="bg-gradient-to-r from-brand-purple to-brand-blue text-white"
+                      >
+                        <Link to={tool.href}>
+                          {tool.ctaLabel ?? `Open ${tool.title}`}
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
                     </div>
-                    <Button asChild className="bg-gradient-to-r from-brand-purple to-brand-blue text-white">
-                      <Link to={profileAuditTool.href}>
-                        Run Profile Audit
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-              </Card>
-            )}
+                  </CardHeader>
+                </Card>
+              ))}
 
             {/* Features Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">

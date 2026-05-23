@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import {
   createAsyncInterview,
@@ -38,6 +39,7 @@ import {
   uploadRecording,
   type AsyncInterview,
 } from "@/lib/services/studio-features-service";
+import { resendInterviewInvite } from "@/lib/services/interview-assignments-service";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -584,6 +586,11 @@ function InterviewListPanel() {
                 {iv.inviteUrl && (
                   <CopyInviteButton url={iv.inviteUrl} />
                 )}
+                <ResendInviteButton
+                  interviewId={iv.id}
+                  status={iv.status}
+                  onResent={fetchInterviews}
+                />
                 <Button
                   variant="outline"
                   size="sm"
@@ -655,6 +662,41 @@ function InterviewListPanel() {
         </Card>
       ))}
     </div>
+  );
+}
+
+function ResendInviteButton({
+  interviewId,
+  status,
+  onResent,
+}: {
+  interviewId: string;
+  status: string;
+  onResent: () => void;
+}) {
+  const [resending, setResending] = useState(false);
+  const disabled = status === "submitted" || status === "reviewed";
+  async function handle() {
+    setResending(true);
+    try {
+      await resendInterviewInvite(interviewId);
+      onResent();
+    } catch {
+      // toast is owned by the parent's fetchInterviews → error path
+    } finally {
+      setResending(false);
+    }
+  }
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={handle}
+      disabled={disabled || resending}
+      title="Re-send magic link"
+    >
+      {resending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+    </Button>
   );
 }
 

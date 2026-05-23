@@ -97,6 +97,8 @@ const ResumeConsolidator = lazy(() => import("./pages/tools/ResumeConsolidator")
 const SkillExtractor = lazy(() => import("./pages/tools/SkillExtractor"));
 const ProfileAudit = lazy(() => import("./pages/tools/ProfileAudit"));
 const Career360 = lazy(() => import("./pages/tools/Career360"));
+const InterviewQuestions = lazy(() => import("./pages/tools/InterviewQuestions"));
+const MyInterviewAssignments = lazy(() => import("./pages/MyInterviewAssignments"));
 const VendorSync = lazy(() => import("./pages/tools/VendorSync"));
 const ToolDetail = lazy(() => import("./pages/ToolDetail"));
 const Outreach = lazy(() => import("./pages/Outreach"));
@@ -743,6 +745,18 @@ const App = () => (
                       <Route
                         path="/tools/career-360"
                         element={<Career360 />}
+                      />
+                      <Route
+                        path="/tools/interview-questions"
+                        element={<InterviewQuestions />}
+                      />
+                      <Route
+                        path="/interview-assignments"
+                        element={<MyInterviewAssignments />}
+                      />
+                      <Route
+                        path="/interview-assignments/:id"
+                        element={<MyInterviewAssignments />}
                       />
                       <Route
                         path="/tools/vendor-sync"

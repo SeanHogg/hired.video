@@ -79,6 +79,7 @@ import { valuePropositionRoutes } from "./routes/value-proposition.js";
 import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
+import { interviewAssignmentRoutes } from "./routes/interview-assignments.js";
 import { scorecardRoutes } from "./routes/scorecards.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
@@ -277,6 +278,12 @@ export function createApp() {
   // Public interview session share links — no auth required.
   const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;
 
+  // Public invite preview for async-interview magic links — candidate
+  // visits /interview/:token before they've logged in / signed up.
+  // /claim/:token still requires auth.
+  const INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE =
+    /^\/api\/interview-assignments\/invite\/[^/]+$/;
+
   // Email-integration OAuth start + callback. These are top-level browser
   // navigations (consent screen redirect) so they can't carry an
   // Authorization header. The route reads the user id from a short-lived
@@ -299,6 +306,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
+    if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return next();
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path) || PUBLIC_RESUME_DETAIL_ROUTE.test(path))) {
@@ -316,6 +324,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
+    if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
     // The OAuth start/callback for email integrations are top-level browser
     // navigations that bypass authMiddleware above (identity rides on a
@@ -486,6 +495,7 @@ export function createApp() {
   app.route("/api/valueproposition", valuePropositionRoutes);
   app.route("/api/hubs", hubsRoutes);
   app.route("/api/interview", interviewRoutes);
+  app.route("/api/interview-assignments", interviewAssignmentRoutes);
   app.route("/api/scorecards", scorecardRoutes);
   app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);

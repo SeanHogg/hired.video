@@ -21,7 +21,7 @@ import {
   type SkillExtractInput,
 } from "../resume/skills.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../adapters/llm-client.js";
-import type { Env } from "../../types/index.js";
+import type { Env, JwtPayload } from "../../types/index.js";
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ function buildMockQuestions(args: GenerateQuestionsArgs): GeneratedQuestion[] {
  *  routes/interview.ts so dev builds without API keys still get a UX). */
 export async function generateQuestionsFromSkills(
   env: Env,
-  user: { sub: string } | undefined,
+  user: JwtPayload | undefined,
   args: GenerateQuestionsArgs,
 ): Promise<GeneratedQuestion[]> {
   const count = Math.min(Math.max(args.count ?? 5, 3), 10);
@@ -182,7 +182,7 @@ ${skillSummary || "(no skills supplied — fall back to role-fit questions for t
  *  loading the source row and passing the SkillExtractInput. */
 export async function generateFromSource(
   env: Env,
-  user: { sub: string } | undefined,
+  user: JwtPayload | undefined,
   input: SkillExtractInput,
   opts: Omit<GenerateQuestionsArgs, "skills">,
 ): Promise<{ skills: Skill[]; questions: GeneratedQuestion[] }> {

@@ -9,6 +9,7 @@ import {
   Brain,
   Calculator,
   Chrome,
+  ClipboardCheck,
   Compass,
   FileText,
   GitMerge,
@@ -249,6 +250,32 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Open Career 360",
     showOnHome: true,
     audienceRoles: [USER_ROLES.JOB_SEEKER],
+  },
+  {
+    id: "interview-questions",
+    href: "/tools/interview-questions",
+    title: "Interview Questions",
+    description:
+      "Generate skill-tailored interview questions from a resume, a job, or just a target role — copy, practise with the AI Coach, or assign to a candidate.",
+    tier: "free",
+    category: "Career",
+    icon: ClipboardCheck,
+    iconBgClassName: "bg-purple-100",
+    iconColorClassName: "text-brand-purple",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "Skills", label: "Targeted", valueClassName: "text-purple-600" },
+      { value: "Assign", label: "or Copy", valueClassName: "text-purple-600" },
+    ],
+    features: [
+      "Pulls skills from your resume or a job",
+      "Copy questions, hand off to AI Coach, or assign",
+      "Magic-link invite for the candidate (text or video answers)",
+    ],
+    ctaLabel: "Generate Questions",
+    showOnHome: true,
+    appliesTo: ["resume", "job"],
+    // Universal: job seekers practise; recruiters/employers assign.
   },
   {
     id: "interview-coach",
