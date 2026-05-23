@@ -15,11 +15,7 @@
  */
 
 import { z } from "zod";
-import {
-  extractSkills,
-  type Skill,
-  type SkillExtractInput,
-} from "../resume/skills.js";
+import type { Skill } from "../resume/skills.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../adapters/llm-client.js";
 import type { Env, JwtPayload } from "../../types/index.js";
 
@@ -176,21 +172,3 @@ ${skillSummary || "(no skills supplied — fall back to role-fit questions for t
   }
 }
 
-/** End-to-end helper: extract skills from a source then generate
- *  questions in one shot. Used by the tool page when the user supplies
- *  a resumeId / jobId / free-text. The caller is responsible for
- *  loading the source row and passing the SkillExtractInput. */
-export async function generateFromSource(
-  env: Env,
-  user: JwtPayload | undefined,
-  input: SkillExtractInput,
-  opts: Omit<GenerateQuestionsArgs, "skills">,
-): Promise<{ skills: Skill[]; questions: GeneratedQuestion[] }> {
-  const llm = hasAnyLLMProviderKey(env) ? createLLMClient(env, user) : null;
-  const extracted = await extractSkills(llm, input);
-  const questions = await generateQuestionsFromSkills(env, user, {
-    ...opts,
-    skills: extracted.skills,
-  });
-  return { skills: extracted.skills, questions };
-}

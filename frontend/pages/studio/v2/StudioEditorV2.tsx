@@ -104,8 +104,11 @@ import GameStage from "@/components/studio/game/GameStage";
 import GameEditor from "@/components/studio/game/GameEditor";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
-import { type ImageState } from "@shared/image-state";
+import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
+import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
+import { flattenCanvasToBlob } from "@/lib/studio/drawing/drawing-engine";
+import { uploadImage } from "@/lib/services/upload-service";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -290,10 +293,188 @@ export default function StudioEditorV2() {
   // Image-runtime state for `mediaKind: "image"` projects (#932). Lives
   // alongside the Timeline `state` (CanvasState) and the
   // `persistedProject.gameState` — each canvas runtime owns its own
-  // state model per PRD §1.2. Hydrated from `persistedProject.imageState`
-  // when an existing image project loads; seeded with a blank canvas
-  // for new image projects. Null for non-image projects.
-  const [imageState, setImageState] = useState<ImageState | null>(null);
+  // state model per PRD §1.2. The history wrapper is the SAME generic
+  // `useCanvasHistory<T>` the Timeline runtime uses (DRY — no parallel
+  // history implementation); seeded with a blank state so the hook can
+  // mount unconditionally and the host's `<CanvasEditToolbar/>` can
+  // drive undo/redo without a kind branch. The blank seed is harmless
+  // for non-image projects — the hook holds the state in memory but
+  // nothing reads it.
+  const imageHistory = useCanvasHistory<ImageState>(() => createBlankImageState());
+  const {
+    state: imageState,
+    setState: setImageState,
+    undo: imageUndo,
+    redo: imageRedo,
+    canUndo: imageCanUndo,
+    canRedo: imageCanRedo,
+    commit: imageCommit,
+    reset: resetImageHistory,
+  } = imageHistory;
+  // Tracks whether the image-runtime state has been hydrated for the
+  // current project (or seeded for a fresh image-kind draft). Distinct
+  // from the always-present `imageState` blank seed above — the host
+  // mounts `<DrawingStage/>` only when this flag is true to avoid a
+  // flash of the blank canvas before the persisted project loads.
+  const [imageStateHydrated, setImageStateHydrated] = useState(false);
+  // Captured by DrawingStage so the host can flatten the composite on
+  // Export / Save-to-library without DrawingStage needing its own
+  // header buttons (single chrome, kind-aware action — per DRY).
+  const [imageCanvas, setImageCanvas] = useState<HTMLCanvasElement | null>(null);
+  // Save-to-library is async + needs a busy state to disable the host's
+  // SaveMenu while in flight.
+  const [savingImageToLibrary, setSavingImageToLibrary] = useState(false);
+
+  // ─── Image-runtime layer-mutation handlers (lifted from DrawingStage) ──
+  // These live in the host so the SHARED `<FloatingImageLayersPanel/>`
+  // (mounted by the host alongside the Timeline `<FloatingLayersPanel/>`)
+  // can drive them without DrawingStage being in the path. Per the DRY
+  // rule the rules ("can't delete the last layer", "active layer
+  // selection follows deletion") live ONCE here.
+  const handleImageAddLayer = useCallback(() => {
+    const id = `layer-${Math.random().toString(36).slice(2, 10)}`;
+    setImageState((prev) => ({
+      ...prev,
+      layers: [
+        ...prev.layers,
+        {
+          id,
+          label: `Layer ${prev.layers.length + 1}`,
+          kind: "raster",
+          opacity: 1,
+          visible: true,
+          locked: false,
+          blendMode: "normal",
+          pixelsDataUrl: null,
+        },
+      ],
+      activeLayerId: id,
+    }));
+    imageCommit();
+  }, [setImageState, imageCommit]);
+  const handleImageDeleteLayer = useCallback(
+    (layerId: string) => {
+      setImageState((prev) => {
+        if (prev.layers.length <= 1) return prev;
+        const next = prev.layers.filter((l) => l.id !== layerId);
+        return {
+          ...prev,
+          layers: next,
+          activeLayerId:
+            prev.activeLayerId === layerId
+              ? (next[next.length - 1]?.id ?? prev.activeLayerId)
+              : prev.activeLayerId,
+        };
+      });
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
+  const handleImageSelectLayer = useCallback(
+    (layerId: string) => {
+      setImageState((prev) =>
+        findImageLayer(prev, layerId) ? { ...prev, activeLayerId: layerId } : prev,
+      );
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
+  const handleImageToggleVisible = useCallback(
+    (layerId: string) => {
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layerId ? { ...l, visible: !l.visible } : l,
+        ),
+      }));
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
+  const handleImageRenameLayer = useCallback(
+    (layerId: string, label: string) => {
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layerId ? { ...l, label } : l,
+        ),
+      }));
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
+  const handleImageSetOpacity = useCallback(
+    (layerId: string, opacity: number) => {
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layerId ? { ...l, opacity } : l,
+        ),
+      }));
+    },
+    [setImageState],
+  );
+  const handleImageMoveLayer = useCallback(
+    (layerId: string, direction: "up" | "down") => {
+      setImageState((prev) => {
+        // ImageState stores bottom-first; "up" in the display (top of
+        // the stack) means later in the array.
+        const idx = prev.layers.findIndex((l) => l.id === layerId);
+        if (idx < 0) return prev;
+        const offset = direction === "up" ? 1 : -1;
+        const target = idx + offset;
+        if (target < 0 || target >= prev.layers.length) return prev;
+        const next = [...prev.layers];
+        const [moved] = next.splice(idx, 1);
+        next.splice(target, 0, moved);
+        return { ...prev, layers: next };
+      });
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
+
+  // Save-to-library: flatten the live composite canvas via the shared
+  // helper, upload through the SAME `uploadImage()` port MediaPicker
+  // uses, toast on success. Wired to the SaveMenu's `asset-library`
+  // publish destination handler so the action surfaces in the same
+  // dropdown as Export / Profile gallery — no duplicate "Save to
+  // library" button on the DrawingStage itself.
+  const handleSaveImageToLibrary = useCallback(async () => {
+    if (!imageCanvas || savingImageToLibrary) return;
+    setSavingImageToLibrary(true);
+    try {
+      const blob = await flattenCanvasToBlob(imageCanvas, "image/png");
+      const url = await uploadImage(blob, `drawing-${Date.now()}.png`);
+      toast({
+        title: "Saved to your library",
+        description: "Pick it from MediaPicker → Library in any studio project.",
+      });
+      return url;
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingImageToLibrary(false);
+    }
+  }, [imageCanvas, savingImageToLibrary, toast]);
+
+  // Export PNG: same flatten path, triggers a browser download. The
+  // SaveMenu's "Export image" item routes here when mediaKind=image,
+  // mirroring the Timeline runtime's MP4 / MP3 / GIF export path.
+  const handleExportImagePng = useCallback(async () => {
+    if (!imageCanvas) return;
+    const blob = await flattenCanvasToBlob(imageCanvas, "image/png");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `drawing-${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [imageCanvas]);
   // Game-runtime state for `mediaKind: "game"` projects (#939 Phase 2b).
   // Same shape as `imageState` — local state hydrated from
   // `persistedProject.gameState`, edited via the right-rail `<GameEditor>`,
@@ -394,19 +575,26 @@ export default function StudioEditorV2() {
   // Hydrate / seed image-runtime state when the editor mounts on an
   // image-kind project. Existing rows arrive with `persistedProject.imageState`
   // populated; fresh rows arrive with it null and we seed a blank
-  // canvas at template-appropriate dimensions. For non-image projects
-  // we hold null so the Timeline path isn't paying ImageState memory
-  // cost.
+  // canvas at template-appropriate dimensions. The history hook is
+  // always mounted (DRY: same hook the Timeline runtime uses);
+  // `imageStateHydrated` tracks whether the current state corresponds
+  // to the loaded project — DrawingStage mounts only when true.
   useEffect(() => {
     if (currentMediaKind !== "image") {
-      if (imageState !== null) setImageState(null);
+      if (imageStateHydrated) setImageStateHydrated(false);
       return;
     }
-    if (imageState !== null) return;
+    if (imageStateHydrated) return;
     const serverImage = persistedProject?.imageState as ImageState | null | undefined;
-    setImageState(serverImage ?? seedImageFromTemplate(templateHint));
-    // imageState is intentionally read once per mediaKind / persistedProject
-    // pair — we don't want a server round-trip to clobber in-flight edits.
+    // `reset` (not `setState`) clears past/future stacks so undo can't
+    // take the user below the just-loaded server state — mirrors the
+    // Timeline runtime's resetHistory behavior in the server-load
+    // effect below.
+    resetImageHistory(serverImage ?? seedImageFromTemplate(templateHint));
+    setImageStateHydrated(true);
+    // imageStateHydrated is intentionally read once per mediaKind /
+    // persistedProject pair — we don't want a server round-trip to
+    // clobber in-flight edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, persistedProject]);
 
@@ -1129,6 +1317,26 @@ export default function StudioEditorV2() {
   }
 
   async function handleExport() {
+    // Image kind has its own flatten-to-PNG path that doesn't go
+    // through the Timeline render pipeline (no ffmpeg.wasm, no
+    // WebCodecs — just `canvas.toBlob`). Routed early so the rest of
+    // the function stays focused on Timeline + game export.
+    if (currentMediaKind === "image") {
+      setExporting(true);
+      try {
+        await handleExportImagePng();
+        toast({ title: "Exported", description: "Your drawing has been downloaded." });
+      } catch (err) {
+        toast({
+          title: "Export failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
     setExporting(true);
     await withRenderErrorRecovery("Export", async () => {
       // Per the canvas-runtime extensibility model (PRD §1.2), each
@@ -1468,13 +1676,17 @@ export default function StudioEditorV2() {
           hasContent={
             // Per-kind content predicate — Timeline kinds need at
             // least one widget on a scene; game kinds need a
-            // gameState with levels. Reads local `gameState` (not
-            // `persistedProject.gameState`) so an in-editor add-level
-            // immediately enables the Export button without waiting
-            // for a save round-trip.
+            // gameState with levels; image kind always has content
+            // (the canvas itself is a flattenable artefact even if no
+            // strokes have landed — the background fill IS valid
+            // output). Reads local kind-state (not `persistedProject.*`)
+            // so an in-editor change immediately enables the Export
+            // button without waiting for a save round-trip.
             currentMediaKind === "game"
               ? !!gameState && gameState.levels.length > 0
-              : state.scenes.some((s) => s.widgets.length > 0)
+              : currentMediaKind === "image"
+                ? imageStateHydrated
+                : state.scenes.some((s) => s.widgets.length > 0)
           }
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
@@ -1482,6 +1694,11 @@ export default function StudioEditorV2() {
           onPublishToYouTube={handlePublishToYouTube}
           onPublishToLinkedIn={handlePublishToLinkedIn}
           onPublishToProfile={handlePublishToProfile}
+          onSaveImageToLibrary={
+            currentMediaKind === "image" && !savingImageToLibrary && !!imageCanvas
+              ? handleSaveImageToLibrary
+              : undefined
+          }
           usesTimelineChrome={usesTimelineChrome}
         />
         {missingProject && (
@@ -1713,12 +1930,14 @@ export default function StudioEditorV2() {
                           </button>
                         </div>
                       ),
-                      image: imageState ? (
+                      image: imageStateHydrated ? (
                         <div className="h-[calc(100vh-200px)] w-full">
                           <DrawingStage
                             state={imageState}
-                            onChange={setImageState}
+                            setState={setImageState}
+                            commit={imageCommit}
                             zoom={zoom}
+                            onCanvasReady={setImageCanvas}
                           />
                         </div>
                       ) : null,
@@ -1819,30 +2038,62 @@ export default function StudioEditorV2() {
                   canvas rather than in the header / left rail so
                   scene-scoped ops sit beside the surface they act on
                   (#647). The layers popover opens upward so the canvas
-                  isn't covered when expanded. */}
+                  isn't covered when expanded. Per the DRY rule the
+                  toolbar's `history` prop is kind-aware — for image
+                  projects it drives `imageHistory`, for Timeline kinds
+                  it drives the CanvasState history. ONE undo/redo
+                  affordance across the editor regardless of kind. */}
               <div className="pointer-events-none absolute left-3 bottom-3 z-10">
                 <CanvasEditToolbar
-                  history={{ undo, redo, canUndo, canRedo }}
+                  history={
+                    currentMediaKind === "image"
+                      ? {
+                          undo: imageUndo,
+                          redo: imageRedo,
+                          canUndo: imageCanUndo,
+                          canRedo: imageCanRedo,
+                        }
+                      : { undo, redo, canUndo, canRedo }
+                  }
                   clipboard={clipboard}
                 />
               </div>
+              {/* Layers panel — kind-aware mount per DRY: Timeline
+                  kinds (video/podcast/voice/animation/comic) render
+                  `<FloatingLayersPanel/>` over CanvasState widgets;
+                  image kind renders `<FloatingImageLayersPanel/>` over
+                  `imageState.layers`. Same `<FloatingCollapsiblePanel/>`
+                  chrome; different body. */}
               <div className="pointer-events-none absolute left-1/2 bottom-3 z-10 -translate-x-1/2">
-                <FloatingLayersPanel
-                  scene={activeScene}
-                  selectedWidgetId={
-                    selection.kind === "widget" ? selection.widgetId : null
-                  }
-                  onSelectWidget={(widgetId) =>
-                    setSelection({
-                      kind: "widget",
-                      sceneId: activeScene.id,
-                      widgetId,
-                    })
-                  }
-                  onReorderLayers={(widgetIds) =>
-                    reorderLayers(activeScene.id, widgetIds)
-                  }
-                />
+                {currentMediaKind === "image" && imageStateHydrated ? (
+                  <FloatingImageLayersPanel
+                    state={imageState}
+                    onAddLayer={handleImageAddLayer}
+                    onDeleteLayer={handleImageDeleteLayer}
+                    onSelectLayer={handleImageSelectLayer}
+                    onToggleVisible={handleImageToggleVisible}
+                    onRenameLayer={handleImageRenameLayer}
+                    onSetOpacity={handleImageSetOpacity}
+                    onMoveLayer={handleImageMoveLayer}
+                  />
+                ) : (
+                  <FloatingLayersPanel
+                    scene={activeScene}
+                    selectedWidgetId={
+                      selection.kind === "widget" ? selection.widgetId : null
+                    }
+                    onSelectWidget={(widgetId) =>
+                      setSelection({
+                        kind: "widget",
+                        sceneId: activeScene.id,
+                        widgetId,
+                      })
+                    }
+                    onReorderLayers={(widgetIds) =>
+                      reorderLayers(activeScene.id, widgetIds)
+                    }
+                  />
+                )}
               </div>
               <div className="pointer-events-none absolute right-3 bottom-3 z-10">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
@@ -2078,6 +2329,7 @@ function EditorHeader({
   onPublishToYouTube,
   onPublishToLinkedIn,
   onPublishToProfile,
+  onSaveImageToLibrary,
   usesTimelineChrome,
 }: {
   title: string;
@@ -2097,6 +2349,10 @@ function EditorHeader({
   onPublishToYouTube: () => void;
   onPublishToLinkedIn: () => void;
   onPublishToProfile: () => void;
+  /** Image-kind only: handler bound to the SaveMenu's `asset-library`
+   *  publish destination. Falls through unbound (the dropdown row
+   *  self-disables) for non-image projects. */
+  onSaveImageToLibrary?: () => void;
   /** Drives whether the playback scrubber + Preview button render — the
    *  shared gate (#936) so non-Timeline kinds (game / image) don't see
    *  scene-shaped controls that don't apply to their runtime. */
@@ -2259,6 +2515,13 @@ function EditorHeader({
             youtube: onPublishToYouTube,
             linkedin: onPublishToLinkedIn,
             profile: onPublishToProfile,
+            // Image-kind asset library handoff (#933). When bound the
+            // SaveMenu's `asset-library` row enables; otherwise the
+            // menu self-disables it. Same uploadImage() port the
+            // MediaPicker uses — closes the create→reuse loop.
+            ...(onSaveImageToLibrary
+              ? { "asset-library": onSaveImageToLibrary }
+              : {}),
           }}
         />
       </div>

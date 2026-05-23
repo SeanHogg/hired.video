@@ -5,11 +5,25 @@
  * is image-kind.
  *
  * Composition: left rail (tool palette + brush settings + color
- * picker), centre (visible composite canvas wrapped in zoom container),
- * right rail (layers panel above, AI prompt panel below). Mirrors the
- * editor shell's chrome layout without re-implementing any of it —
- * those rails live INSIDE the DrawingStage because the per-tool
- * controls are runtime-specific and shouldn't pollute the host shell.
+ * picker), centre (visible composite canvas), right rail (AI prompt
+ * panel). The layers list / undo+redo / save / export controls all
+ * live in the SHARED editor chrome the host already mounts — per the
+ * DRY rule (`feedback_extract_on_duplication`) the DrawingStage does
+ * NOT duplicate those affordances. Specifically:
+ *
+ *   • Undo / redo → host's `<CanvasEditToolbar/>` (bottom-left), wired
+ *     to the host's `useCanvasHistory<ImageState>` when image kind.
+ *   • Layers → host's `<FloatingImageLayersPanel/>` (bottom-centre),
+ *     replacing the Timeline `<FloatingLayersPanel/>` for image kind.
+ *   • Save / Export / Save-to-library → host's `<StudioSaveMenuV2/>`
+ *     in the header, with the export verb auto-deriving from the
+ *     mediaKind table and the asset-library publish destination
+ *     routing through the same R2 upload path as MediaPicker.
+ *
+ * This component is CONTROLLED — the host owns `state`, `setState`,
+ * `commit`, plus the layer-mutation handlers. DrawingStage just
+ * renders the canvas + tool palette + AI prompt and emits state
+ * updates on user input.
  *
  * State model: `ImageState` (shared/image-state.ts) is the source of
  * truth. Per-layer offscreen canvases are CACHE — rebuilt from each
@@ -17,29 +31,26 @@
  * stroke commit the active layer's offscreen is serialized back to a
  * dataURL and the state is updated.
  *
- * Undo/redo: reuses the existing `useCanvasHistory<T>` hook (generic
- * over T, originally written for CanvasState). Per the DRY rule we
- * don't fork a parallel history implementation — the snapshot-based
- * past/future stack works identically for ImageState.
- *
  * Per the SOLID open/closed principle the brush engine, fill engine,
  * and composite pipeline are pure functions in
- * `frontend/lib/studio/drawing/drawing-engine.ts`. Adding a new tool
- * is one entry in `DrawingTool` + one branch in the pointer handler
- * below + (optionally) a new pure function in the engine module.
+ * `frontend/lib/studio/drawing/drawing-engine.ts`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Undo2, Redo2, Download, Library, Loader2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   type ImageState,
   type ImageLayer,
   type AiPromptHistoryEntry,
   findLayer,
 } from "@shared/image-state";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
 import {
   type BrushSettings,
   type CanvasPoint,
@@ -50,7 +61,6 @@ import {
 import {
   compositeLayers,
   drawBlobToCanvasFit,
-  flattenCanvasToBlob,
   floodFillAt,
   hydrateLayerCanvas,
   pickColorAt,
@@ -60,50 +70,37 @@ import {
   createOffscreenCanvas,
 } from "@/lib/studio/drawing/drawing-engine";
 import { type ImageGenResult } from "@/lib/services/image-gen-engine";
-import { uploadImage } from "@/lib/services/upload-service";
-import { useToast } from "@/hooks/use-toast";
 import DrawingToolPalette from "./DrawingToolPalette";
-import DrawingLayersPanel from "./DrawingLayersPanel";
 import DrawingAiPromptPanel from "./DrawingAiPromptPanel";
 
 interface DrawingStageProps {
+  /** Controlled image state — owned by the host (so the host's
+   *  CanvasEditToolbar can drive undo/redo + the host's SaveMenu can
+   *  flatten on Export). */
   state: ImageState;
-  onChange: (next: ImageState) => void;
+  /** Host's setState — used directly for stroke pixel commits, AI
+   *  result layer inserts, and active-layer changes. */
+  setState: Dispatch<SetStateAction<ImageState>>;
+  /** Host's history commit — fired on stroke end + AI gen + the
+   *  layer-mutation actions handled by FloatingImageLayersPanel. */
+  commit: () => void;
   zoom: number;
+  /** Captured by the host on first paint so it can flatten the
+   *  composite for Export / Save-to-library. Called with null on
+   *  unmount so the host releases the reference. */
+  onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 export default function DrawingStage({
-  state: incomingState,
-  onChange,
+  state,
+  setState,
+  commit,
   zoom,
+  onCanvasReady,
 }: DrawingStageProps) {
-  const history = useCanvasHistory<ImageState>(incomingState);
-  const { state, setState, commit, undo, redo, canUndo, canRedo, reset } = history;
-
-  // When the server pushes a new ImageState (project switch, remote
-  // save), reset the local history so undo can't take the user below
-  // the just-loaded snapshot. Mirrors the editor-host pattern used for
-  // CanvasState — same hook, same reset semantics.
-  const lastIncomingRef = useRef(incomingState);
-  useEffect(() => {
-    if (incomingState !== lastIncomingRef.current) {
-      lastIncomingRef.current = incomingState;
-      reset(incomingState);
-    }
-  }, [incomingState, reset]);
-
-  // Bubble committed changes up to the host. The host owns persistence
-  // (save-draft autosave hook) so it sees every state change and
-  // schedules a save.
-  useEffect(() => {
-    if (state !== incomingState) onChange(state);
-  }, [state, incomingState, onChange]);
-
   const [tool, setTool] = useState<DrawingTool>("brush");
   const [brush, setBrush] = useState<BrushSettings>(DEFAULT_BRUSH);
   const [recentColors, setRecentColors] = useState<string[]>([]);
-  const [savingToLibrary, setSavingToLibrary] = useState(false);
-  const { toast } = useToast();
 
   // Per-layer offscreen canvases — cached from state.layers[].pixelsDataUrl.
   // Keyed by layer id; rebuilt whenever a layer's pixelsDataUrl changes.
@@ -316,121 +313,17 @@ export default function DrawingStage({
     [commitActiveLayerToState],
   );
 
-  // ─── Layer ops ───────────────────────────────────────────────────────
-  const handleAddLayer = useCallback(() => {
-    const id = `layer-${Math.random().toString(36).slice(2, 10)}`;
-    setState((prev) => {
-      const newLayer: ImageLayer = {
-        id,
-        label: `Layer ${prev.layers.length + 1}`,
-        kind: "raster",
-        opacity: 1,
-        visible: true,
-        locked: false,
-        blendMode: "normal",
-        pixelsDataUrl: null,
-      };
-      return {
-        ...prev,
-        layers: [...prev.layers, newLayer],
-        activeLayerId: id,
-      };
-    });
-    commit();
-  }, [setState, commit]);
-
-  const handleDeleteLayer = useCallback(
-    (layerId: string) => {
-      setState((prev) => {
-        if (prev.layers.length <= 1) return prev;
-        const next = prev.layers.filter((l) => l.id !== layerId);
-        return {
-          ...prev,
-          layers: next,
-          activeLayerId:
-            prev.activeLayerId === layerId
-              ? (next[next.length - 1]?.id ?? prev.activeLayerId)
-              : prev.activeLayerId,
-        };
-      });
-      commit();
-    },
-    [setState, commit],
-  );
-
-  const handleSelectLayer = useCallback(
-    (layerId: string) => {
-      setState((prev) => ({ ...prev, activeLayerId: layerId }));
-      commit();
-    },
-    [setState, commit],
-  );
-
-  const handleToggleVisible = useCallback(
-    (layerId: string) => {
-      setState((prev) => ({
-        ...prev,
-        layers: prev.layers.map((l) =>
-          l.id === layerId ? { ...l, visible: !l.visible } : l,
-        ),
-      }));
-      commit();
-    },
-    [setState, commit],
-  );
-
-  const handleRenameLayer = useCallback(
-    (layerId: string, label: string) => {
-      setState((prev) => ({
-        ...prev,
-        layers: prev.layers.map((l) =>
-          l.id === layerId ? { ...l, label } : l,
-        ),
-      }));
-      commit();
-    },
-    [setState, commit],
-  );
-
-  const handleSetOpacity = useCallback(
-    (layerId: string, opacity: number) => {
-      setState((prev) => ({
-        ...prev,
-        layers: prev.layers.map((l) =>
-          l.id === layerId ? { ...l, opacity } : l,
-        ),
-      }));
-    },
-    [setState],
-  );
-
-  const handleMoveLayer = useCallback(
-    (layerId: string, direction: "up" | "down") => {
-      setState((prev) => {
-        // ImageState stores bottom-first; "up" in the display (top of
-        // the stack) means later in the array.
-        const idx = prev.layers.findIndex((l) => l.id === layerId);
-        if (idx < 0) return prev;
-        const offset = direction === "up" ? 1 : -1;
-        const target = idx + offset;
-        if (target < 0 || target >= prev.layers.length) return prev;
-        const next = [...prev.layers];
-        const [moved] = next.splice(idx, 1);
-        next.splice(target, 0, moved);
-        return { ...prev, layers: next };
-      });
-      commit();
-    },
-    [setState, commit],
-  );
-
   // ─── AI integration ──────────────────────────────────────────────────
+  // The AI prompt panel inserts a new layer + appends one history entry.
+  // Same setState + commit pair the host uses for its layer-mutation
+  // handlers — no separate code path. Layer + history rules stay in the
+  // host's reducer (via setState).
   const handleAiGenerated = useCallback(
     async (result: ImageGenResult, prompt: string) => {
       const newLayerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
-      // Convert the result blob to a dataURL sized to the canvas. We
-      // letterbox/cover-fit so the generated image fills the workspace
-      // without distorting aspect.
+      // Letterbox-fit the result blob onto a layer-sized canvas + return
+      // the dataURL. Shared engine helper — same flatten path used by
+      // the host's Export.
       const dataUrl = await drawBlobToCanvasFit(
         result.blob,
         state.width,
@@ -456,7 +349,7 @@ export default function DrawingStage({
             locked: false,
             blendMode: "normal",
             pixelsDataUrl: dataUrl,
-          },
+          } satisfies ImageLayer,
         ],
         activeLayerId: newLayerId,
         aiPromptHistory: [...prev.aiPromptHistory, historyEntry].slice(-50),
@@ -466,48 +359,14 @@ export default function DrawingStage({
     [setState, commit, state.width, state.height],
   );
 
-  // ─── Export (PNG download) ───────────────────────────────────────────
-  const handleExportPng = useCallback(async () => {
-    const visible = visibleCanvasRef.current;
-    if (!visible) return;
-    const blob = await flattenCanvasToBlob(visible, "image/png");
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `drawing-${Date.now()}.png`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
-
-  // ─── Save to media library ───────────────────────────────────────────
-  // Flattens the current composite to a PNG and uploads it to the
-  // user's R2 namespace via the SHARED `uploadImage()` port. Once
-  // uploaded the result appears in MediaPicker's "Library" tab, ready
-  // to drop onto Video / Game / Comic scenes — that's the closed-loop
-  // interop the user articulated ("Give them all the tools in 1
-  // studio"). Per Gap Register #933.
-  const handleSaveToLibrary = useCallback(async () => {
-    const visible = visibleCanvasRef.current;
-    if (!visible || savingToLibrary) return;
-    setSavingToLibrary(true);
-    try {
-      const blob = await flattenCanvasToBlob(visible, "image/png");
-      const url = await uploadImage(blob, `drawing-${Date.now()}.png`);
-      toast({
-        title: "Saved to your library",
-        description: "Pick it from MediaPicker → Library in any studio project.",
-      });
-      return url;
-    } catch (err) {
-      toast({
-        title: "Save failed",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingToLibrary(false);
-    }
-  }, [savingToLibrary, toast]);
+  // Expose the visible canvas to the host so its SaveMenu (Export / Save
+  // to library) can flatten on demand. Single ownership — the host
+  // captures the live canvas element; DrawingStage doesn't itself
+  // expose download / upload UI.
+  useEffect(() => {
+    onCanvasReady?.(visibleCanvasRef.current);
+    return () => onCanvasReady?.(null);
+  }, [onCanvasReady]);
 
   // ─── Render ──────────────────────────────────────────────────────────
   const cursorClass =
@@ -527,67 +386,6 @@ export default function DrawingStage({
         recentColors={recentColors}
       />
       <div className="relative flex flex-1 flex-col">
-        <div className="flex items-center gap-1 border-b bg-background px-3 py-1.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={undo}
-                disabled={!canUndo}
-                aria-label="Undo"
-              >
-                <Undo2 className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Undo (⌘Z)</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={redo}
-                disabled={!canRedo}
-                aria-label="Redo"
-              >
-                <Redo2 className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Redo (⌘⇧Z)</TooltipContent>
-          </Tooltip>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {state.width}×{state.height}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7"
-              onClick={() => void handleSaveToLibrary()}
-              disabled={savingToLibrary}
-              title="Saved drawings appear in MediaPicker → Library across every studio project."
-            >
-              {savingToLibrary ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Library className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Save to library
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7"
-              onClick={() => void handleExportPng()}
-            >
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              Export PNG
-            </Button>
-          </div>
-        </div>
         <div
           ref={containerRef}
           className="flex flex-1 items-center justify-center overflow-auto bg-muted/40 p-6"
@@ -624,17 +422,7 @@ export default function DrawingStage({
           </div>
         </div>
       </div>
-      <div className="flex w-64 flex-col">
-        <DrawingLayersPanel
-          state={state}
-          onAddLayer={handleAddLayer}
-          onDeleteLayer={handleDeleteLayer}
-          onSelectLayer={handleSelectLayer}
-          onToggleVisible={handleToggleVisible}
-          onRenameLayer={handleRenameLayer}
-          onSetOpacity={handleSetOpacity}
-          onMoveLayer={handleMoveLayer}
-        />
+      <div className="flex w-64 flex-col border-l bg-background">
         <DrawingAiPromptPanel
           history={state.aiPromptHistory}
           onGenerated={(result, prompt) => void handleAiGenerated(result, prompt)}
@@ -643,4 +431,3 @@ export default function DrawingStage({
     </div>
   );
 }
-

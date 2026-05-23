@@ -10,21 +10,28 @@
 -- pending this column).
 --
 -- This migration mirrors the studio_projects shape exactly: varchar(16)
--- default 'video' NOT NULL + CHECK constraint enforcing the union +
--- partial index on non-default values for the upcoming per-kind chooser.
+-- default 'video' NOT NULL + partial index on non-default values for
+-- the upcoming per-kind chooser.
 --
 -- Backfill: every pre-#913 row gets media_kind = 'video' via the column
 -- default, which is correct — every existing template was authored from
 -- a video project.
+--
+-- HISTORICAL NOTE (2026-05-23, gap #963 follow-on): this migration
+-- originally also added a `studio_templates.media_kind` CHECK constraint
+-- hardcoding the 4 kinds known at authoring time. Same drift class as
+-- 0099 / 0101: future kind additions ('game' / 'comic' / 'image') went
+-- through the application path before the broader-set re-add migrations
+-- ran from scratch, so the narrow constraint risks "violated by some
+-- row" on any fresh DB seeded with production data. The CHECK statements
+-- have been removed; the constraint is first introduced for
+-- `studio_templates` by migration 0102 with the broader 7-kind set,
+-- which accepts every existing row. Application-layer validation lives
+-- at the Zod boundary (`z.enum(MEDIA_KINDS)` from
+-- `@shared/media-kinds.ts`).
 
 ALTER TABLE "studio_templates"
   ADD COLUMN IF NOT EXISTS "media_kind" varchar(16) DEFAULT 'video' NOT NULL;
-
-ALTER TABLE "studio_templates"
-  DROP CONSTRAINT IF EXISTS "studio_templates_media_kind_check";
-ALTER TABLE "studio_templates"
-  ADD CONSTRAINT "studio_templates_media_kind_check"
-  CHECK ("media_kind" IN ('video', 'podcast', 'voice', 'animation'));
 
 CREATE INDEX IF NOT EXISTS "idx_studio_templates_media_kind"
   ON "studio_templates" ("media_kind")

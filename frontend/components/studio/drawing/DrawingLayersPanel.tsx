@@ -1,7 +1,12 @@
 /**
- * DrawingStage layers panel — Photoshop-shaped layer list (top of the
+ * DrawingLayersPanel — Photoshop-shaped layer list body (top of the
  * list = top of the stack). MVP: add / delete / reorder / visibility /
  * opacity / rename / select-active.
+ *
+ * BODY-ONLY by design. The outer chrome (border, pill label, collapse
+ * affordance) comes from `<FloatingCollapsiblePanel/>` so this panel
+ * shares pill + open-state UX with the Timeline-runtime layers panel
+ * (per DRY: ONE collapsible chrome, every layers surface plugs in).
  *
  * Per the standing DRY rule (`feedback_extract_on_duplication`) the
  * panel reads ImageState directly + invokes single-purpose callbacks;
@@ -46,17 +51,14 @@ export default function DrawingLayersPanel({
   const canDelete = state.layers.length > 1;
 
   return (
-    <div className="flex w-64 flex-col border-l bg-background">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Layers
-        </p>
+    <div className="flex flex-col">
+      <div className="flex items-center justify-end border-b px-2 py-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-6 w-6"
               onClick={onAddLayer}
               aria-label="Add layer"
             >
@@ -66,7 +68,7 @@ export default function DrawingLayersPanel({
           <TooltipContent>Add layer</TooltipContent>
         </Tooltip>
       </div>
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 py-1">
         {displayed.map((layer) => (
           <LayerRow
             key={layer.id}
