@@ -53,7 +53,7 @@ describe("FloatingImageLayersPanel — chrome", () => {
   it("fires onAddLayer when the (+) button is clicked", () => {
     const handlers = makeHandlers();
     const state = createBlankImageState(1080, 1080);
-    render(<FloatingImageLayersPanel state={state} {...handlers} />);
+    renderWithProviders(<FloatingImageLayersPanel state={state} {...handlers} />);
     const addBtn = screen.getByLabelText("Add layer");
     fireEvent.click(addBtn);
     expect(handlers.onAddLayer).toHaveBeenCalledTimes(1);
