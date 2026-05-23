@@ -3,6 +3,9 @@ import { eq, and, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { buildRepos } from "../repositories/index.js";
+import { GamificationService } from "../domains/gamification/index.js";
+import { pickScoringRole } from "../../../shared/user-roles.js";
 
 const { boards, tasks } = schema;
 
@@ -10,6 +13,35 @@ export const taskRoutes = new Hono<{ Variables: Variables }>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
+}
+
+/** ProductivityItemStatus values that mean "this task is done".
+ *  Mirrors the enum in frontend/types/task.ts:
+ *    Closed = 4, Completed = 6. */
+const COMPLETED_STATUSES = new Set([4, 6]);
+
+function isCompletedStatus(status: unknown): boolean {
+  return typeof status === "number" && COMPLETED_STATUSES.has(status);
+}
+
+/** Fire-and-forget gamification award. Errors are swallowed (caller is
+ *  the task route — we don't want a gamification glitch to fail the
+ *  task save). */
+async function awardTaskCompletion(
+  userId: string,
+  jwtRoles: readonly string[] | undefined,
+  taskId: string,
+  taskType: number,
+): Promise<void> {
+  const role = pickScoringRole(jwtRoles);
+  if (!role) return;
+  try {
+    const repos = buildRepos(getDb());
+    const game = new GamificationService(repos);
+    await game.onTaskClosed({ userId, role, taskId, taskType });
+  } catch (e) {
+    console.warn("[gamification] task-close award failed", { userId, taskId, taskType, error: String(e) });
+  }
 }
 
 type TaskDto = {
@@ -128,16 +160,28 @@ taskRoutes.post("/save", async (c) => {
       .limit(1);
 
     if (existing) {
+      const existingMeta = (existing.metadata as Record<string, unknown> | null) ?? {};
+      const wasCompleted = isCompletedStatus(existingMeta.legacyStatus);
+      const nowCompleted = isCompletedStatus(metadata.legacyStatus);
+
       const [updated] = await db
         .update(tasks)
         .set({
           title: typeof body.text === "string" && body.text.length > 0 ? body.text : existing.title,
           description: typeof body.description === "string" ? body.description : existing.description,
-          metadata: { ...(existing.metadata as object ?? {}), ...metadata },
+          metadata: { ...(existingMeta as object), ...metadata },
           updatedAt: new Date(),
         } as any)
         .where(eq(tasks.id, existingId))
         .returning();
+
+      if (!wasCompleted && nowCompleted) {
+        const taskType = typeof metadata.taskType === "number"
+          ? metadata.taskType
+          : typeof existingMeta.taskType === "number" ? existingMeta.taskType : 0;
+        await awardTaskCompletion(userId, c.var.user.roles, updated.id, taskType);
+      }
+
       return c.json(ok(toTaskDto(updated)), 200);
     }
   }
@@ -154,6 +198,13 @@ taskRoutes.post("/save", async (c) => {
       metadata,
     } as any)
     .returning();
+
+  // First-write-already-completed (rare but valid: e.g. importing
+  // historic completed tasks). Treat as a completion event.
+  if (isCompletedStatus(metadata.legacyStatus)) {
+    const taskType = typeof metadata.taskType === "number" ? metadata.taskType : 0;
+    await awardTaskCompletion(userId, c.var.user.roles, created.id, taskType);
+  }
 
   return c.json(ok(toTaskDto(created)), 200);
 });
@@ -203,16 +254,28 @@ taskRoutes.post("/:id", async (c) => {
   };
 
   if (existing) {
+    const existingMeta = (existing.metadata as Record<string, unknown> | null) ?? {};
+    const wasCompleted = isCompletedStatus(existingMeta.legacyStatus);
+    const nowCompleted = isCompletedStatus(metadata.legacyStatus);
+
     const [updated] = await db
       .update(tasks)
       .set({
         title: typeof body.text === "string" && body.text.length > 0 ? body.text : existing.title,
         description: typeof body.description === "string" ? body.description : existing.description,
-        metadata: { ...(existing.metadata as object ?? {}), ...metadata },
+        metadata: { ...(existingMeta as object), ...metadata },
         updatedAt: new Date(),
       } as any)
       .where(eq(tasks.id, id))
       .returning();
+
+    if (!wasCompleted && nowCompleted) {
+      const taskType = typeof metadata.taskType === "number"
+        ? metadata.taskType
+        : typeof existingMeta.taskType === "number" ? existingMeta.taskType : 0;
+      await awardTaskCompletion(userId, c.var.user.roles, updated.id, taskType);
+    }
+
     return c.json(ok(toTaskDto(updated)), 200);
   }
 
@@ -228,6 +291,11 @@ taskRoutes.post("/:id", async (c) => {
       metadata,
     } as any)
     .returning();
+
+  if (isCompletedStatus(metadata.legacyStatus)) {
+    const taskType = typeof metadata.taskType === "number" ? metadata.taskType : 0;
+    await awardTaskCompletion(userId, c.var.user.roles, created.id, taskType);
+  }
 
   return c.json(ok(toTaskDto(created)), 200);
 });

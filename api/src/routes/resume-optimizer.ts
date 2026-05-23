@@ -11,11 +11,18 @@ import {
 import {
   ConsolidateHighlightsRequestSchema,
   ConsolidateHighlightsResponseSchema,
+  RewriteXyzHighlightsRequestSchema,
+  RewriteXyzTextRequestSchema,
+  RewriteXyzTextResponseSchema,
   ShortenBulletRequestSchema,
   ShortenBulletResponseSchema,
   type ResumeAnalysis,
 } from "../../../shared/tool-schemas.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import {
+  rewriteHighlightsAsXyz,
+  rewriteTextAsXyz,
+} from "../services/resume/rewrite-xyz.js";
 
 export const resumeOptimizerRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 resumeOptimizerRoutes.use("*", attachTokenBudget());
@@ -201,6 +208,98 @@ resumeOptimizerRoutes.post("/shorten-bullet", requireTokenBudget(), async (c) =>
     console.error("[resume/shorten-bullet] LLM error:", err);
     const cap = maxChars ?? 180;
     return c.json(success({ improved: original.slice(0, cap) }));
+  }
+});
+
+/**
+ * XYZ-format rewrite for an entry's bullet list. Same I/O shape as
+ * /consolidate-highlights so the existing review dialog renders both —
+ * the difference is the editorial lens applied to the rewrite ("XYZ
+ * accomplishment format" vs "consolidate near-duplicates").
+ *
+ * Falls back to a 1:1 echo on missing LLM credentials or any LLM error
+ * so the wand never blocks the editor — frontend treats a 1:1 echo as
+ * "no rewrite happened" and surfaces a friendly toast.
+ */
+resumeOptimizerRoutes.post("/rewrite-xyz-highlights", requireTokenBudget(), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = RewriteXyzHighlightsRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid rewrite-xyz-highlights request",
+          details: parsed.error.flatten(),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      400,
+    );
+  }
+
+  const { highlights, context } = parsed.data;
+  const echoItems = highlights.map((h, i) => ({ text: h, sources: [i + 1] }));
+  if (!hasAnyLLMProviderKey(c.env)) {
+    return c.json(success({ items: echoItems }));
+  }
+
+  try {
+    const llm = createLLMClient(c.env, c.var.user);
+    const { items } = await rewriteHighlightsAsXyz(highlights, context, llm);
+    return c.json(success({ items }));
+  } catch (err) {
+    console.error("[resume/rewrite-xyz-highlights] LLM error:", err);
+    return c.json(success({ items: echoItems }));
+  }
+});
+
+/**
+ * XYZ-format rewrite for a single text field (work/volunteer/project
+ * summary, or a position/title). Echoes the input on LLM unavailable
+ * or error — never blocks the editor. The prompt for `kind: "position"`
+ * is deliberately constrained: it polishes capitalisation and expands
+ * unambiguous abbreviations but does NOT change seniority signal, so an
+ * "Engineer" can't be silently promoted to "Senior Engineer".
+ */
+resumeOptimizerRoutes.post("/rewrite-xyz-text", requireTokenBudget(), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = RewriteXyzTextRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid rewrite-xyz-text request",
+          details: parsed.error.flatten(),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      400,
+    );
+  }
+
+  const { kind, original, context } = parsed.data;
+  if (!hasAnyLLMProviderKey(c.env)) {
+    return c.json(success({ improved: original }));
+  }
+
+  try {
+    const llm = createLLMClient(c.env, c.var.user);
+    const result = await rewriteTextAsXyz(kind, original, context, llm);
+    // Defensive: re-validate the model output against the wire schema
+    // before responding. Catches a model that hallucinated a 5000-char
+    // summary that would fail the frontend's schema check anyway.
+    const safe = RewriteXyzTextResponseSchema.safeParse(result);
+    if (!safe.success) {
+      return c.json(success({ improved: original }));
+    }
+    return c.json(success(safe.data));
+  } catch (err) {
+    console.error("[resume/rewrite-xyz-text] LLM error:", err);
+    return c.json(success({ improved: original }));
   }
 });
 

@@ -37,7 +37,29 @@ function makeSprite(overrides: Partial<GameSprite> = {}): GameSprite {
 }
 
 function makeRuntimeSprite(source: GameSprite): RuntimeSprite {
-  return { source, x: source.x, y: source.y, vy: 0, flipped: false, picked: false };
+  // Mirror the shape `runGame.mountLevel` produces — keeping every
+  // field initialised so the behavior dispatcher + script interpreter
+  // + animation interpreter all read defined values.
+  return {
+    source,
+    x: source.x,
+    y: source.y,
+    width: source.width,
+    height: source.height,
+    vy: 0,
+    flipped: false,
+    picked: false,
+    visible: true,
+    alpha: 1,
+    offsetX: 0,
+    offsetY: 0,
+    scale: 1,
+    mountTs: 0,
+    message: null,
+    messageUntilTs: 0,
+    hasFiredOnMount: false,
+    everySecondsLastFiredTs: {},
+  };
 }
 
 // ─── findStartLevel ───────────────────────────────────────────────────────

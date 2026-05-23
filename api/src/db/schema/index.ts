@@ -55,3 +55,5 @@ export * from "./workers.js";
 export * from "./externalEmail.js";
 export * from "./usage.js";
 export * from "./extension.js";
+export * from "./paidmedia.js";
+export * from "./gamification.js";

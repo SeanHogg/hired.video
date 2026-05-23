@@ -22,6 +22,10 @@
 
 import {
   defaultLevel,
+  type AnimationSpec,
+  type BlockAction,
+  type BlockRule,
+  type BlockTrigger,
   type GameLevel,
   type GameSprite,
   type GameState,
@@ -166,6 +170,182 @@ export function updateGameSettings(
 ): GameState {
   return { ...state, ...patch };
 }
+
+// ─── Block-script + animation mutations ──────────────────────────────────
+
+let ruleCounter = 0;
+function nextRuleId(): string {
+  // Caller-stable monotonic id; combined with a Math.random suffix so
+  // serial calls in the same module-load + a fresh project don't
+  // collide on `rule-1`.
+  ruleCounter += 1;
+  return `rule-${ruleCounter}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function addRule(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  trigger: BlockTrigger,
+): GameState {
+  const id = nextRuleId();
+  const rule: BlockRule = { id, trigger, actions: [] };
+  const level = state.levels.find((l) => l.id === levelId);
+  if (!level) return state;
+  return updateLevel(state, levelId, {
+    sprites: level.sprites.map((s) =>
+      s.id === spriteId ? { ...s, scripts: [...(s.scripts ?? []), rule] } : s,
+    ),
+  });
+}
+
+export function deleteRule(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  ruleId: string,
+): GameState {
+  const level = state.levels.find((l) => l.id === levelId);
+  if (!level) return state;
+  return updateLevel(state, levelId, {
+    sprites: level.sprites.map((s) =>
+      s.id === spriteId
+        ? { ...s, scripts: (s.scripts ?? []).filter((r) => r.id !== ruleId) }
+        : s,
+    ),
+  });
+}
+
+export function updateRuleTrigger(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  ruleId: string,
+  trigger: BlockTrigger,
+): GameState {
+  const level = state.levels.find((l) => l.id === levelId);
+  if (!level) return state;
+  return updateLevel(state, levelId, {
+    sprites: level.sprites.map((s) =>
+      s.id === spriteId
+        ? {
+            ...s,
+            scripts: (s.scripts ?? []).map((r) =>
+              r.id === ruleId ? { ...r, trigger } : r,
+            ),
+          }
+        : s,
+    ),
+  });
+}
+
+export function addAction(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  ruleId: string,
+  action: BlockAction,
+): GameState {
+  return mutateRule(state, levelId, spriteId, ruleId, (rule) => ({
+    ...rule,
+    actions: [...rule.actions, action],
+  }));
+}
+
+export function updateAction(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  ruleId: string,
+  actionIndex: number,
+  action: BlockAction,
+): GameState {
+  return mutateRule(state, levelId, spriteId, ruleId, (rule) => ({
+    ...rule,
+    actions: rule.actions.map((a, i) => (i === actionIndex ? action : a)),
+  }));
+}
+
+export function deleteAction(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  ruleId: string,
+  actionIndex: number,
+): GameState {
+  return mutateRule(state, levelId, spriteId, ruleId, (rule) => ({
+    ...rule,
+    actions: rule.actions.filter((_, i) => i !== actionIndex),
+  }));
+}
+
+function mutateRule(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  ruleId: string,
+  patch: (rule: BlockRule) => BlockRule,
+): GameState {
+  const level = state.levels.find((l) => l.id === levelId);
+  if (!level) return state;
+  return updateLevel(state, levelId, {
+    sprites: level.sprites.map((s) =>
+      s.id === spriteId
+        ? {
+            ...s,
+            scripts: (s.scripts ?? []).map((r) =>
+              r.id === ruleId ? patch(r) : r,
+            ),
+          }
+        : s,
+    ),
+  });
+}
+
+export function updateSpriteAnimation(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  onMount: AnimationSpec | null,
+): GameState {
+  return updateSprite(state, levelId, spriteId, { onMount });
+}
+
+export function reorderLevels(
+  state: GameState,
+  orderedIds: string[],
+): GameState {
+  // Filter out ids that don't exist (caller might have passed a stale
+  // list after a delete) + append any current levels missing from the
+  // ordering so we never lose a level on a malformed reorder.
+  const known = new Map(state.levels.map((l) => [l.id, l]));
+  const reordered: GameLevel[] = [];
+  for (const id of orderedIds) {
+    const lvl = known.get(id);
+    if (lvl) {
+      reordered.push(lvl);
+      known.delete(id);
+    }
+  }
+  return { ...state, levels: [...reordered, ...known.values()] };
+}
+
+export function addCustomSpriteAsset(
+  state: GameState,
+  asset: { id: string; url: string; width?: number; height?: number },
+): GameState {
+  // Idempotent — re-adding the same id replaces the URL (so a user
+  // re-uploading "my-character" updates rather than duplicates).
+  const existing = state.assets.find((a) => a.id === asset.id);
+  const next = existing
+    ? state.assets.map((a) =>
+        a.id === asset.id ? { id: asset.id, kind: "sprite" as const, url: asset.url } : a,
+      )
+    : [...state.assets, { id: asset.id, kind: "sprite" as const, url: asset.url }];
+  return { ...state, assets: next };
+}
+
+// ─── Built-in sprite assignment ──────────────────────────────────────────
 
 /** Assign a built-in sprite to a `GameSprite`. Copies the built-in
  *  spec into `state.assets` (idempotent — a duplicate built-in id

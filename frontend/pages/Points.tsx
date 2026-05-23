@@ -1,0 +1,303 @@
+/**
+ * Job seeker's points hub. Balance, streak, badges, activity feed,
+ * redemption catalog. Phase-1: redemption shows the catalog but the
+ * action button surfaces "coming soon" because the backend returns 501
+ * until phase 3.
+ *
+ * Self-gates on role inside the component (per
+ * [[feedback_extract_on_duplication]] — no canViewPoints prop-drill);
+ * non-job_seekers see a friendly notice and a link back to dashboard.
+ */
+
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Navigate } from "react-router-dom";
+import {
+  Flame,
+  Trophy,
+  Sparkles,
+  Gift,
+  CreditCard,
+  Calendar,
+  Lock,
+  Loader2,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import {
+  pointsService,
+  type PointsCatalog,
+  type PointsSummary,
+} from "@/lib/services/points-service";
+import { USER_ROLES } from "@shared/user-roles";
+
+export default function PointsPage() {
+  const { user } = useAuth();
+  const isEligible = user?.roles?.includes(USER_ROLES.JOB_SEEKER) ?? false;
+
+  const summary = useQuery<PointsSummary>({
+    queryKey: ["points", "me"],
+    queryFn: () => pointsService.getMe(),
+    enabled: isEligible,
+  });
+
+  const catalog = useQuery<PointsCatalog>({
+    queryKey: ["points", "catalog"],
+    queryFn: () => pointsService.getCatalog(),
+    enabled: isEligible,
+  });
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isEligible) {
+    return (
+      <div className="container mx-auto max-w-3xl py-12 px-4">
+        <Card className="p-8 text-center">
+          <Sparkles className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Points are coming for your role</h2>
+          <p className="text-muted-foreground">
+            The rewards program launches first for job seekers. Your role's
+            catalog is in the works — check back soon.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (summary.isLoading || !summary.data) {
+    return (
+      <div className="container mx-auto max-w-5xl py-12 px-4 flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const data = summary.data;
+
+  return (
+    <div className="container mx-auto max-w-5xl py-8 px-4 space-y-6">
+      <header>
+        <h1 className="text-3xl font-bold">Points & Rewards</h1>
+        <p className="text-muted-foreground mt-1">
+          Earn for every step of your job hunt. Cash out for AI credits, premium time, or gift cards.
+        </p>
+      </header>
+
+      {data.isSuspended && (
+        <Card className="p-4 border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+          <div className="flex items-start gap-3">
+            <Lock className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div>
+              <div className="font-semibold">Points paused for review</div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {data.suspendedReason ?? "Our system flagged unusual activity. Earning and redemption are paused until support reviews your account."}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-5">
+          <div className="text-xs uppercase text-muted-foreground tracking-wide">Balance</div>
+          <div className="text-3xl font-bold tabular-nums mt-1">{data.balance.toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground mt-2">
+            {data.lifetimeEarned.toLocaleString()} earned · {data.lifetimeRedeemed.toLocaleString()} redeemed
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
+            <Flame className="h-3.5 w-3.5" /> Streak
+          </div>
+          <div className="text-3xl font-bold tabular-nums mt-1">
+            {data.streak.current} <span className="text-base font-normal text-muted-foreground">days</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2">
+            Longest: {data.streak.longest} days · Last active: {data.streak.lastActivityDate ?? "—"}
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
+            <Trophy className="h-3.5 w-3.5" /> Badges
+          </div>
+          <div className="text-3xl font-bold tabular-nums mt-1">
+            {data.badges.filter((b) => b.earned).length}
+            <span className="text-base font-normal text-muted-foreground"> / {data.badges.length}</span>
+          </div>
+          <UserTaskGateRow gate={data.userTaskGate} />
+        </Card>
+      </div>
+
+      <BadgesGrid badges={data.badges} />
+      <RedemptionGrid catalog={catalog.data ?? null} balance={data.balance} disabled={data.isSuspended} />
+      <ActivityFeed activity={data.recentActivity} />
+    </div>
+  );
+}
+
+function UserTaskGateRow({ gate }: { gate: PointsSummary["userTaskGate"] }) {
+  if (gate.unlocked) {
+    return (
+      <div className="text-xs text-green-600 dark:text-green-400 mt-2">
+        ✓ Self-task earnings unlocked
+      </div>
+    );
+  }
+  const pct = Math.min(100, Math.round((gate.completed / gate.threshold) * 100));
+  return (
+    <div className="text-xs text-muted-foreground mt-2 space-y-1">
+      <div className="flex justify-between">
+        <span>Self-task gate</span>
+        <span className="tabular-nums">{gate.completed}/{gate.threshold}</span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function BadgesGrid({ badges }: { badges: PointsSummary["badges"] }) {
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold mb-3 flex items-center gap-2">
+        <Trophy className="h-4 w-4" /> Badges
+      </h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {badges.map((b) => (
+          <div
+            key={b.id}
+            className={`p-3 rounded-lg border ${b.earned ? "border-primary bg-primary/5" : "border-border opacity-50"}`}
+          >
+            <div className="font-medium text-sm">{b.name}</div>
+            <div className="text-xs text-muted-foreground mt-1">{b.description}</div>
+            {b.earned && b.earnedAt && (
+              <div className="text-[10px] text-muted-foreground mt-2">
+                {new Date(b.earnedAt).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function RedemptionGrid({
+  catalog,
+  balance,
+  disabled,
+}: {
+  catalog: PointsCatalog | null;
+  balance: number;
+  disabled: boolean;
+}) {
+  const [redeeming, setRedeeming] = useState<string | null>(null);
+
+  if (!catalog) return null;
+
+  async function handleRedeem(skuId: string) {
+    setRedeeming(skuId);
+    try {
+      const res = await pointsService.redeem(skuId);
+      if (res.success) {
+        toast.success("Redemption confirmed.");
+      } else {
+        toast.message(res.message ?? "Coming soon", {
+          description: "Cashout fulfillment launches in the next release.",
+        });
+      }
+    } catch (e) {
+      toast.error("Redemption failed.", { description: String(e) });
+    } finally {
+      setRedeeming(null);
+    }
+  }
+
+  const groups: Array<{ kind: PointsCatalog["redemptions"][number]["kind"]; label: string; icon: typeof Sparkles }> = [
+    { kind: "ai_credits", label: "AI Credits", icon: Sparkles },
+    { kind: "premium_month", label: "Premium Time", icon: Calendar },
+    { kind: "gift_card", label: "Gift Cards", icon: Gift },
+  ];
+
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold mb-1 flex items-center gap-2">
+        <CreditCard className="h-4 w-4" /> Cash out
+      </h2>
+      <p className="text-xs text-muted-foreground mb-4">
+        Phase 1 ships the catalog. Programmatic gift cards (Tremendous) land in the
+        next release; AI credits + premium-month grants follow on the same path.
+      </p>
+      <div className="space-y-5">
+        {groups.map(({ kind, label, icon: Icon }) => {
+          const items = catalog.redemptions.filter((r) => r.kind === kind);
+          if (items.length === 0) return null;
+          return (
+            <div key={kind}>
+              <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                <Icon className="h-4 w-4" /> {label}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {items.map((sku) => {
+                  const affordable = balance >= sku.pointsCost;
+                  return (
+                    <div
+                      key={sku.id}
+                      className={`p-3 rounded-lg border ${affordable ? "border-border" : "border-border opacity-60"}`}
+                    >
+                      <div className="font-medium text-sm">{sku.label}</div>
+                      <div className="text-xs text-muted-foreground tabular-nums mt-1">
+                        {sku.pointsCost.toLocaleString()} pts
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={affordable ? "default" : "outline"}
+                        className="mt-2 w-full"
+                        disabled={disabled || !affordable || redeeming === sku.id}
+                        onClick={() => handleRedeem(sku.id)}
+                      >
+                        {redeeming === sku.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Redeem"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function ActivityFeed({ activity }: { activity: PointsSummary["recentActivity"] }) {
+  return (
+    <Card className="p-5">
+      <h2 className="font-semibold mb-3">Recent activity</h2>
+      {activity.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No activity yet — complete a task to start earning.</p>
+      ) : (
+        <ul className="space-y-2">
+          {activity.map((a) => (
+            <li key={a.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
+              <div>
+                <div className="font-medium">{a.label}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(a.at).toLocaleString()} · {a.category}
+                </div>
+              </div>
+              <div className={`font-semibold tabular-nums ${a.delta > 0 ? "text-green-600" : a.delta < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                {a.delta > 0 ? "+" : ""}
+                {a.delta}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}

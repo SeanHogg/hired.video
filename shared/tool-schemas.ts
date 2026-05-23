@@ -164,6 +164,47 @@ export type ConsolidateHighlightsRequest = z.infer<typeof ConsolidateHighlightsR
 export type ConsolidateHighlightsResponse = z.infer<typeof ConsolidateHighlightsResponseSchema>;
 export type ConsolidateHighlightsItem = z.infer<typeof ConsolidateHighlightsItemSchema>;
 
+// XYZ-format rewrite of a single text field (work summary, basics summary,
+// or position/title). XYZ = "Accomplished [X] as measured by [Y], by doing
+// [Z]" (Laszlo Bock / Google formulation). The single-string variant powers
+// the wand next to summary/title inputs; the group variant for highlights
+// reuses ConsolidateHighlightsResponseSchema so the existing review-dialog
+// renders both flows without forking.
+export const RewriteXyzKindSchema = z.enum(["summary", "position"]);
+export type RewriteXyzKind = z.infer<typeof RewriteXyzKindSchema>;
+
+export const RewriteXyzTextRequestSchema = z.object({
+  kind: RewriteXyzKindSchema,
+  original: z.string().min(1).max(4000),
+  context: z
+    .object({
+      role: z.string().max(200).optional(),
+      organization: z.string().max(200).optional(),
+      // The highlights the field sits alongside — gives the model
+      // grounding for what accomplishments the summary should foreshadow.
+      highlights: z.array(z.string().max(1000)).max(60).optional(),
+    })
+    .optional(),
+});
+
+export const RewriteXyzTextResponseSchema = z.object({
+  improved: z.string().min(1).max(2000),
+  notes: z.array(z.string()).max(4).optional(),
+});
+
+export type RewriteXyzTextRequest = z.infer<typeof RewriteXyzTextRequestSchema>;
+export type RewriteXyzTextResponse = z.infer<typeof RewriteXyzTextResponseSchema>;
+
+// Highlights → XYZ group rewrite. Same I/O shape as consolidate-highlights
+// so the existing review-dialog primitive can render both — the difference
+// is the system prompt (consolidate = dedupe + tighten; xyz = reframe each
+// bullet as X/Y/Z). Reusing the response schema is deliberate: the wand
+// modes diverge in intent, not shape.
+export const RewriteXyzHighlightsRequestSchema = ConsolidateHighlightsRequestSchema;
+export const RewriteXyzHighlightsResponseSchema = ConsolidateHighlightsResponseSchema;
+export type RewriteXyzHighlightsRequest = z.infer<typeof RewriteXyzHighlightsRequestSchema>;
+export type RewriteXyzHighlightsResponse = z.infer<typeof RewriteXyzHighlightsResponseSchema>;
+
 // ────────────────────────────────────────────────────────────────────────
 // Salary Calculator — POST /api/salarycalculator/*
 // ────────────────────────────────────────────────────────────────────────

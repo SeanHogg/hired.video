@@ -11,6 +11,7 @@ import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
 import { SortableList } from "./SortableList";
+import XyzTextWand from "./XyzTextWand";
 
 interface ProjectsSectionProps {
   projects: Project[];
@@ -155,7 +156,20 @@ export default function ProjectsSection({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("fields.description.label")}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{t("fields.description.label")}</Label>
+              <XyzTextWand
+                kind="summary"
+                value={project.description}
+                onChange={(next) => onUpdate(index, "description", next)}
+                context={{
+                  role: project.name,
+                  organization: project.entity,
+                  highlights: project.highlights,
+                }}
+                fieldLabel="description"
+              />
+            </div>
             <Textarea
               value={project.description}
               onChange={(e) => onUpdate(index, "description", e.target.value)}

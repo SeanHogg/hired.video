@@ -178,6 +178,29 @@ toolRunsRoutes.post("/", async (c) => {
     } as any)
     .returning();
 
+  // Gamification award. Fire-and-forget; never block the tool-run response.
+  // Specific tool ids map to richer actions (resume_tailor, cover_letter);
+  // everything else earns under the generic ai.tool.used action.
+  try {
+    const { pickScoringRole } = await import("../../../shared/user-roles.js");
+    const role = pickScoringRole(c.var.user?.roles);
+    if (role) {
+      const { buildRepos } = await import("../repositories/index.js");
+      const { GamificationService } = await import("../domains/gamification/index.js");
+      const game = new GamificationService(buildRepos(db));
+      const args = { userId, role, toolRunId: run.id, metadata: { toolId } };
+      if (toolId === "resume_optimizer" || toolId === "resume_tailor") {
+        await game.onResumeTailored({ ...args, resumeRunId: run.id });
+      } else if (toolId === "cover_letter" || toolId === "cover_letter_generator") {
+        await game.onCoverLetterGenerated(args);
+      } else {
+        await game.onAiToolUsed(args);
+      }
+    }
+  } catch (e) {
+    console.warn("[gamification] tool-run award failed", { userId, toolId, runId: run.id, error: String(e) });
+  }
+
   return c.json(success(run), 201);
 });
 

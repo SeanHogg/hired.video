@@ -106,6 +106,7 @@ import SpritePalette from "@/components/studio/game/SpritePalette";
 import GamePropertiesPanel, {
   type GameSelection,
 } from "@/components/studio/game/GamePropertiesPanel";
+import { updateSprite as gameUpdateSprite } from "@/lib/studio/game/game-state-edit";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
@@ -2071,6 +2072,15 @@ export default function StudioEditorV2() {
                               } else {
                                 setGameSelection({ kind: "level", levelId: activeLevelId });
                               }
+                            }}
+                            onMoveSprite={(spriteId, x, y) => {
+                              if (!activeLevelId) return;
+                              // Reuse the canonical sprite-update helper
+                              // so drag-to-move + the inspector's x/y
+                              // fields share one mutation path (DRY).
+                              setGameState((prev) =>
+                                prev ? gameUpdateSprite(prev, activeLevelId, spriteId, { x, y }) : prev,
+                              );
                             }}
                           />
                           {/* Playtest toggle — overlaid on the GameStage so

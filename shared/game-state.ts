@@ -87,12 +87,81 @@ export interface GameSprite {
   /** Behavior script id — registered handler that drives the sprite's
    *  per-frame logic (e.g. "platformer-player", "static",
    *  "patrol-horizontal", "spawner"). `null` = no behavior, the
-   *  sprite is decorative. */
+   *  sprite is decorative. The 5 baked behaviors are FAST PATHS for
+   *  common patterns; `scripts` (below) is the general-purpose visual
+   *  scripting that runs ALONGSIDE the behavior. */
   behavior: string | null;
   /** Optional per-sprite key-value params the behavior reads (e.g.
    *  `{ speed: 200 }` for a patroller, `{ jumpPower: 600 }` for a
    *  platformer player). Behaviors document their own param shape. */
   params?: Record<string, unknown>;
+  /** Visual block scripts — Snap! / Scratch-style rules built in the
+   *  block editor. Each rule is `{ trigger, actions }`: when the
+   *  trigger fires (key press, click, level mount, every N seconds),
+   *  the actions run in order (move-by, set-property, goto-level,
+   *  add-score, wait, etc.). Empty / undefined = no block scripts;
+   *  the sprite uses its `behavior` alone (or is decorative if both
+   *  are absent). The same runtime interprets both kinds. */
+  scripts?: BlockRule[];
+  /** Mount-time animation — fade in / slide in / scale up with a
+   *  duration + easing. Reuses the Video editor's motion-preset
+   *  vocabulary so a polish pass on Timeline animations ripples into
+   *  games for free. `null` / undefined = sprite appears in place. */
+  onMount?: AnimationSpec | null;
+}
+
+// ─── Visual scripting (block coding) ─────────────────────────────────────
+//
+// The block scripting model is intentionally a flat, structured shape
+// — not a free-form AST — so the editor's block UI is a forms-driven
+// trigger + actions list (one dropdown per slot) rather than a
+// pannable canvas of draggable blocks. This trades expressive power
+// for build-time + a clear interpretation contract: the runtime in
+// `frontend/lib/studio/game/runtime-core.js` walks the rules once per
+// trigger event and executes the actions sequentially. Designed so a
+// future migration to scratch-blocks / blockly compiles its block
+// tree DOWN to this shape without touching the runtime.
+
+export interface BlockRule {
+  /** Stable id so the editor can update a rule in place without
+   *  re-keying the React list. */
+  id: string;
+  trigger: BlockTrigger;
+  /** Actions run sequentially. `wait-seconds` yields the rule and
+   *  resumes on the next tick after the duration has elapsed. */
+  actions: BlockAction[];
+}
+
+export type BlockTrigger =
+  | { kind: "on-level-mount" }
+  | { kind: "on-tick" }
+  | { kind: "on-key-press"; key: string }
+  | { kind: "on-click" }
+  | { kind: "on-collide-with"; spriteId: string }
+  | { kind: "every-seconds"; interval: number };
+
+export type BlockAction =
+  | { kind: "move-by"; dx: number; dy: number }
+  | { kind: "set-position"; x: number; y: number }
+  | { kind: "set-property"; property: "width" | "height"; value: number }
+  | { kind: "show" }
+  | { kind: "hide" }
+  | { kind: "goto-level"; levelId: string }
+  | { kind: "play-sound"; assetId: string }
+  | { kind: "wait-seconds"; seconds: number }
+  | { kind: "set-message"; text: string };
+
+// ─── Animation ──────────────────────────────────────────────────────────
+
+/** Mount-time / transition animation spec — the runtime interprets
+ *  `kind` to drive an alpha / offset / scale multiplier over
+ *  `durationMs` using the named easing. Designed to compose with
+ *  Phaser's tween library when the engine swap (#939) lands —
+ *  same spec, different interpreter. */
+export interface AnimationSpec {
+  kind: "fade-in" | "slide-in-left" | "slide-in-right" | "slide-in-up" | "slide-in-down" | "scale-up" | "none";
+  durationMs: number;
+  easing: "linear" | "ease-in" | "ease-out" | "ease-in-out";
 }
 
 /** An asset the runtime preloads at boot. */

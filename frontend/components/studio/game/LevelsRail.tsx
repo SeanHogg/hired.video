@@ -13,11 +13,27 @@
  * `lib/studio/game/game-state-edit.ts`. This component is the chrome
  * around those helpers, not a parallel data-model.
  */
-import { Plus, Star, StarOff, Trash2 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Plus, Star, StarOff, Trash2 } from "lucide-react";
 import type { GameLevel, GameState } from "@shared/game-state";
 import {
   addLevel,
   deleteLevel,
+  reorderLevels,
   setStartLevel,
   updateLevel,
 } from "@/lib/studio/game/game-state-edit";
@@ -51,6 +67,20 @@ export default function LevelsRail({
     }
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = gameState.levels.map((l) => l.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    onChange(reorderLevels(gameState, arrayMove(ids, from, to)));
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -72,23 +102,34 @@ export default function LevelsRail({
         className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-2"
         style={{ scrollbarGutter: "stable" }}
       >
-        {gameState.levels.map((level, idx) => (
-          <LevelCard
-            key={level.id}
-            level={level}
-            index={idx}
-            isActive={level.id === activeLevelId}
-            isStart={level.id === gameState.startLevelId}
-            canDelete={gameState.levels.length > 1}
-            onSelect={() => onSelect(level.id)}
-            onRename={(label) => onChange(updateLevel(gameState, level.id, { label }))}
-            onRecolor={(backgroundColor) =>
-              onChange(updateLevel(gameState, level.id, { backgroundColor }))
-            }
-            onSetStart={() => onChange(setStartLevel(gameState, level.id))}
-            onDelete={() => handleDelete(level.id)}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={gameState.levels.map((l) => l.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {gameState.levels.map((level, idx) => (
+              <LevelCard
+                key={level.id}
+                level={level}
+                index={idx}
+                isActive={level.id === activeLevelId}
+                isStart={level.id === gameState.startLevelId}
+                canDelete={gameState.levels.length > 1}
+                onSelect={() => onSelect(level.id)}
+                onRename={(label) => onChange(updateLevel(gameState, level.id, { label }))}
+                onRecolor={(backgroundColor) =>
+                  onChange(updateLevel(gameState, level.id, { backgroundColor }))
+                }
+                onSetStart={() => onChange(setStartLevel(gameState, level.id))}
+                onDelete={() => handleDelete(level.id)}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </ol>
     </div>
   );
@@ -117,8 +158,23 @@ function LevelCard({
   onSetStart: () => void;
   onDelete: () => void;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: level.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
   return (
     <li
+      ref={setNodeRef}
+      style={style}
       className={cn(
         "group rounded-md border bg-card text-left transition-colors",
         isActive ? "border-fuchsia-500 ring-2 ring-fuchsia-500/30" : "border-border hover:border-fuchsia-300",
@@ -137,6 +193,21 @@ function LevelCard({
           style={{ backgroundColor: level.backgroundColor }}
         />
         <div className="flex items-center gap-1 px-2 py-1.5">
+          {/* Drag handle — uses pointer/keyboard sensors from @dnd-kit.
+              `attributes` + `listeners` go on the handle so the rest of
+              the card (rename input, delete button, etc.) doesn't
+              accidentally initiate a drag. */}
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground cursor-grab active:cursor-grabbing"
+            title="Drag to reorder"
+            aria-label="Drag to reorder"
+          >
+            <GripVertical className="h-3 w-3" />
+          </button>
           <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
             {index + 1}
           </span>

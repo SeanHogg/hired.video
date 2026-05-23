@@ -443,6 +443,30 @@ export async function grantTokenPack(args: {
         updatedAt: new Date(),
       },
     });
+
+  // Award gamification points for the purchase. Fire-and-forget so a
+  // gamification glitch can't fail a Stripe webhook.
+  try {
+    const { buildRepos } = await import("../../repositories/index.js");
+    const { GamificationService } = await import("../../domains/gamification/index.js");
+    const repos = buildRepos(db);
+    const game = new GamificationService(repos);
+    const purchaseId = args.stripePaymentIntentId ?? `${args.userId}:${args.packId}:${Date.now()}`;
+    await game.awardWithRoleLookup("purchase.token_pack", {
+      userId: args.userId,
+      refId: purchaseId,
+      refType: "token_pack_purchase",
+      metadata: { packId: args.packId, tokens: args.tokens, pricePaid: args.pricePaid },
+    });
+    await game.awardWithRoleLookup("purchase.any", {
+      userId: args.userId,
+      refId: `any:${purchaseId}`,
+      refType: "token_pack_purchase",
+      metadata: { packId: args.packId, pricePaid: args.pricePaid },
+    });
+  } catch (e) {
+    console.warn("[gamification] token-pack purchase award failed", { userId: args.userId, packId: args.packId, error: String(e) });
+  }
 }
 
 /**

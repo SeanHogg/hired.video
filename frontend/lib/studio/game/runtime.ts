@@ -19,10 +19,13 @@ export {
   drawFrame,
   findStartLevel,
   createAssetCache,
+  fireRules,
+  applyAnimation,
 } from "./runtime-core.js";
 export type {
   RunGameOptions,
   RunGameHandle,
   RuntimeSprite,
   AssetCache,
+  ScriptContext,
 } from "./runtime-core.js";

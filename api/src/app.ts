@@ -73,6 +73,7 @@ import { skillExtractorRoutes } from "./routes/skill-extractor.js";
 import { toolRunsRoutes } from "./routes/tool-runs.js";
 import { sentimentRoutes } from "./routes/sentiment.js";
 import { taskRoutes } from "./routes/task.js";
+import { pointsRoutes } from "./routes/points.js";
 import { feedRoutes } from "./routes/feed.js";
 import { salaryRoutes } from "./routes/salary.js";
 import { valuePropositionRoutes } from "./routes/value-proposition.js";
@@ -113,6 +114,8 @@ import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import { courseRoutes } from "./routes/courses.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
+import { paidMediaRoutes } from "./routes/paid-media.js";
+import { clickIdCaptureMiddleware } from "./middleware/clickIdCapture.js";
 import { careerRoutes } from "./routes/career.js";
 import { phoneRoutes } from "./routes/phone.js";
 import { openapiRoutes } from "./routes/openapi.js";
@@ -139,6 +142,10 @@ export function createApp() {
   }
 
   app.use("*", requestLoggerMiddleware);
+  // Capture paid-media click IDs (fbclid/gclid/li_fat_id/ttclid/msclkid) on
+  // ANY request so the cookies are present whatever the visitor's landing
+  // page. Cheap, idempotent — see middleware/clickIdCapture.ts.
+  app.use("*", clickIdCaptureMiddleware);
   // Strip error._source from JSON error responses for non-SuperAdmin
   // viewers. Registered early so it resumes last in the unwind, after
   // authMiddleware has populated c.var.user.
@@ -221,6 +228,19 @@ export function createApp() {
     // and the marketing surface. Anonymous callers must see live prices, not
     // the compile-time defaults.
     "/api/billing/pricing-config",
+    // Paid-media OAuth start/callback are top-level browser navigations
+    // (consent screen redirect) so they ride a short-lived JWT in
+    // `state` instead of an Authorization header. /pixels/public is read
+    // by the frontend app shell to inject pixel snippets — anonymous
+    // visitors must see it. /conversions is server-to-server only and
+    // stays authenticated.
+    // Paid-media OAuth callback is a top-level browser navigation
+    // (consent screen redirect) — identity rides in the signed `state`
+    // JWT. /pixels/public is read by the frontend app shell to inject
+    // pixel snippets and must be visible to anonymous visitors.
+    // /oauth/start (POST) stays auth-required.
+    "/api/paid-media/oauth/callback",
+    "/api/paid-media/pixels/public",
     // Pre-signup security checks. Geo eligibility is the gate that hides
     // the signup form for sanctioned regions / shows the waitlist for
     // not-yet-launched ones (`<RegisterGate>` reads it). The waitlist POST
@@ -466,6 +486,7 @@ export function createApp() {
   app.route("/api/export", settingsRoutes); // legacy export alias — /api/export/csv maps to /api/settings/export/csv
   app.route("/api/featureflag", featureFlagRoutes);
   app.route("/api/task", taskRoutes);
+  app.route("/api/points", pointsRoutes);
   app.route("/api/upload", uploadRoutes);
   app.route("/api/communication", communicationRoutes);
   app.route("/api/ai", aiRoutes);
@@ -529,6 +550,7 @@ export function createApp() {
   app.route("/api/courses", courseRoutes);
   app.route("/api/legal", legalRoutes);
   app.route("/api/advertising", advertisingRoutes);
+  app.route("/api/paid-media", paidMediaRoutes);
   app.route("/api/career", careerRoutes);
   app.route("/api/phone", phoneRoutes);
   app.route("/api/modules", publicModuleRoutes);

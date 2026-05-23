@@ -17,6 +17,7 @@
  * doesn't re-implement the asset-copying logic.
  */
 import { useMemo } from "react";
+import { Upload } from "lucide-react";
 import type { GameState } from "@shared/game-state";
 import {
   BUILTIN_SPRITES,
@@ -24,10 +25,13 @@ import {
   type SpriteCategory,
 } from "@/lib/studio/game/sprite-library";
 import {
+  addCustomSpriteAsset,
   addSprite,
   assignSpriteAsset,
+  updateSprite,
   type Behavior,
 } from "@/lib/studio/game/game-state-edit";
+import MediaPicker, { type PickedMedia } from "@/components/shared/MediaPicker";
 
 const CATEGORY_LABELS: Record<SpriteCategory, string> = {
   character: "Characters",
@@ -84,6 +88,35 @@ export default function SpritePalette({
     onSelectSprite(added.sprite.id);
   }
 
+  // Custom sprite uploaded via the shared MediaPicker — same asset
+  // pipeline as built-ins (drops into state.assets via the canonical
+  // helper) so the runtime can't tell the two apart at draw time. The
+  // user gets the existing R2 upload + library + AI tabs the rest of
+  // the studio already uses (DRY: one asset-picker chrome serves every
+  // surface that wants media).
+  function handleCustomPick(picked: PickedMedia) {
+    if (!activeLevelId) return;
+    if (picked.mediaType !== "image") return;
+    // Stable id derived from the URL — re-picking the same upload
+    // doesn't double-add the asset. `addCustomSpriteAsset` is
+    // idempotent on id so this is safe to call repeatedly.
+    const customId = `custom:${picked.url}`;
+    const width = picked.width ?? 96;
+    const height = picked.height ?? 96;
+    let next = addCustomSpriteAsset(gameState, { id: customId, url: picked.url, width, height });
+    const added = addSprite(next, activeLevelId, { behavior: null });
+    next = added.state;
+    // Wire the sprite to the custom asset id + adopt the picked
+    // dimensions so the canvas paints at the upload's natural size.
+    next = updateSprite(next, activeLevelId, added.sprite.id, {
+      assetId: customId,
+      width,
+      height,
+    });
+    onChange(next);
+    onSelectSprite(added.sprite.id);
+  }
+
   if (!activeLevelId) {
     return (
       <div className="flex h-full items-center justify-center px-3 py-4 text-center text-xs text-muted-foreground">
@@ -113,6 +146,31 @@ export default function SpritePalette({
           </section>
         );
       })}
+
+      {/* Custom upload — opens the shared MediaPicker (Upload / Library /
+          Stock / AI tabs) and threads the picked image through the same
+          asset pipeline as built-ins. Lives at the bottom of the
+          palette so the built-in catalog is always primary. */}
+      <section className="mt-2 border-t border-border pt-3">
+        <h4 className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Custom
+        </h4>
+        <MediaPicker
+          accept="image"
+          onPick={handleCustomPick}
+          title="Pick a sprite image"
+          triggerLabel="Upload sprite"
+          trigger={
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-fuchsia-300 bg-fuchsia-50/30 px-2 py-3 text-[11px] text-fuchsia-700 hover:bg-fuchsia-50"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload or pick image
+            </button>
+          }
+        />
+      </section>
     </div>
   );
 }

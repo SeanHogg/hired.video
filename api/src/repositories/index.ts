@@ -54,6 +54,7 @@ import {
   EmailSyncRunsRepository,
   type IEmailSyncRunsRepository,
 } from "./emailSyncRunsRepository.js";
+import { PointsRepository, type IPointsRepository } from "./pointsRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -95,6 +96,8 @@ export interface Repos {
   platform: IPlatformRepository;
   // studio templates marketplace
   studioTemplates: IStudioTemplatesRepository;
+  // gamification aggregate (points, streaks, badges, fraud flags)
+  points: IPointsRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -124,6 +127,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     marketing: new MarketingRepository(db, now),
     platform: new PlatformRepository(db, now),
     studioTemplates: new StudioTemplatesRepository(db, now),
+    points: new PointsRepository(db, now),
   };
 }
 
@@ -156,6 +160,7 @@ export type {
   IMarketingRepository,
   IPlatformRepository,
   IStudioTemplatesRepository,
+  IPointsRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
@@ -197,3 +202,4 @@ export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, Pitc
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";
 export type { StudioTemplateRow, StudioTemplateInsert, StudioTemplatePatch, TemplateLicenseRow, TemplateLicenseInsert, TemplateKind, CreatorTemplateEarningsRow, LicensedStudioTemplateRow } from "./studioTemplatesRepository.js";
+export type { PointsBalanceRow, PointsLedgerRow, PointsLedgerInsert, PointsCountersRow, PointsStreakRow, PointsFraudFlagRow, PointsFraudFlagInsert, BadgeRow, UserBadgeRow, UserBadgeInsert } from "./pointsRepository.js";

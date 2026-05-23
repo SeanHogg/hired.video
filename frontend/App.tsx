@@ -29,6 +29,7 @@ import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
 import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error-tracking";
+import { installPaidMediaPixels } from "@/lib/paid-media-pixels";
 
 // Critical components loaded immediately
 import AIChatPanel from "./components/AIChatPanel";
@@ -79,6 +80,7 @@ const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
 const SearchPage = lazy(() => import("./pages/Search"));
 const Settings = lazy(() => import("./pages/Settings"));
+const PaidMediaPage = lazy(() => import("./pages/paid-media/PaidMediaPage"));
 const Contributors = lazy(() => import("./pages/Contributors"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
@@ -219,6 +221,8 @@ const ExtensionTelemetry = lazy(() => import("./pages/admin/ExtensionTelemetry")
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
 const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
 const AdminAccountAnalytics = lazy(() => import("./pages/admin/AccountAnalytics"));
+const PointsPage = lazy(() => import("./pages/Points"));
+const AdminPoints = lazy(() => import("./pages/admin/Points"));
 import AdminLayout from "./components/admin/AdminLayout";
 
 // Loading component
@@ -373,6 +377,14 @@ const queryClient = new QueryClient({
 
 // Initialize error tracking (GlitchTip/Sentry compatible)
 initializeErrorTracking();
+
+// Install paid-media pixels (Meta/Google/LinkedIn/TikTok/Bing) for the
+// hired.video house workspace. Captures landing-page click IDs into
+// cookies, then injects platform pixels based on the public config.
+// Fire-and-forget — safe even if /api/paid-media/pixels/public 404s.
+installPaidMediaPixels().catch((err) => {
+  if (runtimeConfig.isDevelopment) console.warn("[paid-media] pixel install failed", err);
+});
 
 // Log current configuration in development
 if (runtimeConfig.isDevelopment) {
@@ -573,6 +585,7 @@ const App = () => (
                       />
                       <Route path="/profile" element={<ProfileRedirect />} />
                       <Route path="/dashboard" element={<Home />} />
+                      <Route path="/points" element={<PointsPage />} />
                       <Route path="/home" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/feed" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
@@ -851,10 +864,13 @@ const App = () => (
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
                       <Route path="/admin/moderation"        element={<AdminLayout><ModerationQueue /></AdminLayout>} />
                       <Route path="/admin/account-analytics" element={<AdminLayout><AdminAccountAnalytics /></AdminLayout>} />
+                      <Route path="/admin/points"            element={<AdminLayout><AdminPoints /></AdminLayout>} />
                       {/* Legacy redirect */}
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
                       <Route path="/settings" element={<Settings />} />
+                      <Route path="/settings/ads"     element={<PaidMediaPage />} />
+                      <Route path="/superadmin/ads"   element={<PaidMediaPage title="Paid Media (Internal Growth)" />} />
                       <Route path="/contributors" element={<Contributors />} />
                       <Route path="/help" element={<Help />} />
                       <Route path="/guides/getting-started" element={<GettingStartedGuide />} />

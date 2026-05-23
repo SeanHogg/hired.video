@@ -10,6 +10,7 @@ import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
 import { SortableList } from "./SortableList";
+import XyzTextWand from "./XyzTextWand";
 
 interface WorkExperienceSectionProps {
   work: Work[];
@@ -117,7 +118,15 @@ export default function WorkExperienceSection({
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("fields.position.label")}</Label>
+                <div className="flex items-center justify-between">
+                  <Label>{t("fields.position.label")}</Label>
+                  <XyzTextWand
+                    kind="position"
+                    value={workItem.position}
+                    onChange={(next) => onUpdate(index, "position", next)}
+                    context={{ organization: workItem.name }}
+                  />
+                </div>
                 <Input
                   value={workItem.position}
                   onChange={(e) => onUpdate(index, "position", e.target.value)}
@@ -156,7 +165,19 @@ export default function WorkExperienceSection({
             </div>
 
             <div className="space-y-2">
-              <Label>{t("fields.summary.label")}</Label>
+              <div className="flex items-center justify-between">
+                <Label>{t("fields.summary.label")}</Label>
+                <XyzTextWand
+                  kind="summary"
+                  value={workItem.summary}
+                  onChange={(next) => onUpdate(index, "summary", next)}
+                  context={{
+                    role: workItem.position,
+                    organization: workItem.name,
+                    highlights: workItem.highlights,
+                  }}
+                />
+              </div>
               <Textarea
                 value={workItem.summary}
                 onChange={(e) => onUpdate(index, "summary", e.target.value)}

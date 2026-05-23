@@ -62,6 +62,7 @@ import {
   ReferencesSection,
 } from "@/components/resume-sections";
 import { compareByEndThenStartDesc } from "@/lib/utils/resume-date";
+import XyzTextWand from "@/components/resume-sections/XyzTextWand";
 
 const RESUME_TABS = [
   { value: "basics", icon: User, labelKey: "tabs.basics" },
@@ -810,7 +811,16 @@ export default function ResumeBuilder({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="summary">{t("fields.summary.label")}</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="summary">{t("fields.summary.label")}</Label>
+                  <XyzTextWand
+                    kind="summary"
+                    value={basics.summary ?? ""}
+                    onChange={(next) => setBasics({ ...basics, summary: next })}
+                    context={{ role: basics.label }}
+                    fieldLabel="profile summary"
+                  />
+                </div>
                 <Textarea
                   id="summary"
                   value={basics.summary}

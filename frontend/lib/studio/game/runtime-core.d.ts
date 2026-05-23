@@ -9,17 +9,55 @@
  * function in runtime-core.js, declare its signature here too.
  */
 
-import type { GameAsset, GameLevel, GameSprite, GameState } from "@shared/game-state";
+import type {
+  BlockAction,
+  GameAsset,
+  GameLevel,
+  GameSprite,
+  GameState,
+} from "@shared/game-state";
 
 export interface RuntimeSprite {
   source: GameSprite;
   x: number;
   y: number;
+  /** Runtime override of source.width / height — block-script
+   *  `set-property width` mutates this without touching the authored
+   *  data, so exiting play mode restores the authored bbox. */
+  width: number;
+  height: number;
   vy: number;
   /** For memory-card behavior: whether the user has flipped this card. */
   flipped: boolean;
   /** For quiz-answer behavior: whether this answer has been picked. */
   picked: boolean;
+  /** Block-script `show` / `hide` action toggles this; drawFrame skips
+   *  hidden sprites entirely. */
+  visible: boolean;
+  /** Animation-driven render multipliers — applyAnimation() updates
+   *  these each tick based on onMount spec progress. */
+  alpha: number;
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  /** Per-sprite mount timestamp — animations use this as t=0; the
+   *  every-seconds trigger uses it as the initial lastFired value. */
+  mountTs: number;
+  /** Block-script `set-message` action sets this + the expiry; drawFrame
+   *  renders a small pill while messageUntilTs is in the future. */
+  message: string | null;
+  messageUntilTs: number;
+  /** One-shot guard so on-level-mount fires exactly once per sprite. */
+  hasFiredOnMount: boolean;
+  /** Per-rule lastFired timestamp for every-seconds triggers. Indexed
+   *  by rule id so the runtime can support multiple every-seconds
+   *  rules on the same sprite without them sharing a timer. */
+  everySecondsLastFiredTs: Record<string, number>;
+}
+
+export interface ScriptContext {
+  gotoLevel: (levelId: string) => void;
+  now: number;
 }
 
 export interface RunGameOptions {
@@ -79,3 +117,12 @@ export function runGame(
   state: GameState,
   opts: RunGameOptions,
 ): RunGameHandle;
+
+export function fireRules(
+  sprite: RuntimeSprite,
+  eventKind: string,
+  eventArgs: { key?: string } | null,
+  ctx: ScriptContext,
+): void;
+
+export function applyAnimation(sprite: RuntimeSprite, ts: number): void;

@@ -10,6 +10,7 @@ import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
 import { SortableList } from "./SortableList";
+import XyzTextWand from "./XyzTextWand";
 
 interface VolunteerSectionProps {
   volunteer: Volunteer[];
@@ -103,7 +104,15 @@ export default function VolunteerSection({
               />
             </div>
             <div className="space-y-2">
-              <Label>{t("fields.position.label")}</Label>
+              <div className="flex items-center justify-between">
+                <Label>{t("fields.position.label")}</Label>
+                <XyzTextWand
+                  kind="position"
+                  value={vol.position}
+                  onChange={(next) => onUpdate(index, "position", next)}
+                  context={{ organization: vol.organization }}
+                />
+              </div>
               <Input
                 value={vol.position}
                 onChange={(e) => onUpdate(index, "position", e.target.value)}
@@ -141,7 +150,19 @@ export default function VolunteerSection({
           </div>
 
           <div className="space-y-2">
-            <Label>{t("fields.summary.label")}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{t("fields.summary.label")}</Label>
+              <XyzTextWand
+                kind="summary"
+                value={vol.summary}
+                onChange={(next) => onUpdate(index, "summary", next)}
+                context={{
+                  role: vol.position,
+                  organization: vol.organization,
+                  highlights: vol.highlights,
+                }}
+              />
+            </div>
             <Textarea
               value={vol.summary}
               onChange={(e) => onUpdate(index, "summary", e.target.value)}

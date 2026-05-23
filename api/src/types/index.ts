@@ -56,6 +56,27 @@ export interface Env {
   AD_SLOT_PEOPLE_BANNER?: string;
   AD_SLOT_PROFILE_SIDEBAR?: string;
   AD_SLOT_RESUME_BANNER?: string;
+  // ─── Paid Media (external ad-platform integration) ──────────────────────
+  // Meta Marketing API + Conversions API
+  META_APP_ID?: string;
+  META_APP_SECRET?: string;
+  // Google Ads (OAuth client may be shared with YouTube; developer token
+  // separate, requires Google Ads Standard Access).
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_ADS_DEVELOPER_TOKEN?: string;
+  // TikTok For Business — Marketing API.
+  TIKTOK_APP_ID?: string;
+  TIKTOK_APP_SECRET?: string;
+  // Microsoft Advertising (Bing) — REST API + developer token.
+  MICROSOFT_ADS_CLIENT_ID?: string;
+  MICROSOFT_ADS_CLIENT_SECRET?: string;
+  MICROSOFT_ADS_DEVELOPER_TOKEN?: string;
+  // Envelope encryption key for paid_media credential columns. AES-GCM
+  // via HKDF-SHA-256 derivation. See services/paid-media/secrets.ts.
+  PAID_MEDIA_KMS_KEY?: string;
+  // Base URL of the API (used to build OAuth redirect URIs).
+  BASE_URL?: string;
 }
 
 // ── Hono context variables ───────────────────────────────────────────────────
