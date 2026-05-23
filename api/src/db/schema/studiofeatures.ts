@@ -403,16 +403,26 @@ export const studioAsyncInterviews = pgTable(
   "studio_async_interviews",
   {
     id:             uuid("id").primaryKey().defaultRandom(),
-    recruiterId:    text("recruiter_id").notNull(),   // employer/recruiter user ID
-    candidateId:    text("candidate_id"),              // null if invite-only (by email)
-    candidateEmail: text("candidate_email"),
+    recruiterId:    text("recruiter_id").notNull(),   // creator user ID (recruiter, employer, or — for self-practice — job_seeker)
+    candidateId:    text("candidate_id"),              // bound when assignment_type='assign' (existing job_seeker user)
+    candidateEmail: text("candidate_email"),           // always populated; for invite, the magic link claims to this address
     jobId:          text("job_id"),                    // linked job posting
     title:          text("title").notNull(),
     instructions:   text("instructions"),
-    questions:      jsonb("questions").notNull(),      // Array<{id, text, maxDurationSec, required}>
-    deadline:       timestamp("deadline", { withTimezone: true }),
+    questions:      jsonb("questions").notNull(),      // Array<{id, text, maxDurationSec, required, category?}>
+    deadline:       timestamp("deadline", { withTimezone: true }),  // soft "respond by" hint shown to candidate
     status:         text("status").notNull().default("pending"), // pending | in_progress | submitted | reviewed | expired
-    inviteToken:    text("invite_token"),              // unique token for email invites
+    inviteToken:    text("invite_token"),              // unique token for the magic link
+    // -- Added in 0104: assignment + question-generator extensions --
+    inviteTokenExpiresAt:    timestamp("invite_token_expires_at", { withTimezone: true }),
+    questionResponseDeadline: timestamp("question_response_deadline", { withTimezone: true }),
+    resendCount:    integer("resend_count").notNull().default(0),
+    lastResentAt:   timestamp("last_resent_at", { withTimezone: true }),
+    sourceResumeId: uuid("source_resume_id"),          // resume used to generate questions, if any
+    sourceContext:  text("source_context"),            // 'tool' | 'ai-coach' | 'career-360' | 'pipeline'
+    targetRole:     text("target_role"),               // role title passed in from Career 360 / ad-hoc
+    extractedSkills: jsonb("extracted_skills"),        // snapshot of skills the questions were generated against
+    assignmentType: text("assignment_type").notNull().default("assign"), // 'assign' | 'invite' | 'self'
     createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -437,6 +447,9 @@ export const studioAsyncResponses = pgTable(
     transcription: text("transcription"),
     coachingId:    text("coaching_id"),
     status:        text("status").notNull().default("pending"), // pending | recorded | submitted
+    // -- Added in 0104: text-mode answers + per-question response mode --
+    textAnswer:    text("text_answer"),
+    responseMode:  text("response_mode").notNull().default("video"), // 'text' | 'video'
     createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
