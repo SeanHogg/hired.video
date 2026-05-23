@@ -48,7 +48,12 @@ export interface GenerateResponse {
   sourceContext: SourceContext;
   sourceResumeId: string | null;
   sourceJobId: string | null;
+  /** Effective target role used by the LLM — falls back to JD title /
+   *  resume most-recent role when the user didn't enter one. */
   targetRole: string | null;
+  /** Human-readable provenance for the AI Coach hand-off prompt
+   *  (e.g. "the JD for Director, Vehicle Cloud at Ford"). */
+  sourceDescription: string | null;
 }
 
 export interface AssignRequest {
@@ -233,20 +238,40 @@ export async function claimInterviewInvite(token: string): Promise<{
   return res.data;
 }
 
+export interface PracticeHandoff {
+  questions: GeneratedQuestion[];
+  targetRole?: string | null;
+  seniority?: string | null;
+  style?: QuestionStyle | null;
+  sourceDescription?: string | null;
+  skills?: ExtractedSkill[];
+}
+
 /** Build a /ai-coach?q=... URL that drops the candidate (or self-
- *  practicer) into the AI Coach with the questions pre-loaded as a
- *  practice script. Used by the tool's "Practice in AI Coach" button. */
-export function buildAICoachPracticeHref(
-  questions: GeneratedQuestion[],
-  targetRole?: string | null,
-): string {
+ *  practicer) into the AI Coach with the full generator context inline,
+ *  so the coach can begin Q1 without re-asking for role / seniority /
+ *  source. Used by the tool's "Practise in AI Coach" button. */
+export function buildAICoachPracticeHref(handoff: PracticeHandoff): string {
+  const { questions, targetRole, seniority, style, sourceDescription, skills } = handoff;
+  const contextLines: string[] = [];
+  if (targetRole) contextLines.push(`- Target role: ${targetRole}`);
+  if (seniority) contextLines.push(`- Seniority: ${seniority}`);
+  if (style) contextLines.push(`- Style: ${style}`);
+  if (sourceDescription) contextLines.push(`- Generated from: ${sourceDescription}`);
+  if (skills && skills.length > 0) {
+    contextLines.push(`- Skills probed: ${skills.slice(0, 10).map((s) => s.name).join(", ")}`);
+  }
+
   const lines = [
-    "Run me through this interview practice set, one question at a time. After each of my answers give me STAR-method feedback and a 0–10 score, then move to the next question.",
+    "I'm starting an interview practice session — please run me through the questions below in order, one at a time. After each of my answers, give me STAR-method feedback and a 0–10 score, then move to the next question.",
+    "DO NOT ask me for additional context — everything you need is supplied below. Begin with Question 1.",
   ];
-  if (targetRole) lines.push(`I'm preparing for: ${targetRole}.`);
+  if (contextLines.length > 0) {
+    lines.push("Context:\n" + contextLines.join("\n"));
+  }
   lines.push(
-    "Questions to ask me in order:",
-    ...questions.map((q, i) => `${i + 1}. ${q.text}`),
+    "Questions (ask in this exact order):\n" +
+      questions.map((q, i) => `${i + 1}. ${q.text}`).join("\n"),
   );
   return `/ai-coach?q=${encodeURIComponent(lines.join("\n\n"))}`;
 }

@@ -90,39 +90,124 @@ export function updateSprite(sprite, dt, keys, worldWidth) {
   // static / quiz-answer / memory-card / unknown — no per-frame update.
 }
 
+// ─── Asset loader ─────────────────────────────────────────────────────────
+
+/** Build an image cache scoped to one `runGame` instance. Lazy-loads
+ *  assets the first time a sprite that references them is drawn —
+ *  there's no preload phase, so the first frame paints placeholders
+ *  while images decode and seamlessly swaps in the bitmap on the
+ *  frame after `Image.onload` fires.
+ *
+ *  Asset resolution is unified: built-in sprites (`builtin:*` ids) ride
+ *  the same `state.assets` array as user-uploaded R2 assets — the
+ *  editor copies built-ins into `assets` at pick time. The runtime
+ *  doesn't special-case "built-in" anywhere.
+ *
+ *  Returns `{ get(assetId) }`. `get` returns `null` if the asset id
+ *  doesn't resolve OR the image is still loading / errored. Callers
+ *  fall back to a colored rectangle in that case so the layout stays
+ *  visible at all times. */
+export function createAssetCache(assets) {
+  const cache = new Map(); // assetId → { status: "loading"|"ready"|"error", img? }
+  return {
+    get: function (assetId) {
+      if (!assetId) return null;
+      const cached = cache.get(assetId);
+      if (cached) return cached.status === "ready" ? cached.img : null;
+      const asset = assets.find(function (a) { return a.id === assetId; });
+      if (!asset || !asset.url) {
+        cache.set(assetId, { status: "error" });
+        return null;
+      }
+      const entry = { status: "loading", img: null };
+      cache.set(assetId, entry);
+      const img = new Image();
+      img.onload = function () { entry.status = "ready"; entry.img = img; };
+      img.onerror = function () { entry.status = "error"; };
+      img.src = asset.url;
+      return null;
+    },
+  };
+}
+
 // ─── Renderer ─────────────────────────────────────────────────────────────
 
-/** Paint one frame — backdrop + every sprite. Sprites render as colored
- *  rectangles labelled with their id + behavior name (placeholder until
- *  the asset loader lands #939). */
-export function drawFrame(ctx, level, sprites) {
+/** Paint one frame — backdrop + every sprite. Resolves each sprite's
+ *  asset via the cache and draws the image when available, falling
+ *  back to a colored placeholder rectangle (with id / behavior labels
+ *  in edit mode) otherwise. Quiz-answer / memory-card state overlays
+ *  (right-vs-wrong tint, card-flip back) take precedence over the
+ *  asset image because they're transient gameplay state. */
+export function drawFrame(ctx, level, sprites, assets, opts) {
+  const assetCache = opts && opts.assetCache ? opts.assetCache : createAssetCache(assets || []);
+  const showLabels = opts && opts.mode === "edit";
+  const selectedSpriteId = opts && opts.selectedSpriteId ? opts.selectedSpriteId : null;
+
   ctx.fillStyle = level.backgroundColor;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   for (let i = 0; i < sprites.length; i++) {
     const sprite = sprites[i];
-    const tint = tintForBehavior(sprite.source.behavior);
-    let fill = tint.fill;
-    if (sprite.source.behavior === "memory-card" && !sprite.flipped) {
-      fill = "#1e293b";
+    const behavior = sprite.source.behavior;
+
+    // Gameplay-state overlays take precedence over the asset image
+    // because they're the visual feedback the runtime is trying to
+    // surface (correct/incorrect tint, hidden-card back).
+    const memoryHidden = behavior === "memory-card" && !sprite.flipped;
+    const quizPicked = behavior === "quiz-answer" && sprite.picked;
+    const showImage = !memoryHidden && !quizPicked;
+
+    const img = showImage ? assetCache.get(sprite.source.assetId) : null;
+
+    if (img) {
+      ctx.drawImage(img, sprite.x, sprite.y, sprite.source.width, sprite.source.height);
+    } else {
+      // Placeholder rectangle — same palette as before so a project
+      // that hasn't picked sprites yet still reads as a real layout.
+      const tint = tintForBehavior(behavior);
+      let fill = tint.fill;
+      if (memoryHidden) fill = "#1e293b";
+      if (quizPicked) {
+        const correct = !!(sprite.source.params && sprite.source.params.correct);
+        fill = correct ? "#10b981" : "#ef4444";
+      }
+      ctx.fillStyle = fill;
+      ctx.fillRect(sprite.x, sprite.y, sprite.source.width, sprite.source.height);
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sprite.x, sprite.y, sprite.source.width, sprite.source.height);
     }
-    if (sprite.source.behavior === "quiz-answer" && sprite.picked) {
-      const correct = !!(sprite.source.params && sprite.source.params.correct);
-      fill = correct ? "#10b981" : "#ef4444";
+
+    // Labels only in edit mode — play mode runs clean. Sprites with
+    // an image rendered get no labels (the image IS the label).
+    if (showLabels && !img) {
+      const tint = tintForBehavior(behavior);
+      ctx.fillStyle = tint.text;
+      ctx.font = "bold 14px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(sprite.source.id, sprite.x + 8, sprite.y + 6);
+      if (behavior) {
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.fillText(behavior, sprite.x + 8, sprite.y + 22);
+      }
     }
-    ctx.fillStyle = fill;
-    ctx.fillRect(sprite.x, sprite.y, sprite.source.width, sprite.source.height);
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(sprite.x, sprite.y, sprite.source.width, sprite.source.height);
-    ctx.fillStyle = tint.text;
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.fillText(sprite.source.id, sprite.x + 8, sprite.y + 6);
-    if (sprite.source.behavior) {
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.fillText(sprite.source.behavior, sprite.x + 8, sprite.y + 22);
+
+    // Selection outline — only when this sprite is the editor's
+    // selection. Drawn LAST per-sprite so it sits on top of the
+    // image. Fuchsia matches the editor's game-kind accent so the
+    // outline reads as a deliberate UI element, not a debug overlay.
+    if (selectedSpriteId && sprite.source.id === selectedSpriteId) {
+      ctx.strokeStyle = "#d946ef";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(
+        sprite.x - 2,
+        sprite.y - 2,
+        sprite.source.width + 4,
+        sprite.source.height + 4,
+      );
+      ctx.setLineDash([]);
     }
   }
 }
@@ -136,7 +221,15 @@ export function drawFrame(ctx, level, sprites) {
  *  `opts.mode`: "edit" → static layout render, no input. "play" → game
  *  loop + input wired. */
 export function runGame(canvas, state, opts) {
-  const level = findStartLevel(state);
+  // Editor preview overrides — `opts.activeLevelId` lets the editor
+  // show the level the user just selected from the rail (which may
+  // differ from the start level). Falls back to the runtime default
+  // when not set or doesn't resolve. The export bundle never passes
+  // this so the live game still mounts startLevelId as authored.
+  const editorLevel = opts && opts.activeLevelId
+    ? state.levels.find(function (l) { return l.id === opts.activeLevelId; })
+    : null;
+  const level = editorLevel || findStartLevel(state);
   if (!level) return { cleanup: function () {} };
 
   // Match canvas internal resolution to the game's design resolution; CSS
@@ -176,6 +269,12 @@ export function runGame(canvas, state, opts) {
     canvas.addEventListener("click", onClick);
   }
 
+  // Per-instance asset cache so each `runGame` mount loads images
+  // exactly once — repeated frame draws are constant-time lookups.
+  // The cache is captured by the tick closure so it survives across
+  // every frame.
+  const assetCache = createAssetCache(state.assets || []);
+
   let rafId = 0;
   let lastTs = performance.now();
   const tick = function (ts) {
@@ -186,7 +285,11 @@ export function runGame(canvas, state, opts) {
         updateSprite(sprites[i], dt, keys, canvas.width);
       }
     }
-    drawFrame(ctx, level, sprites);
+    drawFrame(ctx, level, sprites, state.assets || [], {
+      mode: opts.mode,
+      assetCache: assetCache,
+      selectedSpriteId: opts && opts.selectedSpriteId,
+    });
     rafId = requestAnimationFrame(tick);
   };
   rafId = requestAnimationFrame(tick);

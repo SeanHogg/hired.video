@@ -98,6 +98,11 @@ export default function InterviewQuestions() {
 
   const [skills, setSkills] = useState<ExtractedSkill[]>([]);
   const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
+  // Authoritative target role + provenance returned by /generate. Used by
+  // the AI Coach hand-off + the assign dialog so we ship the JD title /
+  // resume role even when the user left the targetRole field blank.
+  const [resolvedTargetRole, setResolvedTargetRole] = useState<string | null>(null);
+  const [sourceDescription, setSourceDescription] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,6 +153,8 @@ export default function InterviewQuestions() {
       const res = await generateInterviewQuestions(payload);
       setSkills(res.skills);
       setQuestions(res.questions);
+      setResolvedTargetRole(res.targetRole);
+      setSourceDescription(res.sourceDescription);
       if (res.questions.length === 0) {
         setError("Couldn't generate any questions for that input. Try a different source.");
       }
@@ -180,7 +187,16 @@ export default function InterviewQuestions() {
 
   function handlePracticeInCoach() {
     if (questions.length === 0) return;
-    navigate(buildAICoachPracticeHref(questions, targetRole));
+    navigate(
+      buildAICoachPracticeHref({
+        questions,
+        targetRole: resolvedTargetRole ?? targetRole,
+        seniority,
+        style,
+        sourceDescription,
+        skills,
+      }),
+    );
   }
 
   // ─── Assign dialog state ─────────────────────────────────────────────
@@ -405,8 +421,24 @@ export default function InterviewQuestions() {
 
         {questions.length > 0 && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-base">3. Your questions ({questions.length})</CardTitle>
+            <CardHeader className="flex flex-row items-start justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-base">3. Your questions ({questions.length})</CardTitle>
+                {(resolvedTargetRole || sourceDescription) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Generated for{" "}
+                    {resolvedTargetRole && (
+                      <span className="font-medium text-foreground">{resolvedTargetRole}</span>
+                    )}
+                    {seniority && <span> ({seniority})</span>}
+                    {sourceDescription && (
+                      <>
+                        {" "}from <span className="italic">{sourceDescription}</span>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
               <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={handleCopyAll} className="gap-1">
                   <Copy className="h-3.5 w-3.5" />
@@ -467,7 +499,7 @@ export default function InterviewQuestions() {
           onClose={() => setAssignOpen(false)}
           questions={questions}
           skills={skills}
-          targetRole={targetRole}
+          targetRole={resolvedTargetRole ?? targetRole}
           sourceContext={sourceContext}
           sourceResumeId={mode === "resume" ? resumeId : undefined}
           sourceJobId={mode === "job" ? jobId : undefined}

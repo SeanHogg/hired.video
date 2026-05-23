@@ -26,6 +26,10 @@ import {
   type GameSprite,
   type GameState,
 } from "@shared/game-state";
+import {
+  spriteToAsset,
+  type BuiltinSprite,
+} from "./sprite-library";
 
 // ─── Level mutations ─────────────────────────────────────────────────────────
 
@@ -163,10 +167,31 @@ export function updateGameSettings(
   return { ...state, ...patch };
 }
 
-// Asset add/delete helpers were drafted here but removed per the
-// standing dead-code rule — they have no caller today (the asset
-// library lands with #939). Will be re-added alongside the
-// asset-picker UI.
+/** Assign a built-in sprite to a `GameSprite`. Copies the built-in
+ *  spec into `state.assets` (idempotent — a duplicate built-in id
+ *  reuses the existing entry) and updates the target sprite's
+ *  `assetId` + `width` / `height` to the built-in's recommended size.
+ *
+ *  Per PRD §1.2 the runtime is asset-source-agnostic: it resolves
+ *  every sprite's image via `state.assets`. Built-ins ride the same
+ *  pipeline as user-uploaded R2 assets, so the runtime + the exported
+ *  HTML5 bundle don't need a "built-in library" code path. */
+export function assignSpriteAsset(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  builtin: BuiltinSprite,
+): GameState {
+  const asset = spriteToAsset(builtin);
+  const assetsHasIt = state.assets.some((a) => a.id === asset.id);
+  const nextAssets = assetsHasIt ? state.assets : [...state.assets, asset];
+  const withAsset: GameState = { ...state, assets: nextAssets };
+  return updateSprite(withAsset, levelId, spriteId, {
+    assetId: builtin.id,
+    width: builtin.width,
+    height: builtin.height,
+  });
+}
 
 // ─── Behavior registry ───────────────────────────────────────────────────────
 //

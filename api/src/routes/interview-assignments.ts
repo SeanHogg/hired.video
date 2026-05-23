@@ -133,17 +133,40 @@ const RespondRequestSchema = z.object({
 
 // ─── Skill-extract input builder (mirrors skill-extractor.ts) ───────────────
 
-async function buildSkillInputForUser(
+interface ResolvedSource {
+  skillInput: SkillExtractInput;
+  /** Best-guess target role for the AI Coach hand-off + LLM prompt.
+   *  Used only when the caller didn't pass one explicitly; the JD title
+   *  wins for jobs, the most-recent work entry's position for resumes. */
+  resolvedTargetRole: string | null;
+  /** Human-readable provenance shown in the practise prompt so the LLM
+   *  doesn't have to ask the candidate what the questions are based on. */
+  sourceDescription: string | null;
+}
+
+async function buildSourceForUser(
   userId: string,
   body: z.infer<typeof GenerateRequestSchema>,
-): Promise<SkillExtractInput | { error: { code: string; message: string; status: number } }> {
+): Promise<ResolvedSource | { error: { code: string; message: string; status: number } }> {
   if (body.resumeId) {
     const repos = buildRepos(getDb());
     const row = await repos.resumes.findByIdForOwner(body.resumeId, userId);
     if (!row?.content) {
       return { error: { code: "NOT_FOUND", message: "Resume not found", status: 404 } };
     }
-    return { kind: "resume-json", content: row.content as ResumeContent };
+    const content = row.content as ResumeContent;
+    const recentTitle =
+      (Array.isArray(content?.work) && (content.work as Array<{ position?: string }>)[0]?.position) ||
+      null;
+    const label =
+      (typeof (row as Record<string, unknown>)?.title === "string" &&
+        ((row as Record<string, unknown>).title as string)) ||
+      "your resume";
+    return {
+      skillInput: { kind: "resume-json", content },
+      resolvedTargetRole: typeof recentTitle === "string" ? recentTitle : null,
+      sourceDescription: `your resume "${label}"`,
+    };
   }
   if (body.jobId) {
     const repos = buildRepos(getDb());
@@ -151,22 +174,39 @@ async function buildSkillInputForUser(
     if (!row) {
       return { error: { code: "NOT_FOUND", message: "Job not found", status: 404 } };
     }
+    const jobRow = row as unknown as Record<string, unknown>;
+    const job = parsedJobFromRow(jobRow);
+    const jobTitle = typeof job?.title === "string" ? job.title : null;
+    const company =
+      (typeof jobRow.company === "string" && (jobRow.company as string)) ||
+      (typeof jobRow.companyName === "string" && (jobRow.companyName as string)) ||
+      null;
     return {
-      kind: "job-json",
-      job: parsedJobFromRow(row as unknown as Record<string, unknown>),
+      skillInput: { kind: "job-json", job },
+      resolvedTargetRole: jobTitle,
+      sourceDescription: jobTitle
+        ? `the JD for ${jobTitle}${company ? ` at ${company}` : ""}`
+        : "the saved job description",
     };
   }
   if (body.content) {
     return {
-      kind: "text",
-      sourceType: body.sourceType ?? "resume",
-      text: body.content,
+      skillInput: {
+        kind: "text",
+        sourceType: body.sourceType ?? "resume",
+        text: body.content,
+      },
+      resolvedTargetRole: null,
+      sourceDescription:
+        body.sourceType === "job" ? "the pasted job description" : "the pasted resume",
     };
   }
-  // Pure-targetRole path — no source to extract from. Return a sentinel
-  // empty input; the caller will skip extraction and ask the LLM to
-  // build "role-fit" questions from the target only.
-  return { kind: "text", sourceType: "job", text: body.targetRole ?? "" };
+  // Pure-targetRole path — skill list stays empty; prompt rebalances to "role-fit".
+  return {
+    skillInput: { kind: "text", sourceType: "job", text: body.targetRole ?? "" },
+    resolvedTargetRole: body.targetRole ?? null,
+    sourceDescription: body.targetRole ? `the target role "${body.targetRole}"` : null,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -183,9 +223,9 @@ interviewAssignmentRoutes.post("/generate", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
   }
 
-  const skillInput = await buildSkillInputForUser(user.sub, parsed.data);
-  if ("error" in skillInput) {
-    return c.json(fail(skillInput.error.code, skillInput.error.message), skillInput.error.status as 400 | 404 | 401);
+  const source = await buildSourceForUser(user.sub, parsed.data);
+  if ("error" in source) {
+    return c.json(fail(source.error.code, source.error.message), source.error.status as 400 | 404 | 401);
   }
 
   const llm = hasAnyLLMProviderKey(c.env) ? createLLMClient(c.env, user) : null;
@@ -195,13 +235,18 @@ interviewAssignmentRoutes.post("/generate", async (c) => {
   // the title alone (skills array is empty, prompt rebalances to "role-fit").
   let skills: Skill[] = [];
   if (parsed.data.resumeId || parsed.data.jobId || parsed.data.content) {
-    const extracted = await extractSkills(llm, skillInput);
+    const extracted = await extractSkills(llm, source.skillInput);
     skills = extracted.skills;
   }
 
+  // User-supplied targetRole wins; otherwise fall back to whatever the
+  // source resolution produced (JD title / resume most-recent role).
+  const effectiveTargetRole =
+    parsed.data.targetRole?.trim() || source.resolvedTargetRole || null;
+
   const questions = await generateQuestionsFromSkills(c.env, user, {
     skills,
-    targetRole: parsed.data.targetRole,
+    targetRole: effectiveTargetRole ?? undefined,
     seniority: parsed.data.seniority,
     style: parsed.data.style,
     count: parsed.data.count,
@@ -214,7 +259,8 @@ interviewAssignmentRoutes.post("/generate", async (c) => {
       sourceContext: parsed.data.sourceContext,
       sourceResumeId: parsed.data.resumeId ?? null,
       sourceJobId: parsed.data.jobId ?? null,
-      targetRole: parsed.data.targetRole ?? null,
+      targetRole: effectiveTargetRole,
+      sourceDescription: source.sourceDescription,
     }),
   );
 });

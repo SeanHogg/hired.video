@@ -4,21 +4,32 @@
  * (which seeds `CanvasState` for Timeline kinds).
  *
  * Each entry returns a fresh `GameState` populated with the level /
- * sprite shape the chosen game template starts from. The PRD §1.2
+ * sprite shape the chosen game template starts from. Per PRD §1.2 the
  * canvas-runtime extensibility model puts game on equal footing with
  * Timeline kinds — every kind gets its own seed registry, dispatched
  * by `seedTemplate(template)` in `lib/studio/template-dispatch.ts`.
  *
- * Phase 1 ships placeholder seeds (single level + a sprite or two with
- * stub behavior ids). Phase 2 (the Phaser integration, #927) wires
- * those behaviors to actual game logic.
+ * Seeded sprites pick from `BUILTIN_SPRITES` so projects open with
+ * actual visuals (not the placeholder rectangle fallback). Every
+ * referenced built-in is also dropped into `state.assets` so the
+ * runtime can resolve them via the same asset-loader path that
+ * user-uploaded R2 sprites use (DRY across asset sources). Adding a
+ * new game template is one entry here + (optionally) new entries in
+ * `sprite-library.ts` for any custom visuals it needs.
  */
 
 import {
   emptyGameState,
+  type GameAsset,
+  type GameSprite,
   type GameState,
 } from "@shared/game-state";
 import type { ContentTemplate } from "@/components/studio/templates/catalog";
+import {
+  BUILTIN_SPRITES,
+  pickBuiltinSprite,
+  spriteToAsset,
+} from "./sprite-library";
 
 export function seedGameFromTemplate(
   templateId: string | null | undefined,
@@ -30,48 +41,90 @@ export function seedGameFromTemplate(
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Per-template seeds. Each returns a fresh GameState; placeholder sprite
-// `assetId` values reference assets the user will replace (mirrors how
-// Timeline templates ship with placeholder text the user edits).
+// Per-template seeds. Each pulls its sprite visuals from the built-in
+// catalog so the canvas paints real artwork on first paint.
 // ───────────────────────────────────────────────────────────────────────────
+
+/** Build a sprite that references a built-in by id, adopting the
+ *  built-in's recommended `width` / `height` as defaults. Falls back
+ *  to whatever values are passed when the id doesn't resolve (defensive
+ *  — the seed file + sprite library evolve together, but a missing id
+ *  shouldn't crash the chooser). */
+function builtinSprite(
+  base: Omit<GameSprite, "assetId" | "width" | "height"> & {
+    assetId: string;
+    width?: number;
+    height?: number;
+  },
+): GameSprite {
+  const builtin = pickBuiltinSprite(base.assetId);
+  return {
+    id: base.id,
+    assetId: base.assetId,
+    x: base.x,
+    y: base.y,
+    width: base.width ?? builtin?.width ?? 64,
+    height: base.height ?? builtin?.height ?? 64,
+    behavior: base.behavior,
+    params: base.params,
+  };
+}
+
+/** Collect a deduped `GameAsset[]` for every built-in sprite the seed
+ *  references. Saves callers from manually keeping the `assets`
+ *  manifest in sync with the sprite list — they just declare what they
+ *  use and the helper figures out the asset entries. */
+function assetsFor(ids: string[]): GameAsset[] {
+  const seen = new Set<string>();
+  const out: GameAsset[] = [];
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    const builtin = pickBuiltinSprite(id);
+    if (!builtin) continue;
+    seen.add(id);
+    out.push(spriteToAsset(builtin));
+  }
+  return out;
+}
 
 const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
   endless_runner: () => {
     const base = emptyGameState({ width: 1280, height: 720, fps: 60 });
+    base.assets = assetsFor([
+      "builtin:player-yellow",
+      "builtin:tile-grass",
+      "builtin:obstacle-cactus",
+    ]);
     base.levels[0] = {
       id: "level-1",
       label: "Run!",
       backgroundColor: "#0ea5e9",
       sprites: [
-        {
+        builtinSprite({
           id: "player",
-          assetId: "placeholder:player",
+          assetId: "builtin:player-yellow",
           x: 120,
-          y: 480,
-          width: 64,
-          height: 96,
+          y: 520,
           behavior: "platformer-player",
           params: { jumpPower: 600, runSpeed: 280 },
-        },
-        {
+        }),
+        builtinSprite({
           id: "ground",
-          assetId: "placeholder:tile-ground",
+          assetId: "builtin:tile-grass",
           x: 0,
-          y: 600,
+          y: 640,
           width: 1280,
-          height: 120,
+          height: 80,
           behavior: "static",
-        },
-        {
+        }),
+        builtinSprite({
           id: "obstacle-1",
-          assetId: "placeholder:obstacle",
-          x: 800,
-          y: 528,
-          width: 48,
-          height: 72,
+          assetId: "builtin:obstacle-cactus",
+          x: 900,
+          y: 568,
           behavior: "scroll-left",
           params: { speed: 280 },
-        },
+        }),
       ],
     };
     return base;
@@ -79,32 +132,21 @@ const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
 
   quiz_game: () => {
     const base = emptyGameState({ width: 1280, height: 720, fps: 30 });
+    base.assets = assetsFor(["builtin:button"]);
     base.levels = [
       {
         id: "menu",
         label: "Title screen",
         backgroundColor: "#1e1b4b",
         sprites: [
-          {
-            id: "title",
-            assetId: "placeholder:text-title",
-            x: 240,
-            y: 200,
-            width: 800,
-            height: 120,
-            behavior: "static",
-            params: { text: "PUB QUIZ NIGHT" },
-          },
-          {
+          builtinSprite({
             id: "start-button",
-            assetId: "placeholder:button",
+            assetId: "builtin:button",
             x: 480,
             y: 440,
-            width: 320,
-            height: 80,
-            behavior: "button-goto-level",
-            params: { targetLevelId: "q1", label: "Start" },
-          },
+            behavior: "quiz-answer",
+            params: { text: "Start", correct: true },
+          }),
         ],
         nextLevelId: "q1",
       },
@@ -113,38 +155,22 @@ const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
         label: "Question 1",
         backgroundColor: "#0f172a",
         sprites: [
-          {
-            id: "question",
-            assetId: "placeholder:text-question",
-            x: 120,
-            y: 120,
-            width: 1040,
-            height: 120,
-            behavior: "static",
-            params: {
-              text: "Which planet has the most moons?",
-            },
-          },
-          {
+          builtinSprite({
             id: "answer-a",
-            assetId: "placeholder:button",
+            assetId: "builtin:button",
             x: 120,
             y: 320,
-            width: 480,
-            height: 80,
             behavior: "quiz-answer",
             params: { text: "A. Jupiter", correct: false },
-          },
-          {
+          }),
+          builtinSprite({
             id: "answer-b",
-            assetId: "placeholder:button",
+            assetId: "builtin:button",
             x: 680,
             y: 320,
-            width: 480,
-            height: 80,
             behavior: "quiz-answer",
             params: { text: "B. Saturn", correct: true },
-          },
+          }),
         ],
       },
     ];
@@ -154,25 +180,38 @@ const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
 
   memory_match: () => {
     const base = emptyGameState({ width: 1280, height: 720, fps: 30 });
+    base.assets = assetsFor(["builtin:card-back"]);
     base.levels[0] = {
       id: "board",
       label: "Memory board",
       backgroundColor: "#064e3b",
-      sprites: [
-        // 4×4 grid of card slots — placeholder, the Phaser integration
-        // will shuffle pairs at boot.
-        ...Array.from({ length: 16 }, (_, i) => ({
+      sprites: Array.from({ length: 16 }, (_, i) =>
+        builtinSprite({
           id: `card-${i}`,
-          assetId: "placeholder:card-back",
+          assetId: "builtin:card-back",
           x: 280 + (i % 4) * 180,
           y: 100 + Math.floor(i / 4) * 140,
-          width: 140,
-          height: 120,
           behavior: "memory-card",
           params: { pairId: Math.floor(i / 2) },
-        })),
-      ],
+        }),
+      ),
     };
     return base;
   },
 };
+
+/** Test-only export — `BUILTIN_SPRITES` is the catalog; this is the
+ *  set of ids referenced by the seeds. Kept here so a "library lookup
+ *  drift" regression test can pin that every seed references a real
+ *  built-in. */
+export const SEED_REFERENCED_BUILTINS = [
+  "builtin:player-yellow",
+  "builtin:tile-grass",
+  "builtin:obstacle-cactus",
+  "builtin:button",
+  "builtin:card-back",
+] as const;
+
+// Keep a touchpoint to BUILTIN_SPRITES so the cross-reference test
+// can assert at runtime that every SEED_REFERENCED_BUILTINS id resolves.
+void BUILTIN_SPRITES;

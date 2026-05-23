@@ -1,0 +1,555 @@
+/**
+ * GamePropertiesPanel — right-rail panel for game-kind projects.
+ * Parallel to `<PropertiesPanel>` for Timeline-runtime kinds: same
+ * shell slot, same "the panel content adapts to the editor's
+ * current selection" interaction model.
+ *
+ * Selection dispatch (per `GameSelection` in StudioEditorV2):
+ *   - { kind: "canvas" } / null → game-wide settings (canvas dims,
+ *       FPS, start level).
+ *   - { kind: "level", levelId } → that level's properties (label,
+ *       background color, sprite count, set-as-start, delete).
+ *   - { kind: "sprite", levelId, spriteId } → sprite inspector (id /
+ *       x / y / w / h / behavior + per-behavior params + sprite
+ *       picker that swaps the visual).
+ *
+ * All mutations go through pure helpers in `lib/studio/game/game-state-edit.ts`.
+ * Sprite-swap goes through `assignSpriteAsset` so the new sprite's
+ * asset is copied into `state.assets` once (idempotent).
+ */
+import { useMemo } from "react";
+import { Gamepad2, Trash2 } from "lucide-react";
+import type { GameSprite, GameState } from "@shared/game-state";
+import {
+  BEHAVIORS,
+  BEHAVIOR_LABELS,
+  BEHAVIOR_PARAM_DEFAULTS,
+  assignSpriteAsset,
+  deleteLevel,
+  deleteSprite,
+  setStartLevel,
+  updateGameSettings,
+  updateLevel,
+  updateSprite,
+  updateSpriteParam,
+  type Behavior,
+} from "@/lib/studio/game/game-state-edit";
+import {
+  BUILTIN_SPRITES,
+  pickBuiltinSprite,
+} from "@/lib/studio/game/sprite-library";
+import { cn } from "@/lib/utils";
+
+export type GameSelection =
+  | { kind: "canvas" }
+  | { kind: "level"; levelId: string }
+  | { kind: "sprite"; levelId: string; spriteId: string };
+
+interface Props {
+  gameState: GameState;
+  onChange: (next: GameState) => void;
+  selection: GameSelection;
+  onSelectionChange: (next: GameSelection) => void;
+}
+
+export default function GamePropertiesPanel({
+  gameState,
+  onChange,
+  selection,
+  onSelectionChange,
+}: Props) {
+  if (selection.kind === "sprite") {
+    const level = gameState.levels.find((l) => l.id === selection.levelId);
+    const sprite = level?.sprites.find((s) => s.id === selection.spriteId);
+    if (!level || !sprite) {
+      // Stale selection (the sprite or level was deleted while still
+      // selected). Snap to canvas so the panel always renders something
+      // valid.
+      onSelectionChange({ kind: "canvas" });
+      return null;
+    }
+    return (
+      <SpriteInspector
+        gameState={gameState}
+        onChange={onChange}
+        levelId={level.id}
+        sprite={sprite}
+        onDeselect={() => onSelectionChange({ kind: "canvas" })}
+        onDelete={() => {
+          onChange(deleteSprite(gameState, level.id, sprite.id));
+          onSelectionChange({ kind: "canvas" });
+        }}
+      />
+    );
+  }
+  if (selection.kind === "level") {
+    const level = gameState.levels.find((l) => l.id === selection.levelId);
+    if (!level) {
+      onSelectionChange({ kind: "canvas" });
+      return null;
+    }
+    return (
+      <LevelInspector
+        gameState={gameState}
+        onChange={onChange}
+        levelId={level.id}
+        onDeselect={() => onSelectionChange({ kind: "canvas" })}
+        onDelete={() => {
+          onChange(deleteLevel(gameState, level.id));
+          onSelectionChange({ kind: "canvas" });
+        }}
+      />
+    );
+  }
+  return <GameSettingsInspector gameState={gameState} onChange={onChange} />;
+}
+
+// ─── Section subcomponents ──────────────────────────────────────────────────
+
+function GameSettingsInspector({
+  gameState,
+  onChange,
+}: {
+  gameState: GameState;
+  onChange: (next: GameState) => void;
+}) {
+  return (
+    <PanelShell title="Game">
+      <Section label="Canvas">
+        <Field label="Width">
+          <NumberInput
+            value={gameState.width}
+            onChange={(v) => onChange(updateGameSettings(gameState, { width: Math.max(1, v) }))}
+            min={1}
+            step={16}
+          />
+        </Field>
+        <Field label="Height">
+          <NumberInput
+            value={gameState.height}
+            onChange={(v) => onChange(updateGameSettings(gameState, { height: Math.max(1, v) }))}
+            min={1}
+            step={16}
+          />
+        </Field>
+        <Field label="FPS">
+          <NumberInput
+            value={gameState.fps}
+            onChange={(v) => onChange(updateGameSettings(gameState, { fps: Math.max(1, Math.min(120, v)) }))}
+            min={1}
+            max={120}
+            step={1}
+          />
+        </Field>
+      </Section>
+
+      <Section label="Start level">
+        <select
+          value={gameState.startLevelId}
+          onChange={(e) => onChange(setStartLevel(gameState, e.target.value))}
+          className="h-7 w-full rounded border border-border bg-background px-1 text-xs"
+        >
+          {gameState.levels.map((l) => (
+            <option key={l.id} value={l.id}>{l.label}</option>
+          ))}
+        </select>
+      </Section>
+
+      <Section label="Stats">
+        <ReadOnlyRow label="Levels">{gameState.levels.length}</ReadOnlyRow>
+        <ReadOnlyRow label="Sprites">
+          {gameState.levels.reduce((n, l) => n + l.sprites.length, 0)}
+        </ReadOnlyRow>
+        <ReadOnlyRow label="Assets">{gameState.assets.length}</ReadOnlyRow>
+        <ReadOnlyRow label="Engine">{gameState.engine}</ReadOnlyRow>
+      </Section>
+    </PanelShell>
+  );
+}
+
+function LevelInspector({
+  gameState,
+  onChange,
+  levelId,
+  onDeselect,
+  onDelete,
+}: {
+  gameState: GameState;
+  onChange: (next: GameState) => void;
+  levelId: string;
+  onDeselect: () => void;
+  onDelete: () => void;
+}) {
+  const level = gameState.levels.find((l) => l.id === levelId)!;
+  const isStart = gameState.startLevelId === level.id;
+  return (
+    <PanelShell title="Level" onDeselect={onDeselect}>
+      <Section label="Identity">
+        <Field label="Label">
+          <input
+            value={level.label}
+            onChange={(e) => onChange(updateLevel(gameState, level.id, { label: e.target.value }))}
+            className="h-7 w-full rounded border border-border bg-background px-1.5 text-xs"
+          />
+        </Field>
+        <Field label="Id">
+          <span className="font-mono text-[10px] text-muted-foreground">{level.id}</span>
+        </Field>
+      </Section>
+
+      <Section label="Appearance">
+        <Field label="Background">
+          <input
+            type="color"
+            value={level.backgroundColor}
+            onChange={(e) =>
+              onChange(updateLevel(gameState, level.id, { backgroundColor: e.target.value }))
+            }
+            className="h-7 w-12 cursor-pointer rounded border border-border"
+          />
+        </Field>
+      </Section>
+
+      <Section label="Flow">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={isStart}
+            disabled={isStart}
+            onChange={() => onChange(setStartLevel(gameState, level.id))}
+            className="h-4 w-4 accent-amber-500"
+          />
+          <span>Start the game on this level</span>
+        </label>
+      </Section>
+
+      <Section label="Stats">
+        <ReadOnlyRow label="Sprites">{level.sprites.length}</ReadOnlyRow>
+      </Section>
+
+      <DangerZone>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={gameState.levels.length <= 1}
+          className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Trash2 className="h-3 w-3" />
+          Delete level
+        </button>
+        {gameState.levels.length <= 1 && (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Can't delete — a game needs at least one level.
+          </p>
+        )}
+      </DangerZone>
+    </PanelShell>
+  );
+}
+
+function SpriteInspector({
+  gameState,
+  onChange,
+  levelId,
+  sprite,
+  onDeselect,
+  onDelete,
+}: {
+  gameState: GameState;
+  onChange: (next: GameState) => void;
+  levelId: string;
+  sprite: GameSprite;
+  onDeselect: () => void;
+  onDelete: () => void;
+}) {
+  const currentBuiltin = useMemo(
+    () => pickBuiltinSprite(sprite.assetId),
+    [sprite.assetId],
+  );
+  return (
+    <PanelShell title="Sprite" onDeselect={onDeselect}>
+      <Section label="Identity">
+        {/* `id` is read-only — it doubles as the runtime reference key
+            for selection + behavior dispatch, so an in-place rename
+            would invalidate the editor's `gameSelection.spriteId` and
+            any `nextLevelId` flow edges that point at this sprite.
+            Free-text labelling is intentionally deferred (one field on
+            the data model + a single inspector input) until the data
+            model splits id from label. */}
+        <Field label="Id">
+          <span className="font-mono text-[10px] text-muted-foreground">{sprite.id}</span>
+        </Field>
+      </Section>
+
+      <Section label="Position & size">
+        <Field label="x">
+          <NumberInput
+            value={sprite.x}
+            onChange={(v) => onChange(updateSprite(gameState, levelId, sprite.id, { x: v }))}
+            step={1}
+          />
+        </Field>
+        <Field label="y">
+          <NumberInput
+            value={sprite.y}
+            onChange={(v) => onChange(updateSprite(gameState, levelId, sprite.id, { y: v }))}
+            step={1}
+          />
+        </Field>
+        <Field label="Width">
+          <NumberInput
+            value={sprite.width}
+            onChange={(v) => onChange(updateSprite(gameState, levelId, sprite.id, { width: Math.max(1, v) }))}
+            min={1}
+            step={1}
+          />
+        </Field>
+        <Field label="Height">
+          <NumberInput
+            value={sprite.height}
+            onChange={(v) => onChange(updateSprite(gameState, levelId, sprite.id, { height: Math.max(1, v) }))}
+            min={1}
+            step={1}
+          />
+        </Field>
+      </Section>
+
+      <Section label="Sprite">
+        {currentBuiltin && (
+          <div className="mb-2 flex items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5">
+            <img
+              src={currentBuiltin.url}
+              alt=""
+              className="h-8 w-8 object-contain"
+              draggable={false}
+            />
+            <span className="text-xs text-muted-foreground">{currentBuiltin.label}</span>
+          </div>
+        )}
+        <p className="mb-1 text-[10px] text-muted-foreground">Swap to a different sprite:</p>
+        <div className="grid grid-cols-4 gap-1.5">
+          {BUILTIN_SPRITES.map((s) => {
+            const isCurrent = s.id === sprite.assetId;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => onChange(assignSpriteAsset(gameState, levelId, sprite.id, s))}
+                title={s.label}
+                className={cn(
+                  "flex h-10 items-center justify-center rounded border bg-card p-1 hover:border-fuchsia-400",
+                  isCurrent ? "border-fuchsia-500 ring-2 ring-fuchsia-500/30" : "border-border",
+                )}
+              >
+                <img
+                  src={s.url}
+                  alt=""
+                  className="max-h-8 max-w-full object-contain"
+                  draggable={false}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section label="Behavior">
+        <Field label="Type">
+          <select
+            value={sprite.behavior ?? ""}
+            onChange={(e) => {
+              const value = e.target.value === "" ? null : (e.target.value as Behavior);
+              // Reset params to the new behavior's defaults so the
+              // runtime sees the expected shape after a swap.
+              const params = value
+                ? Object.fromEntries(
+                    (BEHAVIOR_PARAM_DEFAULTS[value] ?? []).map((p) => [p.key, p.default]),
+                  )
+                : {};
+              onChange(updateSprite(gameState, levelId, sprite.id, { behavior: value, params }));
+            }}
+            className="h-7 w-full rounded border border-border bg-background px-1 text-xs"
+          >
+            <option value="">(none)</option>
+            {BEHAVIORS.map((b) => (
+              <option key={b} value={b}>{BEHAVIOR_LABELS[b]}</option>
+            ))}
+          </select>
+        </Field>
+        {sprite.behavior && (
+          <BehaviorParamsForm
+            behavior={sprite.behavior as Behavior}
+            sprite={sprite}
+            onParamChange={(key, value) =>
+              onChange(updateSpriteParam(gameState, levelId, sprite.id, key, value))
+            }
+          />
+        )}
+      </Section>
+
+      <DangerZone>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100"
+        >
+          <Trash2 className="h-3 w-3" />
+          Delete sprite
+        </button>
+      </DangerZone>
+    </PanelShell>
+  );
+}
+
+// ─── Chrome primitives ──────────────────────────────────────────────────────
+
+function PanelShell({
+  title,
+  onDeselect,
+  children,
+}: {
+  title: string;
+  onDeselect?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex h-full flex-col overflow-y-auto px-3 py-3 text-sm">
+      <header className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Gamepad2 className="h-4 w-4 text-fuchsia-500" />
+          <h3 className="font-semibold">{title}</h3>
+        </div>
+        {onDeselect && (
+          <button
+            type="button"
+            onClick={onDeselect}
+            className="rounded px-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+          >
+            Done
+          </button>
+        )}
+      </header>
+      <div className="flex flex-col gap-4">{children}</div>
+    </div>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-1.5">
+      <h4 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {label}
+      </h4>
+      <div className="space-y-1.5">{children}</div>
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function ReadOnlyRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums">{children}</span>
+    </div>
+  );
+}
+
+function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  return (
+    <input
+      type="number"
+      value={Number.isFinite(value) ? value : 0}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(e) => {
+        const n = Number(e.target.value);
+        if (Number.isFinite(n)) onChange(n);
+      }}
+      className="h-7 w-20 rounded border border-border bg-background px-1 text-right text-xs tabular-nums"
+    />
+  );
+}
+
+function DangerZone({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="mt-2 border-t border-border pt-3">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        Danger zone
+      </p>
+      {children}
+    </section>
+  );
+}
+
+function BehaviorParamsForm({
+  behavior,
+  sprite,
+  onParamChange,
+}: {
+  behavior: Behavior;
+  sprite: GameSprite;
+  onParamChange: (key: string, value: unknown) => void;
+}) {
+  const specs = BEHAVIOR_PARAM_DEFAULTS[behavior];
+  if (!specs || specs.length === 0) return null;
+  return (
+    <div className="mt-1 space-y-1.5 rounded border border-border bg-muted/30 px-2 py-2">
+      {specs.map((spec) => {
+        const current = sprite.params?.[spec.key];
+        if (spec.kind === "number") {
+          const v = typeof current === "number" ? current : (spec.default as number);
+          return (
+            <Field key={spec.key} label={spec.label}>
+              <NumberInput value={v} onChange={(next) => onParamChange(spec.key, next)} />
+            </Field>
+          );
+        }
+        if (spec.kind === "boolean") {
+          const v = typeof current === "boolean" ? current : (spec.default as boolean);
+          return (
+            <Field key={spec.key} label={spec.label}>
+              <input
+                type="checkbox"
+                checked={v}
+                onChange={(e) => onParamChange(spec.key, e.target.checked)}
+                className="h-4 w-4 cursor-pointer accent-fuchsia-600"
+              />
+            </Field>
+          );
+        }
+        const v = typeof current === "string" ? current : String(spec.default);
+        return (
+          <Field key={spec.key} label={spec.label}>
+            <input
+              value={v}
+              onChange={(e) => onParamChange(spec.key, e.target.value)}
+              className="h-7 w-32 rounded border border-border bg-background px-1.5 text-xs"
+            />
+          </Field>
+        );
+      })}
+    </div>
+  );
+}

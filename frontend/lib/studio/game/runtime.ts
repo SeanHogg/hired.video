@@ -18,5 +18,11 @@ export {
   updateSprite,
   drawFrame,
   findStartLevel,
+  createAssetCache,
 } from "./runtime-core.js";
-export type { RunGameOptions, RunGameHandle, RuntimeSprite } from "./runtime-core.js";
+export type {
+  RunGameOptions,
+  RunGameHandle,
+  RuntimeSprite,
+  AssetCache,
+} from "./runtime-core.js";

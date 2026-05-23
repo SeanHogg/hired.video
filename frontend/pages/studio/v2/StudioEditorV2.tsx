@@ -101,14 +101,27 @@ import {
   type MediaKind,
 } from "@shared/media-kinds";
 import GameStage from "@/components/studio/game/GameStage";
-import GameEditor from "@/components/studio/game/GameEditor";
+import LevelsRail from "@/components/studio/game/LevelsRail";
+import SpritePalette from "@/components/studio/game/SpritePalette";
+import GamePropertiesPanel, {
+  type GameSelection,
+} from "@/components/studio/game/GamePropertiesPanel";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
 import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
-import { flattenCanvasToBlob } from "@/lib/studio/drawing/drawing-engine";
+import DrawingToolPalette from "@/components/studio/drawing/DrawingToolPalette";
+import DrawingAiPromptPanel from "@/components/studio/drawing/DrawingAiPromptPanel";
+import { flattenCanvasToBlob, drawBlobToCanvasFit } from "@/lib/studio/drawing/drawing-engine";
+import {
+  DEFAULT_BRUSH,
+  MAX_RECENT_COLORS,
+  type BrushSettings,
+  type DrawingTool,
+} from "@/lib/studio/drawing/drawing-types";
 import { uploadImage } from "@/lib/services/upload-service";
+import type { ImageGenResult } from "@/lib/services/image-gen-engine";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -324,6 +337,20 @@ export default function StudioEditorV2() {
   // Save-to-library is async + needs a busy state to disable the host's
   // SaveMenu while in flight.
   const [savingImageToLibrary, setSavingImageToLibrary] = useState(false);
+  // Tool + brush state lifted from DrawingStage so the LEFT-rail
+  // `<DrawingToolPalette/>` (mounted by the host inside the same
+  // `<CollapsiblePanel/>` Timeline kinds use for ScenesRail) drives
+  // them. Per DRY the canvas + the palette read from the same state —
+  // there's no parallel state-mirror.
+  const [imageTool, setImageTool] = useState<DrawingTool>("brush");
+  const [imageBrush, setImageBrush] = useState<BrushSettings>(DEFAULT_BRUSH);
+  const [imageRecentColors, setImageRecentColors] = useState<string[]>([]);
+  const pushImageRecentColor = useCallback((color: string) => {
+    setImageRecentColors((prev) => {
+      const filtered = prev.filter((c) => c !== color);
+      return [color, ...filtered].slice(0, MAX_RECENT_COLORS);
+    });
+  }, []);
 
   // ─── Image-runtime layer-mutation handlers (lifted from DrawingStage) ──
   // These live in the host so the SHARED `<FloatingImageLayersPanel/>`
@@ -475,20 +502,76 @@ export default function StudioEditorV2() {
     a.click();
     URL.revokeObjectURL(url);
   }, [imageCanvas]);
+
+  // AI-result layer insert — appends a new layer with the generated
+  // pixels + records one entry on `aiPromptHistory`. Lives in the host
+  // (alongside the layer-mutation handlers) so the right-rail-mounted
+  // `<DrawingAiPromptPanel/>` can call it without DrawingStage being
+  // in the path.
+  const handleImageAiGenerated = useCallback(
+    async (result: ImageGenResult, prompt: string) => {
+      const newLayerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
+      const dataUrl = await drawBlobToCanvasFit(
+        result.blob,
+        imageState.width,
+        imageState.height,
+      );
+      setImageState((prev) => ({
+        ...prev,
+        layers: [
+          ...prev.layers,
+          {
+            id: newLayerId,
+            label: `AI: ${prompt.slice(0, 24)}${prompt.length > 24 ? "…" : ""}`,
+            kind: "raster",
+            opacity: 1,
+            visible: true,
+            locked: false,
+            blendMode: "normal",
+            pixelsDataUrl: dataUrl,
+          },
+        ],
+        activeLayerId: newLayerId,
+        aiPromptHistory: [
+          ...prev.aiPromptHistory,
+          {
+            id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
+            prompt,
+            at: new Date().toISOString(),
+            engineId: result.engine,
+            ...(result.resultUrl ? { resultUrl: result.resultUrl } : {}),
+          },
+        ].slice(-50),
+      }));
+      imageCommit();
+    },
+    [imageState.width, imageState.height, setImageState, imageCommit],
+  );
   // Game-runtime state for `mediaKind: "game"` projects (#939 Phase 2b).
   // Same shape as `imageState` — local state hydrated from
-  // `persistedProject.gameState`, edited via the right-rail `<GameEditor>`,
+  // `persistedProject.gameState`, edited via the shared shell (LevelsRail /
   // mirrored back through `handleSave`. Null for non-game projects (and
   // for game projects whose template seed hasn't reached the editor yet
   // on a brand-new draft). Per PRD §1.2 each canvas runtime owns its
   // own state model.
   const [gameState, setGameState] = useState<import("@shared/game-state").GameState | null>(null);
-  // Active level / selected sprite for the game editor. Lifted to the
-  // editor shell so the `<GameStage>` canvas + `<GameEditor>` right rail
-  // share one source of truth — clicking a sprite in either surface
-  // selects it in both.
-  const [activeLevelId, setActiveLevelId] = useState<string | null>(null);
-  const [selectedSpriteId, setSelectedSpriteId] = useState<string | null>(null);
+  // Game editor selection — `GameSelection` discriminated union:
+  //   - { kind: "canvas" } → game settings panel
+  //   - { kind: "level", levelId } → level inspector
+  //   - { kind: "sprite", levelId, spriteId } → sprite inspector
+  // Lifted to the editor shell so the canvas, levels rail, sprite
+  // palette, and right-rail properties panel all read the same source.
+  // Parallel to the Timeline editor's `Selection` model; the two
+  // never co-exist because at most one runtime is mounted per
+  // project. `activeLevelId` is derived from selection for runtime
+  // convenience (the canvas needs a level id to render).
+  const [gameSelection, setGameSelection] = useState<GameSelection>({ kind: "canvas" });
+  const activeLevelId =
+    gameSelection.kind === "level" || gameSelection.kind === "sprite"
+      ? gameSelection.levelId
+      : null;
+  const selectedSpriteId =
+    gameSelection.kind === "sprite" ? gameSelection.spriteId : null;
   const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
   const [selection, setSelection] = useState<Selection>({
     kind: "scene",
@@ -618,15 +701,15 @@ export default function StudioEditorV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, persistedProject]);
 
-  // Default the active-level selection to the project's startLevelId
-  // (so the user sees the same level the runtime would mount on
-  // Playtest) once gameState hydrates. Re-runs if the gameState
-  // changes identities (a fresh server-load) but NOT on every sprite
-  // edit, so the selection stays stable during an editing session.
+  // Default the editor's selection to the project's startLevelId once
+  // gameState hydrates — the user lands on the level the runtime would
+  // mount on Playtest. Subsequent edits don't re-fire (selection stays
+  // wherever the user puts it during the session).
   useEffect(() => {
-    if (!gameState || activeLevelId !== null) return;
-    setActiveLevelId(gameState.startLevelId ?? gameState.levels[0]?.id ?? null);
-  }, [gameState, activeLevelId]);
+    if (!gameState || gameSelection.kind !== "canvas") return;
+    const startId = gameState.startLevelId ?? gameState.levels[0]?.id;
+    if (startId) setGameSelection({ kind: "level", levelId: startId });
+  }, [gameState, gameSelection.kind]);
 
   // Server-load when we have a real project id.
   useEffect(() => {
@@ -1715,15 +1798,75 @@ export default function StudioEditorV2() {
               background / music pickers behind tabs so the v2 user has
               parity with v1's sidebar sections. Collapsible via the shared
               CollapsiblePanel (own state, persists to localStorage). */}
-          {/* Left panel (Scenes + Widget palette + Actions) is the entry
-              point for Timeline-runtime authoring. Self-hides for game /
-              image kinds per #936's `mediaKindUsesCanvasStateAuthoring`
-              predicate — those runtimes don't have scenes / widgets to
-              surface. Their canvas (`<GameStage>` / `<DrawingStage>`)
-              spans the full editor width when this panel is hidden,
-              which is the desired UX for a single-canvas-authoring
-              kind. Phase 2b (#939 for game / #940 for image) replaces
-              this slot with kind-specific tool panels. */}
+          {/* Left panel — kind-aware mount per the V2-Video reference
+              pattern. Same `<CollapsiblePanel side="left">` shell every
+              kind uses; CONTENTS swap by mediaKind so the editor's
+              padding / collapse / borders stay uniform across every
+              kind (per DRY: one shell, kind-aware contents).
+                • Timeline kinds → Scenes rail + Widget / Media /
+                  Actions tabs.
+                • Image kind → `<DrawingToolPalette/>` (brush / eraser /
+                  fill / eyedropper + size / opacity / hardness sliders
+                  + color picker + recent-colors row).
+                • Game kind → `<LevelsRail/>` on top + `<SpritePalette/>`
+                  on bottom (same composition as Video's
+                  ScenesRail+WidgetPalette, just with game data). */}
+          {currentMediaKind === "image" && (
+            <CollapsiblePanel
+              side="left"
+              label="Tools"
+              storageKey="studio.v2.panel.left"
+              expandedClassName="w-56"
+            >
+              <DrawingToolPalette
+                tool={imageTool}
+                onToolChange={setImageTool}
+                brush={imageBrush}
+                onBrushChange={setImageBrush}
+                recentColors={imageRecentColors}
+              />
+            </CollapsiblePanel>
+          )}
+          {/* Game-kind left panel — mirrors the Video shell's
+              "ScenesRail on top, WidgetPalette on bottom" composition
+              but with game-shaped contents: LevelsRail + SpritePalette.
+              Same `<CollapsiblePanel side="left">` chrome so users get
+              an identical layout across kinds, just different
+              authoring primitives inside. */}
+          {currentMediaKind === "game" && gameState && (
+            <CollapsiblePanel
+              side="left"
+              label="Levels"
+              storageKey="studio.v2.panel.left"
+              expandedClassName="w-64"
+            >
+              <div className="min-h-0 flex-1 border-b border-border">
+                <LevelsRail
+                  gameState={gameState}
+                  onChange={setGameState}
+                  activeLevelId={activeLevelId}
+                  onSelect={(levelId) => setGameSelection({ kind: "level", levelId })}
+                />
+              </div>
+              <div className="flex h-[55%] min-h-[200px] flex-col bg-card">
+                <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sprites
+                </div>
+                <div className="min-h-0 flex-1">
+                  <SpritePalette
+                    gameState={gameState}
+                    onChange={setGameState}
+                    activeLevelId={activeLevelId}
+                    onSelectSprite={(spriteId) => {
+                      if (spriteId && activeLevelId) {
+                        setGameSelection({ kind: "sprite", levelId: activeLevelId, spriteId });
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </CollapsiblePanel>
+          )}
           {usesTimelineChrome && (
           <CollapsiblePanel
             side="left"
@@ -1910,12 +2053,25 @@ export default function StudioEditorV2() {
                             // mutations (add level / move sprite /
                             // change behavior) refresh the canvas
                             // immediately without waiting for a save
-                            // round-trip. Falls back to the persisted
-                            // value only during the brief moment
-                            // between load and the hydration effect.
+                            // round-trip.
                             gameState={gameState}
                             zoom={zoom}
                             mode={gamePlaying ? "play" : "edit"}
+                            // Selection props — canvas reflects what
+                            // the user picked in the left rail; clicks
+                            // on the canvas update the shared
+                            // `gameSelection` so the right rail swaps
+                            // to the clicked sprite's inspector.
+                            activeLevelId={activeLevelId}
+                            selectedSpriteId={selectedSpriteId}
+                            onSelectSprite={(spriteId) => {
+                              if (!activeLevelId) return;
+                              if (spriteId) {
+                                setGameSelection({ kind: "sprite", levelId: activeLevelId, spriteId });
+                              } else {
+                                setGameSelection({ kind: "level", levelId: activeLevelId });
+                              }
+                            }}
                           />
                           {/* Playtest toggle — overlaid on the GameStage so
                               the user has the affordance right next to the
@@ -1931,15 +2087,17 @@ export default function StudioEditorV2() {
                         </div>
                       ),
                       image: imageStateHydrated ? (
-                        <div className="h-[calc(100vh-200px)] w-full">
-                          <DrawingStage
-                            state={imageState}
-                            setState={setImageState}
-                            commit={imageCommit}
-                            zoom={zoom}
-                            onCanvasReady={setImageCanvas}
-                          />
-                        </div>
+                        <DrawingStage
+                          state={imageState}
+                          setState={setImageState}
+                          commit={imageCommit}
+                          zoom={zoom}
+                          tool={imageTool}
+                          brush={imageBrush}
+                          onBrushChange={setImageBrush}
+                          onRecentColor={pushImageRecentColor}
+                          onCanvasReady={setImageCanvas}
+                        />
                       ) : null,
                       timeline: (
                   <>
@@ -2139,11 +2297,12 @@ export default function StudioEditorV2() {
               panel to that widget's meta.
 
               Self-hides for non-Timeline-authoring kinds (game / image)
-              per #936's predicate. Game-kind shows the dedicated
-              `<GameEditor>` instead — settings + levels + sprites +
-              sprite inspector wired to the local `gameState`. Image-
-              kind `<DrawingStage>` owns its own inline inspector so
-              the right rail is empty for that kind. */}
+              per #936's predicate. Game-kind mounts the dedicated
+              `<GamePropertiesPanel/>` — selection-aware (canvas →
+              game settings, level → level inspector, sprite → sprite
+              inspector with sprite picker). Image-kind `<DrawingStage>`
+              owns its own inline inspector so the right rail surfaces
+              the AI prompt panel instead. */}
           {usesTimelineChrome ? (
           <CollapsiblePanel
             side="right"
@@ -2216,25 +2375,39 @@ export default function StudioEditorV2() {
           ) : currentMediaKind === "game" && gameState ? (
             <CollapsiblePanel
               side="right"
-              label="Game"
+              label="Properties"
               storageKey="studio.v2.panel.right"
-              expandedClassName="w-80"
+              expandedClassName="w-72"
             >
-              {/* Full game editor — settings + levels + sprites + sprite
-                  inspector. Reads + writes the LOCAL `gameState` so
-                  edits feed `<GameStage>` and the bundled `handleSave`
-                  in one shared source of truth (DRY across the canvas
-                  + the right rail). */}
-              <GameEditor
+              {/* Game-kind right rail — selection-aware properties
+                  panel. Same shell slot Timeline kinds use for
+                  PropertiesPanel; the content adapts to the selection
+                  (canvas → game settings, level → level inspector,
+                  sprite → sprite inspector). Mirrors the Video editor
+                  pattern: click an element, see its meta on the right. */}
+              <GamePropertiesPanel
                 gameState={gameState}
                 onChange={setGameState}
-                activeLevelId={activeLevelId}
-                onSelectLevel={(id) => {
-                  setActiveLevelId(id);
-                  setSelectedSpriteId(null);
-                }}
-                selectedSpriteId={selectedSpriteId}
-                onSelectSprite={setSelectedSpriteId}
+                selection={gameSelection}
+                onSelectionChange={setGameSelection}
+              />
+            </CollapsiblePanel>
+          ) : currentMediaKind === "image" && imageStateHydrated ? (
+            <CollapsiblePanel
+              side="right"
+              label="AI Prompt"
+              storageKey="studio.v2.panel.right"
+              expandedClassName="w-72"
+            >
+              {/* Image-kind right rail — the AI prompt panel mounts in
+                  the SAME `<CollapsiblePanel/>` Timeline kinds use for
+                  PropertiesPanel + game uses for GamePropertiesPanel.
+                  One layout shell, kind-aware contents (per DRY). */}
+              <DrawingAiPromptPanel
+                history={imageState.aiPromptHistory}
+                onGenerated={(result, prompt) =>
+                  void handleImageAiGenerated(result, prompt)
+                }
               />
             </CollapsiblePanel>
           ) : null}

@@ -9,7 +9,7 @@
  * function in runtime-core.js, declare its signature here too.
  */
 
-import type { GameLevel, GameSprite, GameState } from "@shared/game-state";
+import type { GameAsset, GameLevel, GameSprite, GameState } from "@shared/game-state";
 
 export interface RuntimeSprite {
   source: GameSprite;
@@ -26,6 +26,14 @@ export interface RunGameOptions {
   /** "edit" → static layout render, no input. "play" → game loop +
    *  input wired. */
   mode: "edit" | "play";
+  /** Editor-only override — render this level instead of the
+   *  GameState's startLevelId. Falls back to startLevelId when unset
+   *  or the id doesn't resolve. The export bundle never passes this
+   *  so the live game still mounts the authored start level. */
+  activeLevelId?: string;
+  /** Editor-only — draws a dashed selection outline on the sprite
+   *  with this id. Unset = no outline. */
+  selectedSpriteId?: string | null;
 }
 
 export interface RunGameHandle {
@@ -44,10 +52,26 @@ export function updateSprite(
   worldWidth: number,
 ): void;
 
+export interface AssetCache {
+  /** Returns the loaded `HTMLImageElement` for the asset id, or null
+   *  if the asset hasn't loaded yet (or doesn't resolve). The cache
+   *  starts the load on first call so subsequent frames pick up the
+   *  bitmap automatically. */
+  get(assetId: string | null | undefined): HTMLImageElement | null;
+}
+
+export function createAssetCache(assets: readonly GameAsset[]): AssetCache;
+
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   level: GameLevel,
   sprites: RuntimeSprite[],
+  assets: readonly GameAsset[],
+  opts?: {
+    mode?: "edit" | "play";
+    assetCache?: AssetCache;
+    selectedSpriteId?: string | null;
+  },
 ): void;
 
 export function runGame(

@@ -4,32 +4,29 @@
  * by `<CanvasRouter mediaKind/>` in StudioEditorV2 when the project
  * is image-kind.
  *
- * Composition: left rail (tool palette + brush settings + color
- * picker), centre (visible composite canvas), right rail (AI prompt
- * panel). The layers list / undo+redo / save / export controls all
- * live in the SHARED editor chrome the host already mounts — per the
- * DRY rule (`feedback_extract_on_duplication`) the DrawingStage does
- * NOT duplicate those affordances. Specifically:
+ * **Canvas-only by design** — mirrors `<CanvasStage/>`'s role for
+ * Timeline kinds. The surrounding chrome lives on the host:
  *
- *   • Undo / redo → host's `<CanvasEditToolbar/>` (bottom-left), wired
- *     to the host's `useCanvasHistory<ImageState>` when image kind.
- *   • Layers → host's `<FloatingImageLayersPanel/>` (bottom-centre),
- *     replacing the Timeline `<FloatingLayersPanel/>` for image kind.
- *   • Save / Export / Save-to-library → host's `<StudioSaveMenuV2/>`
- *     in the header, with the export verb auto-deriving from the
- *     mediaKind table and the asset-library publish destination
- *     routing through the same R2 upload path as MediaPicker.
+ *   • LEFT rail → `<DrawingToolPalette/>` mounted by `StudioEditorV2`
+ *     inside the standard left `<CollapsiblePanel/>` slot (the same
+ *     slot Timeline kinds use for ScenesRail / WidgetPalette).
+ *   • RIGHT rail → `<DrawingAiPromptPanel/>` mounted by the host
+ *     inside the standard right `<CollapsiblePanel/>` slot (the same
+ *     slot Timeline kinds use for PropertiesPanel).
+ *   • Bottom-left → host's `<CanvasEditToolbar/>` (undo / redo).
+ *   • Bottom-centre → host's `<FloatingImageLayersPanel/>` (layers).
+ *   • Header → host's `<StudioSaveMenuV2/>` (save / export / library).
  *
- * This component is CONTROLLED — the host owns `state`, `setState`,
- * `commit`, plus the layer-mutation handlers. DrawingStage just
- * renders the canvas + tool palette + AI prompt and emits state
- * updates on user input.
+ * Per the DRY rule, DrawingStage owns ZERO chrome — every affordance
+ * lives in the same shared slot the V2 Video editor uses, just with
+ * image-kind-specific contents.
  *
  * State model: `ImageState` (shared/image-state.ts) is the source of
- * truth. Per-layer offscreen canvases are CACHE — rebuilt from each
- * layer's `pixelsDataUrl` on hydrate / undo / redo / AI gen. On every
- * stroke commit the active layer's offscreen is serialized back to a
- * dataURL and the state is updated.
+ * truth, owned by the host's `useCanvasHistory<ImageState>`. Per-layer
+ * offscreen canvases are CACHE — rebuilt from each layer's
+ * `pixelsDataUrl` on hydrate / undo / redo / AI gen. On every stroke
+ * commit the active layer's offscreen is serialized back to a dataURL
+ * and the host's state is updated.
  *
  * Per the SOLID open/closed principle the brush engine, fill engine,
  * and composite pipeline are pure functions in
@@ -41,53 +38,48 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import {
   type ImageState,
-  type ImageLayer,
-  type AiPromptHistoryEntry,
   findLayer,
 } from "@shared/image-state";
 import {
   type BrushSettings,
   type CanvasPoint,
   type DrawingTool,
-  DEFAULT_BRUSH,
-  MAX_RECENT_COLORS,
 } from "@/lib/studio/drawing/drawing-types";
 import {
   compositeLayers,
-  drawBlobToCanvasFit,
+  createOffscreenCanvas,
   floodFillAt,
   hydrateLayerCanvas,
   pickColorAt,
   serializeLayer,
   strokeBetween,
   stampBrushDab,
-  createOffscreenCanvas,
 } from "@/lib/studio/drawing/drawing-engine";
-import { type ImageGenResult } from "@/lib/services/image-gen-engine";
-import DrawingToolPalette from "./DrawingToolPalette";
-import DrawingAiPromptPanel from "./DrawingAiPromptPanel";
 
 interface DrawingStageProps {
-  /** Controlled image state — owned by the host (so the host's
-   *  CanvasEditToolbar can drive undo/redo + the host's SaveMenu can
-   *  flatten on Export). */
+  /** Controlled image state — owned by the host. */
   state: ImageState;
-  /** Host's setState — used directly for stroke pixel commits, AI
-   *  result layer inserts, and active-layer changes. */
   setState: Dispatch<SetStateAction<ImageState>>;
-  /** Host's history commit — fired on stroke end + AI gen + the
-   *  layer-mutation actions handled by FloatingImageLayersPanel. */
+  /** Host's history commit — fired on stroke end. */
   commit: () => void;
   zoom: number;
-  /** Captured by the host on first paint so it can flatten the
-   *  composite for Export / Save-to-library. Called with null on
-   *  unmount so the host releases the reference. */
+  /** Active tool + brush settings — owned by the host so the left-rail
+   *  `<DrawingToolPalette/>` (also mounted by the host) can drive the
+   *  canvas's stroke behavior. */
+  tool: DrawingTool;
+  brush: BrushSettings;
+  /** Host updaters — used by the eyedropper to push a sampled color
+   *  back into the brush state, and by the canvas (indirectly) when a
+   *  paint action pushes a color into the recent-colors swatch row. */
+  onBrushChange: (next: BrushSettings) => void;
+  onRecentColor: (color: string) => void;
+  /** Captured by the host on first paint so its SaveMenu (Export /
+   *  Save-to-library) can flatten the composite on demand. */
   onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
@@ -96,12 +88,12 @@ export default function DrawingStage({
   setState,
   commit,
   zoom,
+  tool,
+  brush,
+  onBrushChange,
+  onRecentColor,
   onCanvasReady,
 }: DrawingStageProps) {
-  const [tool, setTool] = useState<DrawingTool>("brush");
-  const [brush, setBrush] = useState<BrushSettings>(DEFAULT_BRUSH);
-  const [recentColors, setRecentColors] = useState<string[]>([]);
-
   // Per-layer offscreen canvases — cached from state.layers[].pixelsDataUrl.
   // Keyed by layer id; rebuilt whenever a layer's pixelsDataUrl changes.
   const layerCanvasesRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
@@ -137,7 +129,6 @@ export default function DrawingStage({
     (async () => {
       const cache = layerCanvasesRef.current;
       const snap = hydratedSnapshotRef.current;
-      // Remove canvases for layers that no longer exist.
       const aliveIds = new Set(state.layers.map((l) => l.id));
       for (const id of Array.from(cache.keys())) {
         if (!aliveIds.has(id)) {
@@ -154,8 +145,6 @@ export default function DrawingStage({
           await hydrateLayerCanvas(canvas, layer.pixelsDataUrl);
           snap.set(layer.id, layer.pixelsDataUrl);
         } else if (prevHydrated !== layer.pixelsDataUrl) {
-          // The dataURL changed (undo/redo/AI gen replaced pixels) —
-          // re-hydrate while keeping the same canvas reference.
           const ctx = canvas.getContext("2d");
           if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
           await hydrateLayerCanvas(canvas, layer.pixelsDataUrl);
@@ -203,13 +192,6 @@ export default function DrawingStage({
     [state.width, state.height],
   );
 
-  const pushRecentColor = useCallback((color: string) => {
-    setRecentColors((prev) => {
-      const filtered = prev.filter((c) => c !== color);
-      return [color, ...filtered].slice(0, MAX_RECENT_COLORS);
-    });
-  }, []);
-
   const commitActiveLayerToState = useCallback(() => {
     const layer = activeLayer;
     const canvas = activeLayerCanvas();
@@ -245,14 +227,14 @@ export default function DrawingStage({
         const visibleCtx = visible.getContext("2d");
         if (!visibleCtx) return;
         const color = pickColorAt(visibleCtx, point.x, point.y);
-        setBrush((b) => ({ ...b, color }));
-        pushRecentColor(color);
+        onBrushChange({ ...brush, color });
+        onRecentColor(color);
         return;
       }
 
       if (tool === "fill") {
         floodFillAt(ctx, state.width, state.height, point.x, point.y, brush.color);
-        pushRecentColor(brush.color);
+        onRecentColor(brush.color);
         recomposite();
         commitActiveLayerToState();
         return;
@@ -264,7 +246,7 @@ export default function DrawingStage({
       ctx.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
       stampBrushDab(ctx, brush, point);
       ctx.restore();
-      if (tool === "brush") pushRecentColor(brush.color);
+      if (tool === "brush") onRecentColor(brush.color);
       recomposite();
     },
     [
@@ -273,7 +255,8 @@ export default function DrawingStage({
       brush,
       commitActiveLayerToState,
       localPointFromEvent,
-      pushRecentColor,
+      onBrushChange,
+      onRecentColor,
       recomposite,
       state.height,
       state.width,
@@ -313,62 +296,13 @@ export default function DrawingStage({
     [commitActiveLayerToState],
   );
 
-  // ─── AI integration ──────────────────────────────────────────────────
-  // The AI prompt panel inserts a new layer + appends one history entry.
-  // Same setState + commit pair the host uses for its layer-mutation
-  // handlers — no separate code path. Layer + history rules stay in the
-  // host's reducer (via setState).
-  const handleAiGenerated = useCallback(
-    async (result: ImageGenResult, prompt: string) => {
-      const newLayerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
-      // Letterbox-fit the result blob onto a layer-sized canvas + return
-      // the dataURL. Shared engine helper — same flatten path used by
-      // the host's Export.
-      const dataUrl = await drawBlobToCanvasFit(
-        result.blob,
-        state.width,
-        state.height,
-      );
-      const historyEntry: AiPromptHistoryEntry = {
-        id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
-        prompt,
-        at: new Date().toISOString(),
-        engineId: result.engine,
-        ...(result.resultUrl ? { resultUrl: result.resultUrl } : {}),
-      };
-      setState((prev) => ({
-        ...prev,
-        layers: [
-          ...prev.layers,
-          {
-            id: newLayerId,
-            label: `AI: ${prompt.slice(0, 24)}${prompt.length > 24 ? "…" : ""}`,
-            kind: "raster",
-            opacity: 1,
-            visible: true,
-            locked: false,
-            blendMode: "normal",
-            pixelsDataUrl: dataUrl,
-          } satisfies ImageLayer,
-        ],
-        activeLayerId: newLayerId,
-        aiPromptHistory: [...prev.aiPromptHistory, historyEntry].slice(-50),
-      }));
-      commit();
-    },
-    [setState, commit, state.width, state.height],
-  );
-
-  // Expose the visible canvas to the host so its SaveMenu (Export / Save
-  // to library) can flatten on demand. Single ownership — the host
-  // captures the live canvas element; DrawingStage doesn't itself
-  // expose download / upload UI.
+  // Expose the visible canvas to the host so its SaveMenu (Export /
+  // Save to library) can flatten on demand.
   useEffect(() => {
     onCanvasReady?.(visibleCanvasRef.current);
     return () => onCanvasReady?.(null);
   }, [onCanvasReady]);
 
-  // ─── Render ──────────────────────────────────────────────────────────
   const cursorClass =
     tool === "fill"
       ? "cursor-cell"
@@ -376,56 +310,40 @@ export default function DrawingStage({
         ? "cursor-crosshair"
         : "cursor-crosshair";
 
+  // ─── Render — canvas only, mirroring CanvasStage's shape. The host
+  //     provides the surrounding chrome via the SAME `<CollapsiblePanel/>`
+  //     slots Timeline kinds use, so the layout shell stays uniform
+  //     across kinds (per DRY: one shell, kind-aware contents).
   return (
-    <div className="flex h-full w-full">
-      <DrawingToolPalette
-        tool={tool}
-        onToolChange={setTool}
-        brush={brush}
-        onBrushChange={setBrush}
-        recentColors={recentColors}
-      />
-      <div className="relative flex flex-1 flex-col">
-        <div
-          ref={containerRef}
-          className="flex flex-1 items-center justify-center overflow-auto bg-muted/40 p-6"
-        >
-          <div
-            className="relative shadow-xl ring-1 ring-border"
-            style={{
-              width: state.width * zoom,
-              height: state.height * zoom,
-              backgroundImage:
-                state.background.kind === "transparent"
-                  ? "linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)"
-                  : undefined,
-              backgroundSize:
-                state.background.kind === "transparent"
-                  ? "16px 16px"
-                  : undefined,
-              backgroundPosition:
-                state.background.kind === "transparent"
-                  ? "0 0, 0 8px, 8px -8px, -8px 0px"
-                  : undefined,
-            }}
-          >
-            <canvas
-              ref={visibleCanvasRef}
-              width={state.width}
-              height={state.height}
-              className={`block h-full w-full touch-none ${cursorClass}`}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex w-64 flex-col border-l bg-background">
-        <DrawingAiPromptPanel
-          history={state.aiPromptHistory}
-          onGenerated={(result, prompt) => void handleAiGenerated(result, prompt)}
+    <div
+      ref={containerRef}
+      className="flex h-full w-full items-center justify-center overflow-auto bg-muted/40 p-6"
+    >
+      <div
+        className="relative shadow-xl ring-1 ring-border"
+        style={{
+          width: state.width * zoom,
+          height: state.height * zoom,
+          backgroundImage:
+            state.background.kind === "transparent"
+              ? "linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)"
+              : undefined,
+          backgroundSize: state.background.kind === "transparent" ? "16px 16px" : undefined,
+          backgroundPosition:
+            state.background.kind === "transparent"
+              ? "0 0, 0 8px, 8px -8px, -8px 0px"
+              : undefined,
+        }}
+      >
+        <canvas
+          ref={visibleCanvasRef}
+          width={state.width}
+          height={state.height}
+          className={`block h-full w-full touch-none ${cursorClass}`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         />
       </div>
     </div>
