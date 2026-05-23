@@ -6,10 +6,8 @@
 import { cn } from "@/lib/utils";
 import type { ContentTemplate, TemplateDef } from "./catalog";
 import { COMIC_GENRES, type ComicGenreId } from "@shared/comic-genres";
-import {
-  DRAWING_TEMPLATE_PRESETS,
-  type DrawingTemplatePreset,
-} from "@/lib/studio/drawing/drawing-template-presets";
+import { DRAWING_TEMPLATE_PRESETS } from "@/lib/studio/drawing/drawing-template-presets";
+import DrawingPlaceholderThumbnail from "@/components/studio/drawing/DrawingPlaceholderThumbnail";
 
 interface TemplateThumbProps {
   template: TemplateDef;
@@ -48,7 +46,16 @@ function renderThumb(id: ContentTemplate) {
   // proliferation.
   if (id.startsWith("drawing_")) {
     const preset = DRAWING_TEMPLATE_PRESETS[id];
-    if (preset) return <DrawingThumb preset={preset} />;
+    if (preset) {
+      return (
+        <DrawingPlaceholderThumbnail
+          width={preset.width}
+          height={preset.height}
+          accent={preset.accent}
+          dimensionLabel={preset.dimensionLabel}
+        />
+      );
+    }
   }
   switch (id) {
     case "basic":
@@ -643,61 +650,6 @@ function ComicThumb({ genre }: { genre: (typeof COMIC_GENRES)[number] }) {
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-/**
- * Drawing-template thumbnail — a Photoshop-shaped mini canvas with
- * stacked layer rectangles + a dimension chip. All three drawing
- * templates share this component (per the DRY rule); preset dimensions
- * + accent colour drive the visual difference so each card reads as
- * distinct. The aspect ratio of the inner canvas matches the actual
- * `state.width × state.height` the editor will land on, so the card
- * visually previews the canvas shape (square vs. landscape OG).
- */
-function DrawingThumb({ preset }: { preset: DrawingTemplatePreset }) {
-  const innerAspect = `${preset.width} / ${preset.height}`;
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-slate-100 p-3">
-      {/* Inner workspace — aspect-matched to the real canvas. */}
-      <div
-        className="relative max-h-full max-w-full overflow-hidden rounded-sm bg-white shadow-sm ring-1 ring-slate-300"
-        style={{ aspectRatio: innerAspect, width: "100%" }}
-      >
-        {/* Transparent-checker hint at the corner — communicates "this
-            is a raster canvas with layers" at a glance. */}
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              "linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)",
-            backgroundSize: "8px 8px",
-            backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
-          }}
-        />
-        {/* Stacked layer rectangles — gives the card a layered look. */}
-        <div
-          className="absolute left-[12%] top-[18%] h-[55%] w-[55%] rounded-sm opacity-90"
-          style={{ backgroundColor: preset.accent }}
-        />
-        <div
-          className="absolute right-[10%] bottom-[12%] h-[45%] w-[45%] rounded-full opacity-80"
-          style={{ backgroundColor: preset.accent, filter: "brightness(0.7)" }}
-        />
-        {/* Tiny "brush" mark — a tilted bristle. */}
-        <div
-          className="absolute right-[20%] top-[20%] h-[3px] w-[28%] rotate-[20deg] rounded-full opacity-90"
-          style={{ backgroundColor: "#111827" }}
-        />
-      </div>
-      {/* Dimension chip. */}
-      <div
-        className="absolute bottom-1 right-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white shadow-sm"
-        style={{ backgroundColor: preset.accent, filter: "brightness(0.75)" }}
-      >
-        {preset.dimensionLabel}
-      </div>
     </div>
   );
 }

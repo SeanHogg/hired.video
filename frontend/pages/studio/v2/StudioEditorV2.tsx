@@ -101,7 +101,7 @@ import {
   type MediaKind,
 } from "@shared/media-kinds";
 import GameStage from "@/components/studio/game/GameStage";
-import GameInspectorPlaceholder from "@/components/studio/game/GameInspectorPlaceholder";
+import GameEditor from "@/components/studio/game/GameEditor";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState } from "@shared/image-state";
@@ -294,6 +294,20 @@ export default function StudioEditorV2() {
   // when an existing image project loads; seeded with a blank canvas
   // for new image projects. Null for non-image projects.
   const [imageState, setImageState] = useState<ImageState | null>(null);
+  // Game-runtime state for `mediaKind: "game"` projects (#939 Phase 2b).
+  // Same shape as `imageState` — local state hydrated from
+  // `persistedProject.gameState`, edited via the right-rail `<GameEditor>`,
+  // mirrored back through `handleSave`. Null for non-game projects (and
+  // for game projects whose template seed hasn't reached the editor yet
+  // on a brand-new draft). Per PRD §1.2 each canvas runtime owns its
+  // own state model.
+  const [gameState, setGameState] = useState<import("@shared/game-state").GameState | null>(null);
+  // Active level / selected sprite for the game editor. Lifted to the
+  // editor shell so the `<GameStage>` canvas + `<GameEditor>` right rail
+  // share one source of truth — clicking a sprite in either surface
+  // selects it in both.
+  const [activeLevelId, setActiveLevelId] = useState<string | null>(null);
+  const [selectedSpriteId, setSelectedSpriteId] = useState<string | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
   const [selection, setSelection] = useState<Selection>({
     kind: "scene",
@@ -395,6 +409,36 @@ export default function StudioEditorV2() {
     // pair — we don't want a server round-trip to clobber in-flight edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, persistedProject]);
+
+  // Parallel hydration path for `gameState` — same shape as imageState
+  // above. Game projects arrive with `persistedProject.gameState`
+  // populated (the chooser writes it on first save via
+  // `seedGameFromTemplate`). For non-game projects we drop the state to
+  // null. The default-active-level effect below (one useEffect down)
+  // initialises the `activeLevelId` selection once the gameState lands.
+  useEffect(() => {
+    if (currentMediaKind !== "game") {
+      if (gameState !== null) setGameState(null);
+      return;
+    }
+    if (gameState !== null) return;
+    const serverGame = persistedProject?.gameState as
+      | import("@shared/game-state").GameState
+      | null
+      | undefined;
+    if (serverGame) setGameState(serverGame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMediaKind, persistedProject]);
+
+  // Default the active-level selection to the project's startLevelId
+  // (so the user sees the same level the runtime would mount on
+  // Playtest) once gameState hydrates. Re-runs if the gameState
+  // changes identities (a fresh server-load) but NOT on every sprite
+  // edit, so the selection stays stable during an editing session.
+  useEffect(() => {
+    if (!gameState || activeLevelId !== null) return;
+    setActiveLevelId(gameState.startLevelId ?? gameState.levels[0]?.id ?? null);
+  }, [gameState, activeLevelId]);
 
   // Server-load when we have a real project id.
   useEffect(() => {
@@ -1113,10 +1157,11 @@ export default function StudioEditorV2() {
    *  else → the existing Timeline render path. */
   async function renderProjectToBlob(): Promise<Blob | null> {
     if (currentMediaKind === "game") {
-      const game = persistedProject?.gameState as
-        | import("@shared/game-state").GameState
-        | null
-        | undefined;
+      // Read local `gameState` so the export reflects unsaved edits
+      // the user made since the last `handleSave`. handleExport also
+      // saves first, but the local-first read keeps the export self-
+      // consistent in case the save round-trip is slow.
+      const game = gameState;
       if (!game) {
         toast({
           title: "Save the project first",
@@ -1326,6 +1371,12 @@ export default function StudioEditorV2() {
         mediaKind: currentMediaKind,
         ...(timeline !== null ? { timelineSpec: timeline } : {}),
         ...(isImageKind && imageState !== null ? { imageState } : {}),
+        // Game state mirror — written whenever local gameState differs
+        // from the server's last known value. Mirrors the imageState
+        // pattern above per PRD §1.2 ("each runtime persists its own
+        // state column"). Saves the user's level / sprite edits so a
+        // reload preserves them.
+        ...(currentMediaKind === "game" && gameState !== null ? { gameState } : {}),
         // First save of a `/studio/new?subject=...` deep-link binds the
         // freshly-created project row to the source entity. Subsequent
         // saves (persistedProjectId set) leave the subjects array alone
@@ -1417,10 +1468,12 @@ export default function StudioEditorV2() {
           hasContent={
             // Per-kind content predicate — Timeline kinds need at
             // least one widget on a scene; game kinds need a
-            // gameState with levels. The save-menu's "Export"
-            // button reads this single boolean.
+            // gameState with levels. Reads local `gameState` (not
+            // `persistedProject.gameState`) so an in-editor add-level
+            // immediately enables the Export button without waiting
+            // for a save round-trip.
             currentMediaKind === "game"
-              ? !!persistedProject?.gameState
+              ? !!gameState && gameState.levels.length > 0
               : state.scenes.some((s) => s.widgets.length > 0)
           }
           onOpenPreview={() => setPreviewOpen(true)}
@@ -1636,12 +1689,14 @@ export default function StudioEditorV2() {
                       game: (
                         <div className="relative">
                           <GameStage
-                            gameState={
-                              (persistedProject?.gameState as
-                                | import("@shared/game-state").GameState
-                                | null
-                                | undefined) ?? null
-                            }
+                            // Reads LOCAL `gameState` so in-editor
+                            // mutations (add level / move sprite /
+                            // change behavior) refresh the canvas
+                            // immediately without waiting for a save
+                            // round-trip. Falls back to the persisted
+                            // value only during the brief moment
+                            // between load and the hydration effect.
+                            gameState={gameState}
                             zoom={zoom}
                             mode={gamePlaying ? "play" : "edit"}
                           />
@@ -1834,12 +1889,10 @@ export default function StudioEditorV2() {
 
               Self-hides for non-Timeline-authoring kinds (game / image)
               per #936's predicate. Game-kind shows the dedicated
-              `<GameInspectorPlaceholder>` instead — a small info-panel
-              that surfaces canvas dimensions, level / sprite counts,
-              and a pointer to the Phase 2b (#939) gap for the actual
-              sprite-placement / behavior-chip editor. Image-kind
-              `<DrawingStage>` owns its own inline inspector so the
-              right rail is empty for that kind. */}
+              `<GameEditor>` instead — settings + levels + sprites +
+              sprite inspector wired to the local `gameState`. Image-
+              kind `<DrawingStage>` owns its own inline inspector so
+              the right rail is empty for that kind. */}
           {usesTimelineChrome ? (
           <CollapsiblePanel
             side="right"
@@ -1909,20 +1962,28 @@ export default function StudioEditorV2() {
               }
             />
           </CollapsiblePanel>
-          ) : currentMediaKind === "game" ? (
+          ) : currentMediaKind === "game" && gameState ? (
             <CollapsiblePanel
               side="right"
               label="Game"
               storageKey="studio.v2.panel.right"
-              expandedClassName="w-72"
+              expandedClassName="w-80"
             >
-              <GameInspectorPlaceholder
-                gameState={
-                  (persistedProject?.gameState as
-                    | import("@shared/game-state").GameState
-                    | null
-                    | undefined) ?? null
-                }
+              {/* Full game editor — settings + levels + sprites + sprite
+                  inspector. Reads + writes the LOCAL `gameState` so
+                  edits feed `<GameStage>` and the bundled `handleSave`
+                  in one shared source of truth (DRY across the canvas
+                  + the right rail). */}
+              <GameEditor
+                gameState={gameState}
+                onChange={setGameState}
+                activeLevelId={activeLevelId}
+                onSelectLevel={(id) => {
+                  setActiveLevelId(id);
+                  setSelectedSpriteId(null);
+                }}
+                selectedSpriteId={selectedSpriteId}
+                onSelectSprite={setSelectedSpriteId}
               />
             </CollapsiblePanel>
           ) : null}
