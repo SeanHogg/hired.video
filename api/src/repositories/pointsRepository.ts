@@ -28,6 +28,8 @@ const {
   pointsFraudFlags,
   badges,
   userBadges,
+  pointRedemptions,
+  userTaxStatus,
 } = schema;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,6 +45,9 @@ export type PointsFraudFlagInsert = typeof pointsFraudFlags.$inferInsert;
 export type BadgeRow = typeof badges.$inferSelect;
 export type UserBadgeRow = typeof userBadges.$inferSelect;
 export type UserBadgeInsert = typeof userBadges.$inferInsert;
+export type PointRedemptionRow = typeof pointRedemptions.$inferSelect;
+export type PointRedemptionInsert = typeof pointRedemptions.$inferInsert;
+export type UserTaxStatusRow = typeof userTaxStatus.$inferSelect;
 
 export interface IPointsRepository {
   // ── balance ─────────────────────────────────────────────────────────
@@ -121,6 +126,32 @@ export interface IPointsRepository {
   findBadgeBySlug(slug: string): Promise<BadgeRow | null>;
   listUserBadges(userId: string): Promise<UserBadgeRow[]>;
   awardBadge(input: UserBadgeInsert): Promise<UserBadgeRow | null>;
+
+  // ── redemptions ─────────────────────────────────────────────────────
+  insertRedemption(input: PointRedemptionInsert): Promise<PointRedemptionRow>;
+  updateRedemption(
+    id: string,
+    patch: Partial<{
+      status: string;
+      vendorOrderId: string | null;
+      fulfilledAt: Date | null;
+      failureReason: string | null;
+      approvedBy: string | null;
+      approvedAt: Date | null;
+      kycCompletedAt: Date | null;
+      metadata: Record<string, unknown> | null;
+    }>,
+  ): Promise<PointRedemptionRow>;
+  findRedemptionsForUser(userId: string, limit: number): Promise<PointRedemptionRow[]>;
+  findRedemptionsByStatus(status: string, limit: number): Promise<PointRedemptionRow[]>;
+  findRedemptionById(id: string): Promise<PointRedemptionRow | null>;
+
+  // ── tax status ──────────────────────────────────────────────────────
+  findTaxStatus(userId: string): Promise<UserTaxStatusRow | null>;
+  /** Adds `addCents` to the YTD redemption running total. Auto-resets
+   *  to `addCents` when the stored `ytdRedemptionYear` is older than
+   *  the current year. */
+  bumpYtdRedemption(userId: string, addCents: number, currentYear: number): Promise<UserTaxStatusRow>;
 
   // ── stats (superadmin) ──────────────────────────────────────────────
   globalStats(): Promise<{
@@ -467,6 +498,106 @@ export class PointsRepository implements IPointsRepository {
       .onConflictDoNothing()
       .returning();
     return (row as UserBadgeRow) ?? null;
+  }
+
+  // ── redemptions ───────────────────────────────────────────────────────
+
+  async insertRedemption(input: PointRedemptionInsert): Promise<PointRedemptionRow> {
+    const [row] = await this.db.insert(pointRedemptions).values(input).returning();
+    return row as PointRedemptionRow;
+  }
+
+  async updateRedemption(
+    id: string,
+    patch: Partial<{
+      status: string;
+      vendorOrderId: string | null;
+      fulfilledAt: Date | null;
+      failureReason: string | null;
+      approvedBy: string | null;
+      approvedAt: Date | null;
+      kycCompletedAt: Date | null;
+      metadata: Record<string, unknown> | null;
+    }>,
+  ): Promise<PointRedemptionRow> {
+    const [row] = await this.db
+      .update(pointRedemptions)
+      .set({ ...patch, updatedAt: this.now() })
+      .where(eq(pointRedemptions.id, id))
+      .returning();
+    return row as PointRedemptionRow;
+  }
+
+  async findRedemptionsForUser(userId: string, limit: number): Promise<PointRedemptionRow[]> {
+    const rows = await this.db
+      .select()
+      .from(pointRedemptions)
+      .where(eq(pointRedemptions.userId, userId))
+      .orderBy(desc(pointRedemptions.createdAt))
+      .limit(limit);
+    return rows as PointRedemptionRow[];
+  }
+
+  async findRedemptionsByStatus(status: string, limit: number): Promise<PointRedemptionRow[]> {
+    const rows = await this.db
+      .select()
+      .from(pointRedemptions)
+      .where(eq(pointRedemptions.status, status))
+      .orderBy(desc(pointRedemptions.createdAt))
+      .limit(limit);
+    return rows as PointRedemptionRow[];
+  }
+
+  async findRedemptionById(id: string): Promise<PointRedemptionRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(pointRedemptions)
+      .where(eq(pointRedemptions.id, id))
+      .limit(1);
+    return (row as PointRedemptionRow) ?? null;
+  }
+
+  // ── tax status ────────────────────────────────────────────────────────
+
+  async findTaxStatus(userId: string): Promise<UserTaxStatusRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(userTaxStatus)
+      .where(eq(userTaxStatus.userId, userId))
+      .limit(1);
+    return (row as UserTaxStatusRow) ?? null;
+  }
+
+  async bumpYtdRedemption(
+    userId: string,
+    addCents: number,
+    currentYear: number,
+  ): Promise<UserTaxStatusRow> {
+    // Year-rollover semantics: when the stored row's `ytdRedemptionYear`
+    // is earlier than `currentYear`, replace (not add) — first
+    // redemption of a new tax year starts fresh.
+    const [row] = await this.db
+      .insert(userTaxStatus)
+      .values({
+        userId,
+        ytdRedemptionCents: addCents,
+        ytdRedemptionYear: currentYear,
+      })
+      .onConflictDoUpdate({
+        target: userTaxStatus.userId,
+        set: {
+          ytdRedemptionCents: sql`
+            CASE WHEN ${userTaxStatus.ytdRedemptionYear} < ${currentYear}
+              THEN ${addCents}
+              ELSE ${userTaxStatus.ytdRedemptionCents} + ${addCents}
+            END
+          `,
+          ytdRedemptionYear: currentYear,
+          updatedAt: this.now(),
+        },
+      })
+      .returning();
+    return row as UserTaxStatusRow;
   }
 
   // ── stats ─────────────────────────────────────────────────────────────

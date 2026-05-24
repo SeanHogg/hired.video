@@ -15,6 +15,7 @@ import {
 } from "../services/resume/summarize.js";
 import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume/merge.js";
 import { consolidateBullets, type BulletFieldType } from "../services/resume/rewrite.js";
+import { ipCountryFromCtx } from "../services/analytics/artifactView.js";
 import {
   extractJson as extractJsonUtil,
   isParseComplete as isParseCompleteUtil,
@@ -786,6 +787,7 @@ resumeRoutes.get("/public/:slug", async (c) => {
     {
       viewerId: c.var.user?.sub ?? null,
       ipHash: hashClientIp(c),
+      ipCountry: ipCountryFromCtx(c),
       referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
       userAgent: c.req.header("user-agent") ?? null,
     },
@@ -842,6 +844,7 @@ resumeRoutes.get("/embedded/:identifier", async (c) => {
     {
       viewerId: c.var.user?.sub ?? null,
       ipHash: hashClientIp(c),
+      ipCountry: ipCountryFromCtx(c),
       referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
       userAgent: c.req.header("user-agent") ?? null,
     },
@@ -1211,6 +1214,7 @@ resumeRoutes.get("/:id", async (c) => {
     {
       viewerId: c.var.user?.sub ?? null,
       ipHash: hashClientIp(c),
+      ipCountry: ipCountryFromCtx(c),
       referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
       userAgent: c.req.header("user-agent") ?? null,
     },

@@ -32,6 +32,7 @@ import {
 } from "./rules.js";
 import { rollStreak, utcDay } from "./streak-engine.js";
 import { evaluate as evaluateFraud } from "./fraud-engine.js";
+import { evaluateBadges } from "./badge-engine.js";
 
 export interface AwardContext {
   userId: string;
@@ -157,6 +158,7 @@ export class PointsEngine {
     const updatedBalance = await this.repo.applyBalanceDelta(ctx.userId, pointsToAward, "earn");
 
     await this.maybeAdvanceStreak(action, ctx);
+    await this.maybeUnlockBadges(rule.key, pointsToAward, ctx.userId);
 
     // Run fraud heuristics for user-task completions only (v1 scope).
     if (rule.key === ACTIONS.TASK_COMPLETE_USER) {
@@ -284,6 +286,39 @@ export class PointsEngine {
       if (milestone.badgeSlug && this.opts.onBadgeUnlock) {
         await this.opts.onBadgeUnlock(ctx.userId, milestone.badgeSlug);
       }
+    }
+  }
+
+  private async maybeUnlockBadges(action: string, delta: number, userId: string): Promise<void> {
+    if (!this.opts.onBadgeUnlock) return;
+    const [counters, totalEarns, earned] = await Promise.all([
+      this.repo.findCounters(userId),
+      this.repo.countEarnsByAction(userId, action),
+      this.repo.listUserBadges(userId),
+    ]);
+
+    // Resolve slugs the user already holds — listUserBadges returns
+    // user_badge rows keyed by badgeId, so we need the slug → id
+    // mapping from the catalog. Cheaper to do this here than to extend
+    // the repo with a join.
+    const allBadges = await this.repo.listBadges();
+    const idToSlug = new Map(allBadges.map((b) => [b.id, b.slug]));
+    const earnedSlugs = new Set<string>();
+    for (const ub of earned) {
+      const slug = idToSlug.get(ub.badgeId);
+      if (slug) earnedSlugs.add(slug);
+    }
+
+    const toUnlock = evaluateBadges({
+      action,
+      delta,
+      counters,
+      totalEarnsForAction: totalEarns,
+      alreadyEarnedSlugs: earnedSlugs,
+    });
+
+    for (const slug of toUnlock) {
+      await this.opts.onBadgeUnlock(userId, slug);
     }
   }
 

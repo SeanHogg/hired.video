@@ -153,6 +153,8 @@ import { useCanvasClipboard } from "@/lib/studio/editor-v2/use-canvas-clipboard"
 import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts";
 import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capture";
 import { useKindHydration } from "@/lib/studio/editor-v2/use-kind-hydration";
+import { runtimeStatePayload } from "@/lib/studio/editor-v2/runtime-state-payload";
+import { exportProjectByKind, extensionForBlob } from "@/lib/studio/editor-v2/export-facade";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
@@ -1946,36 +1948,24 @@ export default function StudioEditorV2() {
       // writes `gameState`. The save-draft payload carries whichever
       // is relevant; the server's editor-kind discriminator picks
       // which JSONB column to update.
-      const isImageKind = currentMediaKind === "image";
-      const isAnimationKind = currentMediaKind === "animation";
-      // Non-Timeline kinds (image / animation / game) don't emit a
-      // timelineSpec — each has its own state column the canvas
-      // runtime owns.
-      const skipTimeline = isImageKind || isAnimationKind;
-      const timeline = skipTimeline ? null : canvasStateToTimeline(state);
-      // #637 closed: V2 no longer mirrors a v1 VideoScript projection
-      // onto the project row. Publish-as-template now accepts an
-      // inline script from the dialog (computed via
-      // `canvasStateToScript(state)` at click time), so the project
-      // stores exactly one canonical representation: the timelineSpec.
+      // Per-kind runtime-state slice — single SoT in
+      // `runtimeStatePayload`. The branch lives ONCE (per the DRY
+      // rule); adding a new mediaKind is one more case there, not a
+      // new spread here. #637 closed: V2 no longer mirrors a v1
+      // VideoScript projection onto the project row — the slice's
+      // `kind` discriminator + the runtime-specific state column is
+      // the canonical representation.
+      const runtimeSlice = runtimeStatePayload(currentMediaKind, {
+        canvasState: state,
+        imageState,
+        animationState,
+        gameState,
+      });
       const res = await studioService.saveDraft({
         name: title,
         projectId: persistedProjectId ?? undefined,
-        kind: skipTimeline ? "scene" : "nle",
         mediaKind: currentMediaKind,
-        ...(timeline !== null ? { timelineSpec: timeline } : {}),
-        ...(isImageKind && imageState !== null ? { imageState } : {}),
-        // Animation state mirror — same pattern as imageState. Written
-        // whenever local animationState changes (frame edits, frame
-        // inserts/deletes, settings changes). Persisted under
-        // `studio_projects.animation_state` per migration 0106. #1003.
-        ...(isAnimationKind && animationState !== null ? { animationState } : {}),
-        // Game state mirror — written whenever local gameState differs
-        // from the server's last known value. Mirrors the imageState
-        // pattern above per PRD §1.2 ("each runtime persists its own
-        // state column"). Saves the user's level / sprite edits so a
-        // reload preserves them.
-        ...(currentMediaKind === "game" && gameState !== null ? { gameState } : {}),
+        ...runtimeSlice,
         // First save of a `/studio/new?subject=...` deep-link binds the
         // freshly-created project row to the source entity. Subsequent
         // saves (persistedProjectId set) leave the subjects array alone

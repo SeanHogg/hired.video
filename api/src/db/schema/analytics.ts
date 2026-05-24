@@ -7,8 +7,62 @@ import {
   timestamp,
   jsonb,
   integer,
+  real,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+
+/**
+ * artifact_views — polymorphic view-event table (migration 0107). Backs
+ * the unified creator-stats surface (Gap Register #1019). Replaces the
+ * scatter of `resume_views` / `profile_views` / `company_views` /
+ * `studio_video_heatmap` over time; legacy tables stay readable during
+ * the bake window and get dual-written by handlers in this PR.
+ *
+ * `artifactKind` is the discriminator (see shared/artifact-views.ts).
+ * `engagement` + `engagementUnit` cover both per-second (video, audio)
+ * and per-percent (resume, article, profile, …) shapes in one column.
+ */
+export const artifactViews = pgTable(
+  "artifact_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    artifactKind: varchar("artifact_kind", { length: 32 }).notNull(),
+    artifactId: uuid("artifact_id").notNull(),
+    ownerUserId: uuid("owner_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    viewerId: uuid("viewer_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    viewerEmail: text("viewer_email"),
+    viewerCompany: text("viewer_company"),
+    ipHash: varchar("ip_hash", { length: 64 }),
+    ipCountry: varchar("ip_country", { length: 2 }),
+    referrer: text("referrer"),
+    userAgent: text("user_agent"),
+    engagement: jsonb("engagement"),
+    engagementUnit: varchar("engagement_unit", { length: 4 })
+      .notNull()
+      .default("s"),
+    totalEngagementSec: integer("total_engagement_sec").notNull().default(0),
+    percentConsumed: real("percent_consumed").notNull().default(0),
+    dropOffBucket: integer("drop_off_bucket"),
+    viewedAt: timestamp("viewed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("artifact_views_kind_id_idx").on(t.artifactKind, t.artifactId),
+    index("artifact_views_owner_idx").on(t.ownerUserId),
+    index("artifact_views_viewer_idx").on(t.viewerId),
+    index("artifact_views_viewed_at_idx").on(t.viewedAt),
+    index("artifact_views_kind_viewed_idx").on(t.artifactKind, t.viewedAt),
+  ],
+);
+
+export type ArtifactView = typeof artifactViews.$inferSelect;
+export type NewArtifactView = typeof artifactViews.$inferInsert;
 
 export const profileViews = pgTable("profile_views", {
   id: uuid("id").primaryKey().defaultRandom(),

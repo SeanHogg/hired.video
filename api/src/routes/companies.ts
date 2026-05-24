@@ -10,6 +10,7 @@ import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/
 import { slugify } from "../../../shared/slugify.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
+import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
 
 const {
   companyProfiles,
@@ -366,12 +367,27 @@ companyRoutes.get("/:id", async (c) => {
 
   // Record the view before computing extras so the fresh count is
   // reflected in the response. `recordCompanyView` no-ops when the
-  // viewer is the company owner.
+  // viewer is the company owner. Also dual-writes to artifact_views for
+  // the unified creator-stats rollup (Gap Register #1019).
+  const ipHash = hashClientIp(c);
+  const referrer = c.req.header("referer") ?? c.req.header("referrer") ?? null;
+  const userAgent = c.req.header("user-agent") ?? null;
   await recordCompanyView(db, id, row.ownerId, {
     userId: callerSub,
-    ipHash: hashClientIp(c),
-    referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
-    userAgent: c.req.header("user-agent") ?? null,
+    ipHash,
+    referrer,
+    userAgent,
+  });
+  await recordArtifactView({
+    artifactKind: "company",
+    artifactId: id,
+    ownerUserId: row.ownerId,
+    viewerId: callerSub,
+    ipHash,
+    ipCountry: ipCountryFromCtx(c),
+    referrer,
+    userAgent,
+    engagementUnit: "%",
   });
 
   const [jobsRow, activeJobsRow, followersRow, viewsRow, locations, teamMembers] = await Promise.all([

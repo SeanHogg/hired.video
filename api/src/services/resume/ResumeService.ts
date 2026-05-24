@@ -36,6 +36,7 @@ import {
   computeViewerExtrasBatch,
   recordResumeView as recordResumeViewService,
 } from "../../services/resume/view.js";
+import { recordArtifactView } from "../../services/analytics/artifactView.js";
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -70,6 +71,7 @@ export interface ResumeDeps {
 export interface ResumeRequestContext {
   viewerId: string | null;
   ipHash: string | null;
+  ipCountry: string | null;
   referrer: string | null;
   userAgent: string | null;
 }
@@ -92,7 +94,10 @@ import { isUuid } from "../../../../shared/value-types.js";
 
 /** Re-shape the per-request context into the viewer object the view
  *  service expects. Kept local so the service layer stays ignorant of
- *  Hono's request-context type. */
+ *  Hono's request-context type. Dual-writes: legacy `resume_views` (via
+ *  the repo) keeps fueling the existing view-count reads; the new
+ *  polymorphic `artifact_views` table is the source of truth for the
+ *  unified creator-stats dashboard (Gap Register #1019). */
 async function recordResumeView(
   deps: ResumeDeps,
   resumeId: string,
@@ -104,6 +109,17 @@ async function recordResumeView(
     ipHash: ctx.ipHash,
     referrer: ctx.referrer,
     userAgent: ctx.userAgent,
+  });
+  await recordArtifactView({
+    artifactKind: "resume",
+    artifactId: resumeId,
+    ownerUserId: ownerId,
+    viewerId: ctx.viewerId,
+    ipHash: ctx.ipHash,
+    ipCountry: ctx.ipCountry,
+    referrer: ctx.referrer,
+    userAgent: ctx.userAgent,
+    engagementUnit: "%",
   });
 }
 

@@ -230,3 +230,105 @@ export const userBadges = pgTable(
 
 export type UserBadge = typeof userBadges.$inferSelect;
 export type NewUserBadge = typeof userBadges.$inferInsert;
+
+/**
+ * Point redemptions — Phase 3. One row per "user spent points for
+ * something". Status drives the fulfillment lifecycle:
+ *
+ *   • `ai_credits` + `premium_month` complete synchronously (state goes
+ *     pending → fulfilled in the same request).
+ *   • `gift_card` calls Tremendous async; state walks pending →
+ *     queued (Tremendous accepted the order) → fulfilled (Tremendous
+ *     dispatched) or → failed. A SuperAdmin can manually mark a flagged
+ *     `gift_card` redemption as `approved` before it dispatches when
+ *     the user crosses the $599 1099-MISC YTD threshold (`requires_kyc`
+ *     = true and `kyc_completed_at` IS NULL stops auto-dispatch).
+ */
+export const pointRedemptions = pgTable(
+  "point_redemptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** SKU id from REDEMPTION_CATALOG, e.g. "ai_credits_100k". */
+    skuId: varchar("sku_id", { length: 80 }).notNull(),
+    /** Coarse kind (denormalised from the SKU for query convenience). */
+    kind: varchar("kind", { length: 30 }).notNull(),
+    /** Points debited at redemption time (frozen for audit even if the
+     *  catalog price changes later). */
+    pointsCost: integer("points_cost").notNull(),
+    /** USD-cents value the user redeemed. For ai_credits + premium_month
+     *  this is the equivalent retail value (used for KYC threshold
+     *  tracking — IRS treats gift cards differently but all earned-
+     *  redemption value counts toward the W-9 line). */
+    valueCents: integer("value_cents").notNull(),
+    /** "pending" | "approved" | "queued" | "fulfilled" | "failed" |
+     *  "cancelled". */
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    /** Tremendous order id for gift cards. NULL for AI credits + premium. */
+    vendorOrderId: varchar("vendor_order_id", { length: 100 }),
+    /** Free-form per-kind grant payload (token count, plan slug+days,
+     *  gift-card delivery email + recipient name). */
+    grantPayload: jsonb("grant_payload").notNull(),
+    /** When the engine completes synchronous fulfillment (ai_credits /
+     *  premium_month) OR when Tremendous reports the order shipped. */
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+    /** Set when status='failed' or 'cancelled'. */
+    failureReason: text("failure_reason"),
+    /** When the redemption requires manual SuperAdmin approval (W-9
+     *  threshold crossing, suspicious-looking activity flagged by the
+     *  fraud engine). */
+    requiresKyc: boolean("requires_kyc").default(false).notNull(),
+    /** Set when the user completes / SuperAdmin records W-9. Stays NULL
+     *  if the user is below the threshold. */
+    kycCompletedAt: timestamp("kyc_completed_at", { withTimezone: true }),
+    /** SuperAdmin who approved a flagged redemption (null when auto-
+     *  approved). */
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    userCreatedIdx: index("point_redemptions_user_created_idx").on(t.userId, t.createdAt),
+    statusIdx: index("point_redemptions_status_idx").on(t.status),
+    vendorOrderIdx: index("point_redemptions_vendor_order_idx").on(t.vendorOrderId),
+  }),
+);
+
+export type PointRedemption = typeof pointRedemptions.$inferSelect;
+export type NewPointRedemption = typeof pointRedemptions.$inferInsert;
+
+/**
+ * Per-user tax / W-9 status. Populated when the user crosses the
+ * $599 1099-MISC YTD threshold, OR pre-emptively by a SuperAdmin for a
+ * known high-redemption user. `ytd_redemption_cents` resets each
+ * calendar year via a cron (or lazy on first redemption of the new
+ * year — engine checks the `ytdRedemptionYear` field).
+ *
+ * We deliberately store only the last 4 digits of the SSN/EIN — the
+ * full id never lives in the DB; W-9 PDFs go to KYC vendor storage and
+ * we hold the pointer.
+ */
+export const userTaxStatus = pgTable("user_tax_status", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  w9CollectedAt: timestamp("w9_collected_at", { withTimezone: true }),
+  /** "personal" | "business" — drives 1099-MISC vs 1099-NEC. */
+  taxClassification: varchar("tax_classification", { length: 20 }),
+  taxIdLast4: varchar("tax_id_last4", { length: 4 }),
+  legalName: text("legal_name"),
+  address: jsonb("address"),
+  /** Running YTD value of points redeemed (USD cents). Updated on each
+   *  redemption fulfilment. */
+  ytdRedemptionCents: integer("ytd_redemption_cents").default(0).notNull(),
+  ytdRedemptionYear: integer("ytd_redemption_year")
+    .default(sql`EXTRACT(YEAR FROM NOW())::int`)
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type UserTaxStatus = typeof userTaxStatus.$inferSelect;
