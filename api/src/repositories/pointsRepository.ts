@@ -278,6 +278,20 @@ export class PointsRepository implements IPointsRepository {
     return row?.c ?? 0;
   }
 
+  async countEarnsByAction(userId: string, action: string): Promise<number> {
+    const [row] = await this.db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(pointsLedger)
+      .where(
+        and(
+          eq(pointsLedger.userId, userId),
+          eq(pointsLedger.action, action),
+          eq(pointsLedger.category, "earn"),
+        ),
+      );
+    return row?.c ?? 0;
+  }
+
   async sumEarnedSince(userId: string, sinceMs: number, action?: string): Promise<number> {
     const cutoff = new Date(Date.now() - sinceMs);
     const conditions = [
