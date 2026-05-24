@@ -3,11 +3,16 @@ import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import { USER_ROLES } from "@shared/user-roles";
 
-/** SSoT for points eligibility. V1 = job_seeker only; widens when the
- *  catalog gains recruiter / employer SKUs. Consumers (widget + page +
- *  any future surface) check this — never re-implement the role test. */
+/** SSoT for points eligibility. job_seeker / recruiter / employer all
+ *  have catalog entries since the Phase-5 widen. Consumers (widget +
+ *  page + any future surface) check this — never re-implement the role
+ *  test. */
 export function isPointsEligible(user: { role?: string | null } | null | undefined): boolean {
-  return user?.role === USER_ROLES.JOB_SEEKER;
+  return (
+    user?.role === USER_ROLES.JOB_SEEKER ||
+    user?.role === USER_ROLES.RECRUITER ||
+    user?.role === USER_ROLES.EMPLOYER
+  );
 }
 
 /**
@@ -127,21 +132,56 @@ export const pointsService = {
     return { awarded: res.data.awarded, delta: res.data.delta ?? 0 };
   },
 
-  /** Phase-1: backend returns 501. The caller should show "coming soon"
-   *  on a 501 instead of treating it as an error. */
-  async redeem(skuId: string): Promise<{ success: boolean; message?: string }> {
-    try {
-      await apiClient.post(`/api/points/redeem`, { skuId });
-      return { success: true };
-    } catch (e) {
-      const err = e as { status?: number; message?: string };
-      if (err.status === 501) {
-        return { success: false, message: err.message ?? "Coming soon" };
-      }
-      throw e;
-    }
+  /** Redeem points for an SKU. For `gift_card` kinds the caller must
+   *  supply `recipientName` + `recipientEmail` (Tremendous delivers to
+   *  these). Returns the outcome (fulfilled / queued / pending_kyc) or
+   *  throws on rejection so React Query surfaces it. */
+  async redeem(args: {
+    skuId: string;
+    recipientName?: string;
+    recipientEmail?: string;
+  }): Promise<RedeemResponse> {
+    const res = await apiClient.post<RedeemResponse>("/api/points/redeem", args);
+    return res.data;
+  },
+
+  /** User's redemption history. */
+  async getRedemptions(): Promise<UserRedemption[]> {
+    const res: ApiSuccessResponse<{ redemptions: UserRedemption[] }> = await apiClient.get(
+      "/api/points/redemptions",
+      z.object({ redemptions: z.array(RedemptionRowSchema) }),
+    );
+    return res.data.redemptions;
   },
 };
+
+const RedemptionRowSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  skuId: z.string(),
+  kind: z.string(),
+  pointsCost: z.number(),
+  valueCents: z.number(),
+  status: z.string(),
+  vendorOrderId: z.string().nullable().optional(),
+  fulfilledAt: z.string().nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  requiresKyc: z.boolean(),
+  kycCompletedAt: z.string().nullable().optional(),
+  approvedBy: z.string().nullable().optional(),
+  approvedAt: z.string().nullable().optional(),
+  grantPayload: z.unknown().nullable().optional(),
+  metadata: z.unknown().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type UserRedemption = z.infer<typeof RedemptionRowSchema>;
+
+export interface RedeemResponse {
+  status: "fulfilled" | "queued" | "pending_kyc";
+  redemptionId: string;
+  redemption: UserRedemption;
+}
 
 // ── SuperAdmin client ───────────────────────────────────────────────
 
@@ -250,6 +290,43 @@ export const pointsAdminService = {
       decision,
       notes,
       reinstate,
+    });
+  },
+
+  // ── Redemption queue ───────────────────────────────────────────────
+
+  async getRedemptions(status?: string, limit = 100): Promise<UserRedemption[]> {
+    const qs = new URLSearchParams();
+    if (status) qs.set("status", status);
+    qs.set("limit", String(limit));
+    const res: ApiSuccessResponse<{ redemptions: UserRedemption[] }> = await apiClient.get(
+      `${ADMIN_BASE}/redemptions?${qs.toString()}`,
+      z.object({ redemptions: z.array(RedemptionRowSchema) }),
+    );
+    return res.data.redemptions;
+  },
+
+  async approveRedemption(
+    id: string,
+    args: { recipientName?: string; recipientEmail?: string } = {},
+  ): Promise<void> {
+    await apiClient.post(`${ADMIN_BASE}/redemptions/${id}/approve`, args);
+  },
+
+  async cancelRedemption(id: string, reason: string): Promise<void> {
+    await apiClient.post(`${ADMIN_BASE}/redemptions/${id}/cancel`, { reason });
+  },
+
+  async markW9(args: {
+    userId: string;
+    legalName: string;
+    taxIdLast4: string;
+    taxClassification: "personal" | "business";
+  }): Promise<void> {
+    await apiClient.post(`${ADMIN_BASE}/user/${args.userId}/w9`, {
+      legalName: args.legalName,
+      taxIdLast4: args.taxIdLast4,
+      taxClassification: args.taxClassification,
     });
   },
 };

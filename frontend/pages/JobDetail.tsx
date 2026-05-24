@@ -30,6 +30,8 @@ import { jobService } from "@/lib/services/job-service";
 import { isUuid } from "@shared/value-types";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
+import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
+import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
@@ -150,6 +152,11 @@ export default function JobDetail() {
 
   const isOwner = user && job && job.userId === user.id;
   const permissions = useJobPermissions(job);
+  useArtifactViewTracking({
+    artifactKind: "job",
+    artifactId: job?.id,
+    ownerUserId: (job as any)?.userId ?? null,
+  });
 
   // Pipeline tabs (Candidates + Reports) gate on the same single source
   // of truth as Edit / Delete (`useJobPermissions`), which mirrors the
@@ -303,6 +310,24 @@ export default function JobDetail() {
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
                 <JobScoreBadges job={job} />
+                <ArtifactDetailsSheet
+                  permission={{
+                    kind: "job",
+                    entity: { id: job.id, userId: job.userId, viewerCanManage: job.viewerCanManage },
+                  }}
+                  title={job.title ?? "Job details"}
+                  chips={
+                    <Badge variant="secondary">{job.status}</Badge>
+                  }
+                  activity={{
+                    viewCount: job.views,
+                    createdAt: job.createdAt,
+                    updatedAt: job.updatedAt,
+                    extra: [
+                      { label: "Applications", value: <span className="tabular-nums">{job.applications ?? 0}</span> },
+                    ],
+                  }}
+                />
                 {isOwner && (
                   <>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">

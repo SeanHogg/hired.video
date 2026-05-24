@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -34,13 +34,24 @@ import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
 import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import CreatorDashboard from "@/components/dashboard/CreatorDashboard";
+import TabStrip, { type TabStripItem } from "@/components/ui/tab-strip";
+import { BarChart3, Activity } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import ProductDashboard from "@/pages/admin/ProductDashboard";
 
 
+type DashboardTab = "activity" | "content";
+
+const DASHBOARD_TABS: TabStripItem<DashboardTab>[] = [
+  { key: "activity", label: "Activity", icon: Activity },
+  { key: "content", label: "Content", icon: BarChart3 },
+];
+
 export default function Dashboard() {
   const { t } = useTranslation();  const { user, isAuthenticated, isLoading } = useAuth();
   const effectiveRole = useEffectiveRole();
+  const [activeTab, setActiveTab] = useState<DashboardTab>("activity");
 
   // Use custom dashboard hook for data management
   const {
@@ -261,5 +272,4 @@ export default function Dashboard() {
   }
 
   // Main dashboard render
-  return <PageLayout>{renderDashboardContent()}</PageLayout>;
-}
+  return <PageLayout>{renderDashboardContent()}</Pag

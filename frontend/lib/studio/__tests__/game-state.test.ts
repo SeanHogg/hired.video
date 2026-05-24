@@ -21,7 +21,11 @@ describe("emptyGameState", () => {
   it("returns a playable state with a single starter level by default", () => {
     const state = emptyGameState();
     expect(state.schemaVersion).toBe(GAME_STATE_SCHEMA_VERSION);
-    expect(state.engine).toBe("phaser-3");
+    // Engine field was renamed in #1014 from a misleading "phaser-3"
+    // (no Phaser imported anywhere) to the honest "canvas-2d" — the
+    // runtime is a hand-rolled Canvas-2D loop today. Phaser-3 +
+    // matter-js remain valid enum values for future engine swaps.
+    expect(state.engine).toBe("canvas-2d");
     expect(state.width).toBe(1280);
     expect(state.height).toBe(720);
     expect(state.fps).toBe(60);

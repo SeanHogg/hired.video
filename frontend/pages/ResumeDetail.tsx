@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useResumePermissions } from "@/hooks/use-resume-permissions";
+import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
@@ -182,6 +183,12 @@ export default function ResumeDetail() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
   const [editorError, setEditorError] = useState<string | null>(null);
+
+  useArtifactViewTracking({
+    artifactKind: "resume",
+    artifactId: resume?.id,
+    ownerUserId: resume?.userId ?? null,
+  });
 
   // Tool-history side panel — opened from the "..." menu. The Run-Tool
   // submenu now deep-links to each tool's full page (via the catalog),

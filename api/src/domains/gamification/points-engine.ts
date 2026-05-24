@@ -30,7 +30,7 @@ import {
   type ActionKey,
   type PointsRule,
 } from "./rules.js";
-import { rollStreak, utcDay } from "./streak-engine.js";
+import { rollStreak, localDay } from "./streak-engine.js";
 import { evaluate as evaluateFraud } from "./fraud-engine.js";
 import { evaluateBadges } from "./badge-engine.js";
 
@@ -247,7 +247,10 @@ export class PointsEngine {
   private async maybeAdvanceStreak(action: string, ctx: AwardContext): Promise<void> {
     if (!STREAK_SIGNAL_ACTIONS.has(action as ActionKey)) return;
 
-    const current = await this.repo.findStreak(ctx.userId);
+    const [current, timezone] = await Promise.all([
+      this.repo.findStreak(ctx.userId),
+      this.resolveUserTimezone(ctx.userId),
+    ]);
     const out = rollStreak({
       current: current
         ? {
@@ -257,7 +260,7 @@ export class PointsEngine {
             lastBonusMilestone: current.lastBonusMilestone,
           }
         : null,
-      activityDate: utcDay(this.now()),
+      activityDate: localDay(timezone, this.now()),
     });
 
     await this.repo.upsertStreak(ctx.userId, {
@@ -286,6 +289,27 @@ export class PointsEngine {
       if (milestone.badgeSlug && this.opts.onBadgeUnlock) {
         await this.opts.onBadgeUnlock(ctx.userId, milestone.badgeSlug);
       }
+    }
+  }
+
+  /** Best-effort user-timezone lookup. The points repo doesn't own the
+   *  users table; we read via the underlying db handle the repo holds.
+   *  Returning null degrades cleanly to UTC. */
+  private async resolveUserTimezone(userId: string): Promise<string | null> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const repo = this.repo as any;
+      if (!repo.db || typeof repo.db.select !== "function") return null;
+      const { schema } = await import("../../db/index.js");
+      const { eq } = await import("drizzle-orm");
+      const [row] = await repo.db
+        .select({ timezone: schema.users.timezone })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+      return (row as { timezone: string | null } | undefined)?.timezone ?? null;
+    } catch {
+      return null;
     }
   }
 

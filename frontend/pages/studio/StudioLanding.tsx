@@ -603,6 +603,7 @@ export default function StudioLanding() {
         )}
       </section>
       <ProjectDetailsSheet
+        noTrigger
         open={detailsProject !== null}
         onOpenChange={(open) => {
           if (!open) setDetailsProject(null);

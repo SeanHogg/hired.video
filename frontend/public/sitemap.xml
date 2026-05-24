@@ -335,6 +335,7 @@
   <url><loc>https://hired.video/for/voice_actor</loc><lastmod>2026-05-22</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/for/game_dev</loc><lastmod>2026-05-22</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/for/illustrator</loc><lastmod>2026-05-22</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/animator</loc><lastmod>2026-05-24</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
 
   <!-- ===== Studio per-template landing pages (#901) ===== -->
   <!-- One per TEMPLATE_CATALOG entry (id is the slug). weekly/0.7 — high
@@ -373,6 +374,11 @@
   <url><loc>https://hired.video/templates/drawing_blank</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/drawing_social_square</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/drawing_og_card</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
+  <url><loc>https://hired.video/templates/animation-logo-loop</loc><lastmod>2026-05-24</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/animation-spinner</loc><lastmod>2026-05-24</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/animation-reaction</loc><lastmod>2026-05-24</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/animation-explainer</loc><lastmod>2026-05-24</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <!-- Comic genres (12) — generated from COMIC_GENRES; keep in sync per #920 -->
   <url><loc>https://hired.video/templates/comic_hero</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/comic_noir</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>

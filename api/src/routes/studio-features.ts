@@ -36,6 +36,7 @@ import { cdnUrl } from "../utils/cdn.js";
 import { slugify } from "../../../shared/slugify.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
+import { recordArtifactView } from "../services/analytics/artifactView.js";
 
 const {
   studioVoiceClones, studioVoiceCloneLicenses, studioCaptions,
@@ -1946,6 +1947,34 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
     userAgent: parsed.data.userAgent ?? null,
     ipCountry,
   } as any).returning();
+
+  // Dual-write to artifact_views for the unified creator-stats rollup
+  // (Gap Register #1019). Owner lookup is best-effort — if the project
+  // was deleted between event and persist, we still record an anonymous
+  // view without the owner stamp.
+  const [project] = await db
+    .select({ userId: schema.studioProjects.userId })
+    .from(schema.studioProjects)
+    .where(eq(schema.studioProjects.id, parsed.data.projectId))
+    .limit(1);
+  await recordArtifactView({
+    artifactKind: "video",
+    artifactId: parsed.data.projectId,
+    ownerUserId: project?.userId ?? null,
+    viewerId: parsed.data.viewerId && /^[0-9a-f-]{36}$/i.test(parsed.data.viewerId)
+      ? parsed.data.viewerId
+      : null,
+    viewerEmail: parsed.data.viewerEmail ?? null,
+    viewerCompany,
+    ipCountry,
+    referrer: parsed.data.referrer ?? null,
+    userAgent: parsed.data.userAgent ?? null,
+    engagement: parsed.data.secondsWatched,
+    engagementUnit: "s",
+    totalEngagementSec: parsed.data.totalWatchTimeSec,
+    percentConsumed: parsed.data.percentWatched / 100,
+    dropOffBucket: parsed.data.dropOffSecond ?? null,
+  });
 
   return c.json(ok({ id: heatmap.id }), 201);
 });

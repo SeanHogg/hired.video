@@ -19,6 +19,8 @@ import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/c
 import { workers as registeredWorkers } from "./workers/registry.js";
 import { isWorkerDue, runWorker } from "./workers/runner.js";
 import { runMonthClose } from "./domains/services-processing/month-close.js";
+import { runFraudSweep } from "./services/gamification/fraud-sweep.js";
+import { buildRepos } from "./repositories/index.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -276,6 +278,28 @@ async function processRegisteredWorkers(): Promise<void> {
 // scheduled tick but only does work between 00:00 and 04:00 UTC on day 1 of
 // the month so the cron stays cheap; idempotent via unique constraints.
 
+// ---------------------------------------------------------------------------
+// Gamification fraud sweep
+// ---------------------------------------------------------------------------
+// Runs once per day between 04:30 and 05:00 UTC. Iterates users with
+// gamification activity and applies the Phase-4 fraud heuristics
+// (rapid_redemption, sybil_signup_ip, refund_then_redeem). The /5 cron
+// tick is the trigger; a window guard keeps it from firing 288 times
+// per day.
+
+async function processGamificationFraudSweep(): Promise<void> {
+  const now = new Date();
+  if (now.getUTCHours() !== 4 || now.getUTCMinutes() < 30) return;
+  try {
+    const db = getDb();
+    const repos = buildRepos(db);
+    const result = await runFraudSweep(repos, db);
+    console.log("[scheduled] gamification fraud sweep", result);
+  } catch (err) {
+    console.error("[scheduled] gamification fraud sweep failed:", err);
+  }
+}
+
 async function processMonthlyUsageClose(): Promise<void> {
   const now = new Date();
   const isFirstOfMonth = now.getUTCDate() === 1;
@@ -302,5 +326,6 @@ export async function runScheduled(): Promise<void> {
     scrapeAllActiveSources(),
     processRegisteredWorkers(),
     processMonthlyUsageClose(),
+    processGamificationFraudSweep(),
   ]);
 }

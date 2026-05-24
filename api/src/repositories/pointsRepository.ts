@@ -152,6 +152,12 @@ export interface IPointsRepository {
    *  to `addCents` when the stored `ytdRedemptionYear` is older than
    *  the current year. */
   bumpYtdRedemption(userId: string, addCents: number, currentYear: number): Promise<UserTaxStatusRow>;
+  /** Record that the user filed their W-9 (or that a SA confirmed it
+   *  out-of-band). Upserts the tax_status row if one doesn't exist. */
+  markW9Collected(
+    userId: string,
+    args: { legalName: string; taxIdLast4: string; taxClassification: "personal" | "business" },
+  ): Promise<UserTaxStatusRow>;
 
   // ── stats (superadmin) ──────────────────────────────────────────────
   globalStats(): Promise<{
@@ -593,6 +599,33 @@ export class PointsRepository implements IPointsRepository {
             END
           `,
           ytdRedemptionYear: currentYear,
+          updatedAt: this.now(),
+        },
+      })
+      .returning();
+    return row as UserTaxStatusRow;
+  }
+
+  async markW9Collected(
+    userId: string,
+    args: { legalName: string; taxIdLast4: string; taxClassification: "personal" | "business" },
+  ): Promise<UserTaxStatusRow> {
+    const [row] = await this.db
+      .insert(userTaxStatus)
+      .values({
+        userId,
+        legalName: args.legalName,
+        taxIdLast4: args.taxIdLast4,
+        taxClassification: args.taxClassification,
+        w9CollectedAt: this.now(),
+      })
+      .onConflictDoUpdate({
+        target: userTaxStatus.userId,
+        set: {
+          legalName: args.legalName,
+          taxIdLast4: args.taxIdLast4,
+          taxClassification: args.taxClassification,
+          w9CollectedAt: this.now(),
           updatedAt: this.now(),
         },
       })

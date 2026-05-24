@@ -538,6 +538,14 @@ searchRoutes.post("/saved", async (c) => {
 
   servicesProcessor.meterEvent(c, "saved_search", { id: row?.id });
 
+  // Gamification award. Saved-search creation is the strongest "active
+  // job-hunting" signal we have today; the deeper "saved search delivered
+  // new jobs" event requires a dedicated runner (see gap register).
+  const { withGamification } = await import("../domains/gamification/with-gamification.js");
+  await withGamification(c, "saved-search-create", (game, role, uid) =>
+    game.onSavedSearchRun({ userId: uid, role, runId: row?.id ?? crypto.randomUUID() }),
+  );
+
   return c.json(success(row), 201);
 });
 

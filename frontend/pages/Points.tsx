@@ -9,7 +9,7 @@
  * non-job_seekers see a friendly notice and a link back to dashboard.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
@@ -25,11 +25,22 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   pointsService,
   isPointsEligible,
   type PointsCatalog,
+  type PointsRedemption,
   type PointsSummary,
 } from "@/lib/services/points-service";
 
@@ -195,25 +206,47 @@ function RedemptionGrid({
   balance: number;
   disabled: boolean;
 }) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
   const [redeeming, setRedeeming] = useState<string | null>(null);
+  const [giftCardSku, setGiftCardSku] = useState<PointsRedemption | null>(null);
 
   if (!catalog) return null;
 
-  async function handleRedeem(skuId: string) {
+  async function executeRedeem(skuId: string, recipient?: { name: string; email: string }) {
     setRedeeming(skuId);
     try {
-      const res = await pointsService.redeem(skuId);
-      if (res.success) {
-        toast.success("Redemption confirmed.");
-      } else {
-        toast.message(res.message ?? "Coming soon", {
-          description: "Cashout fulfillment launches in the next release.",
+      const res = await pointsService.redeem({
+        skuId,
+        recipientName: recipient?.name,
+        recipientEmail: recipient?.email,
+      });
+      if (res.status === "fulfilled") {
+        toast.success("Redemption fulfilled.");
+      } else if (res.status === "queued") {
+        toast.success("Gift card on the way.", {
+          description: "Tremendous will deliver to your email within minutes.",
+        });
+      } else if (res.status === "pending_kyc") {
+        toast.message("Tax info required.", {
+          description: "You've crossed the $599 reporting threshold; support will reach out before dispatch.",
         });
       }
+      qc.invalidateQueries({ queryKey: ["points"] });
+      setGiftCardSku(null);
     } catch (e) {
-      toast.error("Redemption failed.", { description: String(e) });
+      const err = e as { message?: string };
+      toast.error("Redemption failed.", { description: err.message ?? String(e) });
     } finally {
       setRedeeming(null);
+    }
+  }
+
+  function handleRedeemClick(sku: PointsRedemption) {
+    if (sku.kind === "gift_card") {
+      setGiftCardSku(sku);
+    } else {
+      void executeRedeem(sku.id);
     }
   }
 
@@ -229,8 +262,7 @@ function RedemptionGrid({
         <CreditCard className="h-4 w-4" /> Cash out
       </h2>
       <p className="text-xs text-muted-foreground mb-4">
-        Phase 1 ships the catalog. Programmatic gift cards (Tremendous) land in the
-        next release; AI credits + premium-month grants follow on the same path.
+        Convert points to AI credits, a free month of Pro, or a Tremendous gift card.
       </p>
       <div className="space-y-5">
         {groups.map(({ kind, label, icon: Icon }) => {
@@ -258,7 +290,7 @@ function RedemptionGrid({
                         variant={affordable ? "default" : "outline"}
                         className="mt-2 w-full"
                         disabled={disabled || !affordable || redeeming === sku.id}
-                        onClick={() => handleRedeem(sku.id)}
+                        onClick={() => handleRedeemClick(sku)}
                       >
                         {redeeming === sku.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Redeem"}
                       </Button>
@@ -270,7 +302,74 @@ function RedemptionGrid({
           );
         })}
       </div>
+
+      <GiftCardDialog
+        sku={giftCardSku}
+        defaultEmail={user?.email ?? ""}
+        defaultName={user?.name ?? ""}
+        busy={!!redeeming}
+        onCancel={() => setGiftCardSku(null)}
+        onConfirm={(name, email) => giftCardSku && executeRedeem(giftCardSku.id, { name, email })}
+      />
     </Card>
+  );
+}
+
+function GiftCardDialog({
+  sku,
+  defaultName,
+  defaultEmail,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  sku: PointsRedemption | null;
+  defaultName: string;
+  defaultEmail: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: (name: string, email: string) => void;
+}) {
+  const [name, setName] = useState(defaultName);
+  const [email, setEmail] = useState(defaultEmail);
+
+  return (
+    <Dialog open={!!sku} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send {sku?.label}</DialogTitle>
+          <DialogDescription>
+            Tremendous emails the gift card to the recipient below. The card lets them choose
+            from a catalog (Amazon, Visa, Target, and more).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="gc-name">Recipient name</Label>
+            <Input id="gc-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="gc-email">Recipient email</Label>
+            <Input id="gc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Reminder: redemptions over $599/year require a W-9 for IRS reporting. We'll reach out before
+            dispatch if you cross the threshold.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onConfirm(name, email)}
+            disabled={busy || !name.trim() || !email.includes("@")}
+          >
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Send gift card"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

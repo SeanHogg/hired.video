@@ -14,17 +14,17 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../../types/index.js";
+import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { GamificationService } from "../../domains/gamification/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../../utils/audit.js";
 
-export const superadminPointsRoutes = new Hono<{ Variables: Variables }>();
+export const superadminPointsRoutes = new Hono<AppEnv>();
 
-function service() {
-  return new GamificationService(buildRepos(getDb()));
+function service(env: Record<string, string | undefined>) {
+  return new GamificationService(buildRepos(getDb()), { workerEnv: env });
 }
 
 function actorId(c: { var: { user: { sub: string } } }): string {
@@ -35,7 +35,7 @@ function actorId(c: { var: { user: { sub: string } } }): string {
 
 superadminPointsRoutes.get("/", async (c) => {
   const repos = buildRepos(getDb());
-  const game = new GamificationService(repos);
+  const game = new GamificationService(repos, { workerEnv: c.env as never });
   const stats = await repos.points.globalStats();
   return c.json(success({
     stats,
@@ -56,7 +56,7 @@ superadminPointsRoutes.get("/top", async (c) => {
 superadminPointsRoutes.get("/user/:userId", async (c) => {
   const userId = c.req.param("userId");
   const repos = buildRepos(getDb());
-  const game = new GamificationService(repos);
+  const game = new GamificationService(repos, { workerEnv: c.env as never });
   const [summary, fullActivity, flags] = await Promise.all([
     game.getUserSummary(userId),
     game.getActivityPage(userId, 200),
@@ -77,7 +77,7 @@ superadminPointsRoutes.post("/user/:userId/adjust", async (c) => {
   const parsed = AdjustBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const game = service();
+  const game = service(c.env as never);
   const row = await game.adminAdjust({
     userId: targetId,
     delta: parsed.data.delta,
@@ -103,7 +103,7 @@ superadminPointsRoutes.post("/user/:userId/suspend", async (c) => {
   const parsed = SuspendBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const row = await service().adminSuspend(targetId, parsed.data.reason, actorId(c));
+  const row = await service(c.env as never).adminSuspend(targetId, parsed.data.reason, actorId(c));
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_SUSPENDED,
     actorId: actorId(c),
@@ -116,7 +116,7 @@ superadminPointsRoutes.post("/user/:userId/suspend", async (c) => {
 
 superadminPointsRoutes.post("/user/:userId/reinstate", async (c) => {
   const targetId = c.req.param("userId");
-  const row = await service().adminReinstate(targetId, actorId(c));
+  const row = await service(c.env as never).adminReinstate(targetId, actorId(c));
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_REINSTATED,
     actorId: actorId(c),
@@ -149,7 +149,7 @@ superadminPointsRoutes.post("/fraud/:flagId/resolve", async (c) => {
   const parsed = ResolveBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const flag = await service().resolveFraudFlag({
+  const flag = await service(c.env as never).resolveFraudFlag({
     flagId,
     decision: parsed.data.decision,
     reviewerId: actorId(c),
@@ -166,4 +166,107 @@ superadminPointsRoutes.post("/fraud/:flagId/resolve", async (c) => {
   });
 
   return c.json(success({ flag }));
+});
+
+// ── Redemptions queue ─────────────────────────────────────────────────
+
+const RedemptionsQuery = z.object({
+  status: z.enum(["pending", "queued", "fulfilled", "failed", "cancelled"]).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+});
+
+/** Default lists pending+queued so SAs see what needs attention. Filter
+ *  to other statuses for support follow-ups (failed = vendor retry,
+ *  fulfilled = success audit). */
+superadminPointsRoutes.get("/redemptions", async (c) => {
+  const parsed = RedemptionsQuery.safeParse(c.req.query());
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const repos = buildRepos(getDb());
+
+  if (parsed.data.status) {
+    const rows = await repos.points.findRedemptionsByStatus(parsed.data.status, parsed.data.limit);
+    return c.json(success({ redemptions: rows }));
+  }
+  const [pending, queued] = await Promise.all([
+    repos.points.findRedemptionsByStatus("pending", parsed.data.limit),
+    repos.points.findRedemptionsByStatus("queued", parsed.data.limit),
+  ]);
+  return c.json(success({ redemptions: [...pending, ...queued] }));
+});
+
+const ApproveBody = z.object({
+  recipientName: z.string().min(1).max(120).optional(),
+  recipientEmail: z.string().email().optional(),
+});
+
+superadminPointsRoutes.post("/redemptions/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const parsed = ApproveBody.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+
+  const row = await service(c.env as never).approveRedemption({
+    redemptionId: id,
+    approverId: actorId(c),
+    recipientName: parsed.data.recipientName,
+    recipientEmail: parsed.data.recipientEmail,
+  });
+
+  await auditLog({
+    action: AUDIT_ACTIONS.POINTS_REDEMPTION_APPROVED,
+    actorId: actorId(c),
+    targetType: "point_redemption",
+    targetId: id,
+    metadata: { userId: row.userId, kind: row.kind, valueCents: row.valueCents },
+  });
+  return c.json(success({ redemption: row }));
+});
+
+const CancelBody = z.object({ reason: z.string().min(3).max(500) });
+
+superadminPointsRoutes.post("/redemptions/:id/cancel", async (c) => {
+  const id = c.req.param("id");
+  const parsed = CancelBody.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+
+  const row = await service(c.env as never).cancelRedemption({
+    redemptionId: id,
+    reason: parsed.data.reason,
+    actorId: actorId(c),
+  });
+
+  await auditLog({
+    action: AUDIT_ACTIONS.POINTS_REDEMPTION_CANCELLED,
+    actorId: actorId(c),
+    targetType: "point_redemption",
+    targetId: id,
+    metadata: { userId: row.userId, reason: parsed.data.reason },
+  });
+  return c.json(success({ redemption: row }));
+});
+
+const W9Body = z.object({
+  legalName: z.string().min(2).max(200),
+  taxIdLast4: z.string().regex(/^\d{4}$/),
+  taxClassification: z.enum(["personal", "business"]),
+});
+
+superadminPointsRoutes.post("/user/:userId/w9", async (c) => {
+  const targetId = c.req.param("userId");
+  const parsed = W9Body.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+
+  const row = await service(c.env as never).markW9Collected({
+    userId: targetId,
+    ...parsed.data,
+  });
+
+  await auditLog({
+    action: AUDIT_ACTIONS.POINTS_W9_COLLECTED,
+    actorId: actorId(c),
+    targetType: "user",
+    targetId,
+    metadata: { taxClassification: parsed.data.taxClassification, taxIdLast4: parsed.data.taxIdLast4 },
+  });
+
+  return c.json(success({ taxStatus: row }));
 });

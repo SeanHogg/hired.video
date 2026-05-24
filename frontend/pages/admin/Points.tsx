@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Search, ShieldAlert, AlertOctagon, Plus, Minus, RotateCcw } from "lucide-react";
+import { Loader2, Search, ShieldAlert, AlertOctagon, Plus, Minus, RotateCcw, Gift } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import {
   type PointsAdminUserView,
   type PointsFraudFlag,
   type PointsTopEarner,
+  type UserRedemption,
 } from "@/lib/services/points-service";
 
 export default function AdminPointsPage() {
@@ -36,6 +37,7 @@ export default function AdminPointsPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="user">User Lookup</TabsTrigger>
           <TabsTrigger value="fraud">Fraud Queue</TabsTrigger>
+          <TabsTrigger value="redemptions">Redemptions</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
@@ -46,6 +48,9 @@ export default function AdminPointsPage() {
         </TabsContent>
         <TabsContent value="fraud" className="mt-4">
           <FraudTab />
+        </TabsContent>
+        <TabsContent value="redemptions" className="mt-4">
+          <RedemptionsTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -385,6 +390,119 @@ function UserTab() {
 }
 
 // ── Fraud queue ─────────────────────────────────────────────────────
+
+// ── Redemptions queue ──────────────────────────────────────────────
+
+function RedemptionsTab() {
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState<"queue" | "fulfilled" | "failed" | "cancelled">("queue");
+
+  const redemptions = useQuery<UserRedemption[]>({
+    queryKey: ["admin", "points", "redemptions", filter],
+    queryFn: () => pointsAdminService.getRedemptions(filter === "queue" ? undefined : filter, 200),
+  });
+
+  const approveMut = useMutation({
+    mutationFn: (id: string) => pointsAdminService.approveRedemption(id),
+    onSuccess: () => {
+      toast.success("Redemption approved and dispatched.");
+      qc.invalidateQueries({ queryKey: ["admin", "points", "redemptions"] });
+    },
+    onError: (e) => toast.error("Approve failed.", { description: String(e) }),
+  });
+
+  const cancelMut = useMutation({
+    mutationFn: (vars: { id: string; reason: string }) =>
+      pointsAdminService.cancelRedemption(vars.id, vars.reason),
+    onSuccess: () => {
+      toast.success("Redemption cancelled and points refunded.");
+      qc.invalidateQueries({ queryKey: ["admin", "points", "redemptions"] });
+    },
+  });
+
+  if (redemptions.isLoading || !redemptions.data) {
+    return <Loader2 className="h-5 w-5 animate-spin" />;
+  }
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold flex items-center gap-2">
+          <Gift className="h-4 w-4" /> Redemptions ({redemptions.data.length})
+        </h3>
+        <div className="flex gap-1 text-xs">
+          {(["queue", "fulfilled", "failed", "cancelled"] as const).map((f) => (
+            <Button
+              key={f}
+              size="sm"
+              variant={filter === f ? "default" : "outline"}
+              onClick={() => setFilter(f)}
+            >
+              {f === "queue" ? "Pending + queued" : f}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>User</TableHead>
+            <TableHead>Kind</TableHead>
+            <TableHead>SKU</TableHead>
+            <TableHead className="text-right">Points</TableHead>
+            <TableHead className="text-right">Value</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>KYC</TableHead>
+            <TableHead>Created</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {redemptions.data.map((r) => (
+            <TableRow key={r.id}>
+              <TableCell className="font-mono text-xs">{r.userId}</TableCell>
+              <TableCell className="text-xs">{r.kind}</TableCell>
+              <TableCell className="text-xs">{r.skuId}</TableCell>
+              <TableCell className="text-right tabular-nums">{r.pointsCost.toLocaleString()}</TableCell>
+              <TableCell className="text-right tabular-nums">${(r.valueCents / 100).toFixed(2)}</TableCell>
+              <TableCell>{r.status}</TableCell>
+              <TableCell>{r.requiresKyc ? (r.kycCompletedAt ? "✓" : "needed") : ""}</TableCell>
+              <TableCell className="text-xs">{new Date(r.createdAt).toLocaleString()}</TableCell>
+              <TableCell className="text-right space-x-1">
+                {(r.status === "pending" || r.status === "queued") && (
+                  <>
+                    <Button
+                      size="sm"
+                      disabled={approveMut.isPending}
+                      onClick={() => approveMut.mutate(r.id)}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={cancelMut.isPending}
+                      onClick={() => {
+                        const reason = prompt("Cancel reason?");
+                        if (reason) cancelMut.mutate({ id: r.id, reason });
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                {r.failureReason && (
+                  <span className="text-xs text-red-600">{r.failureReason}</span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
 
 function FraudTab() {
   const qc = useQueryClient();

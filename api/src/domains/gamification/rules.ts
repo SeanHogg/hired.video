@@ -66,7 +66,7 @@ export const ACTIONS = {
   TASK_COMPLETE_SYSTEM: "task.complete.system",
   TASK_COMPLETE_USER: "task.complete.user",
 
-  // Applications + active job hunting
+  // Applications + active job hunting (job_seeker)
   APPLICATION_SUBMITTED: "application.submitted",
   RESUME_TAILORED: "resume.tailored",
   COVER_LETTER_GENERATED: "cover_letter.generated",
@@ -82,6 +82,19 @@ export const ACTIONS = {
   PURCHASE_TOKEN_PACK: "purchase.token_pack",
   PURCHASE_SUBSCRIPTION: "purchase.subscription",
   PURCHASE_ANY: "purchase.any",
+
+  // Recruiter
+  CANDIDATE_SOURCED: "recruiter.candidate.sourced",
+  CANDIDATE_SUBMITTED: "recruiter.candidate.submitted",
+  CANDIDATE_PLACED: "recruiter.candidate.placed",
+  BID_WON: "recruiter.bid.won",
+
+  // Employer
+  JOB_POSTED: "employer.job.posted",
+  CANDIDATE_VIEWED: "employer.candidate.viewed",
+  SCORECARD_COMPLETED: "employer.scorecard.completed",
+  OFFER_EXTENDED: "employer.offer.extended",
+  HIRE_CONFIRMED: "employer.hire.confirmed",
 
   // Streak milestones (written by the streak engine, not callers)
   STREAK_BONUS: "streak.bonus",
@@ -157,7 +170,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   },
   [ACTIONS.SAVED_SEARCH_RUN]: {
     key: ACTIONS.SAVED_SEARCH_RUN,
-    label: "Saved-search delivered new jobs",
+    label: "Created or refreshed a saved search",
     roles: [USER_ROLES.JOB_SEEKER],
     points: 3,
     category: "earn",
@@ -208,10 +221,90 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.BADGE_UNLOCKED]: {
     key: ACTIONS.BADGE_UNLOCKED,
     label: "Badge unlocked",
-    roles: [USER_ROLES.JOB_SEEKER],
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
     points: 0, // engine sets per-badge value
     category: "badge_bonus",
     source: "badge",
+  },
+
+  // ── Recruiter catalog ───────────────────────────────────────────────
+  [ACTIONS.CANDIDATE_SOURCED]: {
+    key: ACTIONS.CANDIDATE_SOURCED,
+    label: "Sourced a candidate",
+    roles: [USER_ROLES.RECRUITER],
+    points: 5,
+    category: "earn",
+    dailyCapPoints: 100,
+    source: "recruiter",
+  },
+  [ACTIONS.CANDIDATE_SUBMITTED]: {
+    key: ACTIONS.CANDIDATE_SUBMITTED,
+    label: "Submitted a candidate to a client",
+    roles: [USER_ROLES.RECRUITER],
+    points: 25,
+    category: "earn",
+    dailyCapPoints: 250,
+    source: "recruiter",
+  },
+  [ACTIONS.CANDIDATE_PLACED]: {
+    key: ACTIONS.CANDIDATE_PLACED,
+    label: "Placed a candidate",
+    roles: [USER_ROLES.RECRUITER],
+    points: 1000,
+    category: "earn",
+    source: "recruiter",
+  },
+  [ACTIONS.BID_WON]: {
+    key: ACTIONS.BID_WON,
+    label: "Won a sourcing bid",
+    roles: [USER_ROLES.RECRUITER],
+    points: 200,
+    category: "earn",
+    source: "recruiter",
+  },
+
+  // ── Employer catalog ────────────────────────────────────────────────
+  [ACTIONS.JOB_POSTED]: {
+    key: ACTIONS.JOB_POSTED,
+    label: "Posted a job",
+    roles: [USER_ROLES.EMPLOYER],
+    points: 100,
+    category: "earn",
+    source: "employer",
+  },
+  [ACTIONS.CANDIDATE_VIEWED]: {
+    key: ACTIONS.CANDIDATE_VIEWED,
+    label: "Reviewed a candidate",
+    roles: [USER_ROLES.EMPLOYER],
+    points: 2,
+    category: "earn",
+    dailyCapPoints: 40,
+    source: "employer",
+  },
+  [ACTIONS.SCORECARD_COMPLETED]: {
+    key: ACTIONS.SCORECARD_COMPLETED,
+    label: "Filled out a hiring scorecard",
+    roles: [USER_ROLES.EMPLOYER],
+    points: 30,
+    category: "earn",
+    dailyCapPoints: 150,
+    source: "employer",
+  },
+  [ACTIONS.OFFER_EXTENDED]: {
+    key: ACTIONS.OFFER_EXTENDED,
+    label: "Extended an offer",
+    roles: [USER_ROLES.EMPLOYER],
+    points: 200,
+    category: "earn",
+    source: "employer",
+  },
+  [ACTIONS.HIRE_CONFIRMED]: {
+    key: ACTIONS.HIRE_CONFIRMED,
+    label: "Confirmed a hire",
+    roles: [USER_ROLES.EMPLOYER],
+    points: 1000,
+    category: "earn",
+    source: "employer",
   },
 };
 
@@ -222,6 +315,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
  * recognized, not just paid.
  */
 export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>([
+  // job_seeker
   ACTIONS.TASK_COMPLETE_SYSTEM,
   ACTIONS.TASK_COMPLETE_USER,
   ACTIONS.APPLICATION_SUBMITTED,
@@ -233,6 +327,17 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.PURCHASE_TOKEN_PACK,
   ACTIONS.PURCHASE_SUBSCRIPTION,
   ACTIONS.PURCHASE_ANY,
+  // recruiter
+  ACTIONS.CANDIDATE_SOURCED,
+  ACTIONS.CANDIDATE_SUBMITTED,
+  ACTIONS.CANDIDATE_PLACED,
+  ACTIONS.BID_WON,
+  // employer
+  ACTIONS.JOB_POSTED,
+  ACTIONS.CANDIDATE_VIEWED,
+  ACTIONS.SCORECARD_COMPLETED,
+  ACTIONS.OFFER_EXTENDED,
+  ACTIONS.HIRE_CONFIRMED,
 ]);
 
 /**

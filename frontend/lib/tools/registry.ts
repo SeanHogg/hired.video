@@ -11,6 +11,7 @@ import {
   Film,
   Gauge,
   Heart,
+  Image as ImageIcon,
   Layers,
   ListChecks,
   Pencil,
@@ -417,6 +418,34 @@ async function runStandardizeResumeDates(ctx: ToolRunContext): Promise<Normalize
       resumeId,
       next,
     },
+  };
+}
+
+// Generate an image via the shared `studioService.generateImage` port
+// — same Cloudflare SDXL-lightning / SD-v1.5 img2img path the studio
+// surfaces use (per the cross-studio first-class image-AI rollout).
+// The route writes the PNG to R2 under `uploads/{userId}/ai-images/`,
+// which IS the user's media library (listed by `GET /api/upload/images`),
+// so the result is automatically available in the MediaPicker's
+// Library tab afterwards — no separate "save to library" step.
+async function runGenerateImage(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const prompt = asString(ctx.args.prompt);
+  if (!prompt) {
+    throw new Error("generate_image requires `prompt`.");
+  }
+  const sourceImageUrl = asString(ctx.args.sourceImageUrl);
+  const { data } = await studioService.generateImage(prompt, {
+    sourceImageUrl,
+  });
+  const { imageUrl, mode } = data;
+  return {
+    summary: `Generated image and saved to your library.${mode === "img2img" ? " (Rewrote source.)" : ""}`,
+    extras: [
+      { label: "URL", value: imageUrl },
+      { label: "Mode", value: mode ?? "text2img" },
+      { label: "Prompt", value: prompt },
+    ],
+    raw: { kind: "generate_image", imageUrl, mode, prompt },
   };
 }
 
@@ -864,6 +893,37 @@ export const toolRegistry: ToolDefinition[] = [
       additionalProperties: false,
     },
     run: runGenerateVideoFromTemplate,
+  },
+
+  // ── Studio: generate an image (text→img OR img→img) ─────────────────────
+
+  {
+    id: "generate_image",
+    label: "Generate image",
+    description:
+      "Generate an image and save it to the user's media library. Use whenever the user asks you to make, draw, create, render, or design any image — headshots, logos, backgrounds, sprites, scene art, social-post graphics. Pass `prompt` (required) describing what to make. Pass `sourceImageUrl` ONLY when the user wants to REWRITE an existing image they've shared a URL for (the model rewrites it under the new prompt, keeping coarse shape). The image is auto-persisted to the user's R2 library; the returned URL is durable and shows up in the Studio MediaPicker's Library tab. Token cost: ~10K.",
+    icon: ImageIcon,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/studio",
+    inputs: [],
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description:
+            "What to generate. Write a vivid description — subject, style, lighting, framing. Caps at 500 chars server-side. Example: 'A professional headshot, soft natural light, neutral grey backdrop, business-casual attire.'",
+        },
+        sourceImageUrl: {
+          type: "string",
+          description:
+            "OPTIONAL. Public CDN URL of an existing image to rewrite under `prompt` (img→img mode). Use ONLY when the user has explicitly shared an image URL they want updated. Omit for fresh generation.",
+        },
+      },
+      required: ["prompt"],
+      additionalProperties: false,
+    },
+    run: runGenerateImage,
   },
 
   // ── Mutation tools (AI coach edits) ──────────────────────────────────────

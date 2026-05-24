@@ -174,24 +174,15 @@ jobRoutes.post("/:id/apply", async (c) => {
   await jobService.applyToJob(jobId, userId, body ?? { resumeId: "" });
 
   // Award gamification points for the application. Fire-and-forget.
-  try {
-    const { pickScoringRole } = await import("../../../shared/user-roles.js");
-    const role = pickScoringRole(c.var.user?.roles);
-    if (role) {
-      const { buildRepos } = await import("../repositories/index.js");
-      const { GamificationService } = await import("../domains/gamification/index.js");
-      const { getDb } = await import("../db/index.js");
-      const game = new GamificationService(buildRepos(getDb()));
-      await game.onApplicationSubmitted({
-        userId,
-        role,
-        applicationId: `${userId}:${jobId}`,
-        metadata: { jobId },
-      });
-    }
-  } catch (e) {
-    console.warn("[gamification] application award failed", { userId, jobId, error: String(e) });
-  }
+  const { withGamification } = await import("../domains/gamification/with-gamification.js");
+  await withGamification(c, "application-submitted", (game, role, uid) =>
+    game.onApplicationSubmitted({
+      userId: uid,
+      role,
+      applicationId: `${uid}:${jobId}`,
+      metadata: { jobId },
+    }),
+  );
 
   return c.json(success({ success: true }));
 });

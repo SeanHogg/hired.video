@@ -1,15 +1,13 @@
 import { Hono } from "hono";
 import { eq, and, desc } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
-import { GamificationService } from "../domains/gamification/index.js";
-import { pickScoringRole } from "../../../shared/user-roles.js";
+import { withGamification } from "../domains/gamification/with-gamification.js";
 
 const { boards, tasks } = schema;
 
-export const taskRoutes = new Hono<{ Variables: Variables }>();
+export const taskRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
@@ -22,26 +20,6 @@ const COMPLETED_STATUSES = new Set([4, 6]);
 
 function isCompletedStatus(status: unknown): boolean {
   return typeof status === "number" && COMPLETED_STATUSES.has(status);
-}
-
-/** Fire-and-forget gamification award. Errors are swallowed (caller is
- *  the task route — we don't want a gamification glitch to fail the
- *  task save). */
-async function awardTaskCompletion(
-  userId: string,
-  jwtRoles: readonly string[] | undefined,
-  taskId: string,
-  taskType: number,
-): Promise<void> {
-  const role = pickScoringRole(jwtRoles);
-  if (!role) return;
-  try {
-    const repos = buildRepos(getDb());
-    const game = new GamificationService(repos);
-    await game.onTaskClosed({ userId, role, taskId, taskType });
-  } catch (e) {
-    console.warn("[gamification] task-close award failed", { userId, taskId, taskType, error: String(e) });
-  }
 }
 
 type TaskDto = {
@@ -179,7 +157,9 @@ taskRoutes.post("/save", async (c) => {
         const taskType = typeof metadata.taskType === "number"
           ? metadata.taskType
           : typeof existingMeta.taskType === "number" ? existingMeta.taskType : 0;
-        await awardTaskCompletion(userId, c.var.user.roles, updated.id, taskType);
+        await withGamification(c, "task-close", (game, role, uid) =>
+          game.onTaskClosed({ userId: uid, role, taskId: updated.id, taskType }),
+        );
       }
 
       return c.json(ok(toTaskDto(updated)), 200);
@@ -203,7 +183,9 @@ taskRoutes.post("/save", async (c) => {
   // historic completed tasks). Treat as a completion event.
   if (isCompletedStatus(metadata.legacyStatus)) {
     const taskType = typeof metadata.taskType === "number" ? metadata.taskType : 0;
-    await awardTaskCompletion(userId, c.var.user.roles, created.id, taskType);
+    await withGamification(c, "task-create-closed", (game, role, uid) =>
+      game.onTaskClosed({ userId: uid, role, taskId: created.id, taskType }),
+    );
   }
 
   return c.json(ok(toTaskDto(created)), 200);
@@ -294,7 +276,9 @@ taskRoutes.post("/:id", async (c) => {
 
   if (isCompletedStatus(metadata.legacyStatus)) {
     const taskType = typeof metadata.taskType === "number" ? metadata.taskType : 0;
-    await awardTaskCompletion(userId, c.var.user.roles, created.id, taskType);
+    await withGamification(c, "task-create-closed", (game, role, uid) =>
+      game.onTaskClosed({ userId: uid, role, taskId: created.id, taskType }),
+    );
   }
 
   return c.json(ok(toTaskDto(created)), 200);

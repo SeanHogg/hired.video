@@ -332,3 +332,97 @@ analyticsRoutes.get("/hiring-metrics", requirePro("Hiring Metrics"), async (c) =
     200,
   );
 });
+
+// ---------------------------------------------------------------------------
+// Polymorphic artifact-views surface — Gap Register #1019.
+// ---------------------------------------------------------------------------
+
+import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
+import { buildArtifactMetrics, lookupArtifactOwner } from "../services/analytics/artifactAnalytics.js";
+import { ARTIFACT_KINDS, type ArtifactKind } from "../../../shared/artifact-views.js";
+import { hashClientIp } from "./resumes.js";
+
+const beaconSchema = z.object({
+  artifactKind: z.enum(ARTIFACT_KINDS as unknown as [ArtifactKind, ...ArtifactKind[]]),
+  artifactId: z.string().uuid(),
+  engagement: z.array(z.number()).optional(),
+  totalEngagementSec: z.number().int().nonnegative().optional(),
+  percentConsumed: z.number().min(0).max(1).optional(),
+  dropOffBucket: z.number().int().nonnegative().nullable().optional(),
+  viewerEmail: z.string().email().optional().nullable(),
+  viewerCompany: z.string().max(255).optional().nullable(),
+  referrer: z.string().max(2048).optional().nullable(),
+});
+
+// POST /api/analytics/artifacts/beacon — public; never auth-required.
+// Records a single artifact view event. The owner of the artifact is
+// looked up server-side per-kind so the client can't spoof attribution.
+analyticsRoutes.post("/artifacts/beacon", async (c) => {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = beaconSchema.safeParse(raw);
+  if (!parsed.success) return c.body(null, 204); // never fail the client
+
+  const ownerUserId = await lookupArtifactOwner(
+    parsed.data.artifactKind,
+    parsed.data.artifactId,
+  );
+
+  await recordArtifactView({
+    artifactKind: parsed.data.artifactKind,
+    artifactId: parsed.data.artifactId,
+    ownerUserId,
+    viewerId: (c.var as any).user?.sub ?? null,
+    viewerEmail: parsed.data.viewerEmail ?? null,
+    viewerCompany: parsed.data.viewerCompany ?? null,
+    ipHash: hashClientIp(c),
+    ipCountry: ipCountryFromCtx(c),
+    referrer: parsed.data.referrer ?? c.req.header("referer") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+    engagement: parsed.data.engagement ?? null,
+    engagementUnit: parsed.data.artifactKind === "video" ? "s" : "%",
+    totalEngagementSec: parsed.data.totalEngagementSec ?? 0,
+    percentConsumed: parsed.data.percentConsumed ?? 0,
+    dropOffBucket: parsed.data.dropOffBucket ?? null,
+  });
+
+  return c.body(null, 204);
+});
+
+// GET /api/analytics/artifacts/:kind/:id — kind-aware analytics rollup.
+// Returns the shared ArtifactMetrics shape (totalViews, heatmap, geo,
+// referrers, viewers, ctaClicks). Owner-gated: only the artifact's
+// owner (or a super-admin) can read aggregated viewer-level data.
+analyticsRoutes.get("/artifacts/:kind/:id", async (c) => {
+  const kindParam = c.req.param("kind");
+  if (!(ARTIFACT_KINDS as readonly string[]).includes(kindParam)) {
+    return c.json(error("INVALID_KIND", "Unknown artifact kind"), 400);
+  }
+  const kind = kindParam as ArtifactKind;
+  const id = c.req.param("id");
+
+  const uid = (c.var as any).user?.sub ?? null;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const ownerUserId = await lookupArtifactOwner(kind, id);
+  const isSuperAdmin = (c.var as any).user?.role === "super_admin";
+  if (!isSuperAdmin && ownerUserId !== uid) {
+    return c.json(error("FORBIDDEN", "Only the artifact owner can read stats"), 403);
+  }
+
+  const metrics = await buildArtifactMetrics(kind, id);
+  return c.json(success(metrics), 200);
+});
+
+// GET /api/analytics/creator/me — cross-artifact rollup for the unified
+// creator dashboard (#1019 L5). Returns top-line totals + per-artifact
+// summary rows for everything the authed user owns.
+analyticsRoutes.get("/creator/me", async (c) => {
+  const uid = (c.var as any).user?.sub ?? null;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const { buildCreatorRollup } = await import(
+    "../services/analytics/creatorRollup.js"
+  );
+  const rollup = await buildCreatorRollup(uid);
+  return c.json(success(rollup), 200);
+});

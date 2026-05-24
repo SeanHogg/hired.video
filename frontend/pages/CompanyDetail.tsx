@@ -50,6 +50,8 @@ import type { CompanyProfile } from "@/lib/services/company-service";
 import { ReviewsSection } from "@/components/reviews/ReviewsSection";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
+import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
+import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { toast } from "@/components/ui/use-toast";
 import { AppShell } from "@/components/AppShell";
@@ -69,6 +71,12 @@ export default function CompanyDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTracked, setIsTracked] = useState(false);
+
+  useArtifactViewTracking({
+    artifactKind: "company",
+    artifactId: (company as any)?.data?.id ?? null,
+    ownerUserId: (company as any)?.data?.ownerUserId ?? null,
+  });
 
   // Fetch company data
   useEffect(() => {
@@ -282,6 +290,24 @@ export default function CompanyDetail() {
                             <Badge className={getStatusColor(company.status)}>
                               {String(company.status)}
                             </Badge>
+                            <ArtifactDetailsSheet
+                              permission={{
+                                kind: "company",
+                                entity: {
+                                  id: (company as any).data?.id ?? "",
+                                  ownerUserId: (company as any).data?.ownerUserId ?? null,
+                                },
+                              }}
+                              title={company.data.name}
+                              chips={
+                                <Badge variant="secondary">{String(company.status)}</Badge>
+                              }
+                              activity={{
+                                viewCount: (company as any).viewCount ?? undefined,
+                                createdAt: (company as any).createdAt,
+                                updatedAt: (company as any).updatedAt,
+                              }}
+                            />
                           </div>
                           {company.data.tagline && (
                             <CardDescription className="text-lg mb-2">

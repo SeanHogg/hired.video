@@ -3,9 +3,10 @@
  * something on day X" and returns the updated streak state + any
  * milestone bonus to award.
  *
- * Day resolution is UTC-day for v1 (tracked in the Gap Register as a
- * thing to revisit once we wire user timezones into the engine — the
- * pointsStreaks row only stores a date, so a TZ swap is non-breaking).
+ * Day resolution honors the user's IANA timezone when provided
+ * (`users.timezone`), falling back to UTC when missing — the storage
+ * shape (`pointsStreaks.lastActivityDate` = `date`) is identical in
+ * both modes.
  *
  * Caller is the points engine; this module never touches the DB.
  */
@@ -137,7 +138,31 @@ function daysBetween(thenIso: string, todayIso: string): number {
   return Math.round((t2 - t1) / 86_400_000);
 }
 
-/** Convenience: get today as YYYY-MM-DD in UTC. */
+/** Get today as YYYY-MM-DD in UTC. Use this when the user's TZ is
+ *  unknown — every consumer falls back here. */
 export function utcDay(at: Date = new Date()): string {
   return at.toISOString().slice(0, 10);
+}
+
+/** Get the local-day YYYY-MM-DD in the supplied IANA timezone. When
+ *  the timezone is invalid or null, falls back to UTC. */
+export function localDay(timezone: string | null | undefined, at: Date = new Date()): string {
+  if (!timezone) return utcDay(at);
+  try {
+    // Intl.DateTimeFormat is the single cross-runtime path that handles
+    // DST correctly. The `en-CA` locale yields YYYY-MM-DD natively.
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(at);
+    const yyyy = parts.find((p) => p.type === "year")?.value;
+    const mm = parts.find((p) => p.type === "month")?.value;
+    const dd = parts.find((p) => p.type === "day")?.value;
+    if (yyyy && mm && dd) return `${yyyy}-${mm}-${dd}`;
+  } catch {
+    /* fall through */
+  }
+  return utcDay(at);
 }

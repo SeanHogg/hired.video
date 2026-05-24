@@ -19,6 +19,14 @@
  */
 import { useMemo } from "react";
 import { Gamepad2, Plus, Trash2 } from "lucide-react";
+import {
+  PanelShell,
+  Section,
+  Field,
+  ReadOnlyRow,
+  NumberInput,
+  DangerZone,
+} from "@/components/studio/shared/InspectorShell";
 import type {
   AnimationSpec,
   BlockAction,
@@ -200,7 +208,7 @@ function GameSettingsInspector({
   onChange: (next: GameState) => void;
 }) {
   return (
-    <PanelShell title="Game">
+    <PanelShell title="Game" icon={Gamepad2}>
       <Section label="Canvas">
         <Field label="Width">
           <NumberInput
@@ -320,7 +328,7 @@ function LevelInspector({
   const level = gameState.levels.find((l) => l.id === levelId)!;
   const isStart = gameState.startLevelId === level.id;
   return (
-    <PanelShell title="Level" onDeselect={onDeselect}>
+    <PanelShell title="Level" icon={Gamepad2} onDeselect={onDeselect}>
       <Section label="Identity">
         <Field label="Label">
           <input
@@ -404,7 +412,7 @@ function SpriteInspector({
     [sprite.assetId],
   );
   return (
-    <PanelShell title="Sprite" onDeselect={onDeselect}>
+    <PanelShell title="Sprite" icon={Gamepad2} onDeselect={onDeselect}>
       <Section label="Identity">
         {/* `id` is read-only — it doubles as the runtime reference key
             for selection + behavior dispatch, so an in-place rename
@@ -572,106 +580,6 @@ function SpriteInspector({
 }
 
 // ─── Chrome primitives ──────────────────────────────────────────────────────
-
-function PanelShell({
-  title,
-  onDeselect,
-  children,
-}: {
-  title: string;
-  onDeselect?: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex h-full flex-col overflow-y-auto px-3 py-3 text-sm">
-      <header className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Gamepad2 className="h-4 w-4 text-fuchsia-500" />
-          <h3 className="font-semibold">{title}</h3>
-        </div>
-        {onDeselect && (
-          <button
-            type="button"
-            onClick={onDeselect}
-            className="rounded px-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
-          >
-            Done
-          </button>
-        )}
-      </header>
-      <div className="flex flex-col gap-4">{children}</div>
-    </div>
-  );
-}
-
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-1.5">
-      <h4 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </h4>
-      <div className="space-y-1.5">{children}</div>
-    </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2 text-xs">
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
-}
-
-function ReadOnlyRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium tabular-nums">{children}</span>
-    </div>
-  );
-}
-
-function NumberInput({
-  value,
-  onChange,
-  min,
-  max,
-  step = 1,
-}: {
-  value: number;
-  onChange: (next: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-}) {
-  return (
-    <input
-      type="number"
-      value={Number.isFinite(value) ? value : 0}
-      min={min}
-      max={max}
-      step={step}
-      onChange={(e) => {
-        const n = Number(e.target.value);
-        if (Number.isFinite(n)) onChange(n);
-      }}
-      className="h-7 w-20 rounded border border-border bg-background px-1 text-right text-xs tabular-nums"
-    />
-  );
-}
-
-function DangerZone({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="mt-2 border-t border-border pt-3">
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        Danger zone
-      </p>
-      {children}
-    </section>
-  );
-}
 
 function BehaviorParamsForm({
   behavior,

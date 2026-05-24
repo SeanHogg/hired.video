@@ -32,7 +32,6 @@ import {
   SkipBack,
   Music,
   Mic,
-  Globe,
   Pencil,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
@@ -544,37 +543,6 @@ export default function StudioEditorV2() {
       setSavingImageToLibrary(false);
     }
   }, [imageCanvas, savingImageToLibrary, toast]);
-
-  // Export PNG: same flatten path, triggers a browser download. The
-  // SaveMenu's "Export image" item routes here when mediaKind=image,
-  // mirroring the Timeline runtime's MP4 / MP3 / GIF export path.
-  const handleExportImagePng = useCallback(async () => {
-    if (!imageCanvas) return;
-    const blob = await flattenCanvasToBlob(imageCanvas, "image/png");
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `drawing-${Date.now()}.png`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [imageCanvas]);
-
-  // Export animation: dispatches to the GIF89a / APNG / WebP / MP4-alpha
-  // encoder strategy. Routed by the project's saved-output-profile or
-  // the default profile for the animation kind. Closes #1004 in
-  // combination with `lib/studio/animation/animation-export.ts`.
-  const handleExportAnimation = useCallback(async () => {
-    const { renderAnimation } = await import("@/lib/studio/animation/animation-export");
-    const { defaultOutputProfile } = await import("@shared/media-kinds");
-    const profile = defaultOutputProfile("animation");
-    const { blob } = await renderAnimation(animationState, profile);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "animation"}${profile.fileExt}`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [animationState, title]);
 
   // Selection actions — Delete clears pixels inside the selection on
   // the active layer; Fill paints the selection with the current
@@ -1523,6 +1491,114 @@ export default function StudioEditorV2() {
     [],
   );
 
+  // Derived source for the floating AI selection chip — resolves the
+  // currently-selected element's image (per the active media kind) into
+  // the props the shared `<AiSelectionChip/>` consumes. Returns null
+  // when no usable source exists; the chip self-hides on null per the
+  // shared-component visibility rule.
+  //
+  // Per-kind mapping (all routed through the SAME chip + the SAME
+  // `useMediaAiPrompt` hook — DRY all the way down):
+  //   • image      → active layer's pixelsDataUrl (img→img via dataUrl)
+  //   • animation  → active frame's pixelsDataUrl (img→img via dataUrl)
+  //   • game       → selected sprite's asset URL  (img→img via CDN url)
+  //   • timeline   → selected image widget's URL  (img→img via CDN url)
+  const aiChipSource = useMemo<{
+    kindNoun: string;
+    label?: string;
+    url?: string;
+    dataUrl?: string;
+    placeholder?: string;
+    onGenerated: (result: ImageGenResult, prompt: string) => void | Promise<void>;
+  } | null>(() => {
+    if (currentMediaKind === "image") {
+      const layer = findImageLayer(imageState, imageState.activeLayerId);
+      if (!layer?.pixelsDataUrl) return null;
+      return {
+        kindNoun: "layer",
+        label: layer.label,
+        dataUrl: layer.pixelsDataUrl,
+        placeholder: "Repaint this layer as a foggy forest at dusk…",
+        onGenerated: (result, prompt) =>
+          void handleImageAiGenerated(result, prompt, {
+            replaceActiveLayer: true,
+            hadTransparentIntent: false,
+          }),
+      };
+    }
+    if (currentMediaKind === "animation") {
+      const frame = animationState.frames.find(
+        (f) => f.id === animationState.activeFrameId,
+      );
+      if (!frame?.pixelsDataUrl) return null;
+      return {
+        kindNoun: "frame",
+        label: `Frame ${animationState.frames.indexOf(frame) + 1}`,
+        dataUrl: frame.pixelsDataUrl,
+        placeholder: "Same pose, brighter lighting…",
+        onGenerated: (result) => void handleAnimationAiGenerated(result),
+      };
+    }
+    if (currentMediaKind === "game" && gameState && selectedSpriteId) {
+      const level = gameState.levels.find((l) => l.id === activeLevelId);
+      const sprite = level?.sprites.find((s) => s.id === selectedSpriteId);
+      const asset = sprite
+        ? gameState.assets.find((a) => a.id === sprite.assetId)
+        : null;
+      if (!asset?.url) return null;
+      return {
+        kindNoun: "sprite",
+        label: `Sprite ${sprite!.id}`,
+        url: asset.url,
+        placeholder: "Same silhouette, neon cyberpunk palette…",
+        onGenerated: (result, prompt) =>
+          handleGameAiGenerated(result, prompt),
+      };
+    }
+    if (usesTimelineChrome && selection.kind === "widget") {
+      const widget = activeScene.widgets.find((w) => w.id === selection.widgetId);
+      if (!widget || widget.params.kind !== "image") return null;
+      const imageParams = widget.params;
+      if (imageParams.data.source.kind !== "url") return null;
+      const url = imageParams.data.source.url;
+      if (!url) return null;
+      return {
+        kindNoun: "image",
+        label: "Selected image",
+        url,
+        placeholder: "Same composition, dramatic golden-hour light…",
+        onGenerated: (result) => {
+          // Replace the image widget's source URL in place — keeps
+          // the widget's position / window / motion / z-index, just
+          // swaps the bitmap. Same SoT mutator the inspector uses.
+          const newUrl = result.resultUrl ?? result.previewUrl;
+          updateWidgetParams(widget.id, {
+            ...imageParams,
+            data: {
+              ...imageParams.data,
+              source: { kind: "url", url: newUrl },
+            },
+          });
+        },
+      };
+    }
+    return null;
+  }, [
+    currentMediaKind,
+    imageState,
+    animationState,
+    gameState,
+    selectedSpriteId,
+    activeLevelId,
+    usesTimelineChrome,
+    selection,
+    activeScene,
+    handleImageAiGenerated,
+    handleAnimationAiGenerated,
+    handleGameAiGenerated,
+    updateWidgetParams,
+  ]);
+
   // V2-native audio mixer adapters (#645). Patch the canvas-level
   // audioMix slice + per-clip voiceover gain/muted. Defaults merge in
   // here so a freshly-created canvas (audioMix === null) still picks
@@ -1680,100 +1756,66 @@ export default function StudioEditorV2() {
     }
   }
 
+  /** Export the active project — single entry point. The per-kind
+   *  dispatch lives in `exportProjectByKind` (closes the studio-audit
+   *  finding that handleExport had three parallel early-return
+   *  branches + a second per-kind switch in renderProjectToBlob).
+   *  The host supplies the kind-specific callbacks the facade injects
+   *  on demand (flattenImage for image kind, renderTimeline for the
+   *  Timeline kinds). */
   async function handleExport() {
-    // Image kind has its own flatten-to-PNG path that doesn't go
-    // through the Timeline render pipeline (no ffmpeg.wasm, no
-    // WebCodecs — just `canvas.toBlob`). Routed early so the rest of
-    // the function stays focused on Timeline + game export.
-    if (currentMediaKind === "image") {
-      setExporting(true);
-      try {
-        await handleExportImagePng();
-        toast({ title: "Exported", description: "Your drawing has been downloaded." });
-      } catch (err) {
-        toast({
-          title: "Export failed",
-          description: err instanceof Error ? err.message : "Unknown error",
-          variant: "destructive",
-        });
-      } finally {
-        setExporting(false);
-      }
-      return;
-    }
-    // Animation kind has its own GIF/APNG/WebP encoder pipeline (#1004).
-    // Routes early for the same reason image does — no ffmpeg.wasm, no
-    // Timeline render facade.
-    if (currentMediaKind === "animation") {
-      setExporting(true);
-      try {
-        await handleExportAnimation();
-        toast({ title: "Exported", description: "Your animation has been downloaded." });
-      } catch (err) {
-        toast({
-          title: "Export failed",
-          description: err instanceof Error ? err.message : "Unknown error",
-          variant: "destructive",
-        });
-      } finally {
-        setExporting(false);
-      }
-      return;
-    }
     setExporting(true);
-    await withRenderErrorRecovery("Export", async () => {
-      // Per the canvas-runtime extensibility model (PRD §1.2), each
-      // mediaKind owns its own export pipeline. Game kind dispatches
-      // to the JSZip game-bundle exporter (`bundleGame()` builds a
-      // self-contained HTML5 ZIP); every other kind keeps the
-      // Timeline render path.
-      const blob = await renderProjectToBlob();
-      if (!blob) return;
+    try {
+      const blob = await exportProjectByKind({
+        mediaKind: currentMediaKind,
+        title,
+        snapshot: {
+          imageState,
+          animationState,
+          gameState,
+          flattenImage: imageCanvas
+            ? async () => flattenCanvasToBlob(imageCanvas, "image/png")
+            : undefined,
+          renderTimeline: async () => {
+            // Timeline kinds: route through the existing error-recovery
+            // wrapper so the heavy render path keeps its toast UX.
+            return withRenderErrorRecovery("Export", async () => {
+              if (state.scenes.length === 0) return null;
+              return renderToBlob();
+            });
+          },
+        },
+      });
+      if (!blob) {
+        // Game without a seeded state surfaces a specific toast — the
+        // user needs to pick a game template before export means
+        // anything. Other null returns mean "nothing to export"
+        // (empty timeline / no image canvas yet) and stay silent.
+        if (currentMediaKind === "game" && !gameState) {
+          toast({
+            title: "Save the project first",
+            description: "Pick a game template + save before exporting.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      // Each pipeline returns a Blob with the right MIME — derive the
-      // file extension from that so a podcast WAV doesn't get an .mp4
-      // suffix.
-      const ext = extForBlob(blob);
-      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "project"}.${ext}`;
+      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "project"}.${extensionForBlob(blob)}`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast({ title: "Exported", description: "Your project has been downloaded." });
-    });
-    setExporting(false);
-  }
-
-  /** Dispatch export per mediaKind. Game → JSZip bundle; everything
-   *  else → the existing Timeline render path. */
-  async function renderProjectToBlob(): Promise<Blob | null> {
-    if (currentMediaKind === "game") {
-      // Read local `gameState` so the export reflects unsaved edits
-      // the user made since the last `handleSave`. handleExport also
-      // saves first, but the local-first read keeps the export self-
-      // consistent in case the save round-trip is slow.
-      const game = gameState;
-      if (!game) {
-        toast({
-          title: "Save the project first",
-          description: "Pick a game template + save before exporting.",
-          variant: "destructive",
-        });
-        return null;
-      }
-      const { bundleGame } = await import("@/lib/studio/game/game-export");
-      return bundleGame(game, { title });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
     }
-    if (state.scenes.length === 0) return null;
-    return renderToBlob();
-  }
-
-  function extForBlob(blob: Blob): string {
-    if (blob.type === "application/zip") return "zip";
-    if (blob.type.includes("webm")) return "webm";
-    if (blob.type.includes("wav")) return "wav";
-    if (blob.type.includes("mpeg")) return "mp3";
-    return "mp4";
   }
 
   // ───── ensureRendered — V2's parity for v1's `ensureRendered`. Used
@@ -2564,6 +2606,29 @@ export default function StudioEditorV2() {
               <div className="pointer-events-none absolute right-3 bottom-3 z-10">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
+              {/* Floating selection chip — quick in-canvas trigger for
+                  the same AI prompt the right-rail panel hosts, with
+                  img→img pre-populated from the currently-selected
+                  element. The chip self-gates on a usable source per
+                  the standing DRY rule (it returns null when no
+                  selection has an image to rewrite — see
+                  `aiChipSource` derivation in the host). Same
+                  `useMediaAiPrompt` hook, same engine, same metering. */}
+              {aiChipSource && (
+                <div className="pointer-events-none absolute right-3 top-3 z-20">
+                  <div className="pointer-events-auto">
+                    <AiSelectionChip
+                      alwaysVisible
+                      kindNoun={aiChipSource.kindNoun}
+                      selectionLabel={aiChipSource.label}
+                      sourceImageUrl={aiChipSource.url}
+                      sourceImageDataUrl={aiChipSource.dataUrl}
+                      placeholder={aiChipSource.placeholder}
+                      onGenerated={aiChipSource.onGenerated}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             {/* Bottom Timeline rail — Timeline-runtime scene/widget
                 strip. Self-hides for game / image kinds per #936's
@@ -2916,7 +2981,6 @@ function EditorHeader({
     const r = Math.floor(s % 60);
     return `${m}:${r.toString().padStart(2, "0")}`;
   };
-  const [detailsOpen, setDetailsOpen] = useState(false);
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
       <div className="flex flex-1 items-center gap-2">
@@ -2943,29 +3007,18 @@ function EditorHeader({
             aria-hidden="true"
           />
         </div>
-        {/* Globe = "Details" — opens the side panel where visibility,
-            linked subjects, SEO metadata, and metrics all live. Status
-            chips used to render here next to the title; they moved into
-            the panel itself so the header stays focused on the canvas.
-            Self-gates on a saved project: nothing to expose for a draft. */}
+        {/* Details drawer — visibility, SEO metadata, engagement tools, and
+            heatmap/geo/CTR metrics all live in the shared <EntityDetailsSheet>
+            chrome (Gap Register #1019). The adapter owns its own [🌐 Details]
+            trigger button so the editor header doesn't need its own click
+            handler. Self-gates on a saved project — nothing to expose for a
+            draft and on the viewer's permission (creator + admins only). */}
         {persistedProject && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setDetailsOpen(true)}
-            className="h-8 w-8 p-0"
-            aria-label="Details — visibility, SEO, metrics"
-            title="Details — visibility, SEO, metrics"
-          >
-            <Globe className="h-4 w-4" />
-          </Button>
+          <ProjectDetailsSheet
+            project={persistedProject}
+            onChange={onProjectChange}
+          />
         )}
-        <ProjectDetailsSheet
-          open={detailsOpen}
-          onOpenChange={setDetailsOpen}
-          project={persistedProject}
-          onChange={onProjectChange}
-        />
       </div>
       {/* Playback controls — Play/Pause + scrubber + timecode. Drives the
           shared `usePreviewPlayback` hook so the canvas/widgets/scenes

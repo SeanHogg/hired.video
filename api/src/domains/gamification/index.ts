@@ -19,6 +19,8 @@ import {
   type ActionKey,
   type RedemptionSku,
 } from "./rules.js";
+import { RedemptionEngine, type RedemptionOutcome } from "./redemption-engine.js";
+import { buildTremendousClient } from "../../services/tremendous/client.js";
 
 export interface AwardArgs {
   userId: string;
@@ -28,10 +30,18 @@ export interface AwardArgs {
   metadata?: Record<string, unknown> | null;
 }
 
+export interface GamificationServiceOpts {
+  /** Worker env passed through so the redemption engine can build a
+   *  Tremendous client lazily. Optional — gift-card redemption returns
+   *  `vendor_unavailable` when missing. */
+  workerEnv?: Record<string, string | undefined>;
+}
+
 export class GamificationService {
   private readonly engine: PointsEngine;
+  private readonly redemption: RedemptionEngine;
 
-  constructor(private readonly repos: Repos) {
+  constructor(private readonly repos: Repos, opts: GamificationServiceOpts = {}) {
     this.engine = new PointsEngine(repos.points, {
       onBadgeUnlock: async (userId, slug) => {
         const badge = await this.repos.points.findBadgeBySlug(slug);
@@ -39,7 +49,7 @@ export class GamificationService {
         const awarded = await this.repos.points.awardBadge({
           userId,
           badgeId: badge.id,
-          awardedFor: { trigger: "streak_milestone", slug },
+          awardedFor: { trigger: "badge_engine", slug },
         });
         if (awarded && badge.pointsReward > 0) {
           await this.engine.writeManualLedger({
@@ -52,6 +62,18 @@ export class GamificationService {
             refType: "badge",
             metadata: { badgeSlug: slug, badgeName: badge.name },
           });
+        }
+      },
+    });
+
+    this.redemption = new RedemptionEngine({
+      repos,
+      buildTremendous: () => {
+        if (!opts.workerEnv) return null;
+        try {
+          return buildTremendousClient(opts.workerEnv);
+        } catch {
+          return null;
         }
       },
     });
@@ -174,6 +196,82 @@ export class GamificationService {
       ...args,
       refId: args.invoiceId,
       refType: "invoice",
+    });
+  }
+
+  // ── Recruiter helpers ──────────────────────────────────────────────
+
+  onCandidateSourced(args: AwardArgs & { candidateId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.CANDIDATE_SOURCED, {
+      ...args,
+      refId: args.candidateId,
+      refType: "candidate",
+    });
+  }
+
+  onCandidateSubmitted(args: AwardArgs & { submissionId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.CANDIDATE_SUBMITTED, {
+      ...args,
+      refId: args.submissionId,
+      refType: "candidate_submission",
+    });
+  }
+
+  onCandidatePlaced(args: AwardArgs & { placementId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.CANDIDATE_PLACED, {
+      ...args,
+      refId: args.placementId,
+      refType: "placement",
+    });
+  }
+
+  onBidWon(args: AwardArgs & { bidId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.BID_WON, {
+      ...args,
+      refId: args.bidId,
+      refType: "sourcing_bid",
+    });
+  }
+
+  // ── Employer helpers ───────────────────────────────────────────────
+
+  onJobPosted(args: AwardArgs & { jobId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.JOB_POSTED, {
+      ...args,
+      refId: args.jobId,
+      refType: "job",
+    });
+  }
+
+  onCandidateViewed(args: AwardArgs & { candidateId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.CANDIDATE_VIEWED, {
+      ...args,
+      refId: args.candidateId,
+      refType: "candidate",
+    });
+  }
+
+  onScorecardCompleted(args: AwardArgs & { scorecardId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.SCORECARD_COMPLETED, {
+      ...args,
+      refId: args.scorecardId,
+      refType: "scorecard",
+    });
+  }
+
+  onOfferExtended(args: AwardArgs & { offerId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.OFFER_EXTENDED, {
+      ...args,
+      refId: args.offerId,
+      refType: "offer",
+    });
+  }
+
+  onHireConfirmed(args: AwardArgs & { hireId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.HIRE_CONFIRMED, {
+      ...args,
+      refId: args.hireId,
+      refType: "hire",
     });
   }
 
@@ -319,6 +417,56 @@ export class GamificationService {
 
   getRedemptionSku(id: string): RedemptionSku | null {
     return getRedemptionSku(id);
+  }
+
+  // ── Redemption ─────────────────────────────────────────────────────
+
+  redeem(args: {
+    userId: string;
+    skuId: string;
+    recipientName?: string;
+    recipientEmail?: string;
+  }): Promise<RedemptionOutcome> {
+    return this.redemption.redeem({
+      skuId: args.skuId,
+      user: {
+        userId: args.userId,
+        recipientName: args.recipientName,
+        recipientEmail: args.recipientEmail,
+      },
+    });
+  }
+
+  /** SuperAdmin path: approve a redemption parked at `pending` due to
+   *  KYC. Routes through the redemption engine so the Tremendous builder
+   *  closure is reused. */
+  approveRedemption(args: {
+    redemptionId: string;
+    approverId: string;
+    recipientName?: string;
+    recipientEmail?: string;
+  }) {
+    return this.redemption.approve(args);
+  }
+
+  /** SuperAdmin path: cancel + refund. */
+  cancelRedemption(args: { redemptionId: string; reason: string; actorId: string }) {
+    return this.redemption.cancel(args);
+  }
+
+  /** SuperAdmin path: mark a user's W-9 as collected so future
+   *  redemptions clear the threshold gate automatically. */
+  markW9Collected(args: {
+    userId: string;
+    legalName: string;
+    taxIdLast4: string;
+    taxClassification: "personal" | "business";
+  }) {
+    return this.repos.points.markW9Collected(args.userId, {
+      legalName: args.legalName,
+      taxIdLast4: args.taxIdLast4,
+      taxClassification: args.taxClassification,
+    });
   }
 }
 

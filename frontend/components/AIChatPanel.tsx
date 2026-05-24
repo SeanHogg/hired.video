@@ -15,10 +15,17 @@ import {
   ChevronLeft,
   MessageSquare,
   Trash2,
+  Image as ImageIcon,
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
 import { AIInputBox } from "@/components/AIInputBox";
+import MediaAiPromptPanel from "@/components/studio/ai/MediaAiPromptPanel";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useAI } from "@/lib/ai-context";
 import { type ChatMessage } from "@/lib/services/ai-service";
 import { apiClient } from "@/lib/api-client";
@@ -338,6 +345,10 @@ export default function AIChatPanel() {
   const [sessions, setSessions] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  // Quick-action AI image popover — cross-studio first-class image
+  // gen rollout. Same `MediaAiPromptPanel` the studio surfaces use;
+  // opens above the chat input as a popover.
+  const [aiImagePromptOpen, setAiImagePromptOpen] = useState(false);
 
   // Initialize welcome message based on user role
   useEffect(() => {
@@ -1152,12 +1163,47 @@ export default function AIChatPanel() {
         {/* Input */}
         <div className="p-4 border-t">
           {hasAIAccess ? (
-            <AIInputBox
-              onSubmit={(v) => handleSendMessage(v)}
-              disabled={isTyping}
-              placeholder="Ask me anything about HR..."
-              helpText={AI_FOOTER_CAPTION}
-            />
+            <>
+              {/* Quick-action chip — bypasses the "type 'generate an
+                  image…'" indirection by surfacing the same shared
+                  `MediaAiPromptPanel` inline. The image is generated
+                  via the `generate_image` tool path (registered in
+                  registry.ts) so the URL is auto-persisted to the
+                  user's R2 library + shows up in MediaPicker. After
+                  generation the URL is pushed into the chat as a user
+                  message; the assistant sees it, can comment, and the
+                  conversation continues naturally. */}
+              <div className="mb-2 flex items-center gap-2">
+                <Popover open={aiImagePromptOpen} onOpenChange={setAiImagePromptOpen}>
+                  <PopoverTrigger asChild>
+                    <UiButton variant="outline" size="sm" className="h-7 gap-1">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <span className="text-xs">Generate image</span>
+                    </UiButton>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" side="top" className="w-80 p-0">
+                    <MediaAiPromptPanel
+                      compact
+                      kindNoun="image"
+                      placeholder="A clean studio backdrop, soft warm lighting…"
+                      onGenerated={(result, prompt) => {
+                        const url = result.resultUrl ?? result.previewUrl;
+                        setAiImagePromptOpen(false);
+                        handleSendMessage(
+                          `I just generated an image for "${prompt}". URL: ${url}\n\nIt's been saved to my media library — what should I do with it next?`,
+                        );
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <AIInputBox
+                onSubmit={(v) => handleSendMessage(v)}
+                disabled={isTyping}
+                placeholder="Ask me anything about HR..."
+                helpText={AI_FOOTER_CAPTION}
+              />
+            </>
           ) : (
             <>
               <div className="flex items-center justify-between gap-2">

@@ -5,6 +5,7 @@
  */
 
 export { default as MetricsPanel } from "./MetricsPanel";
+export { default as ArtifactAnalyticsDashboard } from "./ArtifactAnalyticsDashboard";
 export { default as GeoHotspotMap } from "./GeoHotspotMap";
 export { default as EngagementHeatmap } from "./EngagementHeatmap";
 export { default as ReferrerBreakdown } from "./ReferrerBreakdown";

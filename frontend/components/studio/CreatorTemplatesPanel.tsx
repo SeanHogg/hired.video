@@ -30,6 +30,7 @@ import {
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
 import MediaPicker from "@/components/shared/MediaPicker";
+import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 
 interface Props {
   open: boolean;
@@ -243,6 +244,21 @@ function TemplateRow({ template: t, busy, onEdit, onChangeVisibility, onChangeTh
 
       {/* Actions row — the row decides what to show based on visibility. */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-t bg-muted/20">
+        <ArtifactDetailsSheet
+          permission={{
+            kind: "studio_template",
+            entity: { id: t.id, creatorUserId: (t as any).creatorUserId ?? null },
+          }}
+          title={t.name}
+          activity={{
+            viewCount: t.viewCount,
+            createdAt: (t as any).createdAt,
+            updatedAt: (t as any).updatedAt,
+            extra: [
+              { label: "Sold", value: <span className="tabular-nums">{t.purchaseCount}</span> },
+            ],
+          }}
+        />
         {onEdit && (
           <Button
             size="sm"

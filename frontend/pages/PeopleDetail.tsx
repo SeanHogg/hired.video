@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import AuthOverlay from "@/components/AuthOverlay";
 import ShareModal from "@/components/ShareModal";
+import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
+import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -105,6 +107,12 @@ function PeopleDetailContent() {
     error,
     refetch,
   } = useProfileView(target);
+
+  useArtifactViewTracking({
+    artifactKind: "profile",
+    artifactId: profile?.id ?? null,
+    ownerUserId: profile?.id ?? null,
+  });
 
   // ---------------------------------------------------------------------
   // Local UI state — dialogs and in-flight flags. All mutations delegate to
@@ -500,8 +508,9 @@ function PeopleDetailContent() {
           <EntityHubTabStrip entity="person" />
           <PageHeader tabs={profileTabs} activeTabKey={activeProfileTab} />
 
-          <div className="mb-6">
-            <ProfileHeader
+          <div className="mb-6 flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <ProfileHeader
               avatar={profile.profilePicture ?? undefined}
               firstName={firstName}
               lastName={lastName}
@@ -517,6 +526,18 @@ function PeopleDetailContent() {
               onEditUrl={() => setActiveOwnerDialog("url")}
               onShare={() => setShowShare(true)}
               rightSlot={<ProfileHeaderVideos videos={videos} />}
+            />
+            </div>
+            <ArtifactDetailsSheet
+              permission={{ kind: "profile", entity: profile ? { id: profile.id } : null }}
+              title={fullName || "Profile"}
+              activity={{
+                createdAt: profile?.createdAt ?? undefined,
+                updatedAt: profile?.updatedAt ?? undefined,
+                extra: lastActive
+                  ? [{ label: "Last active", value: lastActive }]
+                  : undefined,
+              }}
             />
           </div>
 

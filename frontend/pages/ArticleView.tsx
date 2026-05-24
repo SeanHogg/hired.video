@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/AppShell";
 import { articleService } from "@/lib/services/article-service";
+import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
+import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 
 interface ArticleData {
   id: string;
@@ -44,6 +46,12 @@ export default function ArticleView() {
     return () => { cancelled = true; };
   }, [authorSlug, slug, t]);
 
+  useArtifactViewTracking({
+    artifactKind: "article",
+    artifactId: article?.id ?? null,
+    ownerUserId: article?.author?.id ?? null,
+  });
+
   return (
     <AppShell bgClassName="bg-background">
 <div className="pt-16">
@@ -63,8 +71,26 @@ export default function ArticleView() {
                   <img src={article.coverImageUrl} alt="" className="w-full aspect-[16/9] object-cover rounded-lg mb-6" />
                 )}
                 <header className="space-y-3 mb-6">
-                  {article.category && <Badge variant="secondary">{article.category}</Badge>}
-                  <h1 className="text-3xl font-bold leading-tight">{article.title}</h1>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      {article.category && <Badge variant="secondary">{article.category}</Badge>}
+                      <h1 className="text-3xl font-bold leading-tight">{article.title}</h1>
+                    </div>
+                    <ArtifactDetailsSheet
+                      permission={{
+                        kind: "article",
+                        entity: { id: article.id, authorId: article.author.id },
+                      }}
+                      title={article.title}
+                      activity={{
+                        viewCount: article.viewCount,
+                        createdAt: article.publishedAt,
+                        extra: [
+                          { label: "Read time", value: `${article.readMinutes} min` },
+                        ],
+                      }}
+                    />
+                  </div>
                   {article.summary && <p className="text-lg text-muted-foreground">{article.summary}</p>}
                   <div className="flex items-center gap-3 text-sm text-muted-foreground pt-2 border-t">
                     <Link to={`/people/${article.author.slug}`} className="flex items-center gap-2 hover:underline">
