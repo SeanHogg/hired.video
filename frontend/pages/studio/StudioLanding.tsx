@@ -1,8 +1,10 @@
 /**
  * Studio landing page — the PowerPoint-style chooser shown to every
  * authenticated user at /studio. Two sections: templates (start a new
- * video from a preset) and "My videos" (resume a project). Clicking
- * either navigates to `/studio/:id`, where the editor opens.
+ * project from a preset) and "My projects" (resume an existing one —
+ * videos, podcasts, voice, animations, games, comics, images all live
+ * here post-#894). Clicking either navigates to `/studio/:id`, where
+ * the editor opens.
  *
  * The templates section is a horizontal scroller with arrow controls,
  * category pills, and an inline search field — see UnifiedTemplateCarousel
@@ -99,6 +101,12 @@ const EDITOR_FORWARDED_PARAMS = ["capture", "contentTemplate"] as const;
 // the canonical registries — no parallel pill arrays here.
 type UseForFilter = "all" | TemplateCategory | "created" | "purchased";
 type KindFilter = "all" | MediaKind;
+// "My projects" visibility filter — projects only carry `isPublic: boolean`
+// today, so a third "unlisted" option would require backend work (see
+// `studio_projects.isPublic` schema in studio-service.ts). Keep this
+// binary + "all" for now; expand here when the project visibility model
+// grows a third state.
+type VisibilityFilter = "all" | "public" | "private";
 
 // Normalised shape the owned-template surfaces consume so the card +
 // carousel renderers don't branch on "is this a creator-published row or
@@ -128,6 +136,10 @@ export default function StudioLanding() {
   // Two orthogonal filter axes — see UseForFilter / KindFilter above.
   const [useForFilter, setUseForFilter] = useState<UseForFilter>("all");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+  // "My projects" grid visibility filter — independent from the
+  // templates-section filters above (a published template isn't the
+  // same as a public project).
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
   // User's own published templates + claimed/purchased licensed templates.
   // Single source of truth feeding the unified Templates section — both
   // the "All" merged view and the dedicated Created/Purchased filters.
@@ -285,10 +297,19 @@ export default function StudioLanding() {
 
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
-    return [...projects].sort((a, b) =>
+    const filtered = projects.filter((p) => {
+      if (visibilityFilter === "public") return p.isPublic === true;
+      if (visibilityFilter === "private") return p.isPublic !== true;
+      return true;
+    });
+    return filtered.sort((a, b) =>
       b.updateDateTime.localeCompare(a.updateDateTime),
     );
-  }, [projects]);
+  }, [projects, visibilityFilter]);
+
+  // Total count BEFORE visibility filter applies — drives the "no
+  // matches" vs "no projects yet" branch in the empty state.
+  const totalProjectCount = projects?.length ?? 0;
 
   // Composed list of every template the user owns — their own published
   // rows plus their claimed/purchased licenses. Sorted by most-recent so
@@ -559,15 +580,42 @@ export default function StudioLanding() {
       </section>
 
       <section>
-        {/* My videos header — title + workspace switcher inline. The
+        {/* My projects header — title + workspace switcher inline. The
             switcher self-gates (returns null when the user has no
             companies / delegations to act through), so single-workspace
             users see a plain title. Selection persists across reloads
-            and is shared with the editor's sidebar control. */}
+            and is shared with the editor's sidebar control. Title is
+            "My projects" (was "My videos" pre-#894) because the studio
+            now hosts every media kind, not just video. */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-medium">My videos</h2>
+          <h2 className="text-lg font-medium">My projects</h2>
           <WorkspaceSwitcher />
         </div>
+        {/* Visibility axis — gates the grid below by `isPublic`. Reuses
+            the templates-section FilterPillRow so the visual matches
+            the Type / Use-for rows above. */}
+        <FilterPillRow
+          label="Visibility"
+          render={() => (
+            <>
+              <CategoryPill
+                label="All"
+                active={visibilityFilter === "all"}
+                onClick={() => setVisibilityFilter("all")}
+              />
+              <CategoryPill
+                label="Public"
+                active={visibilityFilter === "public"}
+                onClick={() => setVisibilityFilter("public")}
+              />
+              <CategoryPill
+                label="Private"
+                active={visibilityFilter === "private"}
+                onClick={() => setVisibilityFilter("private")}
+              />
+            </>
+          )}
+        />
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -581,10 +629,23 @@ export default function StudioLanding() {
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center">
             <Video className="h-10 w-10 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">No videos yet</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Pick a template above to get started.
-              </p>
+              {totalProjectCount === 0 ? (
+                <>
+                  <p className="text-sm font-medium">No projects yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pick a template above to get started.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">
+                    No {visibilityFilter} projects
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Switch the visibility filter or start a new project from a template above.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         ) : (

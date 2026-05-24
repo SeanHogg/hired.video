@@ -171,7 +171,28 @@ export default function Dashboard() {
       );
     }
 
-    return <DashboardWrapper>{getDashboardComponent()}</DashboardWrapper>;
+    return (
+      <DashboardWrapper>
+        {/* Tab strip — Activity (role-aware role dashboard) vs Content
+            (cross-artifact creator rollup per Gap Register #1019 L5).
+            Hidden for SuperAdmin since the Product Dashboard is its own
+            self-contained surface. */}
+        {!rolePermissions.isSuperAdmin && (
+          <div className="px-1">
+            <TabStrip<DashboardTab>
+              tabs={DASHBOARD_TABS}
+              activeKey={activeTab}
+              onChange={setActiveTab}
+            />
+          </div>
+        )}
+        {activeTab === "content" && !rolePermissions.isSuperAdmin ? (
+          <CreatorDashboard />
+        ) : (
+          getDashboardComponent()
+        )}
+      </DashboardWrapper>
+    );
   };
 
   // Shared layout component
@@ -272,4 +293,5 @@ export default function Dashboard() {
   }
 
   // Main dashboard render
-  return <PageLayout>{renderDashboardContent()}</Pag
+  return <PageLayout>{renderDashboardContent()}</PageLayout>;
+}

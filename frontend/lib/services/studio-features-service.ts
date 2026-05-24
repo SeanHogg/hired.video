@@ -205,29 +205,12 @@ export interface AsyncInterview {
   inviteUrl?: string;
 }
 
-export interface VideoAnalytics {
-  totalViews: number;
-  avgWatchTimeSec: number;
-  avgPercentWatched: number;
-  heatmap: number[];
-  topDropOffSecond: number | null;
-  viewers: Array<{
-    id: string;
-    email?: string;
-    company?: string;
-    lastViewed: string;
-    views: number;
-    avgPercent: number;
-  }>;
-  /** Traffic source breakdown derived from document.referrer captured
-   *  at view time. Bare hostnames; direct/in-app visits land under
-   *  "Direct". Sum equals totalViews. */
-  referrers: Array<{ source: string; views: number }>;
-  /** Country breakdown from Cloudflare's `cf-ipcountry` header captured
-   *  at view time. ISO-3166 alpha-2 codes; rows without a country land
-   *  under the "ZZ" sentinel ("Unknown"). Sum equals totalViews. */
-  countries: Array<{ country: string; views: number }>;
-}
+// VideoAnalytics + getVideoAnalytics removed — subsumed by the
+// polymorphic `GET /api/analytics/artifacts/video/:id` endpoint and
+// `fetchArtifactAnalytics` in artifact-view-service.ts (Gap Register
+// #1019 L3). The legacy `/api/studio/analytics/projects/:id` endpoint
+// stays mounted server-side during the bake window for any out-of-tree
+// consumer; remove it in a follow-up gap.
 
 // ─── TTS ────────────────────────────────────────────────────────────────────
 //
@@ -640,10 +623,7 @@ export async function trackVideoView(params: {
   });
 }
 
-export async function getVideoAnalytics(projectId: string): Promise<VideoAnalytics> {
-  const res = await apiClient.get<VideoAnalytics>(`/api/studio/analytics/projects/${projectId}`);
-  return res.data;
-}
+// getVideoAnalytics removed — see header note above the TTS section.
 
 // One-shot view + CTA-click counters keyed on the studio project. The
 // heatmap tracker (above) only fires on 30s tick / beforeunload / ended,
