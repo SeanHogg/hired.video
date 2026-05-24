@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import OAuthProviders from "@/components/OAuthProviders";
 import { LoginGate } from "@/components/security/RegisterGate";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { EmailField } from "@/components/auth/EmailField";
 import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
@@ -229,10 +230,13 @@ export default function Login() {
                         </div>
                       ) : (
                         <form onSubmit={handleMagicLink} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="magic-email">{t("fields.email.label")}</Label>
-                            <Input id="magic-email" type="email" placeholder={t("fields.email.placeholder")} value={email} onChange={(e) => setEmail(e.target.value)} required />
-                          </div>
+                          <EmailField
+                            id="magic-email"
+                            value={email}
+                            onChange={setEmail}
+                            label={t("fields.email.label")}
+                            placeholder={t("fields.email.placeholder")}
+                          />
                           <Button type="submit" className="w-full min-h-[44px]" disabled={magicLinkLoading}>
                             {magicLinkLoading ? t("status.sending") : t("actions.sendSignInLink")}
                           </Button>
@@ -240,10 +244,13 @@ export default function Login() {
                       )
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="email">{t("fields.email.label")}</Label>
-                          <Input id="email" type="email" placeholder={t("fields.email.placeholder")} value={email} onChange={(e) => setEmail(e.target.value)} required />
-                        </div>
+                        <EmailField
+                          id="email"
+                          value={email}
+                          onChange={setEmail}
+                          label={t("fields.email.label")}
+                          placeholder={t("fields.email.placeholder")}
+                        />
                         <div className="space-y-2">
                           <Label htmlFor="password">{t("fields.password.label")}</Label>
                           <div className="relative">

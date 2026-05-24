@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { EmailField } from "@/components/auth/EmailField";
 import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
@@ -152,13 +153,16 @@ export default function AffiliateProgram() {
                         <label className="text-sm font-medium">Last name</label>
                         <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" required />
                       </div>
-                      <div>
-                        <label className="text-sm font-medium">Email address</label>
-                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
-                      </div>
+                      <EmailField
+                        id="affiliate-email"
+                        value={email}
+                        onChange={setEmail}
+                        label="Email address"
+                        placeholder="you@example.com"
+                      />
                       <div>
                         <label className="text-sm font-medium">Password</label>
-                        <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                        <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
                         <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
                       </div>
                       {captcha.configured && (

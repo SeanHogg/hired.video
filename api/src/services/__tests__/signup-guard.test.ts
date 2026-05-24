@@ -16,7 +16,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
-import { validateSignupRequest } from "../auth/signupGuard.js";
+import { validateSignupRequest, noopBreachCheck } from "../auth/signupGuard.js";
 import type { CaptchaPort } from "../auth/AuthService.js";
 
 function makeDb() {
@@ -90,19 +90,33 @@ describe("validateSignupRequest — priority order", () => {
     assert.equal(result.reason, "DISPOSABLE_EMAIL");
   });
 
-  it("Captcha blocks when enforced and verify fails", async () => {
-    const { db } = makeDb();
+  it("Captcha is a SOFT signal — signup proceeds when verify fails (gap #1122)", async () => {
+    // Per #1122: a missing/invalid Turnstile token used to hard-block
+    // signup with TURNSTILE_FAIL. That soft-locked every real user when
+    // the frontend bundle was missing VITE_TURNSTILE_SITE_KEY (widget
+    // never renders → empty token → 400). New posture mirrors login:
+    // the bot_block_event still fires for the SuperAdmin globe, but
+    // signup proceeds. Email verification is the secondary check —
+    // bots without inbox access never activate the account.
+    const { db, state } = makeDb();
+    // noopBreachCheck so the post-captcha layers always say ok regardless
+    // of password — keeps the assertion focused on captcha behaviour.
     const result = await validateSignupRequest(
-      { db, captcha: failingCaptcha, endpoint: "register" },
+      { db, captcha: failingCaptcha, endpoint: "register", breachCheck: noopBreachCheck },
       {
-        email: "foo@gmail.com",
-        password: "hunter2",
+        email: "captcha-fail-test-" + Math.random().toString(36).slice(2) + "@gmail.com",
+        password: "L0ng-r4nd0m-pa55w0rd-" + Math.random().toString(36).slice(2),
         countryCode: "US",
       },
     );
-    // Note: MX may also fire on @gmail.com (real domain → passes).
-    // We assert one of the two early reasons hit, not the post-MX path.
-    assert.equal(result.reason, "TURNSTILE_FAIL");
+    assert.equal(result.ok, true, "signup proceeds despite captcha miss");
+    assert.deepEqual(result.softSignals, ["TURNSTILE_FAIL"], "soft signal surfaced to caller");
+    assert.equal(
+      (state as any).bot_block_events.length,
+      1,
+      "bot_block_event still recorded for SuperAdmin telemetry",
+    );
+    assert.equal((state as any).bot_block_events[0].reason, "TURNSTILE_FAIL");
   });
 
   it("Captcha is skipped when not enforced", async () => {

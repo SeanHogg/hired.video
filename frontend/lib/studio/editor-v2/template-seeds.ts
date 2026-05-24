@@ -1277,6 +1277,110 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
     ],
   }),
 
+  // ─── Social-video ad seeds (#1041 / `category: "ads"`) ───────────────
+  // Each opens the v2 editor with the canvas sized to the platform's
+  // official spec (pulled from `lib/studio/video-formats.ts`). Skeletal
+  // content — the user is expected to swap copy in. The marketing arc
+  // (hook → product → CTA) is the same one `product_promo` uses; the
+  // dimension is the differentiator. Display-ad seeds (mediaKind="image")
+  // live in `lib/studio/drawing/drawing-template-presets.ts` and don't
+  // need an entry here.
+  ad_social_reel_9x16: () => ({
+    ...emptyCanvasState({ width: 1080, height: 1920, fps: 30 }),
+    scenes: [
+      makeScene("Hook (3s)", "#0f172a", 3, [
+        makeHeading("Watch this →", { y: 0.32, align: "center", color: "#ffffff", fontPx: 64 }),
+        makeText("Stop the scroll in the first second.", {
+          y: 0.5, align: "center", fontPx: 28, color: "#fde68a", height: 0.1,
+        }),
+      ]),
+      makeScene("Reveal", "#1e1b4b", 6, [
+        makeHeading("Your product here.", { y: 0.3, align: "center", color: "#ffffff", fontPx: 56 }),
+        makeText("One sentence that says what it does.", {
+          y: 0.5, align: "center", fontPx: 24, color: "#e0e7ff", height: 0.2,
+        }),
+      ]),
+      makeScene("CTA", "#0f172a", 4, [
+        makeCta("Try it free", "Get started", "https://example.com", {
+          subheadline: "Link in bio · 60-sec setup",
+          bgColor: "#7c3aed",
+          textColor: "#ffffff",
+          accentColor: "#fde68a",
+          accentTextColor: "#1e1b4b",
+        }),
+      ]),
+    ],
+  }),
+
+  ad_meta_in_feed_4x5: () => ({
+    ...emptyCanvasState({ width: 1080, height: 1350, fps: 30 }),
+    scenes: [
+      makeScene("Hook", "#0f172a", 3, [
+        makeHeading("Here's the thing.", { y: 0.35, align: "center", color: "#ffffff", fontPx: 56 }),
+        makeText("Hook them in 3 seconds.", {
+          y: 0.55, align: "center", fontPx: 26, color: "#fde68a",
+        }),
+      ]),
+      makeScene("Product", "#1e293b", 6, [
+        makeHeading("Meet [Product].", { y: 0.2, align: "center", color: "#ffffff", fontPx: 52 }),
+        makeText("One value claim. One image. One reason to care.", {
+          y: 0.45, align: "center", fontPx: 24, color: "#e2e8f0", height: 0.2,
+        }),
+      ]),
+      makeScene("CTA", "#0f172a", 4, [
+        makeCta("Shop now", "Get yours", "https://example.com", {
+          subheadline: "Free shipping · 30-day returns",
+          bgColor: "#7c3aed",
+          textColor: "#ffffff",
+          accentColor: "#fde68a",
+          accentTextColor: "#1e1b4b",
+        }),
+      ]),
+    ],
+  }),
+
+  ad_pinterest_pin_2x3: () => ({
+    ...emptyCanvasState({ width: 1000, height: 1500, fps: 30 }),
+    scenes: [
+      makeScene("Pin", "#0f172a", 6, [
+        makeHeading("Big bold headline.", { y: 0.06, align: "center", color: "#ffffff", fontPx: 60, height: 0.18 }),
+        makeText("Hero image goes here.", {
+          y: 0.42, align: "center", fontPx: 22, color: "#cbd5e1",
+        }),
+        makeText("Save for later → tap to learn more.", {
+          y: 0.86, align: "center", fontPx: 22, color: "#fde68a", height: 0.1,
+        }),
+      ]),
+    ],
+  }),
+
+  ad_youtube_bumper_6s: () => ({
+    ...emptyCanvasState({ width: 1920, height: 1080, fps: 30 }),
+    scenes: [
+      makeScene("One beat", "#1e1b4b", 6, [
+        makeHeading("One product. One CTA.", { y: 0.3, align: "center", color: "#ffffff", fontPx: 72 }),
+        makeText("6 seconds, no skip — make every frame count.", {
+          y: 0.55, align: "center", fontPx: 28, color: "#fde68a",
+        }),
+        makeText("[Brand] · example.com", {
+          y: 0.78, align: "center", fontPx: 22, color: "#cbd5e1",
+        }),
+      ]),
+    ],
+  }),
+
+  ad_outdoor_billboard_4x1: () => ({
+    ...emptyCanvasState({ width: 1920, height: 480, fps: 30 }),
+    scenes: [
+      makeScene("Billboard", "#7c3aed", 6, [
+        makeHeading("Five words. Tops.", { y: 0.18, align: "center", color: "#ffffff", fontPx: 96, height: 0.5 }),
+        makeText("[Brand] · short.url", {
+          y: 0.72, align: "center", fontPx: 32, color: "#fde68a",
+        }),
+      ]),
+    ],
+  }),
+
   // ─── Comic genre seeds (#894 / mediaKind === "comic") ─────────────────
   // One seed per genre, all built from the shared `comicSeedFor()` helper.
   // The helper reads the genre's palette + stock assets + narrative beats

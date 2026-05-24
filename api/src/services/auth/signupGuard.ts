@@ -69,6 +69,50 @@ export interface ValidateSignupResult {
   ok: boolean;
   reason?: SignupBlockReason;
   message?: string;
+  /** Non-blocking signals raised during validation — recorded as
+   *  bot_block_events for the SuperAdmin globe + telemetry, but the
+   *  signup is allowed to proceed. The handler logs these on the
+   *  register loginEvent so postmortems can correlate. Today: only
+   *  TURNSTILE_FAIL is treated as a soft signal — see #1122 for the
+   *  rationale (config-mismatched frontend would otherwise soft-lock
+   *  every real signup with no recovery; email-verification is the
+   *  secondary check that catches bots without inbox access). */
+  softSignals?: SignupBlockReason[];
+}
+
+/**
+ * captchaSoftCheck — shared between handleLogin and validateSignupRequest.
+ * Returns `passed` indicating whether the user's Turnstile token was
+ * valid; ALSO writes a bot_block_events row on miss so the SuperAdmin
+ * globe lights up identically whether the caller treats the result as a
+ * soft signal (signup) or escalates to email-OTP (login).
+ *
+ * DRY anchor: login + signup were doing the same record-then-branch
+ * dance with subtly different field names — both consumers now share
+ * this helper so the bot-block telemetry shape stays consistent.
+ */
+export async function captchaSoftCheck(args: {
+  db: any;
+  captcha: CaptchaPort;
+  endpoint: string;
+  token: string | null;
+  countryCode: string | null;
+  ipAddress: string | null;
+  email: string | null;
+}): Promise<boolean> {
+  if (!args.captcha.enforced) return true;
+  const passed = await args.captcha.verify(args.token, args.ipAddress);
+  if (!passed) {
+    await recordBotBlock({
+      db: args.db,
+      endpoint: args.endpoint,
+      reason: "TURNSTILE_FAIL",
+      countryCode: args.countryCode,
+      ipAddress: args.ipAddress,
+      email: args.email,
+    });
+  }
+  return passed;
 }
 
 export async function validateSignupRequest(
@@ -109,12 +153,24 @@ export async function validateSignupRequest(
     return block("DISPOSABLE_EMAIL", "Please use a permanent email address.");
   }
 
-  if (deps.captcha.enforced) {
-    const passed = await deps.captcha.verify(req.cfTurnstileToken ?? null, req.ipAddress ?? null);
-    if (!passed) {
-      return block("TURNSTILE_FAIL", "Captcha verification failed. Please retry.");
-    }
-  }
+  // Captcha is a SOFT signal on signup (gap #1122): a missing token (the
+  // frontend bundle has no VITE_TURNSTILE_SITE_KEY → widget never renders
+  // → empty token) or a replay/expiry was previously a 400 TURNSTILE_FAIL
+  // that left the user with no recovery path. Email-verification is the
+  // secondary check — bots without inbox access never activate the
+  // account they registered for. Mirrors login's posture (see handleLogin
+  // captchaFailed → email-OTP step-up). The bot_block_event still fires
+  // for SuperAdmin globe telemetry.
+  const captchaPassed = await captchaSoftCheck({
+    db: deps.db,
+    captcha: deps.captcha,
+    endpoint: deps.endpoint,
+    token: req.cfTurnstileToken ?? null,
+    countryCode: req.countryCode ?? null,
+    ipAddress: req.ipAddress ?? null,
+    email: req.email,
+  });
+  const softSignals: SignupBlockReason[] = captchaPassed ? [] : ["TURNSTILE_FAIL"];
 
   const mx = deps.mxCheck ?? realMxCheck;
   const mxOk = await mx.verify(req.email);
@@ -133,5 +189,5 @@ export async function validateSignupRequest(
     );
   }
 
-  return { ok: true };
+  return softSignals.length > 0 ? { ok: true, softSignals } : { ok: true };
 }

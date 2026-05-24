@@ -2,7 +2,6 @@ import {
   Eye,
   EyeOff,
   User,
-  Mail,
   Lock,
   Users,
   Briefcase,
@@ -15,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { EmailField } from "@/components/auth/EmailField";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -278,21 +278,14 @@ export default function Signup() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t("fields.email.label")}</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder={t("fields.email.placeholder")}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
+                  <EmailField
+                    id="email"
+                    value={email}
+                    onChange={setEmail}
+                    label={t("fields.email.label")}
+                    placeholder={t("fields.email.placeholder")}
+                    withIcon
+                  />
 
                   {/* Persona selection */}
                   <div className="space-y-2">

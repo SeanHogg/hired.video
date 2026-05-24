@@ -357,6 +357,41 @@ describe("handleRegister", () => {
     });
     assert.equal((result.body as any).data.verificationToken, undefined);
   });
+
+  it("treats a captcha miss as a SOFT signal — signup still succeeds, bot signal still recorded (gap #1122)", async () => {
+    // Per #1122: when TURNSTILE_SECRET_KEY is set on the backend but the
+    // frontend bundle has no VITE_TURNSTILE_SITE_KEY (or the user's
+    // token is replayed/expired), the captcha check used to hard-fail
+    // with 400 TURNSTILE_FAIL. That soft-locked every real user with no
+    // recovery path. New posture mirrors login: account is created,
+    // bot_block_event records the signal for the SuperAdmin globe, and
+    // email-verification is the secondary check that catches bots
+    // without inbox access.
+    const deps = makeDeps();
+    deps.captcha = { enforced: true, verify: async () => false };
+    const result = await handleRegister(deps, {
+      email: "soft-captcha@example.com",
+      password: "password123",
+      name: "Soft Captcha",
+    });
+    assert.equal(result.status, 201, "signup proceeds despite captcha miss");
+    assert.equal((result.body as any).data.requiresEmailVerification, true);
+    assert.equal(deps._state.users.length, 1, "user row was inserted");
+    assert.equal(deps._state.emailVerificationTokens.length, 1, "verification token was issued");
+    assert.equal(deps._email.calls.filter((c) => c.name === "sendVerification").length, 1);
+    assert.ok(
+      (deps._state.bot_block_events ?? []).some((e: any) => e.reason === "TURNSTILE_FAIL"),
+      "bot_block_event written so the SuperAdmin globe still lights up",
+    );
+    // The register loginEvent records the soft signal so postmortems
+    // can correlate the bot_block_events row to the created account.
+    assert.ok(
+      (deps._state.loginEvents ?? []).some(
+        (e: any) => e.kind === "register" && e.success === true && e.failureReason?.startsWith("soft:"),
+      ),
+      "register loginEvent annotated with the soft signal",
+    );
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

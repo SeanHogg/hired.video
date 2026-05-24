@@ -120,25 +120,58 @@ export type ContentTemplate =
   | "animation-logo-loop"
   | "animation-spinner"
   | "animation-reaction"
-  | "animation-explainer";
+  | "animation-explainer"
+  // ─── IAB display ad templates (#1041) ─────────────────────────────────
+  // mediaKind === "image" — each opens DrawingStage seeded at the IAB
+  // banner's official dimensions. Sizes pulled from `video-formats.ts`
+  // FormatCategory === "display-ad". Covers the eight units that trade
+  // ~80% of programmatic + GDN inventory in 2026; the full IAB New Ad
+  // Portfolio remains roadmap (#1042).
+  | "ad_iab_mpu_300x250"
+  | "ad_iab_large_rect_336x280"
+  | "ad_iab_leaderboard_728x90"
+  | "ad_iab_half_page_300x600"
+  | "ad_iab_skyscraper_160x600"
+  | "ad_iab_billboard_970x250"
+  | "ad_iab_mobile_banner_320x50"
+  | "ad_iab_large_mobile_320x100"
+  | "ad_og_link_card_1200x630"
+  // ─── Social-video ad templates (#1041) ────────────────────────────────
+  // mediaKind === "video" — each opens StudioEditorV2 with the canvas
+  // sized to the platform's recommended ad spec from `video-formats.ts`
+  // FormatCategory === "social-feed" / "social-story" / "broadcast".
+  | "ad_social_reel_9x16"
+  | "ad_meta_in_feed_4x5"
+  | "ad_pinterest_pin_2x3"
+  | "ad_youtube_bumper_6s"
+  | "ad_outdoor_billboard_4x1";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
  *  "film" pill clusters Director / Actor surfaces (self-tapes, monologues,
  *  showreels, director pitches, casting calls) so the demographic finds
- *  its templates in one place. */
+ *  its templates in one place. The "ads" pill clusters every paid-media
+ *  format (IAB display banners, social-video ad specs, outdoor) so a
+ *  performance marketer finds the ad inventory in one click without
+ *  scrolling past every personal-brand / hiring template. */
 export type TemplateCategory =
   | "promote"
   | "showcase"
   | "hiring"
   | "quick"
   | "film"
-  | "comic";
+  | "comic"
+  | "ads";
 
 export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: "promote", label: "Promote Yourself" },
   { id: "showcase", label: "Showcase Work" },
   { id: "hiring", label: "Hiring" },
+  // Paid-media bucket (#1041). Surfaces IAB display banners + social-
+  // video ad specs + outdoor/CTV formats in one place. Templates here
+  // are sized to the platform's official spec from
+  // `lib/studio/video-formats.ts` (single source of truth).
+  { id: "ads", label: "Ads & Banners" },
   { id: "film", label: "Film & Acting" },
   // Comic mediaKind (#894). Twelve genre templates live in this bucket so
   // the landing page can surface the whole comic shelf with one click.
@@ -836,6 +869,226 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     audiences: ["animator", "creator", "educator", "designer"],
     defaultName: "Explainer loop",
     defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+
+  // ─── Advertising templates (#1041 / `category: "ads"`) ────────────────
+  // Single bucket for every paid-media format the studio supports —
+  // display banners (mediaKind="image"), social-video ad specs
+  // (mediaKind="video"), and outdoor/CTV. Each canvas size is pulled
+  // from the SSoT in `lib/studio/video-formats.ts` (IAB units +
+  // `FormatCategory === "social-feed" / "social-story" / "outdoor"`).
+  // For display banners the editor mounts `<DrawingStage>` seeded via
+  // `DRAWING_TEMPLATE_PRESETS`; for social videos it mounts the v2
+  // Timeline editor seeded via `template-seeds.ts`.
+  {
+    id: "ad_iab_mpu_300x250",
+    label: "IAB Medium Rectangle 300×250",
+    desc: "MPU — the most-bought IAB unit. Sidebar + in-article placement.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter", "creator"],
+    defaultName: "MPU 300×250 banner",
+    defaultPrompt: "Design a 300×250 IAB Medium Rectangle banner: a tight headline, a single product/value claim, a clear button-shaped CTA.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_large_rect_336x280",
+    label: "IAB Large Rectangle 336×280",
+    desc: "Slightly larger than the MPU — more headline room, same intent.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Large Rectangle 336×280 banner",
+    defaultPrompt: "Design a 336×280 IAB Large Rectangle banner — headline, supporting line, accent colour and a CTA.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_leaderboard_728x90",
+    label: "IAB Leaderboard 728×90",
+    desc: "Top-of-page horizontal banner — wide, short, single-line message.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Leaderboard 728×90 banner",
+    defaultPrompt: "Design a 728×90 IAB Leaderboard: brand mark on the left, single-line headline + CTA on the right. Avoid stacking lines — the unit is 90px tall.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_half_page_300x600",
+    label: "IAB Half-Page 300×600",
+    desc: "Tall sidebar — high-impact desktop unit with room for storytelling.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Half-Page 300×600 banner",
+    defaultPrompt: "Design a 300×600 IAB Half-Page banner: top hero image, mid-block value props, bottom CTA. The format gives you room for 3 layers — use them.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_skyscraper_160x600",
+    label: "IAB Wide Skyscraper 160×600",
+    desc: "Side-rail vertical — narrow column, stacked content top → bottom.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Skyscraper 160×600 banner",
+    defaultPrompt: "Design a 160×600 IAB Wide Skyscraper: brand mark top, vertical headline stack, CTA pinned bottom. Width is only 160px — single-column layout only.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_billboard_970x250",
+    label: "IAB Billboard 970×250",
+    desc: "Top-of-page hero on premium publishers — wide, tall, maximum impact.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Billboard 970×250 banner",
+    defaultPrompt: "Design a 970×250 IAB Billboard: hero visual on the left, large headline + CTA on the right. Premium publisher inventory — design to that standard.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_mobile_banner_320x50",
+    label: "IAB Mobile Banner 320×50",
+    desc: "Sticky bottom-of-screen mobile banner — one line, one CTA.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Mobile banner 320×50",
+    defaultPrompt: "Design a 320×50 IAB Mobile Banner: brand mark + single-line headline + CTA. Tap-target the whole unit; keep type ≥16px so it's legible on phones.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_iab_large_mobile_320x100",
+    label: "IAB Large Mobile 320×100",
+    desc: "Mobile in-feed — twice the height of the sticky, room for a headline + supporting line.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "employer", "recruiter"],
+    defaultName: "Large Mobile 320×100",
+    defaultPrompt: "Design a 320×100 IAB Large Mobile Banner: brand mark, headline, supporting line, CTA chip. Two horizontal lines max.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_og_link_card_1200x630",
+    label: "Link-share card 1200×630",
+    desc: "Open Graph preview card — the thumbnail LinkedIn / FB / X scrape from your URL.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "ads",
+    mediaKind: "image",
+    audiences: ["designer", "founder", "creator", "developer"],
+    defaultName: "Link-share card",
+    defaultPrompt: "Design a 1200×630 Open Graph card: bold title, brand mark, supporting glyph, brand palette. Centre the type — some platforms crop the edges.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_social_reel_9x16",
+    label: "Reels / TikTok / Shorts ad",
+    desc: "Vertical 1080×1920 ad spec — full-screen mobile, sound-on hook in 3s.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "product_launch",
+    category: "ads",
+    mediaKind: "video",
+    audiences: ["creator", "founder", "employer", "recruiter", "podcaster"],
+    defaultName: "Reels / TikTok ad",
+    defaultPrompt: "Create a 15-second vertical 9:16 ad for Reels / TikTok / Shorts: hook in the first 3 seconds (sound-on), product reveal, social proof, clear CTA. Keep titles inside the platform-UI safe zone (caption + action rail).",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_meta_in_feed_4x5",
+    label: "Meta In-Feed 4:5 ad",
+    desc: "1080×1350 portrait — Meta's 2026 gold-standard in-feed ad spec.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "product_launch",
+    category: "ads",
+    mediaKind: "video",
+    audiences: ["creator", "founder", "employer", "recruiter"],
+    defaultName: "Meta In-Feed ad",
+    defaultPrompt: "Create a 1080×1350 4:5 video ad for Meta in-feed placement: hook in 3s, product/value claim, two proof beats, end-card CTA. Designed to fill more of the feed than 1:1.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_pinterest_pin_2x3",
+    label: "Pinterest Pin (2:3)",
+    desc: "1000×1500 video Pin — top-of-pin hook, large text, vertical layout.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "product_launch",
+    category: "ads",
+    mediaKind: "video",
+    audiences: ["creator", "designer", "founder"],
+    defaultName: "Pinterest Pin",
+    defaultPrompt: "Design a 1000×1500 vertical Pinterest Pin: large headline at top, product image centre, value-add line bottom. Optimised for the 2:3 Pin format.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_youtube_bumper_6s",
+    label: "YouTube Bumper (6s)",
+    desc: "Non-skippable 6-second 16:9 ad — one beat, one CTA, that's it.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "product_launch",
+    category: "ads",
+    mediaKind: "video",
+    audiences: ["creator", "founder", "employer", "recruiter"],
+    defaultName: "YouTube bumper ad",
+    defaultPrompt: "Create a 6-second 16:9 YouTube bumper ad: one product beat, one CTA. No build-up — the format is too short for a setup-payoff structure.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "ad_outdoor_billboard_4x1",
+    label: "Outdoor billboard (4:1)",
+    desc: "1920×480 — roadside / digital-signage spec. 5-word rule.",
+    icon: Megaphone,
+    importMode: "none",
+    purpose: "product_launch",
+    category: "ads",
+    mediaKind: "video",
+    audiences: ["designer", "founder", "employer"],
+    defaultName: "Outdoor billboard",
+    defaultPrompt: "Design a 1920×480 outdoor billboard: ≤5 words headline, brand mark, single image. Read time is 2 seconds at 60 km/h — strip everything that doesn't earn its pixel.",
     firstTabLabel: "Setup",
     IntakeForm: BasicIntake,
   },

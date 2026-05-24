@@ -12,8 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { EmailField } from "@/components/auth/EmailField";
 import { useSEO } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
 
@@ -143,18 +142,14 @@ export default function ForgotPassword() {
                     </Alert>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t("fields.email.label")}</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder={t("fields.email.placeholder")}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={loading}
-                      required
-                    />
-                  </div>
+                  <EmailField
+                    id="email"
+                    value={email}
+                    onChange={setEmail}
+                    label={t("fields.email.label")}
+                    placeholder={t("fields.email.placeholder")}
+                    disabled={loading}
+                  />
 
                   <Button type="submit" className="w-full min-h-[44px]" disabled={loading}>
                     {loading ? (

@@ -9,6 +9,7 @@ import {
 } from "../services/auth/AuthService.js";
 import { buildAuthDeps } from "../services/auth/deps.js";
 import { createSession } from "../services/auth/sessions.js";
+import { captchaSoftCheck } from "../services/auth/signupGuard.js";
 import {
   requestEmailChange,
   confirmCurrent as confirmEmailChangeCurrent,
@@ -208,6 +209,12 @@ export const RegisterSchema = z.object({
 
 export const ForgotPasswordSchema = z.object({
   email: z.string().email(),
+  // Cloudflare Turnstile token. Optional at the schema level so tests /
+  // dev don't have to set up Turnstile, but the handler treats a miss
+  // as a SOFT signal (records bot_block_event, proceeds with the
+  // always-200-no-enumeration response) per the visible-widget posture
+  // on every unauthenticated entry form.
+  cfTurnstileToken: z.string().optional(),
 });
 
 export const ResetPasswordSchema = z.object({
@@ -554,14 +561,25 @@ authRoutes.post("/resend-email-verification", async (c) => {
 authRoutes.post("/magic-link", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
+  const cfTurnstileToken = typeof body.cfTurnstileToken === "string" ? body.cfTurnstileToken : null;
   const redirect = typeof body.redirect === "string" ? body.redirect : "/dashboard";
   if (!email) return c.json(error("VALIDATION_ERROR", "email is required"), 400);
 
-  // No captcha gate here on purpose. This endpoint is the documented
-  // escape hatch from a TURNSTILE_FAIL on /login (see Login.tsx) — if a
-  // user can't solve the challenge, mailing them a one-shot link is the
-  // recovery path. authWriteRateLimiterMiddleware (20/10min/IP) is the
-  // abuse cap; per-email guards belong in [[project_emailRateLimit]].
+  // Captcha — visible widget on every unauthenticated entry form. Treated
+  // as a SOFT signal here: the always-200-no-enumeration response stays
+  // identical, but the SuperAdmin globe lights up on a miss. Bots without
+  // inbox access can't consume the link they trigger. authWriteRateLimiter
+  // (20/10min/IP) is the abuse cap on top.
+  const deps = buildAuthDeps(c);
+  await captchaSoftCheck({
+    db: deps.db,
+    captcha: deps.captcha,
+    endpoint: "magic-link",
+    token: cfTurnstileToken,
+    countryCode: deps.ipCountry,
+    ipAddress: deps.clientIp,
+    email,
+  });
 
   const db = getDb();
   const [user] = await db

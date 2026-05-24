@@ -43,7 +43,7 @@ import {
 } from "../../routes/auth.js";
 import { createSession, bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
 import { isAccountLocked } from "./lock.js";
-import { validateSignupRequest } from "./signupGuard.js";
+import { validateSignupRequest, captchaSoftCheck } from "./signupGuard.js";
 import { recordBotBlock } from "./botBlock.js";
 import { recordFailedLogin } from "./bruteForce.js";
 import { scoreLoginRisk } from "./risk.js";
@@ -248,6 +248,22 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       : 400;
     return fail(status, guard.reason ?? "SIGNUP_BLOCKED", guard.message ?? "Signup blocked");
   }
+  // Soft signals fired during validation (today: TURNSTILE_FAIL on
+  // missing/invalid token — #1122). The signup still proceeds, but we
+  // log the signal on the register event so postmortems can correlate
+  // the bot_block_events row to a specific account creation. Email
+  // verification is required (line below) — bots without inbox access
+  // never activate the account.
+  if (guard.softSignals && guard.softSignals.length > 0) {
+    await recordLoginEvent(deps, {
+      userId: null,
+      email,
+      kind: "register",
+      provider: "password",
+      success: true,
+      failureReason: `soft:${guard.softSignals.join(",")}`,
+    });
+  }
 
   const existing = await deps.db
     .select({ id: users.id })
@@ -379,24 +395,18 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
   // inbox and proceeds; a bot without mailbox access stalls at the
   // second factor. Skipped entirely when no TURNSTILE_SECRET_KEY is
   // set (`enforced=false`).
-  let captchaFailed = false;
-  if (deps.captcha.enforced) {
-    const passed = await deps.captcha.verify(
-      parsed.data.cfTurnstileToken ?? null,
-      deps.clientIp,
-    );
-    if (!passed) {
-      captchaFailed = true;
-      await recordBotBlock({
-        db: deps.db,
-        endpoint: "login",
-        reason: "TURNSTILE_FAIL",
-        countryCode: deps.ipCountry,
-        ipAddress: deps.clientIp,
-        email: attemptedEmail,
-      });
-    }
-  }
+  // Shared helper — same record-then-branch dance as signup (#1122),
+  // so the bot_block_events shape stays consistent across both endpoints.
+  const captchaPassed = await captchaSoftCheck({
+    db: deps.db,
+    captcha: deps.captcha,
+    endpoint: "login",
+    token: parsed.data.cfTurnstileToken ?? null,
+    countryCode: deps.ipCountry,
+    ipAddress: deps.clientIp,
+    email: attemptedEmail,
+  });
+  const captchaFailed = !captchaPassed;
 
   const [user] = await deps.db
     .select()
@@ -572,6 +582,21 @@ export async function handleForgotPassword(deps: AuthDeps, body: unknown): Promi
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid request body");
   }
+
+  // Captcha runs as a SOFT signal — the SuperAdmin globe lights up on
+  // a miss, but the always-200-no-enumeration response shape stays
+  // identical so attackers can't probe captcha state to learn whether
+  // an email has an account. Bots without inbox access still can't
+  // consume the reset link.
+  await captchaSoftCheck({
+    db: deps.db,
+    captcha: deps.captcha,
+    endpoint: "forgot-password",
+    token: parsed.data.cfTurnstileToken ?? null,
+    countryCode: deps.ipCountry,
+    ipAddress: deps.clientIp,
+    email: parsed.data.email,
+  });
 
   const [user] = await deps.db
     .select({ id: users.id, email: users.email, name: users.name })

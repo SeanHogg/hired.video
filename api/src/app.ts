@@ -201,6 +201,13 @@ export function createApp() {
     // `/marketplace/voices/:id` share-link landing page for unauthenticated
     // viewers. Returns the SAFE projection only (no sampleAudioUrl).
     "/api/studio/voice-clones/public",
+    // Studio template marketplace — visibility='public' listings shown on
+    // the /studio landing page and the per-creator listing pages. Handlers
+    // at studio-templates.ts are explicitly anonymous ("No auth: anonymous
+    // browsers + logged-in users both see the same set, which is what makes
+    // the marketplace a marketplace") — gap #1121.
+    "/api/studio/templates/public",
+    "/api/studio/templates/listing",
     "/api/users/check-slug",
     "/api/resume/roast",
     "/api/og",
