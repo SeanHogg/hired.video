@@ -40,14 +40,17 @@ import {
   deleteSprite,
   setStartLevel,
   updateAction,
+  updateGamePhysics,
   updateGameSettings,
   updateLevel,
   updateRuleTrigger,
   updateSprite,
   updateSpriteAnimation,
   updateSpriteParam,
+  updateSpritePhysics,
   type Behavior,
 } from "@/lib/studio/game/game-state-edit";
+import type { GameSpritePhysics } from "@shared/game-state";
 import {
   BUILTIN_SPRITES,
   pickBuiltinSprite,
@@ -236,6 +239,57 @@ function GameSettingsInspector({
             <option key={l.id} value={l.id}>{l.label}</option>
           ))}
         </select>
+      </Section>
+
+      {/* Physics (#1009) — opt-in. Enabling turns on the gravity +
+          collision solver in `runtime-core.js`'s stepPhysics; sprites
+          opt into being affected via the SpriteInspector's Physics
+          section. */}
+      <Section label="Physics">
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={!!gameState.physics}
+            onChange={(e) =>
+              onChange(
+                updateGamePhysics(
+                  gameState,
+                  e.target.checked ? { gravity: 1200, friction: 0.1 } : undefined,
+                ),
+              )
+            }
+            className="h-4 w-4 accent-fuchsia-500"
+          />
+          <span>Enable physics (gravity + collisions)</span>
+        </label>
+        {gameState.physics && (
+          <>
+            <Field label="Gravity">
+              <NumberInput
+                value={gameState.physics.gravity}
+                onChange={(v) => onChange(updateGamePhysics(gameState, { gravity: v, friction: gameState.physics!.friction }))}
+                min={0}
+                max={5000}
+                step={50}
+              />
+            </Field>
+            <Field label="Friction">
+              <NumberInput
+                value={gameState.physics.friction}
+                onChange={(v) => onChange(updateGamePhysics(gameState, { gravity: gameState.physics!.gravity, friction: Math.max(0, Math.min(1, v)) }))}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+            </Field>
+            <p className="text-[10px] text-muted-foreground">
+              Sprites are kinematic by default — set a sprite's body kind to
+              <code className="mx-1 rounded bg-slate-100 px-1">dynamic</code>
+              or <code className="rounded bg-slate-100 px-1">static</code> in
+              the sprite inspector to make them participate.
+            </p>
+          </>
+        )}
       </Section>
 
       <Section label="Stats">
@@ -478,6 +532,20 @@ function SpriteInspector({
           }
         />
       </Section>
+
+      {/* Physics (#1009) — per-sprite body kind opt-in. Only visible
+          when project-level physics is enabled (mirrors the "shared
+          component decides its own visibility" DRY rule). */}
+      {gameState.physics && (
+        <Section label="Physics">
+          <SpritePhysicsForm
+            physics={sprite.physics ?? null}
+            onChange={(next) =>
+              onChange(updateSpritePhysics(gameState, levelId, sprite.id, next))
+            }
+          />
+        </Section>
+      )}
 
       <Section label="Block scripts">
         <ScriptsEditor
@@ -722,6 +790,84 @@ function AnimationForm({
             </select>
           </Field>
         </>
+      )}
+    </div>
+  );
+}
+
+// ─── Per-sprite physics opt-in form (#1009) ────────────────────────────────
+
+/** Sprite physics inspector — body-kind picker + mass + restitution
+ *  fields. Visibility is gated by GameState.physics being enabled
+ *  (parent toggles via the project-level Physics section). Per the DRY
+ *  rule the form decides what to render based on the `physics` shape
+ *  the caller hands it — no extra `enabled` boolean is prop-drilled. */
+function SpritePhysicsForm({
+  physics,
+  onChange,
+}: {
+  physics: GameSpritePhysics | null;
+  onChange: (next: GameSpritePhysics | undefined) => void;
+}) {
+  const kind = physics?.kind ?? "kinematic";
+  const mass = physics?.mass ?? 1;
+  const restitution = physics?.restitution ?? 0;
+  return (
+    <div className="space-y-1.5 rounded border border-border bg-muted/30 px-2 py-2">
+      <Field label="Body kind">
+        <select
+          value={kind}
+          onChange={(e) => {
+            const next = e.target.value as GameSpritePhysics["kind"];
+            // "kinematic" is the default no-op — clear the field so
+            // the saved data stays compact for the common case.
+            if (next === "kinematic" && !physics) {
+              onChange(undefined);
+            } else {
+              onChange({ kind: next, mass, restitution });
+            }
+          }}
+          className="h-7 rounded border border-border bg-background px-1 text-xs"
+        >
+          <option value="kinematic">Kinematic (default — moved by scripts)</option>
+          <option value="static">Static (immovable platform)</option>
+          <option value="dynamic">Dynamic (falls, bounces, collides)</option>
+        </select>
+      </Field>
+      {kind === "dynamic" && (
+        <>
+          <Field label="Mass">
+            <NumberInput
+              value={mass}
+              onChange={(v) =>
+                onChange({ kind, mass: Math.max(0.1, v), restitution })
+              }
+              min={0.1}
+              max={100}
+              step={0.1}
+            />
+          </Field>
+          <Field label="Bounciness">
+            <NumberInput
+              value={restitution}
+              onChange={(v) =>
+                onChange({ kind, mass, restitution: Math.max(0, Math.min(1, v)) })
+              }
+              min={0}
+              max={1}
+              step={0.05}
+            />
+          </Field>
+        </>
+      )}
+      {physics && (
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+        >
+          Clear physics
+        </button>
       )}
     </div>
   );

@@ -558,6 +558,7 @@ export default function JobCreatePage() {
 
   return (
     <EntityEditShell
+      hubEntity="job"
       parent={{ label: "Jobs", to: "/jobs", icon: Briefcase }}
       entity={{}}
       accessDenied={accessDenied}

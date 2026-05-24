@@ -26,6 +26,7 @@ export default function CompanyCreatePage() {
 
   return (
     <EntityEditShell
+      hubEntity="company"
       parent={{ label: "Companies", to: "/companies", icon: Building2 }}
       entity={{}}
       leafLabel="Create"

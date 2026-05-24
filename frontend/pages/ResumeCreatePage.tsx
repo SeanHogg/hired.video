@@ -51,6 +51,7 @@ export default function ResumeCreatePage() {
 
   return (
     <EntityEditShell
+      hubEntity="resume"
       parent={{ label: "Resumes", to: "/resumes", icon: FileText }}
       entity={{}}
       leafLabel="Create"

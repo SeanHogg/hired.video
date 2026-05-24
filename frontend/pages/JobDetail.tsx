@@ -35,6 +35,7 @@ import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import { Briefcase } from "lucide-react";
 import { jobPipelineService } from "@/lib/services/job-pipeline-service";
 import { useSEO, generateStructuredData } from "@/lib/seo";
@@ -277,6 +278,9 @@ export default function JobDetail() {
             <AuthOverlay contentType="job" title={job?.data.title} />
           )}
           <div className="max-w-6xl mx-auto p-4 md:p-6">
+            {/* Hub-level tab strip — keeps the Jobs / Saved / Applications
+                / Alerts / My Postings / Candidates context visible. */}
+            {isAuthenticated && <EntityHubTabStrip entity="job" />}
             <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} />
 
             {section === "candidates" ? (

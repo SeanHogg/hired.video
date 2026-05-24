@@ -106,13 +106,25 @@ import GamePropertiesPanel, {
 } from "@/components/studio/game/GamePropertiesPanel";
 import { updateSprite as gameUpdateSprite } from "@/lib/studio/game/game-state-edit";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
+import AnimationStage from "@/components/studio/animation/AnimationStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
+import { type AnimationState, createBlankAnimationState } from "@shared/animation-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
+import { seedAnimationFromTemplate } from "@/lib/studio/animation/animation-seeds";
 import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
 import DrawingToolPalette from "@/components/studio/drawing/DrawingToolPalette";
 import DrawingAiPromptPanel from "@/components/studio/drawing/DrawingAiPromptPanel";
-import { flattenCanvasToBlob, drawBlobToCanvasFit } from "@/lib/studio/drawing/drawing-engine";
+import {
+  clearRectOnLayer,
+  drawBlobToCanvasFit,
+  fillRectOnLayer,
+  flattenCanvasToBlob,
+  hydrateLayerCanvas,
+  serializeLayer,
+  createOffscreenCanvas,
+} from "@/lib/studio/drawing/drawing-engine";
+import type { MarqueeRect } from "@/components/studio/drawing/DrawingStage";
 import {
   DEFAULT_BRUSH,
   MAX_RECENT_COLORS,
@@ -328,6 +340,18 @@ export default function StudioEditorV2() {
   // mounts `<DrawingStage/>` only when this flag is true to avoid a
   // flash of the blank canvas before the persisted project loads.
   const [imageStateHydrated, setImageStateHydrated] = useState(false);
+  // Animation runtime state — same parallel-history pattern as
+  // imageHistory above. The history wrapper is mounted unconditionally
+  // (DRY: same `useCanvasHistory<T>` the Timeline + image runtimes use)
+  // so the editor's undo/redo chrome doesn't fork by kind.
+  const animationHistory = useCanvasHistory<AnimationState>(() => createBlankAnimationState());
+  const {
+    state: animationState,
+    setState: setAnimationState,
+    commit: animationCommit,
+    reset: resetAnimationHistory,
+  } = animationHistory;
+  const [animationStateHydrated, setAnimationStateHydrated] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -349,6 +373,15 @@ export default function StudioEditorV2() {
       return [color, ...filtered].slice(0, MAX_RECENT_COLORS);
     });
   }, []);
+  // Marquee selection rect for image-kind projects — lives at the host
+  // level so the Delete handler + future keyboard shortcuts can read
+  // it without DrawingStage being in the path. Cleared whenever the
+  // active tool changes away from `marquee` so a stale rect doesn't
+  // linger when the user picks the brush.
+  const [imageMarquee, setImageMarquee] = useState<MarqueeRect | null>(null);
+  useEffect(() => {
+    if (imageTool !== "marquee" && imageMarquee !== null) setImageMarquee(null);
+  }, [imageTool, imageMarquee]);
 
   // ─── Image-runtime layer-mutation handlers (lifted from DrawingStage) ──
   // These live in the host so the SHARED `<FloatingImageLayersPanel/>`
@@ -501,46 +534,131 @@ export default function StudioEditorV2() {
     URL.revokeObjectURL(url);
   }, [imageCanvas]);
 
+  // Export animation: dispatches to the GIF89a / APNG / WebP / MP4-alpha
+  // encoder strategy. Routed by the project's saved-output-profile or
+  // the default profile for the animation kind. Closes #1004 in
+  // combination with `lib/studio/animation/animation-export.ts`.
+  const handleExportAnimation = useCallback(async () => {
+    const { renderAnimation } = await import("@/lib/studio/animation/animation-export");
+    const { defaultOutputProfile } = await import("@shared/media-kinds");
+    const profile = defaultOutputProfile("animation");
+    const { blob } = await renderAnimation(animationState, profile);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "animation"}${profile.fileExt}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [animationState, title]);
+
+  // Marquee actions — Delete clears pixels inside the rect on the
+  // active layer; Fill paints the rect with the current brush color.
+  // Both mutations go through the shared pure helpers
+  // (`clearRectOnLayer` / `fillRectOnLayer`) so the engine is the
+  // single source of truth for "modify layer pixels in a rect."
+  // Mutations re-hydrate the active layer's offscreen, mutate, then
+  // serialize back to the dataURL — same shape commitActiveLayerToState
+  // produces from a brush stroke, so undo/redo treats them as ordinary
+  // history checkpoints.
+  const applyMarqueeOp = useCallback(
+    async (op: "delete" | "fill") => {
+      if (!imageMarquee) return;
+      const layer = findImageLayer(imageState, imageState.activeLayerId);
+      if (!layer || layer.locked) return;
+      const offscreen = createOffscreenCanvas(imageState.width, imageState.height);
+      await hydrateLayerCanvas(offscreen, layer.pixelsDataUrl);
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) return;
+      if (op === "delete") {
+        clearRectOnLayer(ctx, imageMarquee.x, imageMarquee.y, imageMarquee.width, imageMarquee.height);
+      } else {
+        fillRectOnLayer(
+          ctx,
+          imageMarquee.x,
+          imageMarquee.y,
+          imageMarquee.width,
+          imageMarquee.height,
+          imageBrush.color,
+        );
+        pushImageRecentColor(imageBrush.color);
+      }
+      const pixels = serializeLayer(offscreen);
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layer.id ? { ...l, pixelsDataUrl: pixels } : l,
+        ),
+      }));
+      imageCommit();
+      setImageMarquee(null);
+    },
+    [imageMarquee, imageState, imageBrush.color, pushImageRecentColor, setImageState, imageCommit],
+  );
+  const handleImageMarqueeDelete = useCallback(() => void applyMarqueeOp("delete"), [applyMarqueeOp]);
+  const handleImageMarqueeFill = useCallback(() => void applyMarqueeOp("fill"), [applyMarqueeOp]);
+
   // AI-result layer insert — appends a new layer with the generated
   // pixels + records one entry on `aiPromptHistory`. Lives in the host
   // (alongside the layer-mutation handlers) so the right-rail-mounted
   // `<DrawingAiPromptPanel/>` can call it without DrawingStage being
   // in the path.
   const handleImageAiGenerated = useCallback(
-    async (result: ImageGenResult, prompt: string) => {
-      const newLayerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
+    async (
+      result: ImageGenResult,
+      prompt: string,
+      options: { replaceActiveLayer: boolean; hadTransparentIntent: boolean },
+    ) => {
       const dataUrl = await drawBlobToCanvasFit(
         result.blob,
         imageState.width,
         imageState.height,
       );
-      setImageState((prev) => ({
-        ...prev,
-        layers: [
-          ...prev.layers,
-          {
-            id: newLayerId,
-            label: `AI: ${prompt.slice(0, 24)}${prompt.length > 24 ? "…" : ""}`,
-            kind: "raster",
-            opacity: 1,
-            visible: true,
-            locked: false,
-            blendMode: "normal",
-            pixelsDataUrl: dataUrl,
-          },
-        ],
-        activeLayerId: newLayerId,
-        aiPromptHistory: [
-          ...prev.aiPromptHistory,
-          {
-            id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
-            prompt,
-            at: new Date().toISOString(),
-            engineId: result.engine,
-            ...(result.resultUrl ? { resultUrl: result.resultUrl } : {}),
-          },
-        ].slice(-50),
-      }));
+      const historyEntry = {
+        id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
+        prompt,
+        at: new Date().toISOString(),
+        engineId: result.engine,
+        ...(result.resultUrl ? { resultUrl: result.resultUrl } : {}),
+      };
+      if (options.replaceActiveLayer) {
+        // Overwrite the active layer's pixels — useful for iteration
+        // on a specific layer ("regenerate this one"). Preserves the
+        // layer's id / label / opacity / visibility / position in the
+        // stack — only pixels change. Per the user's ask, the AI can
+        // update existing layers (not just append new ones).
+        setImageState((prev) => ({
+          ...prev,
+          layers: prev.layers.map((l) =>
+            l.id === prev.activeLayerId ? { ...l, pixelsDataUrl: dataUrl } : l,
+          ),
+          aiPromptHistory: [...prev.aiPromptHistory, historyEntry].slice(-50),
+        }));
+      } else {
+        // Append as a new layer at the top of the stack — the default,
+        // non-destructive path. Label includes the prompt prefix; the
+        // transparent flag annotates the label so the user can tell
+        // background-removed layers apart at a glance.
+        const newLayerId = `layer-${Math.random().toString(36).slice(2, 10)}`;
+        const labelPrefix = options.hadTransparentIntent ? "AI · cut-out" : "AI";
+        setImageState((prev) => ({
+          ...prev,
+          layers: [
+            ...prev.layers,
+            {
+              id: newLayerId,
+              label: `${labelPrefix}: ${prompt.slice(0, 24)}${prompt.length > 24 ? "…" : ""}`,
+              kind: "raster",
+              opacity: 1,
+              visible: true,
+              locked: false,
+              blendMode: "normal",
+              pixelsDataUrl: dataUrl,
+            },
+          ],
+          activeLayerId: newLayerId,
+          aiPromptHistory: [...prev.aiPromptHistory, historyEntry].slice(-50),
+        }));
+      }
       imageCommit();
     },
     [imageState.width, imageState.height, setImageState, imageCommit],
@@ -676,6 +794,22 @@ export default function StudioEditorV2() {
     // imageStateHydrated is intentionally read once per mediaKind /
     // persistedProject pair — we don't want a server round-trip to
     // clobber in-flight edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMediaKind, persistedProject]);
+
+  // Hydrate / seed animation-runtime state when the editor mounts on
+  // an animation-kind project. Mirrors the image hydration above —
+  // server rows arrive with `persistedProject.animationState` populated;
+  // fresh rows arrive with it null and we seed from the template hint.
+  useEffect(() => {
+    if (currentMediaKind !== "animation") {
+      if (animationStateHydrated) setAnimationStateHydrated(false);
+      return;
+    }
+    if (animationStateHydrated) return;
+    const serverAnim = persistedProject?.animationState as AnimationState | null | undefined;
+    resetAnimationHistory(serverAnim ?? seedAnimationFromTemplate(templateHint));
+    setAnimationStateHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, persistedProject]);
 
@@ -1418,6 +1552,25 @@ export default function StudioEditorV2() {
       }
       return;
     }
+    // Animation kind has its own GIF/APNG/WebP encoder pipeline (#1004).
+    // Routes early for the same reason image does — no ffmpeg.wasm, no
+    // Timeline render facade.
+    if (currentMediaKind === "animation") {
+      setExporting(true);
+      try {
+        await handleExportAnimation();
+        toast({ title: "Exported", description: "Your animation has been downloaded." });
+      } catch (err) {
+        toast({
+          title: "Export failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
+      } finally {
+        setExporting(false);
+      }
+      return;
+    }
     setExporting(true);
     await withRenderErrorRecovery("Export", async () => {
       // Per the canvas-runtime extensibility model (PRD §1.2), each
@@ -1647,7 +1800,12 @@ export default function StudioEditorV2() {
       // is relevant; the server's editor-kind discriminator picks
       // which JSONB column to update.
       const isImageKind = currentMediaKind === "image";
-      const timeline = isImageKind ? null : canvasStateToTimeline(state);
+      const isAnimationKind = currentMediaKind === "animation";
+      // Non-Timeline kinds (image / animation / game) don't emit a
+      // timelineSpec — each has its own state column the canvas
+      // runtime owns.
+      const skipTimeline = isImageKind || isAnimationKind;
+      const timeline = skipTimeline ? null : canvasStateToTimeline(state);
       // #637 closed: V2 no longer mirrors a v1 VideoScript projection
       // onto the project row. Publish-as-template now accepts an
       // inline script from the dialog (computed via
@@ -1656,10 +1814,15 @@ export default function StudioEditorV2() {
       const res = await studioService.saveDraft({
         name: title,
         projectId: persistedProjectId ?? undefined,
-        kind: isImageKind ? "scene" : "nle",
+        kind: skipTimeline ? "scene" : "nle",
         mediaKind: currentMediaKind,
         ...(timeline !== null ? { timelineSpec: timeline } : {}),
         ...(isImageKind && imageState !== null ? { imageState } : {}),
+        // Animation state mirror — same pattern as imageState. Written
+        // whenever local animationState changes (frame edits, frame
+        // inserts/deletes, settings changes). Persisted under
+        // `studio_projects.animation_state` per migration 0106. #1003.
+        ...(isAnimationKind && animationState !== null ? { animationState } : {}),
         // Game state mirror — written whenever local gameState differs
         // from the server's last known value. Mirrors the imageState
         // pattern above per PRD §1.2 ("each runtime persists its own
@@ -1916,6 +2079,7 @@ export default function StudioEditorV2() {
                       }
                       onAddVoiceover={addVoiceoverClip}
                       activeSceneId={activeSceneId}
+                      mediaKind={currentMediaKind}
                     />
                   )}
                   {leftTab === "actions" && (
@@ -2079,7 +2243,27 @@ export default function StudioEditorV2() {
                           brush={imageBrush}
                           onBrushChange={setImageBrush}
                           onRecentColor={pushImageRecentColor}
+                          marquee={imageMarquee}
+                          onMarqueeChange={setImageMarquee}
+                          onMarqueeDelete={
+                            imageMarquee ? handleImageMarqueeDelete : undefined
+                          }
+                          onMarqueeFill={
+                            imageMarquee ? handleImageMarqueeFill : undefined
+                          }
                           onCanvasReady={setImageCanvas}
+                        />
+                      ) : null,
+                      animation: animationStateHydrated ? (
+                        <AnimationStage
+                          state={animationState}
+                          setState={setAnimationState}
+                          commit={animationCommit}
+                          zoom={zoom}
+                          tool={imageTool}
+                          brush={imageBrush}
+                          onBrushChange={setImageBrush}
+                          onRecentColor={pushImageRecentColor}
                         />
                       ) : null,
                       timeline: (
@@ -2388,8 +2572,8 @@ export default function StudioEditorV2() {
                   One layout shell, kind-aware contents (per DRY). */}
               <DrawingAiPromptPanel
                 history={imageState.aiPromptHistory}
-                onGenerated={(result, prompt) =>
-                  void handleImageAiGenerated(result, prompt)
+                onGenerated={(result, prompt, options) =>
+                  void handleImageAiGenerated(result, prompt, options)
                 }
               />
             </CollapsiblePanel>

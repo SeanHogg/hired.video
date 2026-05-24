@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import Footer from "@/components/Footer";
 import MetadataModal from "@/components/MetadataModal";
 import Navigation from "@/components/Navigation";
@@ -483,6 +484,15 @@ export default function ResumeDetail() {
 
         <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
           {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || "Resume"} />}
+
+          {/* Hub-level tab strip — keeps the My Resumes / Available /
+              Sourced context visible as the user navigates into a single
+              resume. Falls back to "no highlight" on direct loads. */}
+          {isAuthenticated && (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+              <EntityHubTabStrip entity="resume" />
+            </div>
+          )}
 
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

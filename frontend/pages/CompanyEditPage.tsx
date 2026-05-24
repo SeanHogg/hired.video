@@ -47,6 +47,7 @@ export default function CompanyEditPage() {
 
   return (
     <EntityEditShell
+      hubEntity="company"
       parent={{ label: "Companies", to: "/companies", icon: Building2 }}
       entity={{
         label: company?.data.name,

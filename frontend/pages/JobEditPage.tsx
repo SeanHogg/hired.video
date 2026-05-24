@@ -61,6 +61,7 @@ export default function JobEditPage() {
 
   return (
     <EntityEditShell
+      hubEntity="job"
       parent={{ label: "Jobs", to: "/jobs", icon: Briefcase }}
       entity={{ label: job?.title, to: job ? `/jobs/${job.id}` : undefined }}
       description="Update your job posting details, requirements, and benefits"

@@ -250,6 +250,11 @@ export const StudioProjectSchema = z.object({
   // parallel-column pattern as gameState. Validated client-side by
   // <DrawingStage>; server stores verbatim. See shared/image-state.ts.
   imageState: z.unknown().nullish(),
+  // Animation runtime state for mediaKind='animation' projects (#1003).
+  // Same parallel-column pattern. Validated client-side by
+  // <AnimationStage>; server stores verbatim. See
+  // shared/animation-state.ts.
+  animationState: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
@@ -614,6 +619,10 @@ export const studioService = {
        *  by `<DrawingStage>` on save; same parallel-column pattern as
        *  `gameState`. See `shared/image-state.ts`. */
       imageState?: unknown;
+      /** Animation runtime state for mediaKind='animation' projects
+       *  (#1003). Sent by `<AnimationStage>` on save; same parallel-
+       *  column pattern. See `shared/animation-state.ts`. */
+      animationState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -636,6 +645,7 @@ export const studioService = {
       ...(args.timelineSpec !== undefined ? { timelineSpec: args.timelineSpec } : {}),
       ...(args.gameState !== undefined ? { gameState: args.gameState } : {}),
       ...(args.imageState !== undefined ? { imageState: args.imageState } : {}),
+      ...(args.animationState !== undefined ? { animationState: args.animationState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),

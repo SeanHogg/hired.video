@@ -151,6 +151,7 @@ export default function Index() {
                     profession={v.ownerName}
                     company="hired.video"
                     createdAt={v.createdAt}
+                    video={v}
                     onView={() => navigate(`/v/${v.id}`)}
                   />
                 ))}

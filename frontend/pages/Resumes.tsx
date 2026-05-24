@@ -63,12 +63,13 @@ import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
+import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import CandidatesPanel, {
   CandidatesHeaderActions,
 } from "@/components/recruit/CandidatesPanel";
 import AvailableResumesPanel from "@/components/resumes/AvailableResumesPanel";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
-import { USER_ROLES } from "@shared/user-roles";
+import { RESUMES_HUB_DEFAULT_TAB, RESUMES_HUB_TABS } from "@/hooks/use-resumes-tabs";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
@@ -1442,32 +1443,24 @@ export default function Resumes() {
     </div>
   );
 
-  const resumeTabs: EntityHubTab[] = [
-    {
-      key: "mine",
-      label: "My Resumes",
-      icon: FileText,
-      roles: [USER_ROLES.JOB_SEEKER],
+  // Per-tab body / actions / meta — joined onto the shared tab metadata
+  // (RESUMES_HUB_TABS, the SSoT for key / label / icon / roles / route)
+  // below. Keeping the join keyed by `key` means the strip on detail /
+  // edit pages and the hub list page can never diverge on labels.
+  const resumeTabBodies: Record<string, Omit<EntityHubTab, "key" | "label" | "icon" | "roles"> | undefined> = {
+    mine: {
       title: "Your Resumes",
       description: "Manage and track your resumes.",
       headerActions: mineActions,
       meta: mineMeta,
       body: renderMineBody,
     },
-    {
-      key: "available",
-      label: "Available",
-      icon: Search,
-      roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+    available: {
       title: "Available Resumes",
       description: "Browse public candidate resumes.",
       body: <AvailableResumesPanel />,
     },
-    {
-      key: "sourced",
-      label: "Sourced",
-      icon: UserCheck,
-      roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+    sourced: {
       title: "Sourced Candidates",
       description: "Private to your company. Source, annotate, and share.",
       headerActions: (
@@ -1487,7 +1480,12 @@ export default function Resumes() {
         />
       ),
     },
-  ];
+  };
+  const resumeTabs: EntityHubTab[] = RESUMES_HUB_TABS.map((meta) => {
+    const body = resumeTabBodies[meta.key];
+    if (!body) throw new Error(`Missing body for resume tab "${meta.key}"`);
+    return { key: meta.key, label: meta.label, icon: meta.icon, roles: meta.roles, ...body };
+  });
 
   // Dialogs JSX — bound to a local so list-mode and builder/viewer mode
   // share a single render path. Radix dialogs are portal-rendered so
@@ -1705,6 +1703,10 @@ export default function Resumes() {
       <AppShell bgClassName="bg-background">
         <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
+            {/* Keep the hub-level tab strip visible even in the in-page
+                viewer / builder modes — the user is still "inside" the
+                Resumes section and shouldn't lose that context. */}
+            <EntityHubTabStrip entity="resume" />
             {successAlert}
             {view === "builder" && (
               <div className="space-y-4 sm:space-y-6">
@@ -1752,7 +1754,7 @@ export default function Resumes() {
 
   return (
     <>
-      <EntityHubShell entity="resume" tabs={resumeTabs} defaultTab="mine" />
+      <EntityHubShell entity="resume" tabs={resumeTabs} defaultTab={RESUMES_HUB_DEFAULT_TAB} />
       {dialogs}
     </>
   );

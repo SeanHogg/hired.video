@@ -171,6 +171,52 @@ export function updateGameSettings(
   return { ...state, ...patch };
 }
 
+/** Update the project-level physics block (#1009). Passing `undefined`
+ *  TURNS OFF physics entirely (removes the field); passing a partial
+ *  patch merges over the existing block. Defaults applied when the
+ *  block doesn't exist yet: gravity 1200, friction 0.1 — a 2D-platformer
+ *  starter feel. */
+export function updateGamePhysics(
+  state: GameState,
+  patch: import("@shared/game-state").GamePhysicsSettings | undefined,
+): GameState {
+  if (patch === undefined) {
+    const { physics: _physics, ...rest } = state;
+    return rest;
+  }
+  return {
+    ...state,
+    physics: {
+      gravity: 1200,
+      friction: 0.1,
+      ...(state.physics ?? {}),
+      ...patch,
+    },
+  };
+}
+
+/** Update a sprite's per-sprite physics opt-in (#1009). Passing
+ *  `undefined` removes the field; passing a body kind sets it. */
+export function updateSpritePhysics(
+  state: GameState,
+  levelId: string,
+  spriteId: string,
+  physics: import("@shared/game-state").GameSpritePhysics | undefined,
+): GameState {
+  const level = state.levels.find((l) => l.id === levelId);
+  if (!level) return state;
+  return updateLevel(state, levelId, {
+    sprites: level.sprites.map((s) => {
+      if (s.id !== spriteId) return s;
+      if (physics === undefined) {
+        const { physics: _drop, ...rest } = s;
+        return rest;
+      }
+      return { ...s, physics };
+    }),
+  });
+}
+
 // ─── Block-script + animation mutations ──────────────────────────────────
 
 let ruleCounter = 0;

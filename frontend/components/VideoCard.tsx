@@ -5,8 +5,10 @@ import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import { CardActions } from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
+import PublicVideoPreview from "@/components/PublicVideoPreview";
 import { buildShareAction } from "@/lib/card-share-action";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import type { PublicVideo } from "@/lib/services/studio-service";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 
 interface VideoCardProps {
@@ -24,6 +26,12 @@ interface VideoCardProps {
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
   onView?: () => void;
+  /** When supplied, the thumbnail slot mounts a muted/looping "live
+   *  thumbnail" through the shared PublicVideoPreview surface instead
+   *  of a static image. Consumers that only have a thumbnail URL (e.g.
+   *  generic search-result cards) can omit this and the card falls
+   *  back to the legacy <img>-or-gradient render. */
+  video?: PublicVideo;
 }
 
 export default function VideoCard({
@@ -41,6 +49,7 @@ export default function VideoCard({
   userContext: _userContext,
   itemOwnership,
   onView,
+  video,
 }: VideoCardProps) {
   const isOwner = itemOwnership?.ownership === "owned";
   const formatViews = (count: number) => {
@@ -98,22 +107,40 @@ export default function VideoCard({
   return (
     <BaseCard className="group overflow-hidden" onClick={handleView}>
       <CardContent className="p-0">
-        {/* Video Thumbnail Section */}
+        {/* Video Thumbnail Section.
+            When the consumer hands us a full PublicVideo, the shared
+            PublicVideoPreview surface plays a muted/looping "live
+            thumbnail" (canvas-rendered for v2 projects, native <video>
+            for baked URLs, iframe for YouTube). Otherwise we fall
+            back to the legacy <img>/gradient placeholder. The preview
+            is wrapped in pointer-events-none so every click bubbles to
+            BaseCard → handleView; the play overlay below re-enables
+            pointer events for itself with stopPropagation so it
+            navigates without first toggling the embed. */}
         <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
-          {/* Thumbnail image */}
-          {thumbnail ? (
+          {video ? (
+            <div className="absolute inset-0 pointer-events-none">
+              <PublicVideoPreview
+                video={video}
+                controls={false}
+                autoPlay
+                loop
+                muted
+                className="absolute inset-0"
+              />
+            </div>
+          ) : thumbnail ? (
             <img
               src={thumbnail}
               alt={title}
               className="absolute inset-0 w-full h-full object-cover"
             />
           ) : (
-            /* Thumbnail placeholder with gradient */
             <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20" />
           )}
 
           {/* Play button overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300 pointer-events-none">
             <Button
               size="icon"
               aria-label={`Play ${title}`}
@@ -121,7 +148,7 @@ export default function VideoCard({
                 e.stopPropagation();
                 handleView();
               }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12"
+              className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 hover:bg-black/70 text-white rounded-full h-12 w-12"
             >
               <Play className="h-6 w-6 fill-current ml-1" />
             </Button>

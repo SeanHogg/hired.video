@@ -8,7 +8,7 @@
  * follow-on phases tracked on the gap register.
  */
 
-import { Brush, Eraser, PaintBucket, Pipette } from "lucide-react";
+import { Brush, Eraser, Hand, PaintBucket, Pipette, SquareDashed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,6 +32,8 @@ const TOOL_DEFS: ReadonlyArray<{
   shortcut: string;
   icon: typeof Brush;
 }> = [
+  { id: "hand", label: "Hand · move layer", shortcut: "V", icon: Hand },
+  { id: "marquee", label: "Marquee · select", shortcut: "M", icon: SquareDashed },
   { id: "brush", label: "Brush", shortcut: "B", icon: Brush },
   { id: "eraser", label: "Eraser", shortcut: "E", icon: Eraser },
   { id: "fill", label: "Fill", shortcut: "G", icon: PaintBucket },
@@ -51,7 +53,7 @@ export default function DrawingToolPalette({
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Tools
         </p>
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-3 gap-1">
           {TOOL_DEFS.map((def) => {
             const Icon = def.icon;
             const active = tool === def.id;

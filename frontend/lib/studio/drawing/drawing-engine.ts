@@ -177,7 +177,8 @@ export async function hydrateLayerCanvas(
 
 /** Composite the background + all visible layers onto `dest`. Caller
  *  supplies the per-layer offscreen canvases keyed by layer id; the
- *  function reads layer order, opacity, and visibility from `state`. */
+ *  function reads layer order, opacity, visibility, and transformOffset
+ *  from `state`. */
 export function compositeLayers(
   dest: CanvasRenderingContext2D,
   width: number,
@@ -188,6 +189,7 @@ export function compositeLayers(
     visible: boolean;
     opacity: number;
     blendMode: GlobalCompositeOperation | string;
+    transformOffset?: { x: number; y: number };
   }>,
   layerCanvases: ReadonlyMap<string, HTMLCanvasElement>,
 ): void {
@@ -208,9 +210,50 @@ export function compositeLayers(
     // MVP only supports `normal` blend — the field is on ImageLayer so
     // a future picker can flip it without state-shape migration.
     dest.globalCompositeOperation = "source-over";
-    dest.drawImage(layerCanvas, 0, 0);
+    const offsetX = layer.transformOffset?.x ?? 0;
+    const offsetY = layer.transformOffset?.y ?? 0;
+    dest.drawImage(layerCanvas, offsetX, offsetY);
   }
   dest.restore();
+}
+
+/** Clear a rectangular region of pixels on an offscreen canvas. Used
+ *  by the marquee tool's "Delete" action — clears the active layer's
+ *  pixels inside the user-drawn rect. Coordinates are layer-local
+ *  (matching the offscreen canvas's natural frame). */
+export function clearRectOnLayer(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  if (width <= 0 || height <= 0) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.clearRect(x, y, width, height);
+  ctx.restore();
+}
+
+/** Fill a rectangular region on an offscreen canvas with a solid
+ *  color. Used by the marquee tool's "Fill" action — fills the active
+ *  layer's selected rect with the active brush color. */
+export function fillRectOnLayer(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+): void {
+  if (width <= 0 || height <= 0) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, width, height);
+  ctx.restore();
 }
 
 /** Letterbox-fit the supplied blob onto a fresh canvas of the given

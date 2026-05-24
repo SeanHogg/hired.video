@@ -105,6 +105,7 @@ import AddToListMenu from "@/components/lists/AddToListMenu";
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
+import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { UserRole } from "@shared/user-roles";
@@ -141,6 +142,11 @@ export default function People() {
   // Shared tab strip — also rendered by /people/pitch-decks, /people/hiring,
   // /people/scorecards so one nav definition drives every People surface.
   const peopleTabs = usePeopleTabs();
+  // Remember the user's current tab so the strip on /people/:id and the
+  // other deep /people/* surfaces keeps it highlighted.
+  useEffect(() => {
+    writeEntityHubActiveTab("person", activeTab);
+  }, [activeTab]);
   const urlQuery = searchParams.get("q") ?? "";
   const urlRole = searchParams.get("role") ?? "";
   const urlSkills = searchParams.get("skills") ?? "";

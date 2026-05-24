@@ -76,11 +76,19 @@ export interface BackdropPreset {
   id: string;
   label: string;
   /** CSS-style gradient applied behind the subject. Falls through to
-   *  a flat fill when only one stop. */
+   *  a flat fill when only one stop. When `transparent` is true the
+   *  gradient is ignored entirely — the composite leaves the
+   *  background alpha=0 (used by the DrawingStage AI flow's
+   *  remove-background path). */
   gradient: { from: string; to: string };
   /** When true, applies a vignette + soft blur over the gradient
    *  before compositing the subject — gives a "studio backdrop" feel. */
   studioBlur?: boolean;
+  /** When true, the compositor skips the backdrop fill entirely —
+   *  the masked subject renders onto a fully transparent canvas. Used
+   *  by the image-runtime AI flow when the prompt asks for a
+   *  transparent background. */
+  transparent?: boolean;
 }
 
 export const BACKDROP_PRESETS: BackdropPreset[] = [
@@ -90,6 +98,10 @@ export const BACKDROP_PRESETS: BackdropPreset[] = [
   { id: "creative-teal",  label: "Creative teal",  gradient: { from: "#0d9488", to: "#083344" } },
   { id: "neutral-cream",  label: "Neutral cream",  gradient: { from: "#fef3c7", to: "#f5f5f4" } },
   { id: "speaker-spot",   label: "Speaker spotlight", gradient: { from: "#1e293b", to: "#020617" }, studioBlur: true },
+  // Transparent — skips the backdrop fill in `composite()` so the
+  // subject lands on a fully alpha-0 canvas. Consumed by the image-
+  // runtime AI flow when the user asks for a "transparent background".
+  { id: "transparent",    label: "Transparent",     gradient: { from: "#00000000", to: "#00000000" }, transparent: true },
 ];
 
 export function getBackdropPreset(id: string): BackdropPreset {
@@ -284,22 +296,25 @@ async function composite({
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2D canvas context unavailable for headshot composite");
 
-  // 1. Backdrop fill.
-  const grad = ctx.createLinearGradient(0, 0, width, height);
-  grad.addColorStop(0, preset.gradient.from);
-  grad.addColorStop(1, preset.gradient.to);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, width, height);
-  if (preset.studioBlur) {
-    // Soft vignette to approximate a lit backdrop.
-    const r = ctx.createRadialGradient(
-      width * 0.5, height * 0.45, width * 0.1,
-      width * 0.5, height * 0.5, Math.max(width, height) * 0.7,
-    );
-    r.addColorStop(0, "rgba(255,255,255,0.18)");
-    r.addColorStop(1, "rgba(0,0,0,0.55)");
-    ctx.fillStyle = r;
+  // 1. Backdrop fill — skipped entirely when the preset is
+  // transparent, so the masked subject lands on an alpha-0 canvas.
+  if (!preset.transparent) {
+    const grad = ctx.createLinearGradient(0, 0, width, height);
+    grad.addColorStop(0, preset.gradient.from);
+    grad.addColorStop(1, preset.gradient.to);
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
+    if (preset.studioBlur) {
+      // Soft vignette to approximate a lit backdrop.
+      const r = ctx.createRadialGradient(
+        width * 0.5, height * 0.45, width * 0.1,
+        width * 0.5, height * 0.5, Math.max(width, height) * 0.7,
+      );
+      r.addColorStop(0, "rgba(255,255,255,0.18)");
+      r.addColorStop(1, "rgba(0,0,0,0.55)");
+      ctx.fillStyle = r;
+      ctx.fillRect(0, 0, width, height);
+    }
   }
 
   // 2. Load the user's photo.

@@ -16,7 +16,7 @@
  * server before the conversion fires.
  */
 
-import { paidMediaService, type PublicPixelConfig } from "./services/paid-media-service";
+import { paidMediaService } from "./services/paid-media-service";
 
 const CLICK_ID_PARAMS = ["fbclid", "gclid", "li_fat_id", "ttclid", "msclkid"] as const;
 type ClickIdParam = (typeof CLICK_ID_PARAMS)[number];
@@ -170,11 +170,10 @@ export interface InstallPixelsOptions {
 export async function installPaidMediaPixels(opts: InstallPixelsOptions = {}): Promise<void> {
   captureClickIds();
   try {
-    const config = await paidMediaService.getPublicPixelConfig(opts.workspaceUserId, opts.workspaceCompanyId ?? null);
-    if (!config || (config as any).configured === false) return;
-    const cfg = config as PublicPixelConfig;
+    const cfg = await paidMediaService.getPublicPixelConfig(opts.workspaceUserId, opts.workspaceCompanyId ?? null);
+    if (cfg.configured === false) return;
     if (cfg.metaPixelId)               injectMeta(cfg.metaPixelId);
-    if (cfg.googleAdsConversionId)     injectGoogleAds(cfg.googleAdsConversionId, cfg.ga4MeasurementId);
+    if (cfg.googleAdsConversionId)     injectGoogleAds(cfg.googleAdsConversionId, cfg.ga4MeasurementId ?? null);
     else if (cfg.ga4MeasurementId)     injectGoogleAds(cfg.ga4MeasurementId, null);
     if (cfg.linkedInPartnerId)         injectLinkedIn(cfg.linkedInPartnerId);
     if (cfg.tiktokPixelId)             injectTikTok(cfg.tiktokPixelId);

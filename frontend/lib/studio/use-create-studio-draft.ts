@@ -129,6 +129,7 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           ...(seed.timelineSpec !== undefined ? { timelineSpec: seed.timelineSpec } : {}),
           ...(seed.gameState !== undefined ? { gameState: seed.gameState } : {}),
           ...(seed.imageState !== undefined ? { imageState: seed.imageState } : {}),
+          ...(seed.animationState !== undefined ? { animationState: seed.animationState } : {}),
         });
         return finalise(res.data);
       }

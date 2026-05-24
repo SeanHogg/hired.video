@@ -6,14 +6,22 @@
  * the standing DRY rule it just submits the prompt and renders the
  * result.
  *
- * On success the result is appended as a NEW layer (not destructive
- * to the user's existing paint work) — they can delete it, move it
- * down, drop its opacity, or paint on top. The panel also pushes one
- * entry onto `state.aiPromptHistory` so previous prompts can be
- * re-used without retyping.
+ * Three options the user can toggle before generating:
+ *   - **Replace active layer** vs add as a NEW layer. Default = new
+ *     layer (less destructive). When on, the host replaces the active
+ *     layer's pixels with the generated image; otherwise it inserts
+ *     above. Allows iteration on a single layer ("regenerate this
+ *     scene").
+ *   - **Transparent background** — when on (auto-detected from the
+ *     prompt via `detectTransparentIntent`), the host post-processes
+ *     the result through the segmentation pipeline to strip the
+ *     background. Toggle remains user-overridable.
+ *
+ * `aiPromptHistory` is rendered as a recent-prompts popover so the
+ * user can re-issue / iterate without retyping.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles, Loader2, History } from "lucide-react";
 import type { AiPromptHistoryEntry } from "@shared/image-state";
 import { Button } from "@/components/ui/button";
@@ -24,10 +32,28 @@ import {
   generateImage,
   type ImageGenResult,
 } from "@/lib/services/image-gen-engine";
+import {
+  detectTransparentIntent,
+  removeBackground,
+} from "@/lib/services/transparent-background";
+
+export interface DrawingAiGenerateOptions {
+  /** When true, the host should replace the active layer's pixels
+   *  with the generated image; otherwise insert above as a new layer.
+   *  Default false (add new layer — safer). */
+  replaceActiveLayer: boolean;
+  /** When true, the result was already passed through background
+   *  removal — the host can flag it as such on the history entry. */
+  hadTransparentIntent: boolean;
+}
 
 interface DrawingAiPromptPanelProps {
   history: ReadonlyArray<AiPromptHistoryEntry>;
-  onGenerated: (result: ImageGenResult, prompt: string) => void;
+  onGenerated: (
+    result: ImageGenResult,
+    prompt: string,
+    options: DrawingAiGenerateOptions,
+  ) => void;
 }
 
 export default function DrawingAiPromptPanel({
@@ -38,6 +64,18 @@ export default function DrawingAiPromptPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [replaceActive, setReplaceActive] = useState(false);
+  // Transparent intent is AUTO-DETECTED from the prompt + user-
+  // overridable via the toggle. Auto-detection means a user who types
+  // "transparent background" doesn't have to also hunt for the
+  // checkbox; the manual override means a user can FORCE transparency
+  // even when the prompt doesn't include the keywords.
+  const [transparent, setTransparent] = useState(false);
+  const [userOverrodeTransparent, setUserOverrodeTransparent] = useState(false);
+  useEffect(() => {
+    if (userOverrodeTransparent) return;
+    setTransparent(detectTransparentIntent(prompt));
+  }, [prompt, userOverrodeTransparent]);
 
   const submit = async () => {
     const trimmed = prompt.trim();
@@ -47,9 +85,27 @@ export default function DrawingAiPromptPanel({
     setProgress(0);
     try {
       const result = await generateImage({ prompt: trimmed }, (p) =>
-        setProgress(p),
+        setProgress(p * (transparent ? 0.6 : 1)),
       );
-      onGenerated(result, trimmed);
+      // If the user asked for a transparent background, post-process
+      // the result through the segmentation pipeline. The remaining
+      // 40% of the progress bar covers the segmentation step.
+      let finalResult = result;
+      if (transparent) {
+        setProgress(0.7);
+        const transparentBlob = await removeBackground(result.blob);
+        URL.revokeObjectURL(result.previewUrl);
+        finalResult = {
+          ...result,
+          blob: transparentBlob,
+          previewUrl: URL.createObjectURL(transparentBlob),
+        };
+        setProgress(1);
+      }
+      onGenerated(finalResult, trimmed, {
+        replaceActiveLayer: replaceActive,
+        hadTransparentIntent: transparent,
+      });
       setPrompt("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");
@@ -118,6 +174,35 @@ export default function DrawingAiPromptPanel({
           }
         }}
       />
+      <div className="mt-2 space-y-1.5 text-xs">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={replaceActive}
+            onChange={(e) => setReplaceActive(e.target.checked)}
+            disabled={busy}
+          />
+          <span>Replace active layer</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">
+            {replaceActive ? "overwrites" : "adds new"}
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={transparent}
+            onChange={(e) => {
+              setUserOverrodeTransparent(true);
+              setTransparent(e.target.checked);
+            }}
+            disabled={busy}
+          />
+          <span>Transparent background</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">
+            {transparent ? "post-processed" : "as generated"}
+          </span>
+        </label>
+      </div>
       {error && (
         <p className="mt-1.5 text-xs text-destructive" role="alert">
           {error}
@@ -125,7 +210,7 @@ export default function DrawingAiPromptPanel({
       )}
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="text-[10px] text-muted-foreground">
-          ⌘/Ctrl+Enter · adds as new layer · ~10K tokens
+          ⌘/Ctrl+Enter · ~10K tokens{transparent ? " + segmentation" : ""}
         </p>
         <Button
           size="sm"

@@ -110,7 +110,17 @@ export type ContentTemplate =
   // its use case; the user can change dimensions later via the editor.
   | "drawing_blank"
   | "drawing_social_square"
-  | "drawing_og_card";
+  | "drawing_og_card"
+  // ─── Animation canvas (#1003 / mediaKind === "animation") ────────────
+  // Frame-by-frame raster animation. Each entry seeds AnimationStage
+  // with a starter strip sized for the use case (logo loop / spinner /
+  // reaction GIF / explainer loop). Exports go through the GIF89a /
+  // APNG / WebP encoder strategies (#1004) — not the Timeline render
+  // facade.
+  | "animation-logo-loop"
+  | "animation-spinner"
+  | "animation-reaction"
+  | "animation-explainer";
 
 /** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
  *  the landing page can group them without a parallel mapping table. The
@@ -756,6 +766,76 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultName: "OG card",
     defaultPrompt:
       "Generate an Open Graph link-preview card: title, brand mark, supporting glyph, brand palette. Centred content with breathing room — the social sites crop the edges on some platforms.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+
+  // ─── Animation templates (#1003 / mediaKind === "animation") ─────────
+  // Frame-by-frame raster animation kind. Each entry seeds
+  // `<AnimationStage>` with a starter strip + appropriate fps; exports
+  // go through the GIF89a / APNG / WebP encoder strategies (#1004).
+  // Audience: `animator` is its primary audience; bonus tagging to
+  // `creator` + `designer` because reaction GIFs + explainer loops are
+  // cross-functional. Per-template dimensions + fps + starter frame
+  // count are SINGLE-SOURCED in
+  // `lib/studio/animation/animation-seeds.ts` (DRY).
+  {
+    id: "animation-logo-loop",
+    label: "Logo loop",
+    desc: "Square brand bug — 512×512, 24fps, 8 frames. Spin / wipe / pulse.",
+    icon: Sparkles,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "promote",
+    mediaKind: "animation",
+    audiences: ["animator", "designer", "creator", "founder"],
+    defaultName: "Logo loop",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "animation-spinner",
+    label: "Loading spinner",
+    desc: "Tiny 256² spinner — 30fps, 6 frames. Drop-in animated loading GIF.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "quick",
+    mediaKind: "animation",
+    audiences: ["animator", "designer", "developer"],
+    defaultName: "Loading spinner",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "animation-reaction",
+    label: "Reaction GIF",
+    desc: "480² meme reaction — 15fps, 12 frames. Perfect for Twitter / Reddit.",
+    icon: Rabbit,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "promote",
+    mediaKind: "animation",
+    audiences: ["animator", "creator", "podcaster"],
+    defaultName: "Reaction",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "animation-explainer",
+    label: "Explainer loop",
+    desc: "640×360 16:9 — 12fps 'on 2s' hand-drawn cadence, 16 frames.",
+    icon: Palette,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "animation",
+    audiences: ["animator", "creator", "educator", "designer"],
+    defaultName: "Explainer loop",
+    defaultPrompt: "",
     firstTabLabel: "Setup",
     IntakeForm: BasicIntake,
   },

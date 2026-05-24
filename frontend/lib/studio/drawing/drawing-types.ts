@@ -10,8 +10,13 @@
  * is here so adding one is one entry.
  */
 
-/** Which tool the brush slot is currently in. */
-export type DrawingTool = "brush" | "eraser" | "fill" | "eyedropper";
+/** Which tool the brush slot is currently in. The "hand" tool selects
+ *  the active layer + drags it to translate (per-layer offset on
+ *  ImageLayer.transformOffset). The "marquee" tool draws a
+ *  rectangular pixel selection — Delete clears pixels within the rect
+ *  on the active layer, the Fill button fills with the active brush
+ *  color. */
+export type DrawingTool = "brush" | "eraser" | "fill" | "eyedropper" | "hand" | "marquee";
 
 /** Brush stroke settings — shared by brush + eraser (eraser ignores
  *  color but honours size + opacity). The "soft brush" curve is the

@@ -21,6 +21,7 @@ export {
   createAssetCache,
   fireRules,
   applyAnimation,
+  stepPhysics,
 } from "./runtime-core.js";
 export type {
   RunGameOptions,

@@ -34,8 +34,10 @@ import {
 } from "@shared/media-kinds";
 
 describe("mediaKindUsesTimelineExport", () => {
-  const TIMELINE_EXPORT_KINDS = ["video", "podcast", "voice", "animation"] as const;
-  const NON_TIMELINE_EXPORT_KINDS = ["game", "comic", "image"] as const;
+  // #1003 moved animation OUT of the Timeline export path — animation
+  // exports through the GIF89a / APNG / WebP encoder strategies.
+  const TIMELINE_EXPORT_KINDS = ["video", "podcast", "voice"] as const;
+  const NON_TIMELINE_EXPORT_KINDS = ["game", "comic", "image", "animation"] as const;
 
   for (const kind of TIMELINE_EXPORT_KINDS) {
     it(`is true for ${kind} (ffmpeg.wasm / WebCodecs render path)`, () => {
@@ -59,8 +61,10 @@ describe("mediaKindUsesTimelineExport", () => {
 describe("mediaKindUsesCanvasStateAuthoring", () => {
   // Comic is the asymmetry that motivated #936: TRUE for authoring
   // (pages = scenes via CanvasState) even though FALSE for export.
-  const CANVAS_AUTHORING_KINDS = ["video", "podcast", "voice", "animation", "comic"] as const;
-  const NON_CANVAS_AUTHORING_KINDS = ["game", "image"] as const;
+  // Animation also moved out (#1003) — has its own AnimationStage
+  // frame-by-frame canvas runtime.
+  const CANVAS_AUTHORING_KINDS = ["video", "podcast", "voice", "comic"] as const;
+  const NON_CANVAS_AUTHORING_KINDS = ["game", "image", "animation"] as const;
 
   for (const kind of CANVAS_AUTHORING_KINDS) {
     it(`is true for ${kind} (uses ScenesRail / WidgetPalette / Timeline editor chrome)`, () => {

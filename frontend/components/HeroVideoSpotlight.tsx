@@ -4,9 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import StudioVideoSurface, {
-  type FlatVideoSource,
-} from "@/components/studio/StudioVideoSurface";
+import PublicVideoPreview from "@/components/PublicVideoPreview";
 import type { PublicVideo } from "@/lib/services/studio-service";
 
 interface HeroVideoSpotlightProps {
@@ -80,38 +78,12 @@ export default function HeroVideoSpotlight({
     return () => window.clearTimeout(id);
   }, [index, paused, isVisible, isDesktop, slides.length, desktopRotationMs, mobileRotationMs]);
 
-  // No manual restart effect needed — StudioVideoSurface is keyed on
+  // No manual restart effect needed — PublicVideoPreview is keyed on
   // the slide id below, so React fully remounts the embed when the
   // rotation advances. That naturally resets currentTime + retriggers
   // autoplay.
 
-  // Hero autoplays a muted, looping "live thumbnail" on every viewport —
-  // mobile included. iOS/Android both allow muted-autoplay <video> +
-  // playsInline, and the embed iframe is identical bytes on either side.
-  // Sources picked in order:
-  //   1. Baked CDN URL          → cheapest, native autoplay/loop/muted.
-  //   2. Real YouTube id        → privacy-friendly iframe embed.
-  //   3. Saved-but-unrendered   → fall through to <StudioVideoSurface/>
-  //                               (the universal player). Lazy-fetches
-  //                               the project, compiles the script
-  //                               client-side, plays the live canvas —
-  //                               same path the editor's Preview uses.
-  //                               This is the gap #717 fix: a SA-pinned
-  //                               featured video that hasn't been
-  //                               rendered yet still plays on the hero,
-  //                               instead of stranding the rotation on
-  //                               a static thumbnail.
-  const useStudioSurface = hasRealVideo && !current.videoUrl && !current.youtubeVideoId;
-  const playerSource: FlatVideoSource | null = !hasRealVideo || useStudioSurface
-    ? null
-    : current.videoUrl
-      ? { kind: "url", url: current.videoUrl, poster: current.thumbnailUrl }
-      : current.youtubeVideoId
-        ? { kind: "youtube", videoId: current.youtubeVideoId }
-        : { kind: "thumbnail", thumbnailUrl: current.thumbnailUrl };
-  const isAutoplaying = useStudioSurface || playerSource?.kind === "url" || playerSource?.kind === "youtube";
-
-  // Overlay chrome stacked on top of the embed inside StudioVideoSurface's
+  // Overlay chrome stacked on top of the embed inside the preview's
   // AspectFrame. The previous click-through capture + bottom metadata
   // gradient + "Watch →" CTA were removed: the click-through blocked
   // every native player control (you couldn't pause), and the bottom
@@ -151,40 +123,22 @@ export default function HeroVideoSpotlight({
   return (
     <div ref={containerRef} className="relative">
       <div className="group relative w-full max-w-md lg:max-w-none mx-auto">
-        {useStudioSurface && current.id !== "__skeleton__" ? (
-          // Universal-player branch — saved-but-unrendered videos play
-          // here off their saved script. StudioVideoSurface owns the
-          // fetch + compile + StudioPlayer mount; overlay floats above
-          // via the wrapper below.
-          <div className="rounded-2xl shadow-2xl ring-1 ring-border overflow-hidden relative">
-            <StudioVideoSurface
-              key={current.id}
-              mode="lazy"
-              videoId={current.id}
-              poster={current.thumbnailUrl}
-              title={displayTitle}
-              autoplay
-            />
-            {overlay}
-          </div>
-        ) : playerSource ? (
-          <StudioVideoSurface
+        {hasRealVideo ? (
+          <PublicVideoPreview
             key={current.id}
-            mode="flat"
-            source={playerSource}
+            video={current}
             title={displayTitle}
             controls={false}
-            autoPlay={isAutoplaying}
-            loop={isAutoplaying}
+            autoPlay
+            loop
             muted
             className="rounded-2xl shadow-2xl ring-1 ring-border"
           >
             {overlay}
-          </StudioVideoSurface>
+          </PublicVideoPreview>
         ) : (
-          // Empty-state placeholder — no real video yet. Uses AspectFrame
-          // implicitly through the same wrapper styling so the box stays
-          // the same size as a real player.
+          // Empty-state placeholder — no real video yet. Uses the same
+          // wrapper styling as the player so the box stays the same size.
           <div className="aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 relative">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center px-6">

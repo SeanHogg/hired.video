@@ -70,7 +70,11 @@ describe("seedTemplate", () => {
   });
 
   describe("Timeline-runtime kinds", () => {
-    const kinds = ["video", "podcast", "voice", "animation", "comic"] as const;
+    // Animation is excluded from this list because its runtime (added
+    // alongside the canvas-runtime extensibility pass) owns its OWN
+    // state shape (`animationState`) — same architectural pattern as
+    // game and image. The exhaustiveness test below still covers it.
+    const kinds = ["video", "podcast", "voice", "comic"] as const;
 
     for (const kind of kinds) {
       it(`returns timelineSpec (not gameState / imageState) for ${kind}`, () => {
@@ -147,10 +151,12 @@ describe("seedTemplate", () => {
         // At least one state-shaped field must be populated; which one
         // depends on the kind. Asserting the OR-shape catches "switch
         // returned bare { name }" regressions.
+        const r = result as typeof result & { animationState?: unknown };
         const hasSomePayload =
           result.timelineSpec !== undefined ||
           result.gameState !== undefined ||
-          result.imageState !== undefined;
+          result.imageState !== undefined ||
+          r.animationState !== undefined;
         expect(hasSomePayload).toBe(true);
       });
     }

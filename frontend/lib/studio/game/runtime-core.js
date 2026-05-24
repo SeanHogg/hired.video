@@ -61,17 +61,41 @@ export function tintForBehavior(behavior) {
 /** Per-sprite per-frame update. Behaviors fall through unknown values as
  *  no-ops — tolerant of future behavior additions. Mutates the sprite's
  *  instance fields in place (x / y / vy); the source GameSprite is never
- *  touched so "exit play mode" returns the canvas to authored positions. */
+ *  touched so "exit play mode" returns the canvas to authored positions.
+ *
+ *  When the sprite opts into physics (#1009 — `sprite.source.physics`
+ *  is set), the baked behavior cedes gravity + ground clamping to the
+ *  physics solver in `stepPhysics`. The behavior still handles INPUT
+ *  (left/right/jump) — input drives velocity, the solver integrates it. */
 export function updateSprite(sprite, dt, keys, worldWidth) {
   const behavior = sprite.source.behavior;
   if (!behavior) return;
+  const hasPhysics = !!sprite.source.physics && sprite.source.physics.kind === "dynamic";
 
   if (behavior === "platformer-player") {
     const params = sprite.source.params || {};
     const runSpeed = typeof params.runSpeed === "number" ? params.runSpeed : 200;
     const jumpPower = typeof params.jumpPower === "number" ? params.jumpPower : 500;
-    const gravity = 1400;
     const groundY = sprite.source.y;
+    if (hasPhysics) {
+      // Physics-on path: input drives vx + jump-impulse; the solver
+      // handles gravity, ground collision, and rest. Treat ground
+      // contact as "vy near 0 after collision-resolve" — close enough
+      // for jump gating in the MVP.
+      sprite.vx = 0;
+      if (keys.has("ArrowLeft") || keys.has("a")) sprite.vx = -runSpeed;
+      if (keys.has("ArrowRight") || keys.has("d")) sprite.vx = runSpeed;
+      const onGround = sprite.onGround === true;
+      if ((keys.has("ArrowUp") || keys.has(" ") || keys.has("w")) && onGround) {
+        sprite.vy = -jumpPower;
+        sprite.onGround = false;
+      }
+      return;
+    }
+    // Legacy hand-rolled physics path — kept identical to pre-#1009
+    // so existing projects continue to work without opting into the
+    // global physics system.
+    const gravity = 1400;
     if (keys.has("ArrowLeft") || keys.has("a")) sprite.x -= runSpeed * dt;
     if (keys.has("ArrowRight") || keys.has("d")) sprite.x += runSpeed * dt;
     const onGround = sprite.y >= groundY - 0.01;
@@ -96,6 +120,87 @@ export function updateSprite(sprite, dt, keys, worldWidth) {
   }
 
   // static / quiz-answer / memory-card / unknown — no per-frame update.
+}
+
+// ─── Physics solver (#1009) ───────────────────────────────────────────────
+//
+// Hand-rolled AABB physics — gravity integration + axis-aligned bounding-
+// box collision response. Three body kinds (per `GameSpritePhysics.kind`):
+//   - static    — immovable, infinite mass (platforms, walls)
+//   - kinematic — moved by behaviors / scripts, not by physics; dynamic
+//                 bodies still collide against them
+//   - dynamic   — affected by gravity + collisions
+//
+// Only the dynamic-vs-(static|kinematic) case is implemented in the MVP;
+// dynamic-vs-dynamic collisions (boxes pushing each other) are logged as
+// a follow-on. Same SoT pattern as block scripts: editor + exported
+// HTML5 bundle run identical code.
+
+export function stepPhysics(sprites, projectPhysics, dt) {
+  if (!projectPhysics) return;
+  const gravity = typeof projectPhysics.gravity === "number" ? projectPhysics.gravity : 0;
+  const friction = typeof projectPhysics.friction === "number" ? projectPhysics.friction : 0.1;
+
+  // Phase A — integrate velocity onto dynamic bodies.
+  for (let i = 0; i < sprites.length; i++) {
+    const s = sprites[i];
+    const p = s.source.physics;
+    if (!p || p.kind !== "dynamic") continue;
+    if (typeof s.vx !== "number") s.vx = 0;
+    if (typeof s.vy !== "number") s.vy = 0;
+    if (gravity !== 0) s.vy += gravity * dt;
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    // Reset onGround each tick; collision phase below re-sets it when
+    // the body lands.
+    s.onGround = false;
+  }
+
+  // Phase B — collision resolve. For each dynamic body, sweep against
+  // every other sprite; if their AABBs overlap, push apart along the
+  // shallowest penetration axis. Mirror the velocity component along
+  // the contact normal scaled by restitution (bouncy bodies bounce).
+  for (let i = 0; i < sprites.length; i++) {
+    const a = sprites[i];
+    const pa = a.source.physics;
+    if (!pa || pa.kind !== "dynamic") continue;
+    for (let j = 0; j < sprites.length; j++) {
+      if (i === j) continue;
+      const b = sprites[j];
+      const pb = b.source.physics;
+      // Dynamic-vs-dynamic collision is a follow-on; the MVP only
+      // handles dynamic-vs-(static|kinematic).
+      if (!pb || pb.kind === "dynamic") continue;
+      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      if (overlapX <= 0 || overlapY <= 0) continue;
+      const restitution = typeof pa.restitution === "number" ? pa.restitution : 0;
+      if (overlapX < overlapY) {
+        // Resolve horizontally — smaller overlap on X.
+        if (a.x + a.width / 2 < b.x + b.width / 2) {
+          a.x -= overlapX;
+        } else {
+          a.x += overlapX;
+        }
+        a.vx = -a.vx * restitution;
+      } else {
+        // Resolve vertically.
+        if (a.y + a.height / 2 < b.y + b.height / 2) {
+          // a landed on top of b — apply friction to horizontal vel
+          // (the surface drags the body) + mark onGround for the
+          // platformer-player's jump gate.
+          a.y -= overlapY;
+          a.onGround = true;
+          a.vx *= (1 - friction);
+          a.vy = a.vy > 0 ? -a.vy * restitution : a.vy;
+          if (Math.abs(a.vy) < 0.5) a.vy = 0; // rest threshold
+        } else {
+          a.y += overlapY;
+          a.vy = -a.vy * restitution;
+        }
+      }
+    }
+  }
 }
 
 // ─── Block-script interpreter ─────────────────────────────────────────────
@@ -549,6 +654,14 @@ export function runGame(canvas, state, opts) {
       //    platformer-player clamps Y to groundY each frame).
       for (let i = 0; i < sprites.length; i++) {
         updateSprite(sprites[i], dt, keys, canvas.width);
+      }
+      // 2b. Physics solver (#1009) — integrate gravity onto dynamic
+      //    bodies + resolve collisions against static / kinematic
+      //    bodies. Runs AFTER baked behaviors so the platformer-
+      //    player's input-driven vx update has landed; the solver
+      //    integrates the resulting velocity against the world.
+      if (state.physics) {
+        stepPhysics(sprites, state.physics, dt);
       }
     }
 

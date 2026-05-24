@@ -1133,6 +1133,9 @@ function toProjectDto(
     // for every other kind — same parallel-column pattern as `gameState`.
     // See `shared/image-state.ts`.
     imageState: project.imageState ?? null,
+    // Animation runtime state for mediaKind='animation' projects (#1003).
+    // Same parallel-column pattern. See `shared/animation-state.ts`.
+    animationState: project.animationState ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
@@ -1298,6 +1301,9 @@ studioRoutes.post("/save-draft", async (c) => {
     // (shape matches shared/image-state.ts); server stores verbatim
     // because the image runtime is the schema authority.
     imageState:     z.any().optional(),
+    // Animation state JSON for mediaKind='animation' projects (#1003).
+    // Same parallel-column pattern. See `shared/animation-state.ts`.
+    animationState: z.any().optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics
@@ -1325,7 +1331,7 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, animationState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
   // mediaKind is orthogonal (output axis) — patched separately when the
@@ -1334,13 +1340,14 @@ studioRoutes.post("/save-draft", async (c) => {
   // (#927 / #932); each lives on its own JSONB column per the canvas-
   // runtime extensibility model (PRD §1.2).
   const editorKindPatch =
-    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined
+    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined || animationState !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
           ...(mediaKind !== undefined ? { mediaKind } : {}),
           ...(timelineSpec !== undefined ? { timelineSpec } : {}),
           ...(gameState !== undefined ? { gameState } : {}),
           ...(imageState !== undefined ? { imageState } : {}),
+          ...(animationState !== undefined ? { animationState } : {}),
         }
       : {};
   const db = getDb();

@@ -9,8 +9,7 @@
 //
 // Podcaster + educator landed alongside the Phase 2 podcast templates.
 // voice_actor landed alongside the Phase 4 voice templates. animator
-// remains deferred to its Phase 5 template entries — keeping the list
-// anchored to populated audiences (no empty-state landings).
+// lands here with the Phase 5 animation templates (#1003 / #1013).
 
 export type Audience =
   | "athlete"
@@ -29,7 +28,8 @@ export type Audience =
   | "educator"
   | "voice_actor"
   | "game_dev"
-  | "illustrator";
+  | "illustrator"
+  | "animator";
 
 export interface AudienceDef {
   id: Audience;
@@ -127,6 +127,11 @@ export const AUDIENCES: AudienceDef[] = [
     id: "illustrator",
     label: "Illustrators",
     blurb: "Comics, drawing canvases, social posts, and OG cards — raster + vector tools with AI generation alongside.",
+  },
+  {
+    id: "animator",
+    label: "Animators",
+    blurb: "Frame-by-frame raster animation with onion-skin overlay — logo loops, reaction GIFs, explainer micro-loops exported as GIF / APNG / WebP.",
   },
 ];
 

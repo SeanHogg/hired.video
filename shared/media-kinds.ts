@@ -117,11 +117,12 @@ export function mediaKindUsesTimelineRuntime(kind: MediaKind): boolean {
 /** Whether the kind's render facade emits a Timeline-shaped output
  *  (frames per second + audio track → MP4 / MP3 / GIF / WebM). Closes
  *  the export-pipeline half of the predicate split tracked in #936:
- *  game / comic / image bundle their own export pipelines (HTML5 ZIP,
- *  PDF / CBZ / PNG strip, PNG / JPG / SVG) — they do NOT ride the
- *  ffmpeg.wasm / WebCodecs path the Timeline runtime uses. */
+ *  game / comic / image / animation bundle their own export pipelines
+ *  (HTML5 ZIP, PDF / CBZ / PNG strip, PNG / JPG / SVG, GIF89a / APNG /
+ *  WebP) — they do NOT ride the ffmpeg.wasm / WebCodecs path the
+ *  Timeline runtime uses. */
 export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
-  return kind !== "game" && kind !== "comic" && kind !== "image";
+  return kind !== "game" && kind !== "comic" && kind !== "image" && kind !== "animation";
 }
 
 /** Whether the kind authors via the v2 editor's `CanvasState` shape
@@ -131,19 +132,20 @@ export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
  *  surface half of the predicate split tracked in #936.
  *
  *  Returns:
- *   - `true`  for video / podcast / voice / animation / comic — comics
- *               author via CanvasState (pages = scenes, panels =
- *               widgets) even though their export pipeline is non-
- *               Timeline. This is the asymmetry that motivated #936.
- *   - `false` for game / image — these kinds mount their own canvas
- *               runtimes (`<GameStage>` / `<DrawingStage>`) which own
- *               their own state shape, inspectors, and toolbars. The
- *               Timeline shell is irrelevant chrome and was confusing
- *               users (Scene 1 / Duration / Widgets palette / Timeline
- *               scrubber all surfaced for a memory-match game).
+ *   - `true`  for video / podcast / voice / comic — comics author via
+ *               CanvasState (pages = scenes, panels = widgets) even
+ *               though their export pipeline is non-Timeline. This is
+ *               the asymmetry that motivated #936.
+ *   - `false` for game / image / animation — these kinds mount their
+ *               own canvas runtimes (`<GameStage>` / `<DrawingStage>`
+ *               / `<AnimationStage>`) which own their own state shape,
+ *               inspectors, and toolbars. The Timeline shell is
+ *               irrelevant chrome and was confusing users (Scene 1 /
+ *               Duration / Widgets palette / Timeline scrubber all
+ *               surfaced for a memory-match game).
  *  Future runtimes (cad / 3d_model) → false. */
 export function mediaKindUsesCanvasStateAuthoring(kind: MediaKind): boolean {
-  return kind !== "game" && kind !== "image";
+  return kind !== "game" && kind !== "image" && kind !== "animation";
 }
 
 // ─── Output profiles ─────────────────────────────────────────────────────────

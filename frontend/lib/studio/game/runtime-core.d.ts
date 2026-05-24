@@ -13,6 +13,7 @@ import type {
   BlockAction,
   GameAsset,
   GameLevel,
+  GamePhysicsSettings,
   GameSprite,
   GameState,
 } from "@shared/game-state";
@@ -27,6 +28,14 @@ export interface RuntimeSprite {
   width: number;
   height: number;
   vy: number;
+  /** Horizontal velocity. Tracked when the sprite opts into physics
+   *  (#1009); the platformer-player behavior also writes here in the
+   *  physics-on code path. */
+  vx?: number;
+  /** Set by the physics solver when the dynamic body landed on a
+   *  static / kinematic surface this tick — gates jump input on the
+   *  platformer-player behavior. */
+  onGround?: boolean;
   /** For memory-card behavior: whether the user has flipped this card. */
   flipped: boolean;
   /** For quiz-answer behavior: whether this answer has been picked. */
@@ -126,3 +135,13 @@ export function fireRules(
 ): void;
 
 export function applyAnimation(sprite: RuntimeSprite, ts: number): void;
+
+/** Integrate gravity onto dynamic bodies + resolve AABB collisions
+ *  against static / kinematic bodies. No-op when projectPhysics is
+ *  undefined. See `GameSprite.physics.kind` for the body classification.
+ *  #1009. */
+export function stepPhysics(
+  sprites: RuntimeSprite[],
+  projectPhysics: GamePhysicsSettings | undefined,
+  dt: number,
+): void;

@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import EntityHubTabStrip, { type EntityHubKind } from "@/components/EntityHubTabStrip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,12 @@ export interface EntityEditShellProps {
   maxWidthClass?: string;
   className?: string;
 
+  /** Entity family this edit surface belongs to. When set, the hub-level
+   *  tab strip (e.g. "My Resumes / Available / Sourced") renders above
+   *  the breadcrumb header — same component the hub list page uses —
+   *  with the user's last-visited tab highlighted (sessionStorage). */
+  hubEntity?: EntityHubKind;
+
   /** Editor body (CompanyBuilder, JobEditForm, ResumeBuilder, …). */
   children: ReactNode;
 }
@@ -114,6 +121,7 @@ export default function EntityEditShell({
   extraActions,
   maxWidthClass = "max-w-4xl",
   className,
+  hubEntity,
   children,
 }: EntityEditShellProps): JSX.Element {
   const parentSingular = parent.singular ?? singularize(parent.label);
@@ -212,6 +220,7 @@ export default function EntityEditShell({
   return (
     <AppShell bgClassName="bg-background">
       <div className={cn(maxWidthClass, "mx-auto p-4 md:p-6", className)}>
+        {hubEntity && <EntityHubTabStrip entity={hubEntity} />}
         {header}
         {body}
       </div>

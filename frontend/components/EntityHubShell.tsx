@@ -16,7 +16,7 @@
 //   - the SA-bypass rule lives in ONE place (`visibleTo` in persona.ts);
 //     each descriptor only names the positive role list
 
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import type { UserRole } from "@shared/user-roles";
@@ -24,6 +24,7 @@ import { visibleTo } from "@/lib/persona";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { usePermissions } from "@/hooks/use-permissions";
+import { writeEntityHubActiveTab, type EntityHubKind } from "@/components/EntityHubTabStrip";
 
 /** Either a node or a deferred render function. The shell only invokes
  *  the function for the *active* tab, so inactive tab bodies don't run. */
@@ -62,8 +63,10 @@ export interface EntityHubTab {
 }
 
 export interface EntityHubShellProps {
-  /** Entity name — drives the URL prefix (`/resumes`, `/jobs`, …). */
-  entity: "resume" | "job" | "person" | "company";
+  /** Entity name — drives the URL prefix (`/resumes`, `/jobs`, …) and
+   *  the sessionStorage slot that lets detail / edit / create pages
+   *  restore the user's last-visited tab in the strip. */
+  entity: EntityHubKind;
   /** Display-order tab descriptors. Filtered by role at render time. */
   tabs: EntityHubTab[];
   /** Default tab key when `?tab=` is missing or invalid for the viewer's
@@ -121,6 +124,13 @@ export default function EntityHubShell({
       })),
     [visibleTabs, entity, defaultTab],
   );
+
+  // Remember the user's active tab so EntityHubTabStrip on detail / edit
+  // / create pages can keep the same tab highlighted as they navigate
+  // deeper. Cleared only on session end — sessionStorage scope is fine.
+  useEffect(() => {
+    if (activeTab) writeEntityHubActiveTab(entity, activeTab.key);
+  }, [entity, activeTab?.key]);
 
   return (
     <AppShell bgClassName={bgClassName}>

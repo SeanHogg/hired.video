@@ -45,6 +45,7 @@ import ServiceInquiryDialog from "@/components/profile/dialogs/ServiceInquiryDia
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 
 import { useStartConversation } from "@/hooks/use-start-conversation";
 import { useAuth } from "@/lib/auth";
@@ -494,6 +495,9 @@ function PeopleDetailContent() {
     <>
       {shell(
         <div className="max-w-6xl mx-auto p-4 md:p-6">
+          {/* Hub-level tab strip — keeps the People / Connections /
+              Talent Pool / etc. context visible across profile pages. */}
+          <EntityHubTabStrip entity="person" />
           <PageHeader tabs={profileTabs} activeTabKey={activeProfileTab} />
 
           <div className="mb-6">

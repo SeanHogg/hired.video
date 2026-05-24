@@ -214,19 +214,19 @@ function wsQuery(w: WorkspaceParam | null | undefined): string {
 // ─── Service ──────────────────────────────────────────────────────────────
 class PaidMediaService {
   async listPlatforms() {
-    const res = await apiClient.get<{ data: Array<z.infer<typeof PlatformInfoSchema>> }>(
+    const res = await apiClient.get<Array<z.infer<typeof PlatformInfoSchema>>>(
       "/api/paid-media/platforms",
-      z.object({ data: z.array(PlatformInfoSchema) }),
+      z.array(PlatformInfoSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async listConnections() {
-    const res = await apiClient.get<{ data: Connection[] }>(
+    const res = await apiClient.get<Connection[]>(
       "/api/paid-media/connections",
-      z.object({ data: z.array(ConnectionSchema) }),
+      z.array(ConnectionSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async deleteConnection(id: string) {
@@ -234,56 +234,56 @@ class PaidMediaService {
   }
 
   async listAccounts() {
-    const res = await apiClient.get<{ data: Account[] }>(
+    const res = await apiClient.get<Account[]>(
       "/api/paid-media/accounts",
-      z.object({ data: z.array(AccountSchema) }),
+      z.array(AccountSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   /** Start the OAuth flow. Returns the URL the browser should
    *  navigate to (consent screen). Caller does `window.location.href = url`. */
   async startOAuth(platform: PaidMediaPlatform, workspace: WorkspaceParam | null = null, redirectTo?: string) {
-    const res = await apiClient.post<{ data: { url: string } }>(
+    const res = await apiClient.post<{ url: string }>(
       "/api/paid-media/oauth/start",
       { platform, workspace: serializeWorkspace(workspace), redirectTo },
-      z.object({ data: z.object({ url: z.string() }) }),
+      z.object({ url: z.string() }),
     );
-    return res.data.data.url;
+    return res.data.url;
   }
 
   async listCampaigns(workspace?: WorkspaceParam | null) {
-    const res = await apiClient.get<{ data: Campaign[] }>(
+    const res = await apiClient.get<Campaign[]>(
       `/api/paid-media/campaigns${wsQuery(workspace)}`,
-      z.object({ data: z.array(CampaignSchema) }),
+      z.array(CampaignSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async getCampaign(id: string) {
-    const res = await apiClient.get<{ data: Campaign }>(
+    const res = await apiClient.get<Campaign>(
       `/api/paid-media/campaigns/${id}`,
-      z.object({ data: CampaignSchema }),
+      CampaignSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async createCampaign(input: Partial<Campaign>, workspace?: WorkspaceParam | null) {
-    const res = await apiClient.post<{ data: Campaign }>(
+    const res = await apiClient.post<Campaign>(
       `/api/paid-media/campaigns${wsQuery(workspace)}`,
       input,
-      z.object({ data: CampaignSchema }),
+      CampaignSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async updateCampaign(id: string, patch: Partial<Campaign>) {
-    const res = await apiClient.patch<{ data: Campaign }>(
+    const res = await apiClient.patch<Campaign>(
       `/api/paid-media/campaigns/${id}`,
       patch,
-      z.object({ data: CampaignSchema }),
+      CampaignSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async deleteCampaign(id: string) {
@@ -291,63 +291,63 @@ class PaidMediaService {
   }
 
   async syncCampaign(campaignId: string, accountId: string) {
-    const res = await apiClient.post<{ data: { platform: string; success: boolean; externalId?: string; error?: string } }>(
+    const res = await apiClient.post<{ platform: string; success: boolean; externalId?: string; error?: string }>(
       `/api/paid-media/campaigns/${campaignId}/sync`,
       { accountId },
-      z.object({ data: z.object({ platform: z.string(), success: z.boolean(), externalId: z.string().optional(), error: z.string().optional() }) }),
+      z.object({ platform: z.string(), success: z.boolean(), externalId: z.string().optional(), error: z.string().optional() }),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async listAdSets(campaignId: string) {
-    const res = await apiClient.get<{ data: AdSet[] }>(
+    const res = await apiClient.get<AdSet[]>(
       `/api/paid-media/campaigns/${campaignId}/ad-sets`,
-      z.object({ data: z.array(AdSetSchema) }),
+      z.array(AdSetSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async createAdSet(campaignId: string, input: Partial<AdSet>) {
-    const res = await apiClient.post<{ data: AdSet }>(
+    const res = await apiClient.post<AdSet>(
       `/api/paid-media/campaigns/${campaignId}/ad-sets`,
       input,
-      z.object({ data: AdSetSchema }),
+      AdSetSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async listAds(adSetId: string) {
-    const res = await apiClient.get<{ data: Ad[] }>(
+    const res = await apiClient.get<Ad[]>(
       `/api/paid-media/ad-sets/${adSetId}/ads`,
-      z.object({ data: z.array(AdSchema) }),
+      z.array(AdSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async createAd(adSetId: string, input: Partial<Ad>) {
-    const res = await apiClient.post<{ data: Ad }>(
+    const res = await apiClient.post<Ad>(
       `/api/paid-media/ad-sets/${adSetId}/ads`,
       input,
-      z.object({ data: AdSchema }),
+      AdSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async listCreatives(workspace?: WorkspaceParam | null) {
-    const res = await apiClient.get<{ data: Creative[] }>(
+    const res = await apiClient.get<Creative[]>(
       `/api/paid-media/creatives${wsQuery(workspace)}`,
-      z.object({ data: z.array(CreativeSchema) }),
+      z.array(CreativeSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async createCreative(input: Partial<Creative>, workspace?: WorkspaceParam | null) {
-    const res = await apiClient.post<{ data: Creative }>(
+    const res = await apiClient.post<Creative>(
       `/api/paid-media/creatives${wsQuery(workspace)}`,
       input,
-      z.object({ data: CreativeSchema }),
+      CreativeSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async pullInsights(args: {
@@ -357,29 +357,29 @@ class PaidMediaService {
     since: string;
     until: string;
   }) {
-    const res = await apiClient.post<{ data: { count: number } }>(
+    const res = await apiClient.post<{ count: number }>(
       "/api/paid-media/insights/pull",
       args,
-      z.object({ data: z.object({ count: z.number() }) }),
+      z.object({ count: z.number() }),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async listInsights(params: { internalId?: string; since?: string; until?: string }) {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null) as [string, string][]).toString();
-    const res = await apiClient.get<{ data: Insight[] }>(
+    const res = await apiClient.get<Insight[]>(
       `/api/paid-media/insights?${qs}`,
-      z.object({ data: z.array(InsightSchema) }),
+      z.array(InsightSchema),
     );
-    return res.data.data;
+    return res.data;
   }
 
   async getPixels(workspace?: WorkspaceParam | null) {
-    const res = await apiClient.get<{ data: PixelConfig }>(
+    const res = await apiClient.get<PixelConfig>(
       `/api/paid-media/pixels${wsQuery(workspace)}`,
-      z.object({ data: PixelConfigSchema }),
+      PixelConfigSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   async savePixels(input: Partial<PixelConfig> & {
@@ -399,11 +399,11 @@ class PaidMediaService {
     if (workspaceCompanyId) qs.set("workspaceCompanyId", workspaceCompanyId);
     // PublicPixelConfigSchema's `configured` is optional so the "not
     // configured" response (`{ configured: false }`) parses cleanly.
-    const res = await apiClient.get<{ data: PublicPixelConfig }>(
+    const res = await apiClient.get<PublicPixelConfig>(
       `/api/paid-media/pixels/public${qs.toString() ? `?${qs.toString()}` : ""}`,
-      z.object({ data: PublicPixelConfigSchema }),
+      PublicPixelConfigSchema,
     );
-    return res.data.data;
+    return res.data;
   }
 
   /** Record a server-side conversion. The backend fans out to every
@@ -418,12 +418,12 @@ class PaidMediaService {
     properties?: Record<string, unknown>;
     sourceUrl?: string | null;
   }) {
-    const res = await apiClient.post<{ data: { id: string; delivery: Record<string, unknown> } }>(
+    const res = await apiClient.post<{ id: string; delivery: Record<string, unknown> }>(
       "/api/paid-media/conversions",
       input,
-      z.object({ data: z.object({ id: z.string(), delivery: z.record(z.string(), z.unknown()) }) }),
+      z.object({ id: z.string(), delivery: z.record(z.string(), z.unknown()) }),
     );
-    return res.data.data;
+    return res.data;
   }
 }
 

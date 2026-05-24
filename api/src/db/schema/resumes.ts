@@ -160,6 +160,12 @@ export const studioProjects = pgTable("studio_projects", {
   // `shared/image-state.ts` (layers + dimensions + history). Null for
   // every non-image project. Migration 0102.
   imageState: jsonb("image_state"),
+  // Animation state JSON for mediaKind='animation' projects. Same
+  // parallel-column pattern as `gameState` / `imageState`. Shape lives
+  // in `shared/animation-state.ts` (frames + fps + onion-skin depth +
+  // background + loop count). Null for every non-animation project.
+  // Migration 0106 / #1003.
+  animationState: jsonb("animation_state"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   // Project-level visibility. After the Save/Publish split (#665) the

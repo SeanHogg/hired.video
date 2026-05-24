@@ -49,6 +49,11 @@ export type CanvasRuntimeSurfaces = {
   /** Image / drawing runtime surface (#932). Mounted when
    *  `mediaKind === "image"`. */
   image?: ReactNode;
+  /** Animation runtime surface (#1003). Mounted when
+   *  `mediaKind === "animation"`. Frame-by-frame raster authoring with
+   *  onion-skin overlay; runtime owns its own state shape
+   *  (`AnimationState` in `shared/animation-state.ts`). */
+  animation?: ReactNode;
 };
 
 interface CanvasRouterProps {
@@ -67,6 +72,9 @@ export default function CanvasRouter({
   }
   if (mediaKind === "image" && surfaces.image !== undefined) {
     return surfaces.image;
+  }
+  if (mediaKind === "animation" && surfaces.animation !== undefined) {
+    return surfaces.animation;
   }
   return surfaces.timeline;
 }

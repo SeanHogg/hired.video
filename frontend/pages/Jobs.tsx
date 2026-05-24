@@ -102,7 +102,9 @@ import CreateJobAlertButton from "@/components/CreateJobAlertButton";
 import AdSlot from "@/components/ads/AdSlot";
 import CandidatesPanel from "@/components/recruit/CandidatesPanel";
 import { AppShell } from "@/components/AppShell";
-import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import PageHeader from "@/components/PageHeader";
+import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
+import { useJobsTabs } from "@/hooks/use-jobs-tabs";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import { recruitService } from "@/lib/services/recruit-service";
 
@@ -250,6 +252,14 @@ export default function Jobs() {
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
   const [candidateCount, setCandidateCount] = useState<number>(0);
+  // Hub tab strip — must call unconditionally (rules of hooks). Returns
+  // [] for unauthenticated viewers, who never reach the authed branch.
+  const topTabs = useJobsTabs({ totalJobs, candidateCount });
+  // Remember the user's current tab so the strip on /jobs/:id /
+  // /jobs/edit/:id / /jobs/create surfaces keeps it highlighted.
+  useEffect(() => {
+    writeEntityHubActiveTab("job", activeTab);
+  }, [activeTab]);
 
   // Saved Jobs state
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
@@ -676,29 +686,6 @@ export default function Jobs() {
         : undefined,
     });
 
-    const topTabs: PageHeaderTab[] = [
-      { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs", badge: totalJobs },
-      { key: "saved", label: "Saved", icon: Bookmark, to: "/jobs?tab=saved" },
-      { key: "applications", label: "Applications", icon: FileText, to: "/jobs?tab=applications" },
-      { key: "alerts", label: "Alerts", icon: Bell, to: "/jobs?tab=alerts" },
-      ...(canManageJobs
-        ? [
-            {
-              key: "posted",
-              label: "My Postings",
-              icon: Briefcase,
-              to: "/jobs?tab=posted",
-            } satisfies PageHeaderTab,
-            {
-              key: "candidates",
-              label: "Candidates",
-              icon: Users,
-              to: "/jobs?tab=candidates",
-              badge: candidateCount,
-            } satisfies PageHeaderTab,
-          ]
-        : []),
-    ];
 
     return (
       <AppShell bgClassName="bg-background">

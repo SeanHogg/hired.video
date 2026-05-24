@@ -152,6 +152,7 @@ export default function ResumeEditPage() {
   return (
     <>
       <EntityEditShell
+        hubEntity="resume"
         parent={{ label: "Resumes", to: "/resumes", icon: FileText }}
         entity={{ label: resume?.title, to: resume ? `/resumes/${resume.id}` : undefined }}
         description={description}

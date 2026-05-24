@@ -29,13 +29,18 @@
 
 export const GAME_STATE_SCHEMA_VERSION = 1;
 
-export type GameEngineId = "phaser-3";
+/** Which runtime executes this state. `canvas-2d` is the honest current
+ *  value — `runtime-core.js` is a hand-rolled Canvas-2D draw loop with
+ *  the physics solver added in #1009. The `phaser-3` enum slot is kept
+ *  for backwards compatibility (existing rows seeded the field with
+ *  that string before #1014 honesty cleanup); the runtime treats both
+ *  values identically today (the Canvas-2D loop). `matter-js` is
+ *  reserved for the future physics-engine swap. Closes #1014. */
+export type GameEngineId = "canvas-2d" | "phaser-3" | "matter-js";
 
 export interface GameState {
   schemaVersion: number;
-  /** Which runtime executes this state. Phaser 3 is the only option
-   *  today; the field is here so future runtimes (three-js / p5-js)
-   *  can plug in without a state-shape migration. */
+  /** Which runtime executes this state. See `GameEngineId` docs. */
   engine: GameEngineId;
   /** Output viewport dimensions. The runtime scales / letterboxes
    *  the rendered canvas to fit; this is the design-time reference. */
@@ -54,6 +59,25 @@ export interface GameState {
    *  Sources live in R2 (resolved via the existing MediaPicker flow);
    *  this array is the manifest the runtime preloads at boot. */
   assets: GameAsset[];
+  /** Project-level physics settings (#1009). Optional — when omitted
+   *  the runtime treats every sprite as kinematic (no gravity, no
+   *  collision response, behavior scripts move sprites directly).
+   *  Setting `physics: { gravity: 1200 }` turns on the gravity solver
+   *  for sprites that opt in via `GameSprite.physics.kind = "dynamic"`. */
+  physics?: GamePhysicsSettings;
+}
+
+/** Project-level physics knobs. Single source — every runtime tick
+ *  reads from here. Default values match a "2D platformer" feel: 1200
+ *  px/s² gravity (~120 px/frame at 60fps), 0.1 friction. */
+export interface GamePhysicsSettings {
+  /** Downward acceleration in pixels-per-second-squared. Positive
+   *  pulls sprites toward the bottom of the canvas. 0 = no gravity
+   *  (top-down games). */
+  gravity: number;
+  /** Surface friction coefficient applied to dynamic sprites resting
+   *  on a static / kinematic surface. 0..1; 0 = ice, 1 = velcro. */
+  friction: number;
 }
 
 /** A single state-graph node — a level, a menu screen, a cutscene. */
@@ -108,6 +132,37 @@ export interface GameSprite {
    *  vocabulary so a polish pass on Timeline animations ripples into
    *  games for free. `null` / undefined = sprite appears in place. */
   onMount?: AnimationSpec | null;
+  /** Per-sprite physics opt-in (#1009). When omitted the sprite is
+   *  treated as kinematic (the runtime moves it directly per
+   *  behavior / script — same as today). Setting `kind: "dynamic"`
+   *  turns on gravity + collision response for this sprite; `static`
+   *  marks it as an immovable platform that dynamic sprites collide
+   *  against. */
+  physics?: GameSpritePhysics;
+}
+
+/** Per-sprite physics opt-in. Three body kinds matching the Matter.js
+ *  / Box2D vocabulary (the project picks one of those engines in #1009
+ *  follow-on; the spec stays the same): */
+export interface GameSpritePhysics {
+  /** Body kind:
+   *   - `static`    — immovable, infinite mass (platforms, walls,
+   *                    ceilings). Dynamic bodies collide against
+   *                    static bodies; static bodies never move.
+   *   - `kinematic` — moved by behavior / scripts, NOT by physics.
+   *                    Dynamic bodies collide against kinematic
+   *                    bodies (e.g. a moving elevator). The default
+   *                    when `physics` is omitted entirely.
+   *   - `dynamic`   — affected by gravity + collisions. The player
+   *                    sprite + falling crates are dynamic. */
+  kind: "static" | "kinematic" | "dynamic";
+  /** Mass for collision response. Defaults to 1 — sprites of equal
+   *  mass push each other equally. A 10× mass crate pushes a 1× mass
+   *  sprite ~10× harder. */
+  mass?: number;
+  /** Bounciness — 0..1. 0 = absorbs all collision energy (a sandbag),
+   *  1 = perfectly elastic (a rubber ball). Default 0. */
+  restitution?: number;
 }
 
 // ─── Visual scripting (block coding) ─────────────────────────────────────
@@ -190,13 +245,19 @@ export function emptyGameState(opts: {
   const startId = "level-1";
   return {
     schemaVersion: GAME_STATE_SCHEMA_VERSION,
-    engine: "phaser-3",
+    // Honest current value (#1014) — the runtime is canvas-2D today.
+    // Phaser-3 swap is a future renderer choice tracked separately.
+    engine: "canvas-2d",
     width: opts.width ?? 1280,
     height: opts.height ?? 720,
     fps: opts.fps ?? 60,
     startLevelId: startId,
     levels: [defaultLevel(startId, "Level 1")],
     assets: [],
+    // Physics turned OFF by default (#1009) — existing projects
+    // continue to work with hand-rolled behaviors. Authors opt in by
+    // setting `physics: { gravity, friction }` here + flagging
+    // individual sprites with `physics.kind: "static" | "dynamic"`.
   };
 }
 

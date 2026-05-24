@@ -26,8 +26,8 @@ import { useHeaderFilters } from "@/lib/header-filters";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
+import { COMPANIES_HUB_DEFAULT_TAB, COMPANIES_HUB_TABS } from "@/hooks/use-companies-tabs";
 import ViewModeToggle from "@/components/ViewModeToggle";
-import { USER_ROLES } from "@shared/user-roles";
 import {
   Card,
   CardDescription,
@@ -458,49 +458,41 @@ export default function Companies() {
       </>
     );
 
-    const companyTabs: EntityHubTab[] = [
-      {
-        key: "browse",
-        label: "Companies",
-        icon: Building2,
-        roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+    // Bodies keyed by tab — joined onto COMPANIES_HUB_TABS (the SSoT for
+    // key / label / icon / roles / route) so the strip rendered on
+    // /companies/:id / edit / create surfaces can never drift.
+    const companyTabBodies: Record<string, Omit<EntityHubTab, "key" | "label" | "icon" | "roles"> | undefined> = {
+      browse: {
         title: "Companies",
         description: "Discover and explore companies",
         headerActions: browseActions,
         body: renderBrowseBody,
       },
-      {
-        key: "connections",
-        label: "Following",
-        icon: Eye,
-        roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      connections: {
         title: "Following",
         description: "Companies you're following.",
         badge: trackedCompanyCount > 0 ? trackedCompanyCount : undefined,
         body: renderConnectionsBody,
       },
-      {
-        key: "mine",
-        label: "My Companies",
-        icon: Building2,
-        roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      mine: {
         title: "My Companies",
         description: "Companies you manage.",
         headerActions: mineActions,
         body: renderMineBody,
       },
-      {
-        key: "team",
-        label: "Team",
-        icon: Trophy,
-        roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      team: {
         title: "Team leaderboard",
         description: "Per-recruiter pipeline activity. Sourcing, stage moves, hires.",
         body: () => <TeamLeaderboardPanel />,
       },
-    ];
+    };
+    const companyTabs: EntityHubTab[] = COMPANIES_HUB_TABS.map((meta) => {
+      const body = companyTabBodies[meta.key];
+      if (!body) throw new Error(`Missing body for company tab "${meta.key}"`);
+      return { key: meta.key, label: meta.label, icon: meta.icon, roles: meta.roles, ...body };
+    });
 
-    return <EntityHubShell entity="company" tabs={companyTabs} defaultTab="browse" />;
+    return <EntityHubShell entity="company" tabs={companyTabs} defaultTab={COMPANIES_HUB_DEFAULT_TAB} />;
   }
 
   // If user is not authenticated, show marketing page

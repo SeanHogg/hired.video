@@ -54,6 +54,7 @@ import { useSEO, generateStructuredData } from "@/lib/seo";
 import { toast } from "@/components/ui/use-toast";
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import { entityBreadcrumb } from "@/components/entity-breadcrumb";
 
 export default function CompanyDetail() {
@@ -247,6 +248,9 @@ export default function CompanyDetail() {
   return (
     <AppShell bgClassName="bg-background">
         <div className="max-w-6xl mx-auto p-4 md:p-6">
+          {/* Hub-level tab strip — keeps the Companies / Following /
+              My Companies / Team context visible across detail pages. */}
+          <EntityHubTabStrip entity="company" />
           <PageHeader tabs={companyTabs} activeTabKey="current" />
 
             {/* Company Header */}

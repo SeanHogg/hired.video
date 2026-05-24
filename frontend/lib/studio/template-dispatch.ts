@@ -33,8 +33,10 @@ import { seedCanvasFromTemplate } from "./editor-v2/template-seeds";
 import { canvasStateToTimeline } from "./editor-v2/timeline-emit";
 import { seedGameFromTemplate } from "./game/game-seeds";
 import { seedImageFromTemplate } from "./image/image-seeds";
+import { seedAnimationFromTemplate } from "./animation/animation-seeds";
 import type { GameState } from "@shared/game-state";
 import type { ImageState } from "@shared/image-state";
+import type { AnimationState } from "@shared/animation-state";
 
 /** Discriminated payload — exactly ONE state-shaped field is set per
  *  result; the shape mirrors what `saveDraft` accepts on the wire.
@@ -50,6 +52,9 @@ export interface TemplateSeedPayload {
   gameState?: GameState;
   /** Image state JSON for `mediaKind: "image"`. Undefined for other kinds. */
   imageState?: ImageState;
+  /** Animation state JSON for `mediaKind: "animation"` (#1003). Undefined
+   *  for other kinds. */
+  animationState?: AnimationState;
   // Future: cadState?, sceneState?, …
 }
 
@@ -65,14 +70,20 @@ export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
       return { name, gameState: seedGameFromTemplate(template.id) };
     case "image":
       return { name, imageState: seedImageFromTemplate(template.id) };
+    case "animation":
+      // Animation mediaKind (#1003) mounts the frame-by-frame
+      // <AnimationStage> runtime; its seed registry lives in
+      // `animation/animation-seeds.ts`. No timelineSpec emitted —
+      // export goes through the GIF/APNG/WebP encoder strategies.
+      return { name, animationState: seedAnimationFromTemplate(template.id) };
     case "video":
     case "podcast":
     case "voice":
-    case "animation":
     case "comic":
-      // All Timeline-runtime kinds (and comic which authors via
-      // CanvasState today per the user's enum addition) share the same
-      // canvas seed registry.
+      // Timeline-runtime kinds (and comic which authors via CanvasState
+      // today per the user's enum addition) share the same canvas seed
+      // registry. Animation was MOVED OUT of this branch in #1003 —
+      // animation now has its own canvas runtime.
       return {
         name,
         timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),
