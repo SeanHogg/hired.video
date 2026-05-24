@@ -5,13 +5,12 @@
  * Per the canvas-runtime extensibility model (#931 / PRD §1.2), every
  * kind has its own preview path; this component dispatches:
  *
- *   1. **Timeline-runtime kinds with visible frames** (video, animation,
- *      comic — which authors via CanvasState) render the first scene
- *      of the project's `timelineSpec` via the shared
- *      `<SceneThumbnail/>` (the same v2 widget renderer the editor
- *      canvas uses), so what consumers see ALWAYS matches the
- *      project's current canvas — no stale baked PNG/JPG drift after
- *      an edit.
+ *   1. **Timeline-runtime kinds with visible frames** (video, comic —
+ *      which authors via CanvasState) render the first scene of the
+ *      project's `timelineSpec` via the shared `<SceneThumbnail/>`
+ *      (the same v2 widget renderer the editor canvas uses), so what
+ *      consumers see ALWAYS matches the project's current canvas — no
+ *      stale baked PNG/JPG drift after an edit.
  *   2. **Audio-only Timeline kinds** (podcast, voice) render the
  *      synthetic-peaks `<WaveformThumbnail/>` so the chooser's "My
  *      videos" grid distinguishes a podcast row from a video one at a
@@ -25,6 +24,10 @@
  *      `<DrawingPlaceholderThumbnail/>` (the same Photoshop-shaped
  *      visual the catalog card uses, so a fresh drawing project tile
  *      reads identically to its source template).
+ *   5. **Animation kind** (#1003) renders the first painted frame's
+ *      pixels when present (mirrors image-kind), else a kind-tagged
+ *      gradient placeholder so the tile is still distinguishable
+ *      before the user has drawn anything.
  *
  * Baked artifact URLs (`project.thumbnailUrl`) are intentionally NOT
  * consulted — they freeze the moment of last render and can't reflect
@@ -43,6 +46,7 @@ import WaveformThumbnail from "./WaveformThumbnail";
 import { mediaKindHasVideo } from "@shared/media-kinds";
 import { firstLayerPixels, type ImageState } from "@shared/image-state";
 import type { GameState } from "@shared/game-state";
+import { firstFramePixels, type AnimationState } from "@shared/animation-state";
 import GameStateThumbnail from "@/components/studio/game/GameStateThumbnail";
 import DrawingPlaceholderThumbnail from "@/components/studio/drawing/DrawingPlaceholderThumbnail";
 import { cn } from "@/lib/utils";
@@ -97,6 +101,43 @@ export default function VideoProjectThumbnail({
     return (
       <div className={cn("relative h-full w-full", className)}>
         <DrawingPlaceholderThumbnail width={width} height={height} />
+      </div>
+    );
+  }
+
+  // Animation projects (#1003) render the first painted frame as the
+  // tile preview — mirrors the image-kind path so the "My videos" grid
+  // visually distinguishes an animation row from a video one even
+  // before the user has painted on it. Fresh projects with no painted
+  // frame yet fall through to the kind-aware gradient placeholder
+  // below (the chip on top + the kind badge cue the user to keep
+  // drawing).
+  if (mediaKind === "animation") {
+    const animationState = (project.animationState as AnimationState | null | undefined) ?? null;
+    const pixels = firstFramePixels(animationState);
+    if (pixels) {
+      return (
+        <div className={cn("h-full w-full bg-slate-100", className)}>
+          <img
+            src={pixels}
+            alt=""
+            className="h-full w-full object-contain"
+            draggable={false}
+          />
+        </div>
+      );
+    }
+    return (
+      <div
+        className={cn(
+          "flex h-full w-full items-center justify-center bg-gradient-to-br from-fuchsia-500/30 to-violet-700/40 text-white",
+          className,
+        )}
+      >
+        <div className="text-center text-[10px] font-semibold uppercase tracking-widest opacity-80">
+          <Sparkles className="mx-auto mb-1 h-4 w-4" />
+          Animation
+        </div>
       </div>
     );
   }

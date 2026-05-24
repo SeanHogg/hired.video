@@ -104,27 +104,39 @@ import SpritePalette from "@/components/studio/game/SpritePalette";
 import GamePropertiesPanel, {
   type GameSelection,
 } from "@/components/studio/game/GamePropertiesPanel";
-import { updateSprite as gameUpdateSprite } from "@/lib/studio/game/game-state-edit";
+import {
+  updateSprite as gameUpdateSprite,
+  addSprite as gameAddSprite,
+  addCustomSpriteAsset as gameAddCustomSpriteAsset,
+} from "@/lib/studio/game/game-state-edit";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
-import { type AnimationState, createBlankAnimationState } from "@shared/animation-state";
+import {
+  type AnimationState,
+  createBlankAnimationState,
+  updateFramePixels,
+} from "@shared/animation-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
 import { seedAnimationFromTemplate } from "@/lib/studio/animation/animation-seeds";
 import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
 import DrawingToolPalette from "@/components/studio/drawing/DrawingToolPalette";
 import DrawingAiPromptPanel from "@/components/studio/drawing/DrawingAiPromptPanel";
+import MediaAiPromptPanel from "@/components/studio/ai/MediaAiPromptPanel";
+import AiSelectionChip from "@/components/studio/ai/AiSelectionChip";
 import {
-  clearRectOnLayer,
+  clearSelectionOnLayer,
+  compositeImageIntoSelection,
   drawBlobToCanvasFit,
-  fillRectOnLayer,
+  fillSelectionOnLayer,
   flattenCanvasToBlob,
   hydrateLayerCanvas,
   serializeLayer,
   createOffscreenCanvas,
 } from "@/lib/studio/drawing/drawing-engine";
-import type { MarqueeRect } from "@/components/studio/drawing/DrawingStage";
+import { generateImage } from "@/lib/services/image-gen-engine";
+import type { MarqueeSelection } from "@/components/studio/drawing/DrawingStage";
 import {
   DEFAULT_BRUSH,
   MAX_RECENT_COLORS,
@@ -140,6 +152,7 @@ import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
 import { useCanvasClipboard } from "@/lib/studio/editor-v2/use-canvas-clipboard";
 import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts";
 import { useScreenshotCapture } from "@/lib/studio/editor-v2/use-screenshot-capture";
+import { useKindHydration } from "@/lib/studio/editor-v2/use-kind-hydration";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
@@ -378,9 +391,19 @@ export default function StudioEditorV2() {
   // it without DrawingStage being in the path. Cleared whenever the
   // active tool changes away from `marquee` so a stale rect doesn't
   // linger when the user picks the brush.
-  const [imageMarquee, setImageMarquee] = useState<MarqueeRect | null>(null);
+  const [imageMarquee, setImageMarquee] = useState<MarqueeSelection | null>(null);
+  // Clear the selection whenever the user switches AWAY from any
+  // selection-emitting tool. Selection-emitting tools today: marquee,
+  // lasso, magic-wand, quick-select. Brush / eraser / fill / hand
+  // don't produce selections so leaving a stale rect when switching
+  // would be confusing.
   useEffect(() => {
-    if (imageTool !== "marquee" && imageMarquee !== null) setImageMarquee(null);
+    const isSelectionTool =
+      imageTool === "marquee" ||
+      imageTool === "lasso" ||
+      imageTool === "magic-wand" ||
+      imageTool === "quick-select";
+    if (!isSelectionTool && imageMarquee !== null) setImageMarquee(null);
   }, [imageTool, imageMarquee]);
 
   // ─── Image-runtime layer-mutation handlers (lifted from DrawingStage) ──
@@ -551,15 +574,13 @@ export default function StudioEditorV2() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [animationState, title]);
 
-  // Marquee actions — Delete clears pixels inside the rect on the
-  // active layer; Fill paints the rect with the current brush color.
-  // Both mutations go through the shared pure helpers
-  // (`clearRectOnLayer` / `fillRectOnLayer`) so the engine is the
-  // single source of truth for "modify layer pixels in a rect."
-  // Mutations re-hydrate the active layer's offscreen, mutate, then
-  // serialize back to the dataURL — same shape commitActiveLayerToState
-  // produces from a brush stroke, so undo/redo treats them as ordinary
-  // history checkpoints.
+  // Selection actions — Delete clears pixels inside the selection on
+  // the active layer; Fill paints the selection with the current
+  // brush color. Both dispatch through the shared kind-aware engine
+  // helpers (`clearSelectionOnLayer` / `fillSelectionOnLayer`) — ONE
+  // pair of functions handles rect / path (lasso) / mask (magic-wand,
+  // quick-select) shapes. Per DRY adding a future selection tool
+  // (elliptical, polygonal) means zero changes here.
   const applyMarqueeOp = useCallback(
     async (op: "delete" | "fill") => {
       if (!imageMarquee) return;
@@ -570,14 +591,13 @@ export default function StudioEditorV2() {
       const ctx = offscreen.getContext("2d");
       if (!ctx) return;
       if (op === "delete") {
-        clearRectOnLayer(ctx, imageMarquee.x, imageMarquee.y, imageMarquee.width, imageMarquee.height);
+        clearSelectionOnLayer(ctx, imageState.width, imageState.height, imageMarquee);
       } else {
-        fillRectOnLayer(
+        fillSelectionOnLayer(
           ctx,
-          imageMarquee.x,
-          imageMarquee.y,
-          imageMarquee.width,
-          imageMarquee.height,
+          imageState.width,
+          imageState.height,
+          imageMarquee,
           imageBrush.color,
         );
         pushImageRecentColor(imageBrush.color);
@@ -596,6 +616,93 @@ export default function StudioEditorV2() {
   );
   const handleImageMarqueeDelete = useCallback(() => void applyMarqueeOp("delete"), [applyMarqueeOp]);
   const handleImageMarqueeFill = useCallback(() => void applyMarqueeOp("fill"), [applyMarqueeOp]);
+
+  // AI inpaint (#1103) — when a selection is active, prompts the user
+  // for a description, generates an image (img→img if the active
+  // layer has pixels), composites the result MASKED to the selection.
+  // The rest of the active layer's pixels are preserved. Uses the
+  // browser's `prompt()` for now — a richer inline UI is logged as a
+  // follow-on.
+  const handleImageMarqueeInpaint = useCallback(async () => {
+    if (!imageMarquee) return;
+    const promptText = window.prompt("Describe what should fill the selection:");
+    if (!promptText || promptText.trim().length < 3) return;
+    const layer = findImageLayer(imageState, imageState.activeLayerId);
+    if (!layer || layer.locked) return;
+    try {
+      const result = await generateImage({
+        prompt: promptText.trim(),
+        width: imageState.width,
+        height: imageState.height,
+      });
+      const offscreen = createOffscreenCanvas(imageState.width, imageState.height);
+      await hydrateLayerCanvas(offscreen, layer.pixelsDataUrl);
+      const ctx = offscreen.getContext("2d");
+      if (!ctx) return;
+      const img = new Image();
+      const url = URL.createObjectURL(result.blob);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Failed to decode AI result"));
+          img.src = url;
+        });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      compositeImageIntoSelection(ctx, imageState.width, imageState.height, img, imageMarquee);
+      const pixels = serializeLayer(offscreen);
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layer.id ? { ...l, pixelsDataUrl: pixels } : l,
+        ),
+        aiPromptHistory: [
+          ...prev.aiPromptHistory,
+          {
+            id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
+            prompt: `[inpaint] ${promptText.trim()}`,
+            at: new Date().toISOString(),
+            engineId: result.engine,
+            ...(result.resultUrl ? { resultUrl: result.resultUrl } : {}),
+          },
+        ].slice(-50),
+      }));
+      imageCommit();
+      setImageMarquee(null);
+      URL.revokeObjectURL(result.previewUrl);
+    } catch (err) {
+      toast({
+        title: "AI fill failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }, [imageMarquee, imageState, setImageState, imageCommit, toast]);
+
+  // Hand-tool transform commit — DrawingStage's TransformHandles emit
+  // the combined offset / scale / rotation; the host writes it back to
+  // the active layer's transform fields. Per DRY the host owns the
+  // layer-mutation handler; DrawingStage just renders the chrome.
+  const handleImageLayerTransform = useCallback(
+    (next: { offset: { x: number; y: number }; scale: { x: number; y: number }; rotation: number }) => {
+      const layerId = imageState.activeLayerId;
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layerId
+            ? {
+                ...l,
+                transformOffset: next.offset,
+                transformScale: next.scale,
+                transformRotation: next.rotation,
+              }
+            : l,
+        ),
+      }));
+    },
+    [imageState.activeLayerId, setImageState],
+  );
 
   // AI-result layer insert — appends a new layer with the generated
   // pixels + records one entry on `aiPromptHistory`. Lives in the host
@@ -663,6 +770,27 @@ export default function StudioEditorV2() {
     },
     [imageState.width, imageState.height, setImageState, imageCommit],
   );
+
+  // AI-result animation-frame insert — overwrites the active frame's
+  // pixels (default UX is "regenerate this frame"). Mirrors the
+  // image-kind handler shape so the right-rail panel can call it
+  // without AnimationStage being in the path. Cross-studio first-class
+  // AI rollout: animation kind now has the same prompt UX as drawing.
+  const handleAnimationAiGenerated = useCallback(
+    async (result: ImageGenResult) => {
+      const dataUrl = await drawBlobToCanvasFit(
+        result.blob,
+        animationState.width,
+        animationState.height,
+      );
+      setAnimationState((prev) =>
+        updateFramePixels(prev, prev.activeFrameId, dataUrl),
+      );
+      animationCommit();
+    },
+    [animationState.width, animationState.height, setAnimationState, animationCommit],
+  );
+
   // Game-runtime state for `mediaKind: "game"` projects (#939 Phase 2b).
   // Same shape as `imageState` — local state hydrated from
   // `persistedProject.gameState`, edited via the shared shell (LevelsRail /
@@ -688,6 +816,37 @@ export default function StudioEditorV2() {
       : null;
   const selectedSpriteId =
     gameSelection.kind === "sprite" ? gameSelection.spriteId : null;
+
+  // Game-kind AI-result handler — registers the generated PNG as a new
+  // custom sprite asset and mints a fresh sprite on the active level.
+  // Asset URL is the durable R2 CDN URL the route already persists, so
+  // the runtime preloads it the same way it preloads user-uploaded
+  // sprites. Per the cross-studio first-class AI rollout: game kind
+  // gets the same prompt UX as drawing — type a prompt, get a sprite.
+  const handleGameAiGenerated = useCallback(
+    (result: ImageGenResult, prompt: string) => {
+      if (!gameState) return;
+      // Asset URL — server-side R2 path. Fall back to the blob URL only
+      // for the (currently unreachable) WebGPU client engine; that path
+      // can't reload across sessions, but at least the user sees the
+      // sprite in this session.
+      const url = result.resultUrl ?? result.previewUrl;
+      const levelId = activeLevelId ?? gameState.startLevelId ?? gameState.levels[0]?.id;
+      if (!levelId) return;
+      const assetId = `ai-${Math.random().toString(36).slice(2, 10)}`;
+      let next = gameAddCustomSpriteAsset(gameState, { id: assetId, url });
+      const added = gameAddSprite(next, levelId, { behavior: null, assetId });
+      // Stamp the assetId onto the sprite — addSprite's opts only carry
+      // it as a hint, the sprite's `assetId` field is the SoT for the
+      // runtime. updateSprite is the canonical mutator.
+      next = gameUpdateSprite(added.state, levelId, added.sprite.id, { assetId });
+      void prompt;
+      setGameState(next);
+      setGameSelection({ kind: "sprite", levelId, spriteId: added.sprite.id });
+    },
+    [gameState, activeLevelId],
+  );
+
   const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
   const [selection, setSelection] = useState<Selection>({
     kind: "scene",
@@ -771,67 +930,55 @@ export default function StudioEditorV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistedProject]);
 
-  // Hydrate / seed image-runtime state when the editor mounts on an
-  // image-kind project. Existing rows arrive with `persistedProject.imageState`
-  // populated; fresh rows arrive with it null and we seed a blank
-  // canvas at template-appropriate dimensions. The history hook is
-  // always mounted (DRY: same hook the Timeline runtime uses);
-  // `imageStateHydrated` tracks whether the current state corresponds
-  // to the loaded project — DrawingStage mounts only when true.
-  useEffect(() => {
-    if (currentMediaKind !== "image") {
-      if (imageStateHydrated) setImageStateHydrated(false);
-      return;
-    }
-    if (imageStateHydrated) return;
-    const serverImage = persistedProject?.imageState as ImageState | null | undefined;
-    // `reset` (not `setState`) clears past/future stacks so undo can't
-    // take the user below the just-loaded server state — mirrors the
-    // Timeline runtime's resetHistory behavior in the server-load
-    // effect below.
-    resetImageHistory(serverImage ?? seedImageFromTemplate(templateHint));
-    setImageStateHydrated(true);
-    // imageStateHydrated is intentionally read once per mediaKind /
-    // persistedProject pair — we don't want a server round-trip to
-    // clobber in-flight edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMediaKind, persistedProject]);
+  // Per-kind runtime hydration — three previously-bespoke useEffect
+  // blocks unified through `useKindHydration` (closes the studio-
+  // audit DRY finding). Each hook call owns one runtime's lifecycle:
+  //   - kind matches + not hydrated → seed (or read serverState)
+  //   - kind doesn't match + was hydrated → unhydrate
+  //   - kind matches + already hydrated → no-op (preserves edits)
+  // Adding a new mediaKind = one more `useKindHydration` call here.
+  useKindHydration<ImageState>({
+    active: currentMediaKind === "image",
+    hydrated: imageStateHydrated,
+    serverState: persistedProject?.imageState as ImageState | null | undefined,
+    seed: () => seedImageFromTemplate(templateHint),
+    hydrate: (next) => {
+      // `reset` (not `setState`) clears past/future stacks so undo
+      // can't take the user below the just-loaded server state —
+      // mirrors the Timeline runtime's resetHistory behavior.
+      resetImageHistory(next);
+      setImageStateHydrated(true);
+    },
+    unhydrate: () => setImageStateHydrated(false),
+  });
 
-  // Hydrate / seed animation-runtime state when the editor mounts on
-  // an animation-kind project. Mirrors the image hydration above —
-  // server rows arrive with `persistedProject.animationState` populated;
-  // fresh rows arrive with it null and we seed from the template hint.
-  useEffect(() => {
-    if (currentMediaKind !== "animation") {
-      if (animationStateHydrated) setAnimationStateHydrated(false);
-      return;
-    }
-    if (animationStateHydrated) return;
-    const serverAnim = persistedProject?.animationState as AnimationState | null | undefined;
-    resetAnimationHistory(serverAnim ?? seedAnimationFromTemplate(templateHint));
-    setAnimationStateHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMediaKind, persistedProject]);
+  useKindHydration<AnimationState>({
+    active: currentMediaKind === "animation",
+    hydrated: animationStateHydrated,
+    serverState: persistedProject?.animationState as AnimationState | null | undefined,
+    seed: () => seedAnimationFromTemplate(templateHint),
+    hydrate: (next) => {
+      resetAnimationHistory(next);
+      setAnimationStateHydrated(true);
+    },
+    unhydrate: () => setAnimationStateHydrated(false),
+  });
 
-  // Parallel hydration path for `gameState` — same shape as imageState
-  // above. Game projects arrive with `persistedProject.gameState`
-  // populated (the chooser writes it on first save via
-  // `seedGameFromTemplate`). For non-game projects we drop the state to
-  // null. The default-active-level effect below (one useEffect down)
-  // initialises the `activeLevelId` selection once the gameState lands.
-  useEffect(() => {
-    if (currentMediaKind !== "game") {
-      if (gameState !== null) setGameState(null);
-      return;
-    }
-    if (gameState !== null) return;
-    const serverGame = persistedProject?.gameState as
+  // Game uses the null-sentinel hydration pattern instead of a
+  // separate boolean flag — `gameState !== null` IS the hydration
+  // signal. No local `seed` because the first-save pipeline
+  // (`seedGameFromTemplate` in `useCreateStudioDraft`) writes
+  // gameState upstream before this hook fires; this hook waits.
+  useKindHydration<import("@shared/game-state").GameState>({
+    active: currentMediaKind === "game",
+    hydrated: gameState !== null,
+    serverState: persistedProject?.gameState as
       | import("@shared/game-state").GameState
       | null
-      | undefined;
-    if (serverGame) setGameState(serverGame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMediaKind, persistedProject]);
+      | undefined,
+    hydrate: (next) => setGameState(next),
+    unhydrate: () => setGameState(null),
+  });
 
   // Default the editor's selection to the project's startLevelId once
   // gameState hydrates — the user lands on the level the runtime would
@@ -2251,6 +2398,10 @@ export default function StudioEditorV2() {
                           onMarqueeFill={
                             imageMarquee ? handleImageMarqueeFill : undefined
                           }
+                          onMarqueeInpaint={
+                            imageMarquee ? handleImageMarqueeInpaint : undefined
+                          }
+                          onLayerTransform={handleImageLayerTransform}
                           onCanvasReady={setImageCanvas}
                         />
                       ) : null,
@@ -2457,7 +2608,21 @@ export default function StudioEditorV2() {
             )}
           </section>
 
-          {/* RIGHT — properties panel. Also hosts the previously-DESIGN-tab
+          {/* RIGHT — vertical column of stacked CollapsiblePanels. The
+              row flex above lays the LEFT panel, middle section, and
+              this column out horizontally; inside this column the
+              panels stack VERTICALLY (each `side="right"` panel
+              collapses HORIZONTALLY independently, sharing the column
+              width).
+
+              Today the column holds two panels:
+                1. Properties / Game inspector / Drawing AI (kind-
+                   aware — only one of the three mounts at a time)
+                2. Cross-studio AI prompt (mounts for every non-image
+                   kind — image already has the drawing AI panel on
+                   top, which includes the prompt UX + extra knobs) */}
+          <div className="flex flex-col">
+          {/* PROPERTIES — also hosts the previously-DESIGN-tab
               configuration (themes / fonts / palette / motion / music /
               format / export) under a "Canvas" section group, surfaced
               when no widget is selected. Selecting a widget swaps the
@@ -2475,7 +2640,7 @@ export default function StudioEditorV2() {
             side="right"
             label="Properties"
             storageKey="studio.v2.panel.right"
-            expandedClassName="w-72"
+            expandedClassName="w-72 flex-1 overflow-y-auto"
           >
             <PropertiesPanel
               state={state}
@@ -2569,7 +2734,11 @@ export default function StudioEditorV2() {
               {/* Image-kind right rail — the AI prompt panel mounts in
                   the SAME `<CollapsiblePanel/>` Timeline kinds use for
                   PropertiesPanel + game uses for GamePropertiesPanel.
-                  One layout shell, kind-aware contents (per DRY). */}
+                  One layout shell, kind-aware contents (per DRY). The
+                  drawing kind uses the wrapped DrawingAiPromptPanel
+                  (adds the Replace-layer + Transparent-BG knobs); other
+                  kinds get the bare `MediaAiPromptPanel` mounted below
+                  this switcher (next sibling). */}
               <DrawingAiPromptPanel
                 history={imageState.aiPromptHistory}
                 onGenerated={(result, prompt, options) =>
@@ -2578,6 +2747,60 @@ export default function StudioEditorV2() {
               />
             </CollapsiblePanel>
           ) : null}
+
+          {/* Cross-studio AI prompt — appended to the right rail for
+              every kind that doesn't already host an AI prompt panel
+              (i.e. everything except image, which has the drawing
+              wrapper above). Per the user's first-class AI rollout:
+              every studio kind gets the same prompt UX, with kind-
+              specific `onGenerated` handlers that drop the result onto
+              the right canvas surface (sprite for game, frame for
+              animation, image widget for timeline kinds). Same shell
+              (`<CollapsiblePanel/>`), same shared body
+              (`<MediaAiPromptPanel/>`) — DRY all the way down. */}
+          {currentMediaKind !== "image" && (
+            <CollapsiblePanel
+              side="right"
+              label="AI"
+              storageKey="studio.v2.panel.right.ai"
+              expandedClassName="w-72"
+              defaultOpen={false}
+            >
+              {currentMediaKind === "game" && gameState ? (
+                <MediaAiPromptPanel
+                  kindNoun="sprite"
+                  placeholder="A pixel-art hero sprite, side view…"
+                  onGenerated={(result, prompt) =>
+                    handleGameAiGenerated(result, prompt)
+                  }
+                />
+              ) : currentMediaKind === "animation" && animationStateHydrated ? (
+                <MediaAiPromptPanel
+                  kindNoun="frame"
+                  placeholder="A bouncing ball, current frame mid-arc…"
+                  onGenerated={(result) =>
+                    void handleAnimationAiGenerated(result)
+                  }
+                />
+              ) : (
+                <MediaAiPromptPanel
+                  kindNoun="image"
+                  placeholder="A clean studio backdrop, soft warm lighting…"
+                  onGenerated={(result) => {
+                    // Timeline kinds (video/podcast/voice/comic): drop
+                    // the generated image into the active scene as a
+                    // new image widget. Reuses `addMediaWidget` — the
+                    // SAME path the MediaPicker uses — so undo / save /
+                    // export all behave identically regardless of
+                    // image origin.
+                    const url = result.resultUrl ?? result.previewUrl;
+                    addMediaWidget("image", url, 0);
+                  }}
+                />
+              )}
+            </CollapsiblePanel>
+          )}
+          </div>
         </div>
       </div>
       {previewOpen && (

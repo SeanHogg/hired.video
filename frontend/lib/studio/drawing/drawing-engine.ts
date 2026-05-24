@@ -177,8 +177,10 @@ export async function hydrateLayerCanvas(
 
 /** Composite the background + all visible layers onto `dest`. Caller
  *  supplies the per-layer offscreen canvases keyed by layer id; the
- *  function reads layer order, opacity, visibility, and transformOffset
- *  from `state`. */
+ *  function reads layer order, opacity, visibility, transformOffset,
+ *  transformScale, and transformRotation from `state`. The transform
+ *  pivot is the layer's bounding-box CENTRE (matches V2 Video's widget
+ *  rotation pivot — `transformOrigin: center`). */
 export function compositeLayers(
   dest: CanvasRenderingContext2D,
   width: number,
@@ -190,6 +192,8 @@ export function compositeLayers(
     opacity: number;
     blendMode: GlobalCompositeOperation | string;
     transformOffset?: { x: number; y: number };
+    transformScale?: { x: number; y: number };
+    transformRotation?: number;
   }>,
   layerCanvases: ReadonlyMap<string, HTMLCanvasElement>,
 ): void {
@@ -212,7 +216,25 @@ export function compositeLayers(
     dest.globalCompositeOperation = "source-over";
     const offsetX = layer.transformOffset?.x ?? 0;
     const offsetY = layer.transformOffset?.y ?? 0;
-    dest.drawImage(layerCanvas, offsetX, offsetY);
+    const scaleX = layer.transformScale?.x ?? 1;
+    const scaleY = layer.transformScale?.y ?? 1;
+    const rotation = layer.transformRotation ?? 0;
+    const hasNonIdentity =
+      offsetX !== 0 || offsetY !== 0 || scaleX !== 1 || scaleY !== 1 || rotation !== 0;
+    if (!hasNonIdentity) {
+      dest.drawImage(layerCanvas, 0, 0);
+      continue;
+    }
+    // Pivot at the layer canvas's centre so rotation + scale feel
+    // natural (matches V2 Video's `transformOrigin: center`).
+    const cx = width / 2;
+    const cy = height / 2;
+    dest.save();
+    dest.translate(cx + offsetX, cy + offsetY);
+    if (rotation !== 0) dest.rotate((rotation * Math.PI) / 180);
+    if (scaleX !== 1 || scaleY !== 1) dest.scale(scaleX, scaleY);
+    dest.drawImage(layerCanvas, -cx, -cy);
+    dest.restore();
   }
   dest.restore();
 }
@@ -254,6 +276,296 @@ export function fillRectOnLayer(
   ctx.fillStyle = color;
   ctx.fillRect(x, y, width, height);
   ctx.restore();
+}
+
+// ─── Generic selection model (rect / path / mask) ──────────────────────────
+//
+// Every selection tool (marquee / lasso / magic-wand / quick-select)
+// emits one of these. The Delete + Fill action chips consume any
+// variant via the dispatch helpers below, so adding a future tool
+// (polygonal lasso, elliptical marquee, …) means one new emitter +
+// zero changes to the action chips (per DRY).
+
+export type MarqueeSelection =
+  | { kind: "rect"; x: number; y: number; width: number; height: number }
+  | { kind: "path"; points: ReadonlyArray<{ x: number; y: number }> }
+  | { kind: "mask"; mask: ImageData };
+
+/** Rasterise a closed polygon (lasso output) to a 1-channel alpha
+ *  mask sized to the canvas. Used when the host needs the mask form
+ *  (e.g. for AI inpaint compositing); the cheap pixel-only ops below
+ *  can also consume the polygon directly via ctx.clip. */
+export function rasterizePathToMask(
+  width: number,
+  height: number,
+  points: ReadonlyArray<{ x: number; y: number }>,
+): ImageData {
+  const canvas = createOffscreenCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("rasterizePathToMask: 2D context unavailable");
+  if (points.length < 3) return ctx.getImageData(0, 0, width, height);
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  return ctx.getImageData(0, 0, width, height);
+}
+
+/** Magic-wand: tolerance-based flood-fill on the source canvas
+ *  starting at `(startX, startY)`. Returns a canvas-sized mask where
+ *  alpha=255 means "in the selection" and 0 means "outside". The
+ *  source is typically the COMPOSITE visible canvas (so the wand
+ *  selects what the user can see, not the active layer's hidden
+ *  pixels). Stack-based scanline so a 4096² fill doesn't blow the
+ *  stack. */
+export function magicWandMask(
+  source: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  startX: number,
+  startY: number,
+  tolerance = 24,
+): ImageData {
+  const x = Math.floor(startX);
+  const y = Math.floor(startY);
+  const empty = (): ImageData => {
+    const c = createOffscreenCanvas(width, height);
+    return c.getContext("2d")!.getImageData(0, 0, width, height);
+  };
+  if (x < 0 || y < 0 || x >= width || y >= height) return empty();
+  const src = source.getImageData(0, 0, width, height).data;
+  const mask = empty();
+  const m = mask.data;
+  const idx = (cx: number, cy: number) => (cy * width + cx) * 4;
+  const startI = idx(x, y);
+  const target: [number, number, number, number] = [
+    src[startI],
+    src[startI + 1],
+    src[startI + 2],
+    src[startI + 3],
+  ];
+  const stack: Array<[number, number]> = [[x, y]];
+  while (stack.length > 0) {
+    const popped = stack.pop();
+    if (!popped) break;
+    const [cx, cy] = popped;
+    if (cx < 0 || cy < 0 || cx >= width || cy >= height) continue;
+    const i = idx(cx, cy);
+    if (m[i + 3] === 255) continue; // already in mask
+    const px: [number, number, number, number] = [src[i], src[i + 1], src[i + 2], src[i + 3]];
+    if (
+      Math.abs(px[0] - target[0]) > tolerance ||
+      Math.abs(px[1] - target[1]) > tolerance ||
+      Math.abs(px[2] - target[2]) > tolerance ||
+      Math.abs(px[3] - target[3]) > tolerance
+    ) {
+      continue;
+    }
+    m[i] = 255;
+    m[i + 1] = 255;
+    m[i + 2] = 255;
+    m[i + 3] = 255;
+    stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+  return mask;
+}
+
+/** Quick-select grow — add a flood-filled region (centred at the
+ *  pointer) to an existing mask. Each brush dab accumulates; the
+ *  caller passes the prior mask + the new sample point. Returns a
+ *  fresh ImageData (mutation-safe). */
+export function quickSelectAccumulate(
+  source: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  startX: number,
+  startY: number,
+  tolerance: number,
+  prior: ImageData | null,
+): ImageData {
+  const dab = magicWandMask(source, width, height, startX, startY, tolerance);
+  if (!prior) return dab;
+  const combined = new ImageData(width, height);
+  const out = combined.data;
+  const a = prior.data;
+  const b = dab.data;
+  for (let i = 0; i < out.length; i += 4) {
+    const mark = Math.max(a[i + 3], b[i + 3]) === 255;
+    out[i] = 255;
+    out[i + 1] = 255;
+    out[i + 2] = 255;
+    out[i + 3] = mark ? 255 : 0;
+  }
+  return combined;
+}
+
+/** Dispatch Delete on the active layer for any selection shape. The
+ *  rect form uses the fast `clearRect` path; path + mask forms apply
+ *  the selection as a clip / globalCompositeOperation respectively. */
+export function clearSelectionOnLayer(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  selection: MarqueeSelection,
+): void {
+  if (selection.kind === "rect") {
+    clearRectOnLayer(ctx, selection.x, selection.y, selection.width, selection.height);
+    return;
+  }
+  if (selection.kind === "path") {
+    if (selection.points.length < 3) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(selection.points[0].x, selection.points[0].y);
+    for (let i = 1; i < selection.points.length; i++) {
+      ctx.lineTo(selection.points[i].x, selection.points[i].y);
+    }
+    ctx.closePath();
+    ctx.clip();
+    ctx.clearRect(0, 0, width, height);
+    ctx.restore();
+    return;
+  }
+  // Mask form — `destination-out` with the mask as the source erases
+  // every pixel where the mask has alpha.
+  const maskCanvas = createOffscreenCanvas(width, height);
+  const maskCtx = maskCanvas.getContext("2d");
+  if (!maskCtx) return;
+  maskCtx.putImageData(selection.mask, 0, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.drawImage(maskCanvas, 0, 0);
+  ctx.restore();
+}
+
+/** Dispatch Fill on the active layer for any selection shape. The
+ *  rect form uses `fillRect`; path + mask forms paint a solid fill
+ *  clipped to the selection. */
+export function fillSelectionOnLayer(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  selection: MarqueeSelection,
+  color: string,
+): void {
+  if (selection.kind === "rect") {
+    fillRectOnLayer(ctx, selection.x, selection.y, selection.width, selection.height, color);
+    return;
+  }
+  if (selection.kind === "path") {
+    if (selection.points.length < 3) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(selection.points[0].x, selection.points[0].y);
+    for (let i = 1; i < selection.points.length; i++) {
+      ctx.lineTo(selection.points[i].x, selection.points[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  // Mask form — clip to the mask + flood-fill the canvas.
+  const maskCanvas = createOffscreenCanvas(width, height);
+  const maskCtx = maskCanvas.getContext("2d");
+  if (!maskCtx) return;
+  // Render the mask as a solid-color silhouette in `color`, then blit
+  // onto the layer using source-over. Simpler than clip-region work.
+  maskCtx.putImageData(selection.mask, 0, 0);
+  maskCtx.globalCompositeOperation = "source-in";
+  maskCtx.fillStyle = color;
+  maskCtx.fillRect(0, 0, width, height);
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.drawImage(maskCanvas, 0, 0);
+  ctx.restore();
+}
+
+/** Composite an image blob INSIDE a selection — used by AI inpaint
+ *  (#1103) when a marquee is active. The active layer's pixels are
+ *  preserved outside the selection; the AI-generated image fills the
+ *  selected region only. Returns the mutated layer canvas (caller
+ *  passes the layer's offscreen canvas as `dest`). */
+export function compositeImageIntoSelection(
+  dest: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  source: HTMLCanvasElement | HTMLImageElement,
+  selection: MarqueeSelection,
+): void {
+  // Step 1: clear the selected region on the layer so we don't blend
+  // the new pixels with what was there.
+  clearSelectionOnLayer(dest, width, height, selection);
+  // Step 2: build a clipped copy of the source the same shape as the
+  // selection, then blit onto the layer.
+  const clipped = createOffscreenCanvas(width, height);
+  const cctx = clipped.getContext("2d");
+  if (!cctx) return;
+  if (selection.kind === "rect") {
+    cctx.drawImage(source, 0, 0, width, height);
+    // Keep only the rect region.
+    cctx.globalCompositeOperation = "destination-in";
+    cctx.fillStyle = "#000";
+    cctx.fillRect(selection.x, selection.y, selection.width, selection.height);
+  } else if (selection.kind === "path") {
+    if (selection.points.length < 3) return;
+    cctx.beginPath();
+    cctx.moveTo(selection.points[0].x, selection.points[0].y);
+    for (let i = 1; i < selection.points.length; i++) {
+      cctx.lineTo(selection.points[i].x, selection.points[i].y);
+    }
+    cctx.closePath();
+    cctx.save();
+    cctx.clip();
+    cctx.drawImage(source, 0, 0, width, height);
+    cctx.restore();
+  } else {
+    cctx.drawImage(source, 0, 0, width, height);
+    cctx.globalCompositeOperation = "destination-in";
+    const maskCanvas = createOffscreenCanvas(width, height);
+    maskCanvas.getContext("2d")?.putImageData(selection.mask, 0, 0);
+    cctx.drawImage(maskCanvas, 0, 0);
+  }
+  dest.save();
+  dest.globalCompositeOperation = "source-over";
+  dest.drawImage(clipped, 0, 0);
+  dest.restore();
+}
+
+/** Compute the tightest bbox of non-transparent pixels on a layer
+ *  canvas. Returns null when the layer is entirely transparent. Used
+ *  by the Hand-tool selection chrome (#1104) to draw the dashed
+ *  bounding box around the active layer's content + by the
+ *  TransformHandles primitive to know what region to surround. */
+export function getLayerContentBbox(
+  canvas: HTMLCanvasElement,
+): { x: number; y: number; width: number; height: number } | null {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const { width, height } = canvas;
+  const data = ctx.getImageData(0, 0, width, height).data;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const a = data[(y * width + x) * 4 + 3];
+      if (a !== 0) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
 /** Letterbox-fit the supplied blob onto a fresh canvas of the given

@@ -8,6 +8,7 @@ import type { ContentTemplate, TemplateDef } from "./catalog";
 import { COMIC_GENRES, type ComicGenreId } from "@shared/comic-genres";
 import { DRAWING_TEMPLATE_PRESETS } from "@/lib/studio/drawing/drawing-template-presets";
 import DrawingPlaceholderThumbnail from "@/components/studio/drawing/DrawingPlaceholderThumbnail";
+import { getAnimationTemplatePreset } from "@/lib/studio/animation/animation-seeds";
 
 interface TemplateThumbProps {
   template: TemplateDef;
@@ -55,6 +56,17 @@ function renderThumb(id: ContentTemplate) {
           dimensionLabel={preset.dimensionLabel}
         />
       );
+    }
+  }
+  // Animation-template thumbnails (#1003). Same derived-branch pattern
+  // as comic + drawing — single SSoT (`ANIMATION_TEMPLATE_PRESETS` in
+  // animation-seeds.ts) drives the visual (frame strip mini-preview at
+  // the seed's starter frame count + fps badge), so adding a 5th
+  // animation template needs ZERO changes here.
+  if (id.startsWith("animation-")) {
+    const preset = getAnimationTemplatePreset(id);
+    if (preset) {
+      return <AnimationThumb id={id} preset={preset} />;
     }
   }
   switch (id) {
@@ -595,6 +607,65 @@ function renderThumb(id: ContentTemplate) {
         </div>
       );
   }
+}
+
+/**
+ * Animation-template thumbnail — frame-strip mini-preview. All 4
+ * animation templates share this component (DRY); the preset's
+ * `starterFrames` count drives the strip length + `fps` drives the
+ * label so each template's card visually previews the strip you'll
+ * land in the editor with. Per-template accent reads from the id
+ * suffix so each card stays visually distinct (logo loop = brand
+ * purple, spinner = mono, reaction = warm, explainer = teal).
+ */
+function AnimationThumb({
+  id,
+  preset,
+}: {
+  id: string;
+  preset: { width: number; height: number; fps: number; starterFrames: number };
+}) {
+  // Per-id accent. Reads off the trailing slug so the four templates
+  // are visually distinct without proliferating switch cases.
+  const accent =
+    id === "animation-logo-loop"
+      ? { bg: "from-violet-600 to-fuchsia-700", chip: "bg-violet-300 text-violet-950" }
+      : id === "animation-spinner"
+      ? { bg: "from-slate-700 to-slate-900", chip: "bg-slate-300 text-slate-950" }
+      : id === "animation-reaction"
+      ? { bg: "from-amber-500 to-rose-600", chip: "bg-amber-200 text-amber-950" }
+      : { bg: "from-teal-700 to-cyan-800", chip: "bg-teal-200 text-teal-950" };
+  // Cap the visible frame count at 6 — the strip reads as "multi-
+  // frame" regardless of seed count, and at thumbnail size more cells
+  // become illegible. Real strip length surfaces in the chip below.
+  const visibleFrames = Math.min(6, preset.starterFrames);
+  return (
+    <div className={cn("absolute inset-0 flex flex-col bg-gradient-to-br p-2 text-white", accent.bg)}>
+      <div className="text-[6px] tracking-widest opacity-80">ANIMATION</div>
+      <div className="mt-0.5 text-[8px] font-bold leading-tight">
+        {preset.width}×{preset.height}
+      </div>
+      <div className="mt-auto flex gap-[2px]">
+        {Array.from({ length: visibleFrames }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-square flex-1 rounded-[2px] border border-white/30 bg-white/10"
+          >
+            {/* Stick-figure-ish dot to telegraph per-frame variation. */}
+            <div
+              className="m-auto mt-[35%] h-1 w-1 rounded-full bg-white/80"
+              style={{ marginLeft: `${20 + i * 8}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="absolute bottom-1 right-1 flex gap-1">
+        <span className={cn("rounded-full px-1.5 py-0.5 text-[7px] font-bold", accent.chip)}>
+          {preset.starterFrames}f · {preset.fps}fps
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /**

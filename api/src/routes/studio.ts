@@ -1494,19 +1494,28 @@ studioRoutes.post("/save-draft", async (c) => {
 });
 
 // POST /api/studio/generate-image — AI image generation, used everywhere
-// across the app via the shared MediaPicker (not just the studio).
+// across the app via the shared MediaPicker, the cross-studio AI prompt
+// panel, and the CHRO Brain `generate_image` tool. ONE port — every
+// caller (drawing/game/animation/timeline/Brain) routes here.
 //
-// Token metering: runs through `aiCall()`, which gates on the user's token
-// budget (free 50K / Pro 1M) before invoking the model and debits a
-// synthetic 10K-token charge on success. SDXL-lightning inference is ~$0.0002
-// raw; at our $3/M cost basis 10K tokens = $0.03, sitting between the
-// autofill (~2K) and resume-roast (~20K) charges and matching margin policy.
+// Two modes — selected by whether `sourceImageUrl` is in the body:
+//   • text→image (default): SDXL-Lightning. Produces a fresh PNG from a
+//     prompt only. Cheap (4 steps).
+//   • image→image (when sourceImageUrl is present): SD-v1.5 img2img with
+//     the supplied image bytes as the source latent + the prompt as the
+//     drift target. Powers "update this element" across all studios —
+//     the caller passes the selected layer/sprite/widget's image; the
+//     model rewrites it under the prompt. `strength` (0..1) controls
+//     drift; default 0.8 keeps coarse shape, replaces detail.
+//
+// Token metering: same gate + 10K-token synthetic charge regardless of
+// mode. SDXL-lightning ~$0.0002, SD-v1.5 img2img ~$0.0004 — both well
+// under the $0.03 charged.
 //
 // Persistence: writes the PNG to R2 and returns a durable CDN URL. The
-// previous implementation returned a base64 data URL, which works for the
-// studio (storyboard JSON) but blows up DB rows when used as a profile
-// avatar / company logo / article cover. CDN URL is the only sane shape
-// for a first-class media-picker output.
+// R2 key namespace (`uploads/{userId}/ai-images/`) IS the user's media
+// library — `GET /api/upload/images` lists it, so Brain-generated images
+// land in the MediaPicker's Library tab for free.
 studioRoutes.post("/generate-image", async (c) => {
   const user = c.var.user;
   if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
@@ -1516,6 +1525,31 @@ studioRoutes.post("/generate-image", async (c) => {
   if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
     return c.json(fail("VALIDATION_ERROR", "prompt is required"), 400);
   }
+
+  // Optional img2img source. Two accepted shapes:
+  //   • `sourceImageUrl` — public CDN URL (game sprite asset, timeline
+  //     widget URL, MediaPicker library item). Server fetches it.
+  //   • `sourceImageDataUrl` — base64 data URL ("data:image/png;base64,…").
+  //     Drawing layers + animation frames live as data URLs in memory;
+  //     this saves an upload round-trip before image→image.
+  // Either one switches the model to img→img; URL takes precedence if
+  // both are present. Strength is denoise strength (0 passthrough, 1
+  // ignore source). Default 0.8 — keeps coarse shape, replaces detail.
+  const sourceImageUrl =
+    typeof body?.sourceImageUrl === "string" && body.sourceImageUrl.trim()
+      ? body.sourceImageUrl.trim()
+      : null;
+  const sourceImageDataUrl =
+    !sourceImageUrl &&
+    typeof body?.sourceImageDataUrl === "string" &&
+    body.sourceImageDataUrl.startsWith("data:image/")
+      ? body.sourceImageDataUrl
+      : null;
+  const hasSource = !!(sourceImageUrl || sourceImageDataUrl);
+  const strength =
+    typeof body?.strength === "number" && body.strength > 0 && body.strength <= 1
+      ? body.strength
+      : 0.8;
 
   const ai = (c.env as any).AI;
   if (!ai) {
@@ -1535,10 +1569,47 @@ studioRoutes.post("/generate-image", async (c) => {
     // the model fires, then charge a synthetic 10K-token cost on success.
     await tokenLedger.ensureBudget(c.var.user);
 
-    const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
-      prompt: prompt.trim().slice(0, 500),
-      num_steps: 4,
-    });
+    let modelId: string;
+    let runInput: Record<string, unknown>;
+    if (hasSource) {
+      let sourceBytes: Uint8Array;
+      if (sourceImageUrl) {
+        const fetched = await fetch(sourceImageUrl);
+        if (!fetched.ok) {
+          return c.json(
+            fail("SOURCE_FETCH_FAILED", `Could not fetch source image (${fetched.status})`),
+            400,
+          );
+        }
+        sourceBytes = new Uint8Array(await fetched.arrayBuffer());
+      } else {
+        // Data URL: split off the base64 payload after the comma. Reject
+        // shapes we can't decode rather than silently mis-rendering.
+        const comma = sourceImageDataUrl!.indexOf(",");
+        if (comma < 0) {
+          return c.json(fail("VALIDATION_ERROR", "Malformed sourceImageDataUrl"), 400);
+        }
+        const b64 = sourceImageDataUrl!.slice(comma + 1);
+        const bin = atob(b64);
+        sourceBytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) sourceBytes[i] = bin.charCodeAt(i);
+      }
+      modelId = "@cf/runwayml/stable-diffusion-v1-5-img2img";
+      runInput = {
+        prompt: prompt.trim().slice(0, 500),
+        image: Array.from(sourceBytes),
+        strength,
+        num_steps: 20,
+      };
+    } else {
+      modelId = "@cf/bytedance/stable-diffusion-xl-lightning";
+      runInput = {
+        prompt: prompt.trim().slice(0, 500),
+        num_steps: 4,
+      };
+    }
+
+    const response = await ai.run(modelId, runInput);
     const buffer = await new Response(response as ReadableStream).arrayBuffer();
     const bytes = new Uint8Array(buffer);
     const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
@@ -1551,13 +1622,13 @@ studioRoutes.post("/generate-image", async (c) => {
         promptTokens: 10_000,
         completionTokens: 0,
         totalTokens: 10_000,
-        model: "cf-stable-diffusion-xl-lightning",
+        model: hasSource ? "cf-sd-v1-5-img2img" : "cf-stable-diffusion-xl-lightning",
       },
     }).catch((err) => {
       console.warn("[studio/generate-image] charge failed:", err);
     });
 
-    return c.json(ok({ imageUrl: cdnUrl(key) }));
+    return c.json(ok({ imageUrl: cdnUrl(key), mode: hasSource ? "img2img" : "text2img" }));
   } catch (err) {
     console.error("[studio/generate-image] AI error:", err);
     return c.json(fail("GENERATION_FAILED", "Image generation failed"), 500);

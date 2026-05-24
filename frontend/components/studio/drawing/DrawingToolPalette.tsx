@@ -8,7 +8,17 @@
  * follow-on phases tracked on the gap register.
  */
 
-import { Brush, Eraser, Hand, PaintBucket, Pipette, SquareDashed } from "lucide-react";
+import {
+  Brush,
+  Eraser,
+  Hand,
+  Lasso,
+  PaintBucket,
+  Pipette,
+  SquareDashed,
+  Wand2,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,8 +42,11 @@ const TOOL_DEFS: ReadonlyArray<{
   shortcut: string;
   icon: typeof Brush;
 }> = [
-  { id: "hand", label: "Hand · move layer", shortcut: "V", icon: Hand },
-  { id: "marquee", label: "Marquee · select", shortcut: "M", icon: SquareDashed },
+  { id: "hand", label: "Hand · move / resize / rotate", shortcut: "V", icon: Hand },
+  { id: "marquee", label: "Marquee · rectangular select", shortcut: "M", icon: SquareDashed },
+  { id: "lasso", label: "Lasso · free-form select", shortcut: "L", icon: Lasso },
+  { id: "magic-wand", label: "Magic wand · tolerance select", shortcut: "W", icon: Wand2 },
+  { id: "quick-select", label: "Quick select · brush grow", shortcut: "Q", icon: Sparkles },
   { id: "brush", label: "Brush", shortcut: "B", icon: Brush },
   { id: "eraser", label: "Eraser", shortcut: "E", icon: Eraser },
   { id: "fill", label: "Fill", shortcut: "G", icon: PaintBucket },

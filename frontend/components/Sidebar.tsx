@@ -28,6 +28,7 @@ import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 import { AITokenPill } from "@/components/AITokenPill";
+import { PointsPill } from "@/components/PointsPill";
 import { UpgradeAccountButton } from "@/components/UpgradeAccountButton";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 
@@ -268,6 +269,11 @@ export default function Sidebar({
                 {/* AI Token Budget Pill */}
                 <div className={cn(collapsed ? "mb-1" : "mb-3")}>
                   <AITokenPill collapsed={collapsed} onNavigate={onClose} />
+                </div>
+
+                {/* Points + streak pill (self-gates on role; job_seeker only in V1) */}
+                <div className={cn(collapsed ? "mb-1" : "mb-3")}>
+                  <PointsPill collapsed={collapsed} onNavigate={onClose} />
                 </div>
 
                 {/* Account Switcher */}

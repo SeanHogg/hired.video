@@ -103,17 +103,19 @@ export default function WizardLauncher({
    *
    *  Dispatches on the active template's `mediaKind`:
    *    • comic → `studioService.generateComic` → `kind: "comicSpec"`
-   *    • CanvasState-authoring kinds (video / podcast / voice /
-   *      animation) → `generateStoryboard` → `kind: "script"`. The
+   *    • CanvasState-authoring kinds (video / podcast / voice) →
+   *      `generateStoryboard` → `kind: "script"`. The
    *      `mediaKindUsesCanvasStateAuthoring` predicate (#936) gates
    *      this so adding a new non-CanvasState runtime doesn't quietly
    *      take the storyboard path.
-   *    • Non-CanvasState kinds (game, image) → seed the project from
-   *      the template registry via `kind: "template"` — no AI
-   *      storyboard generation; these kinds bring their own state
-   *      shape (`gameState` / `imageState`) and runtime-specific
-   *      tooling. Skipping the storyboard call was the root cause of
-   *      the "Couldn't create project" toast for drawing templates.
+   *    • Non-CanvasState kinds (game, image, animation) → seed the
+   *      project from the template registry via `kind: "template"` —
+   *      no AI storyboard generation; these kinds bring their own
+   *      state shape (`gameState` / `imageState` / `animationState`)
+   *      and runtime-specific tooling. Skipping the storyboard call
+   *      was the root cause of the "Couldn't create project" toast
+   *      for drawing templates (#961) — animation joined this branch
+   *      via #1003.
    *
    *  The branch lives at the wizard level rather than inside the
    *  intake form per the DRY rule — the intake is a dumb data

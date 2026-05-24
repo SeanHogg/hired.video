@@ -88,10 +88,17 @@ export interface ImageLayer {
   /** Translation offset applied to the layer's pixels when
    *  compositing — set by the Hand / Move tool's drag. Pixels still
    *  live in their natural top-left frame on the dataURL; the offset
-   *  shifts them visually + on export. Omitted = `{ x: 0, y: 0 }`.
-   *  Future scale + rotation are tracked as separate fields on the
-   *  same `transform` axis (#972). */
+   *  shifts them visually + on export. Omitted = `{ x: 0, y: 0 }`. */
   transformOffset?: { x: number; y: number };
+  /** Per-layer scale factor applied at composite time. `{ x: 1, y: 1 }`
+   *  or omitted = no scaling. Set by the Hand / Move tool's
+   *  resize-handle drag (`<TransformHandles/>` primitive). */
+  transformScale?: { x: number; y: number };
+  /** Per-layer rotation in DEGREES applied at composite time around
+   *  the layer's canvas centre (matches V2 Video's widget pivot
+   *  semantics). 0 or omitted = no rotation. Set by the Hand /
+   *  Move tool's rotation-handle drag. */
+  transformRotation?: number;
 }
 
 /** Background fill behind layer 0. `transparent` leaves the canvas

@@ -10,13 +10,35 @@
  * is here so adding one is one entry.
  */
 
-/** Which tool the brush slot is currently in. The "hand" tool selects
- *  the active layer + drags it to translate (per-layer offset on
- *  ImageLayer.transformOffset). The "marquee" tool draws a
- *  rectangular pixel selection — Delete clears pixels within the rect
- *  on the active layer, the Fill button fills with the active brush
- *  color. */
-export type DrawingTool = "brush" | "eraser" | "fill" | "eyedropper" | "hand" | "marquee";
+/** Which tool the brush slot is currently in.
+ *
+ *  - "hand" — selects the active layer + drags it (translate +
+ *    resize + rotate via the floating `<TransformHandles/>` chrome).
+ *  - "marquee" — rectangular pixel selection. Delete clears /
+ *    Fill paints inside the rect on the active layer.
+ *  - "lasso" — free-form polygon selection (pointer drag traces the
+ *    perimeter; on pointerup the polygon is closed + rasterized to a
+ *    selection mask).
+ *  - "magic-wand" — single-click tolerance flood-fill on the
+ *    composited canvas; the connected same-color region becomes the
+ *    selection mask.
+ *  - "quick-select" — brush-style mask grow; each dab samples the
+ *    pixel + flood-fills within tolerance into the mask. Multiple
+ *    dabs accumulate.
+ *
+ *  All four selection tools produce the same `MarqueeSelection`
+ *  output shape — the floating Delete / Fill action chips consume
+ *  the selection regardless of which tool drew it. */
+export type DrawingTool =
+  | "brush"
+  | "eraser"
+  | "fill"
+  | "eyedropper"
+  | "hand"
+  | "marquee"
+  | "lasso"
+  | "magic-wand"
+  | "quick-select";
 
 /** Brush stroke settings — shared by brush + eraser (eraser ignores
  *  color but honours size + opacity). The "soft brush" curve is the

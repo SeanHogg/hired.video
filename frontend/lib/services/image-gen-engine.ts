@@ -55,6 +55,23 @@ export interface ImageGenInput {
    *  the result Blob is what the caller actually gets. Default 1024². */
   width?: number;
   height?: number;
+  /** Optional source image for img→img mode — when set, the engine
+   *  rewrites this image under the prompt instead of generating from
+   *  scratch. Powers "update this element" across all studio kinds
+   *  (selected drawing layer, selected sprite, selected scene widget,
+   *  selected animation frame). MUST be a public CDN URL the server can
+   *  fetch — engines that run client-side may fetch + downscale before
+   *  sending. */
+  sourceImageUrl?: string;
+  /** Alternative source for in-memory rasters that haven't been uploaded
+   *  yet — typically a drawing layer's `pixelsDataUrl` or an animation
+   *  frame. Server decodes the base64. Ignored when `sourceImageUrl` is
+   *  also set (URL wins). */
+  sourceImageDataUrl?: string;
+  /** Denoise strength for img→img (0..1). 0 = passthrough, 1 = ignore
+   *  source. Ignored in text→img mode. Default 0.8 (keeps coarse shape,
+   *  replaces detail). */
+  strength?: number;
 }
 
 export interface ImageGenResult {
@@ -75,6 +92,11 @@ export interface ImageGenResult {
    *  Optional — the WebGPU engine returns a Blob the caller may keep
    *  ephemeral instead of persisting. */
   resultUrl?: string;
+  /** Which model path produced this — "text2img" or "img2img". Lets the
+   *  caller decide UX (e.g. "Replaced selected layer" vs "Added new
+   *  layer"). Server engine reports this from the route; client engines
+   *  derive it from whether `sourceImageUrl` was supplied. */
+  mode?: "text2img" | "img2img";
 }
 
 export interface ImageGenEngine {
@@ -196,7 +218,11 @@ registerImageGenEngine({
     const t0 = performance.now();
     onProgress?.(0);
 
-    const response = await studioService.generateImage(input.prompt);
+    const response = await studioService.generateImage(input.prompt, {
+      sourceImageUrl: input.sourceImageUrl,
+      sourceImageDataUrl: input.sourceImageDataUrl,
+      strength: input.strength,
+    });
     onProgress?.(0.7);
 
     const fetched = await fetch(response.data.imageUrl);
@@ -213,6 +239,7 @@ registerImageGenEngine({
       engine: "server-cf-sdxl-lightning",
       elapsedMs: performance.now() - t0,
       resultUrl: response.data.imageUrl,
+      mode: response.data.mode ?? (input.sourceImageUrl ? "img2img" : "text2img"),
     };
   },
 });

@@ -80,6 +80,9 @@ export interface IPointsRepository {
   ): Promise<PointsLedgerRow[]>;
   countEarnedSince(userId: string, sinceMs: number, action?: string): Promise<number>;
   sumEarnedSince(userId: string, sinceMs: number, action?: string): Promise<number>;
+  /** Lifetime count of "earn" ledger rows for this user + action. Used
+   *  by the badge engine to know "is this the 10th application?". */
+  countEarnsByAction(userId: string, action: string): Promise<number>;
 
   // ── counters ────────────────────────────────────────────────────────
   findCounters(userId: string): Promise<PointsCountersRow | null>;

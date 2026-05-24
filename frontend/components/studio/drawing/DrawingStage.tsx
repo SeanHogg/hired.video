@@ -56,24 +56,38 @@ import {
   createOffscreenCanvas,
   fillRectOnLayer,
   floodFillAt,
+  getLayerContentBbox,
   hydrateLayerCanvas,
+  magicWandMask,
   pickColorAt,
+  quickSelectAccumulate,
   serializeLayer,
   strokeBetween,
   stampBrushDab,
+  type MarqueeSelection,
 } from "@/lib/studio/drawing/drawing-engine";
+import TransformHandles, {
+  type TransformRect,
+} from "@/components/studio/v2/TransformHandles";
 
-/** Selection rectangle in CANVAS coordinates (not screen). Set by the
- *  marquee tool's drag; consumed by the host's marquee-action buttons
- *  (Delete / Fill) which translate into engine ops on the active
- *  layer. The host owns the rect so its toolbar buttons can read +
- *  clear it after acting. */
+/** Selection rectangle (rect-form only) in CANVAS coordinates.
+ *  Retained as the host's external prop name + back-compat shape for
+ *  rect-only consumers; the full union (rect | path | mask) is
+ *  `MarqueeSelection` re-exported from the engine. */
 export interface MarqueeRect {
   x: number;
   y: number;
   width: number;
   height: number;
 }
+
+/** Re-export so the host can type its state once instead of importing
+ *  from both DrawingStage AND the engine. Three selection shapes:
+ *    - rect:  marquee tool (free-form drag).
+ *    - path:  lasso tool (closed polygon).
+ *    - mask:  magic-wand + quick-select tools (rasterised flood-fill).
+ */
+export type { MarqueeSelection };
 
 interface DrawingStageProps {
   /** Controlled image state — owned by the host. */
@@ -92,19 +106,32 @@ interface DrawingStageProps {
    *  paint action pushes a color into the recent-colors swatch row. */
   onBrushChange: (next: BrushSettings) => void;
   onRecentColor: (color: string) => void;
-  /** Marquee selection rect (canvas coords). Null when no selection
-   *  is active or when the marquee tool is not the current tool.
-   *  Bidirectionally controlled — DrawingStage emits it on drag, the
-   *  host clears it after Delete / Fill. */
-  marquee: MarqueeRect | null;
-  onMarqueeChange: (next: MarqueeRect | null) => void;
-  /** Marquee action handlers — invoked by the floating Delete / Fill
-   *  chips overlayed on the active selection rect. Host owns the
-   *  imperative work (clearRectOnLayer / fillRectOnLayer + commit);
-   *  DrawingStage just renders the buttons because they're positioned
-   *  ON the marquee rect (tight visual coupling). */
+  /** Active selection (rect / path / mask) in canvas coords. Null
+   *  when no selection is active or when no selection tool is the
+   *  current tool. Bidirectionally controlled — DrawingStage emits
+   *  selections from the marquee / lasso / magic-wand / quick-select
+   *  tools, the host clears it after Delete / Fill / AI inpaint. */
+  marquee: MarqueeSelection | null;
+  onMarqueeChange: (next: MarqueeSelection | null) => void;
+  /** Selection action handlers — invoked by the floating Delete /
+   *  Fill / AI-inpaint chips overlayed on the active selection. Host
+   *  owns the imperative work (engine ops + commit); DrawingStage
+   *  renders the buttons because they're positioned ON the selection's
+   *  bounding box (tight visual coupling). */
   onMarqueeDelete?: () => void;
   onMarqueeFill?: () => void;
+  onMarqueeInpaint?: () => void;
+  /** Hand-tool layer transform — bidirectionally controlled. The
+   *  active layer's combined offset / scale / rotation is surfaced
+   *  via the <TransformHandles/> primitive around the layer's content
+   *  bbox. The host owns the commits + the per-axis defaults so
+   *  DrawingStage doesn't have to know how the layer-mutation
+   *  handlers are structured. */
+  onLayerTransform?: (next: {
+    offset: { x: number; y: number };
+    scale: { x: number; y: number };
+    rotation: number;
+  }) => void;
   /** Captured by the host on first paint so its SaveMenu (Export /
    *  Save-to-library) can flatten the composite on demand. */
   onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
@@ -123,6 +150,8 @@ export default function DrawingStage({
   onMarqueeChange,
   onMarqueeDelete,
   onMarqueeFill,
+  onMarqueeInpaint,
+  onLayerTransform,
   onCanvasReady,
 }: DrawingStageProps) {
   // Per-layer offscreen canvases — cached from state.layers[].pixelsDataUrl.
@@ -202,14 +231,14 @@ export default function DrawingStage({
 
   // Stroke state — tracked outside React so the 60fps pointermove loop
   // doesn't allocate or re-render on every frame. The discriminated
-  // union covers all four pointer-driven interactions a tool can
-  // initiate: paint (brush/eraser), translate (hand), select (marquee),
-  // or nothing (fill / eyedropper fire on pointerdown only).
+  // union covers every pointer-driven interaction a tool can initiate.
   type DragState =
     | { kind: "none" }
     | { kind: "paint"; lastPoint: CanvasPoint }
     | { kind: "translate"; startX: number; startY: number; startOffset: { x: number; y: number } }
-    | { kind: "marquee"; startX: number; startY: number };
+    | { kind: "marquee"; startX: number; startY: number }
+    | { kind: "lasso"; points: Array<{ x: number; y: number }> }
+    | { kind: "quick-select"; mask: ImageData | null };
   const strokeRef = useRef<DragState>({ kind: "none" });
 
   const localPointFromEvent = useCallback(
@@ -278,8 +307,57 @@ export default function DrawingStage({
       // coords. Resets any prior selection. The rect is reported to
       // the host on every pointermove + finalised on pointerup.
       if (tool === "marquee") {
-        onMarqueeChange({ x: point.x, y: point.y, width: 0, height: 0 });
+        onMarqueeChange({ kind: "rect", x: point.x, y: point.y, width: 0, height: 0 });
         strokeRef.current = { kind: "marquee", startX: point.x, startY: point.y };
+        return;
+      }
+
+      // Lasso tool — drag traces a free-form polygon perimeter.
+      // pointerup closes the polygon. Reported to the host as
+      // `{ kind: "path", points }` so the engine's clip-based
+      // clear/fill operate inside the polygon.
+      if (tool === "lasso") {
+        const points = [{ x: point.x, y: point.y }];
+        onMarqueeChange({ kind: "path", points });
+        strokeRef.current = { kind: "lasso", points };
+        return;
+      }
+
+      // Magic wand — single click. Flood-fills the COMPOSITE visible
+      // canvas at the click point (not the active layer's hidden
+      // pixels), so the wand selects what the user actually sees.
+      // Emits a mask-form selection.
+      if (tool === "magic-wand") {
+        const visible = visibleCanvasRef.current;
+        if (!visible) return;
+        const visibleCtx = visible.getContext("2d");
+        if (!visibleCtx) return;
+        const mask = magicWandMask(visibleCtx, state.width, state.height, point.x, point.y);
+        onMarqueeChange({ kind: "mask", mask });
+        // No drag — pointerup is a no-op for this tool.
+        strokeRef.current = { kind: "none" };
+        return;
+      }
+
+      // Quick-select — drag accumulates flood-fill dabs into the
+      // running mask. Each pointermove samples + grows the mask;
+      // pointerup finalises whatever's been accumulated.
+      if (tool === "quick-select") {
+        const visible = visibleCanvasRef.current;
+        if (!visible) return;
+        const visibleCtx = visible.getContext("2d");
+        if (!visibleCtx) return;
+        const seed = quickSelectAccumulate(
+          visibleCtx,
+          state.width,
+          state.height,
+          point.x,
+          point.y,
+          24,
+          null,
+        );
+        onMarqueeChange({ kind: "mask", mask: seed });
+        strokeRef.current = { kind: "quick-select", mask: seed };
         return;
       }
 
@@ -362,7 +440,34 @@ export default function DrawingStage({
         const y = Math.min(drag.startY, point.y);
         const width = Math.abs(point.x - drag.startX);
         const height = Math.abs(point.y - drag.startY);
-        onMarqueeChange({ x, y, width, height });
+        onMarqueeChange({ kind: "rect", x, y, width, height });
+        return;
+      }
+
+      if (drag.kind === "lasso") {
+        // Append point + emit updated path. Cheap because the engine
+        // op consumes the array directly (no rasterisation per frame).
+        drag.points.push({ x: point.x, y: point.y });
+        onMarqueeChange({ kind: "path", points: drag.points.slice() });
+        return;
+      }
+
+      if (drag.kind === "quick-select") {
+        const visible = visibleCanvasRef.current;
+        if (!visible) return;
+        const visibleCtx = visible.getContext("2d");
+        if (!visibleCtx) return;
+        const next = quickSelectAccumulate(
+          visibleCtx,
+          state.width,
+          state.height,
+          point.x,
+          point.y,
+          24,
+          drag.mask,
+        );
+        drag.mask = next;
+        onMarqueeChange({ kind: "mask", mask: next });
         return;
       }
 
@@ -403,13 +508,18 @@ export default function DrawingStage({
       } else if (drag.kind === "translate") {
         commitLayerTranslation();
       }
-      // Marquee finalise: the rect is already in host state from
-      // handlePointerMove; nothing else to do here. Tiny rects (drag
-      // distance < ~3px) probably mean a click rather than a drag —
-      // clear them so an accidental click doesn't leave a phantom
-      // selection.
-      if (drag.kind === "marquee" && marquee && (marquee.width < 3 || marquee.height < 3)) {
+      // Marquee finalise: tiny rects (drag distance < ~3px) probably
+      // mean a click rather than a drag — clear them so an accidental
+      // click doesn't leave a phantom selection.
+      if (drag.kind === "marquee" && marquee?.kind === "rect" && (marquee.width < 3 || marquee.height < 3)) {
         onMarqueeChange(null);
+        return;
+      }
+      // Lasso finalise: require >= 3 points for a meaningful polygon;
+      // anything less is a misclick.
+      if (drag.kind === "lasso" && marquee?.kind === "path" && marquee.points.length < 3) {
+        onMarqueeChange(null);
+        return;
       }
     },
     [commitActiveLayerToState, commitLayerTranslation, marquee, onMarqueeChange],
@@ -425,11 +535,107 @@ export default function DrawingStage({
   const cursorClass =
     tool === "hand"
       ? "cursor-grab"
-      : tool === "marquee"
+      : tool === "marquee" || tool === "lasso" || tool === "magic-wand" || tool === "quick-select"
         ? "cursor-crosshair"
         : tool === "fill"
           ? "cursor-cell"
           : "cursor-crosshair";
+
+  // ─── Selection overlay helpers — bbox + render path ──────────────────
+  // Compute the bbox of any selection shape so the floating action
+  // chips can position themselves consistently regardless of which
+  // tool produced the selection (DRY: one chip layout, three shapes).
+  const selectionBbox = useMemo(() => {
+    if (!marquee) return null;
+    if (marquee.kind === "rect") {
+      return { x: marquee.x, y: marquee.y, width: marquee.width, height: marquee.height };
+    }
+    if (marquee.kind === "path") {
+      if (marquee.points.length === 0) return null;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const p of marquee.points) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+    // Mask form — scan for non-zero alpha bounds. Cached per-mask via
+    // useMemo since the mask reference changes only on tool action.
+    const m = marquee.mask;
+    let minX = m.width;
+    let minY = m.height;
+    let maxX = -1;
+    let maxY = -1;
+    const data = m.data;
+    for (let y = 0; y < m.height; y++) {
+      for (let x = 0; x < m.width; x++) {
+        if (data[(y * m.width + x) * 4 + 3] !== 0) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  }, [marquee]);
+
+  // Render the mask form as a translucent canvas overlay via dataURL.
+  // Computed only when the mask changes; not on every render.
+  const maskOverlayDataUrl = useMemo(() => {
+    if (!marquee || marquee.kind !== "mask") return null;
+    const c = createOffscreenCanvas(marquee.mask.width, marquee.mask.height);
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    // Tint the mask brand-purple at low alpha so the user sees what's
+    // selected without obscuring the canvas underneath.
+    ctx.putImageData(marquee.mask, 0, 0);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.fillStyle = "rgba(124, 58, 237, 0.35)";
+    ctx.fillRect(0, 0, c.width, c.height);
+    return c.toDataURL("image/png");
+  }, [marquee]);
+
+  // ─── Hand-tool selection chrome (#1101 + #1104) ──────────────────────
+  // When the Hand tool is active, surround the active layer's content
+  // bbox with the shared <TransformHandles/> primitive so the user
+  // can move / resize / rotate. The bbox derives from the layer's
+  // pixel content (#1104) so empty layers don't show a phantom chrome
+  // around an empty canvas.
+  const activeLayerBbox = useMemo(() => {
+    if (tool !== "hand") return null;
+    if (!activeLayer || !activeLayer.pixelsDataUrl) return null;
+    const canvas = activeLayerCanvas();
+    if (!canvas) return null;
+    return getLayerContentBbox(canvas);
+  }, [tool, activeLayer, activeLayerCanvas]);
+
+  // Combined transform applied to the bbox so TransformHandles surrounds
+  // the layer in its rendered position (offset + scale + rotation
+  // applied at composite time means the on-screen bbox shifts too).
+  const handleRect: TransformRect | null = useMemo(() => {
+    if (!activeLayerBbox || !activeLayer) return null;
+    const offset = activeLayer.transformOffset ?? { x: 0, y: 0 };
+    const scale = activeLayer.transformScale ?? { x: 1, y: 1 };
+    const rotation = activeLayer.transformRotation ?? 0;
+    // Centre-pivot scaling: each axis grows/shrinks from the canvas
+    // centre, matching `compositeLayers`. The visible bbox in
+    // composite coordinates is the source bbox shifted toward/away
+    // from the centre by the scale factor.
+    const cx = state.width / 2;
+    const cy = state.height / 2;
+    const x = cx + (activeLayerBbox.x - cx) * scale.x + offset.x;
+    const y = cy + (activeLayerBbox.y - cy) * scale.y + offset.y;
+    const width = activeLayerBbox.width * scale.x;
+    const height = activeLayerBbox.height * scale.y;
+    return { x, y, width, height, rotation };
+  }, [activeLayerBbox, activeLayer, state.width, state.height]);
 
   // ─── Render — canvas only, mirroring CanvasStage's shape. The host
   //     provides the surrounding chrome via the SAME `<CollapsiblePanel/>`
@@ -466,16 +672,13 @@ export default function DrawingStage({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         />
-        {/* Marquee selection overlay — purely visual; the rect lives in
-            host state (`marquee` prop) so the toolbar's Delete / Fill
-            actions can consume it without DrawingStage being in the
-            path. Rendered as an SVG sibling above the canvas so pointer
-            events still hit the canvas underneath. Floating Delete /
-            Fill chips render on TOP of the SVG, positioned just above
-            the rect — the actions are tightly coupled to the
-            selection's screen position so they live with the overlay
-            (not in the host chrome). */}
-        {marquee && marquee.width > 0 && marquee.height > 0 && (
+        {/* Selection overlay — single render path that handles all
+            three shapes (rect / path / mask) so adding a future
+            selection tool (elliptical marquee, polygonal lasso) means
+            zero changes to the overlay or the chip layout. Visual
+            language is brand-purple dashed outline for rect + path,
+            translucent purple tint for mask. */}
+        {marquee && selectionBbox && (
           <>
             <svg
               className="pointer-events-none absolute inset-0 h-full w-full"
@@ -483,31 +686,49 @@ export default function DrawingStage({
               preserveAspectRatio="none"
               aria-hidden="true"
             >
-              <rect
-                x={marquee.x}
-                y={marquee.y}
-                width={marquee.width}
-                height={marquee.height}
-                fill="rgba(124, 58, 237, 0.12)"
-                stroke="#7c3aed"
-                strokeWidth={Math.max(1, state.width / 400)}
-                strokeDasharray={`${Math.max(4, state.width / 100)} ${Math.max(4, state.width / 100)}`}
-              />
+              {marquee.kind === "rect" && (
+                <rect
+                  x={marquee.x}
+                  y={marquee.y}
+                  width={marquee.width}
+                  height={marquee.height}
+                  fill="rgba(124, 58, 237, 0.12)"
+                  stroke="#7c3aed"
+                  strokeWidth={Math.max(1, state.width / 400)}
+                  strokeDasharray={`${Math.max(4, state.width / 100)} ${Math.max(4, state.width / 100)}`}
+                />
+              )}
+              {marquee.kind === "path" && marquee.points.length >= 2 && (
+                <polygon
+                  points={marquee.points.map((p) => `${p.x},${p.y}`).join(" ")}
+                  fill="rgba(124, 58, 237, 0.12)"
+                  stroke="#7c3aed"
+                  strokeWidth={Math.max(1, state.width / 400)}
+                  strokeDasharray={`${Math.max(4, state.width / 100)} ${Math.max(4, state.width / 100)}`}
+                />
+              )}
             </svg>
-            {/* Action chips — positioned just above the rect (or below
-                if the rect starts near the top edge). Pixel-perfect
-                placement via percentage so they stay glued to the
-                rect across zoom. */}
+            {marquee.kind === "mask" && maskOverlayDataUrl && (
+              <img
+                src={maskOverlayDataUrl}
+                alt=""
+                className="pointer-events-none absolute inset-0 h-full w-full"
+                draggable={false}
+                aria-hidden="true"
+              />
+            )}
+            {/* Action chips — anchored to selection bbox; same layout
+                regardless of selection shape (per DRY). */}
             <div
               className="pointer-events-auto absolute flex gap-1"
               style={{
-                left: `${(marquee.x / state.width) * 100}%`,
+                left: `${(selectionBbox.x / state.width) * 100}%`,
                 top:
-                  marquee.y > state.height * 0.08
-                    ? `${(marquee.y / state.height) * 100}%`
-                    : `${((marquee.y + marquee.height) / state.height) * 100}%`,
+                  selectionBbox.y > state.height * 0.08
+                    ? `${(selectionBbox.y / state.height) * 100}%`
+                    : `${((selectionBbox.y + selectionBbox.height) / state.height) * 100}%`,
                 transform:
-                  marquee.y > state.height * 0.08
+                  selectionBbox.y > state.height * 0.08
                     ? "translateY(-110%)"
                     : "translateY(8%)",
               }}
@@ -531,6 +752,16 @@ export default function DrawingStage({
                   Fill
                 </button>
               )}
+              {onMarqueeInpaint && (
+                <button
+                  type="button"
+                  onClick={onMarqueeInpaint}
+                  className="rounded-md bg-fuchsia-600 px-2 py-1 text-[11px] font-semibold text-white shadow-md hover:bg-fuchsia-500"
+                  title="AI: fill the selected region from a prompt"
+                >
+                  AI fill
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onMarqueeChange(null)}
@@ -541,6 +772,41 @@ export default function DrawingStage({
               </button>
             </div>
           </>
+        )}
+        {/* Hand-tool transform chrome — surrounds the active layer's
+            content bbox with the shared <TransformHandles/> primitive
+            so the user can move / resize / rotate. Visual mirrors
+            V2-Video's widget selection (halo + bottom-right resize +
+            rotation ball). Only renders when (a) the Hand tool is the
+            active tool AND (b) the active layer has pixels AND (c)
+            the host wired an `onLayerTransform` callback. */}
+        {tool === "hand" && handleRect && onLayerTransform && (
+          <TransformHandles
+            rect={handleRect}
+            stageWidth={state.width}
+            stageHeight={state.height}
+            selected
+            onChange={(next) => {
+              // Translate the bbox-frame rect back into layer-frame
+              // transforms. Width / height in `handleRect` are the
+              // bbox scaled; deriving scale = next.size / bboxNatural
+              // assumes the bbox dimensions stay fixed across the
+              // drag (true — handleRect is memoised on the bbox).
+              if (!activeLayerBbox) return;
+              const scaleX = activeLayerBbox.width > 0 ? next.width / activeLayerBbox.width : 1;
+              const scaleY = activeLayerBbox.height > 0 ? next.height / activeLayerBbox.height : 1;
+              const cx = state.width / 2;
+              const cy = state.height / 2;
+              const offsetX = next.x - (cx + (activeLayerBbox.x - cx) * scaleX);
+              const offsetY = next.y - (cy + (activeLayerBbox.y - cy) * scaleY);
+              onLayerTransform({
+                offset: { x: offsetX, y: offsetY },
+                scale: { x: scaleX, y: scaleY },
+                rotation: next.rotation,
+              });
+            }}
+            onCommit={commit}
+          />
         )}
       </div>
     </div>

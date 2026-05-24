@@ -726,10 +726,36 @@ export const studioService = {
   },
 
   /**
-   * Generate an AI background image for a scene using Cloudflare Workers AI.
+   * Generate an AI image via Cloudflare Workers AI. Two modes:
+   *   • text→image (default) — pass just the prompt
+   *   • image→image — pass `sourceImageUrl` to rewrite an existing image
+   *     under the prompt. Powers "update this element" across studios.
+   * `strength` (0..1) is denoise strength for img2img only; ignored in
+   * text→image mode. Defaults to 0.8 server-side.
    */
-  async generateImage(prompt: string): Promise<ApiSuccessResponse<{ imageUrl: string }>> {
-    return apiClient.post("/api/studio/generate-image", { prompt }, z.object({ imageUrl: z.string() }));
+  async generateImage(
+    prompt: string,
+    opts?: {
+      sourceImageUrl?: string;
+      sourceImageDataUrl?: string;
+      strength?: number;
+    },
+  ): Promise<ApiSuccessResponse<{ imageUrl: string; mode?: "img2img" | "text2img" }>> {
+    return apiClient.post(
+      "/api/studio/generate-image",
+      {
+        prompt,
+        ...(opts?.sourceImageUrl ? { sourceImageUrl: opts.sourceImageUrl } : {}),
+        ...(opts?.sourceImageDataUrl && !opts?.sourceImageUrl
+          ? { sourceImageDataUrl: opts.sourceImageDataUrl }
+          : {}),
+        ...(typeof opts?.strength === "number" ? { strength: opts.strength } : {}),
+      },
+      z.object({
+        imageUrl: z.string(),
+        mode: z.enum(["img2img", "text2img"]).optional(),
+      }),
+    );
   },
 
   /**
