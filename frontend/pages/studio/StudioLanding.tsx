@@ -152,7 +152,7 @@ export default function StudioLanding() {
   // Same pattern for the delete confirm — one AlertDialog instance, cards
   // flip the target to request confirmation.
   const [deletingProject, setDeletingProject] = useState<StudioProject | null>(null);
-  // Optimistic prepend so the user sees their new project in "My videos"
+  // Optimistic prepend so the user sees their new project in "My projects"
   // if they navigate back. Skips the hook's internal navigate so the
   // deep-link forwarder below can append UI-state seed params (capture
   // mode, etc.) onto the destination URL.
@@ -808,7 +808,7 @@ function StudioVideoCard({
           {visibilityLabel}
         </button>
         {/* Kind badge — bottom-left, mirrors the template-card position
-            so the chooser + "My videos" grid read symmetric. Self-hides
+            so the chooser + "My projects" grid read symmetric. Self-hides
             when `mediaKind === "video"` — the StudioProject DTO defaults
             to 'video' for every pre-#894 row. */}
         <MediaKindBadge

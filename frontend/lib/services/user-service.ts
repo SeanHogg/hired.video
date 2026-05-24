@@ -40,6 +40,11 @@ export const UserProfileSchema = z.object({
     .nullable()
     .transform((val) => (val === null ? undefined : val))
     .optional(),
+  industries: z
+    .array(z.string())
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   openToWork: nullableBoolean(),
   providesServices: nullableBoolean(),
   // When true, the owner has opted into a fully public profile that

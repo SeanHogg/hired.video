@@ -43,7 +43,7 @@ export async function lookupArtifactOwner(
     }
     case "company": {
       const [r] = await db
-        .select({ userId: schema.companyProfiles.ownerUserId })
+        .select({ userId: schema.companyProfiles.ownerId })
         .from(schema.companyProfiles)
         .where(eq(schema.companyProfiles.id, artifactId))
         .limit(1);
@@ -76,7 +76,7 @@ export async function lookupArtifactOwner(
     }
     case "job": {
       const [r] = await db
-        .select({ userId: schema.jobItems.userId })
+        .select({ userId: schema.jobItems.postedByUserId })
         .from(schema.jobItems)
         .where(eq(schema.jobItems.id, artifactId))
         .limit(1);

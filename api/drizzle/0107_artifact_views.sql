@@ -131,7 +131,7 @@ INSERT INTO "artifact_views" (
 SELECT
   'company',
   cv."company_id",
-  cp."owner_user_id",
+  cp."owner_id",
   cv."viewer_id",
   cv."ip_hash",
   cv."referrer",

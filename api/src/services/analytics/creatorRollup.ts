@@ -172,15 +172,22 @@ async function fetchArtifactMeta(
   try {
     switch (kind) {
       case "video": {
+        // Studio projects don't have title/thumbnail columns — the
+        // display title is derived from the storyboard JSONB's `_name`
+        // key (see api/src/routes/studio.ts:toProjectDto). Pull the
+        // storyboard and project the same fields here.
         const [r] = await db
           .select({
-            title: schema.studioProjects.title,
-            thumbnail: schema.studioProjects.thumbnailUrl,
+            storyboard: schema.studioProjects.storyboard,
+            resumeText: schema.studioProjects.resumeText,
           })
           .from(schema.studioProjects)
           .where(eq(schema.studioProjects.id, id))
           .limit(1);
-        return { title: r?.title ?? "Untitled video", thumbnail: r?.thumbnail ?? null };
+        const meta = (r?.storyboard ?? null) as Record<string, unknown> | null;
+        const savedName = meta?._name as string | undefined;
+        const title = savedName || r?.resumeText?.slice(0, 80) || "Untitled video";
+        return { title, thumbnail: null };
       }
       case "resume": {
         const [r] = await db
@@ -193,13 +200,13 @@ async function fetchArtifactMeta(
       case "company": {
         const [r] = await db
           .select({
-            title: schema.companyProfiles.name,
-            thumbnail: schema.companyProfiles.logoUrl,
+            name: schema.companyProfiles.name,
+            logoUrl: schema.companyProfiles.logoUrl,
           })
           .from(schema.companyProfiles)
           .where(eq(schema.companyProfiles.id, id))
           .limit(1);
-        return { title: r?.title ?? "Untitled company", thumbnail: r?.thumbnail ?? null };
+        return { title: r?.name ?? "Untitled company", thumbnail: r?.logoUrl ?? null };
       }
       case "profile": {
         const [r] = await db
@@ -215,7 +222,7 @@ async function fetchArtifactMeta(
           .from(schema.jobItems)
           .where(eq(schema.jobItems.id, id))
           .limit(1);
-        return { title: r?.title ?? "Untitled job", thumbnail: null };
+        return { title: (r as any)?.title ?? "Untitled job", thumbnail: null };
       }
       default:
         return { title: `${kind}:${id.slice(0, 6)}`, thumbnail: null };

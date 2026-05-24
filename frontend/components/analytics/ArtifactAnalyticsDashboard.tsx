@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { MetricsPanel, type ArtifactMetrics, type ArtifactKind } from "@/components/analytics";
-import type { ArtifactKind as ArtifactKindKey } from "../../../../shared/artifact-views";
+import type { ArtifactKind as ArtifactKindKey } from "@shared/artifact-views";
 import { fetchArtifactAnalytics } from "@/lib/services/artifact-view-service";
 
 interface Props {

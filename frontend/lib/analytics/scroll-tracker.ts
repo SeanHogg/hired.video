@@ -20,7 +20,7 @@
  * scroll-depth heatmap.
  */
 
-import type { ArtifactKind } from "../../../shared/artifact-views";
+import type { ArtifactKind } from "@shared/artifact-views";
 import { sendArtifactViewBeacon } from "../services/artifact-view-service";
 
 const BUCKETS = 100;

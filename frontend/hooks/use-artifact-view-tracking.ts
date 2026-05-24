@@ -15,7 +15,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { ScrollTracker } from "@/lib/analytics/scroll-tracker";
-import type { ArtifactKind } from "../../../shared/artifact-views";
+import type { ArtifactKind } from "@shared/artifact-views";
 
 interface Options {
   artifactKind: ArtifactKind;

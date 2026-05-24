@@ -94,22 +94,17 @@ export default function ArtifactDetailsSheet({
           {activity?.createdAt && (
             <>
               <dt className="text-muted-foreground">Created</dt>
-              <dd>{formatDate(activity.createdAt)}</dd>
+              <dd>{formatDate(toIsoString(activity.createdAt))}</dd>
             </>
           )}
           {activity?.updatedAt && (
             <>
               <dt className="text-muted-foreground">Updated</dt>
-              <dd>{formatDate(activity.updatedAt)}</dd>
+              <dd>{formatDate(toIsoString(activity.updatedAt))}</dd>
             </>
           )}
           {activity?.extra?.map((row) => (
-            <>
-              <dt key={`${row.label}-k`} className="text-muted-foreground">
-                {row.label}
-              </dt>
-              <dd key={`${row.label}-v`}>{row.value}</dd>
-            </>
+            <ActivityRow key={row.label} label={row.label} value={row.value} />
           ))}
         </dl>
       ),
@@ -126,4 +121,18 @@ export default function ArtifactDetailsSheet({
       layout={layout}
     />
   );
+}
+
+function ActivityRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{value}</dd>
+    </>
+  );
+}
+
+function toIsoString(d: string | Date): string {
+  if (typeof d === "string") return d;
+  return d.toISOString();
 }

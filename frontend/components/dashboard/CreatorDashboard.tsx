@@ -94,26 +94,10 @@ export default function CreatorDashboard() {
     <div className="space-y-6">
       {/* Top stat strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          label="Total views"
-          value={rollup.totals.totalViews}
-          icon={<Eye className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Unique viewers"
-          value={rollup.totals.uniqueViewers}
-          icon={<Users className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Countries"
-          value={rollup.totals.countriesReached}
-          icon={<Globe2 className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Artifacts"
-          value={rollup.totals.artifactCount}
-          icon={<BarChart3 className="h-4 w-4" />}
-        />
+        <StatCard title="Total views" value={rollup.totals.totalViews} icon={Eye} />
+        <StatCard title="Unique viewers" value={rollup.totals.uniqueViewers} icon={Users} />
+        <StatCard title="Countries" value={rollup.totals.countriesReached} icon={Globe2} />
+        <StatCard title="Artifacts" value={rollup.totals.artifactCount} icon={BarChart3} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -130,7 +114,10 @@ export default function CreatorDashboard() {
             <CardTitle className="text-sm">Traffic sources</CardTitle>
           </CardHeader>
           <CardContent>
-            <ReferrerBreakdown referrers={rollup.referrers.slice(0, 10)} />
+            <ReferrerBreakdown
+              referrers={rollup.referrers.slice(0, 10)}
+              totalViews={rollup.totals.totalViews}
+            />
           </CardContent>
         </Card>
       </div>

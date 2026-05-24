@@ -196,6 +196,30 @@ function PeopleDetailContent() {
     ? profile.bio ||
       `${fullName || "User"} is a ${getRoleDisplayLabel((profile as any).role ?? "")}.`
     : undefined;
+
+  // Combine resume skills (canonical source), profile-level SEO keywords,
+  // and industries into a single discoverability vocabulary used both as
+  // <meta name="keywords"> and Person.knowsAbout JSON-LD.
+  const discoverabilityTags = useMemo<string[]>(() => {
+    if (!profile) return [];
+    const resumeSkills = (masterResume?.content?.skills ?? []).flatMap((s: any) => [
+      ...(s?.name ? [s.name as string] : []),
+      ...((s?.keywords ?? []) as string[]),
+    ]);
+    const profileKeywords = (profile.skills ?? []) as string[];
+    const profileIndustries = ((profile as any).industries ?? []) as string[];
+    const seen = new Set<string>();
+    return [...resumeSkills, ...profileKeywords, ...profileIndustries]
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .filter((v) => {
+        if (!v) return false;
+        const key = v.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [profile, masterResume]);
+
   const structuredData = profile
     ? generateStructuredData.person({
         name: fullName,
@@ -203,6 +227,7 @@ function PeopleDetailContent() {
         bio: profile.bio ?? undefined,
         avatar: profile.profilePicture ?? undefined,
         id: profile.id ?? "",
+        knowsAbout: discoverabilityTags.length > 0 ? discoverabilityTags : undefined,
       })
     : undefined;
   useSEO(location.pathname, {
@@ -210,6 +235,7 @@ function PeopleDetailContent() {
     description: seoDescription,
     ogTitle: seoTitle,
     ogDescription: seoDescription,
+    keywords: discoverabilityTags.length > 0 ? discoverabilityTags.join(", ") : undefined,
     structuredData,
   });
 
@@ -617,11 +643,11 @@ function PeopleDetailContent() {
                   />
 
                   <SkillsSection
-                    profileSkills={profile.skills ?? undefined}
-                    industries={(profile as any).data?.industries ?? undefined}
+                    keywords={profile.skills ?? undefined}
+                    industries={(profile as any).industries ?? undefined}
                     isOwner={isOwner}
                     onEdit={() => setActiveOwnerDialog("skills")}
-                    title={t("messages.industriesAndSearchTags")}
+                    title={t("messages.discoverabilityTags")}
                   />
                 </TabsContent>
 

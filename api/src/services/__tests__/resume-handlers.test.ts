@@ -216,11 +216,11 @@ function makeDeps(
 }
 
 function anonCtx(): ResumeRequestContext {
-  return { viewerId: null, ipHash: null, referrer: null, userAgent: null };
+  return { viewerId: null, ipHash: null, ipCountry: null, referrer: null, userAgent: null };
 }
 
 function userCtx(id: string, extras: Partial<ResumeRequestContext> = {}): ResumeRequestContext {
-  return { viewerId: id, ipHash: "hash123", referrer: "https://example.com", userAgent: "UA", ...extras };
+  return { viewerId: id, ipHash: "hash123", ipCountry: null, referrer: "https://example.com", userAgent: "UA", ...extras };
 }
 
 function makeResume(overrides: Partial<FakeResume> = {}): FakeResume {

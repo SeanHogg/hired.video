@@ -1214,15 +1214,28 @@ export const generateStructuredData = {
     address: company.address,
   }),
 
-  person: (person: any) => ({
-    "@context": "https://schema.org",
-    "@type": "Person",
-    name: person.name,
-    jobTitle: person.title,
-    description: person.bio,
-    image: person.avatar,
-    url: `https://hired.video/people/${person.id}`,
-  }),
+  person: (person: {
+    name: string;
+    title?: string;
+    bio?: string;
+    avatar?: string;
+    id: string;
+    knowsAbout?: string[];
+  }) => {
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      name: person.name,
+      jobTitle: person.title,
+      description: person.bio,
+      image: person.avatar,
+      url: `https://hired.video/people/${person.id}`,
+    };
+    if (person.knowsAbout && person.knowsAbout.length > 0) {
+      data.knowsAbout = person.knowsAbout;
+    }
+    return data;
+  },
 };
 
 /**

@@ -15,7 +15,7 @@
  */
 
 import { apiClient } from "../api-client";
-import type { ArtifactKind, ArtifactViewBeacon } from "../../../shared/artifact-views";
+import type { ArtifactKind, ArtifactViewBeacon } from "@shared/artifact-views";
 import type { ArtifactMetrics } from "@/components/analytics";
 
 export async function sendArtifactViewBeacon(

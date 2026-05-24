@@ -315,7 +315,7 @@ export default function JobDetail() {
                     kind: "job",
                     entity: { id: job.id, userId: job.userId, viewerCanManage: job.viewerCanManage },
                   }}
-                  title={job.title ?? "Job details"}
+                  title={job.data?.title ?? "Job details"}
                   chips={
                     <Badge variant="secondary">{job.status}</Badge>
                   }
