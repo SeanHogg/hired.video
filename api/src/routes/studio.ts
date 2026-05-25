@@ -401,6 +401,17 @@ function buildMockAdVideoScript(
       { type: "skills",      title: "Core Expertise", skills: ["Leadership", "Strategy", "Innovation", "AI & Technology", "Team Building"] },
       { type: "cta",         title: "Let's Connect", text: "Follow my journey and join the conversation.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
+    // SCORM-shaped lesson storyboard — learning-objective + concept +
+    // worked-example + knowledge-check + summary. The real LLM path
+    // generates a richer storyboard; this template seeds the editor with
+    // a usable scaffold when the route short-circuits without an LLM.
+    course_lesson: [
+      { type: "intro",          title: name, subtitle: "Learning Objectives", text: text.trim() || "By the end of this lesson, you'll be able to apply the concept covered." },
+      { type: "concept",        title: "Core Concept", items: ["Define the key term", "Explain when it applies", "Identify the failure modes"] },
+      { type: "worked-example", title: "Worked Example", text: "Walk through a concrete scenario step-by-step so the abstract idea sticks." },
+      { type: "knowledge-check",title: "Knowledge Check", items: ["Pause and answer in your own words", "Compare against the model answer", "Note what you'd refine"] },
+      { type: "summary",        title: "Summary", text: "Recap the objective, the example, and the next lesson in the path." },
+    ],
   };
 
   const rawScenes = scenesByPurpose[purpose] ?? scenesByPurpose.job_ad;
