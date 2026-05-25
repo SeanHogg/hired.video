@@ -34,6 +34,7 @@ import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import { MediaIconPicker } from "@/components/shared/MediaPicker";
 import { X } from "lucide-react";
 import { ArtifactAnalyticsDashboard } from "@/components/analytics";
+import { mediaKindToArtifactKind } from "@/components/analytics/types";
 import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import { campaignShareUrlFor } from "@/lib/campaigns/bake-utm";
 
@@ -278,7 +279,7 @@ export default function ProjectDetailsSheet({
       icon: BarChart3,
       render: () =>
         playable ? (
-          <ArtifactAnalyticsDashboard kind={mediaKind} artifactId={project.id} />
+          <ArtifactAnalyticsDashboard kind={mediaKindToArtifactKind(mediaKind)} artifactId={project.id} />
         ) : (
           <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
             Make this {kindLabel} public to start collecting metrics — the

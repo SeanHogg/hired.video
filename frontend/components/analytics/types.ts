@@ -92,18 +92,16 @@ export type ArtifactKind =
   // Fallback bucket for company / studio_template / service.
   | "channel";
 
-/** Project a studio `MediaKind` onto the analytics `ArtifactKind`.
- *  ArtifactKind is a narrower union (only the kinds whose analytics copy
- *  + heatmap axis differ); kinds that don't have distinct rollups fold
- *  back to the closest peer (`interactive_comic` → `comic`, `cad_3d` →
- *  `cad`). Single seam per the DRY rule so every analytics call site
- *  agrees on the mapping. */
+/** Project a studio `MediaKind` onto the analytics-wire `ArtifactKind`.
+ *  Single seam per the DRY rule so every analytics call site (Studio
+ *  dashboard, Project details drawer, future per-channel rollups)
+ *  agrees on the mapping. Every `MediaKind` literal is also a
+ *  `ArtifactKind` literal by construction (see comment in
+ *  shared/artifact-views.ts: "Adding a new studio MediaKind ALSO adds
+ *  an ArtifactKind entry here"), so the body is a typesafe identity. */
 import type { MediaKind } from "@shared/media-kinds";
+import type { ArtifactKind as WireArtifactKind } from "@shared/artifact-views";
 
-export function mediaKindToArtifactKind(kind: MediaKind): ArtifactKind {
-  switch (kind) {
-    case "interactive_comic": return "comic";
-    case "cad_3d":            return "cad";
-    default:                  return kind;
-  }
+export function mediaKindToArtifactKind(kind: MediaKind): WireArtifactKind {
+  return kind;
 }

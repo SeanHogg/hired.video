@@ -122,6 +122,7 @@ export default function StudioPreview({
     recruiter_brand: "Add brand details in the Prompt tab",
     product_launch: "Add product details in the Prompt tab",
     personal_brand: "Add your bio in the Prompt tab",
+    course_lesson: "Add lesson topic + learning objectives in the Prompt tab",
   };
 
   const statusLabel: Record<string, string> = {
