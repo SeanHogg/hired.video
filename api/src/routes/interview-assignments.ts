@@ -38,6 +38,7 @@ import { buildRepos } from "../repositories/index.js";
 import { extractSkills, type SkillExtractInput, type Skill } from "../services/resume/skills.js";
 import { parsedJobFromRow } from "../services/job/match-handlers.js";
 import { generateQuestionsFromSkills, type GeneratedQuestion } from "../services/interview/question-generator.js";
+import { scoreAnswer, aggregateScores } from "../services/interview/answer-scorer.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import type { ResumeContent } from "../../../shared/resume.js";
@@ -112,14 +113,35 @@ const AssignRequestSchema = z.object({
   questions: z.array(QuestionInputSchema).min(1).max(10),
   jobId: z.string().uuid().optional(),
   sourceResumeId: z.string().uuid().optional(),
-  sourceContext: z.enum(["tool", "ai-coach", "career-360", "pipeline"]).default("tool"),
+  sourceContext: z.enum(["tool", "ai-coach", "career-360", "pipeline", "job-screening"]).default("tool"),
   targetRole: z.string().max(120).optional(),
   extractedSkills: z.array(z.any()).optional(),
+  /** Provenance: the reusable library set this assignment was created from
+   *  (if any). The library is decoupled from the live row — once assigned,
+   *  per-candidate edits don't bleed back to the library. */
+  questionSetId: z.string().uuid().optional(),
   /** How long the magic link is valid (hours). */
   linkExpiryHours: z.number().int().min(1).max(720).default(168), // 7 days default
   /** How long the candidate has to submit responses once they open the link (hours). */
   responseWindowHours: z.number().int().min(1).max(720).default(72),
+  /** Recorder behaviour applied to every question. */
+  prepTimeSec: z.number().int().min(0).max(120).default(10),
+  maxRetakes: z.number().int().min(0).max(10).default(1),
+  proctoringOn: z.boolean().default(true),
 });
+
+const ProctoringFlagsSchema = z
+  .object({
+    tabBlurCount: z.number().int().nonnegative().default(0),
+    pasteCount: z.number().int().nonnegative().default(0),
+    copyCount: z.number().int().nonnegative().default(0),
+    fullscreenExits: z.number().int().nonnegative().default(0),
+    prepUsedSec: z.number().int().nonnegative().default(0),
+    retakesUsed: z.number().int().nonnegative().default(0),
+    micLevelAvg: z.number().optional(),
+    deviceLabel: z.string().max(100).optional(),
+  })
+  .optional();
 
 const RespondRequestSchema = z.object({
   questionId: z.string(),
@@ -129,6 +151,9 @@ const RespondRequestSchema = z.object({
   videoUrl: z.string().optional(),
   durationMs: z.number().optional(),
   transcription: z.string().optional(),
+  proctoringFlags: ProctoringFlagsSchema,
+  /** 1-indexed; recorder tells us which attempt this is. Capped server-side by the row's maxRetakes. */
+  attempt: z.number().int().min(1).max(11).optional(),
 });
 
 // ─── Skill-extract input builder (mirrors skill-extractor.ts) ───────────────
@@ -338,6 +363,10 @@ interviewAssignmentRoutes.post("/assign", async (c) => {
       targetRole: parsed.data.targetRole ?? null,
       extractedSkills: parsed.data.extractedSkills ?? null,
       assignmentType,
+      questionSetId: parsed.data.questionSetId ?? null,
+      prepTimeSec: parsed.data.prepTimeSec,
+      maxRetakes: parsed.data.maxRetakes,
+      proctoringOn: parsed.data.proctoringOn,
     } as any)
     .returning();
 
@@ -552,6 +581,12 @@ interviewAssignmentRoutes.post("/:id/respond", async (c) => {
     )
     .limit(1);
 
+  // Cap attempt against the interview's maxRetakes. attempts > maxRetakes+1
+  // are silently coerced so a misbehaving client can't claim "this is take 9"
+  // and trick the recruiter UI into showing inflated retake counts.
+  const allowedAttempts = Math.max(1, (interview.maxRetakes ?? 1) + 1);
+  const attempt = Math.min(parsed.data.attempt ?? (existing ? (existing.attempt ?? 1) + 1 : 1), allowedAttempts);
+
   let saved;
   if (existing) {
     [saved] = await db
@@ -563,7 +598,17 @@ interviewAssignmentRoutes.post("/:id/respond", async (c) => {
         transcription: parsed.data.transcription ?? null,
         textAnswer: parsed.data.textAnswer ?? null,
         responseMode: parsed.data.responseMode,
+        proctoringFlags: parsed.data.proctoringFlags ?? existing.proctoringFlags ?? {},
+        attempt,
         status: "recorded",
+        // A re-record invalidates the previous AI score — clear so the
+        // recruiter knows the saved AI verdict is stale.
+        aiScore: null,
+        aiScoreBreakdown: null,
+        aiSummary: null,
+        aiStrengths: null,
+        aiConcerns: null,
+        aiScoredAt: null,
       } as any)
       .where(eq(studioAsyncResponses.id, existing.id))
       .returning();
@@ -580,6 +625,8 @@ interviewAssignmentRoutes.post("/:id/respond", async (c) => {
         transcription: parsed.data.transcription ?? null,
         textAnswer: parsed.data.textAnswer ?? null,
         responseMode: parsed.data.responseMode,
+        proctoringFlags: parsed.data.proctoringFlags ?? {},
+        attempt,
         status: "recorded",
       } as any)
       .returning();
@@ -668,6 +715,10 @@ interviewAssignmentRoutes.get("/invite/:token", async (c) => {
       status: interview.status,
       expired,
       targetRole: interview.targetRole,
+      // Recorder behaviour — drives prep timer, retake cap, proctoring flag.
+      prepTimeSec: interview.prepTimeSec ?? 10,
+      maxRetakes: interview.maxRetakes ?? 1,
+      proctoringOn: interview.proctoringOn ?? true,
     }),
   );
 });
@@ -736,6 +787,317 @@ interviewAssignmentRoutes.post("/claim/:token", async (c) => {
       claimed: true,
       title: interview.title,
       questions: interview.questions,
+    }),
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10. SCORE — AI scores a single response (recruiter-only)
+//     POST /:id/responses/:rid/score
+// ═══════════════════════════════════════════════════════════════════════════
+
+interviewAssignmentRoutes.post("/:id/responses/:rid/score", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  if (!user.roles?.some((r) => ASSIGNABLE_ROLES.has(r))) {
+    return c.json(fail("FORBIDDEN", "Only recruiters or employers can score answers"), 403);
+  }
+
+  const id = c.req.param("id");
+  const rid = c.req.param("rid");
+  const db = getDb();
+
+  const [interview] = await db
+    .select()
+    .from(studioAsyncInterviews)
+    .where(and(eq(studioAsyncInterviews.id, id), eq(studioAsyncInterviews.recruiterId, user.sub)))
+    .limit(1);
+  if (!interview) return c.json(fail("NOT_FOUND", "Interview not found"), 404);
+
+  const [response] = await db
+    .select()
+    .from(studioAsyncResponses)
+    .where(and(eq(studioAsyncResponses.id, rid), eq(studioAsyncResponses.interviewId, id)))
+    .limit(1);
+  if (!response) return c.json(fail("NOT_FOUND", "Response not found"), 404);
+
+  // Locate the question the response is tied to so we can give the LLM
+  // context (question text + skill probes + category).
+  const questions = (interview.questions as Array<GeneratedQuestion>) ?? [];
+  const question = questions.find((q) => q.id === response.questionId);
+  if (!question) return c.json(fail("NOT_FOUND", "Question not found on interview"), 404);
+
+  const answerText = response.textAnswer?.trim() || response.transcription?.trim() || "";
+  if (!answerText) {
+    return c.json(fail("NO_TRANSCRIPT", "No answer text or transcript on this response"), 400);
+  }
+
+  const result = await scoreAnswer(c.env, user, {
+    question: question.text,
+    skillLinks: question.skillLinks,
+    category: question.category,
+    answerText,
+    targetRole: interview.targetRole ?? undefined,
+  });
+
+  const [saved] = await db
+    .update(studioAsyncResponses)
+    .set({
+      aiScore: result.score,
+      aiScoreBreakdown: result.breakdown,
+      aiSummary: result.summary,
+      aiStrengths: result.strengths,
+      aiConcerns: result.concerns,
+      aiScoredAt: new Date(),
+    } as any)
+    .where(eq(studioAsyncResponses.id, rid))
+    .returning();
+
+  return c.json(ok(saved));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 11. SCORE-ALL — convenience: score every un-scored answer on the interview
+//     POST /:id/score-all
+// ═══════════════════════════════════════════════════════════════════════════
+
+interviewAssignmentRoutes.post("/:id/score-all", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  if (!user.roles?.some((r) => ASSIGNABLE_ROLES.has(r))) {
+    return c.json(fail("FORBIDDEN", "Only recruiters or employers can score answers"), 403);
+  }
+
+  const id = c.req.param("id");
+  const db = getDb();
+
+  const [interview] = await db
+    .select()
+    .from(studioAsyncInterviews)
+    .where(and(eq(studioAsyncInterviews.id, id), eq(studioAsyncInterviews.recruiterId, user.sub)))
+    .limit(1);
+  if (!interview) return c.json(fail("NOT_FOUND", "Interview not found"), 404);
+
+  const responses = await db
+    .select()
+    .from(studioAsyncResponses)
+    .where(eq(studioAsyncResponses.interviewId, id));
+
+  const questions = (interview.questions as Array<GeneratedQuestion>) ?? [];
+  const questionById = new Map(questions.map((q) => [q.id, q]));
+
+  let scoredCount = 0;
+  const scoredRows: Array<{ score: number; required: boolean }> = [];
+
+  for (const r of responses) {
+    const q = questionById.get(r.questionId);
+    if (!q) continue;
+    const answerText = r.textAnswer?.trim() || r.transcription?.trim() || "";
+    if (!answerText) continue;
+
+    // Skip if already scored — avoid burning LLM credits twice. Recruiter can
+    // re-score one at a time via /responses/:rid/score if they really want.
+    if (r.aiScoredAt) {
+      if (typeof r.aiScore === "number") {
+        scoredRows.push({ score: r.aiScore, required: q.required });
+      }
+      continue;
+    }
+
+    const result = await scoreAnswer(c.env, user, {
+      question: q.text,
+      skillLinks: q.skillLinks,
+      category: q.category,
+      answerText,
+      targetRole: interview.targetRole ?? undefined,
+    });
+    await db
+      .update(studioAsyncResponses)
+      .set({
+        aiScore: result.score,
+        aiScoreBreakdown: result.breakdown,
+        aiSummary: result.summary,
+        aiStrengths: result.strengths,
+        aiConcerns: result.concerns,
+        aiScoredAt: new Date(),
+      } as any)
+      .where(eq(studioAsyncResponses.id, r.id));
+    scoredCount += 1;
+    scoredRows.push({ score: result.score, required: q.required });
+  }
+
+  // Roll up to an overall score on the interview row.
+  const requiredQids = new Set(questions.filter((q) => q.required).map((q) => q.id));
+  const allRows = responses
+    .map((r) => ({ score: r.aiScore, required: requiredQids.has(r.questionId) }))
+    .filter((r) => r.score != null) as Array<{ score: number; required: boolean }>;
+  // Merge in newly-scored rows from this run (the cached responses array is
+  // pre-update, so include those too).
+  for (const sr of scoredRows) allRows.push(sr);
+  const { overall, coverage } = aggregateScores(allRows);
+
+  await db
+    .update(studioAsyncInterviews)
+    .set({
+      aiOverallScore: overall,
+      aiOverallSummary: `${coverage}% answer coverage; weighted average ${overall.toFixed(1)}/10`,
+      aiScoredAt: new Date(),
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(studioAsyncInterviews.id, id));
+
+  return c.json(ok({ scoredCount, overall, coverage }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. DECISION — recruiter marks shortlist / maybe / reject
+//     POST /:id/decision
+// ═══════════════════════════════════════════════════════════════════════════
+
+interviewAssignmentRoutes.post("/:id/decision", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  if (!user.roles?.some((r) => ASSIGNABLE_ROLES.has(r))) {
+    return c.json(fail("FORBIDDEN", "Only recruiters or employers can decide"), 403);
+  }
+
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const DecisionSchema = z.object({
+    decision: z.enum(["shortlist", "maybe", "reject"]).nullable(),
+    reason: z.string().max(2000).optional(),
+  });
+  const parsed = DecisionSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid decision payload", parsed.error.flatten()), 400);
+  }
+
+  const db = getDb();
+  const [interview] = await db
+    .select()
+    .from(studioAsyncInterviews)
+    .where(and(eq(studioAsyncInterviews.id, id), eq(studioAsyncInterviews.recruiterId, user.sub)))
+    .limit(1);
+  if (!interview) return c.json(fail("NOT_FOUND", "Interview not found"), 404);
+
+  const [updated] = await db
+    .update(studioAsyncInterviews)
+    .set({
+      decision: parsed.data.decision,
+      decisionReason: parsed.data.reason ?? null,
+      decisionBy: parsed.data.decision ? user.sub : null,
+      decisionAt: parsed.data.decision ? new Date() : null,
+      status: parsed.data.decision ? "reviewed" : interview.status,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(studioAsyncInterviews.id, id))
+    .returning();
+
+  return c.json(ok(updated));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 13. REPORT — combined interview + responses + AI breakdown
+//     GET /:id/report — convenience endpoint for the recruiter review surface
+// ═══════════════════════════════════════════════════════════════════════════
+
+interviewAssignmentRoutes.get("/:id/report", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+
+  const id = c.req.param("id");
+  const db = getDb();
+  const [interview] = await db
+    .select()
+    .from(studioAsyncInterviews)
+    .where(eq(studioAsyncInterviews.id, id))
+    .limit(1);
+  if (!interview) return c.json(fail("NOT_FOUND", "Interview not found"), 404);
+  const isCreator = interview.recruiterId === user.sub;
+  const isCandidate = interview.candidateId === user.sub;
+  if (!isCreator && !isCandidate) {
+    return c.json(fail("FORBIDDEN", "Not your interview"), 403);
+  }
+
+  const responses = await db
+    .select()
+    .from(studioAsyncResponses)
+    .where(eq(studioAsyncResponses.interviewId, id))
+    .orderBy(studioAsyncResponses.createdAt);
+
+  // Optional candidate lookup so the report carries a name on it. Drizzle
+  // join would balloon the row width; one extra point read is cheap.
+  let candidate: { id: string; name: string | null; email: string | null } | null = null;
+  if (interview.candidateId) {
+    const [row] = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, interview.candidateId))
+      .limit(1);
+    candidate = row ?? null;
+  }
+
+  return c.json(
+    ok({
+      interview,
+      responses,
+      candidate,
+      viewerRole: isCreator ? "creator" : "candidate",
+    }),
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 14. COMPARE — side-by-side view of multiple interviews (recruiter-only)
+//     GET /compare?ids=<id>,<id>,…   max 6 ids
+// ═══════════════════════════════════════════════════════════════════════════
+
+interviewAssignmentRoutes.get("/compare", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  if (!user.roles?.some((r) => ASSIGNABLE_ROLES.has(r))) {
+    return c.json(fail("FORBIDDEN", "Only recruiters or employers can compare"), 403);
+  }
+
+  const raw = c.req.query("ids") ?? "";
+  const ids = raw.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6);
+  if (ids.length < 2) return c.json(fail("VALIDATION_ERROR", "Pass at least 2 ids"), 400);
+
+  const db = getDb();
+  const interviews = await db
+    .select()
+    .from(studioAsyncInterviews)
+    .where(
+      and(
+        eq(studioAsyncInterviews.recruiterId, user.sub),
+        sql`${studioAsyncInterviews.id} = ANY(${ids})`,
+      ),
+    );
+  if (interviews.length === 0) {
+    return c.json(fail("NOT_FOUND", "No matching interviews"), 404);
+  }
+
+  // Pull responses for everything in a single query then bucket in memory —
+  // far fewer round-trips than per-id selects.
+  const interviewIds = interviews.map((i) => i.id);
+  const responses = await db
+    .select()
+    .from(studioAsyncResponses)
+    .where(sql`${studioAsyncResponses.interviewId} = ANY(${interviewIds})`);
+
+  const buckets = new Map<string, typeof responses>();
+  for (const r of responses) {
+    const bucket = buckets.get(r.interviewId) ?? [];
+    bucket.push(r);
+    buckets.set(r.interviewId, bucket);
+  }
+
+  return c.json(
+    ok({
+      interviews: interviews.map((i) => ({
+        interview: i,
+        responses: buckets.get(i.id) ?? [],
+      })),
     }),
   );
 });

@@ -34,12 +34,21 @@ export interface JobAccess {
  * Job button / Candidates+Reports tabs were leaking to non-owners).
  *
  * Returns `null` if the job doesn't exist so the caller can surface a 404.
+ *
+ * #438 — Super-admin no longer auto-passes this check. The UI override
+ * was removed (impersonation is the only path for SA to act on a job
+ * they don't own); the API now enforces the same rule for symmetry, so
+ * a curl against `DELETE /api/jobs/:id` from an SA token without an
+ * active impersonation also fails. The legacy `/admin/*` tooling that
+ * needed unrestricted access should re-acquire ownership via the
+ * impersonation flow rather than relying on a silent bypass.
  */
 export async function canViewerManageJob(
   viewerUserId: string,
   isSuperAdmin: boolean,
   jobId: string,
 ): Promise<{ canManage: boolean; access: JobAccess } | null> {
+  void isSuperAdmin;
   const db = getDb();
   const [job] = await db
     .select({
@@ -54,7 +63,7 @@ export async function canViewerManageJob(
 
   const access: JobAccess = { jobId, ownerId: job.ownerId, companyId: job.companyId };
 
-  if (isSuperAdmin || job.ownerId === viewerUserId) {
+  if (job.ownerId === viewerUserId) {
     return { canManage: true, access };
   }
 

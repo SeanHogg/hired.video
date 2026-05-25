@@ -281,13 +281,13 @@ const FEATURE_ROWS: FeatureRow[] = [
     feature: "Validated AI hiring assessments (predictive science)",
     icon: FlaskConical,
     values: {
-      hired: "no",
+      hired: "partial",
       loxo: "no",
       linkedin: "no",
       greenhouse: "no",
       bullhorn: "no",
     },
-    note: "HireVue's moat — 20+ years of validated predictive assessments. Hired.Video has AI candidate↔job match scoring, not a validated psychometric assessment battery. Different product.",
+    note: "HireVue still owns the 20+-year validation moat. Hired.Video now ships a validated-inspired predictive battery (Big Five via IPIP, cognitive sample, situational judgment, EQ, DISC, and resume → predictive-index match) under /tools/predictive-assessments with per-run history. Calibrated, normed scoring is the remaining gap.",
   },
   {
     feature: "Real-time chat (presence, typing, instant delivery)",
@@ -299,7 +299,7 @@ const FEATURE_ROWS: FeatureRow[] = [
       greenhouse: "partial",
       bullhorn: "partial",
     },
-    note: "LinkedIn InMail and modern ATSes ship WebSocket-backed presence and typing indicators. Hired.Video chat is REST-based today; WebSocket transport is on the roadmap.",
+    note: "LinkedIn InMail and modern ATSes ship WebSocket-backed presence and typing indicators. Hired.Video chat is REST-based today; WebSocket transport is on the roadmap (gap #1230).",
   },
   {
     feature: "Large integration marketplace (hundreds of partners)",
@@ -347,7 +347,7 @@ const FEATURE_ROWS: FeatureRow[] = [
       greenhouse: "yes",
       bullhorn: "yes",
     },
-    note: "Greenhouse top-tier ships DEI dashboards, time-to-hire benchmarking, and deep audit-trail features. Hired.Video has analytics but not at this depth or audit-trail rigor.",
+    note: "Hired.Video now ships per-job + org-level time-to-hire (median / average / fastest / slowest, on JobDetail + the Globe Details drawer) and a unified Account Audit Log on Settings → Security (logins, password / email changes, locks, impersonation events, admin actions). DEI is partial: an aggregate anonymous funnel + source-mix panel ships on EmployerDashboard, but Greenhouse-grade EEO-1 dashboards require opt-in candidate demographic capture (gap #1231).",
   },
 ];
 

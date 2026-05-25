@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 
 interface EditSocialProfilesDialogProps {
   open: boolean;
@@ -21,8 +22,12 @@ interface EditSocialProfilesDialogProps {
 
 export default function EditSocialProfilesDialog({ open, onOpenChange, onSaved }: EditSocialProfilesDialogProps) {
   const { t } = useTranslation();
-  const { user, updateProfile, refreshUser } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const { saving, save } = useProfileSectionSaver({
+    onSaved,
+    onClose: onOpenChange,
+    errorLabel: "social profiles",
+  });
   const [form, setForm] = useState({ linkedIn: "", github: "", twitter: "" });
 
   useEffect(() => {
@@ -35,23 +40,12 @@ export default function EditSocialProfilesDialog({ open, onOpenChange, onSaved }
     }
   }, [open, user]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({
-        linkedIn: form.linkedIn,
-        github: form.github,
-        twitter: form.twitter,
-      });
-      refreshUser().catch(() => {});
-      onSaved?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to save social profiles:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSave = () =>
+    save({
+      linkedIn: form.linkedIn,
+      github: form.github,
+      twitter: form.twitter,
+    });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

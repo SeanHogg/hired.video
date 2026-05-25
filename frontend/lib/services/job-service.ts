@@ -341,13 +341,32 @@ export class JobService {
   }
 
   /**
-   * Apply to a job
+   * Apply to a job. When the job has a video screening attached, the response
+   * carries an inviteToken + screeningRequired flag — the apply page uses
+   * that to land the candidate directly on `/interview/:token`.
    */
   async applyToJob(
     jobId: string,
     application: { resumeId: string; coverLetter?: string },
-  ): Promise<void> {
-    await apiClient.post(`/api/Job/${jobId}/apply`, application);
+  ): Promise<{
+    success: true;
+    applicationId: string;
+    screening: {
+      interviewId: string;
+      inviteToken: string;
+      screeningRequired: "required" | "optional";
+    } | null;
+  }> {
+    const res = await apiClient.post<{
+      success: true;
+      applicationId: string;
+      screening: {
+        interviewId: string;
+        inviteToken: string;
+        screeningRequired: "required" | "optional";
+      } | null;
+    }>(`/api/Job/${jobId}/apply`, application);
+    return res.data;
   }
 
   /**

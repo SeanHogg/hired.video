@@ -446,8 +446,72 @@ recruiterRoutes.post("/placements", async (c) => {
 		guaranteePeriodDays: body.guaranteePeriodDays ?? null,
 		guaranteeEndDate,
 		notes: body.notes ?? null,
+		// #226 — Placement Type field FK → workspace_job_types. Optional;
+		// when absent the placement inherits no financial defaults.
+		placementTypeId: body.placementTypeId ?? null,
 	} as any).returning();
 	return c.json(responseEnvelope(rowToPlacement(placement)));
+});
+
+// #225 — Bulk save: N placements against (potentially) one job in a
+// single round-trip. Each row is independent — splits, fees, and
+// placement_type can vary row-by-row. The endpoint is owner-scoped
+// (recruiterId = caller) and validates an array; failure on any row
+// fails the whole batch (no partial commits).
+recruiterRoutes.post("/placements/bulk", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => null);
+	if (!body || !Array.isArray(body.placements) || body.placements.length === 0) {
+		return c.json(
+			{ success: false, error: { code: "VALIDATION_ERROR", message: "placements array required" } },
+			400,
+		);
+	}
+	if (body.placements.length > 50) {
+		return c.json(
+			{ success: false, error: { code: "VALIDATION_ERROR", message: "Bulk cap is 50 placements per call" } },
+			400,
+		);
+	}
+	const db = getDb();
+	const [recruiterUser] = await db
+		.select({ name: schema.users.name })
+		.from(schema.users)
+		.where(eq(schema.users.id, user.sub))
+		.limit(1);
+
+	const rows = body.placements.map((p: any) => {
+		const commissionPct = Number(p.commissionPercentage ?? 0);
+		const annualSalary = Number(p.annualSalary ?? 0);
+		const commissionAmount = Number(((annualSalary * commissionPct) / 100).toFixed(2));
+		let guaranteeEndDate: Date | null = null;
+		if (p.startDate && p.guaranteePeriodDays) {
+			guaranteeEndDate = new Date(p.startDate);
+			guaranteeEndDate.setDate(guaranteeEndDate.getDate() + Number(p.guaranteePeriodDays));
+		}
+		return {
+			recruiterId: user.sub,
+			recruiterName: recruiterUser?.name ?? "",
+			candidateId: p.candidateUserId ?? user.sub,
+			candidateName: p.candidateName ?? "",
+			jobId: p.jobId ?? null,
+			jobTitle: p.jobTitle ?? "",
+			companyName: p.companyName ?? "",
+			submissionId: p.submissionId ?? null,
+			startDate: p.startDate ? new Date(p.startDate) : null,
+			annualSalary: annualSalary || null,
+			commissionPercentage: String(commissionPct),
+			commissionAmount: String(commissionAmount),
+			commissionStatus: "Pending",
+			guaranteePeriodDays: p.guaranteePeriodDays ?? null,
+			guaranteeEndDate,
+			notes: p.notes ?? null,
+			placementTypeId: p.placementTypeId ?? null,
+		};
+	});
+
+	const inserted = await db.insert(schema.placements).values(rows as any).returning();
+	return c.json(responseEnvelope(inserted.map(rowToPlacement)));
 });
 
 // GET /placements — list all placements for current recruiter

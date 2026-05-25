@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import JobEditForm from "@/components/JobEditForm";
 import EntityEditShell from "@/components/EntityEditShell";
+import { JobScreeningCard } from "@/components/jobs/JobScreeningCard";
 import { jobService } from "@/lib/services/job-service";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
@@ -71,12 +72,15 @@ export default function JobEditPage() {
       notFound={!loading && !job}
     >
       {job && permissions.canEdit && (
-        <JobEditForm
-          job={job}
-          onSave={handleSave}
-          onCancel={handleCancel}
-          loading={saving}
-        />
+        <div className="space-y-6">
+          <JobEditForm
+            job={job}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            loading={saving}
+          />
+          <JobScreeningCard jobId={job.id} jobTitle={job.title} />
+        </div>
       )}
     </EntityEditShell>
   );

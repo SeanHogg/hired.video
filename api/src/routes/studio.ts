@@ -492,6 +492,43 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
 // StudioPurpose is re-exported below from shared/studio-purposes.ts.
 type StudioPurpose = (typeof STUDIO_PURPOSES)[number];
 
+/** Detect an explicit scene-count constraint inside the user's free-form
+ *  prompt. Without this, the per-purpose system-prompt RULES baseline
+ *  (e.g. "5 scenes: intro → benefits → cta") silently overrides phrases
+ *  like "one scene only" / "single scene" the user actually wrote (gap
+ *  #483). Returns the constrained count or `null` if the prompt doesn't
+ *  pin one. A `targetDuration` ≤ 8s also forces 1 scene — a sub-10s
+ *  multi-scene video is jarringly short per scene. */
+const WORD_TO_COUNT: Record<string, number> = {
+  one: 1, single: 1, two: 2, three: 3, four: 4, five: 5,
+};
+export function detectExplicitSceneCount(
+  prompt: string | undefined,
+  targetDuration: number,
+): number | null {
+  if (targetDuration <= 8) return 1;
+  if (!prompt) return null;
+  const lower = prompt.toLowerCase();
+  // Explicit "single scene" / "one scene only" / "one-scene" phrasings.
+  const wordMatch = lower.match(/\b(one|single|two|three|four|five)[- ]scenes?\b/);
+  if (wordMatch && wordMatch[1] in WORD_TO_COUNT) {
+    return WORD_TO_COUNT[wordMatch[1]];
+  }
+  // Numeric "1 scene" / "2 scenes" etc.
+  const numericMatch = lower.match(/\b(\d{1,2})\s+scenes?\b/);
+  if (numericMatch) {
+    const n = parseInt(numericMatch[1], 10);
+    if (n >= 1 && n <= 20) return n;
+  }
+  // "No chapters" / "no transitions" — a soft signal the user wants
+  // one continuous shot. Treat as 1 only when paired with sub-15s
+  // total duration so we don't over-collapse longer videos.
+  if (/\bno (?:chapters?|transitions?|scenes?)\b/.test(lower) && targetDuration <= 15) {
+    return 1;
+  }
+  return null;
+}
+
 function buildStudioSystemPrompt(
   targetDuration: number,
   motion: string,
@@ -499,6 +536,7 @@ function buildStudioSystemPrompt(
   purpose: StudioPurpose = "resume",
   ctaUrl?: string,
   ctaText?: string,
+  explicitSceneCount?: number | null,
 ): string {
   const ctaBlock = ctaUrl ? `\n- For the "cta" scene: ctaUrl: "${ctaUrl}", ctaText: "${ctaText ?? "Learn More"}"` : "";
   const typeInterface = `"intro"|"achievement"|"skills"|"closing"|"job-details"|"company-culture"|"cta"|"testimonial"|"product-feature"|"brand-story"|"requirements"|"benefits"`;
@@ -643,7 +681,14 @@ ${baseInterface}${jobBlock}`;
   const jobBlock = jobDescription
     ? `\n\nPersonalise the intro scene for this role. Filter achievements and skills to only those relevant.\nJob Description:\n${jobDescription.slice(0, 3000)}`
     : "";
-  return `You are a professional video director and career storyteller. Produce a JSON VideoScript for a ${targetDuration}-second video resume that powerfully showcases this specific candidate.
+  // When the caller pinned an explicit scene count (e.g. user wrote
+  // "one scene only") prepend a strict override block that beats the
+  // per-purpose RULES default further down. Without this, "5 scenes"
+  // baselines silently override user intent (gap #483).
+  const overrideBlock = explicitSceneCount != null
+    ? `STRICT USER OVERRIDE: The user pinned scene count = ${explicitSceneCount}. Produce exactly ${explicitSceneCount} scene${explicitSceneCount === 1 ? "" : "s"} regardless of the default scene plan below. Scene durations still must sum to ${targetDuration}s.\n\n`
+    : "";
+  return `${overrideBlock}You are a professional video director and career storyteller. Produce a JSON VideoScript for a ${targetDuration}-second video resume that powerfully showcases this specific candidate.
 
 RULES:
 - Exactly 4 scenes in order: intro → achievement → skills → closing
@@ -710,7 +755,7 @@ const BASIC_TEMPLATES = [
   },
 ];
 
-const PREMIUM_TEMPLATES = [
+const PRO_TEMPLATES = [
   {
     id: "executive-platinum",
     name: "Executive Platinum",
@@ -769,8 +814,8 @@ studioRoutes.get("/templates", async (c) => {
 
   const sub = await getSubscription(userId);
   const templates = sub.isPro
-    ? [...BASIC_TEMPLATES, ...PREMIUM_TEMPLATES]
-    : BASIC_TEMPLATES.map((t) => ({ ...t, lockedCount: PREMIUM_TEMPLATES.length }));
+    ? [...BASIC_TEMPLATES, ...PRO_TEMPLATES]
+    : BASIC_TEMPLATES.map((t) => ({ ...t, lockedCount: PRO_TEMPLATES.length }));
 
   return c.json({ success: true, data: { templates, isPro: sub.isPro } }, 200);
 });
@@ -814,7 +859,10 @@ studioRoutes.post("/storyboard", async (c) => {
     script = buildMockAdVideoScript(brief, targetDuration, motion, purpose, ctaUrl, ctaText);
   } else {
     const llm = createLLMClient(c.env, c.var.user);
-    const systemPrompt = buildStudioSystemPrompt(targetDuration, motion, jobDescription, purpose, ctaUrl, ctaText);
+    const explicitSceneCount = detectExplicitSceneCount(prompt, targetDuration);
+    const systemPrompt = buildStudioSystemPrompt(
+      targetDuration, motion, jobDescription, purpose, ctaUrl, ctaText, explicitSceneCount,
+    );
     const defaultPrompt = purpose === "resume"
       ? "Create a professional video resume"
       : purpose === "job_ad" ? "Create a compelling job advertisement video"

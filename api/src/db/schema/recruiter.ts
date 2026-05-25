@@ -47,6 +47,9 @@ export const talentPoolCandidates = pgTable("talent_pool_candidates", {
   lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
   nextFollowUpAt: timestamp("next_follow_up_at", { withTimezone: true }),
   contactFrequency: varchar("contact_frequency", { length: 50 }),
+  /** FK → workspace_sources.id (#238). Origin attribution — was the
+   *  candidate inbound, sourced, referred, etc. */
+  sourceId: uuid("source_id"),
   addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -105,6 +108,10 @@ export type NewCandidateSubmission = typeof candidateSubmissions.$inferInsert;
 
 export const placements = pgTable("placements", {
   id: uuid("id").primaryKey().defaultRandom(),
+  /** FK → workspace_job_types.id (#226). Drives the bill / pay /
+   *  overtime / fee defaults the commission engine consumes. Nullable
+   *  on legacy rows that pre-date the taxonomy. */
+  placementTypeId: uuid("placement_type_id"),
   recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   candidateId: uuid("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   recruiterName: varchar("recruiter_name", { length: 255 }).default("").notNull(),

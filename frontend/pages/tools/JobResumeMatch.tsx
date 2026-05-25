@@ -22,6 +22,7 @@ import {
 } from "@/lib/services/match-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
 
 type WizardStep = "job" | "resume" | "results";
 
@@ -157,7 +158,7 @@ export default function JobResumeMatch() {
       clear();
     } catch (err) {
       console.error("Match analysis failed:", err);
-      setError(t("errors.analyzeJobResumeMatchFailed"));
+      setError(appendDiagnosticReference(t("errors.analyzeJobResumeMatchFailed"), err));
     } finally {
       setIsAnalyzing(false);
     }

@@ -89,11 +89,13 @@ interface ResumeCardProps {
   onTrack?: () => void;
   onContactOwner?: () => void;
   onViewToolHistory?: () => void;
-  /** Fired when a score chip is clicked. Receives the catalog tool id that
-   *  produced the score (e.g. "ai-resume-scorer", "sentiment-analysis"),
-   *  so the host can open the tool-history sheet pre-expanded on that
-   *  tool. Optional — when omitted the chips render as non-interactive. */
-  onScoreClick?: (toolId: string) => void;
+  /** Fired when a score chip is clicked. Receives the catalog tool
+   *  id(s) that produced the score (e.g. `["ai-resume-scorer"]` or
+   *  `["ai-resume-scorer", "resume-optimizer"]` for the ATS chip,
+   *  since both write that sub-score), so the host can open the
+   *  tool-history sheet pre-expanded on every matching tool. Optional
+   *  — when omitted the chips render as non-interactive. */
+  onScoreClick?: (toolIds: readonly string[]) => void;
   onViewAnalytics?: () => void;
   /** Extra dropdown items appended to the card's overflow menu (e.g. AddToListMenu). */
   extraMenuItems?: React.ReactNode;

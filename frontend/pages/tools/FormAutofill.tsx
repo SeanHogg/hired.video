@@ -29,6 +29,7 @@ import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { autofillService } from "@/lib/services/autofill-service";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { FormField, FieldAnswer } from "@shared/autofill";
@@ -114,7 +115,7 @@ export default function FormAutofill() {
         setError(t("errors.noFormFieldsDetected"));
       }
     } catch (err: any) {
-      setError(err?.message || t("errors.analyzeFormFailed"));
+      setError(appendDiagnosticReference(err?.message || t("errors.analyzeFormFailed"), err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -159,7 +160,7 @@ export default function FormAutofill() {
         );
       }
     } catch (err: any) {
-      setError(err?.message || t("errors.generateAnswersFailed"));
+      setError(appendDiagnosticReference(err?.message || t("errors.generateAnswersFailed"), err));
     } finally {
       setIsGenerating(false);
     }

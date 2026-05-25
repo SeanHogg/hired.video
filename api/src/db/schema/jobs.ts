@@ -80,6 +80,14 @@ export const jobItems = pgTable("job_items", {
   // submission until the screening starts (required) or just nudges the
   // candidate after applying (optional).
   screeningRequired: varchar("screening_required", { length: 16 }).notNull().default("none"),
+  /** Workspace-scoped source attribution (#238). Replaces ad-hoc
+   *  free-text source fields once callers migrate; null until a user
+   *  picks a source via the editor. FK kept unenforced at the schema
+   *  level (workspace_sources lives in another table file). */
+  sourceId: uuid("source_id"),
+  /** Soft-delete timestamp (#154). When set, this job is hidden from
+   *  default lists; "Include archived" toggles surface it back. */
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

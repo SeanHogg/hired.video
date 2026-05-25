@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Play,
   TrendingUp,
-  Users,
   Building2,
   Target,
   Zap,
@@ -104,7 +103,6 @@ import { companyService } from "@/lib/services/company-service";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { UserRole } from "@shared/user-roles";
 import { canPostJobs } from "@/lib/persona";
-import type { JobWithOwnership } from "@/types/job";
 import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
 import CreateJobAlertButton from "@/components/CreateJobAlertButton";
@@ -285,13 +283,6 @@ export default function Jobs() {
   const listIdFromUrl = searchParams.get("list_id");
   const [listMembership, setListMembership] = useState<Set<string> | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [jobsData, setJobsData] = useState<{
-    owned: JobWithOwnership[];
-    tracked: JobWithOwnership[];
-  }>({
-    owned: [],
-    tracked: [],
-  });
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
   const [candidateCount, setCandidateCount] = useState<number>(0);
@@ -636,77 +627,6 @@ export default function Jobs() {
   // English strings. Shared with any future surface that renders dates.
   const { formatDate, getTimeAgo } = useTimeAgo();
 
-  // Temporary stub until owned/tracked jobs are wired
-  const getJobsForUser = (): {
-    owned: JobWithOwnership[];
-    tracked: JobWithOwnership[];
-  } => {
-    return { owned: [], tracked: [] };
-  };
-
-  // Load user's jobs when authenticated - only when needed
-  const loadUserJobsOnDemand = async () => {
-    if (!isAuthenticated || !user) return;
-
-    try {
-      setIsLoading(true);
-      // Get user's owned and tracked jobs
-      const ownedJobs = await jobService.getUserJobs();
-      const trackedJobs = await jobService.getSavedJobs();
-
-      setJobsData({
-        owned: ownedJobs.map((j) => ({
-          ...j,
-          company: j.company ?? "",
-          location: j.location ?? "",
-          employmentType: j.employmentType ?? "",
-          ownership: "owned" as const,
-          slug: (j as any).slug || "",
-          experienceLevel: (j as any).experienceLevel || "entry",
-          status: "active" as const,
-          privacy: "public" as const,
-          description: (j as any).description || "",
-          views: (j as any).views || 0,
-          applications: (j as any).applications || 0,
-          summary: (j as any).summary || "",
-          userId: (j as any).userId || "",
-          createdAt: (j as any).createdAt || "",
-          updatedAt: (j as any).updatedAt || "",
-        })),
-        tracked: trackedJobs.map((j) => ({
-          ...j,
-          company: j.company ?? "",
-          location: j.location ?? "",
-          employmentType: j.employmentType ?? "",
-          ownership: "tracked" as const,
-          slug: (j as any).slug || "",
-          experienceLevel: (j as any).experienceLevel || "entry",
-          status: "active" as const,
-          privacy: "public" as const,
-          description: (j as any).description || "",
-          views: (j as any).views || 0,
-          applications: (j as any).applications || 0,
-          summary: (j as any).summary || "",
-          userId: (j as any).userId || "",
-          createdAt: (j as any).createdAt || "",
-          updatedAt: (j as any).updatedAt || "",
-        })),
-      });
-    } catch (error) {
-      console.error("Failed to load user jobs:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Only load user jobs when specifically needed (not on every page load)
-  // This prevents the unnecessary /api/Job/saved API call
-  // useEffect(() => {
-  //   if (isAuthenticated && user) {
-  //     loadUserJobsOnDemand();
-  //   }
-  // }, [isAuthenticated, user]);
-
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
     // Capability lives in persona.ts (single SA-bypass rule). canPostJobs
@@ -857,54 +777,13 @@ export default function Jobs() {
               <Tabs value={effectiveTab} className="space-y-4 sm:space-y-6">
                 {/* Jobs (browse) Tab */}
                 <TabsContent value="jobs" className="space-y-6">
-                  {/* Owned Jobs (for recruiters/employers) */}
-                  {canManageJobs &&
-                    "owned" in jobsData &&
-                    jobsData.owned.length > 0 && (
-                      <div>
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                          <Briefcase className="h-5 w-5" />
-                          Your Job Postings ({jobsData.owned.length})
-                        </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                          {jobsData.owned.map((job) => (
-                            <JobCard
-                              key={job.id}
-                              job={job}
-                              showOwnership
-                              {...jobMenuHandlersFor({ id: job.id, title: job.title })}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Tracked Jobs */}
-                  {("tracked" in jobsData
-                    ? jobsData.tracked.length > 0
-                    : false) && (
-                    <div>
-                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Users className="h-5 w-5" />
-                        Tracked Jobs ({(jobsData as any).tracked.length})
-                      </h2>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {(jobsData as any).tracked.map(
-                          (job: JobWithOwnership) => (
-                            <JobCard
-                              key={job.id}
-                              job={job}
-                              showOwnership
-                              {...jobMenuHandlersFor({ id: job.id, title: job.title })}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                 {/* All Available Jobs — header omitted; the inline PageHeader
-                    search slot already labels this surface as "Jobs". */}
+                    search slot already labels this surface as "Jobs". Owned
+                    jobs surface in this grid via the per-row Edit affordance
+                    (ownership marker on the public-jobs payload); the
+                    dedicated "Your Job Postings" / "Tracked Jobs" groups
+                    were removed in #396 because they hung off a wiring that
+                    never ran. */}
                 <div>
                   {isLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

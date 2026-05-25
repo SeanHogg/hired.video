@@ -32,11 +32,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Search,
   Sparkles,
   Wand2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { resumeToText, jobToText } from "@/components/PromptEditor";
 import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import TemplateList from "@/components/studio/templates/TemplateList";
@@ -144,9 +146,26 @@ const STEP_TITLE: Record<StepId, string> = {
  *  the shared `VISUAL_THEMES` / `BG_PRESETS` registries; every other
  *  kind owns its visual defaults inside its own runtime (game / image /
  *  animation / cad) or per-template palette (comic genres), or has no
- *  visible frame (voice). */
+ *  visible frame (voice).
+ *
+ *  #1201 — a parallel per-kind "Look & Feel" step is planned (genre
+ *  palette swatch for comic, base style + size for image / animation,
+ *  sprite pack for game, default voice for voice). For now the wizard
+ *  jumps straight to the intake form for those kinds because the
+ *  intake already captures the kind-specific tunables. Tracked in the
+ *  Consolidated Gap Register so the asymmetry is visible. */
 function kindNeedsThemeStep(kind: MediaKind): boolean {
   return kind === "video" || kind === "podcast";
+}
+
+/** Whether the wizard's "Done" actually fires an LLM generator. Only
+ *  CanvasState-authoring kinds do — `WizardLauncher.handleGenerate`
+ *  hits `generateStoryboard` for video/podcast and `generateComic` for
+ *  comic. Voice / animation / game / image / cad take the
+ *  `kind: "template"` seed path with no AI round-trip, so the CTA
+ *  reads "Create …" rather than "Generate …". */
+function kindNeedsAiGeneration(kind: MediaKind): boolean {
+  return kind === "video" || kind === "podcast" || kind === "comic";
 }
 
 interface Props {
@@ -191,6 +210,9 @@ export default function StudioWizard({
   // templates (owned templates open from the carousel on /studio).
   const [kindFilter, setKindFilter] = useState<TemplateKindFilter>("all");
   const [useForFilter, setUseForFilter] = useState<TemplateUseForFilter>("all");
+  // Inline search field — parity with /studio landing chooser; the
+  // helper already accepts a query arg, so this just threads through.
+  const [templateQuery, setTemplateQuery] = useState("");
 
   // Artifact import state
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -220,6 +242,7 @@ export default function StudioWizard({
       TEMPLATE_CATALOG,
       kindFilter,
       useForFilter,
+      templateQuery,
     );
     if (
       selectedTemplate &&
@@ -228,7 +251,7 @@ export default function StudioWizard({
       return [selectedTemplate, ...filtered];
     }
     return filtered;
-  }, [kindFilter, useForFilter, selectedTemplate]);
+  }, [kindFilter, useForFilter, templateQuery, selectedTemplate]);
 
   // Per-kind step list. `theme` is video-frame chrome (VISUAL_THEMES +
   // BG_PRESETS) so it only mounts for kinds where those defaults apply
@@ -535,6 +558,19 @@ export default function StudioWizard({
                   output differently. We'll auto-import the right artifact
                   when there is one.
                 </p>
+                {/* Inline template search — parity with /studio landing
+                    so a user who knows the template name doesn't have to
+                    scroll the filtered grid. */}
+                <div className="relative mb-3">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    value={templateQuery}
+                    onChange={(e) => setTemplateQuery(e.target.value)}
+                    placeholder="Search templates"
+                    className="h-9 pl-9"
+                  />
+                </div>
                 {/* Type + Use-for filters — DRY-shared with the /studio
                     landing chooser. `includeOwnedPills={false}` because
                     the wizard only authors built-ins. */}
@@ -842,10 +878,11 @@ export default function StudioWizard({
           ) : (
             <Button size="sm" onClick={handleDone} disabled={!canGenerate || running}>
               {running ? (
-                <>Generating…</>
+                <>{selectedTemplate ? (kindNeedsAiGeneration(selectedTemplate.mediaKind) ? "Generating…" : "Creating…") : "Working…"}</>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 mr-1.5" /> Done — Generate
+                  <Sparkles className="w-4 h-4 mr-1.5" />
+                  Done — {selectedTemplate ? MEDIA_KIND_UI[selectedTemplate.mediaKind].createVerb : "Generate"}
                 </>
               )}
             </Button>

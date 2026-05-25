@@ -1,32 +1,41 @@
 /**
  * AsyncInterviewPage — candidate-facing magic-link page at /interview/:token.
  *
- * Two routes feed it:
- *   - The legacy AsyncInterviewManager (recruiter Studio Features Hub)
- *     creates a token via POST /api/studio/async-interview and lands
- *     candidates here.
- *   - The new Interview Questions tool (POST /api/interview-assignments/assign)
- *     does the same; tokens are stored in the same studio_async_interviews
- *     table, so this page reads them through the new
- *     /api/interview-assignments/invite/:token endpoint.
+ * Three entry paths land here:
+ *   1. Legacy AsyncInterviewManager (recruiter Studio Features Hub) creates a
+ *      token via POST /api/studio/async-interview.
+ *   2. The Interview Questions tool (POST /api/interview-assignments/assign).
+ *   3. The job apply flow (POST /api/jobs/:id/apply) when the job has a
+ *      screening question set attached — assignmentType === 'screening'.
  *
- * Both flows share this surface: the page is public (no auth required)
- * to fetch the preview, but answering requires the candidate to be
- * signed in as a job_seeker. For "invite" assignments where the
- * candidate doesn't have an account yet, the page redirects to /signup
- * with a `next=/interview/<token>` deep-link so they return here once
- * verified, then auto-claim the assignment.
+ * Recorder + proctoring upgrades shipped in 0120:
+ *   - Per-question prep timer (defaults to set.prepTimeSec, or 10s)
+ *   - Per-question countdown timer + auto-submit on time-up
+ *   - Re-record affordance bounded by interview.maxRetakes
+ *   - Tab-blur / paste / copy / fullscreen-exit counters via
+ *     useProctoringSignals, surfaced as a discreet status pill but stored
+ *     against the response so the recruiter can see them at review time
+ *   - "Practise with AI Coach" link inline so candidates have a low-stakes
+ *     dry-run option before they submit a real take
+ *
+ * The page is public (no auth) so the preview can render. Answering still
+ * requires a signed-in job_seeker; invite-type rows redirect to /signup
+ * with a `next=` deep-link, and screening rows auto-claim through the same
+ * mechanism since the candidate is already authenticated from the apply flow.
  */
 
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
   Clock,
+  Eye,
   Loader2,
-  Mic,
+  MessageSquare,
+  RotateCcw,
+  Sparkles,
   Type,
   Video,
 } from "lucide-react";
@@ -39,7 +48,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
+import { useProctoringSignals } from "@/hooks/use-proctoring-signals";
 import {
+  buildAICoachPracticeHref,
   claimInterviewInvite,
   finalizeInterviewAssignment,
   getInterviewInvitePreview,
@@ -54,6 +65,13 @@ const WebcamRecorder = lazy(() =>
 
 type ResponseMode = "text" | "video";
 
+interface AnswerSaved {
+  mode: ResponseMode;
+  text?: string;
+  videoDurationMs?: number;
+  attempt: number;
+}
+
 export default function AsyncInterviewPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -66,7 +84,7 @@ export default function AsyncInterviewPage() {
   const [claiming, setClaiming] = useState(false);
 
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, { mode: ResponseMode; text?: string; videoDurationMs?: number }>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerSaved>>({});
   const [responseMode, setResponseMode] = useState<ResponseMode>("text");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -83,9 +101,7 @@ export default function AsyncInterviewPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  // 2. Auto-claim once authenticated as a job seeker. Strict-assign rows
-  //    arrive pre-bound (preview.candidateBound === true); invite rows
-  //    require this explicit claim before /respond will accept us.
+  // 2. Auto-claim once authenticated as a job seeker.
   useEffect(() => {
     if (!token || !preview || claimed || claiming) return;
     if (!isAuthenticated || !user) return;
@@ -97,7 +113,7 @@ export default function AsyncInterviewPage() {
       .finally(() => setClaiming(false));
   }, [token, preview, claimed, claiming, isAuthenticated, user]);
 
-  // ─── Loading / error / signup gates ──────────────────────────────────────
+  // ─── Gates ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <CenteredCard>
@@ -120,15 +136,12 @@ export default function AsyncInterviewPage() {
         <Clock className="h-12 w-12 text-amber-500 mx-auto mb-4" />
         <h2 className="text-xl font-bold mb-2">Link expired</h2>
         <p className="text-muted-foreground mb-4">
-          This magic link has expired. Ask the recruiter to re-send a fresh one — they have a "Resend link" button on
-          their side.
+          This magic link has expired. Ask the recruiter to re-send a fresh one.
         </p>
       </CenteredCard>
     );
   }
 
-  // Invite flow: candidate isn't logged in yet → bounce to signup with
-  // ?next= preserved so the page reloads after they verify.
   if (!isAuthenticated) {
     const nextHref = `/interview/${token}`;
     const isInvite = preview.assignmentType === "invite";
@@ -165,8 +178,6 @@ export default function AsyncInterviewPage() {
     );
   }
 
-  // Authenticated but not as a job_seeker — refuse with a clear error
-  // rather than silently letting a recruiter answer their own assignment.
   if (user && user.role !== USER_ROLES.JOB_SEEKER) {
     return (
       <CenteredCard>
@@ -204,51 +215,176 @@ export default function AsyncInterviewPage() {
     );
   }
 
-  // ─── Answer flow ─────────────────────────────────────────────────────────
+  // ─── Active interview ────────────────────────────────────────────────────
+  return (
+    <ActiveInterview
+      preview={preview}
+      currentIdx={currentIdx}
+      setCurrentIdx={setCurrentIdx}
+      responseMode={responseMode}
+      setResponseMode={setResponseMode}
+      answers={answers}
+      setAnswers={setAnswers}
+      submitting={submitting}
+      setSubmitting={setSubmitting}
+      onSubmitted={() => setDone(true)}
+      onError={setError}
+      navigate={navigate}
+      error={error}
+    />
+  );
+}
+
+// ─── ActiveInterview — split out so the per-question proctoring hook key changes ───
+
+interface ActiveInterviewProps {
+  preview: InvitePreview;
+  currentIdx: number;
+  setCurrentIdx: (n: number | ((p: number) => number)) => void;
+  responseMode: ResponseMode;
+  setResponseMode: (m: ResponseMode) => void;
+  answers: Record<string, AnswerSaved>;
+  setAnswers: React.Dispatch<React.SetStateAction<Record<string, AnswerSaved>>>;
+  submitting: boolean;
+  setSubmitting: (b: boolean) => void;
+  onSubmitted: () => void;
+  onError: (s: string) => void;
+  navigate: (path: string) => void;
+  error: string | null;
+}
+
+function ActiveInterview({
+  preview,
+  currentIdx,
+  setCurrentIdx,
+  responseMode,
+  setResponseMode,
+  answers,
+  setAnswers,
+  submitting,
+  setSubmitting,
+  onSubmitted,
+  onError,
+  navigate,
+  error,
+}: ActiveInterviewProps) {
   const questions = (preview.questions ?? []) as GeneratedQuestion[];
   const currentQuestion = questions[currentIdx];
   const totalQuestions = questions.length;
   const progress = (Object.keys(answers).length / totalQuestions) * 100;
   const allAnswered = questions.every((q) => answers[q.id] || !q.required);
 
+  // ─── Per-question prep + retake state ─────────────────────────────────────
+  // Reset prep + retake counters every time the question changes.
+  const [prepRemaining, setPrepRemaining] = useState<number>(preview.prepTimeSec);
+  const [prepDone, setPrepDone] = useState<boolean>(preview.prepTimeSec === 0);
+  const [retakesUsed, setRetakesUsed] = useState<number>(0);
+  const proctoring = useProctoringSignals({
+    enabled: preview.proctoringOn,
+    scope: currentQuestion?.id,
+  });
+  const proctoringRef = useRef(proctoring);
+  proctoringRef.current = proctoring;
+
+  // Reset prep / retake whenever the candidate moves to a new question.
+  useEffect(() => {
+    setPrepRemaining(preview.prepTimeSec);
+    setPrepDone(preview.prepTimeSec === 0);
+    setRetakesUsed(0);
+    proctoringRef.current.reset();
+  }, [currentQuestion?.id, preview.prepTimeSec]);
+
+  // Tick the prep countdown.
+  useEffect(() => {
+    if (prepDone) return;
+    if (prepRemaining <= 0) {
+      setPrepDone(true);
+      return;
+    }
+    const t = setTimeout(() => {
+      setPrepRemaining((s) => s - 1);
+      proctoringRef.current.addPrepTime(1);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [prepDone, prepRemaining]);
+
+  const retakesAllowed = preview.maxRetakes;
+  const canRetake = answers[currentQuestion?.id ?? ""] && retakesUsed < retakesAllowed;
+
+  // ─── Save handlers ────────────────────────────────────────────────────────
   async function saveAnswer(mode: ResponseMode, params: { text?: string; videoDurationMs?: number }) {
-    if (!currentQuestion || !preview) return;
+    if (!currentQuestion) return;
+    const attempt = (answers[currentQuestion.id]?.attempt ?? 0) + 1;
     try {
       await submitInterviewResponse(preview.id, {
         questionId: currentQuestion.id,
         responseMode: mode,
         textAnswer: params.text,
         durationMs: params.videoDurationMs,
+        proctoringFlags: proctoring.snapshot(),
+        attempt,
       });
       setAnswers((prev) => ({
         ...prev,
-        [currentQuestion.id]: { mode, text: params.text, videoDurationMs: params.videoDurationMs },
+        [currentQuestion.id]: { mode, text: params.text, videoDurationMs: params.videoDurationMs, attempt },
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save answer");
+      onError(err instanceof Error ? err.message : "Could not save answer");
     }
   }
 
+  function handleRetake() {
+    if (!currentQuestion) return;
+    // Drop the saved answer locally so the recorder/text-editor re-shows the
+    // input. The server-side row stays so the AI score on the previous take
+    // is overwritten by the next /respond call (the route clears stale AI
+    // scoring on every re-record).
+    setAnswers((prev) => {
+      const next = { ...prev };
+      delete next[currentQuestion.id];
+      return next;
+    });
+    setRetakesUsed((n) => n + 1);
+    proctoring.recordRetake();
+  }
+
   async function handleSubmit() {
-    if (!preview) return;
     setSubmitting(true);
     try {
       await finalizeInterviewAssignment(preview.id);
-      setDone(true);
+      onSubmitted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit");
+      onError(err instanceof Error ? err.message : "Could not submit");
     } finally {
       setSubmitting(false);
     }
   }
 
+  // ─── AI Coach hand-off ───────────────────────────────────────────────────
+  const aiCoachHref = useMemo(
+    () =>
+      buildAICoachPracticeHref({
+        questions,
+        targetRole: preview.targetRole,
+        sourceDescription: preview.title,
+      }),
+    [questions, preview.targetRole, preview.title],
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <div className="max-w-3xl mx-auto px-4 py-8">
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold mb-2">{preview.title}</h1>
           {preview.instructions && <p className="text-muted-foreground mb-4">{preview.instructions}</p>}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
+            {preview.assignmentType === "screening" && (
+              <Badge className="bg-blue-100 text-blue-800">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Job screening
+              </Badge>
+            )}
             {preview.targetRole && (
               <Badge variant="outline">{preview.targetRole}</Badge>
             )}
@@ -258,9 +394,16 @@ export default function AsyncInterviewPage() {
                 Due: {new Date(preview.questionResponseDeadline).toLocaleString()}
               </Badge>
             )}
+            <Button asChild variant="ghost" size="sm" className="gap-1 ml-auto">
+              <a href={aiCoachHref}>
+                <MessageSquare className="h-3.5 w-3.5" />
+                Practise with AI Coach
+              </a>
+            </Button>
           </div>
         </div>
 
+        {/* Progress */}
         <div className="mb-6">
           <div className="flex justify-between text-sm text-muted-foreground mb-2">
             <span>
@@ -283,48 +426,81 @@ export default function AsyncInterviewPage() {
                   <Clock className="h-3 w-3 mr-1" />
                   Max {currentQuestion.maxDurationSec}s
                 </Badge>
+                {retakesAllowed > 0 && (
+                  <Badge variant="outline">
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    {retakesUsed}/{retakesAllowed} retakes used
+                  </Badge>
+                )}
                 {currentQuestion.required && <Badge variant="destructive">Required</Badge>}
                 {answers[currentQuestion.id] && (
                   <Badge className="bg-green-500/10 text-green-600">
                     <CheckCircle2 className="h-3 w-3 mr-1" /> Saved
                   </Badge>
                 )}
+                {preview.proctoringOn && (
+                  <Badge variant="outline" className="gap-1 text-[10px]">
+                    <Eye className="h-3 w-3" />
+                    Proctored: blurs {proctoring.flags.tabBlurCount} · pastes{" "}
+                    {proctoring.flags.pasteCount}
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Tabs value={responseMode} onValueChange={(v) => setResponseMode(v as ResponseMode)}>
-                <TabsList>
-                  <TabsTrigger value="text" className="gap-1">
-                    <Type className="h-3.5 w-3.5" />
-                    Text
-                  </TabsTrigger>
-                  <TabsTrigger value="video" className="gap-1">
-                    <Mic className="h-3.5 w-3.5" />
-                    Video
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
-              {responseMode === "text" ? (
-                <TextAnswerEditor
-                  key={currentQuestion.id}
-                  initial={answers[currentQuestion.id]?.text ?? ""}
-                  maxSeconds={currentQuestion.maxDurationSec}
-                  onSave={(text) => saveAnswer("text", { text })}
+              {!prepDone ? (
+                <PrepCountdown
+                  remaining={prepRemaining}
+                  total={preview.prepTimeSec}
+                  onSkip={() => setPrepDone(true)}
                 />
               ) : (
-                <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin mx-auto" />}>
-                  <WebcamRecorder
-                    onRecordingComplete={(_blob, durationMs) => saveAnswer("video", { videoDurationMs: durationMs })}
-                    mode="webcam"
-                    maxDurationSec={currentQuestion.maxDurationSec}
-                  />
-                </Suspense>
+                <>
+                  <Tabs value={responseMode} onValueChange={(v) => setResponseMode(v as ResponseMode)}>
+                    <TabsList>
+                      <TabsTrigger value="text" className="gap-1">
+                        <Type className="h-3.5 w-3.5" />
+                        Text
+                      </TabsTrigger>
+                      <TabsTrigger value="video" className="gap-1">
+                        <Video className="h-3.5 w-3.5" />
+                        Video
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+
+                  {responseMode === "text" ? (
+                    <TextAnswerEditor
+                      key={`${currentQuestion.id}-${retakesUsed}`}
+                      initial={answers[currentQuestion.id]?.text ?? ""}
+                      maxSeconds={currentQuestion.maxDurationSec}
+                      onSave={(text) => saveAnswer("text", { text })}
+                    />
+                  ) : (
+                    <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin mx-auto" />}>
+                      <WebcamRecorder
+                        key={`${currentQuestion.id}-${retakesUsed}`}
+                        onRecordingComplete={(_blob, durationMs) =>
+                          saveAnswer("video", { videoDurationMs: durationMs })
+                        }
+                        mode="webcam"
+                        maxDurationSec={currentQuestion.maxDurationSec}
+                      />
+                    </Suspense>
+                  )}
+                  {canRetake && (
+                    <Button variant="outline" size="sm" onClick={handleRetake} className="gap-1">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Re-record this answer ({retakesAllowed - retakesUsed} left)
+                    </Button>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
         )}
 
+        {/* Nav */}
         <div className="flex justify-between">
           <Button
             variant="outline"
@@ -385,6 +561,31 @@ function CenteredCard({ children }: { children: React.ReactNode }) {
       <Card className="max-w-md w-full">
         <CardContent className="p-8 text-center">{children}</CardContent>
       </Card>
+    </div>
+  );
+}
+
+function PrepCountdown({
+  remaining,
+  total,
+  onSkip,
+}: {
+  remaining: number;
+  total: number;
+  onSkip: () => void;
+}) {
+  const pct = total > 0 ? Math.max(0, Math.round(((total - remaining) / total) * 100)) : 100;
+  return (
+    <div className="rounded-md border border-dashed bg-muted/40 p-4 text-center space-y-3">
+      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+        <Clock className="h-4 w-4" />
+        <span className="text-sm">Take a moment to think before you start recording</span>
+      </div>
+      <div className="text-3xl font-bold">{remaining}s</div>
+      <Progress value={pct} className="h-1" />
+      <Button variant="ghost" size="sm" onClick={onSkip}>
+        I'm ready — start now
+      </Button>
     </div>
   );
 }

@@ -9,7 +9,7 @@
 // (resume-roast, resume-consolidator, …) that aren't in the runtime
 // registry.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { History, Play, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -58,11 +58,15 @@ interface Props {
    *  with new inputs. Ignored for the `entity` source (which uses a
    *  deep-link to the tool's page) and the `user` source (read-only). */
   onRunAgain?: (toolId: string) => void;
-  /** Catalog tool id to pre-expand on first render. When the panel is
-   *  opened from a clicked score chip, this lets the user land on the
-   *  relevant tool's history without re-clicking the accordion header.
-   *  Silently ignored if the user has no runs of that tool yet. */
-  initialToolId?: string;
+  /** Catalog tool id(s) to pre-expand on first render. When the panel
+   *  is opened from a clicked score chip, this lets the user land on
+   *  the relevant tool's history without re-clicking the accordion
+   *  header. Accepts a single id or an array — chips that map to
+   *  multiple tools (e.g. ATS score, which both Resume Scorer and
+   *  Resume Optimizer write) pass every id that may have produced the
+   *  value so the user sees runs from either. Silently ignored if the
+   *  user has no runs of any listed tool yet. */
+  initialToolId?: string | readonly string[];
 }
 
 function formatDate(iso: string): string {
@@ -116,10 +120,31 @@ interface ToolHistoryGroupProps {
   /** When omitted, the "Run again" button is hidden — used by the
    *  admin view, which is read-only from the operator's side. */
   runAgain?: RunAgainAffordance;
+  /** When true, scroll this group into view after mount — set by the
+   *  panel for whichever group matches the deep-link `initialToolId`
+   *  so a chip click reliably lands on the right tool's history even
+   *  on a tall side-sheet with many groups. */
+  autoScrollIntoView?: boolean;
 }
 
-function ToolHistoryGroup({ toolId, toolLabel, runs, runAgain }: ToolHistoryGroupProps) {
+function ToolHistoryGroup({ toolId, toolLabel, runs, runAgain, autoScrollIntoView }: ToolHistoryGroupProps) {
   const [openRunId, setOpenRunId] = useState<string | null>(null);
+  const itemRef = useRef<HTMLDivElement | null>(null);
+
+  // When the chip-deep-link points at this group, scroll the header
+  // into view after mount so the user actually sees the accordion that
+  // just expanded (otherwise on resumes with many tool groups it can
+  // sit below the fold of the side sheet).
+  useEffect(() => {
+    if (!autoScrollIntoView) return;
+    const el = itemRef.current;
+    if (!el) return;
+    // Defer so the accordion's open animation runs first.
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [autoScrollIntoView]);
 
   // Runs arrive newest-first; sparkline reads oldest → newest.
   const scorePoints = useMemo(
@@ -135,7 +160,7 @@ function ToolHistoryGroup({ toolId, toolLabel, runs, runAgain }: ToolHistoryGrou
   const delta = latestScore !== null && firstScore !== null ? latestScore - firstScore : null;
 
   return (
-    <AccordionItem value={toolId}>
+    <AccordionItem value={toolId} ref={itemRef}>
       <AccordionTrigger>
         <div className="flex items-center gap-3 w-full">
           <span className="font-medium">{toolLabel}</span>
@@ -229,6 +254,17 @@ function buildRunAgainHref(
 }
 
 export function ToolHistoryPanel({ source, onRunAgain, initialToolId }: Props) {
+  // Normalize to an array up front so the rest of the component can
+  // treat single-id and multi-id chip deep-links identically.
+  const initialToolIds = useMemo<readonly string[]>(
+    () =>
+      typeof initialToolId === "string"
+        ? [initialToolId]
+        : Array.isArray(initialToolId)
+          ? initialToolId
+          : [],
+    [initialToolId],
+  );
   const queryKey =
     source.kind === "entity"
       ? (["tool-runs", "entity", source.entityType, source.entityId] as const)
@@ -315,13 +351,12 @@ export function ToolHistoryPanel({ source, onRunAgain, initialToolId }: Props) {
           <Accordion
             type="multiple"
             className="w-full"
-            // Re-mount when initialToolId changes so a different chip-click
-            // re-expands cleanly even if the sheet stayed mounted between
-            // opens (shadcn Sheet keeps its content portal alive).
-            key={initialToolId ?? "all"}
-            defaultValue={
-              initialToolId && byTool.has(initialToolId) ? [initialToolId] : []
-            }
+            // Re-mount when the chip-deep-link target changes so a
+            // different click re-expands cleanly even if the sheet
+            // stayed mounted between opens (shadcn Sheet keeps its
+            // content portal alive).
+            key={initialToolIds.length > 0 ? initialToolIds.join(",") : "all"}
+            defaultValue={initialToolIds.filter((id) => byTool.has(id))}
           >
             {orderedToolIds.map((toolId) => {
               const entry = getCatalogTool(toolId);
@@ -340,6 +375,7 @@ export function ToolHistoryPanel({ source, onRunAgain, initialToolId }: Props) {
                   toolLabel={label}
                   runs={byTool.get(toolId)!}
                   runAgain={runAgain}
+                  autoScrollIntoView={initialToolIds.includes(toolId)}
                 />
               );
             })}

@@ -6,11 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send, ArrowLeft, Briefcase, Building2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Send, ArrowLeft, Briefcase, Building2, Video, Clock, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
 import { resumeService } from "@/lib/services/resume-service";
+import {
+  getJobScreeningPreview,
+  type JobScreeningPreview,
+} from "@/lib/services/interview-question-sets-service";
 
 interface Resume {
   id: string;
@@ -30,6 +36,8 @@ export default function JobApplicationPage() {
   const [coverLetter, setCoverLetter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Screening config — populated when the job has a question set attached.
+  const [screening, setScreening] = useState<JobScreeningPreview | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -50,6 +58,16 @@ export default function JobApplicationPage() {
       // Load job details
       const jobData = await jobService.getJobById(id);
       setJob(jobData);
+
+      // Screening preview — sanitised (counts + timing only, no questions
+      // leak). Used to warn the candidate that a screening interview will
+      // follow once they submit. Best-effort; on error we just skip the panel.
+      try {
+        const screeningData = await getJobScreeningPreview(id);
+        setScreening(screeningData);
+      } catch {
+        setScreening(null);
+      }
 
       // Load user's resumes
       const resumesData = await resumeService.getUserResumes();
@@ -89,13 +107,21 @@ export default function JobApplicationPage() {
     setIsSubmitting(true);
 
     try {
-      await jobService.applyToJob(id, {
+      const result = await jobService.applyToJob(id, {
         resumeId: selectedResumeId,
         coverLetter: coverLetter.trim() || undefined,
       });
 
       toast.success(t("messages.applicationSubmitted"));
-      navigate(`/jobs/${id}`);
+      // If the job has a screening interview attached, land the candidate
+      // directly on it — magic-link emails are still queued by the server
+      // as a fallback, but the in-flow continuation is the killer UX vs
+      // HireVue's "you'll get an email in a bit" round-trip.
+      if (result.screening?.inviteToken) {
+        navigate(`/interview/${result.screening.inviteToken}`);
+      } else {
+        navigate(`/jobs/${id}`);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : t("messages.applicationSubmitFailed");
       toast.error(errorMessage);
@@ -157,6 +183,55 @@ export default function JobApplicationPage() {
           </div>
         </CardHeader>
       </Card>
+
+      {/* Screening preview — only when the job has a question set attached. */}
+      {screening?.hasScreening && (
+        <Card className="mb-6 border-brand-purple/40 bg-brand-purple/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Video className="h-5 w-5 text-brand-purple" />
+              {screening.screeningRequired === "required"
+                ? "Step 2: Video screening (required)"
+                : "Optional video screening after you apply"}
+            </CardTitle>
+            <CardDescription>
+              After you submit, you'll be sent directly to a {screening.questionCount}-question screening
+              interview {screening.expectedMinutes ? `(~${screening.expectedMinutes} min)` : ""}.
+              {screening.proctoringOn
+                ? " It's lightly proctored — keep this tab in focus while answering."
+                : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex flex-wrap gap-2 text-xs">
+              {typeof screening.prepTimeSec === "number" && (
+                <Badge variant="outline" className="gap-1">
+                  <Clock className="h-3 w-3" />
+                  {screening.prepTimeSec}s prep per question
+                </Badge>
+              )}
+              {typeof screening.maxRetakes === "number" && screening.maxRetakes > 0 && (
+                <Badge variant="outline">{screening.maxRetakes} retakes allowed</Badge>
+              )}
+              <Badge variant="outline">Text or video answers</Badge>
+            </div>
+            {screening.screeningRequired === "required" && (
+              <Alert>
+                <AlertDescription className="text-xs">
+                  This employer requires the screening to consider your application. You can
+                  practise the question style with our AI Coach first if you want.
+                </AlertDescription>
+              </Alert>
+            )}
+            <Button asChild variant="ghost" size="sm" className="gap-1 -ml-2">
+              <a href="/ai-coach">
+                <MessageSquare className="h-3.5 w-3.5" />
+                Warm up with AI Coach
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Application Form */}
       <Card>

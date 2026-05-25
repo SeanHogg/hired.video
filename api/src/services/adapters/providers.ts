@@ -50,6 +50,8 @@ export type LLMUseCase =
   | "match_insights"
   | "interview_questions"
   | "interview_analyze"
+  | "interview_answer_score"
+  | "video_pitch_script"
   | "autofill"
   | "skill_extract"
   | "linkedin_post"

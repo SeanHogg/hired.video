@@ -13,10 +13,13 @@
  *   if (denied) return denied;
  *
  * Authorization rules (single place to extend later):
- *   1. Super-admin can manage any company.
- *   2. The user who owns the company (`ownerId`) can always manage it.
- *   3. Any active member listed in `user_company_role_associations` can
+ *   1. The user who owns the company (`ownerId`) can always manage it.
+ *   2. Any active member listed in `user_company_role_associations` can
  *      manage it (multi-recruiter team support — same model as jobs).
+ *
+ * #438 — Super-admin no longer auto-passes. Impersonation is the only
+ * path for SA to act on a company they don't own, matching the UI gate
+ * removed from `useEntityOwnership`.
  */
 import type { MiddlewareHandler } from "hono";
 import { and, eq } from "drizzle-orm";
@@ -80,10 +83,9 @@ export async function requireCompanyOwner(
     };
   }
 
-  const isSuperAdmin = c.var.user?.isSuperAdmin === true;
   const access: CompanyAccess = { companyId: company.id, ownerId: company.ownerId };
 
-  if (isSuperAdmin || company.ownerId === userId) {
+  if (company.ownerId === userId) {
     return { denied: null, access };
   }
 

@@ -28,6 +28,7 @@ import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
 import { jobService } from "@/lib/services/job-service";
 import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
@@ -173,7 +174,7 @@ export default function SentimentAnalysis() {
       clear();
     } catch (err) {
       console.error("Sentiment analysis failed:", err);
-      setError("Failed to analyze sentiment. Please try again.");
+      setError(appendDiagnosticReference("Failed to analyze sentiment. Please try again.", err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -197,7 +198,7 @@ export default function SentimentAnalysis() {
       recordSentimentRun(score, { jobId: selectedJobId });
     } catch (err) {
       console.error("Job sentiment analysis failed:", err);
-      setError("Failed to analyze job sentiment. Please try again.");
+      setError(appendDiagnosticReference("Failed to analyze job sentiment. Please try again.", err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -225,7 +226,7 @@ export default function SentimentAnalysis() {
       clear();
     } catch (err) {
       console.error("Resume sentiment analysis failed:", err);
-      setError("Failed to analyze resume sentiment. Please try again.");
+      setError(appendDiagnosticReference("Failed to analyze resume sentiment. Please try again.", err));
     } finally {
       setIsAnalyzing(false);
     }

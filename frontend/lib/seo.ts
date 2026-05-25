@@ -868,6 +868,46 @@ export const PAGE_SEO: Record<string, SEOData> = {
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
   },
+  "/tools/interview-templates": {
+    title: "Interview Templates: Reusable Async Video Screening Sets — hired.video",
+    description:
+      "Build interview question sets once, attach to any job posting. Every applicant gets the same screening interview — AI-scored, proctored, decision-ready. Out-perform HireVue and VidCruiter on a free tier.",
+    keywords:
+      "interview templates, async video interview, screening interview, HireVue alternative, VidCruiter alternative, AI interview scoring, structured interview questions",
+    ogTitle: "Interview Templates — reusable async video screening for every job",
+    ogDescription:
+      "Author once, attach to any job, AI-score every answer. Free.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Interview Templates",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/interview-templates",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/video-pitch-lab": {
+    title: "Video Pitch Lab: 60-Second AI-Coached Elevator Pitch — hired.video",
+    description:
+      "Workshop the elevator pitch every recruiter asks for. AI drafts a script from your resume, you record with a teleprompter + prep timer, then paste the URL into any application. Free.",
+    keywords:
+      "video pitch, elevator pitch, video resume, tell me about yourself video, AI pitch script, candidate video introduction",
+    ogTitle: "Video Pitch Lab — record the perfect 60-second elevator pitch",
+    ogDescription:
+      "AI script, teleprompter, prep timer, retake — one portable pitch URL for every job.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Video Pitch Lab",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/video-pitch-lab",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
   "/tools/career-360": {
     title: "Career 360: AI Career Planner with Gap Analysis & Roadmap — hired.video",
     description:

@@ -29,26 +29,37 @@ interface ResumeScoreBadgesProps {
   size?: ScoreChipSize;
   className?: string;
   /** When provided, each chip becomes a button that fires this with the
-   *  catalog tool id that produced the score. Surfaces use this to open
-   *  the tool-history sheet at the right tool. Omit on read-only contexts
-   *  (e.g. public profile) and the chips render as plain badges. */
-  onChipClick?: (toolId: string) => void;
+   *  catalog tool id(s) that produced the score. Surfaces use this to
+   *  open the tool-history sheet pre-expanded on every matching tool.
+   *  Most chips return a single id; ATS returns two because both
+   *  `ai-resume-scorer` and `resume-optimizer` write `scores.ats`, so
+   *  the panel needs to expand both groups for the user to actually
+   *  see the run that produced the visible chip. Omit on read-only
+   *  contexts (e.g. public profile) and the chips render as plain
+   *  badges. */
+  onChipClick?: (toolIds: readonly string[]) => void;
   /** Show only the Overall chip. Used by tight rows like the resume
    *  picker where the full sub-score cluster overflows the row. */
   compact?: boolean;
 }
 
 /**
- * Catalog tool id that produces each score. Centralised here so every
+ * Catalog tool id(s) that produce each score. Centralised here so every
  * surface that renders these badges deep-links consistently.
  *
  * The ai-resume-scorer writes the full 6-score blob (overall + ATS +
- * content + keyword + format + impact); the resume-optimizer also writes
- * ATS but the scorer is the more complete history view, so it wins for
- * the shared sub-scores.
+ * content + keyword + format + impact). The resume-optimizer also writes
+ * `scores.ats` via `persistResumeScoresIfReferenced`, so a user who only
+ * ran the Optimizer sees an ATS chip on the card — clicking it must open
+ * both groups so the optimizer-only run isn't invisible below the fold.
  */
-const SCORE_TOOL_ID = "ai-resume-scorer";
+const SCORER_TOOL_ID = "ai-resume-scorer";
+const OPTIMIZER_TOOL_ID = "resume-optimizer";
 const SENTIMENT_TOOL_ID = "sentiment-analysis";
+
+const SCORE_TOOL_IDS = [SCORER_TOOL_ID] as const;
+const ATS_SCORE_TOOL_IDS = [SCORER_TOOL_ID, OPTIMIZER_TOOL_ID] as const;
+const SENTIMENT_TOOL_IDS = [SENTIMENT_TOOL_ID] as const;
 
 /**
  * Cluster of score badges for a resume. Renders only the scores that
@@ -80,8 +91,9 @@ export default function ResumeScoreBadges({
         scores.impact != null));
   if (!hasAny) return null;
 
-  const onScore = onChipClick ? () => onChipClick(SCORE_TOOL_ID) : undefined;
-  const onSentiment = onChipClick ? () => onChipClick(SENTIMENT_TOOL_ID) : undefined;
+  const onScore = onChipClick ? () => onChipClick(SCORE_TOOL_IDS) : undefined;
+  const onAtsScore = onChipClick ? () => onChipClick(ATS_SCORE_TOOL_IDS) : undefined;
+  const onSentiment = onChipClick ? () => onChipClick(SENTIMENT_TOOL_IDS) : undefined;
 
   if (compact) {
     return (
@@ -116,7 +128,7 @@ export default function ResumeScoreBadges({
         fullLabel="ATS compatibility"
         score={scores?.ats}
         size={size}
-        onClick={onScore}
+        onClick={onAtsScore}
       />
       <ScoreChip
         label="KW"

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import NewCandidatesCard from "./shared/NewCandidatesCard";
 import ScheduledInterviewsCard from "./shared/ScheduledInterviewsCard";
+import { HiringInsightsPanel } from "./HiringInsightsPanel";
 
 import type { EmployerDashboard as EmployerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -422,6 +423,10 @@ export function EmployerDashboard({
         </Card>
       )}
 
+      {/* Aggregate hiring funnel + source mix + time-to-hire + the
+          honest DEI / EEO-1 banner. Self-fetches and empty-states when
+          the employer hasn't posted a job yet. */}
+      <HiringInsightsPanel />
     </div>
   );
 }

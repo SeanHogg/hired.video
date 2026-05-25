@@ -27,8 +27,31 @@ export interface GeneratedQuestion {
 }
 
 export type QuestionStyle = "behavioral" | "technical" | "mixed";
-export type SourceContext = "tool" | "ai-coach" | "career-360" | "pipeline";
-export type AssignmentType = "assign" | "invite" | "self";
+export type SourceContext = "tool" | "ai-coach" | "career-360" | "pipeline" | "job-screening";
+export type AssignmentType = "assign" | "invite" | "self" | "screening";
+export type InterviewDecision = "shortlist" | "maybe" | "reject";
+
+/** Proctoring signals captured by the recorder + text-answer editor.
+ *  These are advisory — the recruiter sees the counts on each answer
+ *  but the platform never auto-rejects on them. */
+export interface ProctoringFlags {
+  tabBlurCount: number;
+  pasteCount: number;
+  copyCount: number;
+  fullscreenExits: number;
+  prepUsedSec: number;
+  retakesUsed: number;
+  micLevelAvg?: number;
+  deviceLabel?: string;
+}
+
+export interface AnswerScoreBreakdown {
+  situation: number;
+  task: number;
+  action: number;
+  result: number;
+  skillProbe: number;
+}
 
 export interface GenerateRequest {
   resumeId?: string;
@@ -66,8 +89,14 @@ export interface AssignRequest {
   sourceContext?: SourceContext;
   targetRole?: string;
   extractedSkills?: ExtractedSkill[];
+  /** Reusable library set this assignment was created from. */
+  questionSetId?: string;
   linkExpiryHours?: number;
   responseWindowHours?: number;
+  /** Recorder behaviour applied to every question. */
+  prepTimeSec?: number;
+  maxRetakes?: number;
+  proctoringOn?: boolean;
 }
 
 export interface AssignResponse {
@@ -101,6 +130,22 @@ export interface InterviewAssignmentRow {
   targetRole: string | null;
   extractedSkills: ExtractedSkill[] | null;
   assignmentType: AssignmentType | null;
+  // Question-set provenance + apply-flow link (0120).
+  questionSetId: string | null;
+  applicationId: string | null;
+  // Recruiter decision pillar.
+  decision: InterviewDecision | null;
+  decisionReason: string | null;
+  decisionBy: string | null;
+  decisionAt: string | null;
+  // AI overall aggregate.
+  aiOverallScore: number | null;
+  aiOverallSummary: string | null;
+  aiScoredAt: string | null;
+  // Recorder behaviour.
+  prepTimeSec: number;
+  maxRetakes: number;
+  proctoringOn: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,6 +163,15 @@ export interface AssignmentResponse {
   textAnswer: string | null;
   responseMode: "text" | "video";
   status: string;
+  // 0120: AI scoring + proctoring + retake.
+  aiScore: number | null;
+  aiScoreBreakdown: AnswerScoreBreakdown | null;
+  aiSummary: string | null;
+  aiStrengths: string[] | null;
+  aiConcerns: string[] | null;
+  aiScoredAt: string | null;
+  proctoringFlags: ProctoringFlags;
+  attempt: number;
   createdAt: string;
 }
 
@@ -136,6 +190,10 @@ export interface InvitePreview {
   status: string;
   expired: boolean;
   targetRole: string | null;
+  // Recorder behaviour (0120) — drives prep timer + retake button + proctoring overlay.
+  prepTimeSec: number;
+  maxRetakes: number;
+  proctoringOn: boolean;
 }
 
 export async function generateInterviewQuestions(
@@ -205,12 +263,70 @@ export async function submitInterviewResponse(
     videoUrl?: string;
     durationMs?: number;
     transcription?: string;
+    proctoringFlags?: Partial<ProctoringFlags>;
+    attempt?: number;
   },
 ): Promise<AssignmentResponse> {
   const res = await apiClient.post<AssignmentResponse>(
     `/api/interview-assignments/${id}/respond`,
     params,
   );
+  return res.data;
+}
+
+export async function scoreSingleAnswer(
+  interviewId: string,
+  responseId: string,
+): Promise<AssignmentResponse> {
+  const res = await apiClient.post<AssignmentResponse>(
+    `/api/interview-assignments/${interviewId}/responses/${responseId}/score`,
+    {},
+  );
+  return res.data;
+}
+
+export async function scoreAllAnswers(
+  interviewId: string,
+): Promise<{ scoredCount: number; overall: number; coverage: number }> {
+  const res = await apiClient.post<{ scoredCount: number; overall: number; coverage: number }>(
+    `/api/interview-assignments/${interviewId}/score-all`,
+    {},
+  );
+  return res.data;
+}
+
+export async function setInterviewDecision(
+  interviewId: string,
+  decision: InterviewDecision | null,
+  reason?: string,
+): Promise<InterviewAssignmentRow> {
+  const res = await apiClient.post<InterviewAssignmentRow>(
+    `/api/interview-assignments/${interviewId}/decision`,
+    { decision, reason },
+  );
+  return res.data;
+}
+
+export interface InterviewReport {
+  interview: InterviewAssignmentRow;
+  responses: AssignmentResponse[];
+  candidate: { id: string; name: string | null; email: string | null } | null;
+  viewerRole: "creator" | "candidate";
+}
+
+export async function getInterviewReport(interviewId: string): Promise<InterviewReport> {
+  const res = await apiClient.get<InterviewReport>(
+    `/api/interview-assignments/${interviewId}/report`,
+  );
+  return res.data;
+}
+
+export async function compareInterviews(ids: string[]): Promise<{
+  interviews: Array<{ interview: InterviewAssignmentRow; responses: AssignmentResponse[] }>;
+}> {
+  const res = await apiClient.get<{
+    interviews: Array<{ interview: InterviewAssignmentRow; responses: AssignmentResponse[] }>;
+  }>(`/api/interview-assignments/compare?ids=${encodeURIComponent(ids.join(","))}`);
   return res.data;
 }
 

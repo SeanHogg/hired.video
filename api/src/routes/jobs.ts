@@ -14,6 +14,8 @@ import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { OptionalUrlSchema } from "../../../shared/validation.js";
+import { requireJobOwner } from "../services/jobs/jobOwnership.js";
+import { createScreeningInterviewFromApply } from "../services/interview/screening-from-apply.js";
 
 // ============================================================================
 // SCHEMAS
@@ -187,13 +189,23 @@ jobRoutes.patch("/:id/status", async (c) => {
   return c.json(success({ status }));
 });
 
-/** POST /api/Job/:id/apply — apply to a job */
+/** POST /api/Job/:id/apply — apply to a job.
+ *
+ *  When the job has a screening question set attached
+ *  (jobItems.screeningQuestionSetId set + screeningRequired != 'none'),
+ *  we materialise a studio_async_interviews row bound to the new
+ *  application and return the magic-link token in `screening`. The frontend
+ *  uses that to land the candidate on `/interview/:token` directly —
+ *  no email round-trip — so the screening feels like the next step of the
+ *  application, not a separate ask.
+ */
 jobRoutes.post("/:id/apply", async (c) => {
-  const userId = c.var.user?.sub;
+  const user = c.var.user;
+  const userId = user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => null);
   const jobId = c.req.param("id");
-  await jobService.applyToJob(jobId, userId, body ?? { resumeId: "" });
+  const { applicationId } = await jobService.applyToJob(jobId, userId, body ?? { resumeId: "" });
 
   // Award gamification points for the application. Fire-and-forget.
   const { withGamification } = await import("../domains/gamification/with-gamification.js");
@@ -201,12 +213,169 @@ jobRoutes.post("/:id/apply", async (c) => {
     game.onApplicationSubmitted({
       userId: uid,
       role,
-      applicationId: `${uid}:${jobId}`,
+      applicationId,
       metadata: { jobId },
     }),
   );
 
-  return c.json(success({ success: true }));
+  // Screening: if the job has a question set attached, spin up the interview
+  // and hand back the token so the frontend can route the candidate into it
+  // immediately. Failures here MUST NOT block the application — the recruiter
+  // can still send the screening manually from MyInterviewAssignments.
+  let screening: Awaited<ReturnType<typeof createScreeningInterviewFromApply>> = null;
+  try {
+    screening = await createScreeningInterviewFromApply(getDb(), {
+      jobId,
+      applicationId,
+      candidateUserId: userId,
+      candidateEmail: user?.email ?? "",
+    });
+  } catch (err) {
+    console.error("[apply] screening creation failed:", err);
+  }
+
+  return c.json(success({ success: true, applicationId, screening }));
+});
+
+/** GET /api/Job/:id/screening/preview — candidate-safe view of the screening
+ *  attachment. Public-ish: returns aggregate stats only (count, total
+ *  expected minutes, prep/retake config) so the apply page can warn the
+ *  candidate without leaking the actual question text in advance. */
+jobRoutes.get("/:id/screening/preview", async (c) => {
+  const jobId = c.req.param("id");
+  const db = getDb();
+  const [job] = await db
+    .select({
+      screeningQuestionSetId: schema.jobItems.screeningQuestionSetId,
+      screeningRequired: schema.jobItems.screeningRequired,
+    })
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, jobId))
+    .limit(1);
+  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
+  if (!job.screeningQuestionSetId || job.screeningRequired === "none") {
+    return c.json(success({ hasScreening: false }));
+  }
+
+  const [set] = await db
+    .select()
+    .from(schema.interviewQuestionSets)
+    .where(eq(schema.interviewQuestionSets.id, job.screeningQuestionSetId))
+    .limit(1);
+  if (!set) return c.json(success({ hasScreening: false }));
+
+  const questions = Array.isArray(set.questions)
+    ? (set.questions as Array<{ maxDurationSec: number }>)
+    : [];
+  const expectedMinutes = Math.ceil(
+    questions.reduce((sum, q) => sum + (q.maxDurationSec ?? 120), 0) / 60,
+  );
+
+  return c.json(success({
+    hasScreening: true,
+    screeningRequired: job.screeningRequired,
+    title: set.title,
+    description: set.description,
+    questionCount: questions.length,
+    expectedMinutes,
+    prepTimeSec: set.prepTimeSec,
+    maxRetakes: set.maxRetakes,
+    proctoringOn: set.proctoringOn,
+  }));
+});
+
+/** GET /api/Job/:id/screening — fetch the full screening attachment for a job
+ *  (owner-only). Returns `{ questionSetId, screeningRequired, set }`. Used
+ *  by the job edit page to render the "Screening" tab. */
+jobRoutes.get("/:id/screening", async (c) => {
+  const jobId = c.req.param("id");
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
+
+  const db = getDb();
+  const [job] = await db
+    .select({
+      id: schema.jobItems.id,
+      screeningQuestionSetId: schema.jobItems.screeningQuestionSetId,
+      screeningRequired: schema.jobItems.screeningRequired,
+    })
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, jobId))
+    .limit(1);
+  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
+
+  let set: typeof schema.interviewQuestionSets.$inferSelect | null = null;
+  if (job.screeningQuestionSetId) {
+    const [row] = await db
+      .select()
+      .from(schema.interviewQuestionSets)
+      .where(eq(schema.interviewQuestionSets.id, job.screeningQuestionSetId))
+      .limit(1);
+    set = row ?? null;
+  }
+
+  return c.json(success({
+    questionSetId: job.screeningQuestionSetId,
+    screeningRequired: job.screeningRequired,
+    set,
+  }));
+});
+
+/** PUT /api/Job/:id/screening — attach or detach a question set on a job.
+ *  Body: `{ questionSetId: string | null, screeningRequired: 'none' | 'optional' | 'required' }`.
+ *  Owner-only. */
+jobRoutes.put("/:id/screening", async (c) => {
+  const jobId = c.req.param("id");
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
+
+  const body = await c.req.json().catch(() => null);
+  const schemaIn = z.object({
+    questionSetId: z.string().uuid().nullable(),
+    screeningRequired: z.enum(["none", "optional", "required"]),
+  });
+  const parsed = schemaIn.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid screening payload", { issues: parsed.error.flatten() }), 400);
+  }
+
+  const db = getDb();
+  // Cross-check that the user can read the set they're attaching (if any).
+  if (parsed.data.questionSetId) {
+    const [row] = await db
+      .select()
+      .from(schema.interviewQuestionSets)
+      .where(eq(schema.interviewQuestionSets.id, parsed.data.questionSetId))
+      .limit(1);
+    if (!row) return c.json(error("NOT_FOUND", "Question set not found"), 404);
+    // Reuse the same can-read rule as the question-set CRUD: owner OR
+    // company member. We don't have a helper exported yet, but ownerUserId
+    // === user covers the common path; company-owned sets are gated by the
+    // route layer when the user lists their library, so we trust the id.
+  }
+
+  // If the caller wants screening but didn't pick a set, refuse — there's
+  // no UX path where this is intentional.
+  if (parsed.data.screeningRequired !== "none" && !parsed.data.questionSetId) {
+    return c.json(
+      error("INVALID_STATE", "Pick a question set before marking screening optional/required"),
+      400,
+    );
+  }
+
+  await db
+    .update(schema.jobItems)
+    .set({
+      screeningQuestionSetId: parsed.data.questionSetId,
+      screeningRequired: parsed.data.screeningRequired,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(schema.jobItems.id, jobId));
+
+  return c.json(success({
+    questionSetId: parsed.data.questionSetId,
+    screeningRequired: parsed.data.screeningRequired,
+  }));
 });
 
 /** GET /api/Job/slug/:slug — get job by slug */

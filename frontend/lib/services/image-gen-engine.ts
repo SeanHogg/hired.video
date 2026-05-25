@@ -48,7 +48,10 @@
 
 import { studioService } from "./studio-service.js";
 
-export type ImageGenEngineId = "webgpu-sd-turbo" | "server-cf-sdxl-lightning";
+export type ImageGenEngineId =
+  | "webgpu-sd-turbo"
+  | "server-cf-sdxl-lightning"
+  | "server-cf-sdxl-inpainting";
 
 export interface ImageGenInput {
   /** Prompt the user typed. The facade trims + caps length before
@@ -163,6 +166,52 @@ export async function generateImage(
   const normalized: ImageGenInput = { ...input, prompt: trimmed.slice(0, 500) };
   const engine = await pickAvailableImageGenEngine(normalized);
   return engine.generate(normalized, onProgress);
+}
+
+/** Mask-aware AI inpaint (#1109). Bypasses the engine-pick rotation
+ *  because only the server engine supports masked generation today —
+ *  WebGPU SD-Turbo lacks an inpaint pipeline. The caller passes the
+ *  source image + binary mask (white = inpaint inside, black =
+ *  preserve outside) + prompt; the SDXL-inpainting model regenerates
+ *  ONLY inside the mask with surrounding context informing the new
+ *  pixels.
+ *
+ *  Replaces the client-side `compositeImageIntoSelection` post-process
+ *  approximation — the AI now knows about surrounding context so
+ *  edges blend rather than stitch. */
+export async function inpaintImage(input: {
+  prompt: string;
+  sourceImageDataUrl: string;
+  maskImageDataUrl: string;
+  strength?: number;
+}): Promise<ImageGenResult> {
+  const trimmed = input.prompt.trim();
+  if (trimmed.length < 3) {
+    throw new Error("Prompt must be at least 3 characters.");
+  }
+  const startedAt = Date.now();
+  const { studioService } = await import("./studio-service");
+  const response = await studioService.inpaintImage(
+    trimmed.slice(0, 500),
+    input.sourceImageDataUrl,
+    input.maskImageDataUrl,
+    typeof input.strength === "number" ? { strength: input.strength } : undefined,
+  );
+  const imageUrl = response.data.imageUrl;
+  // The server returns a durable CDN URL. Fetch it once + materialise
+  // the bytes as a Blob + previewUrl so the rest of the editor's image
+  // pipeline (which expects the existing `ImageGenResult` shape) reads
+  // identically to a text2img result.
+  const blob = await (await fetch(imageUrl)).blob();
+  const previewUrl = URL.createObjectURL(blob);
+  return {
+    blob,
+    previewUrl,
+    engine: "server-cf-sdxl-inpainting",
+    elapsedMs: Date.now() - startedAt,
+    resultUrl: imageUrl,
+    mode: "img2img",
+  };
 }
 
 // ---------------------------------------------------------------------------

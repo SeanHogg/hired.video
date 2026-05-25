@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/lib/auth";
+import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 import { INDUSTRIES } from "@/lib/constants/industries";
 
 interface EditSkillsDialogProps {
@@ -32,8 +33,12 @@ function parseCsv(value: string): string[] {
 
 export default function EditSkillsDialog({ open, onOpenChange, onSaved }: EditSkillsDialogProps) {
   const { t } = useTranslation();
-  const { user, updateProfile, refreshUser } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const { saving, save } = useProfileSectionSaver({
+    onSaved,
+    onClose: onOpenChange,
+    errorLabel: "discoverability tags",
+  });
   const [keywords, setKeywords] = useState("");
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [customIndustries, setCustomIndustries] = useState("");
@@ -57,22 +62,11 @@ export default function EditSkillsDialog({ open, onOpenChange, onSaved }: EditSk
     });
   }, [selectedIndustries, customIndustries]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({
-        skills: parseCsv(keywords),
-        industries: mergedIndustries,
-      });
-      refreshUser().catch(() => {});
-      onSaved?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to save discoverability tags:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSave = () =>
+    save({
+      skills: parseCsv(keywords),
+      industries: mergedIndustries,
+    });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

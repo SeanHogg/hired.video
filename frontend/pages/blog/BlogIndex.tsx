@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppShell } from "@/components/AppShell";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
+import ContentCard from "@/components/search/ContentCard";
 import { BLOG_POSTS, type BlogPost } from "@/data/blog-posts";
 import { slugify } from "@shared/slugify";
 
@@ -221,50 +222,24 @@ export default function BlogIndex() {
                 No guides match your search.
               </div>
             ) : viewMode === "grid" ? (
+              // Grid mode renders the shared search/article ContentCard so
+              // /blog and /?category=articles look identical (#326). List
+              // mode is intentionally a different denser layout — kept
+              // inline below.
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {posts.map((post) => (
-                  <Link key={post.slug} to={`/blog/${post.slug}`} className="group">
-                    <Card className="h-full hover:shadow-lg transition-shadow border-border/50">
-                      <div className="h-40 rounded-t-lg bg-gradient-to-br from-primary/20 via-primary/10 to-blue-500/20 flex items-center justify-center">
-                        <span className="text-4xl opacity-30 group-hover:opacity-50 transition-opacity">
-                          {categoryEmoji(post.category)}
-                        </span>
-                      </div>
-                      <CardContent className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge
-                            variant="secondary"
-                            className={CATEGORY_COLORS[post.category] ?? ""}
-                          >
-                            {post.category}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {post.readingTime} min read
-                          </span>
-                        </div>
-                        <h2 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                          {post.title}
-                        </h2>
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                          {post.description}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(post.publishedAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </span>
-                          <span className="text-sm font-medium text-primary flex items-center gap-1 group-hover:gap-2 transition-all">
-                            Read guide <ArrowRight className="h-3.5 w-3.5" />
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                  <ContentCard
+                    key={post.slug}
+                    item={{
+                      id: post.slug,
+                      type: "article",
+                      title: post.title,
+                      summary: post.description,
+                      href: `/blog/${post.slug}`,
+                      category: post.category,
+                      readingTime: post.readingTime,
+                    }}
+                  />
                 ))}
               </div>
             ) : (

@@ -793,6 +793,36 @@ export const studioService = {
   },
 
   /**
+   * Mask-aware AI inpaint (#1109). Takes a source image + binary mask
+   * (white = inpaint inside, black = preserve outside) + prompt; the
+   * SDXL-inpainting model regenerates content only inside the mask
+   * with surrounding context informing the new pixels. Produces visually
+   * cleaner stitches than the client-side `compositeImageIntoSelection`
+   * fallback. Caller is responsible for rasterising the user's marquee
+   * selection into a binary mask dataURL the same size as the source.
+   */
+  async inpaintImage(
+    prompt: string,
+    sourceImageDataUrl: string,
+    maskImageDataUrl: string,
+    opts?: { strength?: number },
+  ): Promise<ApiSuccessResponse<{ imageUrl: string; mode?: "inpaint" }>> {
+    return apiClient.post(
+      "/api/studio/inpaint-image",
+      {
+        prompt,
+        sourceImageDataUrl,
+        maskImageDataUrl,
+        ...(typeof opts?.strength === "number" ? { strength: opts.strength } : {}),
+      },
+      z.object({
+        imageUrl: z.string(),
+        mode: z.enum(["inpaint"]).optional(),
+      }),
+    );
+  },
+
+  /**
    * Upload a scene background image file to persistent storage (R2/S3).
    * Returns a CDN URL that can be saved in the script and reloaded later.
    */

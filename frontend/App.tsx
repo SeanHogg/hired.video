@@ -107,6 +107,8 @@ const SkillExtractor = lazy(() => import("./pages/tools/SkillExtractor"));
 const ProfileAudit = lazy(() => import("./pages/tools/ProfileAudit"));
 const Career360 = lazy(() => import("./pages/tools/Career360"));
 const InterviewQuestions = lazy(() => import("./pages/tools/InterviewQuestions"));
+const InterviewTemplates = lazy(() => import("./pages/tools/InterviewTemplates"));
+const VideoPitchLab = lazy(() => import("./pages/tools/VideoPitchLab"));
 const MyInterviewAssignments = lazy(() => import("./pages/MyInterviewAssignments"));
 const VendorSync = lazy(() => import("./pages/tools/VendorSync"));
 const ToolDetail = lazy(() => import("./pages/ToolDetail"));
@@ -791,6 +793,14 @@ const App = () => (
                       <Route
                         path="/tools/interview-questions"
                         element={<InterviewQuestions />}
+                      />
+                      <Route
+                        path="/tools/interview-templates"
+                        element={<InterviewTemplates />}
+                      />
+                      <Route
+                        path="/tools/video-pitch-lab"
+                        element={<VideoPitchLab />}
                       />
                       <Route
                         path="/interview-assignments"

@@ -399,7 +399,7 @@ export const REDEMPTION_CATALOG: RedemptionSku[] = [
   { id: "ai_credits_500k", kind: "ai_credits", label: "500K AI tokens", pointsCost: 2_000, grant: { tokens: 500_000 } },
   { id: "ai_credits_2m", kind: "ai_credits", label: "2M AI tokens", pointsCost: 7_500, grant: { tokens: 2_000_000 } },
 
-  // Premium time
+  // Pro plan time
   { id: "premium_1mo", kind: "premium_month", label: "1 free month of Pro", pointsCost: 10_000, grant: { planSlug: "pro", durationDays: 30 } },
 
   // Gift cards — Tremendous SKUs (wired in phase 3)

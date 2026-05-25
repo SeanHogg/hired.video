@@ -22,6 +22,7 @@ import {
   Flame,
   ClipboardPaste,
   UserCheck,
+  Video,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -54,6 +55,7 @@ export type ToolCategory =
   | "Job"
   | "Profile"
   | "Career"
+  | "Interview"
   | "Salary"
   | "Application"
   | "Extension";
@@ -110,6 +112,14 @@ export interface ToolCatalogEntry {
    *  role they're previewing via the Preview-role pill. Values come
    *  from the shared USER_ROLES enum so client and server stay aligned. */
   audienceRoles?: UserRole[];
+  /** Entity contexts on which a recruiter / employer should ALSO see
+   *  this tool, even when `audienceRoles` is job-seeker-only. Drives
+   *  #432: a recruiter looking at an imported candidate resume should
+   *  still see "Run AI Resume Scorer" / "Tailor Resume" on that row —
+   *  the tool itself is seeker-audience on /tools, but acting on a
+   *  candidate's resume is a recruiter-evaluation workflow. Omit when
+   *  the tool is only useful when run on your own entity. */
+  recruiterUseOnEntity?: ToolEntityContext[];
   /** URL of a 1-scene promo video that demos the tool in use. When set,
    *  <ToolPromoVideo> renders a "Watch demo" affordance on the card and
    *  any tool detail surface. Produced by the "Tool Promo" Studio
@@ -258,7 +268,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     description:
       "Generate skill-tailored interview questions from a resume, a job, or just a target role — copy, practise with the AI Coach, or assign to a candidate.",
     tier: "free",
-    category: "Career",
+    category: "Interview",
     icon: ClipboardCheck,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-brand-purple",
@@ -283,7 +293,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Interview Coach",
     description: "Practice interviews with AI Chat",
     tier: "free",
-    category: "Career",
+    category: "Interview",
     icon: MessageSquare,
     iconBgClassName: "bg-blue-100",
     iconColorClassName: "text-brand-blue",
@@ -294,6 +304,56 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Role-specific questions", "Real-time feedback", "Confidence scoring"],
     ctaLabel: "Start AI Chat",
+    showOnHome: true,
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
+  },
+  {
+    id: "interview-templates",
+    href: "/tools/interview-templates",
+    title: "Interview Templates",
+    description:
+      "Save reusable interview question sets. Attach to a job posting once — every applicant gets the same screening interview automatically.",
+    tier: "free",
+    category: "Interview",
+    icon: ClipboardCheck,
+    iconBgClassName: "bg-purple-100",
+    iconColorClassName: "text-brand-purple",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "Reusable", label: "Library", valueClassName: "text-purple-600" },
+      { value: "1-click", label: "Attach", valueClassName: "text-purple-600" },
+    ],
+    features: [
+      "Personal + company-shared libraries",
+      "AI scoring + recruiter shortlist built in",
+      "Auto-attached on /apply when a job has one",
+    ],
+    ctaLabel: "Manage Templates",
+    showOnHome: true,
+    audienceRoles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+  },
+  {
+    id: "video-pitch-lab",
+    href: "/tools/video-pitch-lab",
+    title: "Video Pitch Lab",
+    description:
+      "Workshop the 60-second 'tell me about yourself' video pitch every recruiter asks for. AI script, prep timer, retake, portable URL.",
+    tier: "free",
+    category: "Interview",
+    icon: Video,
+    iconBgClassName: "bg-pink-100",
+    iconColorClassName: "text-pink-600",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "60s", label: "Practice Pitch", valueClassName: "text-pink-600" },
+      { value: "AI", label: "Script + Review", valueClassName: "text-pink-600" },
+    ],
+    features: [
+      "AI script tailored to your resume",
+      "Teleprompter + prep timer + retake",
+      "One portable URL for every application",
+    ],
+    ctaLabel: "Open Video Pitch Lab",
     showOnHome: true,
     audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
@@ -356,6 +416,9 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     showOnHome: true,
     appliesTo: ["resume"],
     audienceRoles: [USER_ROLES.JOB_SEEKER],
+    // #432 — recruiters also score candidate resumes for fit; surface
+    // this on their pool / pipeline row menus.
+    recruiterUseOnEntity: ["resume"],
   },
   {
     id: "summarize-resume",
@@ -396,6 +459,9 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Analyze Sentiment",
     appliesTo: ["resume"],
     audienceRoles: [USER_ROLES.JOB_SEEKER],
+    // #432 — sentiment chip on the candidate card uses this tool; if
+    // it's stripped from the recruiter menu the chip click breaks.
+    recruiterUseOnEntity: ["resume"],
   },
   {
     id: "pdf-to-json",
@@ -503,6 +569,9 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Tailor Resume",
     appliesTo: ["resume", "job"],
     audienceRoles: [USER_ROLES.JOB_SEEKER],
+    // #432 — recruiters tailor a candidate's resume to a job they're
+    // sourcing for. Surface on both resume and job rows.
+    recruiterUseOnEntity: ["resume", "job"],
   },
   {
     id: "form-autofill",
@@ -708,7 +777,17 @@ export function getCatalogToolsForEntity(
 ): Array<ToolCatalogEntry & { href: string }> {
   const audience = audienceForRole(role);
   return TOOLS_CATALOG.flatMap((entry) => {
-    if (!isToolInAudience(entry, audience)) return [];
+    // #432 — a recruiter / employer surfacing this menu on an entity
+    // they're EVALUATING (candidate resume in their pool, candidate
+    // company profile, etc.) gets to run seeker-audience tools too,
+    // when the tool opts in via `recruiterUseOnEntity`. Without this,
+    // the audience tagging silently strips "Run AI Resume Scorer" from
+    // the recruiter's row menu and breaks the score-this-candidate
+    // workflow.
+    const recruiterEvalOverride =
+      audience === "recruiter_employer" &&
+      entry.recruiterUseOnEntity?.includes(entityType) === true;
+    if (!recruiterEvalOverride && !isToolInAudience(entry, audience)) return [];
 
     let href = entry.href;
     if (entry.appliesTo?.includes(entityType) && entityId) {

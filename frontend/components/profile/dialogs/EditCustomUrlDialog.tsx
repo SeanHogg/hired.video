@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 import { userService } from "@/lib/services/user-service";
 
 interface EditCustomUrlDialogProps {
@@ -22,11 +23,15 @@ interface EditCustomUrlDialogProps {
 
 export default function EditCustomUrlDialog({ open, onOpenChange, onSaved }: EditCustomUrlDialogProps) {
   const { t } = useTranslation();
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
+  const { saving, runSave } = useProfileSectionSaver({
+    onSaved,
+    onClose: onOpenChange,
+    errorLabel: "custom URL",
+  });
   const [slugInput, setSlugInput] = useState("");
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -61,17 +66,9 @@ export default function EditCustomUrlDialog({ open, onOpenChange, onSaved }: Edi
       onOpenChange(false);
       return;
     }
-
-    setSaving(true);
-    try {
+    await runSave(async () => {
       await userService.updateSlug(slugInput);
-      await refreshUser();
-      onSaved?.();
-      onOpenChange(false);
-    } catch {
-      // keep dialog open on error
-    }
-    setSaving(false);
+    });
   };
 
   return (

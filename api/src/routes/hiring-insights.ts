@@ -47,7 +47,7 @@ hiringInsightsRoutes.get("/", async (c) => {
       sourceMix: {},
       demographics: {
         supported: false,
-        reason: "Demographic capture not yet enabled — see gap register entry #1224.",
+        reason: "Demographic capture not yet enabled — see gap register entry #1231.",
       },
     }), 200);
   }
@@ -70,7 +70,7 @@ hiringInsightsRoutes.get("/", async (c) => {
       sourceMix: {},
       demographics: {
         supported: false,
-        reason: "Demographic capture not yet enabled — see gap register entry #1224.",
+        reason: "Demographic capture not yet enabled — see gap register entry #1231.",
       },
     }), 200);
   }
@@ -117,7 +117,7 @@ hiringInsightsRoutes.get("/", async (c) => {
     sourceMix,
     demographics: {
       supported: false,
-      reason: "Demographic capture not yet enabled — see gap register entry #1224.",
+      reason: "Demographic capture not yet enabled — see gap register entry #1231.",
     },
   }), 200);
 });

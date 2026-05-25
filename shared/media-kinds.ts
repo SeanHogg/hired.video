@@ -813,20 +813,28 @@ export interface MediaKindUiHints {
   badgeLabel: string;
   /** Single-letter scoring icon hint for sparse-UI surfaces. */
   shortLabel: string;
+  /**
+   * Verb the wizard "Done" CTA uses. CanvasState-authoring kinds
+   * (video / podcast / comic) say "Generate <noun>" because the wizard
+   * actually fires an LLM scene/panel generator; non-CanvasState kinds
+   * (voice / animation / game / image / cad) say "Create <noun>" because
+   * the wizard just seeds a template — no AI round-trip.
+   */
+  createVerb: string;
 }
 
 export const MEDIA_KIND_UI: Record<MediaKind, MediaKindUiHints> = {
-  video:     { exportVerb: "Export video",   badgeLabel: "Video",     shortLabel: "V" },
-  podcast:   { exportVerb: "Export episode", badgeLabel: "Podcast",   shortLabel: "P" },
-  voice:     { exportVerb: "Export audio",   badgeLabel: "Voice",     shortLabel: "A" },
-  animation: { exportVerb: "Export loop",    badgeLabel: "Animation", shortLabel: "L" },
-  game:      { exportVerb: "Export game",    badgeLabel: "Game",      shortLabel: "G" },
-  comic:     { exportVerb: "Export comic",   badgeLabel: "Comic",     shortLabel: "C" },
+  video:     { exportVerb: "Export video",   badgeLabel: "Video",     shortLabel: "V", createVerb: "Generate video"     },
+  podcast:   { exportVerb: "Export episode", badgeLabel: "Podcast",   shortLabel: "P", createVerb: "Generate podcast"   },
+  voice:     { exportVerb: "Export audio",   badgeLabel: "Voice",     shortLabel: "A", createVerb: "Create voice clip"  },
+  animation: { exportVerb: "Export loop",    badgeLabel: "Animation", shortLabel: "L", createVerb: "Create animation"   },
+  game:      { exportVerb: "Export game",    badgeLabel: "Game",      shortLabel: "G", createVerb: "Create game"        },
+  comic:     { exportVerb: "Export comic",   badgeLabel: "Comic",     shortLabel: "C", createVerb: "Generate comic"     },
   // `image` is the single-frame canvas runtime (#929) — single scene,
   // no time axis, exports as PNG/JPG/SVG. The hint lives here so
   // `Record<MediaKind, …>` typing is total even before the runtime ships.
-  image:     { exportVerb: "Export image",   badgeLabel: "Image",     shortLabel: "I" },
+  image:     { exportVerb: "Export image",   badgeLabel: "Image",     shortLabel: "I", createVerb: "Create image"       },
   // `cad` is the 2D drafting runtime (#930). Static vector output;
   // exports as SVG/PDF/DXF/PNG.
-  cad:       { exportVerb: "Export drawing", badgeLabel: "CAD",       shortLabel: "D" },
+  cad:       { exportVerb: "Export drawing", badgeLabel: "CAD",       shortLabel: "D", createVerb: "Create drawing"     },
 };

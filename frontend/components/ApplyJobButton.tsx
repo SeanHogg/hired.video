@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,6 +43,7 @@ export default function ApplyJobButton({
   className,
 }: ApplyJobButtonProps) {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
@@ -81,7 +83,7 @@ export default function ApplyJobButton({
     setIsSubmitting(true);
 
     try {
-      await jobService.applyToJob(jobId, {
+      const result = await jobService.applyToJob(jobId, {
         resumeId: selectedResumeId,
         coverLetter: coverLetter.trim() || undefined,
       });
@@ -91,6 +93,10 @@ export default function ApplyJobButton({
       setCoverLetter("");
       setSelectedResumeId("");
       onApplicationSubmitted?.();
+      // Job has a screening interview attached — land the candidate straight on it.
+      if (result.screening?.inviteToken) {
+        navigate(`/interview/${result.screening.inviteToken}`);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to submit application";
       toast.error(errorMessage);

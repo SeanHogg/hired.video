@@ -12,6 +12,7 @@ const CATEGORY_CLASSNAMES: Record<ToolCategory, string> = {
   Job: "bg-green-100 text-green-800",
   Profile: "bg-purple-100 text-purple-800",
   Career: "bg-amber-100 text-amber-800",
+  Interview: "bg-purple-100 text-purple-800",
   Salary: "bg-emerald-100 text-emerald-800",
   Application: "bg-indigo-100 text-indigo-800",
   Extension: "bg-orange-100 text-orange-800",

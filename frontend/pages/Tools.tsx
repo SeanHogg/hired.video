@@ -29,7 +29,6 @@ import {
   type ToolCategory,
   type ToolTier,
 } from "@/data/tools-catalog";
-import { useHeaderFilters } from "@/lib/header-filters";
 
 type TierFilter = "all" | ToolTier;
 type AudienceFilter = "for_me" | "all" | ToolAudience;
@@ -43,6 +42,7 @@ const CATEGORY_ORDER: ToolCategory[] = [
   "Job",
   "Profile",
   "Career",
+  "Interview",
   "Salary",
   "Application",
   "Extension",
@@ -102,20 +102,25 @@ export default function Tools() {
     setSearchParams(params, { replace: true });
   };
 
-  useHeaderFilters([
-    {
-      key: "audience",
-      label: "Audience",
-      type: "select",
-      options: AUDIENCE_OPTIONS,
-    },
-    {
-      key: "tier",
-      label: "Tier",
-      type: "select",
-      options: TIER_OPTIONS,
-    },
-  ]);
+  // #472 — audience + tier filters used to live in the PageHeader as
+  // select dropdowns via `useHeaderFilters`; category was already a
+  // chip row in-page. Filters now agree on chip-row UX (chips scan
+  // faster than nested dropdowns), so the header-filter slot for
+  // /tools is empty and all three filters live in the same column.
+  const setAudienceFilter = (next: AudienceFilter | "all") => {
+    const params = new URLSearchParams(searchParams);
+    // The "for_me" default is implicit — drop the param when the user
+    // hits the For-me chip so URLs stay clean.
+    if (next === "for_me") params.delete("audience");
+    else params.set("audience", next);
+    setSearchParams(params, { replace: true });
+  };
+  const setTierFilter = (next: TierFilter | "all") => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("tier");
+    else params.set("tier", next);
+    setSearchParams(params, { replace: true });
+  };
 
   // Resolve the active audience bucket. "for_me" maps the viewer's
   // effective role onto the bucket (job_seeker / recruiter_employer);
@@ -483,6 +488,40 @@ export default function Tools() {
               tabs={[{ key: "tools", label: "Tools", icon: Wrench, to: "/tools" }]}
               activeTabKey="tools"
               search={<HeaderSearch />}
+            />
+
+            {/* Audience filter — chip row (#472). Counts are not shown
+                because the audience axis is mutually exclusive with the
+                viewer's effective role; the For-me default already
+                resolves to the right bucket. */}
+            <CategoryFilterBar
+              className="mb-2"
+              value={audienceFilter}
+              onChange={setAudienceFilter}
+              allLabel="Show all"
+              allCount={0}
+              hideZeroCounts={false}
+              options={AUDIENCE_OPTIONS.filter((o) => o.value !== "all").map((o) => ({
+                value: o.value,
+                label: o.label,
+                count: 0,
+              }))}
+            />
+
+            {/* Tier filter — chip row (#472). Counts elided for the same
+                reason: tier is a small enum and counts would be noisy. */}
+            <CategoryFilterBar
+              className="mb-3"
+              value={tierFilter}
+              onChange={setTierFilter}
+              allLabel="Any tier"
+              allCount={0}
+              hideZeroCounts={false}
+              options={TIER_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+                count: 0,
+              }))}
             />
 
             {/* Per-chip count reflects the audience+tier+search filters

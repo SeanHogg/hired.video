@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 
 interface EditContactDialogProps {
   open: boolean;
@@ -21,8 +22,12 @@ interface EditContactDialogProps {
 
 export default function EditContactDialog({ open, onOpenChange, onSaved }: EditContactDialogProps) {
   const { t } = useTranslation();
-  const { user, updateProfile, refreshUser } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const { saving, save } = useProfileSectionSaver({
+    onSaved,
+    onClose: onOpenChange,
+    errorLabel: "contact info",
+  });
   const [form, setForm] = useState({ phone: "", website: "" });
 
   useEffect(() => {
@@ -34,22 +39,11 @@ export default function EditContactDialog({ open, onOpenChange, onSaved }: EditC
     }
   }, [open, user]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({
-        phone: form.phone,
-        website: form.website,
-      });
-      refreshUser().catch(() => {});
-      onSaved?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to save contact info:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSave = () =>
+    save({
+      phone: form.phone,
+      website: form.website,
+    });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

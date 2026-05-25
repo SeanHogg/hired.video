@@ -12,6 +12,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
+import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 
 interface EditAboutDialogProps {
   open: boolean;
@@ -21,8 +22,12 @@ interface EditAboutDialogProps {
 
 export default function EditAboutDialog({ open, onOpenChange, onSaved }: EditAboutDialogProps) {
   const { t } = useTranslation();
-  const { user, updateProfile, refreshUser } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const { saving, save } = useProfileSectionSaver({
+    onSaved,
+    onClose: onOpenChange,
+    errorLabel: "bio",
+  });
   const [bio, setBio] = useState("");
 
   useEffect(() => {
@@ -31,19 +36,7 @@ export default function EditAboutDialog({ open, onOpenChange, onSaved }: EditAbo
     }
   }, [open, user]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({ bio });
-      refreshUser().catch(() => {});
-      onSaved?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to save bio:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSave = () => save({ bio });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

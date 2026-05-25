@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, eq, ne, sql, inArray } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -1241,6 +1241,184 @@ resumeRoutes.delete("/:id", async (c) => {
     c.req.param("id"),
   );
   return c.json(result.body as any, result.status as any);
+});
+
+// #154 — Archive / Unarchive flow. Soft-delete that flips
+// `archived_at`; preserves slug + analytics + score history. Owner-only.
+resumeRoutes.post("/:id/archive", async (c) => {
+  const userId = c.var.user.sub as string;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [row] = await db
+    .select({ id: schema.resumeInformation.id, userId: schema.resumeInformation.userId })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.id, id))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  if (row.userId !== userId) return c.json(fail("FORBIDDEN", "Not your resume"), 403);
+  const [updated] = await db
+    .update(schema.resumeInformation)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(eq(schema.resumeInformation.id, id))
+    .returning();
+  return c.json(ok({ resume: updated }), 200);
+});
+
+resumeRoutes.post("/:id/unarchive", async (c) => {
+  const userId = c.var.user.sub as string;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [row] = await db
+    .select({ id: schema.resumeInformation.id, userId: schema.resumeInformation.userId })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.id, id))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  if (row.userId !== userId) return c.json(fail("FORBIDDEN", "Not your resume"), 403);
+  const [updated] = await db
+    .update(schema.resumeInformation)
+    .set({ archivedAt: null, updatedAt: new Date() })
+    .where(eq(schema.resumeInformation.id, id))
+    .returning();
+  return c.json(ok({ resume: updated }), 200);
+});
+
+// #155 — Resume version history. Mirrors studio_project_versions.
+// Autosave rows are subject to the 50-version cap + 30-day retention
+// applied below; user-labeled snapshots are kept until the parent is
+// deleted (cascade on `resume_id`).
+const RESUME_AUTOSAVE_CAP = 50;
+const RESUME_AUTOSAVE_RETENTION_DAYS = 30;
+
+resumeRoutes.get("/:id/versions", async (c) => {
+  const userId = c.var.user.sub as string;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [parent] = await db
+    .select({ userId: schema.resumeInformation.userId })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.id, id))
+    .limit(1);
+  if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  if (parent.userId !== userId) return c.json(fail("FORBIDDEN", "Not your resume"), 403);
+  const versions = await db
+    .select({
+      id: schema.resumeVersions.id,
+      versionNumber: schema.resumeVersions.versionNumber,
+      label: schema.resumeVersions.label,
+      isAutosave: schema.resumeVersions.isAutosave,
+      createdAt: schema.resumeVersions.createdAt,
+    })
+    .from(schema.resumeVersions)
+    .where(eq(schema.resumeVersions.resumeId, id))
+    .orderBy(desc(schema.resumeVersions.versionNumber))
+    .limit(200);
+  return c.json(ok({ versions }), 200);
+});
+
+const CreateVersionSchema = z.object({
+  label: z.string().trim().max(120).optional(),
+  isAutosave: z.boolean().optional(),
+});
+
+resumeRoutes.post("/:id/versions", async (c) => {
+  const userId = c.var.user.sub as string;
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = CreateVersionSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid version payload"), 400);
+  }
+  const db = getDb();
+  const [parent] = await db
+    .select({
+      userId: schema.resumeInformation.userId,
+      content: schema.resumeInformation.content,
+    })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.id, id))
+    .limit(1);
+  if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  if (parent.userId !== userId) return c.json(fail("FORBIDDEN", "Not your resume"), 403);
+
+  const [{ maxVersion }] = await db
+    .select({ maxVersion: sql<number>`COALESCE(MAX(${schema.resumeVersions.versionNumber}), 0)` })
+    .from(schema.resumeVersions)
+    .where(eq(schema.resumeVersions.resumeId, id));
+
+  const [created] = await db
+    .insert(schema.resumeVersions)
+    .values({
+      resumeId: id,
+      userId,
+      versionNumber: (maxVersion ?? 0) + 1,
+      label: parsed.data.label,
+      resumeData: parent.content as any,
+      isAutosave: parsed.data.isAutosave ?? false,
+    })
+    .returning();
+
+  // Enforce the autosave cap + retention. User-labeled snapshots are
+  // untouched.
+  if (created.isAutosave) {
+    const cutoff = new Date(Date.now() - RESUME_AUTOSAVE_RETENTION_DAYS * 86_400_000);
+    await db
+      .delete(schema.resumeVersions)
+      .where(
+        and(
+          eq(schema.resumeVersions.resumeId, id),
+          eq(schema.resumeVersions.isAutosave, true),
+          sql`${schema.resumeVersions.createdAt} < ${cutoff}`,
+        ),
+      );
+    // Cap autosaves at 50 — drop the oldest beyond that.
+    const autosaves = await db
+      .select({ id: schema.resumeVersions.id, createdAt: schema.resumeVersions.createdAt })
+      .from(schema.resumeVersions)
+      .where(
+        and(
+          eq(schema.resumeVersions.resumeId, id),
+          eq(schema.resumeVersions.isAutosave, true),
+        ),
+      )
+      .orderBy(desc(schema.resumeVersions.createdAt));
+    if (autosaves.length > RESUME_AUTOSAVE_CAP) {
+      const toDrop = autosaves.slice(RESUME_AUTOSAVE_CAP).map((row) => row.id);
+      for (const dropId of toDrop) {
+        await db.delete(schema.resumeVersions).where(eq(schema.resumeVersions.id, dropId));
+      }
+    }
+  }
+
+  return c.json(ok({ version: created }), 201);
+});
+
+resumeRoutes.post("/:id/versions/:vid/restore", async (c) => {
+  const userId = c.var.user.sub as string;
+  const id = c.req.param("id");
+  const vid = c.req.param("vid");
+  const db = getDb();
+  const [parent] = await db
+    .select({ userId: schema.resumeInformation.userId })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.id, id))
+    .limit(1);
+  if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  if (parent.userId !== userId) return c.json(fail("FORBIDDEN", "Not your resume"), 403);
+
+  const [version] = await db
+    .select()
+    .from(schema.resumeVersions)
+    .where(and(eq(schema.resumeVersions.id, vid), eq(schema.resumeVersions.resumeId, id)))
+    .limit(1);
+  if (!version) return c.json(fail("NOT_FOUND", "Version not found"), 404);
+
+  const [restored] = await db
+    .update(schema.resumeInformation)
+    .set({ content: version.resumeData as any, updatedAt: new Date() })
+    .where(eq(schema.resumeInformation.id, id))
+    .returning();
+  return c.json(success({ resume: restored }), 200);
 });
 
 resumeRoutes.post("/:id/clone", async (c) => {

@@ -31,10 +31,12 @@ interface Props {
    *  to the tool's page directly, and on `user` sources, which are
    *  read-only. */
   onRunAgain?: (toolId: string) => void;
-  /** Catalog tool id to pre-expand in the panel's accordion. Used when the
-   *  sheet is opened from a clicked score chip so the user lands on the
-   *  relevant tool's history. */
-  initialToolId?: string;
+  /** Catalog tool id(s) to pre-expand in the panel's accordion. Used
+   *  when the sheet is opened from a clicked score chip so the user
+   *  lands on the relevant tool's history. Pass an array for chips
+   *  whose underlying score is written by more than one tool (e.g.
+   *  ATS — both `ai-resume-scorer` and `resume-optimizer` write it). */
+  initialToolId?: string | readonly string[];
 }
 
 export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRunAgain, initialToolId }: Props) {

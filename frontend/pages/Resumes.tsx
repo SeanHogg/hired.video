@@ -276,10 +276,12 @@ export default function Resumes() {
     open: boolean;
     resumeId?: string;
     resumeName?: string;
-    initialToolId?: string;
+    initialToolId?: string | readonly string[];
   }>({ open: false });
-  const openToolHistory = (resume: { id: string; title: string }, initialToolId?: string) =>
-    setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.title, initialToolId });
+  const openToolHistory = (
+    resume: { id: string; title: string },
+    initialToolId?: string | readonly string[],
+  ) => setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.title, initialToolId });
 
   // (ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown)
 
@@ -1335,7 +1337,7 @@ export default function Resumes() {
                     onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
                     onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                     onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
-                    onScoreClick={(toolId) => openToolHistory({ id: resume.id, title: resume.title }, toolId)}
+                    onScoreClick={(toolIds) => openToolHistory({ id: resume.id, title: resume.title }, toolIds)}
                     onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
                     extraMenuItems={
                       <AddToListMenu

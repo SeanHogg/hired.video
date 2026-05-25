@@ -1470,15 +1470,16 @@ export async function updateSavedJobStatus(jobId: string, userId: string, status
 }
 
 export async function applyToJob(jobId: string, userId: string, application: ApplyJobDTO,
-  deps?: Partial<JobServiceDeps>): Promise<void> {
+  deps?: Partial<JobServiceDeps>): Promise<{ applicationId: string }> {
   const d = resolveDeps(deps); const db = d.db;
-  await db.insert(jobApplications).values({
+  const [created] = await db.insert(jobApplications).values({
     userId,
     jobId,
     resumeId: application.resumeId as any,
     coverLetter: application.coverLetter,
     status: "applied",
-  } as any);
+  } as any).returning({ id: jobApplications.id });
+  return { applicationId: created!.id };
 }
 
 export async function getApplications(userId: string) {

@@ -797,6 +797,32 @@ export default function People() {
       }
     };
 
+    // Shared Discover grid node — referenced by both the recruiter arm's
+    // `browse` tab and the non-recruiter arm's only view. Built once to
+    // collapse the 200-line copy/paste called out by #334.
+    const discoverGrid = (
+      <DiscoverPeopleGrid
+        people={displayedPeople}
+        isLoading={isLoading}
+        error={error}
+        viewMode={viewMode}
+        isFilteredByList={!!listMembership}
+        currentPage={currentPage}
+        totalPeople={totalPeople}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        onItemsPerPageChange={handleItemsPerPageChange}
+        onConnect={handleConnect}
+        onMessage={handleMessage}
+        onAcceptConnection={handleAcceptConnection}
+        onRejectConnection={handleRejectConnection}
+        onAddToTalentPool={handleAddToTalentPool}
+        onCardActions={handleCardActions}
+        onClearFilters={() => setSearchFilters({})}
+        onRetry={fetchPeople}
+      />
+    );
+
     return (
       <AppShell bgClassName="bg-background">
         <div className="p-4 md:p-6">
@@ -866,33 +892,16 @@ export default function People() {
 
               {activeTab !== "connections" && (rolePermissions.isRecruiter ? (
                 <div className="space-y-6">
-                  {/* Browse Tab */}
+                  {/* Browse Tab — uses the shared discoverGrid node so both
+                      arms render identically. The recruiter arm only adds
+                      the extra `talent-pool` / `submissions` panels around
+                      it (gap #334). */}
                   {activeTab === "browse" && <div className="space-y-6">
                 {/* #333 — Tracked / Following section dropped from the
                     Browse body; it lives under the Connections tab now so
                     each tab owns one slice. */}
 
-                {/* Discover People — extracted to DiscoverPeopleGrid (#409). */}
-                <DiscoverPeopleGrid
-                  people={displayedPeople}
-                  isLoading={isLoading}
-                  error={error}
-                  viewMode={viewMode}
-                  isFilteredByList={!!listMembership}
-                  currentPage={currentPage}
-                  totalPeople={totalPeople}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={setCurrentPage}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                  onConnect={handleConnect}
-                  onMessage={handleMessage}
-                  onAcceptConnection={handleAcceptConnection}
-                  onRejectConnection={handleRejectConnection}
-                  onAddToTalentPool={handleAddToTalentPool}
-                  onCardActions={handleCardActions}
-                  onClearFilters={() => setSearchFilters({})}
-                  onRetry={fetchPeople}
-                />
+                {discoverGrid}
                   </div>}
 
                   {/* Talent Pool Tab */}
@@ -1141,33 +1150,9 @@ export default function People() {
                   </div>}
                 </div>
               ) : (
-                /* Non-recruiter view — same surfaces, just no Talent Pool / Submissions */
+                /* Non-recruiter view — same Discover grid, no Talent Pool / Submissions. */
                 <div className="space-y-6">
-                  {/* #333 — Tracked / Following section dropped here too;
-                      lives under the Connections tab. */}
-
-                  {/* Discover People — extracted to DiscoverPeopleGrid (#409). */}
-                  <DiscoverPeopleGrid
-                    people={displayedPeople}
-                    isLoading={isLoading}
-                    error={error}
-                    viewMode={viewMode}
-                    isFilteredByList={!!listMembership}
-                    currentPage={currentPage}
-                    totalPeople={totalPeople}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={handleItemsPerPageChange}
-                    onConnect={handleConnect}
-                    onMessage={handleMessage}
-                    onAcceptConnection={handleAcceptConnection}
-                    onRejectConnection={handleRejectConnection}
-                    onAddToTalentPool={handleAddToTalentPool}
-                    onCardActions={handleCardActions}
-                    onClearFilters={() => setSearchFilters({})}
-                    onRetry={fetchPeople}
-                  />
-
+                  {discoverGrid}
                 </div>
               ))}
 

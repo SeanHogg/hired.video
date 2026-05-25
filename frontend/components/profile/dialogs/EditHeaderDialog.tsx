@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { useProfileSectionSaver } from "@/lib/hooks/useProfileSectionSaver";
 import MediaPicker from "@/components/shared/MediaPicker";
 
 interface EditHeaderDialogProps {
@@ -23,8 +24,12 @@ interface EditHeaderDialogProps {
 
 export default function EditHeaderDialog({ open, onOpenChange, onSaved }: EditHeaderDialogProps) {
   const { t } = useTranslation();
-  const { user, updateProfile, refreshUser } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const { saving, save, runSave } = useProfileSectionSaver({
+    onSaved,
+    onClose: onOpenChange,
+    errorLabel: "profile header",
+  });
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -47,38 +52,26 @@ export default function EditHeaderDialog({ open, onOpenChange, onSaved }: EditHe
     }
   }, [open, user]);
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({
-        firstName: form.firstName,
-        lastName: form.lastName,
-        headline: form.headline,
-        location: form.location,
-        currentRole: form.currentRole,
-        currentCompany: form.currentCompany,
-      });
-      refreshUser().catch(() => {});
-      onSaved?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to save profile header:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSave = () =>
+    save({
+      firstName: form.firstName,
+      lastName: form.lastName,
+      headline: form.headline,
+      location: form.location,
+      currentRole: form.currentRole,
+      currentCompany: form.currentCompany,
+    });
 
+  // Avatar uses the same save envelope but doesn't close the dialog —
+  // user keeps editing other fields after a successful avatar pick.
+  const { updateProfile } = useAuth();
   const handleAvatarPicked = async (url: string) => {
-    try {
-      setSaving(true);
-      await updateProfile({ profilePicture: url });
-      await refreshUser();
-      onSaved?.();
-    } catch (err) {
-      console.error("Avatar update failed", err);
-    } finally {
-      setSaving(false);
-    }
+    await runSave(
+      async () => {
+        await updateProfile({ profilePicture: url });
+      },
+      { closeOnSuccess: false },
+    );
   };
 
   const initials = `${form.firstName?.[0] || ""}${form.lastName?.[0] || ""}`;

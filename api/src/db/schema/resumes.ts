@@ -48,6 +48,10 @@ export const resumeInformation = pgTable("resume_information", {
   // Optimizer. Validated by ResumeScoresSchema in shared/scores.ts.
   // Null until either tool has been run against this resume.
   scores: jsonb("scores"),
+  /** When set, this resume is archived — hidden from the default list
+   *  on /resumes behind an "Include archived" toggle (#154). Soft
+   *  delete that preserves slug + analytics + score history. */
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
@@ -57,6 +61,24 @@ export const resumeInformation = pgTable("resume_information", {
 
 export type ResumeInformation = typeof resumeInformation.$inferSelect;
 export type NewResumeInformation = typeof resumeInformation.$inferInsert;
+
+/** Resume version snapshots — mirrors studio_project_versions (#131).
+ *  Autosave rows churn fast (50-cap + 30-day retention enforced by the
+ *  versions service); user-labeled snapshots are kept until the user
+ *  deletes the parent resume. */
+export const resumeVersions = pgTable("resume_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  resumeId: uuid("resume_id").notNull().references(() => resumeInformation.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull(),
+  label: varchar("label", { length: 120 }),
+  resumeData: jsonb("resume_data").notNull(),
+  isAutosave: boolean("is_autosave").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ResumeVersion = typeof resumeVersions.$inferSelect;
+export type NewResumeVersion = typeof resumeVersions.$inferInsert;
 
 export const resumeTemplates = pgTable("resume_templates", {
   id: uuid("id").primaryKey().defaultRandom(),

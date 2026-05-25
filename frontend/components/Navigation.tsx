@@ -156,9 +156,11 @@ export default function Navigation({
 
           {/* Header search — hidden on the home page where the hero + sticky search are already prominent,
            * and on top-level surfaces that relocated the search inline (PageHeader `search` slot) because
-           * users were missing it docked in the top bar. Keep this list in sync with the pages that pass
-           * `search={<HeaderSearch />}` to PageHeader. */}
-          {location.pathname !== "/" && !pathIsInlineHeaderSearch(location.pathname) && (
+           * users were missing it docked in the top bar. The inline suppression only applies to authed
+           * users; unauth visitors landing on the marketing branches of those routes get no inline
+           * search slot, so we keep the global one to preserve the SEO funnel. Keep this list in sync
+           * with the pages that pass `search={<HeaderSearch />}` to PageHeader. */}
+          {location.pathname !== "/" && !(isAuthenticated && pathIsInlineHeaderSearch(location.pathname)) && (
             <div className="flex-1 max-w-md mx-2 sm:mx-4 min-w-0">
               <HeaderSearch />
             </div>

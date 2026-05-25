@@ -36,6 +36,7 @@ import {
 import { companyRoutes } from "./routes/companies.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { boostRoutes } from "./routes/boosts.js";
+import { taxonomyRoutes } from "./routes/taxonomies.js";
 import { recruiterRoutes } from "./routes/recruiter.js";
 import {
   liveScreenRecruiterRoutes,
@@ -86,6 +87,8 @@ import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
 import { interviewAssignmentRoutes } from "./routes/interview-assignments.js";
+import { interviewQuestionSetRoutes } from "./routes/interview-question-sets.js";
+import { videoPitchRoutes } from "./routes/video-pitch.js";
 import { scorecardRoutes } from "./routes/scorecards.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
@@ -498,6 +501,7 @@ export function createApp() {
   app.route("/api/companies", companyRoutes);
   app.route("/api/reviews", reviewRoutes);
   app.route("/api/boosts", boostRoutes);
+  app.route("/api/taxonomies", taxonomyRoutes);
   app.route("/api/recruiter", recruiterRoutes);
   app.route("/api/recruiter/live-screen", liveScreenRecruiterRoutes);
   app.route("/api/live-screen", liveScreenPublicRoutes);
@@ -552,6 +556,8 @@ export function createApp() {
   app.route("/api/hubs", hubsRoutes);
   app.route("/api/interview", interviewRoutes);
   app.route("/api/interview-assignments", interviewAssignmentRoutes);
+  app.route("/api/interview-question-sets", interviewQuestionSetRoutes);
+  app.route("/api/video-pitch", videoPitchRoutes);
   app.route("/api/scorecards", scorecardRoutes);
   app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);

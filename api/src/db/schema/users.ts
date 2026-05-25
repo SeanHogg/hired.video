@@ -84,6 +84,11 @@ export const users = pgTable("users", {
   // Settings → Privacy. Read by paid-media-pixels.installPaidMediaPixels
   // and the CAPI fan-out to suppress identifier sharing.
   doNotShare: boolean("do_not_share").default(false).notNull(),
+  /** Per-recruiter Resume Forwarding Address slug (#251). Inbound mail
+   *  to `{slug}@resume-forward.hired.video` is parsed by the Mailgun
+   *  webhook and lands in this user's talent pool. Null = the user has
+   *  not opted in to forwarding yet. */
+  resumeForwardingSlug: varchar("resume_forwarding_slug", { length: 48 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
