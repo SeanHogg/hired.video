@@ -169,7 +169,6 @@ const KNOWN_MISSING_CREATE_TABLE = new Set([
   "profile_views",
   "queue_job_to_process",
   "queue_job_to_resume",
-  "recruiter_agent_runs",
   "recruiter_talent_pools",
   "refresh_tokens",
   "refund_requests",
