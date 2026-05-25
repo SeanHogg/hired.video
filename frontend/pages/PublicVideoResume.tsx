@@ -6,11 +6,9 @@ import {
   PublicVideoSchema,
   isReady,
   type PublicVideoPayload as PublicVideo,
-  type PublicVideoReady,
 } from "@/components/studio/StudioVideoSurface";
 import ProjectPlayer from "@/components/studio/shared/ProjectPlayer";
-import type { StudioProject } from "@/lib/services/studio-service";
-import { StudioProjectStatus } from "@/lib/services/studio-service";
+import { publicReadyToProject } from "@/lib/studio/public-payload";
 import { recordProjectView } from "@/lib/services/studio-features-service";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
@@ -190,44 +188,4 @@ export default function PublicVideoResume() {
   );
 }
 
-/** Adapter from the public payload to a `StudioProject`-shaped object
- *  so `<ProjectPlayer>` (which is the SSoT dispatcher and expects a
- *  project) can read the parallel-column state. Only the fields the
- *  dispatcher reads are populated — fields like `userId`, `status`,
- *  `creationDateTime` are stubbed because the public surface has no
- *  use for them. */
-function publicReadyToProject(ready: PublicVideoReady): StudioProject {
-  return {
-    id: ready.id,
-    userId: "",
-    title: ready.title,
-    status: StudioProjectStatus.Published,
-    youtubeVideoId: ready.youtubeVideoId ?? null,
-    videoUrl: ready.videoUrl ?? null,
-    thumbnailUrl: ready.thumbnailUrl ?? null,
-    storyboard: null,
-    script: null,
-    kind: (ready.kind as "scene" | "nle" | null | undefined) ?? "scene",
-    mediaKind: (ready.mediaKind as StudioProject["mediaKind"]) ?? "video",
-    timelineSpec: ready.timelineSpec ?? null,
-    gameState: ready.gameState ?? null,
-    imageState: ready.imageState ?? null,
-    animationState: ready.animationState ?? null,
-    cadState: ready.cadState ?? null,
-    prompt: null,
-    jobDescription: null,
-    resumeText: null,
-    purpose: null,
-    viewCount: 0,
-    ctaClickCount: 0,
-    isPublic: true,
-    metaDescription: ready.metaDescription ?? null,
-    slug: null,
-    keywords: ready.keywords ?? [],
-    socialCardImage: ready.socialCardImage ?? null,
-    subjects: [],
-    creationDateTime: ready.createdAt,
-    updateDateTime: ready.createdAt,
-  };
-}
 

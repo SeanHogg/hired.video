@@ -810,7 +810,11 @@ export default function StudioWizard({
             const Intake = activeTmpl.IntakeForm;
             return (
               <div>
-                <Intake state={state} onStateChange={onStateChange} />
+                <Intake
+                  state={state}
+                  onStateChange={onStateChange}
+                  kind={activeTmpl.mediaKind}
+                />
               </div>
             );
           })()}

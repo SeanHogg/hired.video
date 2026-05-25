@@ -189,6 +189,7 @@ export default function StudioEditor({
             <Intake
               state={state}
               onStateChange={onStateChange}
+              kind={activeTemplate.mediaKind}
               validationFlash={promptValidationFlash}
               onLinkSubject={onLinkSubject}
             />

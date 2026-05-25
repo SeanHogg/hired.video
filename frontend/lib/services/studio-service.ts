@@ -259,6 +259,12 @@ export const StudioProjectSchema = z.object({
   // parallel-column pattern. Validated client-side by <CadStage>;
   // server stores verbatim. See shared/cad-state.ts.
   cadState: z.unknown().nullish(),
+  // Comic runtime state for mediaKind='comic' projects (#929 / #1217).
+  // Dormant today (comic authoring rides the CanvasState path) but
+  // mirrored on the DTO + schema so the per-kind parallel-column
+  // pattern is total. Removes the foot-gun where a future comic-only
+  // field silently round-trips to nothing.
+  comicState: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
@@ -310,6 +316,22 @@ export interface PublishVideoRequest {
 
 // ─── Published video types ───────────────────────────────────────────────────
 
+// mediaKind + parallel-runtime state shared across every video-typed
+// response shape (#1215). Spread into Resume / Public / User schemas
+// below so the four legacy `/videos/*` endpoints all carry enough
+// information for `<ProjectPlayer>` to dispatch per kind on each
+// rail consumer (resume detail / profile / homepage hero / featured).
+// Per the DRY rule, the schemas can't drift on which kinds they carry.
+const MediaKindFields = {
+  mediaKind: z.string().nullish(),
+  timelineSpec: z.unknown().nullish(),
+  gameState: z.unknown().nullish(),
+  imageState: z.unknown().nullish(),
+  animationState: z.unknown().nullish(),
+  cadState: z.unknown().nullish(),
+  comicState: z.unknown().nullish(),
+} as const;
+
 export const ResumeVideoSchema = z.object({
   id: z.string(),
   title: z.string().nullish(),
@@ -320,6 +342,7 @@ export const ResumeVideoSchema = z.object({
   privacyStatus: z.string().nullish(),
   status: z.string(),
   isProfilePrimary: z.boolean().nullish(),
+  ...MediaKindFields,
   createdAt: z.string(),
 });
 export type ResumeVideo = z.infer<typeof ResumeVideoSchema>;
@@ -335,6 +358,7 @@ export const PublicVideoSchema = z.object({
   isFeatured: z.boolean().nullish(),
   ownerName: z.string(),
   resumeId: z.string().nullish(),
+  ...MediaKindFields,
   createdAt: z.string(),
 });
 export type PublicVideo = z.infer<typeof PublicVideoSchema>;
@@ -348,6 +372,7 @@ export const UserVideoSchema = z.object({
   thumbnailUrl: z.string().nullish(),
   description: z.string().nullish(),
   privacyStatus: z.string().nullish(),
+  ...MediaKindFields,
   // Which profile surfaces this video should appear on for the owner —
   // computed server-side against (studio_project_subjects.subject_kind,
   // subject_id). Includes `"profile"` when the project is linked to

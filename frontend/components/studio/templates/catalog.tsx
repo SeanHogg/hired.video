@@ -205,6 +205,13 @@ export type ImportMode =
 export interface IntakeProps {
   state: StudioProjectState;
   onStateChange: (patch: Partial<StudioProjectState>) => void;
+  /** Active template's mediaKind. The wizard + editor pass this so the
+   *  intake renders kind-aware copy ("Describe your podcast" /
+   *  "...your comic" / "...your game") — single source of truth lives
+   *  in `MEDIA_KIND_UI` (`@shared/media-kinds`), no per-intake string
+   *  literals. Especially load-bearing for `BasicIntake`, which is
+   *  mounted by 40+ templates spanning every media kind. */
+  kind: MediaKind;
   /** Allows the intake form to flash required fields when the user tries to
    *  advance without enough input — wizard / editor pass this through. */
   validationFlash?: boolean;

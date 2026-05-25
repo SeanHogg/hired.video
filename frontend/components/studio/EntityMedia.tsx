@@ -37,7 +37,7 @@
  *   • Profile / Job / Company / Skills Demo / Article cards — same shape.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Pencil, Play, Plus } from "lucide-react";
 import {
@@ -45,7 +45,7 @@ import {
   STUDIO_SUBJECT_LABEL,
   type StudioSubject,
 } from "@shared/studio-subject";
-import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
+import { type MediaKind } from "@shared/media-kinds";
 import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
@@ -111,10 +111,12 @@ export default function EntityMedia({
     };
   }, [apiReady, viewerCanCreate, subject.kind, subject.id]);
 
-  // Pluralised "X Videos / X Reels / X Games / X items" header — kind-
-  // aware so the rail labels itself correctly regardless of what the
-  // user actually made. Computed once per render off the loaded list.
-  const headerLabel = useMemo(() => itemsHeaderLabel(items), [items]);
+  // Header reads "X items" — fully kind-agnostic so a rail with one
+  // video doesn't claim "1 Video" when the very next attachment might
+  // be a Photoshop drawing or a game. Per-tile `<MediaKindBadge>`
+  // overlays already convey kind for each item; the rail header is
+  // a count, not a taxonomy label.
+  const headerLabel = itemsHeaderLabel(items);
 
   // Hide the section entirely when the viewer can't create AND no items
   // exist — there's nothing to render. Anonymous viewers (api-not-ready)
@@ -220,21 +222,13 @@ export default function EntityMedia({
   );
 }
 
-/** Pluralised header label that's coherent across mediaKinds. When the
- *  rail contains a single kind we use that kind's plural badge label
- *  ("5 Videos", "3 Games"); when it mixes kinds we fall back to the
- *  generic "X items" so we never lie ("4 Videos" on a rail that has
- *  3 games and a podcast). Exported so a future test can lock this in
- *  without exporting the whole component shape. */
+/** Header label — always "X items" regardless of the kind mix. The
+ *  studio is multi-kind now (a resume may link a video + a Photoshop
+ *  drawing + a podcast), so the rail counts attachments without
+ *  taxonomising them; the per-tile `<MediaKindBadge>` carries kind
+ *  for each individual item. Exported so a future test can lock this
+ *  in without exporting the whole component shape. */
 export function itemsHeaderLabel(items: StudioProject[] | null): string {
-  if (!items || items.length === 0) return "0 items";
-  const kinds = new Set<MediaKind>(
-    items.map((v) => (v.mediaKind ?? "video") as MediaKind),
-  );
-  if (kinds.size === 1) {
-    const only = items[0].mediaKind as MediaKind | undefined;
-    const label = MEDIA_KIND_UI[only ?? "video"].badgeLabel;
-    return `${items.length} ${label}${items.length === 1 ? "" : "s"}`;
-  }
-  return `${items.length} item${items.length === 1 ? "" : "s"}`;
+  const count = items?.length ?? 0;
+  return `${count} item${count === 1 ? "" : "s"}`;
 }

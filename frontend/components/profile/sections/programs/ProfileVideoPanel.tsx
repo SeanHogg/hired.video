@@ -69,7 +69,7 @@ export default function ProfileVideoPanel({ userId, isOwner }: Props) {
       {videos.length > 0 && (
         <section className="space-y-3">
           <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-            Videos
+            Media
           </h3>
           <div className="grid sm:grid-cols-2 gap-3">
             {videos.map((v) => (
@@ -78,7 +78,7 @@ export default function ProfileVideoPanel({ userId, isOwner }: Props) {
                 mode="lazy"
                 videoId={v.id}
                 poster={v.thumbnailUrl ?? null}
-                title={v.title ?? "Video"}
+                title={v.title ?? "Project"}
               />
             ))}
           </div>

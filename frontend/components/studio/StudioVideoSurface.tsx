@@ -32,7 +32,7 @@
 //             rotation thumbnails, in-frame element videos). Skips the
 //             script branch.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Play } from "lucide-react";
 import { z } from "zod";
 
@@ -119,6 +119,11 @@ export const PublicVideoReadySchema = z.object({
   imageState: z.unknown().optional().nullable(),
   animationState: z.unknown().optional().nullable(),
   cadState: z.unknown().optional().nullable(),
+  // Comic state column carried for parity (#1217). Dormant today
+  // because comic authoring rides the CanvasState path; surfaced
+  // here so the public payload round-trips it for the day a comic
+  // adds runtime-only fields outside the canvas state.
+  comicState: z.unknown().optional().nullable(),
   aspect: z.string().nullable().optional(),
   resolution: z.string().nullable().optional(),
   ctaHotzones: z.array(CtaHotzoneSchema).optional().default([]),
@@ -310,6 +315,55 @@ function FlatSurface({
   );
 }
 
+// ─── ProjectPlayer dynamic import ──────────────────────────────────────────
+// `<ProjectPlayer/>` itself imports this module (the eager-Timeline
+// branch delegates back here), so we can't have a static import or
+// a circular module evaluation lands one of us with `undefined`. The
+// React.lazy split-point breaks the cycle at module-load — the
+// dynamic import only resolves the first time the lazy branch
+// renders, by which point both modules are fully evaluated. Single
+// SSoT (ProjectPlayer) for kind dispatch, no duplicated branches.
+
+const ProjectPlayerLazy = lazy(() =>
+  import("@/components/studio/shared/ProjectPlayer"),
+);
+
+function LazyProjectPlayer({
+  ready,
+  analyticsProjectId,
+}: {
+  ready: PublicVideoReady;
+  analyticsProjectId?: string;
+}) {
+  // Inline dynamic import of the adapter too — keeps the
+  // public-payload-to-StudioProject mapping in one place
+  // (`lib/studio/public-payload.ts`) without forcing a static import
+  // chain that would pull StudioProject typings into every consumer.
+  const [project, setProject] = useState<
+    import("@/lib/services/studio-service").StudioProject | null
+  >(null);
+  useEffect(() => {
+    let cancelled = false;
+    void import("@/lib/studio/public-payload").then((m) => {
+      if (cancelled) return;
+      setProject(m.publicReadyToProject(ready));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
+  if (!project) return null;
+  return (
+    <Suspense fallback={null}>
+      <ProjectPlayerLazy
+        project={project}
+        eagerReady={ready}
+        videoSurfaceProps={{ analyticsProjectId }}
+      />
+    </Suspense>
+  );
+}
+
 // ─── Lazy wrapper ───────────────────────────────────────────────────────────
 // Owns its own fetch + loading state so consumers can drop a `<StudioVideoSurface
 // videoId={...} />` anywhere a thumbnail used to live and get full universal-
@@ -360,6 +414,25 @@ function LazySurface({
 
   // Resolved state → dispatch. Pass through title/aspect overrides.
   if (ready) {
+    // Non-video kinds bounce through the kind-aware <ProjectPlayer/>
+    // dispatcher so the lazy callers (resume header rail, profile
+    // panel, homepage hero spotlight) render image / game /
+    // animation / cad projects with their own runtime instead of
+    // falling through to the legacy video-only "not ready" branch.
+    // Video kinds (and legacy payloads with mediaKind undefined)
+    // stay on the existing PublicVideoDispatch path so YouTube /
+    // baked MP4 / live-canvas dispatch is unchanged. Done here
+    // rather than in every consumer per the DRY rule — single
+    // dispatcher covers all 5+ lazy callers.
+    const kind = ready.mediaKind ?? "video";
+    if (kind !== "video") {
+      return (
+        <LazyProjectPlayer
+          ready={ready}
+          analyticsProjectId={analyticsProjectId}
+        />
+      );
+    }
     return (
       <PublicVideoDispatch
         ready={ready}

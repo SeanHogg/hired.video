@@ -1139,6 +1139,13 @@ function toProjectDto(
     // CAD runtime state for mediaKind='cad' projects (#930). Same
     // parallel-column pattern. See `shared/cad-state.ts`.
     cadState: project.cadState ?? null,
+    // Comic runtime state for mediaKind='comic' projects (#929 / #1217).
+    // Comic authoring currently rides the CanvasState path (panels =
+    // widgets) so this column is dormant today, but exposing it on
+    // the DTO matches the parallel-column pattern of the other kinds
+    // and unblocks future comic-only fields (panel-graph nodes,
+    // reading order overrides) without a follow-up schema sweep.
+    comicState: project.comicState ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
@@ -2482,6 +2489,18 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
       isPublic: studioProjects.isPublic,
       isProfilePrimary: studioProjects.isProfilePrimary,
       storyboard: studioProjects.storyboard,
+      // mediaKind + per-runtime state — included so the
+      // ProfileVideoPanel rail can dispatch via <ProjectPlayer/>
+      // and render image / game / animation / cad / comic
+      // projects with their own surface instead of falling
+      // through to the legacy video-only path (#1215).
+      mediaKind: studioProjects.mediaKind,
+      timelineSpec: studioProjects.timelineSpec,
+      gameState: studioProjects.gameState,
+      imageState: studioProjects.imageState,
+      animationState: studioProjects.animationState,
+      cadState: studioProjects.cadState,
+      comicState: studioProjects.comicState,
       createdAt: studioProjects.createdAt,
       // LEFT-joined optional baked artifacts.
       videoTitle: videos.title,
@@ -2569,6 +2588,15 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
       thumbnailUrl: v.thumbnailUrl,
       description: v.description,
       privacyStatus: v.privacyStatus,
+      // mediaKind + state-column fan-out (#1215) so the rail can
+      // dispatch through <ProjectPlayer/> for non-video projects.
+      mediaKind: (v.mediaKind as string | null) ?? "video",
+      timelineSpec: v.timelineSpec ?? null,
+      gameState: v.gameState ?? null,
+      imageState: v.imageState ?? null,
+      animationState: v.animationState ?? null,
+      cadState: v.cadState ?? null,
+      comicState: v.comicState ?? null,
       isProfilePrimary: Boolean(v.isProfilePrimary),
       isCreatorCredit: Boolean(v.isCreatorCredit),
       subjectKinds: Array.from(subjectKindsByProject.get(v.projectId) ?? []),
@@ -2607,6 +2635,17 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
       isPublic: studioProjects.isPublic,
       projectStatus: studioProjects.status,
       storyboard: studioProjects.storyboard,
+      // mediaKind + parallel state — surfaced so the resume detail
+      // header carousel can dispatch through <ProjectPlayer/> per
+      // kind (#1215). Without these the rail rendered image / game
+      // / animation projects as "Video is being processed".
+      mediaKind: studioProjects.mediaKind,
+      timelineSpec: studioProjects.timelineSpec,
+      gameState: studioProjects.gameState,
+      imageState: studioProjects.imageState,
+      animationState: studioProjects.animationState,
+      cadState: studioProjects.cadState,
+      comicState: studioProjects.comicState,
       isProfilePrimary: studioProjects.isProfilePrimary,
       createdAt: studioProjects.createdAt,
       // LEFT-joined optional baked video — present after export, null
@@ -2665,16 +2704,30 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
       thumbnailUrl: v.thumbnailUrl,
       privacyStatus: v.privacyStatus,
       status: v.videoStatus ?? v.projectStatus,
+      // mediaKind + state-column fan-out (#1215).
+      mediaKind: (v.mediaKind as string | null) ?? "video",
+      timelineSpec: v.timelineSpec ?? null,
+      gameState: v.gameState ?? null,
+      imageState: v.imageState ?? null,
+      animationState: v.animationState ?? null,
+      cadState: v.cadState ?? null,
+      comicState: v.comicState ?? null,
       isProfilePrimary: v.isProfilePrimary,
       createdAt: asIso(v.createdAt),
     };
   })));
 });
 
-// Shared select + row→PublicVideo shape for both the discovery feed
-// (`/videos/public`) and the homepage carousel feed (`/videos/featured`).
-// Extracted per DRY — the projection and mapping are identical, only
-// the WHERE clause differs.
+// Shared select + row→PublicVideo shape for the discovery feed
+// (`/videos/public`). The homepage carousel sources from
+// `studio_projects.is_featured` instead (see /videos/featured) because
+// v2 projects render live off `timelineSpec` and never have a
+// `videos` row. mediaKind is hard-coded "video" here because this
+// feed only joins through the `videos` baked-artifact table —
+// non-video kinds never have a video row. card-feed (the lone
+// consumer) hides surfaces it doesn't recognise, so adding kind
+// here means a future cross-kind discovery surface can dispatch
+// without a schema change.
 const PUBLIC_VIDEO_SELECT = {
   id: videos.id,
   title: videos.title,
@@ -2715,6 +2768,17 @@ function mapPublicVideo(v: PublicVideoRow) {
     isFeatured: v.isFeatured,
     ownerName: v.ownerName,
     resumeId: v.resumeId,
+    // mediaKind always "video" here — the source is the `videos`
+    // baked-artifact table, which only carries renders. Surfaces
+    // that need non-video discovery hit /videos/featured or
+    // /videos/user/:userId where the projects table is the source.
+    mediaKind: "video",
+    timelineSpec: null,
+    gameState: null,
+    imageState: null,
+    animationState: null,
+    cadState: null,
+    comicState: null,
     createdAt: asIso(v.createdAt),
   };
 }
@@ -2757,6 +2821,18 @@ studioRoutes.get("/videos/featured", async (c) => {
       id: studioProjects.id,
       videoId: studioProjects.videoId,
       storyboard: studioProjects.storyboard,
+      // mediaKind + parallel state cols — the hero spotlight on the
+      // homepage now dispatches via <ProjectPlayer/> so a Photoshop
+      // drawing / memory-match game / animation in the SA-featured
+      // set plays its own runtime instead of the legacy video-only
+      // surface (#1215).
+      mediaKind: studioProjects.mediaKind,
+      timelineSpec: studioProjects.timelineSpec,
+      gameState: studioProjects.gameState,
+      imageState: studioProjects.imageState,
+      animationState: studioProjects.animationState,
+      cadState: studioProjects.cadState,
+      comicState: studioProjects.comicState,
       createdAt: studioProjects.createdAt,
       updatedAt: studioProjects.updatedAt,
       // LEFT-joined optional baked video. Thumbnails + MP4 URL flow
@@ -2790,6 +2866,14 @@ studioRoutes.get("/videos/featured", async (c) => {
       thumbnailUrl: r.thumbnailUrl,
       description: r.description,
       isFeatured: true,
+      // mediaKind + state-column fan-out (#1215).
+      mediaKind: (r.mediaKind as string | null) ?? "video",
+      timelineSpec: r.timelineSpec ?? null,
+      gameState: r.gameState ?? null,
+      imageState: r.imageState ?? null,
+      animationState: r.animationState ?? null,
+      cadState: r.cadState ?? null,
+      comicState: r.comicState ?? null,
       ownerName: r.ownerName,
       resumeId: r.resumeId,
       createdAt: asIso(r.createdAt),
@@ -2851,6 +2935,8 @@ studioRoutes.get("/public/:videoId", async (c) => {
     imageState: studioProjects.imageState,
     animationState: studioProjects.animationState,
     cadState: studioProjects.cadState,
+    // Comic column included for parallel-column parity (#1217).
+    comicState: studioProjects.comicState,
     ownerName: users.name,
     ownerAvatar: userProfiles.avatarUrl,
   };
@@ -2866,6 +2952,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     imageState: unknown;
     animationState: unknown;
     cadState: unknown;
+    comicState: unknown;
     ownerName: string | null;
     ownerAvatar: string | null;
   };
@@ -2887,6 +2974,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
       imageState: proj.imageState ?? null,
       animationState: proj.animationState ?? null,
       cadState: proj.cadState ?? null,
+      comicState: proj.comicState ?? null,
       ownerName: proj.ownerName,
       ownerAvatar: proj.ownerAvatar,
       metaDescription: (meta?._metaDescription as string | undefined) ?? null,
@@ -3079,6 +3167,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     imageState: projectInfo?.imageState ?? null,
     animationState: projectInfo?.animationState ?? null,
     cadState: projectInfo?.cadState ?? null,
+    comicState: projectInfo?.comicState ?? null,
     aspect,
     resolution,
     ctaHotzones,

@@ -10,11 +10,32 @@ const {
   companyProfiles,
   resumeInformation,
   studioVoiceClones,
+  studioProjects,
   creatorProfiles,
   userProfiles,
 } = schema;
 
 export const ogRoutes = new Hono<{ Variables: Variables }>();
+
+// Per-kind copy for OG share previews — kept here (next to the only
+// consumer) rather than in @shared/media-kinds because OG branding is
+// a worker-side concern and the per-kind nouns + verbs differ from
+// the editor's MEDIA_KIND_UI labels (the editor says "Export drawing"
+// but a share preview reads better as "Drawing on hired.video").
+// SSoT for the rewrite + the SVG card so they can't drift.
+const OG_KIND_COPY: Record<string, { noun: string; verb: string }> = {
+  video:     { noun: "Video Resume",       verb: "Watch" },
+  podcast:   { noun: "Podcast Episode",    verb: "Listen to" },
+  voice:     { noun: "Voiceover",          verb: "Listen to" },
+  animation: { noun: "Animation",          verb: "Watch" },
+  game:      { noun: "Browser Game",       verb: "Play" },
+  comic:     { noun: "Comic",              verb: "Read" },
+  image:     { noun: "Drawing",            verb: "View" },
+  cad:       { noun: "Drafting",           verb: "View" },
+};
+function ogKindCopy(mediaKind: string | null | undefined) {
+  return OG_KIND_COPY[mediaKind ?? "video"] ?? OG_KIND_COPY.video;
+}
 
 // ─── GET /companies/:id ──────────────────────────────────────────────────────
 // Social card for a company profile. Surfaces the cached
@@ -96,30 +117,24 @@ ogRoutes.get("/v/:videoId", async (c) => {
   const { videoId } = c.req.param();
   const db = getDb();
 
-  const rows = await db
-    .select({
-      title: videos.title,
-      thumbnailUrl: videos.thumbnailUrl,
-      privacyStatus: videos.privacyStatus,
-      ownerName: users.name,
-    })
-    .from(videos)
-    .innerJoin(users, eq(videos.userId, users.id))
-    .where(eq(videos.id, videoId))
-    .limit(1);
+  // Resolve mediaKind + title + thumbnail by looking at the project
+  // first (covers every kind including non-video), then falling back
+  // to the videos row for legacy direct uploads. Mirrors the lookup
+  // order in `/api/studio/public/:videoId` so the share preview and
+  // the watch page see the same source-of-truth.
+  const meta = await resolveOgMetaForVideoId(db, videoId);
 
-  // If video exists and has a thumbnail, redirect to it
-  if (rows.length && rows[0].privacyStatus === "public" && rows[0].thumbnailUrl) {
-    return c.redirect(rows[0].thumbnailUrl, 302);
+  // If a thumbnail exists and the project is public, redirect to it.
+  if (meta.isPublic && meta.thumbnailUrl) {
+    return c.redirect(meta.thumbnailUrl, 302);
   }
 
+  const kindCopy = ogKindCopy(meta.mediaKind);
   // Otherwise generate an SVG social card
-  const title = rows.length && rows[0].privacyStatus === "public"
-    ? (rows[0].title || `${rows[0].ownerName}'s Video Resume`)
-    : "Video Resume";
-  const ownerName = rows.length && rows[0].privacyStatus === "public"
-    ? (rows[0].ownerName || "")
-    : "";
+  const title = meta.isPublic
+    ? (meta.title || `${meta.ownerName ?? ""}'s ${kindCopy.noun}`.trim())
+    : kindCopy.noun;
+  const ownerName = meta.isPublic ? (meta.ownerName || "") : "";
 
   // Truncate for display
   const displayTitle = title.length > 60 ? title.slice(0, 57) + "…" : title;
@@ -159,6 +174,96 @@ ogRoutes.get("/v/:videoId", async (c) => {
     },
   });
 });
+
+/** Shared lookup for the `/v/<id>` OG endpoints (#1216). Resolves the
+ *  same data the public watch page uses: project row first (because v2
+ *  projects play live off `timelineSpec` and never have a `videos` row
+ *  until export, and non-video kinds never have one at all), then
+ *  falls back to the videos row for legacy direct uploads. Returns a
+ *  uniform shape so the SVG card + the meta JSON both branch off
+ *  `mediaKind` consistently. */
+async function resolveOgMetaForVideoId(
+  db: ReturnType<typeof getDb>,
+  videoId: string,
+): Promise<{
+  isPublic: boolean;
+  title: string | null;
+  description: string | null;
+  thumbnailUrl: string | null;
+  ownerName: string | null;
+  mediaKind: string;
+}> {
+  if (isUuid(videoId)) {
+    const [proj] = await db
+      .select({
+        id: studioProjects.id,
+        isPublic: studioProjects.isPublic,
+        storyboard: studioProjects.storyboard,
+        mediaKind: studioProjects.mediaKind,
+        ownerName: users.name,
+      })
+      .from(studioProjects)
+      .innerJoin(users, eq(studioProjects.userId, users.id))
+      .where(eq(studioProjects.id, videoId))
+      .limit(1);
+    if (proj) {
+      const meta = proj.storyboard as
+        | { _name?: string; _metaDescription?: string; _socialCardImage?: string }
+        | null;
+      // Try the linked video for a baked thumbnail, but the project
+      // is the source of truth for visibility + title + kind.
+      const [vid] = await db
+        .select({ thumbnailUrl: videos.thumbnailUrl, description: videos.description })
+        .from(videos)
+        .where(eq(videos.id, videoId))
+        .limit(1);
+      return {
+        isPublic: proj.isPublic,
+        title: (meta?._name as string | undefined) ?? null,
+        description: (meta?._metaDescription as string | undefined)
+          ?? vid?.description
+          ?? null,
+        thumbnailUrl: (meta?._socialCardImage as string | undefined)
+          ?? vid?.thumbnailUrl
+          ?? null,
+        ownerName: proj.ownerName,
+        mediaKind: (proj.mediaKind as string | null) ?? "video",
+      };
+    }
+  }
+  // Fall back to the videos row for legacy direct uploads (no project
+  // row, no canvas state — just a baked MP4 / YouTube embed).
+  const [row] = await db
+    .select({
+      title: videos.title,
+      description: videos.description,
+      thumbnailUrl: videos.thumbnailUrl,
+      privacyStatus: videos.privacyStatus,
+      ownerName: users.name,
+    })
+    .from(videos)
+    .innerJoin(users, eq(videos.userId, users.id))
+    .where(eq(videos.id, videoId))
+    .limit(1);
+  if (!row) {
+    return {
+      isPublic: false,
+      title: null,
+      description: null,
+      thumbnailUrl: null,
+      ownerName: null,
+      mediaKind: "video",
+    };
+  }
+  return {
+    isPublic: row.privacyStatus === "public",
+    title: row.title,
+    description: row.description,
+    thumbnailUrl: row.thumbnailUrl,
+    ownerName: row.ownerName,
+    mediaKind: "video",
+  };
+}
 
 function escapeXml(str: string): string {
   return str
@@ -350,27 +455,25 @@ ogRoutes.get("/creator/:userId", async (c) => {
 ogRoutes.get("/v/:videoId/meta", async (c) => {
   const { videoId } = c.req.param();
   const db = getDb();
-  const [row] = await db
-    .select({
-      title: videos.title,
-      description: videos.description,
-      thumbnailUrl: videos.thumbnailUrl,
-      privacyStatus: videos.privacyStatus,
-      ownerName: users.name,
-    })
-    .from(videos)
-    .innerJoin(users, eq(videos.userId, users.id))
-    .where(eq(videos.id, videoId))
-    .limit(1);
-
-  if (!row || row.privacyStatus !== "public") {
-    return c.json({ title: "Video Resume — hired.video", description: null, image: null });
+  // Resolve via the same kind-aware lookup the SVG card uses so the
+  // rewritten meta tags + the social card image match (e.g. share
+  // preview of a Photoshop drawing says "Drawing on hired.video"
+  // alongside the drawing's thumbnail rather than the legacy
+  // "Video Resume" copy that landed regardless of kind — #1216).
+  const meta = await resolveOgMetaForVideoId(db, videoId);
+  const kindCopy = ogKindCopy(meta.mediaKind);
+  if (!meta.isPublic) {
+    return c.json({ title: `${kindCopy.noun} — hired.video`, description: null, image: null });
   }
-
+  const ownerSubject = meta.ownerName ?? "this creator";
   return c.json({
-    title: row.title ? `${row.title} — Video Resume on hired.video` : `${row.ownerName ?? "Video"} — Video Resume on hired.video`,
-    description: row.description ?? `Watch ${row.ownerName ?? "this candidate"}'s AI-generated video resume on hired.video.`,
-    image: row.thumbnailUrl ?? null,
+    title: meta.title
+      ? `${meta.title} — ${kindCopy.noun} on hired.video`
+      : `${meta.ownerName ?? kindCopy.noun} — ${kindCopy.noun} on hired.video`,
+    description:
+      meta.description
+      ?? `${kindCopy.verb} ${ownerSubject}'s ${kindCopy.noun.toLowerCase()} on hired.video.`,
+    image: meta.thumbnailUrl ?? null,
   });
 });
 
