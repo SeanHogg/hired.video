@@ -1196,6 +1196,43 @@ resumeRoutes.post("/unwatch/:id", async (c) => {
   return c.json(result.body as any, result.status as any);
 });
 
+// #403 — Followed-resume surface. Returns every resume the caller is
+// watching, joined to the resume row so /resumes?tab=watched can render
+// the same cards it does for sourced / owned. Mirrors the People
+// connections-vs-talent-pool split.
+resumeRoutes.get("/watched", async (c) => {
+  const userId = c.var.user.sub as string;
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: schema.resumeInformation.id,
+      userId: schema.resumeInformation.userId,
+      title: schema.resumeInformation.title,
+      slug: schema.resumeInformation.slug,
+      isMaster: schema.resumeInformation.isMaster,
+      status: schema.resumeInformation.status,
+      privacyLevel: schema.resumeInformation.privacyLevel,
+      scores: schema.resumeInformation.scores,
+      sentimentScore: schema.resumeInformation.sentimentScore,
+      archivedAt: schema.resumeInformation.archivedAt,
+      createdAt: schema.resumeInformation.createdAt,
+      updatedAt: schema.resumeInformation.updatedAt,
+      watchedAt: schema.watchedResumes.watchedAt,
+    })
+    .from(schema.watchedResumes)
+    .innerJoin(
+      schema.resumeInformation,
+      eq(schema.watchedResumes.resumeId, schema.resumeInformation.id),
+    )
+    .where(eq(schema.watchedResumes.viewerId, userId))
+    .orderBy(desc(schema.watchedResumes.watchedAt))
+    .limit(200);
+  return c.json(
+    ok({ resumes: rows.map((r) => ({ ...r, ownership: "watched" as const })) }),
+    200,
+  );
+});
+
 // Dynamic routes below static routes
 // Mounted under optionalAuthMiddleware via PUBLIC_RESUME_DETAIL_ROUTE in app.ts.
 // Access policy: owner always wins; anyone else only sees public resumes.

@@ -200,7 +200,7 @@ export default function Dashboard() {
     children,
   }) => (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-<div className="pt-16">{children}</div>
+<div>{children}</div>
 </AppShell>
   );
 
@@ -222,7 +222,7 @@ export default function Dashboard() {
   if (!isAuthenticated || !user) {
     return (
       <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-<div className="pt-16">
+<div>
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">

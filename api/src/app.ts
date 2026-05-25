@@ -98,6 +98,8 @@ import { followUpRoutes } from "./routes/followups.js";
 import { hiringOnboardingRoutes } from "./routes/onboarding-hiring.js";
 import { performanceRoutes } from "./routes/performance.js";
 import { calendarRoutes } from "./routes/calendar.js";
+import { eventRoutes } from "./routes/events.js";
+import { coffeeRoutes } from "./routes/coffee.js";
 import { exclusiveBoardRoutes } from "./routes/exclusive-boards.js";
 import { communityRoutes } from "./routes/community.js";
 import { analyticsRoutes } from "./routes/analytics.js";
@@ -486,6 +488,14 @@ export function createApp() {
   app.route("/api/resume", resumeRoutes); // legacy resume endpoints
   app.route("/api/resumescorer", resumeScorerRoutes);
   app.route("/api/resumeoptimizer", resumeOptimizerRoutes);
+  // #376 — canonical alias surface. Both routes proxy the same
+  // `services/resume/analyze.ts` engine; mount them under a single
+  // `/api/resume-analysis` namespace so frontend + Chrome extension
+  // can migrate without `?surface=` query gymnastics. Legacy paths
+  // stay live for SEO continuity (different funnel pages) and existing
+  // tool-run history rows until the 410 sweep.
+  app.route("/api/resume-analysis/score", resumeScorerRoutes);
+  app.route("/api/resume-analysis/optimize", resumeOptimizerRoutes);
   app.route("/api/skillextractor", skillExtractorRoutes);
   app.route("/api/tool-runs", toolRunsRoutes);
   app.route("/api/jobs/:jobId/pipeline/share", pipelineShareRoutes);
@@ -567,6 +577,8 @@ export function createApp() {
   app.route("/api/hiring", hiringOnboardingRoutes);
   app.route("/api/performance", performanceRoutes);
   app.route("/api/calendar", calendarRoutes);
+  app.route("/api/events", eventRoutes);
+  app.route("/api/coffee", coffeeRoutes);
   app.route("/api/boards", exclusiveBoardRoutes);
   app.route("/api/community", communityRoutes);
   app.route("/api/analytics", analyticsRoutes);

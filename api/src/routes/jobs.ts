@@ -15,7 +15,10 @@ import { extractPdfText } from "../utils/pdf-extract.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { OptionalUrlSchema } from "../../../shared/validation.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
-import { createScreeningInterviewFromApply } from "../services/interview/screening-from-apply.js";
+import {
+  createScreeningInterviewFromApply,
+  listApplicationsMissingScreening,
+} from "../services/interview/screening-from-apply.js";
 
 // ============================================================================
 // SCHEMAS
@@ -375,6 +378,59 @@ jobRoutes.put("/:id/screening", async (c) => {
   return c.json(success({
     questionSetId: parsed.data.questionSetId,
     screeningRequired: parsed.data.screeningRequired,
+  }));
+});
+
+/** GET /api/Job/:id/screening/backfill-preview — owner-only count of how
+ *  many existing applicants don't yet have a screening row attached. Used
+ *  by [JobScreeningCard] to render "Send screening to N existing applicants"
+ *  when a recruiter attaches a set after the job has been live. */
+jobRoutes.get("/:id/screening/backfill-preview", async (c) => {
+  const jobId = c.req.param("id");
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
+  const missing = await listApplicationsMissingScreening(getDb(), jobId);
+  return c.json(success({ count: missing.length }));
+});
+
+/** POST /api/Job/:id/screening/backfill — owner-only. For every existing
+ *  applicant on this job that doesn't yet have a screening interview
+ *  attached, materialise one via `createScreeningInterviewFromApply` and
+ *  the magic-link emailer. Closes #1236 (late-attach gap). */
+jobRoutes.post("/:id/screening/backfill", async (c) => {
+  const jobId = c.req.param("id");
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
+
+  const db = getDb();
+  const missing = await listApplicationsMissingScreening(db, jobId);
+  if (missing.length === 0) {
+    return c.json(success({ count: 0, created: 0 }));
+  }
+
+  let created = 0;
+  const failures: Array<{ applicationId: string; reason: string }> = [];
+  for (const row of missing) {
+    try {
+      const result = await createScreeningInterviewFromApply(db, {
+        jobId,
+        applicationId: row.applicationId,
+        candidateUserId: row.candidateUserId,
+        candidateEmail: row.candidateEmail ?? "",
+      });
+      if (result) created += 1;
+    } catch (err) {
+      failures.push({
+        applicationId: row.applicationId,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return c.json(success({
+    count: missing.length,
+    created,
+    failures,
   }));
 });
 

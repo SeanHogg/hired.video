@@ -48,18 +48,38 @@ export const RecommendationSeveritySchema = z.enum([
   "minor",
 ]);
 
+/** Registered wand action ids — when the LLM tags a recommendation
+ *  with one of these in `actionId`, the frontend dispatches directly
+ *  to the wand instead of keyword-matching `title + description` in
+ *  `find-wand-for-recommendation.ts` (#374). Keep this list in lockstep
+ *  with the wand registry. */
+export const WAND_ACTION_IDS = [
+  "consolidate_section_highlights",
+  "standardize_resume_dates",
+  "shorten_bullet",
+  "rewrite_summary",
+  "extract_keywords",
+] as const;
+export const WandActionIdSchema = z.enum(WAND_ACTION_IDS);
+export type WandActionId = z.infer<typeof WandActionIdSchema>;
+
 /** Single recommendation — superset of the legacy ScoreRecommendation +
  *  OptimizationSuggestion shapes. `severity` is the canonical name (was
  *  `type` on the optimizer + `category` on the scorer). `category`
  *  carries the diagnostic bucket (ats / keywords / format / content /
  *  impact / structure). `impact` is a free-form weight; numeric for the
- *  scorer (1-10), prose for the optimizer ("High"/"Medium"/"Low"). */
+ *  scorer (1-10), prose for the optimizer ("High"/"Medium"/"Low").
+ *  `actionId` (#374) is the structured dispatch path — when present,
+ *  the resolver maps directly to the wand instead of keyword-matching
+ *  the prose. `actionArgs` carries the wand's input payload. */
 export const ResumeRecommendationSchema = z.object({
   severity: RecommendationSeveritySchema,
   category: z.string(),
   title: z.string(),
   description: z.string(),
   impact: z.union([z.number(), z.string()]).optional(),
+  actionId: WandActionIdSchema.optional(),
+  actionArgs: z.record(z.unknown()).optional(),
 });
 
 /** Merged response from the analysis engine. Every field except scores +

@@ -57,7 +57,7 @@ export default function ChromeExtension() {
   useBreadcrumbs([{ name: "Chrome Extension", url: "/chrome-extension" }]);
   return (
     <AppShell bgClassName="bg-background">
-<main className="pt-16">
+<main>
           {/* Hero */}
           <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-6">
             <div className="max-w-6xl mx-auto text-center">

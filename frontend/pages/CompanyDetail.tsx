@@ -153,7 +153,7 @@ export default function CompanyDetail() {
   if (isLoading) {
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16">
+<div>
             <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
               <div className="max-w-7xl mx-auto">
                 <div className="animate-pulse">
@@ -179,7 +179,7 @@ export default function CompanyDetail() {
   if (error || !company) {
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+<div className="p-6">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-2xl font-bold mb-4">Company Not Found</h1>
               <p className="text-muted-foreground mb-6">

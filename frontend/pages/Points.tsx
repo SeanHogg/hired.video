@@ -18,7 +18,7 @@ export default function PointsPage() {
   if (!user) return <Navigate to="/login" replace />;
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pt-16">
+      <main>
         <div className="container mx-auto max-w-5xl py-8 px-4">
           <PointsHub />
         </div>

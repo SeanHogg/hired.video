@@ -33,7 +33,8 @@ export type CardFeedType =
   | "article"
   | "guide"
   | "tool"
-  | "faq";
+  | "faq"
+  | "event";
 
 export type CardFeedSort = "recent" | "featured" | "top";
 
@@ -88,6 +89,7 @@ const DEFAULT_TYPES: CardFeedType[] = [
   "guide",
   "tool",
   "faq",
+  "event",
 ];
 
 /**
@@ -443,6 +445,61 @@ async function fetchVideos(limit: number, page: number): Promise<TypedFetchResul
   }
 }
 
+async function fetchEvents(
+  limit: number,
+  page: number,
+  geo?: CardFeedOptions["geo"],
+): Promise<TypedFetchResult> {
+  // Pulls upcoming public events from /api/events. Inherits the same
+  // geo + radius filter the rest of unified search uses; sort key is
+  // startAt (events that have already happened don't surface here).
+  try {
+    const params = new URLSearchParams({
+      scope: "upcoming",
+      limit: String(limit),
+      offset: String(Math.max(0, (page - 1) * limit)),
+    });
+    if (geo?.countryId) params.set("countryId", String(geo.countryId));
+    if (geo?.stateId) params.set("stateId", geo.stateId);
+    if (geo?.cityId) params.set("cityId", geo.cityId);
+    if (geo?.radiusKm) params.set("radiusKm", String(geo.radiusKm));
+    const res = await fetch(`/api/events?${params.toString()}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return { items: [], total: 0 };
+    const data: any = await res.json();
+    const list: any[] = data?.data ?? data?.events ?? [];
+    const items = list.map((e: any) => {
+      const item: RawApiItem = {
+        type: "event",
+        id: e.id,
+        slug: e.slug ?? undefined,
+        title: e.title,
+        name: e.title,
+        summary: e.description ?? "",
+        description: e.description ?? "",
+        thumbnail: e.coverImageUrl ?? undefined,
+        category: e.category ?? undefined,
+        eventFormat: e.eventFormat,
+        location: e.location ?? undefined,
+        startAt: e.startAt,
+        endAt: e.endAt,
+        attendeeCount: e.attendeeCount ?? 0,
+        capacity: e.capacity ?? null,
+        href: e.slug ? `/events/${e.slug}` : `/events/${e.id}`,
+        // Sort by startAt — soonest first across the card-feed merge.
+        createdAt: e.startAt,
+        views: 0,
+      } as RawApiItem;
+      return { ...item, sortKey: toSortKey(item) };
+    });
+    return { items, total: list.length };
+  } catch (err) {
+    console.error("card-feed: event fetch failed", err);
+    return { items: [], total: 0 };
+  }
+}
+
 async function fetchPeople(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await userService.getPublicUsers({ page, limit });
@@ -493,6 +550,7 @@ export async function fetchCardFeed(
   if (types.includes("guide")) tasks.push(fetchGuides(limitPerType, page));
   if (types.includes("tool")) tasks.push(fetchTools(limitPerType, page));
   if (types.includes("faq")) tasks.push(fetchFaqs(limitPerType, page));
+  if (types.includes("event")) tasks.push(fetchEvents(limitPerType, page, geo));
 
   const results = await Promise.all(tasks);
   const merged = results.flatMap((r) => r.items);

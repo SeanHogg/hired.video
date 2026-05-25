@@ -49,7 +49,7 @@ export default function TemplateLandingPage(): JSX.Element {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="pt-16">
+      <div>
         {/* Hero */}
         <section className="px-4 py-16 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
           <div className="mx-auto max-w-5xl">

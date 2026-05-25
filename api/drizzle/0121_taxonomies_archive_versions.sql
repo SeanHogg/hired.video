@@ -157,11 +157,18 @@ CREATE INDEX IF NOT EXISTS "idx_resume_information_archived_at_null"
   ON "resume_information" ("user_id")
   WHERE "archived_at" IS NULL;
 
-ALTER TABLE "job_items"
-  ADD COLUMN IF NOT EXISTS "archived_at" timestamptz;
-CREATE INDEX IF NOT EXISTS "idx_job_items_archived_at_null"
-  ON "job_items" ("is_active")
-  WHERE "archived_at" IS NULL;
+-- The matching `job_items.archived_at` add was MOVED OUT of this file
+-- after this migration first deployed. `job_items` had accumulated
+-- > 1600 attribute slots (live + dropped) over the table's lifetime —
+-- see gap #1220 — and Postgres rejected the ADD COLUMN with
+--   "tables can have at most 1600 columns".
+-- The slot-reclamation pass lives in `0122_reclaim_job_items_columns.sql`
+-- (one-shot VACUUM FULL gated by the runner's @once-marker mechanism)
+-- and the actual column add is in `0123_job_items_archived_at.sql`. The
+-- split is purely an ordering concern: 0121 → 0122 (reclaim) → 0123 (add).
+-- Keep the `archivedAt` field in `api/src/db/schema/jobs.ts` — it
+-- continues to be the source of truth for the Drizzle type; the column
+-- arrives via 0123 on first deploy after this change lands.
 
 -- ─── #155 — Resume Version History (mirrors studio_project_versions) ──
 CREATE TABLE IF NOT EXISTS "resume_versions" (

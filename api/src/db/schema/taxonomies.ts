@@ -71,6 +71,35 @@ export type WorkspaceJobType = typeof workspaceJobTypes.$inferSelect;
 export type NewWorkspaceJobType = typeof workspaceJobTypes.$inferInsert;
 
 // ── #238 Sources ───────────────────────────────────────────────────────
+// ── #265 Person-merge review queue + workspace policy ─────────────────
+/** Per-workspace policy for handling duplicate-person reconciliations
+ *  surfaced by BurnRateOS. `auto` merges whenever confidence ≥
+ *  `autoThresholdBps`; `review` always drops the merge into
+ *  `person_merge_queue` for owner approval. */
+export const workspacePersonMergePolicy = pgTable("workspace_person_merge_policy", {
+  workspaceId: uuid("workspace_id").primaryKey(),
+  mode: varchar("mode", { length: 16 }).default("auto").notNull(),
+  autoThresholdBps: integer("auto_threshold_bps").default(9500).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const personMergeQueue = pgTable("person_merge_queue", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id"),
+  ownerUserId: uuid("owner_user_id").notNull(),
+  targetPersonId: uuid("target_person_id").notNull(),
+  sourcePersonId: uuid("source_person_id").notNull(),
+  confidenceBps: integer("confidence_bps").notNull(),
+  /** 'pending' | 'approved' | 'rejected' | 'merged' | 'expired'. */
+  status: varchar("status", { length: 16 }).default("pending").notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedBy: uuid("decided_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type PersonMergeQueueRow = typeof personMergeQueue.$inferSelect;
+export type NewPersonMergeQueueRow = typeof personMergeQueue.$inferInsert;
+export type WorkspacePersonMergePolicy = typeof workspacePersonMergePolicy.$inferSelect;
+
 export const workspaceSources = pgTable("workspace_sources", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id"),

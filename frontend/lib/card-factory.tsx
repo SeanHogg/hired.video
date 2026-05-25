@@ -12,6 +12,7 @@ import PeopleCard from "@/components/PeopleCard";
 import ResumeCard from "@/components/ResumeCard";
 import VideoCard from "@/components/VideoCard";
 import MediaCard from "@/components/MediaCard";
+import { EventCard } from "@/components/EventCard";
 import { OfficialBadge } from "@/components/badges/OfficialBadge";
 
 import {
@@ -265,6 +266,27 @@ export function useCardRenderer({
           );
         }
 
+        case "event": {
+          return (
+            <EventCard
+              key={item.id}
+              id={String(item.id)}
+              slug={(item as any).slug ?? null}
+              title={String(item.title ?? item.name ?? "Event")}
+              description={(item as any).description ?? (item as any).summary ?? null}
+              thumbnail={(item as any).thumbnail ?? null}
+              category={(item as any).category ?? null}
+              eventFormat={(item as any).eventFormat ?? null}
+              location={(item as any).location ?? null}
+              startAt={String((item as any).startAt ?? item.createdAt ?? new Date().toISOString())}
+              endAt={(item as any).endAt ?? null}
+              attendeeCount={(item as any).attendeeCount ?? 0}
+              capacity={(item as any).capacity ?? null}
+              onView={() => interactions.onView?.(item as any)}
+            />
+          );
+        }
+
         default:
           // eslint-disable-next-line no-console
           console.warn(`Unknown card type for item:`, item);
@@ -407,6 +429,27 @@ export function renderCardItem(
         mediaData.id,
       );
 
+    }
+
+    case "event": {
+      return (
+        <EventCard
+          key={String(item.id)}
+          id={String(item.id)}
+          slug={(item as any).slug ?? null}
+          title={String(item.title ?? item.name ?? "Event")}
+          description={(item as any).description ?? (item as any).summary ?? null}
+          thumbnail={(item as any).thumbnail ?? null}
+          category={(item as any).category ?? null}
+          eventFormat={(item as any).eventFormat ?? null}
+          location={(item as any).location ?? null}
+          startAt={String((item as any).startAt ?? item.createdAt ?? new Date().toISOString())}
+          endAt={(item as any).endAt ?? null}
+          attendeeCount={(item as any).attendeeCount ?? 0}
+          capacity={(item as any).capacity ?? null}
+          onView={() => interactions.onView?.(item as any)}
+        />
+      );
     }
 
     default:

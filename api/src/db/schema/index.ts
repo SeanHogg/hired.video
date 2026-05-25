@@ -22,6 +22,8 @@ export * from "./followups.js";
 export * from "./onboarding.js";
 export * from "./performance.js";
 export * from "./calendar.js";
+export * from "./events.js";
+export * from "./coffee.js";
 export * from "./jobboards.js";
 export * from "./jobscraper.js";
 export * from "./studioadvertising.js";

@@ -331,7 +331,7 @@ export default function AffiliateDashboard() {
   useSEO("/affiliate/dashboard");
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pt-16">
+      <main>
         <section className="max-w-6xl mx-auto px-6 py-10 space-y-6">
           <StandaloneHeader />
           <ReferralLinkCard />

@@ -123,6 +123,75 @@ taxonomyRoutes.get("/job-types", async (c) => {
   return c.json(success({ jobTypes: rows }), 200);
 });
 
+// ── #237 — Built-in delete guard middleware ───────────────────────────
+// Cross-cutting: every taxonomy row carrying `is_built_in = true` is
+// owned by the platform (seeded via migration) and MUST NOT be deletable
+// by any caller. The frontend hides the Delete affordance on built-ins;
+// this is the backend backstop so a curl against the public DELETE
+// endpoint still 409s with a clear reason. Applied to every taxonomy
+// table that carries the flag — workspace_tags (#231), workspace_job_types
+// (#232), workspace_sources (#238), and any future taxonomy that ships
+// built-ins.
+//
+// Returns null on success or a 409 Hono Response on denial. Call sites:
+//   const denied = await assertNotBuiltIn(c, workspaceTags, id);
+//   if (denied) return denied;
+async function assertNotBuiltIn(
+  c: any,
+  table: typeof workspaceTags | typeof workspaceJobTypes | typeof workspaceSources,
+  rowId: string,
+): Promise<Response | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ isBuiltIn: (table as any).isBuiltIn })
+    .from(table)
+    .where(eq((table as any).id, rowId))
+    .limit(1);
+  if (!row) {
+    return c.json(error("NOT_FOUND", "Taxonomy row not found"), 404);
+  }
+  if (row.isBuiltIn) {
+    return c.json(
+      error(
+        "BUILT_IN_LOCKED",
+        "This row was seeded by the platform and can't be deleted. Hide it by setting orderIndex out of view if you don't want to use it.",
+      ),
+      409,
+    );
+  }
+  return null;
+}
+
+taxonomyRoutes.delete("/tags/:id", async (c) => {
+  if (!viewerId(c)) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const denied = await assertNotBuiltIn(c, workspaceTags, id);
+  if (denied) return denied;
+  const db = getDb();
+  await db.delete(workspaceTags).where(eq(workspaceTags.id, id));
+  return c.json(success({}), 200);
+});
+
+taxonomyRoutes.delete("/job-types/:id", async (c) => {
+  if (!viewerId(c)) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const denied = await assertNotBuiltIn(c, workspaceJobTypes, id);
+  if (denied) return denied;
+  const db = getDb();
+  await db.delete(workspaceJobTypes).where(eq(workspaceJobTypes.id, id));
+  return c.json(success({}), 200);
+});
+
+taxonomyRoutes.delete("/sources/:id", async (c) => {
+  if (!viewerId(c)) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const denied = await assertNotBuiltIn(c, workspaceSources, id);
+  if (denied) return denied;
+  const db = getDb();
+  await db.delete(workspaceSources).where(eq(workspaceSources.id, id));
+  return c.json(success({}), 200);
+});
+
 // ── Sources ───────────────────────────────────────────────────────────
 taxonomyRoutes.get("/sources", async (c) => {
   if (!viewerId(c)) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);

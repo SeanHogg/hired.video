@@ -42,7 +42,7 @@ export default function ResumeTemplatesGallery() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pt-16 pb-20 max-w-6xl mx-auto px-6">
+      <main className="pb-20 max-w-6xl mx-auto px-6">
         <section className="py-12 space-y-3">
           <h1 className="text-4xl font-bold tracking-tight">Resume Templates</h1>
           <p className="text-lg text-muted-foreground max-w-3xl">

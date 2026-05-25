@@ -294,7 +294,7 @@ export default function CandidateDetail() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16">
+        <div>
           <div className="max-w-6xl mx-auto p-6">
             <ServicesNav />
 

@@ -77,7 +77,7 @@ export default function PostAJob() {
   return (
     <AppShell bgClassName="bg-background">
 
-      <div className="pt-16">
+      <div>
         {/* Hero */}
         <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 py-16 px-4 sm:px-6 lg:px-8">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">

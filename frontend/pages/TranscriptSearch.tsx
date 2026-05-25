@@ -92,7 +92,7 @@ export default function TranscriptSearch() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+<div className="p-6">
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
               <h1 className="text-3xl font-bold flex items-center gap-2">

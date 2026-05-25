@@ -23,7 +23,7 @@ export default function PlaceholderPage({
 }: PlaceholderPageProps) {
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16">
+<div>
           <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto">
               <Card className="border-dashed border-2 border-muted-foreground/30">

@@ -1,22 +1,52 @@
 /**
- * SQL migration runner — applies every drizzle/0*.sql file via the neon
- * HTTP client.
+ * SQL migration runner — applies pending drizzle/0*.sql files via the
+ * neon HTTP client.
  *
- * Split the problem properly:
- *   1. Strip block + line comments (but not comments INSIDE strings).
- *   2. Walk the SQL character by character, tracking when we're inside a
- *      single-quoted string ('...') or a dollar-quoted string ($$...$$ or
- *      $tag$...$tag$). Only top-level semicolons split statements. Earlier
- *      migrations used a naive `split(';')` which shattered:
- *        • Semicolons inside `-- comments` (0022 sentiment_score)
- *        • Semicolons inside `DO $$ BEGIN ... END $$` blocks (0008 voice
- *          clone constraint).
- *      Both silently "passed" CI for weeks.
+ * Statement splitter (`splitSqlStatements`):
+ *   1. Strip block + line comments (but NOT comments inside string
+ *      literals).
+ *   2. Walk character by character tracking single-quoted strings
+ *      (`'...'`) and dollar-quoted strings (`$$...$$` or `$tag$...$tag$`).
+ *      Only top-level semicolons split statements.
+ *   Earlier versions used a naive `split(';')` which shattered:
+ *     • Semicolons inside `-- line comments` (0022 sentiment_score)
+ *     • Semicolons inside `DO $$ BEGIN ... END $$` blocks (0008 voice
+ *       clone constraint)
+ *   Both silently "passed" CI for weeks. Every bug we hit has a
+ *   regression test in run-sql-migrations.test.mjs.
+ *
+ * Applied-migration tracking (gap #1220):
+ *   The runner tracks which migration files have already been applied
+ *   in a runner-owned `_sql_migrations` table. Each file runs at most
+ *   ONCE per database, end of story — no replay, no `IF NOT EXISTS`
+ *   defensive layer needed for correctness on subsequent deploys.
+ *
+ *   A file is recorded as applied only when EVERY statement in it ran
+ *   without error. A partial application is retried on the next deploy
+ *   so the remaining work can complete (this is why the runner doesn't
+ *   abort on the first error in a file — it continues so subsequent
+ *   independent statements still get a chance to land).
+ *
+ *   Transition behaviour: on the first deploy after this change ships,
+ *   `_sql_migrations` is empty so every existing file is treated as
+ *   pending and runs once. Existing migrations are written to be safe
+ *   under replay (most use IF NOT EXISTS / ON CONFLICT DO NOTHING), so
+ *   the transition deploy behaves identically to the previous "replay
+ *   everything" runner. On every deploy after the transition, only
+ *   genuinely-new migrations run.
+ *
+ *   The tracking table is created by the runner — it never appears in
+ *   any migration .sql file and therefore stays invisible to the
+ *   schema-parity test in migration-schema-parity.test.mjs.
  *
  * Error handling:
- *   • "already exists" errors are expected (migrations are idempotent with
- *     IF NOT EXISTS / IF NOT EXISTS semantics).
- *   • Any other error aborts the script with exit code 1 so CI fails loud.
+ *   • "already exists" errors are tolerated and counted as `skip` —
+ *     legacy migrations exist where two paths could create the same
+ *     object and the second arrival is genuinely a no-op.
+ *   • Any other error from any statement increments the per-file `err`
+ *     count and prevents the file from being recorded as applied. If
+ *     any file finishes with err > 0, the runner exits 1 so CI fails
+ *     loud.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -140,7 +170,31 @@ export function splitSqlStatements(sqlText) {
   return statements;
 }
 
-async function runFile(sql, path) {
+/** Ensure the runner's tracking table exists. Idempotent — safe to call
+ *  on every invocation. The table lives in the public schema and is
+ *  intentionally underscore-prefixed so it sorts away from product
+ *  tables in any pg_dump or admin tool.
+ */
+async function ensureMigrationsTable(sql) {
+  await sql(`CREATE TABLE IF NOT EXISTS "_sql_migrations" (
+    "name"       text PRIMARY KEY,
+    "applied_at" timestamptz NOT NULL DEFAULT now()
+  )`);
+}
+
+/** Load the set of migration filenames already applied to this database.
+ *  Returned as a Set<string> so the runner can do O(1) `has()` checks.
+ */
+async function loadAppliedSet(sql) {
+  const rows = await sql(`SELECT "name" FROM "_sql_migrations"`);
+  return new Set(rows.map((r) => r.name));
+}
+
+async function recordApplied(sql, name) {
+  await sql`INSERT INTO "_sql_migrations" ("name") VALUES (${name}) ON CONFLICT DO NOTHING`;
+}
+
+async function runFile(sql, name, path) {
   const raw = readFileSync(path, "utf8");
   const stmts = splitSqlStatements(raw);
   let ok = 0, skip = 0, err = 0;
@@ -159,7 +213,17 @@ async function runFile(sql, path) {
       }
     }
   }
-  console.log(`${path}: ${ok} applied, ${skip} already existed, ${err} errors`);
+  // A file is only marked applied when every statement ran cleanly.
+  // Partial applications stay pending so the next deploy retries the
+  // tail. Idempotent statements (CREATE … IF NOT EXISTS, ALTER … ADD
+  // COLUMN IF NOT EXISTS, INSERT … ON CONFLICT DO NOTHING) safely
+  // re-execute their already-landed half on the retry.
+  if (err === 0) {
+    await recordApplied(sql, name);
+    console.log(`${path}: ${ok} applied, ${skip} already existed, 0 errors → recorded`);
+  } else {
+    console.log(`${path}: ${ok} applied, ${skip} already existed, ${err} errors`);
+  }
   return err;
 }
 
@@ -170,15 +234,25 @@ async function main() {
     process.exit(1);
   }
   const sql = neon(url);
+  await ensureMigrationsTable(sql);
+  const applied = await loadAppliedSet(sql);
 
   const files = readdirSync(DRIZZLE_DIR)
     .filter((f) => /^0\d+.*\.sql$/.test(f))
     .sort();
 
   let totalErr = 0;
+  let skippedFiles = 0;
   for (const f of files) {
-    const errs = await runFile(sql, join(DRIZZLE_DIR, f));
+    if (applied.has(f)) {
+      skippedFiles++;
+      continue;
+    }
+    const errs = await runFile(sql, f, join(DRIZZLE_DIR, f));
     totalErr += errs;
+  }
+  if (skippedFiles > 0) {
+    console.log(`\n${skippedFiles} migration file(s) skipped (already applied per _sql_migrations).`);
   }
 
   if (totalErr > 0) {

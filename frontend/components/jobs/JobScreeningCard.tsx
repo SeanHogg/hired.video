@@ -27,11 +27,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Sparkles, Video } from "lucide-react";
+import { Loader2, Plus, Send, Sparkles, Video } from "lucide-react";
 import { toast } from "sonner";
 import {
   getJobScreening,
+  getJobScreeningBackfillPreview,
   listQuestionSets,
+  runJobScreeningBackfill,
   setJobScreening,
   type InterviewQuestionSet,
   type JobScreeningConfig,
@@ -52,6 +54,17 @@ export function JobScreeningCard({ jobId, jobTitle }: JobScreeningCardProps) {
   const [saving, setSaving] = useState(false);
   const [selectedSetId, setSelectedSetId] = useState<string>("");
   const [requirement, setRequirement] = useState<ScreeningRequirement>("none");
+  // #1236: late-attach backfill. Populated once the job has a set attached;
+  // shows the count of existing applicants without a screening row + a
+  // "send to all" button.
+  const [backfillCount, setBackfillCount] = useState<number | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
+
+  function refreshBackfill() {
+    getJobScreeningBackfillPreview(jobId)
+      .then((p) => setBackfillCount(p.count))
+      .catch(() => setBackfillCount(null));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +83,34 @@ export function JobScreeningCard({ jobId, jobTitle }: JobScreeningCardProps) {
       cancelled = true;
     };
   }, [jobId]);
+
+  // Refresh the backfill count whenever the persisted config says screening
+  // is attached. (Local edits-in-progress don't trigger this — the count
+  // only matters once the user has saved.)
+  useEffect(() => {
+    if (config?.questionSetId && config.screeningRequired !== "none") {
+      refreshBackfill();
+    } else {
+      setBackfillCount(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.questionSetId, config?.screeningRequired]);
+
+  async function handleBackfill() {
+    setBackfilling(true);
+    try {
+      const result = await runJobScreeningBackfill(jobId);
+      toast.success(
+        `Backfilled ${result.created}/${result.count} applicants` +
+          (result.failures.length > 0 ? ` · ${result.failures.length} failed` : ""),
+      );
+      setBackfillCount(0);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Backfill failed");
+    } finally {
+      setBackfilling(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -204,6 +245,28 @@ export function JobScreeningCard({ jobId, jobTitle }: JobScreeningCardProps) {
             Save screening
           </Button>
         </div>
+
+        {/* #1236 — backfill bar surfaces when screening is attached AND
+            there are existing applicants without a screening row. */}
+        {backfillCount !== null && backfillCount > 0 && (
+          <Alert>
+            <AlertDescription className="flex items-center justify-between gap-2">
+              <span>
+                {backfillCount} existing applicant{backfillCount === 1 ? "" : "s"} applied
+                before screening was attached.
+              </span>
+              <Button
+                size="sm"
+                onClick={handleBackfill}
+                disabled={backfilling}
+                className="gap-1 shrink-0"
+              >
+                {backfilling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Send screening to all
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );

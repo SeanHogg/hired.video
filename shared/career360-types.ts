@@ -42,12 +42,50 @@ export type GapCategory =
   | "outreach"
   | "salary";
 
+// #527 — LLMs occasionally case-mangle the category ("Profile" instead
+// of "profile") or use a synonym ("certs" instead of "certifications").
+// Snap to the canonical 8-value enum BEFORE the zod check so the whole
+// plan response doesn't get rejected on a cosmetic case mismatch. Any
+// value that doesn't normalize cleanly falls through and the enum check
+// rejects it as before.
+const CATEGORY_CANONICAL = new Set([
+  "profile",
+  "resume",
+  "skills",
+  "experience",
+  "certifications",
+  "narrative",
+  "outreach",
+  "salary",
+]);
+const CATEGORY_SYNONYMS: Record<string, string> = {
+  cert: "certifications",
+  certs: "certifications",
+  certification: "certifications",
+  cv: "resume",
+  cv_resume: "resume",
+  skill: "skills",
+  story: "narrative",
+  branding: "narrative",
+  network: "outreach",
+  networking: "outreach",
+  compensation: "salary",
+  pay: "salary",
+  bio: "profile",
+};
+function normalizeGapCategory(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const lower = value.trim().toLowerCase().replace(/\s+/g, "_");
+  if (CATEGORY_CANONICAL.has(lower)) return lower;
+  return CATEGORY_SYNONYMS[lower] ?? value;
+}
+
 export const GapSchema = z.object({
   // Server-stamped on inbound; see Career360Service.selectTarget.
   // Defaulted to "" so a missing id from the LLM doesn't reject the
   // whole response; persisted shape always carries a real id.
   id: z.string().default(""),
-  category: z.enum([
+  category: z.preprocess(normalizeGapCategory, z.enum([
     "profile",
     "resume",
     "skills",
@@ -56,7 +94,7 @@ export const GapSchema = z.object({
     "narrative",
     "outreach",
     "salary",
-  ]),
+  ])),
   severity: z.enum(["low", "medium", "high"]),
   /** Short user-facing label — "No AWS Solutions Architect cert". */
   label: z.string().min(1).max(160),

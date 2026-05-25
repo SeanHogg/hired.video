@@ -107,7 +107,7 @@ export default function SectorLanding() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pt-16 pb-20">
+      <main className="pb-20">
         {/* Hero */}
         <section className="max-w-6xl mx-auto px-6 py-12">
           <div className="space-y-4">

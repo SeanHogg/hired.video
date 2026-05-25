@@ -42,6 +42,7 @@ export default function Footer() {
               <li><Link to="/jobs" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.jobBoard")}</Link></li>
               <li><Link to="/companies" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.forCompanies")}</Link></li>
               <li><Link to="/affiliate-program" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.affiliateProgram")}</Link></li>
+              <li><Link to="/articles" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.articles", "Articles")}</Link></li>
               <li><Link to="/blog" className="text-muted-foreground hover:text-foreground transition-colors">{t("labels.blog")}</Link></li>
             </ul>
           </div>

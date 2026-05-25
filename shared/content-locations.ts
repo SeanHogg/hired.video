@@ -27,6 +27,7 @@ export const CONTENT_LOCATION_KINDS = [
   "talent_pool_candidate",
   "user_profile",
   "company",
+  "event",
 ] as const;
 export type ContentLocationKind = (typeof CONTENT_LOCATION_KINDS)[number];
 

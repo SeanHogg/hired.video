@@ -556,7 +556,7 @@ export default function Competitors() {
 
   return (
     <AppShell bgClassName="bg-background">
-<main className="pt-16">
+<main>
           {/* Hero */}
           <section className="bg-gradient-to-br from-brand-purple/5 via-background to-brand-blue/5 py-16 px-4 sm:px-6 lg:px-8">
             <div className="max-w-6xl mx-auto text-center">

@@ -96,7 +96,7 @@ export default function Contact() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16">
+<div>
           {/* Hero Section */}
           <section className="bg-gradient-to-br from-primary/5 via-background to-secondary/5 py-20">
             <div className="max-w-6xl mx-auto px-6">

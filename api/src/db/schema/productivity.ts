@@ -37,9 +37,32 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   labels: jsonb("labels").default([]),
   metadata: jsonb("metadata"),
+  // Back-reference to the scheduled_event that created this task (coffee
+  // acceptance creates one). Cascading SET NULL on event delete so the
+  // task survives an event cancellation as a manual follow-up.
+  sourceEventId: uuid("source_event_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
+
+// Shared task participants — N-user accountability on a task. The task's
+// own `userId` is the owner; rows here are additional collaborators.
+// Both owner and any 'participant' row may mark the task complete.
+// Coffee acceptance writes one row here with role='participant' so the
+// recipient sees the meetup on their Tasks tab too.
+export const sharedTaskParticipants = pgTable("shared_task_participants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 16 }).default("participant").notNull(), // participant | viewer
+  addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SharedTaskParticipant = typeof sharedTaskParticipants.$inferSelect;
+export type NewSharedTaskParticipant = typeof sharedTaskParticipants.$inferInsert;

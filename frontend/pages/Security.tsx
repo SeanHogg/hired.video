@@ -415,7 +415,7 @@ export default function Security() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16">
+<div>
           {/* Hero */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
             <div className="max-w-5xl mx-auto text-center">

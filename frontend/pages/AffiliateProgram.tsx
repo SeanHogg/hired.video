@@ -61,7 +61,7 @@ export default function AffiliateProgram() {
 
   return (
     <AppShell bgClassName="bg-background">
-<main className="pt-16">
+<main>
           {/* Hero */}
           <section className="max-w-6xl mx-auto px-6 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">

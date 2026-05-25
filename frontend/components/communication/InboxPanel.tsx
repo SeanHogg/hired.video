@@ -242,6 +242,18 @@ function InboxRow({
           {item.preview}
         </p>
 
+        {/* #539 — when an external email is linked to a job, surface
+            "→ Senior Engineer at Acme" below the preview so the user
+            sees WHICH job an email is bound to without clicking through.
+            Hidden when the dto didn't carry a title (linkedJob deleted,
+            or older row from before the join landed). */}
+        {item.kind === "external_email" && item.linkedJobTitle && (
+          <p className="text-xs text-emerald-700 mt-1 truncate">
+            → {item.linkedJobTitle}
+            {item.linkedJobCompany ? ` at ${item.linkedJobCompany}` : ""}
+          </p>
+        )}
+
         <p className="text-xs text-muted-foreground mt-1">
           {safeRelativeTime(item.timestamp)}
         </p>

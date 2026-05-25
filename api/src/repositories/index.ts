@@ -110,6 +110,10 @@ export interface Repos {
   contentLocations: IContentLocationsRepository;
   // persistent cache for Mapbox geocoder calls (forward + reverse)
   geocoderCache: IGeocoderCacheRepository;
+  // public events + coffee meetups (migration 0122 / gaps #1236-#1242)
+  events: IEventsRepository;
+  // "Grab a coffee" proposal/accept flow + shared task participants
+  coffeeRequests: ICoffeeRequestsRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -142,6 +146,8 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     points: new PointsRepository(db, now),
     contentLocations: new ContentLocationsRepository(db, now),
     geocoderCache: new GeocoderCacheRepository(db, now),
+    events: new EventsRepository(db, now),
+    coffeeRequests: new CoffeeRequestsRepository(db, now),
   };
 }
 
@@ -177,6 +183,8 @@ export type {
   IPointsRepository,
   IContentLocationsRepository,
   IGeocoderCacheRepository,
+  IEventsRepository,
+  ICoffeeRequestsRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
@@ -219,3 +227,27 @@ export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";
 export type { StudioTemplateRow, StudioTemplateInsert, StudioTemplatePatch, TemplateLicenseRow, TemplateLicenseInsert, TemplateKind, CreatorTemplateEarningsRow, LicensedStudioTemplateRow } from "./studioTemplatesRepository.js";
 export type { PointsBalanceRow, PointsLedgerRow, PointsLedgerInsert, PointsCountersRow, PointsStreakRow, PointsFraudFlagRow, PointsFraudFlagInsert, BadgeRow, UserBadgeRow, UserBadgeInsert } from "./pointsRepository.js";
+export type {
+  EventRow,
+  EventInsert,
+  EventPatch,
+  EventAttendeeRow,
+  EventAttendeeInsert,
+  EventCoHostRow,
+  EventCoHostInsert,
+  EventWaitlistRow,
+  EventWaitlistInsert,
+  EventReminderSentRow,
+  EventReminderSentInsert,
+  EventMatchmakingRow,
+  EventMatchmakingInsert,
+  EventCategoryRow,
+  EventSearchOptions,
+} from "./eventsRepository.js";
+export type {
+  CoffeeRequestRow,
+  CoffeeRequestInsert,
+  CoffeeRequestPatch,
+  SharedTaskParticipantRow,
+  SharedTaskParticipantInsert,
+} from "./coffeeRequestsRepository.js";

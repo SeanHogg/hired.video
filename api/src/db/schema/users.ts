@@ -89,6 +89,13 @@ export const users = pgTable("users", {
    *  webhook and lands in this user's talent pool. Null = the user has
    *  not opted in to forwarding yet. */
   resumeForwardingSlug: varchar("resume_forwarding_slug", { length: 48 }),
+  /** Durable URL of the candidate's master 60-second video pitch
+   *  produced by the Video Pitch Lab tool (#1237 / migration 0124). One
+   *  per user; re-recording overwrites. Surfaces on the public profile,
+   *  application autofill, and the recruiter inbox so candidates don't
+   *  have to re-upload the same pitch into every application. */
+  videoPitchUrl: text("video_pitch_url"),
+  videoPitchSetAt: timestamp("video_pitch_set_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

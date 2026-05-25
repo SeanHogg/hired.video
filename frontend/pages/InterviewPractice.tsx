@@ -738,7 +738,7 @@ function ResultsStep({
 
 function Landing() {
   return (
-    <div className="pt-16">
+    <div>
       <div className="max-w-6xl mx-auto px-4 py-16">
 
         {/* Hero */}
@@ -1137,7 +1137,7 @@ export default function InterviewPractice() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <div className="pt-16">
+        <div>
         <div className="max-w-4xl mx-auto px-4 py-8">
           {step === "setup" && (
             <SetupStep onStart={generateQuestions} loading={loading} />

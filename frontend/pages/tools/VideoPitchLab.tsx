@@ -14,7 +14,7 @@
 //      hand off to AI Coach for written feedback against the same rubric
 //      the recruiter sees.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -23,7 +23,9 @@ import {
   Loader2,
   MessageSquare,
   Mic,
+  Save,
   Sparkles,
+  Star,
   Video,
 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
@@ -42,7 +44,11 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
-import { generatePitchScript } from "@/lib/services/video-pitch-service";
+import {
+  generatePitchScript,
+  getPitchProfile,
+  setPitchProfile,
+} from "@/lib/services/video-pitch-service";
 import WebcamRecorderWithUpload from "@/components/studio/WebcamRecorderWithUpload";
 import { toast } from "sonner";
 
@@ -58,6 +64,39 @@ export default function VideoPitchLab() {
   const [generating, setGenerating] = useState(false);
   const [step, setStep] = useState<"setup" | "record" | "review">("setup");
   const [recording, setRecording] = useState<{ url: string; durationSec: number } | null>(null);
+  // Saved profile pitch URL (#1237). Hydrated from the API on mount so a
+  // returning user sees "your current pitch" rather than starting fresh.
+  const [savedPitchUrl, setSavedPitchUrl] = useState<string | null>(null);
+  const [savingPitch, setSavingPitch] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    getPitchProfile()
+      .then((p) => {
+        if (!cancelled) setSavedPitchUrl(p.videoPitchUrl);
+      })
+      .catch(() => {
+        /* silent — feature still works without the saved one */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  async function handleSaveAsProfilePitch() {
+    if (!recording?.url) return;
+    setSavingPitch(true);
+    try {
+      const next = await setPitchProfile(recording.url);
+      setSavedPitchUrl(next.videoPitchUrl);
+      toast.success("Saved as your profile pitch — recruiters will see it on your profile");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSavingPitch(false);
+    }
+  }
 
   const { data: resumes = [] } = useQuery({
     queryKey: ["resumes"],
@@ -242,6 +281,18 @@ export default function VideoPitchLab() {
                 preload="metadata"
               />
               <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleSaveAsProfilePitch}
+                  disabled={savingPitch || savedPitchUrl === recording.url}
+                  className="gap-1"
+                >
+                  {savingPitch ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  {savedPitchUrl === recording.url
+                    ? "Saved as your profile pitch"
+                    : savedPitchUrl
+                      ? "Replace profile pitch with this one"
+                      : "Save as my profile pitch"}
+                </Button>
                 <Button onClick={handleCopyUrl} variant="outline" className="gap-1">
                   <Copy className="h-3.5 w-3.5" />
                   Copy pitch URL
@@ -259,6 +310,14 @@ export default function VideoPitchLab() {
                   <Link to="/interview-assignments">View interview assignments</Link>
                 </Button>
               </div>
+              {savedPitchUrl && savedPitchUrl !== recording.url && (
+                <Alert>
+                  <AlertDescription className="text-xs flex items-center gap-2">
+                    <Star className="h-3.5 w-3.5 text-amber-500" />
+                    You already have a profile pitch saved. Saving this one replaces it.
+                  </AlertDescription>
+                </Alert>
+              )}
               <Alert>
                 <AlertDescription className="text-xs">
                   Paste the URL above into any job application, your public profile, or a recruiter

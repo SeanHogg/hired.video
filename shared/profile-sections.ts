@@ -36,6 +36,12 @@ export const PROFILE_SECTION_KEYS = [
   "opportunityPreferences",
   "additionalInfo",
   "profileVideos",
+  // Networking-side sections. `openToCoffee` gates the discoverable
+  // "Grab a coffee" CTA on /people/[id] AND the user's pin visibility
+  // on the /map page. Opt-in by default for job_seekers (they're the
+  // primary networking audience) and opt-OUT for hiring-side accounts
+  // (recruiters/employers prefer their existing Connect/Message CTAs).
+  "openToCoffee",
 ] as const;
 
 export type ProfileSectionKey = (typeof PROFILE_SECTION_KEYS)[number];
@@ -55,6 +61,7 @@ const JOB_SEEKER_DEFAULTS: ProfileSections = {
   opportunityPreferences: true,
   additionalInfo: true,
   profileVideos: true,
+  openToCoffee: true,
 };
 
 // Recruiters and employers hide candidate-only sections by default but
@@ -72,6 +79,7 @@ const HIRING_SIDE_DEFAULTS: ProfileSections = {
   opportunityPreferences: false,
   additionalInfo: true,
   profileVideos: true,
+  openToCoffee: false,
 };
 
 export function getDefaultProfileSections(role: string | null | undefined): ProfileSections {
@@ -158,6 +166,10 @@ export const PROFILE_SECTION_I18N: Record<
   profileVideos: {
     label: "settings.profileSections.profileVideos.label",
     description: "settings.profileSections.profileVideos.desc",
+  },
+  openToCoffee: {
+    label: "settings.profileSections.openToCoffee.label",
+    description: "settings.profileSections.openToCoffee.desc",
   },
 };
 

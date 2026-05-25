@@ -294,7 +294,7 @@ export default function ServicesManagement() {
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-          <div className="pt-16">
+          <div>
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero */}
               <div className="text-center mb-16">
@@ -446,7 +446,7 @@ export default function ServicesManagement() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <div className="pt-16">
+        <div>
         <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
           <ServicesNav />

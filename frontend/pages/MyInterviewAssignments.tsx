@@ -5,7 +5,7 @@
 // Detail view is reached at /interview-assignments/:id.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -29,8 +29,10 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/lib/auth";
 import {
+  compareInterviews,
   getInterviewReport,
   listMyInterviewAssignments,
   resendInterviewInvite,
@@ -42,6 +44,11 @@ import {
   type AssignmentResponse,
   type InterviewDecision,
 } from "@/lib/services/interview-assignments-service";
+import {
+  buildInterviewCompareHref,
+  parseCompareIds,
+  toggleCompareSelection,
+} from "@/lib/interview-compare-href";
 import { toast } from "sonner";
 
 function StatusBadge({ status }: { status: string }) {
@@ -59,16 +66,32 @@ function InterviewRow({
   row,
   perspective,
   onResend,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   row: InterviewAssignmentRow;
   perspective: "creator" | "candidate";
   onResend?: (id: string) => void;
+  /** When true, render a leading checkbox for the multi-select compare flow. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   return (
     <Card>
       <CardContent className="pt-4 pb-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 flex items-start gap-3">
+            {selectable && (
+              <Checkbox
+                checked={!!selected}
+                onCheckedChange={() => onToggleSelect?.(row.id)}
+                className="mt-1"
+                aria-label={`Compare ${row.title}`}
+              />
+            )}
+            <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <Link to={`/interview-assignments/${row.id}`} className="font-medium text-sm hover:underline">
                 {row.title}
@@ -98,6 +121,7 @@ function InterviewRow({
               )}
               {row.resendCount > 0 && <span>Resent {row.resendCount}×</span>}
             </div>
+            </div>
           </div>
           <div className="flex gap-2 shrink-0">
             {perspective === "creator" && onResend && (
@@ -125,10 +149,26 @@ function InterviewRow({
 }
 
 function ListView() {
+  const navigate = useNavigate();
   const [createdByMe, setCreatedByMe] = useState<InterviewAssignmentRow[]>([]);
   const [assignedToMe, setAssignedToMe] = useState<InterviewAssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Multi-select state for the creator-side compare flow (#1235). Only
+   *  rows in `createdByMe` are selectable — recruiters compare candidates
+   *  they assigned, not interviews assigned to themselves. */
+  const [selected, setSelected] = useState<string[]>([]);
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = toggleCompareSelection(prev, id);
+      if (next.length === prev.length && !prev.includes(id)) {
+        // Cap reached.
+        toast.error("Compare up to 6 interviews at once");
+      }
+      return next;
+    });
+  }
 
   async function refresh() {
     setLoading(true);
@@ -185,13 +225,41 @@ function ListView() {
 
       {createdByMe.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Send className="h-4 w-4" />
-            Sent by me
-          </h2>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              Sent by me
+            </h2>
+            {createdByMe.length >= 2 && (
+              <span className="text-xs text-muted-foreground">
+                Tick 2&ndash;6 to compare side&#8209;by&#8209;side
+              </span>
+            )}
+          </div>
           {createdByMe.map((row) => (
-            <InterviewRow key={row.id} row={row} perspective="creator" onResend={handleResend} />
+            <InterviewRow
+              key={row.id}
+              row={row}
+              perspective="creator"
+              onResend={handleResend}
+              selectable={createdByMe.length >= 2}
+              selected={selected.includes(row.id)}
+              onToggleSelect={toggleSelected}
+            />
           ))}
+          {selected.length >= 2 && (
+            <div className="sticky bottom-4 z-10 mt-4 flex items-center justify-between gap-2 rounded-md border bg-background/95 backdrop-blur p-3 shadow">
+              <span className="text-sm font-medium">{selected.length} selected</span>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setSelected([])}>
+                  Clear
+                </Button>
+                <Button size="sm" onClick={() => navigate(buildInterviewCompareHref(selected))}>
+                  Compare {selected.length}
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -652,10 +720,112 @@ function DecisionBadge({ decision }: { decision: InterviewDecision }) {
   return <Badge className={styles[decision]}>{decision}</Badge>;
 }
 
+// ─── Compare view (#1235) ──────────────────────────────────────────────────
+
+function CompareView({ ids }: { ids: string[] }) {
+  const [data, setData] = useState<Awaited<ReturnType<typeof compareInterviews>> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    compareInterviews(ids)
+      .then(setData)
+      .catch((err) => setError(err?.message ?? "Could not load comparison"))
+      .finally(() => setLoading(false));
+  }, [ids.join(",")]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (error || !data) {
+    return <Alert variant="destructive"><AlertDescription>{error ?? "No data"}</AlertDescription></Alert>;
+  }
+  return (
+    <div className="space-y-4">
+      <Button asChild variant="ghost" size="sm">
+        <Link to="/interview-assignments">
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back to assignments
+        </Link>
+      </Button>
+      <div className="overflow-x-auto">
+        <div
+          className="grid gap-4 min-w-fit"
+          style={{ gridTemplateColumns: `repeat(${data.interviews.length}, minmax(260px, 1fr))` }}
+        >
+          {data.interviews.map(({ interview, responses }) => (
+            <Card key={interview.id} className="min-w-[260px]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1">{interview.title}</span>
+                  <StatusBadge status={interview.status} />
+                </CardTitle>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {interview.decision && <DecisionBadge decision={interview.decision} />}
+                  {typeof interview.aiOverallScore === "number" && (
+                    <Badge className="bg-purple-100 text-purple-800 text-[10px]">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      {interview.aiOverallScore.toFixed(1)}/10
+                    </Badge>
+                  )}
+                </div>
+                {interview.candidateEmail && (
+                  <p className="text-xs text-muted-foreground mt-1">{interview.candidateEmail}</p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {responses.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No answers yet.</p>
+                ) : (
+                  responses.map((r, i) => (
+                    <div key={r.id} className="border-t pt-2 first:border-t-0 first:pt-0">
+                      <div className="text-xs font-medium">Q{i + 1}</div>
+                      {typeof r.aiScore === "number" ? (
+                        <Badge className="bg-purple-100 text-purple-800 text-[10px]">
+                          AI {r.aiScore.toFixed(1)}
+                        </Badge>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground italic">Not scored</span>
+                      )}
+                      {r.aiSummary && (
+                        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-3">{r.aiSummary}</p>
+                      )}
+                    </div>
+                  ))
+                )}
+                <Link
+                  to={`/interview-assignments/${interview.id}`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Open full review →
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MyInterviewAssignments() {
   const { isAuthenticated } = useAuth();
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const compareIds = useMemo(
+    () => parseCompareIds(searchParams.get("ids")),
+    [searchParams],
+  );
+  // The compare route lives at /interview-assignments/compare. React-Router
+  // resolves it via the same component as the list view; we branch on the
+  // `:id` param string.
+  const isCompareRoute = id === "compare";
 
   useEffect(() => {
     if (!isAuthenticated) navigate("/login?next=/interview-assignments");
@@ -663,17 +833,36 @@ export default function MyInterviewAssignments() {
 
   return (
     <AppShell>
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
-          <h1 className="text-2xl font-bold">Interview assignments</h1>
-          <Button asChild variant="outline">
-            <Link to="/tools/interview-questions">
-              <Copy className="h-4 w-4 mr-1.5" />
-              New question set
-            </Link>
-          </Button>
+          <h1 className="text-2xl font-bold">
+            {isCompareRoute ? "Compare interviews" : "Interview assignments"}
+          </h1>
+          {!isCompareRoute && (
+            <Button asChild variant="outline">
+              <Link to="/tools/interview-questions">
+                <Copy className="h-4 w-4 mr-1.5" />
+                New question set
+              </Link>
+            </Button>
+          )}
         </div>
-        {id ? <DetailView id={id} /> : <ListView />}
+        {isCompareRoute ? (
+          compareIds.length >= 2 ? (
+            <CompareView ids={compareIds} />
+          ) : (
+            <Alert>
+              <AlertDescription>
+                Pick 2 to 6 interviews from{" "}
+                <Link to="/interview-assignments" className="underline">your list</Link> to compare.
+              </AlertDescription>
+            </Alert>
+          )
+        ) : id ? (
+          <DetailView id={id} />
+        ) : (
+          <ListView />
+        )}
       </div>
     </AppShell>
   );

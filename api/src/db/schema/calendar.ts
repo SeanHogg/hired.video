@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   jsonb,
+  integer,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { oauthConnectionColumns } from "./studiofeatures.js";
@@ -38,7 +39,15 @@ export const calendarConnections = pgTable("calendar_connections", {
 export type CalendarConnection = typeof calendarConnections.$inferSelect;
 export type NewCalendarConnection = typeof calendarConnections.$inferInsert;
 
-// Scheduled events (interviews, meetings) linked to calendar
+// Scheduled events — discriminated by `type`.
+//   'interview' | 'meeting' | 'review' | 'other' — private calendar items
+//     keep using the legacy JSONB `attendees` field; interview booking
+//     flow in calendar.ts route is unchanged.
+//   'event'  → public/unlisted/private discoverable events (see /events).
+//   'coffee' → 1:1 coffee meetup created on a coffee_request accept.
+// Only rows with type IN ('event','coffee') populate the relational
+// `event_attendees` / `event_co_hosts` / `event_waitlist` tables in
+// schema/events.ts. See migration 0122 for the design rationale.
 export const scheduledEvents = pgTable("scheduled_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -51,13 +60,32 @@ export const scheduledEvents = pgTable("scheduled_events", {
   timezone: varchar("timezone", { length: 100 }).default("UTC"),
   location: text("location"),
   meetingUrl: text("meeting_url"), // Zoom, Meet, Teams link
-  type: varchar("type", { length: 50 }).default("interview").notNull(), // interview | meeting | review | other
-  relatedEntityType: varchar("related_entity_type", { length: 50 }), // job | application | candidate
+  type: varchar("type", { length: 50 }).default("interview").notNull(), // interview | meeting | review | other | event | coffee
+  relatedEntityType: varchar("related_entity_type", { length: 50 }), // job | application | candidate | event_host
   relatedEntityId: uuid("related_entity_id"),
-  attendees: jsonb("attendees").default([]), // [{email, name, status}]
+  attendees: jsonb("attendees").default([]), // legacy JSONB — kept for interview/meeting/review/other only
   status: varchar("status", { length: 50 }).default("confirmed").notNull(), // confirmed | tentative | cancelled
   reminderMinutes: jsonb("reminder_minutes").default([30, 1440]), // reminder offsets
   syncedToCalendar: boolean("synced_to_calendar").default(false).notNull(),
+  // ─── Public event columns (migration 0122 / gap #1236) ───────────────
+  // Defaulted to 'private' so existing calendar rows keep their semantics.
+  visibility: varchar("visibility", { length: 16 }).default("private").notNull(), // private | unlisted | public
+  hostUserId: uuid("host_user_id").references(() => users.id, { onDelete: "cascade" }),
+  coverImageUrl: text("cover_image_url"),
+  capacity: integer("capacity"),
+  category: varchar("category", { length: 48 }), // event_categories.slug
+  allowsPlusOnes: boolean("allows_plus_ones").default(false).notNull(),
+  requiresApproval: boolean("requires_approval").default(false).notNull(),
+  eventFormat: varchar("event_format", { length: 16 }).default("in_person").notNull(), // in_person | remote | hybrid
+  videoProvider: varchar("video_provider", { length: 16 }), // zoom | meet | teams | other
+  seriesId: uuid("series_id"),
+  slug: varchar("slug", { length: 80 }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  attendeeCount: integer("attendee_count").default(0).notNull(),
+  waitlistCount: integer("waitlist_count").default(0).notNull(),
+  registrationQuestions: jsonb("registration_questions"), // [{key, label, type, required}]
+  matchmakingEnabled: boolean("matchmaking_enabled").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

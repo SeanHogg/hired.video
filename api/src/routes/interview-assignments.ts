@@ -39,11 +39,13 @@ import { extractSkills, type SkillExtractInput, type Skill } from "../services/r
 import { parsedJobFromRow } from "../services/job/match-handlers.js";
 import { generateQuestionsFromSkills, type GeneratedQuestion } from "../services/interview/question-generator.js";
 import { scoreAnswer, aggregateScores } from "../services/interview/answer-scorer.js";
+import { mapDecisionToApplicationStatus } from "../services/interview/decision-status-map.js";
+import { transcribeResponseInBackground } from "../services/interview/transcribe-response.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import type { ResumeContent } from "../../../shared/resume.js";
 
-const { studioAsyncInterviews, studioAsyncResponses, users } = schema;
+const { studioAsyncInterviews, studioAsyncResponses, users, jobApplications } = schema;
 
 export const interviewAssignmentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 interviewAssignmentRoutes.use("*", attachTokenBudget());
@@ -637,6 +639,17 @@ interviewAssignmentRoutes.post("/:id/respond", async (c) => {
     .set({ status: "in_progress", updatedAt: new Date() } as any)
     .where(eq(studioAsyncInterviews.id, id));
 
+  // #1238: fire-and-forget transcription on video responses. Caller never
+  // waits; recruiter polls `transcriptionStatus` on the row to know.
+  if (parsed.data.responseMode === "video" && saved.videoUrl) {
+    transcribeResponseInBackground(
+      c.env,
+      db,
+      { responseId: saved.id, videoUrl: saved.videoUrl },
+      c.executionCtx?.waitUntil?.bind(c.executionCtx),
+    );
+  }
+
   return c.json(ok(saved), 201);
 });
 
@@ -992,6 +1005,20 @@ interviewAssignmentRoutes.post("/:id/decision", async (c) => {
     } as any)
     .where(eq(studioAsyncInterviews.id, id))
     .returning();
+
+  // #1234: propagate the decision to the linked job_application row so the
+  // pipeline view + recruiter dashboards reflect the screening outcome
+  // without a second click. No-op when the interview was created ad-hoc
+  // (assignment_type='assign' from the tool) and has no application_id.
+  if (interview.applicationId) {
+    await db
+      .update(jobApplications)
+      .set({
+        status: mapDecisionToApplicationStatus(parsed.data.decision),
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(jobApplications.id, interview.applicationId));
+  }
 
   return c.json(ok(updated));
 });

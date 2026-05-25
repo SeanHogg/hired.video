@@ -1,0 +1,142 @@
+/**
+ * Tests for the async-transcription orchestrator (#1238).
+ *
+ * The orchestrator reads/writes to studio_async_responses, fans out to
+ * injected fetchAudio + transcribe deps, and bookkeeps transcriptionStatus
+ * across the three terminal branches (skipped / completed / failed). The
+ * tests pin each branch + verify no AI score is silently nuked on success.
+ *
+ * Run: node --import tsx --test src/services/__tests__/transcribe-response.test.ts
+ */
+
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+import { transcribeResponse } from "../interview/transcribe-response.js";
+
+function seed(rows: Array<Record<string, unknown>>) {
+  return buildFakeDb({ studio_async_responses: rows as any });
+}
+
+const baseRow = {
+  id: "r1",
+  interviewId: "i1",
+  candidateId: "c1",
+  questionId: "q1",
+  responseMode: "video" as const,
+  videoUrl: "https://cdn.example.com/x.webm",
+  textAnswer: null,
+  transcription: null,
+  transcriptionStatus: null,
+  attempt: 1,
+  status: "recorded",
+};
+
+describe("transcribeResponse", () => {
+  it("skips when the response row is missing", async () => {
+    const { db } = seed([]);
+    const out = await transcribeResponse(db, mockDeps(), { responseId: "r-missing" });
+    assert.equal(out.status, "skipped");
+    if (out.status !== "skipped") return;
+    assert.equal(out.reason, "response_not_found");
+  });
+
+  it("skips when responseMode is 'text' (no video to transcribe)", async () => {
+    const { db } = seed([{ ...baseRow, responseMode: "text", videoUrl: null, textAnswer: "wrote it out" }]);
+    const out = await transcribeResponse(db, mockDeps(), { responseId: "r1" });
+    assert.equal(out.status, "skipped");
+    if (out.status !== "skipped") return;
+    assert.equal(out.reason, "not_video_mode");
+  });
+
+  it("skips when there's no videoUrl (and none provided)", async () => {
+    const { db } = seed([{ ...baseRow, videoUrl: null }]);
+    const out = await transcribeResponse(db, mockDeps(), { responseId: "r1" });
+    assert.equal(out.status, "skipped");
+    if (out.status !== "skipped") return;
+    assert.equal(out.reason, "no_video_url");
+  });
+
+  it("happy path — writes transcript + marks completed", async () => {
+    const { db, state } = seed([{ ...baseRow, aiScore: 7.5, aiSummary: "Decent" }]);
+    const out = await transcribeResponse(db, mockDeps("Hello world transcript"), { responseId: "r1" });
+    assert.equal(out.status, "completed");
+    if (out.status !== "completed") return;
+    assert.equal(out.transcription, "Hello world transcript");
+
+    const row = (state as any).studio_async_responses[0];
+    assert.equal(row.transcription, "Hello world transcript");
+    assert.equal(row.transcriptionStatus, "completed");
+    // Crucial: the previous AI score is preserved. The recruiter may
+    // re-score on the new transcript later; we shouldn't nuke their old
+    // verdict in the meantime.
+    assert.equal(row.aiScore, 7.5);
+    assert.equal(row.aiSummary, "Decent");
+  });
+
+  it("records 'pending' on the row before kicking off fetch (visible while in flight)", async () => {
+    // Snapshot the row state at the moment fetchAudio is called.
+    const { db, state } = seed([{ ...baseRow }]);
+    let snapshotAtFetch: any = null;
+    const deps = {
+      fetchAudio: async () => {
+        snapshotAtFetch = { ...(state as any).studio_async_responses[0] };
+        return new ArrayBuffer(8);
+      },
+      transcribe: async () => ({ text: "ok" }),
+    };
+    await transcribeResponse(db, deps, { responseId: "r1" });
+    assert.equal(snapshotAtFetch.transcriptionStatus, "pending");
+  });
+
+  it("marks 'failed' when fetchAudio throws", async () => {
+    const { db, state } = seed([{ ...baseRow }]);
+    const deps = {
+      fetchAudio: async () => {
+        throw new Error("network down");
+      },
+      transcribe: async () => ({ text: "unreachable" }),
+    };
+    const out = await transcribeResponse(db, deps, { responseId: "r1" });
+    assert.equal(out.status, "failed");
+    if (out.status !== "failed") return;
+    assert.match(out.error, /fetch_failed/);
+    assert.equal((state as any).studio_async_responses[0].transcriptionStatus, "failed");
+    assert.equal((state as any).studio_async_responses[0].transcription, null);
+  });
+
+  it("marks 'failed' when transcribe throws", async () => {
+    const { db, state } = seed([{ ...baseRow }]);
+    const deps = {
+      fetchAudio: async () => new ArrayBuffer(8),
+      transcribe: async () => {
+        throw new Error("whisper 500");
+      },
+    };
+    const out = await transcribeResponse(db, deps, { responseId: "r1" });
+    assert.equal(out.status, "failed");
+    if (out.status !== "failed") return;
+    assert.match(out.error, /transcribe_failed/);
+    assert.equal((state as any).studio_async_responses[0].transcriptionStatus, "failed");
+  });
+
+  it("accepts an override videoUrl when the row's videoUrl is null", async () => {
+    // Race condition: the route layer has the videoUrl from the just-
+    // returned row but the persisted row's column may lag behind. The
+    // helper takes an explicit override so we don't lose the work.
+    const { db } = seed([{ ...baseRow, videoUrl: null }]);
+    const out = await transcribeResponse(db, mockDeps("override hit"), {
+      responseId: "r1",
+      videoUrl: "https://cdn.example.com/override.webm",
+    });
+    assert.equal(out.status, "completed");
+  });
+});
+
+function mockDeps(text = "transcript text") {
+  return {
+    fetchAudio: async () => new ArrayBuffer(8),
+    transcribe: async () => ({ text }),
+  };
+}

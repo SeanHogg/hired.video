@@ -177,7 +177,7 @@ export type NormalizedCardData =
   | NormalizedMediaData;
 
 // Card type discriminator
-export type CardType = "job" | "company" | "people" | "resume" | "video" | "media";
+export type CardType = "job" | "company" | "people" | "resume" | "video" | "media" | "event";
 
 // Card rendering context
 export interface CardContext {

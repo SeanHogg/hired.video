@@ -15,7 +15,7 @@
  * The recruiter can hand-send a link from MyInterviewAssignments later.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 
@@ -113,4 +113,46 @@ export async function createScreeningInterviewFromApply(
     inviteToken,
     screeningRequired: job.screeningRequired === "required" ? "required" : "optional",
   };
+}
+
+/**
+ * Return the list of `job_applications` rows for `jobId` that do NOT yet
+ * have a screening interview attached. Used by `POST /api/jobs/:id/screening/
+ * backfill` (#1236) — "send screening to every applicant who applied
+ * before screening was attached".
+ *
+ * Implementation note: a NOT EXISTS sub-select beats a LEFT JOIN here
+ * because we only care about presence, and the join would duplicate rows
+ * when a recruiter has re-sent a screening (one application_id can carry
+ * multiple async-interview rows in degenerate cases).
+ */
+export async function listApplicationsMissingScreening(
+  db: Db,
+  jobId: string,
+): Promise<Array<{ applicationId: string; candidateUserId: string; candidateEmail: string }>> {
+  const { jobApplications, users, studioAsyncInterviews } = schema;
+  const rows = await db
+    .select({
+      applicationId: jobApplications.id,
+      candidateUserId: jobApplications.userId,
+      candidateEmail: users.email,
+    })
+    .from(jobApplications)
+    .innerJoin(users, eq(users.id, jobApplications.userId))
+    .where(
+      and(
+        eq(jobApplications.jobId, jobId),
+        // Postgres NOT EXISTS expressed via Drizzle's `sql` template would
+        // bring `sql` into this module just for one clause; instead, run a
+        // small in-memory anti-join on the (tiny) list of interviews already
+        // backed by this job. Bulk backfill is a recruiter-initiated batch,
+        // so the read cost is acceptable.
+      ),
+    );
+  const existing = await db
+    .select({ applicationId: studioAsyncInterviews.applicationId })
+    .from(studioAsyncInterviews)
+    .where(eq(studioAsyncInterviews.jobId, jobId));
+  const alreadyHas = new Set(existing.map((r) => r.applicationId).filter(Boolean) as string[]);
+  return rows.filter((r) => !alreadyHas.has(r.applicationId));
 }

@@ -131,7 +131,7 @@ export default function ForRecruiters() {
   ];
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-<main className="pt-16">
+<main>
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero */}
             <div className="text-center mb-16">

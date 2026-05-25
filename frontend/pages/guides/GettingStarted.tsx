@@ -70,7 +70,7 @@ export default function GettingStarted() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+<div className="p-6">
           <div className="max-w-4xl mx-auto space-y-8">
             {/* Back link */}
             <Link

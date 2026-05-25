@@ -15,6 +15,7 @@ import {
   ShoppingBag,
   Star,
   GraduationCap,
+  Calendar,
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
@@ -57,6 +58,7 @@ interface UnifiedSearchProps {
 
 const CATEGORIES = [
   { id: "all", label: "All", icon: TrendingUp },
+  { id: "events", label: "Events", icon: Calendar },
   { id: "people", label: "People", icon: User },
   { id: "creators", label: "Creators", icon: Star },
   { id: "services", label: "Services", icon: ShoppingBag },
@@ -104,6 +106,8 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       return ["faq"];
     case "media":
       return ["video"];
+    case "events":
+      return ["event"];
     case "all":
       return [
         "resume",
@@ -116,6 +120,7 @@ const categoryToTypes = (category: string): CardFeedType[] => {
         "guide",
         "tool",
         "faq",
+        "event",
       ];
     default:
       return [];

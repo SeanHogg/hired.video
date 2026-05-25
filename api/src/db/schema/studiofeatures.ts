@@ -475,6 +475,10 @@ export const studioAsyncResponses = pgTable(
     aiScoredAt:        timestamp("ai_scored_at", { withTimezone: true }),
     proctoringFlags:   jsonb("proctoring_flags").notNull().default({}),
     attempt:           integer("attempt").notNull().default(1),
+    // -- Added in 0124: async transcription bookkeeping.
+    //    'pending' | 'completed' | 'failed' | null. Null on legacy + text-mode.
+    transcriptionStatus: text("transcription_status"),
+    transcriptionJobId:  text("transcription_job_id"),
     createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

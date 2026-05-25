@@ -78,7 +78,7 @@ export default function Careers() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16">
+<div>
           <main className="max-w-6xl mx-auto px-6 py-8">
             {/* Breadcrumb Navigation */}
             <nav aria-label="Breadcrumb" className="mb-6">

@@ -94,6 +94,14 @@ export interface InboxExternalEmailDto {
   /** Set by dedup (P3) when this email is bound to a job the candidate
    *  applied to or follows. */
   linkedJobId: string | null;
+  /** Title of the linked job — joined in the repo so the inbox row can
+   *  render `→ Senior Engineer at Acme` without a second round-trip
+   *  (#539). Null when `linkedJobId` is null or the job was deleted. */
+  linkedJobTitle: string | null;
+  /** Company name on the linked job (denormalised text — `jobItems.company`).
+   *  Pairs with `linkedJobTitle` so the inbox row reads
+   *  `<title> at <company>` even when the candidate left the company. */
+  linkedJobCompany: string | null;
   isRead: boolean;
   receivedAt: string;
 }
@@ -341,6 +349,8 @@ function toExternalEmailDto(row: ExternalEmailInboxRow): InboxExternalEmailDto {
     score: Number.isFinite(score as number) ? (score as number) : null,
     summary: row.summary,
     linkedJobId: row.linkedJobId,
+    linkedJobTitle: row.linkedJobTitle ?? null,
+    linkedJobCompany: row.linkedJobCompany ?? null,
     isRead: row.isRead,
     receivedAt: new Date(row.receivedAt).toISOString(),
   };

@@ -7,9 +7,10 @@
  */
 
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
-import { getDb } from "../db/index.js";
+import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
@@ -125,6 +126,58 @@ Return ONLY JSON: { "script": "the full pitch as one paragraph" }`;
     const script = mockScript(parsed.data.tone, parsed.data.length, resumeContext);
     return c.json(ok({ script, targetWordCount }));
   }
+});
+
+// ─── Durable pitch URL (#1237) ─────────────────────────────────────────────
+
+const PitchUrlSchema = z.object({
+  videoPitchUrl: z.string().url().nullable(),
+});
+
+/** GET /api/video-pitch/profile — read current user's saved pitch URL. */
+videoPitchRoutes.get("/profile", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  const db = getDb();
+  const [row] = await db
+    .select({
+      videoPitchUrl: schema.users.videoPitchUrl,
+      videoPitchSetAt: schema.users.videoPitchSetAt,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, user.sub))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "User not found"), 404);
+  return c.json(ok({
+    videoPitchUrl: row.videoPitchUrl,
+    videoPitchSetAt: row.videoPitchSetAt,
+  }));
+});
+
+/** PUT /api/video-pitch/profile — save (or clear) the user's master pitch URL.
+ *  Passing `null` clears it (e.g. "remove from my profile"). */
+videoPitchRoutes.put("/profile", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Sign in"), 401);
+  const body = await c.req.json().catch(() => null);
+  const parsed = PitchUrlSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  }
+  const db = getDb();
+  const now = parsed.data.videoPitchUrl ? new Date() : null;
+  await db
+    .update(schema.users)
+    .set({
+      videoPitchUrl: parsed.data.videoPitchUrl,
+      videoPitchSetAt: now,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(schema.users.id, user.sub));
+  return c.json(ok({
+    videoPitchUrl: parsed.data.videoPitchUrl,
+    videoPitchSetAt: now,
+  }));
 });
 
 function mockScript(tone: string, length: number, resumeContext: string): string {

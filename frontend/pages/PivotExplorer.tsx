@@ -140,7 +140,7 @@ export default function PivotExplorer() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pt-16 pb-20 max-w-6xl mx-auto px-6">
+      <main className="pb-20 max-w-6xl mx-auto px-6">
         <section className="py-12 space-y-3">
           <h1 className="text-4xl font-bold tracking-tight">Pivot Explorer</h1>
           <p className="text-lg text-muted-foreground max-w-3xl">
@@ -234,7 +234,7 @@ function PivotDrilldown({ sector, userSkills }: { sector: Sector; userSkills: st
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pt-16 pb-20 max-w-6xl mx-auto px-6">
+      <main className="pb-20 max-w-6xl mx-auto px-6">
         <section className="py-10 space-y-3">
           <Link to="/pivot-explorer" className="text-sm text-muted-foreground hover:underline">
             ← All sectors

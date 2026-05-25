@@ -88,6 +88,11 @@ export const jobItems = pgTable("job_items", {
   /** Soft-delete timestamp (#154). When set, this job is hidden from
    *  default lists; "Include archived" toggles surface it back. */
   archivedAt: timestamp("archived_at", { withTimezone: true }),
+  /** Granular field-level share matrix for the hiring-manager portal
+   *  (#240). JSONB blob: `{ name: bool, compensation: bool, photo: bool,
+   *  ... }`. Null = use the tenant default (currently "share all"). The
+   *  HM-portal renderer gates each field against the matrix when set. */
+  sharePermissions: jsonb("share_permissions"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -166,7 +166,7 @@ export default function JobDetail() {
   if (loading) {
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+<div className="p-6">
             <div className="max-w-4xl mx-auto">
               <Card>
                 <CardHeader>
@@ -186,7 +186,7 @@ export default function JobDetail() {
   if (!job) {
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+<div className="p-6">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-2xl font-bold mb-4">{t("headings.jobNotFound")}</h1>
               <p className="text-muted-foreground mb-6">

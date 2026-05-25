@@ -32,3 +32,20 @@ export async function generatePitchScript(
   );
   return res.data;
 }
+
+// ─── Durable pitch URL (#1237) ─────────────────────────────────────────────
+
+export interface PitchProfile {
+  videoPitchUrl: string | null;
+  videoPitchSetAt: string | null;
+}
+
+export async function getPitchProfile(): Promise<PitchProfile> {
+  const res = await apiClient.get<PitchProfile>("/api/video-pitch/profile");
+  return res.data;
+}
+
+export async function setPitchProfile(videoPitchUrl: string | null): Promise<PitchProfile> {
+  const res = await apiClient.put<PitchProfile>("/api/video-pitch/profile", { videoPitchUrl });
+  return res.data;
+}

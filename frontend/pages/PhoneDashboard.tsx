@@ -329,7 +329,7 @@ export default function PhoneDashboard() {
         <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
           <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-          <div className="pt-16 flex items-center justify-center min-h-screen">
+          <div className="flex items-center justify-center min-h-screen">
             <p className="text-muted-foreground">{t("messages.signInForBusinessPhone")}</p>
           </div>
         </div>
@@ -342,7 +342,7 @@ export default function PhoneDashboard() {
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="pt-16">
+        <main>
           <div className="container mx-auto px-4 py-8 max-w-6xl">
 
             {/* Header */}

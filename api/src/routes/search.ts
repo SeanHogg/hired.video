@@ -11,7 +11,7 @@ import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
 import type { ContentLocationKind, LocationFilter } from "../../../shared/content-locations.js";
 
-const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles } = schema;
+const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents } = schema;
 
 export const searchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -194,6 +194,29 @@ function toMediaItem(video: typeof videos.$inferSelect, ownerName: string | null
   };
 }
 
+function toEventItem(ev: typeof scheduledEvents.$inferSelect) {
+  return {
+    id: ev.id,
+    type: "event" as const,
+    title: ev.title,
+    description: ev.description,
+    slug: ev.slug,
+    coverImageUrl: ev.coverImageUrl,
+    category: ev.category,
+    eventFormat: ev.eventFormat,
+    startAt: ev.startAt.toISOString(),
+    endAt: ev.endAt.toISOString(),
+    location: ev.location,
+    attendeeCount: ev.attendeeCount,
+    capacity: ev.capacity,
+    isFeatured: false,
+    // Unified-search sort uses createdAt; for events we want sort by start
+    // time, but the global merge order keys on createdAt — so we expose
+    // both. The FE EventResultCard already keys its tile by startAt.
+    createdAt: (ev.publishedAt ?? ev.createdAt).toISOString(),
+  };
+}
+
 // Unified search endpoint used by frontend.
 // Supports category filtering (jobs/people/companies/resumes) and a default "all".
 searchRoutes.get("/public", async (c) => {
@@ -217,6 +240,7 @@ searchRoutes.get("/public", async (c) => {
   const includeMedia = category === "all" || category === "media";
   const includeTemplates = category === "all" || category === "templates";
   const includeArticles = category === "all" || category === "articles";
+  const includeEvents = category === "all" || category === "events";
 
   // Structured geo filter — every kind shares one LocationService call
   // per kind to translate the filter into an entity_id allowlist.
@@ -260,6 +284,7 @@ searchRoutes.get("/public", async (c) => {
     mediaAllow,
     articlesAllow,
     companiesAllow,
+    eventsAllow,
   ] = await Promise.all([
     allowlistFor("job", includeJobs),
     allowlistFor("user_profile", includePeople),
@@ -269,6 +294,7 @@ searchRoutes.get("/public", async (c) => {
     allowlistFor("video", includeMedia),
     allowlistFor("article", includeArticles),
     allowlistFor("company", includeCompanies),
+    allowlistFor("event", includeEvents),
   ]);
 
   const jobsPromise = includeJobs
@@ -452,7 +478,34 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof articles.$inferSelect[]);
 
-  const [jobs, companies, people, resumes, voices, templates, media, articlesList] = await Promise.all([
+  // Events — public, non-cancelled, upcoming (or matching the geo/text filter).
+  // Discovery surface only: `visibility='public'` + `type IN ('event','coffee')`.
+  // Cancelled events stay out of search.
+  const eventsWhereParts: any[] = [
+    eq(scheduledEvents.visibility, "public"),
+    inArray(scheduledEvents.type, ["event", "coffee"]),
+    sql`${scheduledEvents.cancelledAt} IS NULL`,
+  ];
+  if (search) {
+    eventsWhereParts.push(
+      or(
+        ilike(scheduledEvents.title, `%${search}%`),
+        ilike(scheduledEvents.description, `%${search}%`),
+      )!,
+    );
+  }
+  const eventsAllowCl = allowClause(scheduledEvents.id, eventsAllow);
+  if (eventsAllowCl) eventsWhereParts.push(eventsAllowCl);
+  const eventsPromise = includeEvents && !allowEmpty(eventsAllow)
+    ? db
+        .select()
+        .from(scheduledEvents)
+        .where(and(...eventsWhereParts))
+        .orderBy(scheduledEvents.startAt)
+        .limit(100)
+    : Promise.resolve([] as typeof scheduledEvents.$inferSelect[]);
+
+  const [jobs, companies, people, resumes, voices, templates, media, articlesList, events] = await Promise.all([
     jobsPromise,
     companyPromise,
     peoplePromise,
@@ -461,6 +514,7 @@ searchRoutes.get("/public", async (c) => {
     templatesPromise,
     mediaPromise,
     articlesPromise,
+    eventsPromise,
   ]);
 
   // When searching "all", we merge and paginate by createdAt.
@@ -473,6 +527,7 @@ searchRoutes.get("/public", async (c) => {
     ...templates.map((t) => toTemplateItem(t, hvCommunityCompanyId)),
     ...media.map(({ video, ownerName }) => toMediaItem(video, ownerName)),
     ...articlesList.map(toArticleItem),
+    ...events.map(toEventItem),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));
 

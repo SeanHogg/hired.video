@@ -130,3 +130,25 @@ export async function setJobScreening(
   const res = await apiClient.put<JobScreeningConfig>(`/api/jobs/${jobId}/screening`, payload);
   return res.data;
 }
+
+// ─── Bulk-invite backfill (#1236) ──────────────────────────────────────────
+
+export interface BackfillPreview {
+  count: number;
+}
+
+export interface BackfillResult {
+  count: number;
+  created: number;
+  failures: Array<{ applicationId: string; reason: string }>;
+}
+
+export async function getJobScreeningBackfillPreview(jobId: string): Promise<BackfillPreview> {
+  const res = await apiClient.get<BackfillPreview>(`/api/jobs/${jobId}/screening/backfill-preview`);
+  return res.data;
+}
+
+export async function runJobScreeningBackfill(jobId: string): Promise<BackfillResult> {
+  const res = await apiClient.post<BackfillResult>(`/api/jobs/${jobId}/screening/backfill`, {});
+  return res.data;
+}

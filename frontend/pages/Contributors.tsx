@@ -53,7 +53,7 @@ export default function Contributors() {
 
   return (
     <AppShell bgClassName="bg-background">
-<main className="pt-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-12">
+<main className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-12">
           <header className="py-6">
             <h1 className="text-2xl font-bold">Contributors</h1>
             <p className="text-sm text-muted-foreground mt-1">

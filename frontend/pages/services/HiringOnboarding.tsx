@@ -370,7 +370,7 @@ export default function HiringOnboarding() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16">
+        <div>
           <div className="max-w-5xl mx-auto p-6">
             <PageHeader tabs={peopleTabs} activeTabKey="hiring" />
 

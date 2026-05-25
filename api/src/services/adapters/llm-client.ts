@@ -659,6 +659,26 @@ export function createLLMClient(
           profile.model,
           res._builderforce?.resolvedModel ?? res.model,
         );
+        // #515 — silent substitution alarm. The gateway docs (SDK 0.4.0)
+        // treat `model` as a hint and reserve the right to substitute on
+        // cooldown / outage / plan-tier mismatch. For latency-pinned use
+        // cases (e.g. `match` requires Cerebras sub-200ms TTFT) a swap to
+        // OpenRouter is a 50× latency hit. Log the substitution so SA can
+        // dashboard SLA breaches without locking out vendor improvements.
+        // Quiet by default — only fires when the gateway actually swapped.
+        if (
+          usage.model &&
+          usage.model !== profile.model &&
+          // Don't double-warn the fallback chain we drove — substitution
+          // is only the silent gateway-side swap.
+          attempts.length === 0
+        ) {
+          console.warn(
+            `[llm-client ${correlationId}] substitution-alarm ${opts.useCase}: ` +
+              `requested=${profile.model}, gateway-resolved=${usage.model}. ` +
+              `Latency-pinned use cases will see SLA regressions.`,
+          );
+        }
         const finishReason =
           choice?.finish_reason ?? (toolCalls.length > 0 ? "tool_calls" : "stop");
 

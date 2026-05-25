@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Loader2, Clock, Eye, ChevronRight } from "lucide-react";
+import { Loader2, Clock, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useBreadcrumbs } from "@/lib/seo";
 import { articleCoverImageUrl, useUgcSeo } from "@/lib/seo-ugc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { AppShell } from "@/components/AppShell";
 import { articleService } from "@/lib/services/article-service";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
@@ -76,18 +84,27 @@ export default function ArticleView() {
       <article className="max-w-4xl mx-auto px-4 py-8">
         {/* Visible breadcrumb — matches the BreadcrumbList JSON-LD emitted
             via useBreadcrumbs so on-page nav, AppShell sidebar, and rich
-            results agree on the trail. */}
-        <nav aria-label="breadcrumb" className="mb-6 text-sm text-muted-foreground">
-          <ol className="flex flex-wrap items-center gap-1.5">
-            <li><Link to="/articles" className="hover:text-foreground hover:underline">Articles</Link></li>
+            results agree on the trail. Uses the shared Breadcrumb primitive
+            (#1229) so every future "show a trail" surface has one seam. */}
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/articles">Articles</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
             {article && (
               <>
-                <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
-                <li className="text-foreground truncate max-w-[60ch]">{article.title}</li>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="truncate max-w-[60ch]">
+                    {article.title}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
               </>
             )}
-          </ol>
-        </nav>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {loading ? (
           <Card><CardContent className="p-8 flex items-center justify-center text-muted-foreground">

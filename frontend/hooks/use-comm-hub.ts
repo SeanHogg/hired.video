@@ -87,6 +87,10 @@ export interface HubItem {
   category?: string;
   /** Set by dedup (P3) when the email is bound to an applied/followed job. */
   linkedJobId?: string;
+  /** Joined from `jobItems` server-side (#539) so the row can render
+   *  "→ Senior Engineer at Acme" without a second round-trip. */
+  linkedJobTitle?: string;
+  linkedJobCompany?: string;
 }
 
 /** Persisted notification row — superset of the SignalR live shape since
@@ -114,6 +118,8 @@ interface PersistedExternalEmail {
   score: number | null;
   summary: string | null;
   linkedJobId: string | null;
+  linkedJobTitle: string | null;
+  linkedJobCompany: string | null;
   isRead: boolean;
   receivedAt: string;
 }
@@ -402,6 +408,8 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         accountLabel: e.accountLabel,
         category: e.category ?? undefined,
         linkedJobId: e.linkedJobId ?? undefined,
+        linkedJobTitle: e.linkedJobTitle ?? undefined,
+        linkedJobCompany: e.linkedJobCompany ?? undefined,
       });
     }
 

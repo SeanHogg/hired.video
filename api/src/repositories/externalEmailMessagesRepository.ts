@@ -11,7 +11,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 import { JOB_INBOX_CATEGORIES } from "../../../shared/email-classification/index.js";
 
-const { externalEmailMessages, externalEmailAccounts } = schema;
+const { externalEmailMessages, externalEmailAccounts, jobItems } = schema;
 
 export { JOB_INBOX_CATEGORIES };
 
@@ -21,10 +21,15 @@ export type ExternalEmailMessageRow = typeof externalEmailMessages.$inferSelect;
 export type ExternalEmailMessageInsert = typeof externalEmailMessages.$inferInsert;
 
 /** Read-side projection used by the inbox aggregator. The plain message row
- *  doesn't carry the human-readable account label, so this view joins it in. */
+ *  doesn't carry the human-readable account label, so this view joins it in.
+ *  Also stamps the linked job's title + company name when `linkedJobId` is
+ *  set so the inbox row can render `→ Senior Engineer at Acme` without a
+ *  second round-trip (#539). */
 export interface ExternalEmailInboxRow extends ExternalEmailMessageRow {
   accountLabel: string | null;
   accountEmail: string;
+  linkedJobTitle: string | null;
+  linkedJobCompany: string | null;
 }
 
 /** Hard floor below which messages never reach the inbox regardless of
@@ -150,16 +155,24 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       );
     }
 
+    // #539 — join job_items so the dto can render `→ <title> at <company>`
+    // when `linked_job_id` is set, no second round-trip needed.
     const rows = (await this.db
       .select({
         message: externalEmailMessages,
         accountLabel: externalEmailAccounts.accountLabel,
         accountEmail: externalEmailAccounts.accountEmail,
+        linkedJobTitle: jobItems.title,
+        linkedJobCompany: jobItems.company,
       })
       .from(externalEmailMessages)
       .innerJoin(
         externalEmailAccounts,
         eq(externalEmailAccounts.id, externalEmailMessages.accountId),
+      )
+      .leftJoin(
+        jobItems,
+        eq(jobItems.id, externalEmailMessages.linkedJobId),
       )
       .where(and(...conditions))
       .orderBy(desc(externalEmailMessages.receivedAt), desc(externalEmailMessages.id))
@@ -167,12 +180,16 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       message: ExternalEmailMessageRow;
       accountLabel: string | null;
       accountEmail: string;
+      linkedJobTitle: string | null;
+      linkedJobCompany: string | null;
     }>;
 
     return rows.map((r) => ({
       ...r.message,
       accountLabel: r.accountLabel,
       accountEmail: r.accountEmail,
+      linkedJobTitle: r.linkedJobTitle,
+      linkedJobCompany: r.linkedJobCompany,
     }));
   }
 

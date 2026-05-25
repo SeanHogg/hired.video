@@ -142,6 +142,36 @@ export const placements = pgTable("placements", {
 export type Placement = typeof placements.$inferSelect;
 export type NewPlacement = typeof placements.$inferInsert;
 
+/** Placement splits across recruiters / sourcers / managers (#228).
+ *  Sums to 10_000 bps; validation lives in the service layer. Commission
+ *  engine fans out per row so 2 recruiters at 50/50 each see half the
+ *  payout in their commission ledger. */
+export const placementSplits = pgTable("placement_splits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  placementId: uuid("placement_id").notNull().references(() => placements.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull(),
+  /** 'recruiter' | 'sourcer' | 'manager' | custom. */
+  ownerType: varchar("owner_type", { length: 24 }).default("recruiter").notNull(),
+  percentBps: integer("percent_bps").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type PlacementSplit = typeof placementSplits.$inferSelect;
+export type NewPlacementSplit = typeof placementSplits.$inferInsert;
+
+/** Per-placement email notification subscriptions (#230). One row per
+ *  (placementId × event × userId). Stage events fire from the
+ *  PlacementService when status transitions cross 'signed' / 'started'
+ *  / 'first_day' / 'guarantee_expires'. */
+export const placementNotificationSubscriptions = pgTable("placement_notification_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  placementId: uuid("placement_id").notNull().references(() => placements.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull(),
+  event: varchar("event", { length: 48 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type PlacementNotificationSubscription = typeof placementNotificationSubscriptions.$inferSelect;
+export type NewPlacementNotificationSubscription = typeof placementNotificationSubscriptions.$inferInsert;
+
 export const jobBoards = pgTable("job_boards", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
