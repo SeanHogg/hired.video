@@ -18,7 +18,7 @@
 -- to send through their channel of choice. Auto-send routes through the
 -- messaging service when wired in a later pass.
 --
--- ─── Self-sufficient FK target (gap #1203 + #1215) ──────────────────────────
+-- ─── Self-sufficient FK target (gap #1203 + #1220) ──────────────────────────
 -- `recruiter_agent_runs` is declared in [api/src/db/schema/recruiter.ts]
 -- but historically had no CREATE TABLE migration — production had it from
 -- an out-of-tree `drizzle-kit push` and the parity test silently waived

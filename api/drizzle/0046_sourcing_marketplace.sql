@@ -14,7 +14,7 @@
 -- that this is the intended product direction.
 
 -- ---------------------------------------------------------------------------
--- 1. Sourcing fields on the job aggregate — REMOVED 2026-05-25 (gap #1215).
+-- 1. Sourcing fields on the job aggregate — REMOVED 2026-05-25 (gap #1220).
 --
 -- Originally this migration added four columns to `job_items`:
 --   accepts_sourcing_bids / sourcing_fee_cents / sourcing_deadline / sourcing_terms

@@ -127,6 +127,15 @@ export default defineConfig(({ mode }) => {
           screenshots: [],
         },
         workbox: {
+          // Default precache file-size limit is 2 MiB; the main app chunk
+          // is ~2.1 MiB once eagerly-imported content (BLOG_POSTS, Pricing
+          // copy, kind-marketing, etc.) lands. Raising to 5 MiB so the SW
+          // can precache the shell; the underlying bundle bloat is tracked
+          // in the gap register (eagerly-imported BLOG_POSTS via
+          // Index.tsx → LatestGuides → card-feed) and should be addressed
+          // by lazy-loading the post array rather than by raising the
+          // ceiling indefinitely.
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           // Inject BurnRateOS push + notificationclick handlers into the
           // auto-generated SW. The hosted script registers `push` and
           // `notificationclick` listeners against this SW's scope; the
