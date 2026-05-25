@@ -17,6 +17,34 @@
 -- materialises the draft into candidate_interactions for the recruiter
 -- to send through their channel of choice. Auto-send routes through the
 -- messaging service when wired in a later pass.
+--
+-- ─── Self-sufficient FK target (gap #1204) ──────────────────────────────────
+-- `recruiter_agent_runs` is declared in [api/src/db/schema/recruiter.ts]
+-- but historically had no CREATE TABLE migration — production had it from
+-- an out-of-tree `drizzle-kit push` and the parity test silently waived
+-- it (see [scripts/migration-schema-parity.test.mjs] KNOWN_MISSING_CREATE_TABLE).
+-- The runner ([scripts/run-sql-migrations.mjs]) is stateless and re-runs
+-- every 0*.sql in order on every deploy, so a later "create missing tables"
+-- migration cannot save this file from failing on a fresh CI database.
+-- Create the FK target here (IF NOT EXISTS makes it a no-op on production)
+-- so 0117 is self-sufficient against any DB shape. Mirrors the columns of
+-- `recruiterAgentRuns` exactly.
+
+CREATE TABLE IF NOT EXISTS recruiter_agent_runs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recruiter_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id uuid,
+  job_title varchar(255),
+  criteria jsonb DEFAULT '{}'::jsonb,
+  status varchar(50) NOT NULL DEFAULT 'pending',
+  candidates_found integer NOT NULL DEFAULT 0,
+  candidates_scored integer NOT NULL DEFAULT 0,
+  results jsonb DEFAULT '[]'::jsonb,
+  error_message text,
+  started_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS recruiter_agent_followups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

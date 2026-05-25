@@ -10,7 +10,7 @@
  *
  *   • `useEntityOwnership({ ownerUserId, ownership })` — React hook that
  *     reads the auth viewer and forwards to `deriveEntityOwnership`. Used
- *     by every card and `<EntityVideos>` so action menus, edit chips, and
+ *     by every card and `<EntityMedia>` so action menus, edit chips, and
  *     analytics rows agree on a single classification.
  *
  * Resolution order (in `deriveEntityOwnership`):

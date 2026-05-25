@@ -62,14 +62,25 @@ export function parseStudioSubject(raw: string | null | undefined): StudioSubjec
 }
 
 /** Per-kind display copy for menu items / titles. Centralised so
- *  EntityVideos / action menus / wizard pre-fill strings stay consistent. */
+ *  EntityMedia / action menus / wizard pre-fill strings stay consistent.
+ *
+ *  Drops the "Video" prefix that was baked in when the studio was
+ *  video-only — any mediaKind (image / game / animation / podcast /
+ *  cad / comic) can now be linked to any entity, so the chip and
+ *  menu copy must read as "create something for this resume / profile
+ *  / job / …", not "create a video for it". "Reel" is the short
+ *  industry-noun for a self-promotional clip and reads cleanly across
+ *  all mediaKinds (a Photoshop image, a podcast episode, a memory-
+ *  match game are all "the candidate's resume reel"). Skills demo /
+ *  article promo / portfolio credit keep their pre-existing nouns
+ *  because they were already kind-neutral. */
 export const STUDIO_SUBJECT_LABEL: Record<StudioSubjectKind, string> = {
-  resume:         "Video Resume",
-  profile:        "Video Profile",
-  job:            "Video Job Ad",
-  company:        "Video Company Promo",
-  skills_demo:    "Video Skills Demo",
-  article:        "Video Article Promo",
+  resume:         "Resume Reel",
+  profile:        "Profile Reel",
+  job:            "Job Reel",
+  company:        "Company Reel",
+  skills_demo:    "Skills Demo",
+  article:        "Article Promo",
   creator_credit: "Portfolio Credit",
 };
 

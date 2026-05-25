@@ -990,6 +990,44 @@ export default function Pricing() {
                         free="Basic (views only)"
                         pro="Advanced (heatmaps, CTA clicks, campaigns)"
                       />
+
+                      {/* Reviews & Salary Insights — cross-persona surface
+                          that closes the Glassdoor / Indeed-salary parity
+                          gap. Every persona sees the same rows: job
+                          seekers research employers, employers manage
+                          their reputation, recruiters cite real pay
+                          bands when sourcing. */}
+                      <SectionRow label="Company Reviews & Salary Insights" />
+                      <FeatureRow
+                        icon={Star}
+                        label="Browse company reviews (multi-axis ratings)"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Star}
+                        label="Write a verified employee review"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={TrendingUp}
+                        label="Salary guides by role"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Globe}
+                        label="Salary guides by role × city (e.g. SF software engineer)"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={TrendingUp}
+                        label="AI salary negotiation script (your offer vs market)"
+                        free={false}
+                        pro
+                      />
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
@@ -1490,6 +1528,51 @@ export default function Pricing() {
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                       </tr>
+
+                      {/* AI Recruiter Agent v2 + Live Screening — the
+                          LinkedIn Hiring Assistant / ZipIntro parity
+                          rows. PersonaGatedRow keeps the JSX terse vs
+                          the older hand-rolled persona conditionals. */}
+                      <PersonaGatedRow
+                        icon={Brain}
+                        label="AI Recruiter Agent — brief intake (plain-English → search criteria)"
+                        free="1 run / mo"
+                        pro="Unlimited"
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Send}
+                        label="AI Recruiter Agent — sourced candidates + scored outreach drafts"
+                        free="3 candidates / run"
+                        pro="Up to 50 / run"
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Clock}
+                        label="Scheduled follow-up sequences (3d / 7d / 14d default)"
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Video}
+                        label="Live screening blocks — back-to-back video slots (ZipIntro-style)"
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Calendar}
+                        label="Candidate accept / decline magic links (no candidate login required)"
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
@@ -2108,6 +2191,31 @@ function CellValue({ value }: { value: ReactNode | boolean }) {
     );
   }
   return <td className="text-center p-4 text-sm text-muted-foreground">{value}</td>;
+}
+
+/** Persona-gated row. Shows the row but renders the cells as em-dashes
+ *  when the active persona isn't in `visibleFor`. DRY anchor for any
+ *  recruiter-only / employer-only / job-seeker-only feature row so we
+ *  stop hand-rolling the `persona === "recruiter" ? <Check /> : <—/>`
+ *  pattern that 8 raw rows in this file still use (gap register entry).
+ *  Use this for any new persona-specific feature. */
+function PersonaGatedRow({
+  icon,
+  label,
+  free,
+  pro,
+  visibleFor,
+  currentPersona,
+}: FeatureRowProps & { visibleFor: string[]; currentPersona: string }) {
+  const visible = visibleFor.includes(currentPersona);
+  return (
+    <FeatureRow
+      icon={icon}
+      label={label}
+      free={visible ? free : false}
+      pro={visible ? pro : false}
+    />
+  );
 }
 
 /** Section heading row spanning all three table columns. One helper so the

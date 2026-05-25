@@ -1,7 +1,7 @@
 /**
  * Tests for useEntityOwnership — the single-source-of-truth predicate
  * every entity card (CompanyCard, JobCard, ResumeCard, PeopleCard,
- * EntityVideos) uses to decide owner affordances.
+ * EntityMedia) uses to decide owner affordances.
  *
  * Pinning:
  *   • Backend-classified ownership wins over derived match.

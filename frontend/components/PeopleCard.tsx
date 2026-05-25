@@ -43,7 +43,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
-import EntityVideos from "@/components/studio/EntityVideos";
+import EntityMedia from "@/components/studio/EntityMedia";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 import { formatRoleForDisplay, normalizeRole, createRolePermissions } from "@/lib/role-utils";
 import { USER_ROLES } from "@shared/user-roles";
@@ -101,7 +101,7 @@ export default function PeopleCard({
   // `user` is still needed for role-based gates below (talent-pool button
   // checks `createRolePermissions(user.role)`); pure ownership questions
   // route through `useEntityOwnership` so this card stays in lockstep
-  // with EntityVideos and the other card surfaces.
+  // with EntityMedia and the other card surfaces.
   const { user } = useAuth();
   const ownership =
     person && "ownership" in person ? person.ownership : undefined;
@@ -538,10 +538,11 @@ export default function PeopleCard({
             </div>
           )}
 
-          {/* Studio videos linked to this profile (#271). For a profile
+          {/* Studio media linked to this profile (#271). For a profile
               the "owner" is the person themselves — pass person.id and
-              EntityVideos hides the create chip for everyone else. */}
-          <EntityVideos
+              EntityMedia hides the create chip for everyone else.
+              EntityMedia renders any mediaKind they attached. */}
+          <EntityMedia
             subject={{ kind: "profile", id: person.id }}
             ownerUserId={person.id}
           />

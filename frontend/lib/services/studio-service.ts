@@ -546,7 +546,7 @@ export const studioService = {
   /**
    * List all studio projects for the current user. When `subject` is
    * provided, only projects linked to that entity are returned —
-   * `EntityVideos` uses this to populate the per-entity scroller.
+   * `EntityMedia` uses this to populate the per-entity scroller.
    * When `workspace` is provided (e.g. "personal" | "company:<id>" |
    * "delegated:<id>"), the response is restricted to that workspace
    * scope; omit it to receive rows from every workspace the caller can
@@ -571,7 +571,7 @@ export const studioService = {
   },
 
   /**
-   * Public read for the EntityVideos rail (#323). Returns the projects
+   * Public read for the EntityMedia rail (#323). Returns the projects
    * linked to the given subject that the owner has marked public,
    * regardless of who the viewer is — including anonymous viewers on
    * public listing pages. Owners should keep using `getProjects` so they

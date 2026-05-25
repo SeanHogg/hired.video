@@ -775,7 +775,7 @@ export default function StudioLayout() {
           setBootstrapped(true);
 
           // URL deep-link: a specific project id wins over everything else
-          // — that's how the EntityVideos "Edit" tile opens its project.
+          // — that's how the EntityMedia "Edit" tile opens its project.
           if (urlProjectId) {
             const match = list.find((p) => p.id === urlProjectId);
             if (match) {

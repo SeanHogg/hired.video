@@ -81,9 +81,9 @@ export default function SubjectPickerDialog({
         <DialogHeader>
           <DialogTitle>Link a subject</DialogTitle>
           <DialogDescription>
-            Tie this video to one of your resumes, your profile, or a
-            company you own. Linked subjects power the per-entity video
-            scrollers (EntityVideos).
+            Tie this project to one of your resumes, your profile, or a
+            company you own. Linked subjects power the per-entity media
+            scrollers (EntityMedia).
           </DialogDescription>
         </DialogHeader>
 

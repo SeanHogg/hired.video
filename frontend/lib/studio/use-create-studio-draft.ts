@@ -141,7 +141,7 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           kind: projectKind,
           timelineSpec,
           // Subjects pre-link the project to source entities so the
-          // editor's chip rail + EntityVideos rails on the source page
+          // editor's chip rail + EntityMedia rails on the source page
           // are populated from first paint.
           ...(input.subjects && input.subjects.length > 0
             ? { subjects: input.subjects }

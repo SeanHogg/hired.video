@@ -24,7 +24,7 @@ import { apiClient } from "@/lib/api-client";
 import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
-import EntityVideos from "@/components/studio/EntityVideos";
+import EntityMedia from "@/components/studio/EntityMedia";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 import { ReviewRatingBadge } from "@/components/reviews/ReviewRatingBadge";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
@@ -353,12 +353,12 @@ export default function CompanyCard({
             </div>
           )}
 
-          {/* Studio videos linked to this company (#271) — promo / culture
-              videos. EntityVideos compares the auth'd viewer to the
-              company's owner userId and only renders the create chip
-              when they match. */}
+          {/* Studio media linked to this company (#271) — promo /
+              culture clips of any mediaKind. EntityMedia compares the
+              auth'd viewer to the company's owner userId and only
+              renders the create chip when they match. */}
           {company.id && (
-            <EntityVideos
+            <EntityMedia
               subject={{ kind: "company", id: company.id }}
               ownerUserId={company.userId}
             />

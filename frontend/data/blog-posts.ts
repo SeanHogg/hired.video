@@ -1445,6 +1445,422 @@ export const BLOG_POSTS: BlogPost[] = [
   },
 ];
 
+// ── Reviews + Salary value prop ─────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "research-employers-with-reviews-and-salary-data",
+  title: "How to Research an Employer in 10 Minutes with Reviews and Salary Data",
+  description:
+    "Use hired.video's company reviews, multi-axis ratings, and role × city salary guides to pressure-test an offer before you accept — or to negotiate the one you have.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "companies",
+  toolName: "Company Reviews + Salary Guides",
+  toolUrl: "/companies",
+  keywords:
+    "company reviews, employer research, salary by city, glassdoor alternative, before you accept an offer, employee reviews, salary negotiation, company culture research",
+  heroAlt: "Side-by-side view of a company reviews page and a salary-by-city guide",
+  category: "Job Search Strategy",
+  sections: [
+    {
+      heading: "The 10-Minute Pre-Offer Audit",
+      body: "Before you accept any offer, run this 10-minute audit. Most candidates skip it and find out about the bad parts of the company in week three. With public reviews and real salary data, you can pressure-test the offer before you sign.\n\n**Minute 1–3 — Company reviews.** Open `/companies/{name}/reviews`. Skim the overall rating, then the six sub-axis ratings: culture, leadership, work-life balance, compensation, career growth, diversity. If any single axis is more than 1.0 below the overall average, that's where you should ask follow-up questions in your final round.\n\n**Minute 4–6 — Salary by role × city.** Open `/salary/{role}/{city}` (for example, `/salary/senior-software-engineer/san-francisco`). This page shows the entry-level, average, and senior salary derived from real active listings on the platform — not self-reported levels.fyi data. If your offer falls below the average for your level in that city, you have grounds to negotiate.\n\n**Minute 7–10 — Cross-reference.** Search the company reviews for the keyword \"compensation\" or \"pay\". A high compensation rating combined with a market-aligned offer is the green light. A low compensation rating combined with a below-market offer is a hard signal to negotiate or walk away.",
+    },
+    {
+      heading: "What the Six Sub-Axis Ratings Actually Mean",
+      body: "Glassdoor uses a single overall score. hired.video splits the rating across six axes because employees rarely give a uniform answer:\n\n- **Culture** — day-to-day team dynamics, psychological safety, social tone\n- **Leadership** — competence and consistency of managers and execs\n- **Work-Life Balance** — actual hours expected, weekend / on-call norms\n- **Compensation** — market-relative pay and bonus structure\n- **Career Growth** — promotion velocity, mentorship, lateral mobility\n- **Diversity & Inclusion** — representation and equity in practice\n\nFor a 4.0 overall, the *shape* matters more than the number. A 4.0 made of (5, 5, 2, 5, 5, 2) is very different from (4, 4, 4, 4, 4, 4). The first is great culture with brutal hours and a homogeneous team; the second is a steady, balanced employer.\n\nWhen you read reviews, sort by Most Recent — companies change faster than annual averages reflect.",
+    },
+    {
+      heading: "Salary Guides: Why the Numbers Are Different from Glassdoor",
+      body: "hired.video's salary guides derive from **active job listings** on the platform, not from anonymous self-reporting. This has three practical implications:\n\n1. **The numbers are forward-looking.** A self-reported salary from 2023 doesn't tell you what a company will pay in 2026. A live listing posted last week does.\n\n2. **The sample size is transparent.** Every salary page shows the number of listings the figure is based on. If a role × city page says \"Based on 6 listings,\" treat the number as directional. \"Based on 142 listings\" is a real signal.\n\n3. **The city dimension matters.** `/salary/staff-product-manager/austin` is a completely different number from `/salary/staff-product-manager/san-francisco` even for the same company tier — and the comp benchmark you should negotiate against is the city-level one, not the national average.\n\nUse the related-cities and related-roles links at the bottom of each salary page to pivot quickly: \"What does this same role pay in Seattle?\" or \"What does a Staff Engineer make in this city versus a Principal?\"",
+    },
+    {
+      heading: "Three Negotiation Plays You Can Run Today",
+      body: "**Play 1 — The Market Citation.** When you receive an offer below the city-level average for your role, reply with: \"Thanks for the offer. Based on active listings for this role in {city}, the average is {fmt(avg)}. I'd like to anchor the conversation around that number.\" Cite the URL. This shifts the burden from \"why I want more\" to \"why your offer is below market.\"\n\n**Play 2 — The Reviews Pivot.** When the comp axis on company reviews is below 3.5, accept that compensation isn't the company's strength — and negotiate hard for what *is*. If the career growth axis is 4.7, push for promotion-track clarity and a 6-month review with a defined raise. If work-life balance is 4.5, push for an explicit remote-work guarantee.\n\n**Play 3 — The Stale Offer Refresh.** If your offer is 2+ weeks old and you've found a higher market rate since, write: \"Since we last spoke, I've reviewed current pay bands for similar roles in {city}. I'd like to revisit the offer to align with the {percentile} percentile.\" This is most effective in cities where salary guides have updated within the offer-pending window.\n\nAll three plays work better when the company knows you've done the homework. Pasting the hired.video URL signals you're using a public benchmark, not an aspirational anchor.",
+    },
+    {
+      heading: "When to Trust Reviews and When to Discount Them",
+      body: "Trust the signal more when:\n- The review count is **10+** and the published rating average is stable across recent reviews\n- Sub-axis ratings are **internally consistent** with the written pros / cons / advice\n- Reviews come from **multiple job titles** at the company, not just one team\n\nDiscount the signal when:\n- The review count is **under 5** (any single bad review skews the average)\n- The same complaint recurs in **exactly the same words** (often a coordinated post-layoff dump)\n- Reviews are all from **one job title** (probably one team's bad experience, not the whole company)\n\nWhen reviews and salary data disagree — high reviews but below-market pay — the most common explanation is a company that pays in equity. Ask explicitly in the interview about the equity grant size and the vesting cliff.",
+    },
+  ],
+  faq: [
+    {
+      question: "Are hired.video company reviews verified?",
+      answer:
+        "Reviews are bound to authenticated user accounts (one review per user per company), and reviewers can earn a verified-employee badge by matching their corporate email domain at review time. Sub-axis ratings are stored as numeric columns so the platform can audit aggregate drift and flag suspicious bursts.",
+    },
+    {
+      question: "Where does the salary data come from?",
+      answer:
+        "From the `salaryMin` / `salaryMax` fields on active job listings posted on hired.video. The numbers are forward-looking (what companies are paying today) rather than self-reported (what people made years ago). Every salary page shows the underlying sample size.",
+    },
+    {
+      question: "What's the difference between /salary/:role and /salary/:role/:city?",
+      answer:
+        "`/salary/:role` aggregates across every city in the US, useful for a national benchmark. `/salary/:role/:city` filters to one city — the number you should actually negotiate against, because compensation varies 20–40% across major tech hubs.",
+    },
+  ],
+});
+
+// ── AI Recruiter Agent v2 how-to ───────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "ai-recruiter-agent-source-50-candidates-in-5-minutes",
+  title: "Source 50 Candidates in 5 Minutes: The AI Recruiter Agent v2 Playbook",
+  description:
+    "Use hired.video's AI Recruiter Agent to convert a plain-English brief into a ranked shortlist with personalized outreach drafts and scheduled follow-ups — without touching Boolean search.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "recruiter-agent",
+  toolName: "AI Recruiter Agent",
+  toolUrl: "/for-recruiters",
+  keywords:
+    "AI recruiter agent, recruiter automation, LinkedIn hiring assistant alternative, AI candidate sourcing, automated outreach, scheduled follow-ups, semantic sourcing, recruiter productivity",
+  heroAlt:
+    "Flow diagram showing brief intake to sourced candidates to scheduled follow-ups",
+  category: "Recruiter Tools",
+  sections: [
+    {
+      heading: "The Old Workflow vs the Agent Workflow",
+      body: "**The old workflow.** You write a Boolean search by hand. You scroll through 200 profiles. You shortlist 15. You manually draft an outreach to each. You set a calendar reminder to follow up in three days, another in seven. You forget the second one. Half your candidates never hear back. The whole process is two hours for one role.\n\n**The Agent workflow.** You paste a plain-English brief — \"hiring a senior staff infrastructure engineer with deep Go and Kubernetes experience for a Series C fintech in NYC, 7+ years\" — and the agent returns a ranked candidate list, a personalised outreach for each, and a scheduled follow-up sequence. Five minutes, one role.\n\nThe AI Recruiter Agent doesn't replace your judgment — it removes the keystrokes between your judgment and the sent message.",
+    },
+    {
+      heading: "Step 1: Intake (Brief → Structured Criteria)",
+      body: "Hit `POST /api/recruiter/agent/intake` with `{ briefText: \"…\" }`. The agent parses the brief and returns structured criteria:\n\n```json\n{\n  \"jobTitle\": \"Senior Staff Infrastructure Engineer\",\n  \"skills\": [\"go\", \"kubernetes\", \"terraform\"],\n  \"location\": \"New York, NY\",\n  \"experienceYears\": 7,\n  \"maxCandidates\": 20,\n  \"source\": \"brief\"\n}\n```\n\nOr if you already have a job posting, pass `{ jobId: \"<uuid>\" }` and the agent derives the same shape from the job row — title, skills, location, with experience inferred from the description.\n\nThis intake step is what LinkedIn markets as Semantic Sourcing: instead of typing `(go OR golang) AND kubernetes AND \"New York\"` you describe the role in English. The agent runs in heuristic-only mode when no LLM key is configured, so the surface always returns a usable criteria shape — useful for local dev and for graceful degradation when the model provider is down.",
+    },
+    {
+      heading: "Step 2: Source (Criteria → Ranked Candidates + Outreach Drafts)",
+      body: "Pipe the intake response into `POST /api/recruiter/agent/source`. The agent does three things in one round-trip:\n\n1. **Sources** — keyword-matches candidates from the resumes database against the criteria's skills.\n2. **Scores** — runs each candidate through the LLM with the role context, returning a 0–100 fit score and a one-sentence reason.\n3. **Drafts outreach** — for each candidate, generates a three-sentence personalised LinkedIn / email outreach that references the candidate's actual background, not a generic template.\n\nThe run is persisted to `recruiter_agent_runs` so you can revisit it later via `GET /api/recruiter/agent/runs/:id`. The results are sorted by score descending — review the top 10, dismiss the ones that aren't right, and proceed to step 3 for the rest.",
+    },
+    {
+      heading: "Step 3: Schedule Follow-ups (Persistent Cadence)",
+      body: "Manual follow-ups are where 90% of recruiting workflows leak candidates. The agent's third superpower is persisting them.\n\nFor each candidate you want to follow up on, call `POST /api/recruiter/agent/followups/schedule` with `{ runId, candidateId, dayOffset, body }`. The defaults are 3 days for the first follow-up, 7 for the second, 14 for the final. Customise the body or use the AI-generated draft.\n\nA cron worker (`recruiter-agent-followup`, runs every 5 minutes) flips due rows from `pending` to `sent`, materialising the reminder into your `candidate_interactions` feed so you see it in your dashboard the moment the slot arrives. Cancel any scheduled follow-up with `POST /api/recruiter/agent/followups/:id/cancel` if the candidate has already replied.\n\nThis is the part LinkedIn Hiring Assistant charges thousands of dollars per seat for. On hired.video Pro, it's included in the $9.95/mo tier with no per-seat upcharge.",
+    },
+    {
+      heading: "ROI Math: What 5 Minutes Saves Per Role",
+      body: "Conservative estimates for a recruiter sourcing one role per day, 20 working days per month:\n\n- **Manual workflow:** ~2 hours per role × 20 roles = **40 hours / month** on sourcing + outreach + follow-up.\n- **Agent workflow:** ~5 minutes per role × 20 roles = **100 minutes / month** on the same workflow.\n- **Time recovered: ~38 hours / month** to spend on interviewing, closing, and team management instead of keystrokes.\n\nLinkedIn Charter customers using Hiring Assistant report 62% fewer profiles reviewed, 4+ hours saved per role, and 69% higher InMail acceptance. hired.video's agent runs the same loop at $9.95/mo with no Hiring Assistant add-on fee.\n\nThe hidden ROI is the follow-up cadence. Most recruiters drop more candidates from forgetting to follow up than from candidates declining. Scheduled follow-ups effectively give you a +30% top-of-funnel without sending a single extra outreach.",
+    },
+  ],
+  faq: [
+    {
+      question: "Does the AI Recruiter Agent auto-send the outreach?",
+      answer:
+        "Not yet — the agent currently materialises the message as a draft in your candidate-interactions feed and you dispatch via your chosen channel (email, LinkedIn, SMS). Auto-send via the Comm Hub is on the roadmap (Gap Register #1206); the current architecture is deliberately recruiter-in-the-loop so an LLM hallucination can't ping a candidate without review.",
+    },
+    {
+      question: "What happens when the LLM provider is down?",
+      answer:
+        "The intake endpoint falls back to a deterministic heuristic that extracts the role, skills (from a dictionary match), location, and experience years from the brief. The source endpoint falls back to a baseline-score-plus-template-outreach for each candidate. The surface degrades, never errors.",
+    },
+    {
+      question: "How is this different from a Boolean search?",
+      answer:
+        "A Boolean search returns everyone who matches the keywords. The agent ranks them by LLM-derived fit, drafts a personalised outreach for each one, and schedules follow-ups — the three steps that turn a search into a hire. You can still write Boolean searches; the agent layers on top.",
+    },
+  ],
+});
+
+// ── Live screening how-to ──────────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "run-a-live-screening-block-in-30-minutes",
+  title: "Run a 30-Minute Live Screening Block and Replace Two Weeks of Phone Calls",
+  description:
+    "ZipIntro-style back-to-back video screening blocks for any role on hired.video. Set a window, schedule matched candidates, and run 6+ interviews in one sitting.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "live-screening",
+  toolName: "Live Screening Sessions",
+  toolUrl: "/for-recruiters",
+  keywords:
+    "ZipIntro alternative, back-to-back interviews, live video screening, recruiter speed dating, candidate batch scheduling, recruiter productivity, video screening platform",
+  heroAlt:
+    "Calendar view showing a 2-hour live screening block split into eight 8-minute candidate slots",
+  category: "Recruiter Tools",
+  sections: [
+    {
+      heading: "Why Back-to-Back Beats Async",
+      body: "Async video resumes have a place — they let you screen 100 candidates in an evening. But for the candidates already on your shortlist, async screening loses three things sync screening keeps:\n\n1. **Real-time follow-up questions.** You can't ask a recorded answer to clarify.\n2. **Read on energy and culture fit.** Async edits out the moments that tell you whether you'd actually want to work with someone.\n3. **Speed to decision.** Async-only loops add 3–5 days per round; back-to-back blocks let you make a same-day call.\n\nZipRecruiter's ZipIntro is the canonical product here. hired.video's Live Screening Sessions are the same workflow at a fraction of the cost — and they integrate with the AI Recruiter Agent v2 results from the previous article.",
+    },
+    {
+      heading: "Step 1: Declare Your Window",
+      body: "Hit `POST /api/recruiter/live-screen/sessions` with the window:\n\n```json\n{\n  \"title\": \"Staff Backend Engineer first-rounds\",\n  \"jobId\": \"<uuid>\",\n  \"startTime\": \"2026-06-03T13:00:00Z\",\n  \"endTime\": \"2026-06-03T15:00:00Z\",\n  \"slotMinutes\": 15,\n  \"meetingUrl\": \"https://meet.google.com/abc-defg-hij\"\n}\n```\n\nThe session is persisted in `live_screening_sessions` with status `scheduled`. The window is 2 hours; with 15-minute slots, that's a capacity of 8 candidates. You can pick any slot length between 3 and 60 minutes — most recruiters land at 8 minutes for screening and 15 for deeper first-rounds.",
+    },
+    {
+      heading: "Step 2: Schedule Your Candidates",
+      body: "POST your candidate list to `/sessions/:id/schedule`:\n\n```json\n{\n  \"candidates\": [\n    { \"candidateId\": \"…\", \"candidateName\": \"Alice Chen\", \"candidateEmail\": \"alice@example.com\" },\n    { \"candidateId\": \"…\", \"candidateName\": \"Bob Park\", \"candidateEmail\": \"bob@example.com\" }\n  ]\n}\n```\n\nThe pure `buildBackToBackSchedule` function partitions your window into back-to-back slots and pairs the first N candidates with them. The response tells you the capacity, how many got scheduled, and which ones (if any) overflowed — useful when you've shortlisted more candidates than your window holds.\n\nEach invite gets a 32-byte unguessable `invite_token`. Email or SMS the candidate the link to `https://hired.video/live-screen/invite/{token}` — they don't need a hired.video account to respond.",
+    },
+    {
+      heading: "Step 3: Candidate Accepts (or Declines)",
+      body: "When the candidate visits their invite URL, they see the slot time and the session title. They can accept or decline with one click. The public endpoints — `GET /api/live-screen/invites/:token` and `POST /api/live-screen/invites/:token/respond` — require no authentication, so the link works from any inbox.\n\nThe meeting URL is **only revealed after the candidate accepts**. This prevents URL-sharing leaks and gives you a clean accept-rate metric: declined candidates never saw the meeting link.\n\nOn your dashboard, watch the invite list shift from `pending` → `accepted` / `declined` as candidates respond. Most invites are answered within 24 hours; the few that aren't can be re-pinged or replaced before the window starts.",
+    },
+    {
+      heading: "Day-Of Workflow",
+      body: "**T-30 minutes.** Open the session's detail view. Confirm the accepted-invite count matches your expectations. Re-message no-responders one final time.\n\n**T-0.** Open the meeting URL. Candidate 1 joins for 15 minutes. You ask 2–3 questions, take notes in your dashboard. At T+15, candidate 1 leaves and candidate 2 joins — same room, same URL, back-to-back.\n\n**T+session.** After the last candidate leaves, flip the session's status to `completed`. Optionally mark `no_show` on any invite that didn't show. Promote the strongest 2–3 to your next round through the normal pipeline.\n\nA 2-hour block lets you interview 8 candidates at 15 minutes each. That used to be two weeks of \"let's find a time that works.\" Now it's one Tuesday afternoon.",
+    },
+    {
+      heading: "ROI Compared to Phone-Tag Scheduling",
+      body: "**The phone-tag workflow:** 8 candidates × (3 emails + 1 reschedule + 30-min call + 5-min wrap-up) = ~4.5 hours of recruiter time + 14 calendar days from \"interested\" to \"decision\".\n\n**The live-screen workflow:** 8 candidates × (1 invite + 15-min slot) = ~2.5 hours of recruiter time + 3 calendar days.\n\nTime saved per 8 candidates: **2 hours of recruiter labor + 11 days of cycle time**. Cycle time matters more than recruiter hours — the candidate with three offers in flight will accept the company that moves fastest. Live-screen blocks turn cycle-time into your competitive edge.",
+    },
+  ],
+  faq: [
+    {
+      question: "Do candidates need a hired.video account to accept an invite?",
+      answer:
+        "No. The accept / decline flow is fully tokenised — the invite URL contains a 32-byte unguessable token, and the public endpoints don't require authentication. The candidate can respond from any device, any inbox, with one click.",
+    },
+    {
+      question: "Does hired.video provide the video room?",
+      answer:
+        "Not in this release. You provide the meeting URL (Zoom, Meet, Whereby) and hired.video handles matching, scheduling, invites, accept-flow, and reminders. A native WebRTC room is on the roadmap (Gap Register #1210) but external rooms work well today and let you reuse your existing tooling.",
+    },
+    {
+      question: "Can I auto-match candidates from a prior Agent run?",
+      answer:
+        "Auto-match into a session from a saved agent run is on the roadmap (Gap Register #1208). Today you POST the candidate list explicitly. The most common pattern is: run the AI Recruiter Agent (top 8 by score), copy those IDs into the `/schedule` body, send. Two minutes end-to-end.",
+    },
+  ],
+});
+
+// ── Competition: vs LinkedIn Recruiter ─────────────────────────────────
+BLOG_POSTS.push({
+  slug: "hired-video-vs-linkedin-recruiter-2026-comparison",
+  title: "hired.video vs LinkedIn Recruiter: A 2026 Cost and Capability Breakdown",
+  description:
+    "LinkedIn Recruiter Corporate starts at ~$1,080/month per seat. hired.video Pro is $9.95/month with unlimited seats. Here's what each gets you in 2026 — and where each one wins.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 9,
+  author: "hired.video",
+  toolSlug: "for-recruiters",
+  toolName: "hired.video for Recruiters",
+  toolUrl: "/for-recruiters",
+  keywords:
+    "LinkedIn Recruiter alternative, LinkedIn Recruiter pricing, LinkedIn Hiring Assistant, recruiter platform comparison, LinkedIn Recruiter vs, recruiter software pricing, hired.video vs LinkedIn",
+  heroAlt:
+    "Side-by-side feature comparison of hired.video Pro and LinkedIn Recruiter Corporate",
+  category: "Platform Comparisons",
+  sections: [
+    {
+      heading: "Headline Numbers",
+      body: "**LinkedIn Recruiter (2026):** Recruiter Lite ~$170/mo per seat. Recruiter Corporate ~$1,080+/mo per seat (up ~15% YoY). LinkedIn Hiring Assistant is an undisclosed add-on layered on Corporate and RPS+ plans, behind a sales call.\n\n**hired.video Pro:** $9.95/mo (or $95.52/year, 20% discount). Unlimited seats. Includes 1M AI tokens/mo, the AI Recruiter Agent v2, Live Screening Sessions, the Chrome extension, unlimited job postings, candidate scoring, voice cloning, and the multi-format Studio.\n\nThe price difference is ~108× on the entry tier. The capability gap is much narrower than that ratio suggests.",
+    },
+    {
+      heading: "Where LinkedIn Wins",
+      body: "**The graph.** LinkedIn's 1B+ profiles and the social-graph reputation signal are uncloneable in the short term. If your sourcing strategy depends on lukewarm-intro outreach through second-degree connections, you're staying on LinkedIn.\n\n**Enterprise integrations.** LinkedIn Recruiter Corporate ships with ATS integrations for Greenhouse, Workday, SmartRecruiters, and most enterprise tools out of the box. hired.video has an ATS connections schema (`ats_connections`) but the marketplace of pre-built integrations is smaller.\n\n**Brand recognition with executives.** When your VP of HR asks \"why aren't we on LinkedIn Recruiter?\" the answer needs to be specific — usually about cost or workflow, not about features.\n\n**Verified Applicant Spotlight + AI Follow-Ups.** February 2026's quarterly update added Microsoft Teams integration, AI Applicant Targeting, and verification badges. If your stack is Microsoft-first, LinkedIn's first-party Teams integration is worth something.",
+    },
+    {
+      heading: "Where hired.video Wins",
+      body: "**Price.** $9.95/mo vs $1,080/mo for a comparable feature surface. The price gap funds itself in week one of any meaningful sourcing volume.\n\n**Unlimited seats.** LinkedIn charges per seat. hired.video Pro is one flat number for the recruiter, no matter how many teammates you onboard. For a 5-person recruiting team, the annual cost difference is $63,600 vs $119.40.\n\n**Multi-format candidate pitches.** Candidates on hired.video can submit a video, comic, podcast, animation, or game pitch — and the studio AI generates these from their resume in 60 seconds. LinkedIn candidates submit a PDF. As LLM-generated resumes flood every ATS in 2026, the multi-format pitch is becoming the only reliable differentiation signal.\n\n**Live screening + agent integration.** hired.video's AI Recruiter Agent v2 hands directly off into a Live Screening session (`/sessions/:id/schedule`). LinkedIn requires the recruiter to manually move shortlisted candidates between Hiring Assistant and an external scheduling tool.\n\n**Transparent token metering.** You can see exactly what every AI feature costs in tokens. LinkedIn's AI Hiring Assistant is opaque per-seat add-on pricing.",
+    },
+    {
+      heading: "Feature-by-Feature, 2026",
+      body: "| Feature | hired.video Pro | LinkedIn Recruiter Corporate |\n|---|---|---|\n| Monthly cost (per recruiter) | $9.95 | ~$1,080+ |\n| Unlimited seats | Yes | No (per-seat) |\n| AI semantic intake (brief → criteria) | Agent v2 intake | Hiring Assistant (add-on) |\n| AI candidate scoring | Included | Included |\n| AI outreach drafts | Included | Hiring Assistant (add-on) |\n| Scheduled follow-up sequences | Included | Manual / Hiring Assistant |\n| Live back-to-back video screening | Included | Not available |\n| Async video candidate pitches | Multi-format | Not available |\n| Candidate creator studio | Yes (video, comic, game, podcast) | No |\n| Voice cloning marketplace | Yes | No |\n| Chrome sourcing extension | Yes | Yes |\n| Native ATS integrations | Partial | Extensive |\n| Public salary benchmark | Yes (role × city) | Limited |\n| Company reviews surface | Yes (multi-axis) | Limited (via Glassdoor) |\n| Brand recognition | Growing | Industry standard |\n\nThe gap is one of distribution and integrations, not feature coverage. Most LinkedIn-only features are reachable on hired.video; the inverse is no longer true.",
+    },
+    {
+      heading: "When to Pick Each",
+      body: "**Pick LinkedIn Recruiter Corporate when:** you're a 200+ employee company with budget signed off; your hiring depends on second-degree-connection sourcing; you need Greenhouse / Workday / Microsoft Teams integrations on day one; an executive has explicitly mandated LinkedIn as the platform of record.\n\n**Pick hired.video Pro when:** budget is a real constraint; you want unlimited recruiter seats without per-head sticker shock; your sourcing leans on AI-assisted intake and personalised outreach more than warm intros; you want candidates to submit richer pitches than a PDF; you value transparent metered pricing over opaque per-seat fees.\n\n**Use both:** many growing teams keep one LinkedIn Recruiter seat for warm-intro sourcing and put the rest of the team on hired.video Pro for everything else. The math works at almost any team size: one $1,080 seat plus N $9.95 seats beats N+1 $1,080 seats by an enormous margin.",
+    },
+  ],
+  faq: [
+    {
+      question: "Does hired.video have a Chrome extension for sourcing like LinkedIn?",
+      answer:
+        "Yes. The hired.video Chrome extension extracts candidate profiles from LinkedIn, Indeed, Glassdoor, and 10+ other job sites, then drops them into your talent pool with auto-deduplication. It also auto-fills job-application forms for job seekers.",
+    },
+    {
+      question: "Can hired.video import my LinkedIn Recruiter data?",
+      answer:
+        "Your existing LinkedIn Recruiter Notes and Projects don't have an official export API, but you can use the hired.video Chrome extension to extract profiles from your saved searches and push them into your hired.video talent pool. Bulk historical migration is a roadmap item.",
+    },
+    {
+      question: "Is the $9.95/mo price genuinely all-in?",
+      answer:
+        "Yes for the feature set listed. Optional add-ons are clearly priced: extra mailbox connections at $5/mo, AI token top-up packs from $3.99 (500K tokens) to $199.99 (50M tokens). There are no per-seat fees, no Hiring Assistant tier, no enterprise upcharge.",
+    },
+  ],
+});
+
+// ── Competition: vs Indeed ─────────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "hired-video-vs-indeed-when-to-use-each",
+  title: "hired.video vs Indeed: When to Use Each Platform in 2026",
+  description:
+    "Indeed has unmatched scale (31 hires per minute). hired.video has AI Recruiter Agent v2, multi-format candidate pitches, and a $9.95/mo cap. Here's how to choose.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "for-recruiters",
+  toolName: "hired.video for Recruiters",
+  toolUrl: "/for-recruiters",
+  keywords:
+    "Indeed alternative, Indeed pricing, Indeed vs, Indeed Talent Scout, Indeed Smart Sourcing, recruiter platform, sponsored job postings, hired.video vs Indeed",
+  heroAlt:
+    "Comparison chart of Indeed's reach versus hired.video's feature density",
+  category: "Platform Comparisons",
+  sections: [
+    {
+      heading: "Two Different Bets",
+      body: "Indeed is a scale platform. As of 2026 they're powering 31 hires per minute and ~70% of sponsored applications come from AI-powered recommendations. Their core bet: every job, every candidate, every category, billed mostly through pay-per-click sponsored postings.\n\nhired.video is a workflow platform. Smaller candidate pool, much deeper per-role workflow: AI Recruiter Agent v2, Live Screening Sessions, multi-format candidate pitches, candidate creator studio, company reviews, salary guides, $9.95/mo flat.\n\nThe two are complementary more than competitive. Most growing teams should be on both.",
+    },
+    {
+      heading: "Where Indeed Wins",
+      body: "**Top-of-funnel volume.** No other platform comes close to Indeed's applicant volume for general-purpose roles (retail, hospitality, customer service, mid-level office). If you need 200 applicants for a barista role this week, Indeed posts get them.\n\n**Indeed Talent Scout + Smart Sourcing.** Indeed's AI agents are mature and integrated with their applicant flow. The 'sourcing while you sleep' model in the Indeed Connect program quietly fills your pipeline overnight.\n\n**Sponsored Jobs distribution.** Indeed syndicates to Glassdoor, Google for Jobs, and most aggregators. A single sponsored post hits a much bigger surface than a single hired.video post (though hired.video posts hit Google for Jobs too).\n\n**Brand familiarity for non-technical roles.** Plumbers, drivers, line cooks, retail managers — they search 'jobs near me' on Indeed by reflex.",
+    },
+    {
+      heading: "Where hired.video Wins",
+      body: "**Predictable pricing.** Indeed's sponsored model is pay-per-click with variable budgets — easy to overspend, hard to forecast. hired.video Pro is $9.95/mo flat, with unlimited postings.\n\n**Multi-format candidate pitches.** When 64% of recruiters report a flood of identical AI-generated PDFs (a real 2026 stat), the candidate who submits a 60-second video pitch or a comic resume jumps out of the pile. Indeed accepts text resumes. hired.video accepts video, podcast, comic, animation, game, and PDF.\n\n**AI Recruiter Agent v2 for outbound sourcing.** Indeed's Smart Sourcing surfaces candidates *to* employers; hired.video's agent generates ranked candidates *plus personalised outreach drafts plus scheduled follow-ups*. It's the difference between a lead list and an executed sequence.\n\n**Live Screening Sessions.** Back-to-back video screening blocks are not available on Indeed at all. Eight candidates × 15 minutes = one Tuesday afternoon.\n\n**Company reviews and salary guides included.** Indeed has its own salary database; you don't pay extra for it. hired.video has a multi-axis reviews surface and a role × city salary grid. Both are accessible by candidates and recruiters from the same surface — no separate Glassdoor login.",
+    },
+    {
+      heading: "Cost Modelling: One Sponsored Indeed Post vs hired.video Pro",
+      body: "A single sponsored Indeed post for a senior engineering role in a US metro typically lands at **$5–$20 per applicant click**, with reasonable monthly budgets of $400–$1,500 per role.\n\nhired.video Pro is **$9.95/mo total**, with unlimited postings included.\n\nThe break-even is: if you'd spend more than $10/mo on a single sponsored Indeed post, hired.video Pro covers itself before you make a single hire.\n\nThis math is *not* about replacing Indeed. It's about not paying Indeed for the parts of the workflow Indeed isn't good at. Use Indeed for top-of-funnel volume on hard-to-fill roles. Use hired.video for AI-driven workflow, multi-format candidate signal, and unlimited seats for your team.",
+    },
+    {
+      heading: "When to Pick Each",
+      body: "**Pick Indeed when:** you're hiring high-volume hourly or general-labor roles; you need maximum applicant volume right now; the role is well understood and standardised enough that PDF resumes are sufficient screening signal; you have budget for sponsored posts.\n\n**Pick hired.video when:** you're hiring roles where personality, communication, or creative judgment matter (sales, product, design, customer success, executive); you want AI to handle intake + sourcing + scoring + outreach + follow-up in one workflow; you want unlimited seats for your recruiting team; you need transparent fixed pricing.\n\n**Use both:** post on Indeed for volume, source on hired.video for quality, do all your live screening + agent automation on hired.video, evaluate candidate pitches across both surfaces.",
+    },
+  ],
+  faq: [
+    {
+      question: "Does hired.video distribute postings to Google for Jobs?",
+      answer:
+        "Yes. Every active hired.video posting is indexed to Google for Jobs at no additional cost — included in Pro and Free tiers.",
+    },
+    {
+      question: "Can I import my saved Indeed candidates into hired.video?",
+      answer:
+        "The hired.video Chrome extension extracts candidate profiles from Indeed search results and pushes them into your talent pool, with auto-deduplication. Bulk historical migration via the Indeed API is on the roadmap.",
+    },
+    {
+      question: "Does hired.video sponsor postings the way Indeed does?",
+      answer:
+        "Job postings on hired.video have a sponsored flag (`sponsored`, `sponsored_until`, `sponsored_rank_boost`) for promoted placement in the platform's discovery feed and search results. Pricing for the sponsored tier is à la carte and predictable, not pay-per-click.",
+    },
+  ],
+});
+
+// ── Competition: vs ZipRecruiter ───────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "hired-video-vs-ziprecruiter-pricing-ai-video-screening",
+  title: "hired.video vs ZipRecruiter: Pricing, AI Matching, and Video Screening Compared",
+  description:
+    "ZipRecruiter Standard starts at ~$299/mo per job slot. hired.video Pro is $9.95/mo with unlimited postings and unlimited seats. Here's the workflow-level comparison.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "for-recruiters",
+  toolName: "hired.video for Recruiters",
+  toolUrl: "/for-recruiters",
+  keywords:
+    "ZipRecruiter alternative, ZipRecruiter pricing, ZipIntro alternative, video screening, AI matching, recruiter software, ZipRecruiter vs, hired.video vs ZipRecruiter",
+  heroAlt:
+    "Three-pane comparison: pricing tiers, AI matching, and video screening features",
+  category: "Platform Comparisons",
+  sections: [
+    {
+      heading: "Headline Numbers",
+      body: "**ZipRecruiter (2026):** Standard ~$299–$399/mo per job slot. Premium ~$419–$519. Pro ~$719–$899. Custom-quoted by industry, location, and slot volume.\n\n**hired.video Pro:** $9.95/mo (or $95.52/year). Unlimited postings, unlimited seats.\n\nThe price gap is ~30× on the entry tier *per slot*. ZipRecruiter's slot-based pricing is the load-bearing assumption: the more roles you're hiring for, the more it scales.",
+    },
+    {
+      heading: "AI Matching: ZipRecruiter vs hired.video",
+      body: "**ZipRecruiter** uses an AI matching algorithm that syndicates your job to 100+ partner sites and invites top candidates to apply. The 'AI-matched invitations' are the headline value prop.\n\n**hired.video** uses an AI matching surface plus an active sourcing agent. The AI Recruiter Agent v2 (`/api/recruiter/agent/intake` + `/source`) doesn't just invite candidates to apply — it sources them from the resumes database, scores each one against the role, and drafts personalised outreach.\n\nThe distinction: ZipRecruiter's AI is *passive* (it waits for matched candidates to opt in). hired.video's AI is *active* (it goes and gets them). For roles where the best candidates aren't actively job-searching, active sourcing wins.",
+    },
+    {
+      heading: "Video Screening: ZipIntro vs Live Screening Sessions",
+      body: "**ZipIntro (ZipRecruiter):** Recruiter picks a time window, ZipRecruiter matches candidates, invites them to back-to-back short video calls in a single block. The headline ZipRecruiter feature for 2026.\n\n**Live Screening Sessions (hired.video):** Same workflow. Recruiter declares window + slot length, posts candidates via `/sessions/:id/schedule`, candidate accept/decline via tokenised public link, back-to-back slots delivered.\n\nKey differences:\n- **Cost.** ZipIntro is included in ZipRecruiter Pro (~$719+/mo). Live Screening Sessions are included in hired.video Pro ($9.95/mo).\n- **Candidate pool.** ZipIntro auto-matches from ZipRecruiter's candidate database. hired.video's flow currently expects you to POST candidates explicitly — typically from a prior AI Recruiter Agent run. Auto-match from the agent is on the roadmap (Gap Register #1208).\n- **Meeting infra.** ZipIntro hosts the video call. hired.video uses your meeting URL (Zoom / Meet / Whereby). Lighter infra footprint, more tool choice. Native WebRTC is a roadmap item (Gap Register #1210).",
+    },
+    {
+      heading: "Distribution: Does the Reach Matter?",
+      body: "ZipRecruiter's pitch is distribution: post once, syndicate to 100+ partner sites. This is genuinely valuable for general-purpose roles, but the value is concentrated in the first three boards (Indeed, Google for Jobs, Glassdoor) — the long-tail 97+ sites contribute minimally.\n\nhired.video distributes to Google for Jobs and to its own active candidate base. For specialised roles (engineering, design, product, sales, executive), the targeted hired.video audience often outperforms the diffuse 100-board sprayout.\n\nDecision rule: if your role is generic and high-volume, ZipRecruiter's distribution is worth the premium. If your role is specialised and quality-sensitive, hired.video's deeper-per-role workflow is better leverage.",
+    },
+    {
+      heading: "When to Pick Each",
+      body: "**Pick ZipRecruiter when:** you're hiring 1–3 generic roles per quarter and the distribution is the value prop; you want managed syndication across 100+ boards without manual cross-posting; budget is not the binding constraint.\n\n**Pick hired.video when:** you're hiring 5+ roles per quarter (the per-slot pricing on ZipRecruiter becomes punitive); you want AI-driven sourcing + scoring + outreach + follow-up in one workflow; you want unlimited postings and unlimited seats for your team; ZipIntro is appealing but $719/mo for it specifically is not.\n\n**Use both:** post your hardest-to-fill role on ZipRecruiter Pro for the distribution, do all your other roles on hired.video, run all your video screening on hired.video Live Screening Sessions.",
+    },
+  ],
+  faq: [
+    {
+      question: "Is hired.video Live Screening as turnkey as ZipIntro?",
+      answer:
+        "The recruiter workflow is the same shape: declare window, schedule candidates, accept-flow, back-to-back slots. The main maturity gap is auto-match — ZipIntro auto-fills the block from their candidate base; hired.video expects you to POST candidates from a prior AI Recruiter Agent run today, with auto-match on the roadmap.",
+    },
+    {
+      question: "What does ZipRecruiter charge per video screening?",
+      answer:
+        "ZipIntro is included in ZipRecruiter Pro (~$719–$899/mo per job slot). hired.video Live Screening Sessions are included in Pro ($9.95/mo flat).",
+    },
+    {
+      question: "Can I export my ZipRecruiter candidates to hired.video?",
+      answer:
+        "ZipRecruiter doesn't expose a full candidate-list API, but the hired.video Chrome extension can extract candidate profiles you have access to in your ZipRecruiter dashboard and push them into your talent pool.",
+    },
+  ],
+});
+
+// ── Competition: vs Glassdoor ──────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "hired-video-vs-glassdoor-reviews-salary-employer-branding",
+  title: "hired.video vs Glassdoor: Employer Branding, Reviews, and Salary Data",
+  description:
+    "Glassdoor is the legacy reviews + salary surface. hired.video bundles a multi-axis reviews system, a role × city salary grid, and a recruiter workflow on top — at $9.95/mo.",
+  publishedAt: "2026-05-25",
+  updatedAt: "2026-05-25",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "companies",
+  toolName: "Company Reviews + Salary Guides",
+  toolUrl: "/companies",
+  keywords:
+    "Glassdoor alternative, Glassdoor vs, employer reviews, company reviews platform, salary by city, multi-axis ratings, hired.video vs Glassdoor, employer branding tool",
+  heroAlt:
+    "Comparison of multi-axis review surfaces and salary database depth",
+  category: "Platform Comparisons",
+  sections: [
+    {
+      heading: "What Glassdoor Is For",
+      body: "Glassdoor's defensible moat is 20+ years of employee-written reviews and a salary database with deep historical depth. Candidates use it to research companies before they apply. Employers use it as an employer-branding surface — claim your profile, respond to reviews, post benefits, advertise culture.\n\nIn 2026 Glassdoor's job postings flow primarily through Indeed (same parent company). The product is now best understood as a branding + reviews + salary destination rather than a primary job board.",
+    },
+    {
+      heading: "What hired.video Adds on Top",
+      body: "hired.video's company reviews surface ships with **six sub-axis ratings** (culture, leadership, work-life balance, compensation, career growth, diversity) per company, computed and cached on the company row (`review_count`, `review_avg_overall`). Glassdoor's single overall score is computed from the same data but presented as one number.\n\nhired.video's **salary guides** are powered by real active job listings on the platform — forward-looking comp data, not self-reported anonymous history. The `/salary/:role/:city` grid gives you Glassdoor-style city × role pages, plus the related-cities and related-roles cross-links Glassdoor charges premium tiers for.\n\nAnd hired.video bundles the full **recruiter workflow** in the same product — the AI Recruiter Agent v2, Live Screening Sessions, ATS, unlimited postings. Glassdoor stops at branding + research.",
+    },
+    {
+      heading: "Where Glassdoor Wins",
+      body: "**Historical depth.** 20+ years of employee reviews. For a Fortune 500 with 5,000+ reviews going back to 2010, that depth genuinely matters — you can see trend lines, leadership changes, post-acquisition shifts.\n\n**Brand recognition.** Candidates search 'Acme Corp Glassdoor' by reflex. The brand is the moat.\n\n**Sample size for established companies.** A 2-year-old company has 3 Glassdoor reviews and 1 hired.video review. For research on established players, Glassdoor's volume usually beats hired.video's.\n\n**Salary history.** Glassdoor's salary data goes back years, with quarterly cadence. hired.video's salary data is current-listing-only — accurate for *now* but no time series yet.",
+    },
+    {
+      heading: "Where hired.video Wins",
+      body: "**Multi-axis ratings, not a single score.** A 4.0 made of (5, 5, 2, 5, 5, 2) is very different from (4, 4, 4, 4, 4, 4) — and only the multi-axis view tells you which. hired.video shows both the aggregate and the per-axis breakdown by default.\n\n**Forward-looking salary data.** Real active listings, not self-reported memories. The number reflects what employers are paying *now*, not what someone made in 2022.\n\n**Same surface for research and apply.** A candidate researching a company on Glassdoor has to leave to apply (via Indeed). On hired.video the company profile, reviews, salary guide, and job postings are one surface — research-to-apply is one click.\n\n**Recruiter workflow included.** Glassdoor for Employers is a branding-only product. hired.video Pro includes the AI Recruiter Agent, Live Screening, ATS, and unlimited postings in the same $9.95/mo.\n\n**Verified reviews infrastructure.** hired.video's review system stores `is_verified` + `verification_method` (email-domain match or was-a-buyer). Glassdoor moderates but doesn't expose verification status to candidates.",
+    },
+    {
+      heading: "When to Pick Each",
+      body: "**Use Glassdoor when:** you're researching a Fortune 500 or established public company with 100+ reviews of historical depth; you want the time-series view of how a company has changed; brand recognition with your team's executives is required.\n\n**Use hired.video when:** you want a multi-axis view of how a company actually performs across culture / pay / leadership / WLB / growth / diversity; you want forward-looking salary data based on what employers are paying right now; you want to research a company AND apply AND get matched without leaving the surface; you're an employer looking for a branding surface that bundles recruiter workflow at $9.95/mo instead of $400+/mo for Glassdoor Enhanced.\n\n**Use both:** read both reviews, cross-reference. When they agree, the signal is high. When they disagree, the recent hired.video reviews are usually the more current picture.",
+    },
+  ],
+  faq: [
+    {
+      question: "Can employers respond to reviews on hired.video?",
+      answer:
+        "Yes. Companies can post threaded replies under any review via the `review_comments` table; replies from the verified company owner are flagged `is_subject_owner=true` so candidates can see at a glance which comments are official company responses.",
+    },
+    {
+      question: "How does hired.video prevent fake reviews?",
+      answer:
+        "Reviews are bound to authenticated user accounts (one review per user per company, enforced by a unique index). Verified-employee status is awarded when the reviewer's email domain matches the company's verified domain. Reviews from the company owner are blocked by descriptor eligibility (`owner_blocked`). A `submitter_ip_hash` is stored for downstream fraud analysis.",
+    },
+    {
+      question: "Does hired.video have salary data for international roles?",
+      answer:
+        "Currently the salary guides are US-focused (city dimension parsed from free-text job locations like 'San Francisco, CA'). International expansion is on the roadmap as part of the broader internationalization initiative; the underlying schema (`content_locations`) is country-aware and ready.",
+    },
+  ],
+});
+
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
 }

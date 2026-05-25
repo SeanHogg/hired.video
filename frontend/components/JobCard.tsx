@@ -28,7 +28,7 @@ import { useState } from "react";
 import type { JobMetadata, JobWithOwnership } from "@/types/job";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
-import EntityVideos from "@/components/studio/EntityVideos";
+import EntityMedia from "@/components/studio/EntityMedia";
 import { JobActionsMenu } from "@/components/JobActionsMenu";
 
 interface JobCardProps {
@@ -94,7 +94,7 @@ export default function JobCard({
   const { isAuthenticated } = useAuth();
 
   const ownership = "ownership" in job ? job.ownership : undefined;
-  // Single source of truth for owner derivation — same hook EntityVideos
+  // Single source of truth for owner derivation — same hook EntityMedia
   // and every other card use, so the create-chip gate can never drift.
   const { isOwner: isOwned, isTracked } = useEntityOwnership({
     ownerUserId: job.userId,
@@ -365,11 +365,13 @@ export default function JobCard({
             </div>
           </div>
 
-          {/* Studio videos linked to this job (#271). EntityVideos
+          {/* Studio media linked to this job (#271). EntityMedia
               self-fetches and self-gates — given the job's userId it
-              decides internally whether the viewer is the owner. */}
+              decides internally whether the viewer is the owner —
+              and renders any mediaKind (video / podcast / game /
+              image / animation) the owner attached. */}
           {job.id && (
-            <EntityVideos
+            <EntityMedia
               subject={{ kind: "job", id: job.id }}
               ownerUserId={job.userId}
             />

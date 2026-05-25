@@ -218,9 +218,9 @@ export default function StudioEditorV2() {
   // is resolved asynchronously below — initial state still hydrates from
   // built-in template seeds; the creator-template fetch then overrides it.
   const studioTemplateSlug = searchParams.get("studioTemplate");
-  // `?subject=<kind>:<id>` arrives from every entity-card "Create Video"
+  // `?subject=<kind>:<id>` arrives from every entity-card "Create"
   // deep-link (ResumeCard, JobActionsMenu, PeopleCard, CompanyCard,
-  // EntityVideos). Parsed once on mount; carried as a pending attachment
+  // EntityMedia). Parsed once on mount; carried as a pending attachment
   // that ships with the FIRST saveDraft call so the freshly-created
   // project is bound to the source entity. v1 already did this in
   // StudioLayout; this closes the v2-side gap so "Create video from

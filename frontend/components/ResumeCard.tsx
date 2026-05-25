@@ -16,7 +16,7 @@ import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
-import EntityVideos from "@/components/studio/EntityVideos";
+import EntityMedia from "@/components/studio/EntityMedia";
 import ResumeScoreBadges from "@/components/tools/ResumeScoreBadges";
 import type { ResumeScores } from "@shared/scores";
 import { formatStudioSubject } from "@shared/studio-subject";
@@ -35,8 +35,8 @@ import type { ResumePrivacy, ResumeWithOwnership } from "@/types/resume";
 interface ResumeCardProps {
   id: string;
   slug?: string;
-  /** Resume owner's user id — used by EntityVideos to gate the Create
-   *  Video chip and by ownership-aware actions. Required for any surface
+  /** Resume owner's user id — used by EntityMedia to gate the Create
+   *  Reel chip and by ownership-aware actions. Required for any surface
    *  that needs to distinguish owner from non-owner; safe to omit only
    *  when an explicit `ownership` prop is provided alongside. */
   userId?: string;
@@ -145,7 +145,7 @@ export default function ResumeCard({
   extraMenuItems,
 }: ResumeCardProps) {
   // Ownership is centralised in `useEntityOwnership` — single source of
-  // truth shared with EntityVideos and every other card surface.
+  // truth shared with EntityMedia and every other card surface.
   const { isOwner, isAuthenticated } = useEntityOwnership({ ownerUserId: userId, ownership });
   // Score cluster widens to anyone who can triage candidates at the list
   // level (recruiters / employers / admin / SA). Mirrors the detail-page
@@ -332,11 +332,12 @@ export default function ResumeCard({
             )}
           </div>
 
-          {/* Studio videos linked to this resume (#270). EntityVideos
+          {/* Studio media linked to this resume (#270). EntityMedia
               re-runs `useEntityOwnership({ ownerUserId })` so its own
               create-chip gate stays in lockstep with this card's
-              `isOwner`. */}
-          <EntityVideos
+              `isOwner`, and renders any mediaKind the owner attached
+              (video / image / podcast / game / animation). */}
+          <EntityMedia
             subject={{ kind: "resume", id }}
             ownerUserId={userId}
           />

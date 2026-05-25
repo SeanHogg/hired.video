@@ -106,7 +106,7 @@ export default function CompanyDetail() {
 
   // Team membership is folded into useEntityOwnership so the edit
   // affordances on this page agree with every other entity surface
-  // (CompanyCard, EntityVideos, etc.).
+  // (CompanyCard, EntityMedia, etc.).
   const { isOwner } = useEntityOwnership({
     ownerUserId: company?.userId,
     extraOwnerPredicates: [

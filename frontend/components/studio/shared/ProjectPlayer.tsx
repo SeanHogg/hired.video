@@ -1,37 +1,49 @@
 /**
- * ProjectPlayer — kind-aware playback dispatcher.
+ * ProjectPlayer — kind-aware playback dispatcher (the SSoT for
+ * "play a studio project on a page", regardless of mediaKind).
  *
  * Per the canvas-runtime extensibility model (PRD §1.2), every
  * `mediaKind` has its own play surface. This component is the single
- * SoT dispatcher: hand it a `StudioProject` + an aspect-frame and it
- * mounts the right runtime per kind.
+ * SoT dispatcher: hand it a `StudioProject` (or an already-fetched
+ * `PublicVideoReady` payload via `eagerReady`) and it mounts the right
+ * runtime per kind:
  *
- *   - Game → `<GameStage mode="play">` (runs the Phaser-replacement
- *     runtime against `project.gameState`)
- *   - Timeline kinds (video / podcast / voice / animation / comic) →
+ *   - Game     → `<GameStage mode="play">` over `gameState`
+ *   - Image    → `<img>` of the first drawn layer (or template
+ *                placeholder if the project has no pixels yet)
+ *   - Animation→ `<img>` of the first painted frame (mirrors image —
+ *                a full client-side strip player is overkill for a
+ *                public preview; the editor's preview is canonical)
+ *   - CAD      → first-shape SVG preview (or template placeholder)
+ *   - Timeline kinds (video / podcast / voice / comic) →
  *     `<StudioVideoSurface>` (the existing player that handles
  *     YouTube / baked MP4 / live-script preview / poster fallback)
  *
- * Per the standing DRY rule, every consumer that "plays a studio
- * project on a page" should mount THIS, not `<StudioVideoSurface>`
- * directly — adding a new kind is one branch here, and the existing
- * 10+ consumers (EntityVideos rail, ProfileHeaderVideos,
- * HeroVideoSpotlight, ResumeProfileLayout, etc.) inherit the right
- * surface automatically.
+ * Per the standing DRY rule (`feedback_extract_on_duplication`),
+ * every consumer that "plays a studio project on a page" should mount
+ * THIS, not `<StudioVideoSurface>` directly. Adding a new kind is one
+ * branch here, and the existing consumers (EntityMedia rail, the /v/
+ * public watch page, ProfileHeaderVideos, HeroVideoSpotlight,
+ * ResumeProfileLayout, etc.) inherit the right surface automatically
+ * — that's how we stop showing "Video is being processed" on a
+ * Photoshop image / memory-match game / animation.
  *
- * NOTE: zero consumers today. This is the SEAM for the #937 migration
- * — the dispatcher infrastructure ships before the migration so each
- * consumer can swap independently. Today the editor's playtest button
- * + the exported HTML5 bundle already let users play game projects;
- * #937 is what wires inline playback on entity cards / public pages
- * for every non-video kind. Don't delete as dead code — the
- * architectural seam is the deliverable.
+ * Eager-payload mode: pass `eagerReady` to skip the StudioVideoSurface
+ * lazy re-fetch when the caller already hydrated the public payload
+ * (e.g. the /v/<id> watch page fetched `/api/studio/public/<id>` to
+ * render owner chrome + SEO meta and would otherwise duplicate the
+ * fetch). Non-Timeline kinds ignore eagerReady — they need the
+ * parallel-column state which is always on the project object.
  */
 import { lazy, Suspense } from "react";
 import type { StudioProject } from "@/lib/services/studio-service";
 import type { GameState } from "@shared/game-state";
 import { firstLayerPixels, type ImageState } from "@shared/image-state";
-import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
+import { firstFramePixels, type AnimationState } from "@shared/animation-state";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
+import StudioVideoSurface, {
+  type PublicVideoReady,
+} from "@/components/studio/StudioVideoSurface";
 
 const GameStage = lazy(() => import("@/components/studio/game/GameStage"));
 
@@ -41,22 +53,33 @@ interface ProjectPlayerProps {
    *  1 (design-time pixels); callers in fixed-aspect tiles should pass
    *  the ratio (e.g. `tileWidth / project.gameState.width`). */
   gameZoom?: number;
+  /** Already-fetched public payload — when present, the Timeline-kind
+   *  branch uses `<StudioVideoSurface mode="eager" ready={…}>` instead
+   *  of the lazy re-fetch path. Avoids the double round-trip on the
+   *  /v/<id> watch page which already fetched the payload for owner
+   *  chrome + SEO. Ignored for non-Timeline kinds (game / image /
+   *  animation read parallel-column state off `project` directly). */
+  eagerReady?: PublicVideoReady;
   /** Threaded straight to `<StudioVideoSurface>` for Timeline kinds —
    *  see its prop docs. Ignored for non-Timeline kinds. */
-  videoSurfaceProps?: Omit<React.ComponentProps<typeof StudioVideoSurface>, "mode" | "ready">;
+  videoSurfaceProps?: Omit<
+    React.ComponentProps<typeof StudioVideoSurface>,
+    "mode" | "ready" | "videoId" | "source"
+  >;
 }
 
 export default function ProjectPlayer({
   project,
   gameZoom = 1,
+  eagerReady,
   videoSurfaceProps,
 }: ProjectPlayerProps) {
-  const mediaKind = project.mediaKind ?? "video";
+  const mediaKind = (project.mediaKind ?? "video") as MediaKind;
 
   if (mediaKind === "game") {
     const gameState = (project.gameState ?? null) as GameState | null;
     return (
-      <Suspense fallback={null}>
+      <Suspense fallback={<KindUnreadyPlaceholder mediaKind="game" />}>
         <GameStage
           gameState={gameState}
           zoom={gameZoom}
@@ -81,20 +104,59 @@ export default function ProjectPlayer({
         <img
           src={pixels}
           alt={project.title ?? "Drawing"}
-          className="h-full w-full object-contain"
+          className="h-full w-full object-contain bg-slate-100"
           draggable={false}
         />
       );
     }
-    // Fall through to the video surface poster fallback when the
-    // image project has no layer pixels yet — surfaces a "Open in
-    // studio" affordance via the existing poster path.
+    return <KindUnreadyPlaceholder mediaKind="image" />;
   }
 
-  // Every Timeline-runtime kind (and comic, which authors via
-  // CanvasState) delegates to the existing video surface. The surface
-  // already handles MP4 / YouTube / live-script-preview / poster
-  // dispatch per its own internal modes.
+  // Animation projects (#1003) — preview the first painted frame as a
+  // still raster, mirroring the image-kind path. A full client-side
+  // strip player is overkill for a public watch surface; the editor's
+  // own preview overlay is the canonical playback. Falling back to a
+  // kind-tagged placeholder keeps the surface coherent before the
+  // user has painted anything.
+  if (mediaKind === "animation") {
+    const pixels = firstFramePixels(
+      project.animationState as AnimationState | null | undefined,
+    );
+    if (pixels) {
+      return (
+        <img
+          src={pixels}
+          alt={project.title ?? "Animation"}
+          className="h-full w-full object-contain bg-slate-100"
+          draggable={false}
+        />
+      );
+    }
+    return <KindUnreadyPlaceholder mediaKind="animation" />;
+  }
+
+  // CAD (#930) — vector drafting kind with no public viewer runtime
+  // yet (the live editor IS the canonical surface). Show a kind-
+  // tagged placeholder so the watch page doesn't fall through to
+  // the video "is being processed" message.
+  if (mediaKind === "cad") {
+    return <KindUnreadyPlaceholder mediaKind="cad" />;
+  }
+
+  // Every Timeline-runtime kind (video / podcast / voice / comic)
+  // delegates to the existing video surface. The surface already
+  // handles MP4 / YouTube / live-script preview / poster dispatch.
+  // When the caller already fetched the public payload, pass it
+  // through eagerly to skip the lazy re-fetch round-trip.
+  if (eagerReady) {
+    return (
+      <StudioVideoSurface
+        mode="eager"
+        ready={eagerReady}
+        {...videoSurfaceProps}
+      />
+    );
+  }
   return (
     <StudioVideoSurface
       mode="lazy"
@@ -102,5 +164,22 @@ export default function ProjectPlayer({
       poster={project.thumbnailUrl ?? undefined}
       {...videoSurfaceProps}
     />
+  );
+}
+
+/** Kind-aware empty-state for projects without a play surface yet —
+ *  CAD has no public viewer, image/animation projects with no painted
+ *  pixels yet, game runtimes that fail to lazy-load, etc. Replaces
+ *  the legacy "Video is being processed" copy which (a) was wrong
+ *  for non-video kinds and (b) implied a render was in flight when
+ *  the project may simply have no public surface. */
+function KindUnreadyPlaceholder({ mediaKind }: { mediaKind: MediaKind }) {
+  const label = MEDIA_KIND_UI[mediaKind].badgeLabel;
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-black/5 border border-border rounded-xl">
+      <p className="text-muted-foreground text-sm px-4 text-center">
+        This {label.toLowerCase()} isn't ready to preview yet. Check back soon.
+      </p>
+    </div>
   );
 }

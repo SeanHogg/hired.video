@@ -1,8 +1,17 @@
 /**
- * EntityVideos — shared horizontal scroller showing the studio videos
+ * EntityMedia — shared horizontal scroller showing the studio projects
  * linked to a given entity (a resume, profile, job, company, skills demo,
- * etc.) plus a `+ Create Video` chip that deep-links into the studio
- * with the subject pre-bound.
+ * etc.) plus a `+ Create <Subject Label>` chip that deep-links into the
+ * studio with the subject pre-bound.
+ *
+ * Renamed from EntityVideos (#894 follow-up): the studio now produces
+ * eight `mediaKind`s (video / podcast / voice / animation / game / comic
+ * / image / cad) and any of them can be linked to any entity. The header
+ * count now reads "X items" when the rail mixes kinds, or kind-pluralised
+ * ("3 Games", "5 Reels") when uniform — never the hardcoded "X Videos".
+ * Thumbnails are kind-dispatched via `<VideoProjectThumbnail>` (which
+ * already routed by `mediaKind` long before this rename), so a Photoshop
+ * tile reads as a drawing, a memory-match game as a game state, etc.
  *
  * Self-contained per the DRY rule:
  *   • Owns its own data fetch. Owners hit the auth'd
@@ -17,15 +26,18 @@
  *     never see it. Callers don't pass `viewerCanCreate` booleans.
  *   • Owns the URL formatting — owners click the tile to jump to the
  *     editor (`/studio?projectId=…`); non-owners land on the public
- *     watch page (`/v/<projectId>`). Owners get the Edit pencil; non-
+ *     watch page (`/v/<projectId>`), which mounts `<ProjectPlayer>`
+ *     and dispatches per mediaKind. Owners get the Edit pencil; non-
  *     owners don't.
+ *   • Owns the kind-pluralised header label so callers don't reimplement
+ *     "count items by kind" pluralisation per surface.
  *
  * Drops into:
- *   • Resume card — `<EntityVideos subject={{ kind: "resume", id }} ownerUserId={resume.userId} />`
- *   • Profile / Job / Company / Skills Demo cards — same shape.
+ *   • Resume card — `<EntityMedia subject={{ kind: "resume", id }} ownerUserId={resume.userId} />`
+ *   • Profile / Job / Company / Skills Demo / Article cards — same shape.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Pencil, Play, Plus } from "lucide-react";
 import {
@@ -33,17 +45,19 @@ import {
   STUDIO_SUBJECT_LABEL,
   type StudioSubject,
 } from "@shared/studio-subject";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { cn } from "@/lib/utils";
+import MediaKindBadge from "./shared/MediaKindBadge";
 import VideoProjectThumbnail from "./shared/VideoProjectThumbnail";
 
-interface EntityVideosProps {
+interface EntityMediaProps {
   subject: StudioSubject;
   /** Owner of the entity (job poster, resume owner, profile user, company
-   *  account owner, etc.). EntityVideos hands this to `useEntityOwnership`
-   *  and only renders the `+ Create Video` chip when the auth'd viewer
+   *  account owner, etc.). EntityMedia hands this to `useEntityOwnership`
+   *  and only renders the `+ Create …` chip when the auth'd viewer
    *  matches. Pass null/undef when there's no clear single owner — the
    *  chip stays hidden. */
   ownerUserId?: string | null;
@@ -51,13 +65,13 @@ interface EntityVideosProps {
   className?: string;
 }
 
-export default function EntityVideos({
+export default function EntityMedia({
   subject,
   ownerUserId,
   className,
-}: EntityVideosProps) {
+}: EntityMediaProps) {
   const apiReady = useApiReady();
-  const [videos, setVideos] = useState<StudioProject[] | null>(null);
+  const [items, setItems] = useState<StudioProject[] | null>(null);
 
   // Owner-only gate routed through the shared hook so this predicate
   // doesn't drift from the cards that wrap us. The studio API also
@@ -67,7 +81,7 @@ export default function EntityVideos({
 
   useEffect(() => {
     let cancelled = false;
-    setVideos(null);
+    setItems(null);
     // Owners hit the auth'd `/projects` endpoint so they see drafts,
     // analytics, and private projects too. Everyone else (incl. anon
     // viewers on public listing pages — #323) hits `/projects/public`
@@ -80,50 +94,53 @@ export default function EntityVideos({
         : null
       : studioService.getPublicProjects({ kind: subject.kind, id: subject.id });
     if (!fetcher) {
-      setVideos([]);
+      setItems([]);
       return;
     }
     fetcher
       .then((res) => {
         if (cancelled) return;
-        setVideos(res.data ?? []);
+        setItems(res.data ?? []);
       })
       .catch(() => {
         if (cancelled) return;
-        setVideos([]);
+        setItems([]);
       });
     return () => {
       cancelled = true;
     };
   }, [apiReady, viewerCanCreate, subject.kind, subject.id]);
 
-  // Hide the section entirely when the viewer can't create AND no videos
+  // Pluralised "X Videos / X Reels / X Games / X items" header — kind-
+  // aware so the rail labels itself correctly regardless of what the
+  // user actually made. Computed once per render off the loaded list.
+  const headerLabel = useMemo(() => itemsHeaderLabel(items), [items]);
+
+  // Hide the section entirely when the viewer can't create AND no items
   // exist — there's nothing to render. Anonymous viewers (api-not-ready)
   // hit this branch automatically since the fetch above short-circuits
   // to an empty array for them.
-  if (!viewerCanCreate && (videos?.length ?? 0) === 0 && videos !== null) {
+  if (!viewerCanCreate && (items?.length ?? 0) === 0 && items !== null) {
     return null;
   }
 
   const subjectLabel = STUDIO_SUBJECT_LABEL[subject.kind];
-  const newVideoHref = `/studio?subject=${formatStudioSubject(subject)}&new=1`;
+  const newItemHref = `/studio?subject=${formatStudioSubject(subject)}&new=1`;
 
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {videos?.length === 1
-            ? "1 Video"
-            : `${videos?.length ?? 0} Videos`}
+          {headerLabel}
         </h4>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
         {/* Create chip — first so it's always reachable, even when there's
-            an empty list. Uses the same width/aspect as the video tiles
-            below so the strip reads as one consistent rail. */}
+            an empty list. Uses the same width/aspect as the tiles below
+            so the strip reads as one consistent rail. */}
         {viewerCanCreate && (
           <Link
-            to={newVideoHref}
+            to={newItemHref}
             className="snap-start shrink-0 w-48 rounded-md border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-primary"
             title={`Create ${subjectLabel}`}
           >
@@ -136,39 +153,47 @@ export default function EntityVideos({
           </Link>
         )}
 
-        {videos === null && (
+        {items === null && (
           <div className="snap-start shrink-0 w-48 rounded-md border bg-muted/30 p-3 flex items-center justify-center text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
           </div>
         )}
 
-        {videos?.map((v) => {
+        {items?.map((v) => {
           // Owners click the tile to jump into the editor (the canonical
           // /studio/<id> URL so the editor sees the latest project state,
           // not a stale baked videoUrl). Non-owners — incl. anonymous
           // viewers on public listing pages — land on the public watch
-          // page at /v/<id>, which the unified `<StudioPlayer/>` serves
-          // live from the saved script even before a render exists (#323).
+          // page at /v/<id>, which mounts <ProjectPlayer> and dispatches
+          // per mediaKind (so a Photoshop drawing renders as an image,
+          // a memory-match game as a game, etc. — #323).
           const openHref = viewerCanCreate
             ? `/studio?projectId=${encodeURIComponent(v.id)}`
             : `/v/${encodeURIComponent(v.id)}`;
+          const itemKind = (v.mediaKind ?? "video") as MediaKind;
           return (
             <div
               key={v.id}
               className="snap-start shrink-0 w-48 rounded-md border bg-background hover:bg-muted/40 transition-colors flex flex-col"
             >
               {/* Thumbnail via the shared VideoProjectThumbnail — single
-                  source of truth for project tiles, so the resume page
-                  rail always matches the chooser grid. The component
-                  renders the live first scene from `timelineSpec`,
-                  bypassing the baked thumbnailUrl that goes stale on
-                  every edit. */}
+                  source of truth for project tiles, so the entity rail
+                  always matches the chooser grid. The component dispatches
+                  on mediaKind (game state preview / first drawn layer /
+                  first animation frame / live Timeline scene), bypassing
+                  the baked thumbnailUrl that goes stale on every edit.
+                  MediaKindBadge self-gates: a "Video" chip is suppressed,
+                  every other kind surfaces so the rail visibly mixes. */}
               <Link
                 to={openHref}
                 className="relative aspect-video rounded-t-md overflow-hidden group"
                 title={v.title}
               >
                 <VideoProjectThumbnail project={v} />
+                <MediaKindBadge
+                  mediaKind={itemKind}
+                  className="absolute top-1 left-1"
+                />
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Play className="w-6 h-6 text-white fill-white" />
                 </div>
@@ -193,4 +218,23 @@ export default function EntityVideos({
       </div>
     </div>
   );
+}
+
+/** Pluralised header label that's coherent across mediaKinds. When the
+ *  rail contains a single kind we use that kind's plural badge label
+ *  ("5 Videos", "3 Games"); when it mixes kinds we fall back to the
+ *  generic "X items" so we never lie ("4 Videos" on a rail that has
+ *  3 games and a podcast). Exported so a future test can lock this in
+ *  without exporting the whole component shape. */
+export function itemsHeaderLabel(items: StudioProject[] | null): string {
+  if (!items || items.length === 0) return "0 items";
+  const kinds = new Set<MediaKind>(
+    items.map((v) => (v.mediaKind ?? "video") as MediaKind),
+  );
+  if (kinds.size === 1) {
+    const only = items[0].mediaKind as MediaKind | undefined;
+    const label = MEDIA_KIND_UI[only ?? "video"].badgeLabel;
+    return `${items.length} ${label}${items.length === 1 ? "" : "s"}`;
+  }
+  return `${items.length} item${items.length === 1 ? "" : "s"}`;
 }

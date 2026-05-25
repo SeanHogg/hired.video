@@ -2,13 +2,18 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
 import { AppShell } from "@/components/AppShell";
-import StudioVideoSurface, {
+import {
   PublicVideoSchema,
   isReady,
   type PublicVideoPayload as PublicVideo,
+  type PublicVideoReady,
 } from "@/components/studio/StudioVideoSurface";
+import ProjectPlayer from "@/components/studio/shared/ProjectPlayer";
+import type { StudioProject } from "@/lib/services/studio-service";
+import { StudioProjectStatus } from "@/lib/services/studio-service";
 import { recordProjectView } from "@/lib/services/studio-features-service";
 import { useUgcSeo } from "@/lib/seo-ugc";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function PublicVideoResume() {
@@ -111,6 +116,7 @@ export default function PublicVideoResume() {
   // narrow via the predicate so the rest of the JSX can use the full payload.
   if (!isReady(video)) return null;
   const ready = video;
+  const mediaKind = (ready.mediaKind ?? "video") as MediaKind;
 
   return (
     <AppShell bgClassName="bg-background">
@@ -136,27 +142,40 @@ export default function PublicVideoResume() {
           </div>
         </div>
 
-        {/* Universal studio video surface — same component every other
-            on-platform embed mounts (Resume detail page, profile,
-            channel grid). Encapsulates the YouTube / baked / live
-            script dispatch + chrome. `analyticsProjectId` is passed so
-            the surface attaches per-second engagement tracking and
-            forwards CTA-hotzone clicks to the analytics endpoint. */}
-        <StudioVideoSurface
-          mode="eager"
-          ready={ready}
-          analyticsProjectId={ready.id}
-        />
+        {/* Universal media surface — routes through ProjectPlayer so the
+            right runtime mounts per mediaKind (game / image / animation /
+            cad / Timeline kinds). Replaces the prior video-only dispatch
+            which fell through to "Video is being processed" for every
+            non-video kind. ProjectPlayer covers the eager-payload path
+            so we don't double-fetch — the public payload above already
+            carries the parallel state columns ProjectPlayer needs. */}
+        <div
+          className={
+            mediaKind === "image" || mediaKind === "animation" || mediaKind === "cad"
+              ? "rounded-xl overflow-hidden bg-black shadow-lg aspect-video flex items-center justify-center"
+              : "rounded-xl overflow-hidden bg-black shadow-lg"
+          }
+        >
+          <ProjectPlayer
+            project={publicReadyToProject(ready)}
+            eagerReady={ready}
+            videoSurfaceProps={{ analyticsProjectId: ready.id }}
+          />
+        </div>
 
         {/* Description */}
         {ready.description && (
           <p className="text-muted-foreground leading-relaxed">{ready.description}</p>
         )}
 
-        {/* CTA */}
+        {/* CTA — kind-aware so the prompt matches what the viewer just
+            watched (a "Create your own video resume" pitch on top of a
+            Photoshop drawing is incoherent). */}
         <div className="border border-border rounded-xl p-6 bg-card flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-semibold text-foreground">Create your own video resume</p>
+            <p className="font-semibold text-foreground">
+              Create your own {MEDIA_KIND_UI[mediaKind].badgeLabel.toLowerCase()}
+            </p>
             <p className="text-sm text-muted-foreground mt-0.5">AI-powered in minutes. Free to start.</p>
           </div>
           <Link
@@ -169,5 +188,46 @@ export default function PublicVideoResume() {
       </main>
     </AppShell>
   );
+}
+
+/** Adapter from the public payload to a `StudioProject`-shaped object
+ *  so `<ProjectPlayer>` (which is the SSoT dispatcher and expects a
+ *  project) can read the parallel-column state. Only the fields the
+ *  dispatcher reads are populated — fields like `userId`, `status`,
+ *  `creationDateTime` are stubbed because the public surface has no
+ *  use for them. */
+function publicReadyToProject(ready: PublicVideoReady): StudioProject {
+  return {
+    id: ready.id,
+    userId: "",
+    title: ready.title,
+    status: StudioProjectStatus.Published,
+    youtubeVideoId: ready.youtubeVideoId ?? null,
+    videoUrl: ready.videoUrl ?? null,
+    thumbnailUrl: ready.thumbnailUrl ?? null,
+    storyboard: null,
+    script: null,
+    kind: (ready.kind as "scene" | "nle" | null | undefined) ?? "scene",
+    mediaKind: (ready.mediaKind as StudioProject["mediaKind"]) ?? "video",
+    timelineSpec: ready.timelineSpec ?? null,
+    gameState: ready.gameState ?? null,
+    imageState: ready.imageState ?? null,
+    animationState: ready.animationState ?? null,
+    cadState: ready.cadState ?? null,
+    prompt: null,
+    jobDescription: null,
+    resumeText: null,
+    purpose: null,
+    viewCount: 0,
+    ctaClickCount: 0,
+    isPublic: true,
+    metaDescription: ready.metaDescription ?? null,
+    slug: null,
+    keywords: ready.keywords ?? [],
+    socialCardImage: ready.socialCardImage ?? null,
+    subjects: [],
+    creationDateTime: ready.createdAt,
+    updateDateTime: ready.createdAt,
+  };
 }
 

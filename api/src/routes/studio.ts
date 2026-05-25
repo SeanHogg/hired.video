@@ -2825,6 +2825,13 @@ studioRoutes.get("/public/:videoId", async (c) => {
     videoId: studioProjects.videoId,
     isPublic: studioProjects.isPublic,
     kind: studioProjects.kind,
+    // Output-axis discriminator (#894) — drives the public watch page's
+    // surface dispatch (ProjectPlayer). Without this in the payload the
+    // /v/<id> page fell through to "Video is being processed" for every
+    // non-video kind (image / game / animation / cad) because the
+    // dispatcher had no signal to branch on. Default 'video' applies
+    // server-side for pre-0099 rows.
+    mediaKind: studioProjects.mediaKind,
     // Title + SEO meta aren't columns — toProjectDto reads them from the
     // storyboard JSONB (set by save-draft). The whole storyboard doubles
     // as the live-playback VideoScript on v1 (kind='scene') projects.
@@ -2834,6 +2841,16 @@ studioRoutes.get("/public/:videoId", async (c) => {
     // timelineToCanvasState → canvasStateToScript so the same
     // <StudioPlayer/> live branch renders both project shapes.
     timelineSpec: studioProjects.timelineSpec,
+    // Parallel-column state for non-Timeline canvas runtimes. Each kind
+    // owns its own JSONB column per the canvas-runtime extensibility
+    // model (PRD §1.2). ProjectPlayer reads these to mount GameStage /
+    // first-layer image / first-frame animation on the public watch
+    // page so a Photoshop drawing or memory-match game renders the
+    // same pixels here that the editor shows.
+    gameState: studioProjects.gameState,
+    imageState: studioProjects.imageState,
+    animationState: studioProjects.animationState,
+    cadState: studioProjects.cadState,
     ownerName: users.name,
     ownerAvatar: userProfiles.avatarUrl,
   };
@@ -2842,8 +2859,13 @@ studioRoutes.get("/public/:videoId", async (c) => {
     videoId: string | null;
     isPublic: boolean;
     kind: string | null;
+    mediaKind: string | null;
     storyboard: unknown;
     timelineSpec: unknown;
+    gameState: unknown;
+    imageState: unknown;
+    animationState: unknown;
+    cadState: unknown;
     ownerName: string | null;
     ownerAvatar: string | null;
   };
@@ -2858,6 +2880,13 @@ studioRoutes.get("/public/:videoId", async (c) => {
       script: proj.storyboard ?? null,
       timelineSpec: proj.timelineSpec ?? null,
       kind: proj.kind ?? null,
+      // Default 'video' here mirrors the column default and the DTO
+      // fallback in toProjectDto — pre-0099 rows surface as video.
+      mediaKind: (proj.mediaKind as string | null) ?? "video",
+      gameState: proj.gameState ?? null,
+      imageState: proj.imageState ?? null,
+      animationState: proj.animationState ?? null,
+      cadState: proj.cadState ?? null,
       ownerName: proj.ownerName,
       ownerAvatar: proj.ownerAvatar,
       metaDescription: (meta?._metaDescription as string | undefined) ?? null,
@@ -3038,6 +3067,18 @@ studioRoutes.get("/public/:videoId", async (c) => {
     // timeline_spec via VideoProjectThumbnail) played fine.
     timelineSpec: projectInfo?.timelineSpec ?? null,
     kind: projectInfo?.kind ?? null,
+    // Output-axis discriminator + per-runtime state. ProjectPlayer on
+    // the watch page reads these to mount the right surface — image
+    // pixels, GameStage, AnimationStage first-frame — instead of the
+    // legacy video-only StudioVideoSurface fallback that emitted
+    // "Video is being processed" for every non-video kind. Legacy
+    // direct uploads with no project row default to 'video' so they
+    // still take the baked-MP4 path.
+    mediaKind: projectInfo?.mediaKind ?? "video",
+    gameState: projectInfo?.gameState ?? null,
+    imageState: projectInfo?.imageState ?? null,
+    animationState: projectInfo?.animationState ?? null,
+    cadState: projectInfo?.cadState ?? null,
     aspect,
     resolution,
     ctaHotzones,

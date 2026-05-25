@@ -102,6 +102,23 @@ export const PublicVideoReadySchema = z.object({
   // converts it to a VideoScript so the same live branch renders both.
   timelineSpec: z.unknown().optional().nullable(),
   kind: z.string().nullable().optional(),
+  // Output-axis discriminator (#894). Set on every payload from
+  // `/api/studio/public/:videoId` since the mediaKind extension —
+  // older payloads (legacy direct uploads / cached intermediaries)
+  // surface as undefined and default to 'video' downstream. Drives
+  // the public watch page's ProjectPlayer dispatch so non-video
+  // kinds (image, game, animation, cad) render their own surface
+  // instead of the legacy "Video is being processed" fallback.
+  mediaKind: z.string().nullable().optional(),
+  // Parallel-column canvas-runtime state. Each kind owns its own
+  // JSONB column per the canvas-runtime extensibility model in
+  // PRD §1.2 — non-video watch surfaces read these to mount the
+  // right runtime (GameStage / first-layer image / first-frame
+  // animation) on the /v/<id> page.
+  gameState: z.unknown().optional().nullable(),
+  imageState: z.unknown().optional().nullable(),
+  animationState: z.unknown().optional().nullable(),
+  cadState: z.unknown().optional().nullable(),
   aspect: z.string().nullable().optional(),
   resolution: z.string().nullable().optional(),
   ctaHotzones: z.array(CtaHotzoneSchema).optional().default([]),
@@ -524,12 +541,15 @@ function PublicVideoDispatch({
     );
   }
 
+  // Final-fallback "not playable yet" — non-video mediaKinds should
+  // have been dispatched to their own runtime via <ProjectPlayer/>
+  // before reaching this branch (image / game / animation / cad). If
+  // we're here for a non-Timeline kind it means a caller mounted us
+  // directly with an incomplete payload; the kind-aware copy below
+  // is honest about that instead of telling a user looking at a
+  // Photoshop drawing that their "video" is processing.
   return (
-    <div className={`aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center ${className ?? ""}`}>
-      <p className="text-muted-foreground text-sm">
-        Video is being processed. Check back soon.
-      </p>
-    </div>
+    <NotReadyMessage mediaKind={ready.mediaKind} className={className} />
   );
 }
 
@@ -705,13 +725,61 @@ function PublicStudioCanvas({
     );
   }
 
+  // Same kind-aware "not ready" fallback as PublicVideoDispatch — see
+  // notes there. Reaching this branch means the project has neither
+  // a canvas state nor a baked MP4 yet; we honour the kind in the
+  // copy so a podcast doesn't say "Video is being processed".
+  return <NotReadyMessage mediaKind={undefined} className={className} />;
+}
+
+/** Shared empty-state used by the public-dispatch surfaces. Picks
+ *  kind-aware copy when the payload carries a mediaKind ("This podcast
+ *  isn't ready yet"); falls back to the generic "media" noun when not.
+ *  Kept here (next to the surfaces that mount it) so a kind rename in
+ *  `shared/media-kinds.ts` doesn't desync with the message. */
+function NotReadyMessage({
+  mediaKind,
+  className,
+}: {
+  mediaKind?: string | null;
+  className?: string;
+}) {
+  // The badge label set on `media-kinds.ts` is the user-facing noun
+  // for every kind ("Podcast" / "Image" / "Animation" / "Game" /
+  // "Comic" / "CAD" / "Voice"). Unknown / missing strings fall through
+  // to "media" so a stale-payload viewer never sees video-language on
+  // a non-video project.
+  const noun = !mediaKind
+    ? "media"
+    : mediaKind === "video"
+      ? "video"
+      : (mediaKindNoun(mediaKind) ?? "media");
   return (
-    <div className={`aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center ${className ?? ""}`}>
-      <p className="text-muted-foreground text-sm">
-        Video is being processed. Check back soon.
+    <div
+      className={`aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center ${className ?? ""}`}
+    >
+      <p className="text-muted-foreground text-sm px-4 text-center">
+        This {noun} isn't ready yet. Check back soon.
       </p>
     </div>
   );
+}
+
+/** Lazy-loaded MEDIA_KIND_UI lookup — avoids the circular concern of
+ *  pulling `@shared/media-kinds` at the top of this module while still
+ *  letting the surface speak the right noun. Returns null for unknown
+ *  kinds so the caller can fall back to "media". */
+function mediaKindNoun(kind: string): string | null {
+  const map: Record<string, string> = {
+    podcast: "podcast",
+    voice: "voiceover",
+    animation: "animation",
+    game: "game",
+    comic: "comic",
+    image: "drawing",
+    cad: "drawing",
+  };
+  return map[kind] ?? null;
 }
 
 // ─── Raw <video> branch with analytics ───────────────────────────────────────

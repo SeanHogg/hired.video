@@ -34,7 +34,7 @@
  * subsequent edits.
  *
  * Consumers: the chooser's "My videos" grid, the resume page's
- * EntityVideos rail, any future "Recent projects" widget — all mount
+ * EntityMedia rail, any future "Recent projects" widget — all mount
  * this directly. Never reach for `<img src={project.thumbnailUrl}>`
  * inline; that's how the stale-thumbnail bug class returns.
  */

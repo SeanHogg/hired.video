@@ -2,7 +2,7 @@
  * CreateVideoMenuItem — drop-in `<DropdownMenuItem>` that deep-links into
  * Studio with a subject pre-bound. Used by every entity action menu
  * (Resume, Profile, Job, Company, Skills Demo) so the label + link
- * formatting stays in lockstep with the EntityVideos scroller.
+ * formatting stays in lockstep with the EntityMedia scroller.
  *
  * Per the DRY rule: callers don't compute the URL or label themselves —
  * pass the subject and trust the component.

@@ -6,6 +6,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import importPlugin from "eslint-plugin-import";
 import jsxA11y from "eslint-plugin-jsx-a11y";
+import requirePageChrome from "./eslint-rules/require-page-chrome.js";
 
 export default [
   // Base JavaScript configuration
@@ -37,6 +38,9 @@ export default [
       "react-refresh": reactRefresh,
       import: importPlugin,
       "jsx-a11y": jsxA11y,
+      // Local rules — eslint-rules/ lives next to this config; the
+      // `hiredvideo` namespace is project-private.
+      hiredvideo: { rules: { "require-page-chrome": requirePageChrome } },
     },
     rules: {
       // TypeScript-specific rules (strict on types, relaxed on style)
@@ -169,6 +173,12 @@ export default [
       "no-dupe-class-members": "off", // TypeScript handles this
       "no-empty": "warn", // Downgrade to warning for quality checks
       "no-case-declarations": "warn", // Downgrade to warning for quality checks
+
+      // Project-local: every frontend/pages/*.tsx file must wrap in
+      // <AppShell> and call useSEO + useBreadcrumbs. The rule self-
+      // gates on filename so it's safe to enable globally. Opt out
+      // per-file with `// eslint-page-chrome: skip — <reason>`.
+      "hiredvideo/require-page-chrome": "error",
     },
     settings: {
       react: {
