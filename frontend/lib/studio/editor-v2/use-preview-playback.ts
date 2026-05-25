@@ -36,11 +36,29 @@ export interface PreviewPlayback {
   seek: (seconds: number) => void;
   /** Reset to 0 + pause. Called when the user opens a new project. */
   reset: () => void;
+  /** Output muted? When true the shared music scheduler runs with
+   *  master gain pinned to 0 — the schedule keeps ticking so unmuting
+   *  resumes mid-clip without re-decoding buffers. */
+  muted: boolean;
+  setMuted: (muted: boolean) => void;
+  toggleMute: () => void;
 }
 
-export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
+export interface UsePreviewPlaybackOptions {
+  /** Start in the muted state. Hero "live thumbnail" surfaces pass true
+   *  so the autoplay path matches the browser muted-autoplay policy and
+   *  the existing flat/baked branches (which already default
+   *  `muted = autoplay`). */
+  initialMuted?: boolean;
+}
+
+export function usePreviewPlayback(
+  state: CanvasState,
+  options?: UsePreviewPlaybackOptions,
+): PreviewPlayback {
   const [playhead, setPlayhead] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [muted, setMuted] = useState(Boolean(options?.initialMuted));
   const playheadRef = useRef(0);
   const lastTickRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -64,7 +82,7 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
   useMusicScheduler({
     playing: isPlaying,
     clips: audioClips,
-    masterVolume,
+    masterVolume: muted ? 0 : masterVolume,
     playheadRef,
   });
 
@@ -131,6 +149,8 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
     setPlayhead(0);
   }, []);
 
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
+
   // Derive the active scene + intra-scene elapsed time from the playhead.
   const { activeSceneIdAtPlayhead, activeSceneElapsed } = useMemo(() => {
     let cursor = 0;
@@ -162,5 +182,8 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
     toggle,
     seek,
     reset,
+    muted,
+    setMuted,
+    toggleMute,
   };
 }

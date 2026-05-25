@@ -42,6 +42,13 @@ export interface PageHeaderProps {
    *  name). Omit on surfaces that own their own heading (e.g. /people/:id). */
   title?: ReactNode;
   description?: ReactNode;
+  /** Inline search slot. When provided, fills the flex space where
+   *  title/description normally render. Used on top-level surfaces that
+   *  relocated the global header search inline (Jobs, People, etc.) after
+   *  users repeatedly missed it docked in the top bar. Pages that pass this
+   *  should also be listed in `INLINE_HEADER_SEARCH_ROUTES` so the global
+   *  HeaderSearch is hidden in Navigation. */
+  search?: ReactNode;
   /** Right-side action buttons (next to the title). */
   actions?: ReactNode;
   /** Extra content rendered in the title row, below the description. */
@@ -55,6 +62,7 @@ export default function PageHeader({
   activeTabKey,
   title,
   description,
+  search,
   actions,
   meta,
   className,
@@ -136,14 +144,20 @@ export default function PageHeader({
         </nav>
       )}
 
-      {(title || description || actions || meta) && (
+      {(title || description || search || actions || meta) && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0 flex-1">
-            {title && <h1 className="text-2xl sm:text-3xl font-bold">{title}</h1>}
-            {description && (
-              <div className="text-sm sm:text-base text-muted-foreground mt-1">
-                {description}
-              </div>
+            {search ? (
+              <div className="w-full">{search}</div>
+            ) : (
+              <>
+                {title && <h1 className="text-2xl sm:text-3xl font-bold">{title}</h1>}
+                {description && (
+                  <div className="text-sm sm:text-base text-muted-foreground mt-1">
+                    {description}
+                  </div>
+                )}
+              </>
             )}
             {meta && <div className="mt-2">{meta}</div>}
           </div>

@@ -111,6 +111,7 @@ import CreateJobAlertButton from "@/components/CreateJobAlertButton";
 import AdSlot from "@/components/ads/AdSlot";
 import CandidatesPanel from "@/components/recruit/CandidatesPanel";
 import { AppShell } from "@/components/AppShell";
+import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
 import { useJobsTabs } from "@/hooks/use-jobs-tabs";
@@ -695,7 +696,6 @@ export default function Jobs() {
 
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
-    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     // Capability lives in persona.ts (single SA-bypass rule). canPostJobs
     // covers recruiter / employer / admin and SA bypasses; ALSO used to
     // gate the Post-a-Job button and Candidates / Posted tabs.
@@ -733,12 +733,7 @@ export default function Jobs() {
               <PageHeader
                 tabs={topTabs}
                 activeTabKey={effectiveTab}
-                title="Jobs"
-                description={
-                  isJobSeeker
-                    ? "Discover and track job opportunities that match your skills"
-                    : "Manage your job postings and discover talent"
-                }
+                search={<HeaderSearch />}
                 actions={
                   <>
                     {canManageJobs && (
@@ -881,12 +876,9 @@ export default function Jobs() {
                     </div>
                   )}
 
-                {/* All Available Jobs */}
+                {/* All Available Jobs — header omitted; the inline PageHeader
+                    search slot already labels this surface as "Jobs". */}
                 <div>
-                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Search className="h-5 w-5" />
-                    {isJobSeeker ? "Available Jobs" : "All Jobs"}
-                  </h2>
                   {isLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {Array.from({ length: 6 }).map((_, index) => (

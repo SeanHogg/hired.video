@@ -34,6 +34,19 @@ interface NavigationProps {
   sidebarCollapsed?: boolean;
 }
 
+/**
+ * Routes whose pages render their own HeaderSearch inline (via PageHeader's
+ * `search` slot). The global top-bar search is suppressed on these exact
+ * paths so the same input doesn't appear twice. Detail surfaces (e.g.
+ * `/jobs/123`) are unaffected — they keep the global search because they
+ * don't host an inline one.
+ */
+const INLINE_HEADER_SEARCH_ROUTES: ReadonlySet<string> = new Set(["/jobs"]);
+
+function pathIsInlineHeaderSearch(pathname: string): boolean {
+  return INLINE_HEADER_SEARCH_ROUTES.has(pathname);
+}
+
 export default function Navigation({
   onMenuClick,
   onSidebarToggle,
@@ -133,9 +146,11 @@ export default function Navigation({
             </Link>
           </div>
 
-          {/* Header search — hidden on the home page where the hero + sticky search are already prominent.
-           * On all other pages the condensed search shows on every breakpoint, including mobile. */}
-          {location.pathname !== "/" && (
+          {/* Header search — hidden on the home page where the hero + sticky search are already prominent,
+           * and on top-level surfaces that relocated the search inline (PageHeader `search` slot) because
+           * users were missing it docked in the top bar. Keep this list in sync with the pages that pass
+           * `search={<HeaderSearch />}` to PageHeader. */}
+          {location.pathname !== "/" && !pathIsInlineHeaderSearch(location.pathname) && (
             <div className="flex-1 max-w-md mx-2 sm:mx-4 min-w-0">
               <HeaderSearch />
             </div>

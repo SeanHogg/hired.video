@@ -11,7 +11,7 @@
  * public watch page + every other consumer mount this directly — no
  * surface re-implements play/pause/scrub.
  */
-import { Maximize2, Pause, Play, SkipBack } from "lucide-react";
+import { Maximize2, Pause, Play, SkipBack, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { cn } from "@/lib/utils";
@@ -81,6 +81,20 @@ export default function PlaybackControls({
       <span className="shrink-0 min-w-[6rem] text-center text-xs tabular-nums opacity-80">
         {formatTime(playback.playhead)} / {formatTime(playback.duration)}
       </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={playback.toggleMute}
+        aria-label={playback.muted ? "Unmute" : "Mute"}
+        aria-pressed={playback.muted}
+        className="h-10 w-10 shrink-0 rounded-full p-0 text-white hover:bg-white/10"
+      >
+        {playback.muted ? (
+          <VolumeX className="h-4 w-4" />
+        ) : (
+          <Volume2 className="h-4 w-4" />
+        )}
+      </Button>
       {onExpand && (
         <Button
           variant="ghost"

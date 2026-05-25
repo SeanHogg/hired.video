@@ -6,12 +6,10 @@ import {
   Target,
   Users,
   Globe,
-  Eye,
   CheckCircle2,
-  X,
   AlertTriangle,
-  Info,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +26,7 @@ import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useAuth } from "@/lib/auth";
 
 export default function CookiePolicy() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const {
     preferences: cookiePreferences,
@@ -37,73 +36,67 @@ export default function CookiePolicy() {
     rejectOptional,
   } = useCookiePreferences();
 
+  // Cookie type rows. `key` is the persistence key on the backend;
+  // typeKey/descriptionKey/exampleKeys are the i18n keys so the panel
+  // renders in whatever locale the user has selected.
   const cookieTypes = [
     {
-      type: "Essential Cookies",
+      key: "essential" as const,
       icon: Shield,
       required: true,
-      description: "Necessary for the website to function properly",
-      examples: [
-        "Authentication",
-        "Security",
-        "Load balancing",
-        "Form submissions",
+      typeKey: "legal.cookies.types.essential.type",
+      descriptionKey: "legal.cookies.types.essential.description",
+      exampleKeys: [
+        "legal.cookies.types.essential.example.authentication",
+        "legal.cookies.types.essential.example.security",
+        "legal.cookies.types.essential.example.loadBalancing",
+        "legal.cookies.types.essential.example.formSubmissions",
       ],
       color: "green",
     },
     {
-      type: "Analytics Cookies",
+      key: "analytics" as const,
       icon: BarChart3,
       required: false,
-      description: "Help us understand how visitors interact with our website",
-      examples: [
-        "Page views",
-        "Click tracking",
-        "Performance monitoring",
-        "Error reporting",
+      typeKey: "legal.cookies.types.analytics.type",
+      descriptionKey: "legal.cookies.types.analytics.description",
+      exampleKeys: [
+        "legal.cookies.types.analytics.example.pageViews",
+        "legal.cookies.types.analytics.example.clickTracking",
+        "legal.cookies.types.analytics.example.performanceMonitoring",
+        "legal.cookies.types.analytics.example.errorReporting",
       ],
       color: "blue",
     },
     {
-      type: "Marketing Cookies",
+      key: "marketing" as const,
       icon: Target,
       required: false,
-      description: "Used to deliver personalized advertisements",
-      examples: [
-        "Ad targeting",
-        "Conversion tracking",
-        "Social media integration",
-        "Retargeting",
+      typeKey: "legal.cookies.types.marketing.type",
+      descriptionKey: "legal.cookies.types.marketing.description",
+      exampleKeys: [
+        "legal.cookies.types.marketing.example.adTargeting",
+        "legal.cookies.types.marketing.example.conversionTracking",
+        "legal.cookies.types.marketing.example.socialMedia",
+        "legal.cookies.types.marketing.example.retargeting",
       ],
       color: "purple",
     },
     {
-      type: "Personalization Cookies",
+      key: "personalization" as const,
       icon: Users,
       required: false,
-      description: "Remember your preferences and provide customized content",
-      examples: [
-        "Language settings",
-        "Theme preferences",
-        "Recently viewed",
-        "Saved searches",
+      typeKey: "legal.cookies.types.personalization.type",
+      descriptionKey: "legal.cookies.types.personalization.description",
+      exampleKeys: [
+        "legal.cookies.types.personalization.example.languageSettings",
+        "legal.cookies.types.personalization.example.themePreferences",
+        "legal.cookies.types.personalization.example.recentlyViewed",
+        "legal.cookies.types.personalization.example.savedSearches",
       ],
       color: "orange",
     },
   ];
-
-  const handleCookiePreferenceChange = (type: string, enabled: boolean) => {
-    if (type === "essential") return; // Essential cookies cannot be disabled
-    void setCategory(type as "analytics" | "marketing" | "personalization", enabled);
-  };
-
-  const acceptAllCookies = () => {
-    void acceptAll();
-  };
-
-  const rejectOptionalCookies = () => {
-    void rejectOptional();
-  };
 
   return (
     <AppShell bgClassName="bg-background">
@@ -114,17 +107,15 @@ export default function CookiePolicy() {
               <div className="inline-flex items-center space-x-2 mb-4">
                 <Cookie className="h-8 w-8 text-primary" />
                 <span className="text-2xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Cookie Policy
+                  {t("legal.cookies.brand")}
                 </span>
               </div>
-              <h1 className="text-4xl font-bold mb-4">How We Use Cookies</h1>
+              <h1 className="text-4xl font-bold mb-4">{t("legal.cookies.headline")}</h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                We use cookies and similar technologies to enhance your
-                experience, analyze our traffic, and provide personalized
-                content.
+                {t("legal.cookies.intro")}
               </p>
               <p className="text-sm text-muted-foreground mt-4">
-                Last updated: January 15, 2025
+                {t("legal.cookies.lastUpdated")}
               </p>
             </div>
 
@@ -133,30 +124,23 @@ export default function CookiePolicy() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="h-5 w-5" />
-                  Cookie Preferences
+                  {t("legal.cookies.preferences.title")}
                 </CardTitle>
                 <CardDescription>
-                  Manage your cookie preferences. Essential cookies are required
-                  for the site to function.
+                  {t("legal.cookies.preferences.descriptionShared")}{" "}
                   {isAuthenticated
-                    ? " Your choices are saved to your account and sync across devices."
-                    : " Your choices are saved on this device; sign in to sync them across devices."}
+                    ? t("legal.cookies.preferences.descriptionAuth")
+                    : t("legal.cookies.preferences.descriptionAnon")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {cookieTypes.map((cookie, index) => {
-                  const preferenceKey = cookie.type
-                    .toLowerCase()
-                    .replace(" cookies", "") as
-                    | "essential"
-                    | "analytics"
-                    | "marketing"
-                    | "personalization";
-                  const isEnabled = cookiePreferences[preferenceKey];
+                {cookieTypes.map((cookie) => {
+                  const isEnabled = cookiePreferences[cookie.key];
+                  const examplesLabel = cookie.exampleKeys.map((k) => t(k)).join(", ");
 
                   return (
                     <div
-                      key={index}
+                      key={cookie.key}
                       className="flex items-start justify-between p-4 border rounded-lg"
                     >
                       <div className="flex items-start gap-3 flex-1">
@@ -185,27 +169,28 @@ export default function CookiePolicy() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium">{cookie.type}</h4>
+                            <h4 className="font-medium">{t(cookie.typeKey)}</h4>
                             {cookie.required && (
                               <Badge variant="secondary" className="text-xs">
-                                Required
+                                {t("legal.cookies.preferences.required")}
                               </Badge>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">
-                            {cookie.description}
+                            {t(cookie.descriptionKey)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Examples: {cookie.examples.join(", ")}
+                            {t("legal.cookies.preferences.examplesPrefix")} {examplesLabel}
                           </p>
                         </div>
                       </div>
                       <div className="ml-4">
                         <Switch
                           checked={isEnabled}
-                          onCheckedChange={(checked) =>
-                            handleCookiePreferenceChange(preferenceKey, checked)
-                          }
+                          onCheckedChange={(checked) => {
+                            if (cookie.key === "essential") return;
+                            void setCategory(cookie.key, checked);
+                          }}
                           disabled={cookie.required || cookieLoading}
                         />
                       </div>
@@ -214,15 +199,15 @@ export default function CookiePolicy() {
                 })}
 
                 <div className="flex gap-3 pt-4">
-                  <Button onClick={acceptAllCookies} className="flex-1">
-                    Accept All Cookies
+                  <Button onClick={() => void acceptAll()} className="flex-1">
+                    {t("legal.cookies.preferences.acceptAll")}
                   </Button>
                   <Button
-                    onClick={rejectOptionalCookies}
+                    onClick={() => void rejectOptional()}
                     variant="outline"
                     className="flex-1"
                   >
-                    Reject Optional Cookies
+                    {t("legal.cookies.preferences.rejectOptional")}
                   </Button>
                 </div>
               </CardContent>
@@ -231,36 +216,29 @@ export default function CookiePolicy() {
             {/* What Are Cookies */}
             <Card>
               <CardHeader>
-                <CardTitle>What Are Cookies?</CardTitle>
+                <CardTitle>{t("legal.cookies.whatAre.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-muted-foreground">
-                  Cookies are small text files that are placed on your device
-                  when you visit a website. They help websites remember
-                  information about your visit, making your next visit easier
-                  and the site more useful to you.
-                </p>
+                <p className="text-muted-foreground">{t("legal.cookies.whatAre.body")}</p>
 
                 <div className="grid md:grid-cols-2 gap-4 mt-6">
                   <div className="border rounded-lg p-4">
                     <h4 className="font-medium mb-2 flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      First-Party Cookies
+                      {t("legal.cookies.whatAre.firstParty.title")}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      Set directly by hired.video to provide essential
-                      functionality and improve your experience.
+                      {t("legal.cookies.whatAre.firstParty.body")}
                     </p>
                   </div>
 
                   <div className="border rounded-lg p-4">
                     <h4 className="font-medium mb-2 flex items-center gap-2">
                       <Globe className="h-4 w-4 text-blue-600" />
-                      Third-Party Cookies
+                      {t("legal.cookies.whatAre.thirdParty.title")}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      Set by external services we use, such as analytics
-                      providers and advertising networks.
+                      {t("legal.cookies.whatAre.thirdParty.body")}
                     </p>
                   </div>
                 </div>
@@ -270,52 +248,52 @@ export default function CookiePolicy() {
             {/* How We Use Cookies */}
             <Card>
               <CardHeader>
-                <CardTitle>How We Use Cookies</CardTitle>
+                <CardTitle>{t("legal.cookies.howUsed.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h4 className="font-medium mb-3">Essential Functions</h4>
+                  <h4 className="font-medium mb-3">{t("legal.cookies.howUsed.essential.title")}</h4>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                    <li>Keep you logged in during your session</li>
-                    <li>Remember your language and region preferences</li>
-                    <li>Ensure security and prevent fraud</li>
-                    <li>Enable core platform functionality</li>
+                    <li>{t("legal.cookies.howUsed.essential.item1")}</li>
+                    <li>{t("legal.cookies.howUsed.essential.item2")}</li>
+                    <li>{t("legal.cookies.howUsed.essential.item3")}</li>
+                    <li>{t("legal.cookies.howUsed.essential.item4")}</li>
                   </ul>
                 </div>
 
                 <Separator />
 
                 <div>
-                  <h4 className="font-medium mb-3">Performance & Analytics</h4>
+                  <h4 className="font-medium mb-3">{t("legal.cookies.howUsed.analytics.title")}</h4>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                    <li>Understand how you use our platform</li>
-                    <li>Identify popular features and content</li>
-                    <li>Monitor website performance and errors</li>
-                    <li>Improve our services based on usage patterns</li>
+                    <li>{t("legal.cookies.howUsed.analytics.item1")}</li>
+                    <li>{t("legal.cookies.howUsed.analytics.item2")}</li>
+                    <li>{t("legal.cookies.howUsed.analytics.item3")}</li>
+                    <li>{t("legal.cookies.howUsed.analytics.item4")}</li>
                   </ul>
                 </div>
 
                 <Separator />
 
                 <div>
-                  <h4 className="font-medium mb-3">Personalization</h4>
+                  <h4 className="font-medium mb-3">{t("legal.cookies.howUsed.personalization.title")}</h4>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                    <li>Remember your dashboard preferences</li>
-                    <li>Suggest relevant job opportunities</li>
-                    <li>Customize content based on your interests</li>
-                    <li>Save your search filters and criteria</li>
+                    <li>{t("legal.cookies.howUsed.personalization.item1")}</li>
+                    <li>{t("legal.cookies.howUsed.personalization.item2")}</li>
+                    <li>{t("legal.cookies.howUsed.personalization.item3")}</li>
+                    <li>{t("legal.cookies.howUsed.personalization.item4")}</li>
                   </ul>
                 </div>
 
                 <Separator />
 
                 <div>
-                  <h4 className="font-medium mb-3">Marketing & Advertising</h4>
+                  <h4 className="font-medium mb-3">{t("legal.cookies.howUsed.marketing.title")}</h4>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                    <li>Show relevant job advertisements</li>
-                    <li>Measure advertising campaign effectiveness</li>
-                    <li>Provide social media integration</li>
-                    <li>Enable retargeting for our services</li>
+                    <li>{t("legal.cookies.howUsed.marketing.item1")}</li>
+                    <li>{t("legal.cookies.howUsed.marketing.item2")}</li>
+                    <li>{t("legal.cookies.howUsed.marketing.item3")}</li>
+                    <li>{t("legal.cookies.howUsed.marketing.item4")}</li>
                   </ul>
                 </div>
               </CardContent>
@@ -324,37 +302,31 @@ export default function CookiePolicy() {
             {/* Cookie Retention */}
             <Card>
               <CardHeader>
-                <CardTitle>Cookie Retention</CardTitle>
+                <CardTitle>{t("legal.cookies.retention.title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Session Cookies</h4>
+                    <h4 className="font-medium mb-2">{t("legal.cookies.retention.session.title")}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Temporary cookies that are deleted when you close your
-                      browser. Used for essential functionality like maintaining
-                      your login session.
+                      {t("legal.cookies.retention.session.body")}
                     </p>
                   </div>
 
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-2">Persistent Cookies</h4>
+                    <h4 className="font-medium mb-2">{t("legal.cookies.retention.persistent.title")}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Remain on your device for a set period (typically 30 days
-                      to 2 years) or until you delete them. Used for preferences
-                      and analytics.
+                      {t("legal.cookies.retention.persistent.body")}
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
                   <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
-                    Automatic Cleanup
+                    {t("legal.cookies.retention.cleanup.title")}
                   </h4>
                   <p className="text-blue-700 dark:text-blue-300 text-sm">
-                    We automatically delete old cookies and regularly review our
-                    cookie usage to minimize data collection while maintaining
-                    functionality.
+                    {t("legal.cookies.retention.cleanup.body")}
                   </p>
                 </div>
               </CardContent>
@@ -363,31 +335,19 @@ export default function CookiePolicy() {
             {/* Managing Cookies */}
             <Card>
               <CardHeader>
-                <CardTitle>Managing Your Cookies</CardTitle>
+                <CardTitle>{t("legal.cookies.managing.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium mb-3">Browser Settings</h4>
+                  <h4 className="font-medium mb-3">{t("legal.cookies.managing.browser.title")}</h4>
                   <p className="text-muted-foreground mb-3">
-                    You can control cookies through your browser settings:
+                    {t("legal.cookies.managing.browser.body")}
                   </p>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                    <li>
-                      <strong>Chrome:</strong> Settings → Privacy and security →
-                      Cookies and other site data
-                    </li>
-                    <li>
-                      <strong>Firefox:</strong> Settings → Privacy & Security →
-                      Cookies and Site Data
-                    </li>
-                    <li>
-                      <strong>Safari:</strong> Preferences → Privacy → Manage
-                      Website Data
-                    </li>
-                    <li>
-                      <strong>Edge:</strong> Settings → Cookies and site
-                      permissions → Cookies and site data
-                    </li>
+                    <li>{t("legal.cookies.managing.browser.chrome")}</li>
+                    <li>{t("legal.cookies.managing.browser.firefox")}</li>
+                    <li>{t("legal.cookies.managing.browser.safari")}</li>
+                    <li>{t("legal.cookies.managing.browser.edge")}</li>
                   </ul>
                 </div>
 
@@ -396,12 +356,10 @@ export default function CookiePolicy() {
                     <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                     <div>
                       <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                        Impact of Disabling Cookies
+                        {t("legal.cookies.managing.impact.title")}
                       </h4>
                       <p className="text-amber-700 dark:text-amber-300 text-sm">
-                        Disabling certain cookies may limit website
-                        functionality. Essential cookies are required for the
-                        site to work properly and cannot be disabled.
+                        {t("legal.cookies.managing.impact.body")}
                       </p>
                     </div>
                   </div>
@@ -412,19 +370,18 @@ export default function CookiePolicy() {
             {/* Third-Party Services */}
             <Card>
               <CardHeader>
-                <CardTitle>Third-Party Services</CardTitle>
+                <CardTitle>{t("legal.cookies.thirdParty.title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
-                  We use the following third-party services that may set
-                  cookies:
+                  {t("legal.cookies.thirdParty.intro")}
                 </p>
 
                 <div className="grid gap-4">
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-1">Google Analytics</h4>
+                    <h4 className="font-medium mb-1">{t("legal.cookies.thirdParty.googleAnalytics.title")}</h4>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Website analytics and performance monitoring
+                      {t("legal.cookies.thirdParty.googleAnalytics.description")}
                     </p>
                     <a
                       href="https://policies.google.com/privacy"
@@ -432,14 +389,14 @@ export default function CookiePolicy() {
                       rel="noopener noreferrer"
                       className="text-primary text-sm hover:underline"
                     >
-                      View Google's Privacy Policy →
+                      {t("legal.cookies.thirdParty.googleAnalytics.link")} →
                     </a>
                   </div>
 
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-1">LinkedIn Ads</h4>
+                    <h4 className="font-medium mb-1">{t("legal.cookies.thirdParty.linkedinAds.title")}</h4>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Professional networking and job advertising
+                      {t("legal.cookies.thirdParty.linkedinAds.description")}
                     </p>
                     <a
                       href="https://www.linkedin.com/legal/privacy-policy"
@@ -447,14 +404,14 @@ export default function CookiePolicy() {
                       rel="noopener noreferrer"
                       className="text-primary text-sm hover:underline"
                     >
-                      View LinkedIn's Privacy Policy →
+                      {t("legal.cookies.thirdParty.linkedinAds.link")} →
                     </a>
                   </div>
 
                   <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-1">Intercom</h4>
+                    <h4 className="font-medium mb-1">{t("legal.cookies.thirdParty.intercom.title")}</h4>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Customer support and messaging
+                      {t("legal.cookies.thirdParty.intercom.description")}
                     </p>
                     <a
                       href="https://www.intercom.com/legal/privacy"
@@ -462,7 +419,7 @@ export default function CookiePolicy() {
                       rel="noopener noreferrer"
                       className="text-primary text-sm hover:underline"
                     >
-                      View Intercom's Privacy Policy →
+                      {t("legal.cookies.thirdParty.intercom.link")} →
                     </a>
                   </div>
                 </div>
@@ -472,17 +429,16 @@ export default function CookiePolicy() {
             {/* Contact */}
             <Card>
               <CardHeader>
-                <CardTitle>Questions About Cookies?</CardTitle>
+                <CardTitle>{t("legal.cookies.contact.title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
-                  If you have questions about our use of cookies or this policy,
-                  please contact us:
+                  {t("legal.cookies.contact.body")}
                 </p>
 
                 <div className="space-y-2">
                   <p className="text-sm">
-                    Email:{" "}
+                    {t("legal.cookies.contact.emailLabel")}{" "}
                     <a
                       href="mailto:privacy@hired.video"
                       className="text-primary hover:underline"
@@ -490,13 +446,12 @@ export default function CookiePolicy() {
                       privacy@hired.video
                     </a>
                   </p>
-                  <p className="text-sm">Subject: Cookie Policy Inquiry</p>
+                  <p className="text-sm">{t("legal.cookies.contact.subjectLine")}</p>
                 </div>
 
                 <div className="mt-6 p-4 bg-muted/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">
-                    We review and update this Cookie Policy periodically. Check
-                    back regularly for any changes.
+                    {t("legal.cookies.contact.reviewNote")}
                   </p>
                 </div>
               </CardContent>

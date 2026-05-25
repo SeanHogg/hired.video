@@ -653,7 +653,13 @@ function PublicStudioCanvas({
   hotzones?: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   className?: string;
 }) {
-  const playback = usePreviewPlayback(canvasState ?? emptyCanvasState());
+  // Autoplay surfaces start muted — matches both the browser
+  // muted-autoplay policy and the flat/baked branches (which default
+  // `muted = autoplay`). The shared <PlaybackControls/> renders a
+  // toggle so the viewer can unmute with a click.
+  const playback = usePreviewPlayback(canvasState ?? emptyCanvasState(), {
+    initialMuted: Boolean(autoplay),
+  });
   const [started, setStarted] = useState(Boolean(autoplay));
   // Fullscreen handoff to the same <PreviewOverlay/> the studio editor
   // uses. Shared `playback` means progress is continuous across the
