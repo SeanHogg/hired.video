@@ -51,6 +51,8 @@ import {
   locationsService,
   type ContentLocationSet,
 } from "@/lib/services/locations-service";
+import { SectorPicker } from "@/components/sector/SectorPicker";
+import { SECTORS, type Sector } from "@shared/sectors";
 
 
 // Job creation form schema
@@ -100,6 +102,7 @@ const jobCreateSchema = z.object({
   expirationDate: z.string().optional(),
   status: z.enum(["Draft", "Open", "Closed", "Hired"]).default("Open"),
   heroImageUrl: z.string().url().optional().or(z.literal("")),
+  sector: z.enum(SECTORS as readonly [string, ...string[]]).optional(),
 });
 
 type JobCreateForm = z.infer<typeof jobCreateSchema>;
@@ -533,6 +536,7 @@ export default function JobCreatePage() {
         currency: data.currency,
         isPublic: data.isPublic,
         heroImageUrl: data.heroImageUrl || undefined,
+        sector: data.sector || undefined,
       };
 
       // Use auth context's apiCall for proper authentication handling
@@ -968,6 +972,27 @@ export default function JobCreatePage() {
                           multiRegion={false}
                           originLabel="Pin location to map (optional)"
                         />
+                      </div>
+
+                      {/* Sector — drives vertical landing pages, search
+                          filters, and the AI-pivot funnel. Optional;
+                          legacy jobs stay untagged. */}
+                      <div className="space-y-2">
+                        <Label htmlFor="sector">Sector</Label>
+                        <SectorPicker
+                          value={(watchedValues.sector as Sector | undefined) ?? null}
+                          onChange={(s) =>
+                            setValue("sector", s ?? undefined, {
+                              shouldValidate: true,
+                            })
+                          }
+                          mode="recruitable"
+                          emptyLabel="Unspecified"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Tag this job to a sector so it surfaces on the
+                          right landing page and in vertical search.
+                        </p>
                       </div>
 
                       {/* Remote Work Option */}

@@ -18,6 +18,7 @@ import { nleRoutes } from "./routes/nle.js";
 
 import { authRoutes } from "./routes/auth.js";
 import { errorsRoutes } from "./routes/errors.js";
+import { metaRoutes } from "./routes/meta.js";
 import { extensionRoutes } from "./routes/extension.js";
 import { accountRoutes } from "./routes/account.js";
 import { userRoutes } from "./routes/users.js";
@@ -174,6 +175,10 @@ export function createApp() {
     "/api/auth/oauth",
     "/api/auth/magic-link",
     "/api/errors/report",
+    // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages
+    // and any other surface that needs the visitor's country before
+    // they've signed in.
+    "/api/_meta/geo",
     // Chrome extension telemetry — the optionalAuthMiddleware attaches
     // the user if a JWT is present, but signed-out captures are accepted
     // too (most valuable when detection fails on the LinkedIn signed-out
@@ -448,6 +453,7 @@ export function createApp() {
   app.route("/api/security", securityRoutes);
   app.route("/api/admin/security", adminSecurityRoutes);
   app.route("/api/errors", errorsRoutes);
+  app.route("/api/_meta", metaRoutes);
   app.route("/api/extension", extensionRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);

@@ -117,11 +117,16 @@ const NetworkingTipsGuide = lazy(() => import("./pages/guides/NetworkingTips"));
 const JobSearchStrategiesGuide = lazy(() => import("./pages/guides/JobSearchStrategies"));
 const TutorialsGuide = lazy(() => import("./pages/guides/Tutorials"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const PrivacyOptOut = lazy(() => import("./pages/PrivacyOptOut"));
 const SecurityPage = lazy(() => import("./pages/Security"));
 const SecuritySessions = lazy(() => import("./pages/SecuritySessions"));
 const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
+const SectorsIndex = lazy(() => import("./pages/SectorsIndex"));
+const SectorLanding = lazy(() => import("./pages/SectorLanding"));
+const ResumeTemplatesGallery = lazy(() => import("./pages/ResumeTemplatesGallery"));
+const PivotExplorer = lazy(() => import("./pages/PivotExplorer"));
 
 const AICoach = lazy(() => import("./pages/AICoach"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
@@ -679,6 +684,12 @@ const App = () => (
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
                       <Route path="/affiliate/dashboard" element={<Navigate to="/services" replace />} />
 
+                      {/* AI-resilient sector surfaces — see shared/sectors.ts SSoT. */}
+                      <Route path="/sectors" element={<SectorsIndex />} />
+                      <Route path="/sectors/:sector" element={<SectorLanding />} />
+                      <Route path="/resume-templates" element={<ResumeTemplatesGallery />} />
+                      <Route path="/pivot-explorer" element={<PivotExplorer />} />
+
                       <Route
                         path="/companies/create/:id"
                         element={<CompanyCreatePage />}
@@ -891,6 +902,8 @@ const App = () => (
                         element={<PrivacyPolicy />}
                       />
                       <Route path="/privacy" element={<PrivacyPolicy />} />
+                      <Route path="/privacy/opt-out" element={<PrivacyOptOut />} />
+                      <Route path="/do-not-sell" element={<Navigate to="/privacy/opt-out" replace />} />
                       <Route path="/security" element={<SecurityPage />} />
                       <Route path="/security/sessions" element={<SecuritySessions />} />
                       <Route path="/admin/security" element={<AdminSecurity />} />

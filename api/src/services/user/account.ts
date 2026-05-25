@@ -37,7 +37,18 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
   };
 };
 
-const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
+const { users, userProfiles, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
+
+/** Display name + email pattern stamped over the row when a user deletes
+ *  their account. The email pattern preserves the unique-constraint while
+ *  freeing the original address for future re-registration. Anyone who
+ *  joins later with the original email gets a fresh user_id. */
+function anonymizedHandles(userId: string): { name: string; email: string } {
+  return {
+    name: "Deleted User",
+    email: `deleted-${userId}@deleted.local`,
+  };
+}
 
 /** Project a `users` row into the rich AccountUser shape the Team Members
  *  table reads. The `role` column on `users` is a single value — we
@@ -557,16 +568,35 @@ export async function deleteAccount(userId: string,
     }
   }
 
-  // Soft delete: disable the account and revoke existing authentication artifacts.
-  // `deletedAt` is the trigger the nightly purge sweep (account-purge.ts)
-  // watches — without it, an admin-deactivated row (is_active=false) would
-  // never become a purge candidate. Setting both keeps the existing
-  // "account inaccessible" gate working while opting the row into the
-  // retention-window count-down published in the Privacy Policy.
+  // Delete = anonymize + make private. We do NOT hard-delete the row:
+  // historical activity (applications, transactions, audit trails) needs
+  // a stable user_id even after the human has left, but everything
+  // personally identifying about that human is scrubbed.
+  //
+  //   - `users` row: name → "Deleted User", email → unique anonymized
+  //     value (preserves the unique constraint AND frees the original
+  //     email for re-registration), password hash randomised so the row
+  //     can never be authenticated as.
+  //   - `user_profiles` row: every PII column (headline / phone /
+  //     address / linkedIn / etc.) NULLed; structured home location
+  //     cleared so personalised feeds stop targeting; profileVisibility
+  //     forced to 'private' so the public profile page no longer
+  //     surfaces. The row itself stays because foreign keys + JSON
+  //     blobs reference it.
+  //   - `videos`: privacyStatus → 'private' across every owned video so
+  //     the public channel / homepage feeds stop including them.
+  //
+  // Hard-delete remains available as a manual operation handled by the
+  // DPO in response to a verified data-subject request (gap #1168). The
+  // `deletedAt` column is set here as an audit timestamp — NOT as a
+  // sweep trigger; no scheduled job purges these rows.
   const now = new Date();
+  const handles = anonymizedHandles(userId);
   await db
     .update(users)
     .set({
+      name: handles.name,
+      email: handles.email,
       isActive: false,
       emailVerified: false,
       passwordHash: Array.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -576,6 +606,54 @@ export async function deleteAccount(userId: string,
       updatedAt: now,
     } as any)
     .where(eq(users.id, userId));
+
+  // Anonymize the profile row. ON DELETE CASCADE means this row goes
+  // away if the users row is ever hard-deleted by the DPO — but as
+  // long as the row exists, none of its PII columns leak.
+  await db
+    .update(userProfiles)
+    .set({
+      headline: null,
+      summary: null,
+      location: null,
+      website: null,
+      phone: null,
+      linkedIn: null,
+      github: null,
+      twitter: null,
+      currentRole: null,
+      currentCompany: null,
+      avatarUrl: null,
+      billingFullName: null,
+      billingCompany: null,
+      billingLine1: null,
+      billingLine2: null,
+      billingCity: null,
+      billingState: null,
+      billingPostalCode: null,
+      billingCountry: null,
+      billingPhone: null,
+      homeCountryId: null,
+      homeStateId: null,
+      homeCityId: null,
+      homePostalCode: null,
+      homeLatitude: null,
+      homeLongitude: null,
+      homeRadiusKm: null,
+      profileVisibility: "private",
+      openToWork: false,
+      providesServices: false,
+      updatedAt: now,
+    } as any)
+    .where(eq(userProfiles.userId, userId));
+
+  // Flip every owned video to private so the public channel + homepage
+  // feeds stop surfacing them. Company-owned videos (companyId set) are
+  // not touched — those belong to the company, not the leaving user.
+  await db
+    .update(videos)
+    .set({ privacyStatus: "private", updatedAt: now } as any)
+    .where(and(eq(videos.userId, userId), sql`${videos.companyId} IS NULL`));
 
   await db.update(refreshTokens).set({ revoked: true } as any).where(eq(refreshTokens.userId, userId));
   await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.userId, userId));

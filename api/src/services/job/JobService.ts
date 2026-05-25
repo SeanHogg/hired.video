@@ -368,6 +368,7 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     applyUrl: row.applyUrl ?? row.sourceUrl ?? undefined,
     heroImageUrl: (row as any).heroImageUrl ?? undefined,
     sentimentScore: (row as any).sentimentScore ?? null,
+    sector: (row as any).sector ?? null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     createdBy: (row as any).postedByUserId ?? undefined,
@@ -500,6 +501,7 @@ export async function createJob(job: CreateJobDTO, userId: string,
       description: job.description,
       location: job.location,
       heroImageUrl: job.heroImageUrl ?? null,
+      sector: job.sector ?? null,
       isRemote: false,
     } as any)
     .returning();
@@ -1223,6 +1225,7 @@ export async function updateJob(id: string,
   if (jobData.description !== undefined) updates.description = jobData.description;
   if (jobData.location !== undefined) updates.location = jobData.location;
   if (jobData.heroImageUrl !== undefined) updates.heroImageUrl = jobData.heroImageUrl;
+  if (jobData.sector !== undefined) updates.sector = jobData.sector || null;
   // Wire field `skills` maps to DB column `skills_required`. Without
   // this branch, the Skill Extractor's "Add to Job" save returned 200
   // but never persisted anything — Zod stripped the unknown field at

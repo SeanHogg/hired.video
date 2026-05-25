@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import type { BillingAddress } from "@shared/billing-address";
 import { getSubdivisions, normalizeSubdivision } from "@/lib/billing/subdivisions";
+import { useAddressLabels } from "@/hooks/use-address-labels";
 
 interface BillingAddressFormProps {
   value: BillingAddress;
@@ -52,6 +53,10 @@ export function BillingAddressForm({
   function update<K extends keyof BillingAddress>(field: K, next: BillingAddress[K]) {
     onChange({ ...value, [field]: next });
   }
+
+  // Country-aware labels (State vs Province vs Estado; ZIP vs Postal vs CP)
+  // come from one shared hook so we never inline country branches in JSX.
+  const labels = useAddressLabels(value.country);
 
   // Country-aware state picker. For US/CA the payment provider (Helcim)
   // requires an ISO 3166-2 subdivision code — see `lib/billing/subdivisions.ts`.
@@ -136,9 +141,7 @@ export function BillingAddressForm({
           {errors?.city && <p className="text-sm text-destructive mt-1">{errors.city}</p>}
         </div>
         <div>
-          <Label htmlFor="ba-state">
-            {value.country === "CA" ? "Province *" : "State / Region *"}
-          </Label>
+          <Label htmlFor="ba-state">{`${labels.subdivision} *`}</Label>
           {subdivisions ? (
             <Select
               value={stateOptionExists ? stateSelectValue : ""}
@@ -146,7 +149,7 @@ export function BillingAddressForm({
               disabled={disabled}
             >
               <SelectTrigger id="ba-state" aria-invalid={Boolean(errors?.state)}>
-                <SelectValue placeholder={value.country === "CA" ? "Select province" : "Select state"} />
+                <SelectValue placeholder={`Select ${labels.subdivision.toLowerCase()}`} />
               </SelectTrigger>
               <SelectContent>
                 {subdivisions.map((s) => (
@@ -172,13 +175,14 @@ export function BillingAddressForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="ba-postalCode">ZIP / Postal Code *</Label>
+          <Label htmlFor="ba-postalCode">{`${labels.postalCode} *`}</Label>
           <Input
             id="ba-postalCode"
             value={value.postalCode}
             onChange={(e) => update("postalCode", e.target.value)}
             disabled={disabled}
             required
+            placeholder={labels.postalCodePlaceholder}
             aria-invalid={Boolean(errors?.postalCode)}
           />
           {errors?.postalCode && <p className="text-sm text-destructive mt-1">{errors.postalCode}</p>}
@@ -218,6 +222,18 @@ export function BillingAddressForm({
           </Select>
         </div>
       </div>
+
+      {/* CASL compliance — Canadian residents must explicitly opt in to
+          commercial email. The default for new accounts is already
+          marketingEmailsEnabled=false on account_preferences, so the only
+          surface that matters is making the choice discoverable. The
+          cascade (force marketing-off when a non-CA user adds a CA
+          billing address) is tracked as a follow-up under #1150. */}
+      {value.country === "CA" && (
+        <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <strong className="text-foreground">Canada · CASL:</strong> We won't send promotional emails without your explicit consent. Manage email preferences in <a href="/settings?tab=notifications" className="underline hover:text-foreground">Settings → Notifications</a>.
+        </div>
+      )}
 
       <div>
         <Label htmlFor="ba-phone">Phone</Label>

@@ -62,6 +62,15 @@ export const articles = pgTable(
     coverImageUrl: text("cover_image_url"),
     category: varchar("category", { length: 100 }),
     tags: jsonb("tags").$type<string[]>().default([]).notNull(),
+    // AI-resilient sector taxonomy. Slug values + enum lives in
+    // `shared/sectors.ts`. Nullable — legacy articles stay untagged
+    // until re-saved through the new picker.
+    sector: varchar("sector", { length: 64 }),
+    // Audience vocabulary orthogonal to category — drives which sector
+    // landing page surfaces the article ("for job seekers" vs "for
+    // recruiters" vs "pivoting in" vs "resume guide" vs "civic /
+    // run-for-office"). See ARTICLE_AUDIENCES in shared/sectors.ts.
+    audience: varchar("audience", { length: 32 }),
 
     kind: varchar("kind", { length: 16 }).default("article").notNull(),
 
@@ -93,6 +102,9 @@ export const articles = pgTable(
     index("idx_articles_user").on(t.userId, t.createdAt),
     index("idx_articles_status_published").on(t.status, t.publishedAt),
     index("idx_articles_kind_status").on(t.kind, t.status, t.publishedAt),
+    // See migration 0112 — sector + audience indexes are partial (NULL
+    // filtered) at the DB level. Drizzle doesn't model partial indexes
+    // declaratively, so they're declared in SQL only.
     uniqueIndex("uq_articles_user_slug").on(t.userId, t.slug),
   ],
 );

@@ -17,8 +17,6 @@ import {
   Zap,
   BarChart3,
   Plus,
-  Filter,
-  X,
   Bookmark,
   FileText,
   Bell,
@@ -45,12 +43,11 @@ import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
 import Pagination, { usePagination } from "@/components/Pagination";
 import type { SearchFilters } from "@/components/SearchBar";
-import SearchBar from "@/components/SearchBar";
 import {
-  LocationFilter,
   locationFilterFromQuery,
   applyLocationFilterToQuery,
 } from "@/components/location/LocationFilter";
+import LocationFilterButton from "@/components/location/LocationFilterButton";
 import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Badge } from "@/components/ui/badge";
@@ -207,7 +204,6 @@ export default function Jobs() {
         { value: "executive", label: "Executive" },
       ],
     },
-    { key: "remote", label: "Remote", type: "boolean" },
     { key: "salary", label: "Salary range", type: "number-range" },
   ]);
 
@@ -431,18 +427,6 @@ export default function Jobs() {
   // double-saved, (b) re-painted 9 cards per save, and (c) swallowed
   // errors silently. Letting the card own it means a failed save rolls
   // back the bookmark icon naturally.
-
-  const handleSearch = (query: string) => {
-    setSearchFilters((prev) => ({ ...prev, search: query }));
-  };
-
-  const handleFilterChange = (filters: SearchFilters) => {
-    setSearchFilters(filters);
-  };
-
-  const handleClearFilters = () => {
-    setSearchFilters({});
-  };
 
   const handleTabChange = (value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -746,6 +730,10 @@ export default function Jobs() {
                     )}
                     {effectiveTab === "jobs" && (
                       <>
+                        <LocationFilterButton
+                          value={geoFilter}
+                          onChange={handleGeoFilterChange}
+                        />
                         <ViewModeToggle value={viewMode} onChange={setViewMode} />
                         <ListsButton entityType="job" />
                       </>
@@ -822,27 +810,6 @@ export default function Jobs() {
               <Tabs value={effectiveTab} className="space-y-4 sm:space-y-6">
                 {/* Jobs (browse) Tab */}
                 <TabsContent value="jobs" className="space-y-6">
-                  <SearchBar
-                    context="jobs"
-                    value={searchFilters.search}
-                    filters={searchFilters}
-                    onSearch={handleSearch}
-                    onFilterChange={handleFilterChange}
-                    onClearFilters={handleClearFilters}
-                    hideSearchInput
-                    hideFilters
-                  />
-                  <div className="rounded-md border border-border bg-card p-3">
-                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Location
-                    </div>
-                    <LocationFilter
-                      value={geoFilter}
-                      onChange={handleGeoFilterChange}
-                      compact={false}
-                    />
-                  </div>
-
                   {/* Owned Jobs (for recruiters/employers) */}
                   {canManageJobs &&
                     "owned" in jobsData &&

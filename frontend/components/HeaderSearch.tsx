@@ -33,6 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  LocationFilter,
+  locationFilterFromQuery,
+  applyLocationFilterToQuery,
+} from "@/components/location/LocationFilter";
+import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 import { cn } from "@/lib/utils";
 
 export type HeaderSearchContext =
@@ -137,7 +143,13 @@ export default function HeaderSearch() {
   const context = overrideContext ?? derivedContext;
 
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const [location_, setLocation_] = useState("");
+  // Structured geo filter — same component used on Jobs.tsx / UnifiedSearch so
+  // typeahead, "Use my location", and Remote toggle are available everywhere
+  // search is exposed. Seeded from URL when the popover opens; written back
+  // on Apply so deep-links share filter state.
+  const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
+    locationFilterFromQuery(searchParams),
+  );
   const [datePosted, setDatePosted] = useState("all");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -152,7 +164,7 @@ export default function HeaderSearch() {
   // reflects the canonical filter values rather than stale local state.
   useEffect(() => {
     if (!advancedOpen) return;
-    setLocation_(searchParams.get("location") ?? "");
+    setGeoFilter(locationFilterFromQuery(searchParams));
     setDatePosted(searchParams.get("datePosted") ?? "all");
     const next: Record<string, string> = {};
     for (const f of registeredFields) {
@@ -174,7 +186,7 @@ export default function HeaderSearch() {
   const CurrentIcon = current.icon;
 
   const submit = (overrides?: {
-    location?: string;
+    geo?: LocationFilterValue;
     datePosted?: string;
     extras?: Record<string, string>;
   }) => {
@@ -185,8 +197,7 @@ export default function HeaderSearch() {
       if (value) params.set(key, value);
     }
     if (query.trim()) params.set("q", query.trim());
-    const loc = overrides?.location ?? location_;
-    if (loc.trim()) params.set("location", loc.trim());
+    applyLocationFilterToQuery(params, overrides?.geo ?? geoFilter);
     const dp = overrides?.datePosted ?? datePosted;
     if (dp && dp !== "all") params.set("datePosted", dp);
     const extras = overrides?.extras ?? extraValues;
@@ -209,7 +220,7 @@ export default function HeaderSearch() {
   };
 
   const clearAdvanced = () => {
-    setLocation_("");
+    setGeoFilter({});
     setDatePosted("all");
     setExtraValues({});
   };
@@ -389,11 +400,10 @@ export default function HeaderSearch() {
               <label className="text-xs font-medium text-muted-foreground">
                 Location
               </label>
-              <Input
-                value={location_}
-                onChange={(e) => setLocation_(e.target.value)}
-                placeholder="City, state, or remote"
-                className="h-8 text-sm"
+              <LocationFilter
+                value={geoFilter}
+                onChange={setGeoFilter}
+                compact={false}
               />
             </div>
             <div className="space-y-1.5">

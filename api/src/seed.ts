@@ -2,8 +2,9 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { HIRED_VIDEO_SEED_COMPANY } from "./services/job/JobService.js";
 import { USER_ROLES } from "../../shared/user-roles.js";
+import { allSectorArticleDrafts } from "../../shared/sector-article-templates.js";
 
-const { users, companyProfiles, userCompanyRoleAssociations } = schema;
+const { users, companyProfiles, userCompanyRoleAssociations, articles } = schema;
 
 function toSlug(name: string): string {
   return name
@@ -165,10 +166,61 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
       // userCompanyRoleAssociations row too.
       await ensureCompanyMembership(db, userId, fixFasterId, "owner");
       await ensureCompanyMembership(db, userId, hiredVideoCommunityId, "owner");
+
+      // Phase 1: seed sector articles. Idempotent on (userId, slug) so
+      // re-running the boot seed does not duplicate. Platform-shipped
+      // content lands as `published` (approvedBy=SA, approvedAt=now)
+      // because it bypasses the creator-program enrollment gate that
+      // user-authored articles run through.
+      await seedSectorArticles(db, userId);
     }
 
     seeded = true;
   } catch (err) {
     console.error("[seed] Failed to seed super admin / company:", err);
+  }
+}
+
+async function seedSectorArticles(
+  db: ReturnType<typeof getDb>,
+  authorUserId: string,
+): Promise<void> {
+  const drafts = allSectorArticleDrafts();
+  const now = new Date();
+  let inserted = 0;
+  for (const draft of drafts) {
+    const slug = `${draft.sector}-${draft.audience}`.replace(/_/g, "-");
+    const [existing] = await db
+      .select({ id: articles.id })
+      .from(articles)
+      .where(and(eq(articles.userId, authorUserId), eq(articles.slug, slug)))
+      .limit(1);
+    if (existing) continue;
+    const readMinutes = Math.max(
+      1,
+      Math.ceil(draft.bodyMd.trim().split(/\s+/).filter(Boolean).length / 225),
+    );
+    await db.insert(articles).values({
+      userId: authorUserId,
+      slug,
+      title: draft.title,
+      bodyMd: draft.bodyMd,
+      summary: draft.summary,
+      category: "career",
+      tags: draft.tags,
+      sector: draft.sector,
+      audience: draft.audience,
+      kind: "article",
+      status: "published",
+      submittedForReviewAt: now,
+      publishedAt: now,
+      approvedBy: authorUserId,
+      approvedAt: now,
+      readMinutes,
+    } as any);
+    inserted += 1;
+  }
+  if (inserted > 0) {
+    console.log(`[seed] Inserted ${inserted} sector articles`);
   }
 }

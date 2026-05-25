@@ -26,7 +26,9 @@
  * consumers can drop `<EntityDetailsSheet … canView={…} />` inline
  * without their own outer gate. (DRY rule, no prop-drilled canX boolean
  * the parent could have computed itself: callers pass the result of
- * the per-entity useEntityDetailsPermission().)
+ * useEntityDetailsPermission(), which centralises the owner-only rule
+ * for every artifact kind — recruiters/employers viewing someone else's
+ * resume/profile/etc. do NOT see this drawer.)
  */
 
 import { Globe } from "lucide-react";

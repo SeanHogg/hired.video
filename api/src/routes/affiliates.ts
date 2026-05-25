@@ -97,6 +97,19 @@ affiliateRoutes.patch("/profile", async (c) => {
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (body.payoutEmail) updates.payoutEmail = body.payoutEmail;
+  // Sector specialization — affiliates pick 1..5 sectors to specialize
+  // in. We don't validate against the SECTORS enum here on purpose:
+  // marketing will add new sectors faster than schema bumps (same
+  // reasoning behind not adding a CHECK constraint in migration 0112).
+  // Empty array means generalist.
+  if (Array.isArray(body.specialtySectors)) {
+    const cleaned = body.specialtySectors
+      .filter((s: unknown): s is string => typeof s === "string")
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+    updates.specialtySectors = cleaned;
+  }
 
   const [updated] = await db
     .update(schema.affiliateProfiles)
@@ -110,7 +123,15 @@ affiliateRoutes.patch("/profile", async (c) => {
 
 /**
  * POST /api/affiliates/click — record a referral link click (public endpoint)
- * Body: { referralCode, targetPath? }
+ * Body: { referralCode, targetPath?, landingSector? }
+ *
+ * `landingSector` is set when the click lands on a sector landing page
+ * (e.g. /sectors/healthcare). It powers per-sector CTR analytics and
+ * the specialist-bonus matching (affiliate's specialtySectors ⨯
+ * referral's landing_sector — see migration 0112).
+ *
+ * `targetPath` is parsed if it matches `/sectors/<slug>` so the click
+ * tracker auto-derives landingSector when the consumer forgot to set it.
  */
 affiliateRoutes.post("/click", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -126,12 +147,23 @@ affiliateRoutes.post("/click", async (c) => {
 
   if (!profile) return c.json(error("NOT_FOUND", "Invalid referral code"), 404);
 
+  // Auto-derive landingSector from /sectors/<slug> path when caller omitted it.
+  const target: string | null = body.targetPath ?? null;
+  let landingSector: string | null = null;
+  if (typeof body.landingSector === "string" && body.landingSector.trim()) {
+    landingSector = body.landingSector.trim().slice(0, 64);
+  } else if (target) {
+    const match = /^\/sectors\/([a-z_]+)/i.exec(target);
+    if (match?.[1]) landingSector = match[1];
+  }
+
   const clicksTable = (schema as any).affiliateLinkClicks;
   if (clicksTable) {
     await db.insert(clicksTable).values({
       affiliateId: profile.id,
       referralCode: code,
-      targetPath: body.targetPath ?? null,
+      targetPath: target,
+      landingSector,
       ipAddress: c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null,
       userAgent: c.req.header("user-agent") ?? null,
       referer: c.req.header("referer") ?? null,

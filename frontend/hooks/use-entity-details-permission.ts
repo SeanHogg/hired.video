@@ -8,9 +8,20 @@
  * Per the DRY rule, callers do NOT inline `isOwner || isRecruiter`
  * derivations — that scatter is the symptom this hook closes.
  *
+ * Owner-only rule: the [🌐 Details] drawer is gated to the artifact
+ * owner (admin / super-admin preserved for support, same pattern as
+ * every other permission hook). Recruiters and employers do NOT see
+ * the drawer on someone else's resume/company/etc. — the per-entity
+ * hooks expose a wider `canViewStats` for inline surfaces (e.g.
+ * ResumeCard score chips), but the globe drawer is the strict surface
+ * and this aggregator enforces the tighter rule. Jobs are the
+ * exception: the "owner" of a job posting is the whole company team
+ * (backend-stamped `viewerCanManage`), so we delegate to `canEdit`.
+ *
  * Adding a new artifact kind: extend EntityDetailsPermissionArgs with
  * the new kind + its row shape, then add a `case` here that returns
- * `{ canViewStats }`. No drawer site changes.
+ * `{ canViewStats: <hook>.isOwner || adminLike }`. No drawer site
+ * changes.
  */
 
 import { useResumePermissions } from "@/hooks/use-resume-permissions";
@@ -20,6 +31,7 @@ import { useProfilePermissions } from "@/hooks/use-profile-permissions";
 import { useArticlePermissions } from "@/hooks/use-article-permissions";
 import { useStudioTemplatePermissions } from "@/hooks/use-studio-template-permissions";
 import { useServicePermissions } from "@/hooks/use-service-permissions";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Resume } from "@/types/resume";
 
 export interface EntityDetailsPermission {
@@ -52,6 +64,9 @@ export function useEntityDetailsPermission(
   // rules-of-hooks contract. Each per-entity hook accepts a null entity
   // and returns an all-false permissions object in that case, so feeding
   // a non-matching entity is safe.
+  const { isAdmin, isSuperAdmin } = usePermissions();
+  const adminLike = isAdmin || isSuperAdmin;
+
   const resume = useResumePermissions(args.kind === "resume" ? args.entity : null);
   const job = useJobPermissions(args.kind === "job" ? args.entity ?? null : null);
   const company = useCompanyPermissions(args.kind === "company" ? args.entity ?? null : null);
@@ -62,13 +77,13 @@ export function useEntityDetailsPermission(
   const video = useStudioTemplatePermissions(args.kind === "video" ? (args.entity as any) : null);
 
   switch (args.kind) {
-    case "resume": return { canViewStats: resume.canViewStats };
-    case "job": return { canViewStats: job.canEdit };
-    case "company": return { canViewStats: company.canViewStats };
-    case "profile": return { canViewStats: profile.canViewStats };
-    case "article": return { canViewStats: article.canViewStats };
-    case "studio_template": return { canViewStats: template.canViewStats };
-    case "service": return { canViewStats: service.canViewStats };
-    case "video": return { canViewStats: video.canViewStats };
+    case "resume": return { canViewStats: resume.isOwner || adminLike };
+    case "job": return { canViewStats: job.canEdit || adminLike };
+    case "company": return { canViewStats: company.isOwner || adminLike };
+    case "profile": return { canViewStats: profile.isOwner || adminLike };
+    case "article": return { canViewStats: article.isOwner || adminLike };
+    case "studio_template": return { canViewStats: template.isOwner || adminLike };
+    case "service": return { canViewStats: service.isOwner || adminLike };
+    case "video": return { canViewStats: video.isOwner || adminLike };
   }
 }

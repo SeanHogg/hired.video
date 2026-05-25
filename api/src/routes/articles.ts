@@ -66,6 +66,8 @@ const CreateArticleSchema = z.object({
   category: z.string().max(100).optional(),
   tags: z.array(z.string().max(60)).max(20).optional(),
   kind: KindSchema.default("article").optional(),
+  sector: z.string().max(64).optional(),
+  audience: z.string().max(32).optional(),
 });
 
 const UpdateArticleSchema = CreateArticleSchema.partial().extend({
@@ -177,6 +179,8 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
     coverImageUrl: row.article.coverImageUrl,
     category: row.article.category,
     tags: row.article.tags,
+    sector: row.article.sector,
+    audience: row.article.audience,
     readMinutes: row.article.readMinutes,
     viewCount: row.article.viewCount + 1,
     publishedAt: row.article.publishedAt,
@@ -235,10 +239,12 @@ articleRoutes.post("/", async (c) => {
     coverImageUrl: parsed.data.coverImageUrl ?? null,
     category: parsed.data.category ?? null,
     tags: parsed.data.tags ?? [],
+    sector: parsed.data.sector ?? null,
+    audience: parsed.data.audience ?? null,
     kind: parsed.data.kind ?? "article",
     status: "draft",
     readMinutes: readMinutes(parsed.data.bodyMd ?? ""),
-  } as any).returning();
+  }).returning();
   return c.json(success(created), 201);
 });
 
@@ -297,6 +303,8 @@ articleRoutes.patch("/:id", async (c) => {
   if (parsed.data.tags !== undefined) patch.tags = parsed.data.tags;
   if (parsed.data.slug !== undefined) patch.slug = parsed.data.slug;
   if (parsed.data.kind !== undefined) patch.kind = parsed.data.kind;
+  if (parsed.data.sector !== undefined) patch.sector = parsed.data.sector || null;
+  if (parsed.data.audience !== undefined) patch.audience = parsed.data.audience || null;
 
   // A rejected article being edited bumps back to draft so the creator
   // re-submits cleanly. Published edits leave status alone (they're a fresh
@@ -438,6 +446,8 @@ function toPublicCard(r: {
     coverImageUrl: r.article.coverImageUrl,
     category: r.article.category,
     tags: r.article.tags,
+    sector: r.article.sector,
+    audience: r.article.audience,
     readMinutes: r.article.readMinutes,
     viewCount: r.article.viewCount,
     publishedAt: r.article.publishedAt,

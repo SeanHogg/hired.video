@@ -15,6 +15,7 @@
  */
 
 import { apiClient } from "../api-client";
+import { runtimeConfig } from "../runtime-config";
 import type { ArtifactKind, ArtifactViewBeacon } from "@shared/artifact-views";
 import type { ArtifactMetrics } from "@/components/analytics";
 
@@ -25,11 +26,16 @@ export async function sendArtifactViewBeacon(
   // since fetch is best-effort there. Fall back to fetch (keepalive) when
   // sendBeacon is unavailable. apiClient.post lacks the keepalive flag, so
   // we go direct to fetch for the unload path.
+  //
+  // Must use the absolute API origin — the Pages worker on hired.video does
+  // not own /api/* (that's the api.hired.video Hono worker), so a relative
+  // path 405s in prod.
   const body = JSON.stringify(beacon);
+  const url = `${runtimeConfig.apiUrl.replace(/\/$/, "")}/api/analytics/artifacts/beacon`;
   if (typeof navigator !== "undefined" && navigator.sendBeacon) {
     try {
       const blob = new Blob([body], { type: "application/json" });
-      const ok = navigator.sendBeacon("/api/analytics/artifacts/beacon", blob);
+      const ok = navigator.sendBeacon(url, blob);
       if (ok) return;
     } catch {}
   }

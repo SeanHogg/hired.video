@@ -20,6 +20,11 @@ export const affiliateProfiles = pgTable("affiliate_profiles", {
   totalEarned: numeric("total_earned").default("0").notNull(),
   totalPaid: numeric("total_paid").default("0").notNull(),
   payoutEmail: varchar("payout_email", { length: 255 }),
+  // Sectors this affiliate specializes in (healthcare creator,
+  // trades creator, etc.). Empty array = generalist. Specialist
+  // bonus applies when a referral's landing_sector matches one of
+  // these. See shared/sectors.ts Sector enum.
+  specialtySectors: jsonb("specialty_sectors").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -34,6 +39,11 @@ export const affiliateReferrals = pgTable("affiliate_referrals", {
   referralCode: varchar("referral_code", { length: 50 }).notNull(),
   ipAddress: varchar("ip_address", { length: 45 }),
   userAgent: text("user_agent"),
+  // Sector landing page / article the referral arrived through. Drives
+  // vertical conversion analytics and specialist bonuses (see
+  // affiliateProfiles.specialtySectors). Nullable for non-sector
+  // landings (homepage, etc.).
+  landingSector: varchar("landing_sector", { length: 64 }),
   convertedAt: timestamp("converted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -102,6 +112,10 @@ export const affiliateLinkClicks = pgTable("affiliate_link_clicks", {
   referer: text("referer"),
   // Whether this click eventually converted (FK to referrals)
   convertedReferralId: uuid("converted_referral_id").references(() => affiliateReferrals.id, { onDelete: "set null" }),
+  // Sector landing page this click went to (e.g. /sectors/healthcare).
+  // Nullable for non-sector landings. Powers per-sector CTR analytics
+  // and matches the affiliateReferrals.landingSector schema.
+  landingSector: varchar("landing_sector", { length: 64 }),
   clickedAt: timestamp("clicked_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

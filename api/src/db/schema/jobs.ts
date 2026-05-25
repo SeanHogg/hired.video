@@ -30,6 +30,11 @@ export const jobItems = pgTable("job_items", {
   salaryMax: numeric("salary_max"),
   salaryCurrency: varchar("salary_currency", { length: 10 }).default("USD"),
   skillsRequired: jsonb("skills_required").default([]),
+  // AI-resilient sector taxonomy. Slug values + enum lives in
+  // `shared/sectors.ts`. Nullable — legacy jobs stay untagged until
+  // re-saved through the new picker. Indexed for sector-filtered
+  // searches via partial index in migration 0112.
+  sector: varchar("sector", { length: 64 }),
   // Structured details extracted by /api/jobs/extract:
   // { responsibilities: string[], requirements: string[],
   //   qualifications: string[], benefits: string[] }

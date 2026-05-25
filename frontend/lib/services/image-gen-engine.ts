@@ -337,7 +337,13 @@ registerImageGenEngine({
       const canvas = new OffscreenCanvas(image.width, image.height);
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("WebGPU SD-Turbo: no 2D context for raster conversion");
-      const id = new ImageData(image.data, image.width, image.height);
+      // Copy into a fresh Uint8ClampedArray backed by a plain
+      // ArrayBuffer — transformers.js can return a SharedArrayBuffer-
+      // backed view, which `new ImageData()` rejects under strict
+      // lib.dom typing.
+      const pixels = new Uint8ClampedArray(image.data.byteLength);
+      pixels.set(image.data);
+      const id = new ImageData(pixels, image.width, image.height);
       ctx.putImageData(id, 0, 0);
       blob = await canvas.convertToBlob({ type: "image/png" });
     } else {

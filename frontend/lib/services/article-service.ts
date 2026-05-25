@@ -30,6 +30,8 @@ export interface Article {
   coverImageUrl: string | null;
   category: string | null;
   tags: string[];
+  sector: string | null;
+  audience: string | null;
   kind: ArticleKind;
   status: ArticleStatus;
   submittedForReviewAt: string | null;
@@ -62,6 +64,8 @@ export interface PublicArticleCard {
   coverImageUrl: string | null;
   category: string | null;
   tags: string[];
+  sector: string | null;
+  audience: string | null;
   readMinutes: number;
   viewCount: number;
   publishedAt: string | null;
@@ -76,6 +80,8 @@ export interface CreateArticleInput {
   category?: string;
   tags?: string[];
   kind?: ArticleKind;
+  sector?: string;
+  audience?: string;
 }
 
 export interface UpdateArticleInput extends Partial<CreateArticleInput> {

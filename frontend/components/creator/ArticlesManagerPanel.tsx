@@ -36,6 +36,14 @@ import {
   locationsService,
   type ContentLocationSet,
 } from "@/lib/services/locations-service";
+import { SectorPicker } from "@/components/sector/SectorPicker";
+import {
+  ARTICLE_AUDIENCES,
+  ARTICLE_AUDIENCE_LABELS,
+  type ArticleAudience,
+  type Sector,
+  isValidSector,
+} from "@shared/sectors";
 
 type Mode = "list" | "edit";
 
@@ -70,6 +78,10 @@ export default function ArticlesManagerPanel() {
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  // Sector + audience taxonomy (migration 0112). Both optional — articles
+  // not bound to a vertical (general career advice) stay null.
+  const [sector, setSector] = useState<Sector | null>(null);
+  const [audience, setAudience] = useState<ArticleAudience | "">("");
   // Structured geo tags (gap #1138). Hydrated from the server on edit
   // open; persisted via locationsService.setForEntity after the article
   // save resolves. Optional — articles can be country-wide / global.
@@ -105,6 +117,8 @@ export default function ArticlesManagerPanel() {
     setCategory("");
     setTagsInput("");
     setCoverImageUrl("");
+    setSector(null);
+    setAudience("");
     setLocations({ origin: null, serves: [] });
     setMode("edit");
   };
@@ -117,6 +131,12 @@ export default function ArticlesManagerPanel() {
     setCategory(a.category ?? "");
     setTagsInput((a.tags ?? []).join(", "));
     setCoverImageUrl(a.coverImageUrl ?? "");
+    setSector(isValidSector(a.sector) ? a.sector : null);
+    setAudience(
+      a.audience && (ARTICLE_AUDIENCES as readonly string[]).includes(a.audience)
+        ? (a.audience as ArticleAudience)
+        : "",
+    );
     setMode("edit");
     // Hydrate existing geo tags. Failure is non-fatal — the editor just
     // opens with an empty picker (creator can re-pick on re-save).
@@ -160,6 +180,8 @@ export default function ArticlesManagerPanel() {
     category: category.trim() || undefined,
     tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
     coverImageUrl: coverImageUrl.trim() || undefined,
+    sector: sector ?? undefined,
+    audience: audience || undefined,
   });
 
   const save = async () => {
@@ -424,6 +446,43 @@ export default function ArticlesManagerPanel() {
             <div>
               <Label htmlFor="tags">Tags (comma-separated)</Label>
               <Input id="tags" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="resume, ats, interview" disabled={locked} />
+            </div>
+          </div>
+          {/* Sector + audience taxonomy — drives sector landing pages
+              and the For-Job-Seekers / For-Recruiters split. Both
+              optional; leave blank for general career content. */}
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Sector</Label>
+              <SectorPicker
+                value={sector}
+                onChange={setSector}
+                mode="all"
+                emptyLabel="Not sector-specific"
+                disabled={locked}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="audience">Audience</Label>
+              <Select
+                value={audience || "__none__"}
+                onValueChange={(v) =>
+                  setAudience(v === "__none__" ? "" : (v as ArticleAudience))
+                }
+                disabled={locked}
+              >
+                <SelectTrigger id="audience">
+                  <SelectValue placeholder="General audience" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">General audience</SelectItem>
+                  {ARTICLE_AUDIENCES.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {ARTICLE_AUDIENCE_LABELS[a]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="space-y-2">

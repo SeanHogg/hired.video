@@ -9,9 +9,7 @@
 // grid for sourcing browsing.
 
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { resumeService } from "@/lib/services/resume-service";
 import ResumeCard from "@/components/ResumeCard";
 
@@ -36,9 +34,12 @@ const PAGE_SIZE = 24;
 
 export default function AvailableResumesPanel(): JSX.Element {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // The shared HeaderSearch writes `?q=` into the URL — read it here so this
+  // panel filters by the same input rather than maintaining its own box.
+  const search = searchParams.get("q") ?? "";
   const [items, setItems] = useState<PublicResumeItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -73,17 +74,6 @@ export default function AvailableResumesPanel(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search public resumes by title or summary"
-          className="pl-9"
-        />
-      </div>
-
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {[0, 1, 2, 3, 4, 5].map((i) => (

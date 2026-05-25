@@ -40,6 +40,12 @@ export const users = pgTable("users", {
   // reactivate" distinction.
   isBanned: boolean("is_banned").default(false).notNull(),
   isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
+  // Editorial / house author account. Bypasses the creator-marketplace
+  // paywall in `isCreatorVisible` so seeded long-form content (the "So
+  // You Want to Become a..." series, etc.) surfaces publicly without
+  // requiring a real subscription. NEVER auto-grantable from UI — only
+  // set by migrations / SuperAdmin tooling.
+  isSystem: boolean("is_system").default(false).notNull(),
   // #157 — per-user override for the creator marketplace platform fee.
   // Null = fall back to PLATFORM_FEE_BPS_DEFAULT. Snapshotted onto a
   // listing's `platformFeeBps` at first publish (or re-opt-in); changing

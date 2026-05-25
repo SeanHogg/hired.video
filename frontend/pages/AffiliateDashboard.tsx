@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AppShell } from "@/components/AppShell";
 import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
+import { AffiliateSpecialtySectorsPanel } from "@/components/affiliate/AffiliateSpecialtySectorsPanel";
 
 // Content component that can be used with or without layout
 function AffiliateDashboardContent() {
@@ -334,6 +335,7 @@ export default function AffiliateDashboard() {
         <section className="max-w-6xl mx-auto px-6 py-10 space-y-6">
           <StandaloneHeader />
           <ReferralLinkCard />
+          <AffiliateSpecialtySectorsPanel />
           <AffiliateDashboardContent />
         </section>
       </main>

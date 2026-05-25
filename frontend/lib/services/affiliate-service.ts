@@ -55,6 +55,9 @@ const AffiliateProfileSchema = z.object({
   isActive: z.boolean().optional().default(true),
   creationDateTime: z.string().optional(),
   updateDateTime: z.string().nullish().optional(),
+  // Sectors this affiliate specializes in. Empty array = generalist.
+  // Drives the per-sector specialist commission bonus (#1166).
+  specialtySectors: z.array(z.string()).optional().default([]),
 });
 export type AffiliateProfile = z.infer<typeof AffiliateProfileSchema>;
 
@@ -191,6 +194,15 @@ export class AffiliateService {
     const response: ApiSuccessResponse<DashboardData> = await apiClient.get(
       "/api/Affiliate/dashboard",
       DashboardSchema,
+    );
+    return response.data;
+  }
+
+  async updateSpecialtySectors(specialtySectors: string[]): Promise<AffiliateProfile> {
+    const response = await apiClient.patch<AffiliateProfile>(
+      "/api/Affiliate/profile",
+      { specialtySectors },
+      AffiliateProfileSchema,
     );
     return response.data;
   }

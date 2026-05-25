@@ -24,6 +24,14 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
+import { JurisdictionSelector } from "@/components/legal/JurisdictionSelector";
+import {
+  USCaliforniaRightsSection,
+  PIPEDARightsSection,
+  QuebecLaw25Section,
+  MexicoARCOSection,
+  GDPRRightsSection,
+} from "@/components/legal/RegionalPrivacySections";
 
 export default function PrivacyPolicy() {
   const location = useLocation();
@@ -58,6 +66,9 @@ export default function PrivacyPolicy() {
               <p className="text-sm text-muted-foreground mt-4">
                 Last updated: March 30, 2025
               </p>
+              <div className="mt-6 flex justify-center">
+                <JurisdictionSelector />
+              </div>
             </div>
 
             {/* Quick Overview */}
@@ -229,6 +240,16 @@ export default function PrivacyPolicy() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Region-specific rights — each component self-gates via
+                useUserJurisdiction; mount all of them, the matching one
+                renders, the rest return null. Drives the "viewing as"
+                selector at the top of the page. */}
+            <USCaliforniaRightsSection />
+            <PIPEDARightsSection />
+            <QuebecLaw25Section />
+            <MexicoARCOSection />
+            <GDPRRightsSection />
 
             {/* Detailed Sections */}
             <div className="space-y-6">

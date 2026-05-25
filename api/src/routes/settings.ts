@@ -481,13 +481,22 @@ settingsRoutes.post("/security/2fa/disable", async (c) => {
   return c.json(success({ success: true }), 200);
 });
 
+// ============================================================================
+// Data export — closes the GDPR Art. 20 / CPRA portability promise made in
+// PrivacyPolicy.tsx. Default response is a downloadable JSON bundle
+// covering profile / resumes / applications / messages / billing / media.
+// `?format=csv` keeps the spreadsheet-friendly path for the resume + jobs
+// subset (the rich relational data doesn't flatten cleanly to CSV).
+// ============================================================================
+
 settingsRoutes.get("/export", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  const repos = buildRepos(db);
 
   const [user] = await db
-    .select({ email: users.email, name: users.name, role: users.role, createdAt: users.createdAt, lastLoginAt: users.lastLoginAt })
+    .select({ email: users.email, name: users.name, role: users.role, createdAt: users.createdAt, lastLoginAt: users.lastLoginAt, deletedAt: users.deletedAt, doNotShare: users.doNotShare })
     .from(users)
     .where(eq(users.id, uid))
     .limit(1);
@@ -502,40 +511,122 @@ settingsRoutes.get("/export", async (c) => {
   // layering rule. Settings export only needs id/title/status/createdAt
   // so project here rather than widening the repo's surface for one
   // caller's shape.
-  const resumes = (await buildRepos(db).resumes.findAllForOwner(uid)).map((r) => ({
+  const resumes = (await repos.resumes.findAllForOwner(uid)).map((r) => ({
     id: r.id,
     title: r.title,
     status: r.status,
     createdAt: r.createdAt,
   }));
 
-  const applications = await db
-    .select()
-    .from(schema.jobApplications)
-    .where(eq(schema.jobApplications.userId, uid));
-
-  const savedJobsList = await db
-    .select()
-    .from(schema.savedJobs)
-    .where(eq(schema.savedJobs.userId, uid));
-
-  const [prefs] = await db
-    .select()
-    .from(accountPreferences)
-    .where(eq(accountPreferences.userId, uid))
-    .limit(1);
+  // Fan out the remaining tables in parallel. Each is a user-scoped
+  // read so ownership filtering is trivial — no per-table service
+  // layer needed for an export. Failures on optional tables (eg the
+  // tenant doesn't have messaging enabled) surface as empty arrays.
+  const [
+    applications,
+    savedJobsList,
+    sentMessages,
+    userVideos,
+    userStudioProjects,
+    userInvoices,
+    paymentMethodsList,
+    [cookiePrefsRow],
+    [privacyPrefsRow],
+    [prefsRow],
+  ] = await Promise.all([
+    db.select().from(schema.jobApplications).where(eq(schema.jobApplications.userId, uid)),
+    db.select().from(schema.savedJobs).where(eq(schema.savedJobs.userId, uid)),
+    db
+      .select({
+        id: schema.messages.id,
+        conversationId: schema.messages.conversationId,
+        content: schema.messages.content,
+        contentType: schema.messages.contentType,
+        isEdited: schema.messages.isEdited,
+        isDeleted: schema.messages.isDeleted,
+        createdAt: schema.messages.createdAt,
+      })
+      .from(schema.messages)
+      .where(eq(schema.messages.senderId, uid)),
+    db
+      .select({
+        id: schema.videos.id,
+        title: schema.videos.title,
+        description: schema.videos.description,
+        privacyStatus: schema.videos.privacyStatus,
+        status: schema.videos.status,
+        r2Key: schema.videos.r2Key,
+        youtubeUrl: schema.videos.youtubeUrl,
+        duration: schema.videos.duration,
+        createdAt: schema.videos.createdAt,
+      })
+      .from(schema.videos)
+      .where(eq(schema.videos.userId, uid)),
+    db
+      .select({
+        id: schema.studioProjects.id,
+        kind: schema.studioProjects.kind,
+        mediaKind: schema.studioProjects.mediaKind,
+        createdAt: schema.studioProjects.createdAt,
+      })
+      .from(schema.studioProjects)
+      .where(eq(schema.studioProjects.userId, uid)),
+    db
+      .select({
+        id: schema.invoices.id,
+        status: schema.invoices.status,
+        total: schema.invoices.total,
+        currency: schema.invoices.currency,
+        paidAt: schema.invoices.paidAt,
+        invoicePdfUrl: schema.invoices.invoicePdfUrl,
+        createdAt: schema.invoices.createdAt,
+      })
+      .from(schema.invoices)
+      .where(eq(schema.invoices.userId, uid)),
+    db
+      .select({
+        id: schema.paymentMethods.id,
+        last4: schema.paymentMethods.last4,
+        brand: schema.paymentMethods.brand,
+        expiryMonth: schema.paymentMethods.expiryMonth,
+        expiryYear: schema.paymentMethods.expiryYear,
+        isDefault: schema.paymentMethods.isDefault,
+        createdAt: schema.paymentMethods.createdAt,
+      })
+      .from(schema.paymentMethods)
+      .where(eq(schema.paymentMethods.userId, uid)),
+    db.select().from(cookiePreferences).where(eq(cookiePreferences.userId, uid)).limit(1),
+    db.select().from(schema.privacyPreferences).where(eq(schema.privacyPreferences.userId, uid)).limit(1),
+    db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1),
+  ]);
 
   const data = {
     exportedAt: new Date().toISOString(),
+    schemaVersion: 2,
     account: user ?? null,
     profile: profile ?? null,
-    preferences: prefs ?? null,
+    preferences: {
+      account: prefsRow ?? null,
+      cookies: cookiePrefsRow ?? null,
+      privacy: privacyPrefsRow ?? null,
+    },
     resumes,
     jobApplications: applications,
     savedJobs: savedJobsList,
+    messages: sentMessages,
+    media: {
+      videos: userVideos,
+      studioProjects: userStudioProjects,
+    },
+    billing: {
+      invoices: userInvoices,
+      paymentMethods: paymentMethodsList,
+    },
   };
 
   const format = c.req.query("format");
+  const date = new Date().toISOString().slice(0, 10);
+
   if (format === "csv") {
     const escapeCell = (v: unknown) => {
       const s = v == null ? "" : String(v);
@@ -549,14 +640,22 @@ settingsRoutes.get("/export", async (c) => {
     if (resumes.length) sections.push("\n# Resumes\n" + toRows(["id","title","status","createdAt"], resumes as any[]));
     if (applications.length) sections.push("\n# Job Applications\n" + toRows(Object.keys(applications[0] as object), applications as any[]));
 
-    const date = new Date().toISOString().slice(0, 10);
     return new Response(sections.join("\n"), {
       status: 200,
       headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="account-export-${date}.csv"` },
     });
   }
 
-  return c.json(success(data), 200);
+  // Default + ?format=json — downloadable JSON bundle. The
+  // Content-Disposition header is what makes the browser treat the
+  // response as a Save-As rather than an in-tab render.
+  return new Response(JSON.stringify(data, null, 2), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Disposition": `attachment; filename="account-export-${date}.json"`,
+    },
+  });
 });
 
 // GET /api/export/csv and /api/export/excel — legacy standalone export routes

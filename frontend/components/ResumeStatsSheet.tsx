@@ -11,7 +11,8 @@
  * list, referrers, CTR) + Activity (views, created, updated).
  *
  * Self-gates per DRY rule: returns null when the viewer isn't entitled
- * via useResumePermissions, so consumers don't need a wrapping guard.
+ * via useEntityDetailsPermission (owner-only across all entity kinds —
+ * see that hook for the rule). Consumers don't need a wrapping guard.
  */
 
 import { Eye, Globe, Lock, Star, Target, Users } from "lucide-react";
@@ -22,7 +23,7 @@ import EntityDetailsSheet, {
 import { ArtifactAnalyticsDashboard } from "@/components/analytics";
 import ResumeScoreBadges from "@/components/tools/ResumeScoreBadges";
 import { Badge } from "@/components/ui/badge";
-import { useResumePermissions } from "@/hooks/use-resume-permissions";
+import { useEntityDetailsPermission } from "@/hooks/use-entity-details-permission";
 import { formatDate } from "@/lib/utils";
 import type { Resume } from "@/types/resume";
 
@@ -69,7 +70,7 @@ function privacyHint(privacy?: string) {
 }
 
 export default function ResumeStatsSheet({ resume }: Props) {
-  const perms = useResumePermissions(resume);
+  const perms = useEntityDetailsPermission({ kind: "resume", entity: resume });
 
   const chips = (
     <>

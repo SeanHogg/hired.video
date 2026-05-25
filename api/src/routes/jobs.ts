@@ -31,6 +31,10 @@ export const CreateJobSchema = z.object({
    *  Skill Extractor's "Add to Job" button looked successful (200 OK)
    *  but never persisted anything. */
   skills: z.array(z.string()).optional(),
+  /** AI-resilient sector slug. See `shared/sectors.ts`. Same lesson
+   *  as the skills field above — must be declared here or Zod strips
+   *  it at the route boundary and the service never sees it. */
+  sector: z.string().max(64).optional(),
 });
 
 export const UpdateJobSchema = CreateJobSchema.partial();

@@ -66,6 +66,14 @@ export const resumeTemplates = pgTable("resume_templates", {
   templateData: jsonb("template_data").notNull().default({}),
   isPublic: boolean("is_public").default(true).notNull(),
   isPro: boolean("is_premium").default(false).notNull(),
+  // Sectors this template is recommended for. Empty array = generic.
+  // See shared/sectors.ts Sector enum.
+  sectors: jsonb("sectors").$type<string[]>().notNull().default([]),
+  // Marks the template as a career-pivot template (e.g. the existing
+  // `video-resume-pivot-led.json`). The pivot-explorer page filters on
+  // this flag when recommending a template for tech → AI-resilient
+  // sector transitions.
+  isPivotTemplate: boolean("is_pivot_template").notNull().default(false),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

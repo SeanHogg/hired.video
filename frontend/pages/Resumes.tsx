@@ -80,7 +80,6 @@ import RenameResumeDialog from "@/components/RenameResumeDialog";
 import QRCodeDialog from "@/components/QRCodeDialog";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import type { SearchFilters } from "@/components/SearchBar";
-import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -787,18 +786,6 @@ export default function Resumes() {
     return undefined;
   };
 
-  const handleSearch = (query: string) => {
-    setSearchFilters((prev) => ({ ...prev, search: query }));
-  };
-
-  const handleFilterChange = (filters: SearchFilters) => {
-    setSearchFilters(filters);
-  };
-
-  const handleClearFilters = () => {
-    setSearchFilters({});
-  };
-
   const filteredResumes = displayResumes.filter((resume) => {
     const searchTerm = searchFilters.search || "";
     if (
@@ -1290,21 +1277,6 @@ export default function Resumes() {
   const renderMineBody = () => (
     <div className="space-y-6">
       {successAlert}
-      {/* Search/Filter strip — view toggle lives in the header action row. */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <SearchBar
-            context="resumes"
-            value={searchFilters.search}
-            filters={searchFilters}
-            onSearch={handleSearch}
-            onFilterChange={handleFilterChange}
-            onClearFilters={handleClearFilters}
-            hideSearchInput
-            hideFilters
-          />
-        </div>
-      </div>
 
       {loading ? (
         <div className="text-center py-12">
