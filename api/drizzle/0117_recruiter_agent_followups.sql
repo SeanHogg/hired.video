@@ -18,7 +18,7 @@
 -- to send through their channel of choice. Auto-send routes through the
 -- messaging service when wired in a later pass.
 --
--- ─── Self-sufficient FK target (gap #1204) ──────────────────────────────────
+-- ─── Self-sufficient FK target (gap #1203 + #1215) ──────────────────────────
 -- `recruiter_agent_runs` is declared in [api/src/db/schema/recruiter.ts]
 -- but historically had no CREATE TABLE migration — production had it from
 -- an out-of-tree `drizzle-kit push` and the parity test silently waived
@@ -29,6 +29,16 @@
 -- Create the FK target here (IF NOT EXISTS makes it a no-op on production)
 -- so 0117 is self-sufficient against any DB shape. Mirrors the columns of
 -- `recruiterAgentRuns` exactly.
+--
+-- Why the FK is added in a separate DO block (not inline in the
+-- followups CREATE TABLE): a deploy on 2026-05-25 failed with
+-- `relation "recruiter_agent_runs" does not exist` on the followups
+-- CREATE TABLE — symptom of the run order across deploy steps
+-- (`db:push` vs `run-sql-migrations.mjs`) not guaranteeing the runs
+-- table is visible by the time the FK constraint is checked. Splitting
+-- table creation from constraint creation means the followups table
+-- always lands, and the FK is only added when both targets exist.
+-- Mirrors the guarded backfill pattern used by 0032.
 
 CREATE TABLE IF NOT EXISTS recruiter_agent_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,9 +59,11 @@ CREATE TABLE IF NOT EXISTS recruiter_agent_runs (
 CREATE TABLE IF NOT EXISTS recruiter_agent_followups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  run_id        uuid NOT NULL REFERENCES recruiter_agent_runs(id) ON DELETE CASCADE,
-  recruiter_id  uuid NOT NULL REFERENCES users(id)                 ON DELETE CASCADE,
-  candidate_id  uuid NOT NULL REFERENCES users(id)                 ON DELETE CASCADE,
+  -- FK to recruiter_agent_runs added in the DO block below so a missing
+  -- runs table at apply-time doesn't break the followups table itself.
+  run_id        uuid NOT NULL,
+  recruiter_id  uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  candidate_id  uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
   -- Stable ordinal so a recruiter can see "follow-up 2 of 3" in the
   -- UI without computing it. The agent schedules in fixed steps
@@ -69,6 +81,24 @@ CREATE TABLE IF NOT EXISTS recruiter_agent_followups (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Add the run_id FK only when both tables exist AND the constraint
+-- isn't already present. Idempotent across re-runs of the migration.
+DO $migration_117_run_fk$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = current_schema() AND table_name = 'recruiter_agent_runs'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'recruiter_agent_followups_run_id_fkey'
+  ) THEN
+    ALTER TABLE recruiter_agent_followups
+      ADD CONSTRAINT recruiter_agent_followups_run_id_fkey
+      FOREIGN KEY (run_id) REFERENCES recruiter_agent_runs(id) ON DELETE CASCADE;
+  END IF;
+END
+$migration_117_run_fk$;
 
 -- Worker pickup query: due, pending, oldest first.
 CREATE INDEX IF NOT EXISTS idx_recruiter_agent_followups_due
