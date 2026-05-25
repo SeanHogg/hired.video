@@ -5,7 +5,7 @@
 -- `drizzle-kit push` before migrations were source-controlled. They
 -- never had a CREATE TABLE migration, so fresh-deploy CI relied on the
 -- "Push DB schema" step in ci.yml to materialise them — which silently
--- under-applied for some tables (gaps #1204, #1207). This migration
+-- under-applied for some tables (gaps #1204, #1317). This migration
 -- closes the gap by giving every legacy table its own idempotent
 -- `CREATE TABLE IF NOT EXISTS`, mirroring exactly what production
 -- already has (introspected from live `pg_attribute` /

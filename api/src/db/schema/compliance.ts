@@ -1,6 +1,6 @@
 /**
  * Compliance + email-safety + push-subscription pgTable declarations
- * mirroring the SQL shape from migration 0124. Closes gap #1209 — the
+ * mirroring the SQL shape from migration 0124. Closes gap #1319 — the
  * three tables existed in 0124_compliance_safety_oauth_drift.sql but
  * no schema/*.ts file declared them, so the parity test flagged them
  * as orphans (CREATE TABLE without pgTable) and services that touched

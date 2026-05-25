@@ -91,3 +91,19 @@ export type ArtifactKind =
   | "profile"
   // Fallback bucket for company / studio_template / service.
   | "channel";
+
+/** Project a studio `MediaKind` onto the analytics `ArtifactKind`.
+ *  ArtifactKind is a narrower union (only the kinds whose analytics copy
+ *  + heatmap axis differ); kinds that don't have distinct rollups fold
+ *  back to the closest peer (`interactive_comic` → `comic`, `cad_3d` →
+ *  `cad`). Single seam per the DRY rule so every analytics call site
+ *  agrees on the mapping. */
+import type { MediaKind } from "@shared/media-kinds";
+
+export function mediaKindToArtifactKind(kind: MediaKind): ArtifactKind {
+  switch (kind) {
+    case "interactive_comic": return "comic";
+    case "cad_3d":            return "cad";
+    default:                  return kind;
+  }
+}

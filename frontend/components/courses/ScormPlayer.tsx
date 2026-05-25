@@ -100,7 +100,7 @@ export default function ScormPlayer({
         runtime.on("Commit", () => {
           if (!runtime) return;
           const cmi = runtime.cmi ?? {};
-          const completionStatus = readCompletion(cmi, scormVersion);
+          const completionStatus = narrowCompletion(readCompletion(cmi, scormVersion));
           const scoreRaw = readScore(cmi, scormVersion, "raw");
           const scoreMin = readScore(cmi, scormVersion, "min");
           const scoreMax = readScore(cmi, scormVersion, "max");

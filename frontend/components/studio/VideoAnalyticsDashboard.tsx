@@ -19,6 +19,7 @@
  */
 
 import ArtifactAnalyticsDashboard from "@/components/analytics/ArtifactAnalyticsDashboard";
+import { mediaKindToArtifactKind } from "@/components/analytics/types";
 import type { MediaKind } from "@shared/media-kinds";
 
 interface VideoAnalyticsDashboardProps {
@@ -36,7 +37,7 @@ export default function VideoAnalyticsDashboard({
 }: VideoAnalyticsDashboardProps) {
   return (
     <ArtifactAnalyticsDashboard
-      kind={mediaKind ?? "video"}
+      kind={mediaKind ? mediaKindToArtifactKind(mediaKind) : "video"}
       artifactId={projectId}
       durationSec={videoDurationSec}
     />
