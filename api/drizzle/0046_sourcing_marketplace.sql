@@ -14,17 +14,28 @@
 -- that this is the intended product direction.
 
 -- ---------------------------------------------------------------------------
--- 1. Sourcing fields on the job aggregate
+-- 1. Sourcing fields on the job aggregate — REMOVED 2026-05-25 (gap #1215).
+--
+-- Originally this migration added four columns to `job_items`:
+--   accepts_sourcing_bids / sourcing_fee_cents / sourcing_deadline / sourcing_terms
+-- Migration 0052_sourcing_aggregate_split.sql immediately backfills and
+-- DROPs them in favour of the `job_sourcing_listings` aggregate
+-- (1:1 with jobs — see [project_sourcing_aggregate.md] memory and
+-- [services/recruiter-marketplace/SourcingListingService.ts]). Every
+-- consumer (route, service, schema, FE service) reads from
+-- `jobSourcingListings`, not `job_items`. Zero references to the old
+-- columns remain in shared/, api/src/, or frontend/.
+--
+-- Why the deletion: `job_items` on production accumulated > 1600 column
+-- slots (PostgreSQL counts dropped columns toward the limit — see
+-- `pg_attribute.attisdropped`). The ALTER TABLE here was hitting
+-- "tables can have at most 1600 columns" on fresh-CI deploys, breaking
+-- the migration runner with 2 errors that exit-1'd the deploy step.
+-- Since 0052 immediately reverts the schema change anyway, removing the
+-- adds is dead-code cleanup, not a behaviour change. The CREATE INDEX
+-- that depended on `accepts_sourcing_bids` is also gone — 0052 ships a
+-- replacement index `idx_job_sourcing_listings_open` on the new aggregate.
 -- ---------------------------------------------------------------------------
-ALTER TABLE job_items
-  ADD COLUMN IF NOT EXISTS accepts_sourcing_bids BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS sourcing_fee_cents INTEGER,
-  ADD COLUMN IF NOT EXISTS sourcing_deadline TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS sourcing_terms TEXT;
-
-CREATE INDEX IF NOT EXISTS idx_jobs_accepts_sourcing
-  ON job_items (accepts_sourcing_bids)
-  WHERE accepts_sourcing_bids = TRUE;
 
 -- ---------------------------------------------------------------------------
 -- 2. Exclusive boards table (parent of board_bids when boardId is set)
