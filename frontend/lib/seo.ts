@@ -866,6 +866,27 @@ export const PAGE_SEO: Record<string, SEOData> = {
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
   },
+  "/tools/predictive-assessments": {
+    title: "Predictive Assessments (Big Five, Cognitive, EQ, DISC) — hired.video",
+    description:
+      "Validated-inspired psychometric assessments: Big Five personality, cognitive ability, situational judgment, EQ, and DISC. Free Big Five + cognitive sample; Pro unlocks the full battery and resume → predictive-index match.",
+    keywords:
+      "predictive assessments, big five personality test, IPIP, cognitive ability test, situational judgment test, EQ assessment, DISC profile, HireVue alternative, Predictive Index alternative, resume role match",
+    ogTitle: "Predictive Assessments — Big Five, Cognitive, EQ, DISC",
+    ogDescription:
+      "Take the free Big Five + cognitive sample in 8 minutes. Pro unlocks SJT, EQ, DISC, and a resume → predictive-index match — with calibrated percentile bands once the platform's norms cache has the sample.",
+    ogImage: "https://hired.video/og-image.svg",
+    canonical: "https://hired.video/tools/predictive-assessments",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Predictive Assessments",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/predictive-assessments",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
   "/tools/skill-extractor": {
     title: "Skill Extractor: AI Skill Parser for Resumes & Job Posts — hired.video",
     description:

@@ -336,6 +336,15 @@ export function createApp() {
   // earn. Per-user reads (/me, /activity, /redemptions) stay private.
   const POINTS_PUBLIC_ROUTE = /^\/api\/points\/(?:catalog|badges)(?:$|\?)/;
 
+  // Predictive-assessments catalog (Big Five, Cognitive, EQ, DISC, etc.)
+  // is shown on the /tools/predictive-assessments page before the visitor
+  // signs in — the kind picker needs to render for anonymous traffic so
+  // the page doesn't 401-blank on first paint. Per-kind questions, run
+  // start/respond/complete, history, and resume-match stay auth-gated
+  // (and tier-gated) inside the handlers.
+  const PREDICTIVE_ASSESSMENTS_PUBLIC_ROUTE =
+    /^\/api\/predictive-assessments\/kinds(?:$|\?)/;
+
   // Public invite preview for async-interview magic links — candidate
   // visits /interview/:token before they've logged in / signed up.
   // /claim/:token still requires auth.
@@ -386,6 +395,7 @@ export function createApp() {
     if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return "public";
     if (LIVE_SCREEN_PUBLIC_ROUTE.test(path)) return "public";
     if (POINTS_PUBLIC_ROUTE.test(path)) return "public";
+    if (PREDICTIVE_ASSESSMENTS_PUBLIC_ROUTE.test(path)) return "public";
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";

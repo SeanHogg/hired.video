@@ -13,16 +13,14 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Loader2, Sparkles, Lock, CheckCircle2, BarChart3, Clock } from "lucide-react";
+import { Loader2, Sparkles, Lock, CheckCircle2, ClipboardCheck, Clock } from "lucide-react";
 
-import { AppShell } from "@/components/AppShell";
+import { ToolShell } from "@/components/tools/ToolShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { toast } from "@/components/ui/use-toast";
@@ -49,7 +47,6 @@ function fmtDate(iso: string | null | undefined): string {
 }
 
 export default function PredictiveAssessments() {
-  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { isPro } = useSubscription();
 
@@ -62,16 +59,13 @@ export default function PredictiveAssessments() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  useSEO(location.pathname, {
-    title: "Predictive Assessments (Big Five, Cognitive, EQ, DISC) — hired.video",
+  const shellHeader = {
+    icon: <ClipboardCheck className="h-6 w-6 text-emerald-700" />,
+    iconBgClassName: "bg-emerald-100",
+    title: "Predictive Assessments",
     description:
-      "Validated-inspired psychometric assessments: Big Five personality, cognitive ability, situational judgment, EQ, and DISC. Free Big Five + cognitive sample; Pro unlocks the full battery and resume → predictive-index match.",
-    canonical: "https://hired.video/tools/predictive-assessments",
-  });
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Predictive Assessments", url: location.pathname },
-  ]);
+      "Validated-inspired psychometric instruments — Big Five, cognitive ability, situational judgment, EQ, and DISC. Take the free Big Five + cognitive sample in 8 minutes total; upgrade to Pro for the full battery and the resume → predictive-index match.",
+  } as const;
 
   // Initial load — catalog + history.
   useEffect(() => {
@@ -161,35 +155,18 @@ export default function PredictiveAssessments() {
 
   if (loading) {
     return (
-      <AppShell bgClassName="bg-background">
-        <div className="max-w-5xl mx-auto p-6 space-y-4">
-          <Skeleton className="h-10 w-1/3" />
+      <ToolShell toolId="predictive-assessments" header={shellHeader}>
+        <div className="space-y-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-64 w-full" />
         </div>
-      </AppShell>
+      </ToolShell>
     );
   }
 
   return (
-    <AppShell bgClassName="bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        <header className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <BarChart3 className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">Predictive Assessments</h1>
-            <p className="text-muted-foreground mt-1 max-w-2xl">
-              Validated-inspired psychometric instruments — Big Five, cognitive ability,
-              situational judgment, EQ, and DISC. Take the free Big Five + cognitive sample
-              in 8 minutes total; upgrade to Pro for the full battery and the resume →
-              predictive-index match.
-            </p>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <ToolShell toolId="predictive-assessments" header={shellHeader}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Active run — question UI */}
             {activeRun && activeDescriptor && activeRun.status !== "completed" && currentQuestion && (
@@ -401,7 +378,6 @@ export default function PredictiveAssessments() {
             </Card>
           </aside>
         </div>
-      </div>
-    </AppShell>
+    </ToolShell>
   );
 }
