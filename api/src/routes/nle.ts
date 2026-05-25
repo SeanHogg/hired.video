@@ -18,7 +18,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
   assertCanWrite,
@@ -123,7 +123,7 @@ async function resolveWorkspaceFromBody(
 // Router
 // ---------------------------------------------------------------------------
 
-export const nleRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const nleRoutes = new Hono<AppEnv>();
 
 const CreateProjectSchema = z.object({
   title: z.string().min(1).max(200).default("Untitled film"),

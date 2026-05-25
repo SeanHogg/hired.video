@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 
-export const adsRoutes = new Hono<{ Variables: Variables }>();
+export const adsRoutes = new Hono<AppEnv>();
 
 /**
  * Named ad slots — change publisher ID or slot IDs here without touching the

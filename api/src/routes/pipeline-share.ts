@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import { randomBytes } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
@@ -19,8 +19,8 @@ import {
   PIPELINE_STAGE_LABELS,
 } from "../../../shared/recruiter-pipeline.js";
 
-export const pipelineShareRoutes = new Hono<{ Variables: Variables }>();
-export const pipelinePublicRoutes = new Hono<{ Variables: Variables }>();
+export const pipelineShareRoutes = new Hono<AppEnv>();
+export const pipelinePublicRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // POST /share — create a link

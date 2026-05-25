@@ -18,7 +18,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -34,7 +34,7 @@ import {
 
 const { users, videos, studioProjects } = schema;
 
-export const channelRoutes = new Hono<{ Variables: Variables }>();
+export const channelRoutes = new Hono<AppEnv>();
 
 // Public — no auth gate. The handle IS the entry point.
 channelRoutes.get("/:handle", async (c) => {

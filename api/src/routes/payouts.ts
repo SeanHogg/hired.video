@@ -16,7 +16,7 @@
 
 import { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { payoutOnboardingService } from "../services/payout/PayoutOnboardingService.js";
@@ -30,7 +30,7 @@ import {
   type PayoutOnboardingCompleteInput,
 } from "../../../shared/payout-profile.js";
 
-export const payoutRoutes = new Hono<{ Variables: Variables }>();
+export const payoutRoutes = new Hono<AppEnv>();
 
 const { payouts: payoutsTable, payoutProfiles, billingEvents } = schema;
 

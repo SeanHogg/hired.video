@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
@@ -16,7 +16,7 @@ import { requirePro } from "../middleware/tierEnforcement.js";
  * Routes are under /api/community and require both authentication and a
  * Pro subscription (enforced via requirePro middleware).
  */
-export const communityRoutes = new Hono<{ Variables: Variables }>();
+export const communityRoutes = new Hono<AppEnv>();
 
 const VALID_CHANNELS = ["engage", "inform", "inspire", "general"] as const;
 type Channel = (typeof VALID_CHANNELS)[number];

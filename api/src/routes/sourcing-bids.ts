@@ -16,16 +16,16 @@
  */
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import * as listings from "../services/recruiter-marketplace/SourcingListingService.js";
 
-export const sourcingBrowseRoutes = new Hono<{ Variables: Variables }>();
-export const sourcingBidsByJobRoutes = new Hono<{ Variables: Variables }>();
-export const sourcingBidActionRoutes = new Hono<{ Variables: Variables }>();
+export const sourcingBrowseRoutes = new Hono<AppEnv>();
+export const sourcingBidsByJobRoutes = new Hono<AppEnv>();
+export const sourcingBidActionRoutes = new Hono<AppEnv>();
 
 const PlaceSourcingBidSchema = z.object({
   bidAmount: z.number().positive(),

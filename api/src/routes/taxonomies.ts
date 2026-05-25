@@ -12,13 +12,13 @@
 import { Hono } from "hono";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
 const { workspaceTags, tagAssignments, workspaceJobTypes, workspaceSources } = schema;
 
-export const taxonomyRoutes = new Hono<{ Variables: Variables }>();
+export const taxonomyRoutes = new Hono<AppEnv>();
 
 function viewerId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

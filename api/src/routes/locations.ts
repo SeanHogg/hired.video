@@ -17,7 +17,7 @@
  */
 import { Hono } from "hono";
 import { and, asc, eq, ilike, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
@@ -30,7 +30,7 @@ import {
 
 const { countries, stateProvinces, cities, jobItems, resumeInformation, videos, studioVoiceClones, studioTemplates, articles, userProfiles, companyProfiles, talentPoolCandidates, serviceOfferings } = schema;
 
-export const locationRoutes = new Hono<{ Variables: Variables }>();
+export const locationRoutes = new Hono<AppEnv>();
 
 locationRoutes.get("/countries", async (c) => {
   const db = getDb();

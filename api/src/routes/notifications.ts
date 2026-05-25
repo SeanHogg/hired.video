@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, desc } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
@@ -9,7 +9,7 @@ import { etagMiddleware } from "../utils/etag.js";
 
 const { notifications } = schema;
 
-export const notificationRoutes = new Hono<{ Variables: Variables }>();
+export const notificationRoutes = new Hono<AppEnv>();
 
 // Inbox polls /api/inbox every 35s (SignalR is the primary push channel);
 // the /api/notifications/* GETs share that cadence in places, so a 30s

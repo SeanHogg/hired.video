@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
@@ -23,7 +23,7 @@ import { scanContent } from "../services/moderation/contentScan.js";
 
 const { articles, users, userProfiles, adminAuditLog, feedPosts } = schema;
 
-export const adminArticleRoutes = new Hono<{ Variables: Variables }>();
+export const adminArticleRoutes = new Hono<AppEnv>();
 
 adminArticleRoutes.use("*", superAdminMiddleware);
 

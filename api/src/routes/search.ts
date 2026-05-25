@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
@@ -13,7 +13,7 @@ import type { ContentLocationKind, LocationFilter } from "../../../shared/conten
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents } = schema;
 
-export const searchRoutes = new Hono<{ Variables: Variables }>();
+export const searchRoutes = new Hono<AppEnv>();
 
 function toSearchItem(job: JobEntity) {
   return {

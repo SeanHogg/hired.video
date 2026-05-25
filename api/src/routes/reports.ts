@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import { aliasedTable, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
@@ -28,8 +28,8 @@ import {
 
 const { contentReports, users } = schema;
 
-export const reportRoutes = new Hono<{ Variables: Variables }>();
-export const adminReportRoutes = new Hono<{ Variables: Variables }>();
+export const reportRoutes = new Hono<AppEnv>();
+export const adminReportRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

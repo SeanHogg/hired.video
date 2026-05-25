@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 
-export const valuePropositionRoutes = new Hono<{ Variables: Variables }>();
+export const valuePropositionRoutes = new Hono<AppEnv>();
 valuePropositionRoutes.use("*", attachTokenBudget());
 
 function buildResponse() {

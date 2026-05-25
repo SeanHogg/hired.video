@@ -22,7 +22,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
@@ -33,7 +33,7 @@ import { ARTICLE_KINDS } from "../db/schema/articles.js";
 
 const { articles, users, userProfiles, creatorProfiles } = schema;
 
-export const articleRoutes = new Hono<{ Variables: Variables }>();
+export const articleRoutes = new Hono<AppEnv>();
 
 async function getArticlesEnrollment(db: ReturnType<typeof getDb>, userId: string) {
   const [row] = await db.select()

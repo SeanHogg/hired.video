@@ -12,7 +12,7 @@
 
 import { Hono } from "hono";
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
-import type { Env, Variables } from "../../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../../types/index.js";
 import {
   USE_CASE_PROFILES,
@@ -20,7 +20,7 @@ import {
   type LLMUseCase,
 } from "../../services/adapters/providers.js";
 
-export const aiVendorRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const aiVendorRoutes = new Hono<AppEnv>();
 
 // Render one inference profile for the SA console. No vendor identity
 // (the gateway picks; we ask). The model string is informative — it's

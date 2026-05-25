@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { SignJWT, jwtVerify } from "jose";
 import { and, eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { sendMagicLinkEmail } from "../services/adapters/email.js";
@@ -260,7 +260,7 @@ async function getGitHubEmail(accessToken: string): Promise<string> {
   }
 }
 
-export const oauthRoutes = new Hono<{ Variables: Variables }>();
+export const oauthRoutes = new Hono<AppEnv>();
 
 // ============================================================================
 // OAuth provider routes

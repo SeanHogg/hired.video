@@ -13,12 +13,12 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { eq } from "drizzle-orm";
 
-export const applyButtonRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const applyButtonRoutes = new Hono<AppEnv>();
 
 // ─── Lead capture schema ───────────────────────────────────────────────────────
 

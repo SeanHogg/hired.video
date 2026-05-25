@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 
-export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const resumeRoastRoutes = new Hono<AppEnv>();
 resumeRoastRoutes.use("*", attachTokenBudget());
 
 function ok<T>(data: T) {

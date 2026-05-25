@@ -54,7 +54,7 @@ async function validateSidClaim(payload: JwtPayload): Promise<boolean> {
  * Also handles X-Emulation-Token: if present and valid, overrides c.var.user
  * with the emulated user's claims.
  */
-export const optionalAuthMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const optionalAuthMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const rawSecret = getJwtSecretOptional();
   if (!rawSecret) return next(); // Not configured — skip auth, treat as anonymous
 
@@ -85,7 +85,7 @@ export const optionalAuthMiddleware: MiddlewareHandler<{ Variables: Variables }>
   return next();
 };
 
-export const authMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "Missing or malformed Authorization header" } }, 401);

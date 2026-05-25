@@ -13,7 +13,7 @@
 
 import { Hono } from "hono";
 import type { Context } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -27,14 +27,14 @@ import {
   type MatchDeps,
 } from "../services/job/match-handlers.js";
 
-export const matchRoutes = new Hono<{ Variables: Variables }>();
+export const matchRoutes = new Hono<AppEnv>();
 matchRoutes.use("*", attachTokenBudget());
 
 // ---------------------------------------------------------------------------
 // Dep wiring — one source of truth for prod. Tests wire up their own.
 // ---------------------------------------------------------------------------
 
-function buildMatchDeps(c: Context<{ Variables: Variables }>): MatchDeps {
+function buildMatchDeps(c: Context<AppEnv>): MatchDeps {
   const env = (c.env as any) ?? {};
   // Match flows touch multiple use cases (analyze, tailor, roast, insights)
   // so we hand the handler a plain use-case-driven facade — each call site
@@ -49,7 +49,7 @@ function buildMatchDeps(c: Context<{ Variables: Variables }>): MatchDeps {
 }
 
 async function relay(
-  c: Context<{ Variables: Variables }>,
+  c: Context<AppEnv>,
   handlerResult: Promise<{ status: number; body: unknown }>,
 ) {
   const limitError = await checkTokenBudget(c as any);

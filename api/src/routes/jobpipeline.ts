@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -21,7 +21,7 @@ import * as pipelineService from "../services/pipeline/PipelineService.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 
-export const jobPipelineRoutes = new Hono<{ Variables: Variables }>();
+export const jobPipelineRoutes = new Hono<AppEnv>();
 
 // Pipeline reads are recruiter-scoped per-job kanban state. 30s is short
 // enough that drag-drop updates land via the optimistic mutation path

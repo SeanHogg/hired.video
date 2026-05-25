@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
 
-export const passwordChangeMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const passwordChangeMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = c.var.user;
   if (user?.mustChangePassword) {
     return c.json(

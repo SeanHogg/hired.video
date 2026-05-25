@@ -13,7 +13,7 @@ import { Hono } from "hono";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -26,8 +26,8 @@ import {
   type RedactionRules,
 } from "../services/resume/redaction.js";
 
-export const pitchDeckRoutes = new Hono<{ Variables: Variables }>();
-export const pitchDeckPublicRoutes = new Hono<{ Variables: Variables }>();
+export const pitchDeckRoutes = new Hono<AppEnv>();
+export const pitchDeckPublicRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

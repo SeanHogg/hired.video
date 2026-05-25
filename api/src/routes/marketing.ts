@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const marketingRoutes = new Hono<{ Variables: Variables }>();
+export const marketingRoutes = new Hono<AppEnv>();
 
 const CreateCampaignSchema = z.object({
   name: z.string().min(1).max(255),

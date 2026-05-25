@@ -113,7 +113,7 @@ export function analysisToScores(r: ResumeAnalysis): Record<string, number> {
 }
 
 export interface AnalyzeResumeArgs {
-  c: Context<{ Bindings: Env; Variables: Variables }>;
+  c: Context<AppEnv>;
   /** Telemetry slug — `resume_scorer` vs `resume_optimizer` so the two
    *  funnels stay distinguishable in usage analytics. */
   featureKey: string;

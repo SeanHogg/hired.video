@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, desc } from "drizzle-orm";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -15,7 +15,7 @@ import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforceme
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 
-export const aiRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const aiRoutes = new Hono<AppEnv>();
 
 // Piggy-back the live token-budget onto every AI response so clients can
 // update the AI-tokens UI from the same round-trip. See attachTokenBudget.

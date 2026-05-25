@@ -24,7 +24,7 @@ export interface ResolvedResume {
 }
 
 export async function resolveResumeContent(
-  c: Context<{ Bindings: Env; Variables: Variables }>,
+  c: Context<AppEnv>,
   body: unknown,
 ): Promise<ResolvedResume> {
   if (typeof body !== "object" || body === null) return { resumeText: "" };

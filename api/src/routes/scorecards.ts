@@ -11,7 +11,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import {
   ScorecardsService,
   defaultScorecardsServiceDeps,
@@ -23,7 +23,7 @@ import { decisionRoutes } from "./scorecards/decisions.js";
 
 const buildService = () => new ScorecardsService(defaultScorecardsServiceDeps());
 
-export const scorecardRoutes = new Hono<{ Variables: Variables }>();
+export const scorecardRoutes = new Hono<AppEnv>();
 
 scorecardRoutes.route("/templates", templateRoutes(buildService));
 scorecardRoutes.route("/attributes", attributeRoutes(buildService));

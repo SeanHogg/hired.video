@@ -20,7 +20,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../utils/response.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
 import { createIpRateLimiter, getClientIp } from "../middleware/rateLimiter.js";
@@ -125,7 +125,7 @@ function buildEmailHtml(report: ErrorReport, clientIp: string): string {
 
 const REPORT_RECIPIENT = "seanhogg@gmail.com";
 
-export const errorsRoutes = new Hono<{ Variables: Variables }>();
+export const errorsRoutes = new Hono<AppEnv>();
 
 errorsRoutes.post("/report", reportRateLimiter, async (c) => {
   // Reject bodies bigger than ~64KB before even parsing — a real client

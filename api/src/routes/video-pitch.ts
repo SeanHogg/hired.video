@@ -9,14 +9,14 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { ResumeContent } from "../../../shared/resume.js";
 
-export const videoPitchRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const videoPitchRoutes = new Hono<AppEnv>();
 videoPitchRoutes.use("*", attachTokenBudget());
 
 function ok<T>(data: T) {

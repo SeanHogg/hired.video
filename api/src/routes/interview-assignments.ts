@@ -30,7 +30,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
@@ -47,7 +47,7 @@ import type { ResumeContent } from "../../../shared/resume.js";
 
 const { studioAsyncInterviews, studioAsyncResponses, users, jobApplications } = schema;
 
-export const interviewAssignmentRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const interviewAssignmentRoutes = new Hono<AppEnv>();
 interviewAssignmentRoutes.use("*", attachTokenBudget());
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

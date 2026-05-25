@@ -3,7 +3,7 @@ import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { schema } from "../db/index.js";
 
-export const requestLoggerMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const requestLoggerMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const startTime = Date.now();
   await next();
   const durationMs = Date.now() - startTime;

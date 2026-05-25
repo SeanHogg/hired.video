@@ -16,7 +16,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { checkTokenBudget } from "../middleware/token-budget.js";
 import {
@@ -32,7 +32,7 @@ import {
 } from "../services/career360/Career360Service.js";
 import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 
-export const career360Routes = new Hono<{ Variables: Variables }>();
+export const career360Routes = new Hono<AppEnv>();
 
 career360Routes.get("/", async (c) => {
   const userId = c.var.user?.sub;

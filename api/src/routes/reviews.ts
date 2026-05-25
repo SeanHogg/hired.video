@@ -25,7 +25,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
@@ -55,7 +55,7 @@ const {
   templateLicenses,
 } = schema;
 
-export const reviewRoutes = new Hono<{ Variables: Variables }>();
+export const reviewRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -15,7 +15,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { inArray } from "drizzle-orm";
 
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
@@ -38,7 +38,7 @@ function fail(code: string, message: string, details?: unknown) {
   };
 }
 
-export const adminR2Routes = new Hono<{ Variables: Variables }>();
+export const adminR2Routes = new Hono<AppEnv>();
 adminR2Routes.use("*", superAdminMiddleware);
 
 function getR2Bucket(): R2Bucket | undefined {

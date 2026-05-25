@@ -15,7 +15,7 @@
 
 import { Hono } from "hono";
 import type { Context } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import {
   attachTokenBudget,
@@ -29,14 +29,14 @@ import {
   type SalaryDeps,
 } from "../services/salary/handlers.js";
 
-export const salaryRoutes = new Hono<{ Variables: Variables }>();
+export const salaryRoutes = new Hono<AppEnv>();
 salaryRoutes.use("*", attachTokenBudget());
 
 // ---------------------------------------------------------------------------
 // Dep wiring — one source of truth for prod. Tests wire up their own.
 // ---------------------------------------------------------------------------
 
-function buildSalaryDeps(c: Context<{ Variables: Variables }>): SalaryDeps {
+function buildSalaryDeps(c: Context<AppEnv>): SalaryDeps {
   const env = (c.env as any) ?? {};
   return {
     llm: hasAnyLLMProviderKey(env) ? createLLMClient(env, c.var.user) : null,
@@ -44,7 +44,7 @@ function buildSalaryDeps(c: Context<{ Variables: Variables }>): SalaryDeps {
 }
 
 async function relay(
-  c: Context<{ Variables: Variables }>,
+  c: Context<AppEnv>,
   handlerResult: Promise<{ status: number; body: unknown }>,
 ) {
   const limitError = await checkTokenBudget(c as any);

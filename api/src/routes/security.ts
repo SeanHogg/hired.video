@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import { jwtVerify } from "jose";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getJwtSecret } from "../utils/jwt.js";
@@ -29,7 +29,7 @@ import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
 
 const { users, regionWaitlist } = schema;
 
-export const securityRoutes = new Hono<{ Variables: Variables }>();
+export const securityRoutes = new Hono<AppEnv>();
 
 async function requireUserId(c: any): Promise<string | null> {
   const authHeader = c.req.header("Authorization");

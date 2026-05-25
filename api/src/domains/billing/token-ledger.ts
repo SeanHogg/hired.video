@@ -154,7 +154,7 @@ export const tokenLedger: TokenLedger = {
  * so the error payload can't drift between call sites.
  */
 export function buildTokenBudgetExceededResponse(
-  c: Context<{ Variables: Variables }>,
+  c: Context<AppEnv>,
   summary: TokenBudgetSummary,
 ): Response {
   return c.json(

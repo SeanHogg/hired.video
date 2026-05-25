@@ -20,7 +20,7 @@ import { consumeBackupCode } from "../services/auth/backupCodes.js";
 import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
 import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables, JwtPayload } from "../types/index.js";
+import type { Variables, JwtPayload, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -256,7 +256,7 @@ export const ResendTwoFactorSchema = z.object({
 // ROUTES
 // ============================================================================
 
-export const authRoutes = new Hono<{ Variables: Variables }>();
+export const authRoutes = new Hono<AppEnv>();
 
 /** POST /api/auth/register — thin Hono adapter. All business logic lives
  *  in `handleRegister` (auth-handlers.ts) which is tested with mocked deps.

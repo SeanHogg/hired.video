@@ -97,6 +97,41 @@ export interface IExternalEmailMessagesRepository {
   setArchivedBulk(ids: string[], userId: string, archived: boolean): Promise<void>;
 }
 
+/** Shape of one raw row returned by the inbox-row select (messages joined
+ *  to accounts + optional linked job). Kept narrow so both `findInboxForUser`
+ *  and `findByIdWithAccount` cast to the same intermediate type and the
+ *  projector that flattens it is the single source of truth. */
+interface InboxJoinRow {
+  message: ExternalEmailMessageRow;
+  accountLabel: string | null;
+  accountEmail: string;
+  linkedJobTitle: string | null;
+  linkedJobCompany: string | null;
+}
+
+/** Drizzle select shape every inbox-row query passes. Defined once so
+ *  the linked-job columns can't be silently dropped from a new query
+ *  variant (#1313 root cause — `findByIdWithAccount` was missing them). */
+function inboxRowSelect() {
+  return {
+    message: externalEmailMessages,
+    accountLabel: externalEmailAccounts.accountLabel,
+    accountEmail: externalEmailAccounts.accountEmail,
+    linkedJobTitle: jobItems.title,
+    linkedJobCompany: jobItems.company,
+  };
+}
+
+function flattenInboxRow(r: InboxJoinRow): ExternalEmailInboxRow {
+  return {
+    ...r.message,
+    accountLabel: r.accountLabel,
+    accountEmail: r.accountEmail,
+    linkedJobTitle: r.linkedJobTitle,
+    linkedJobCompany: r.linkedJobCompany,
+  };
+}
+
 export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
 
@@ -158,13 +193,7 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     // #539 — join job_items so the dto can render `→ <title> at <company>`
     // when `linked_job_id` is set, no second round-trip needed.
     const rows = (await this.db
-      .select({
-        message: externalEmailMessages,
-        accountLabel: externalEmailAccounts.accountLabel,
-        accountEmail: externalEmailAccounts.accountEmail,
-        linkedJobTitle: jobItems.title,
-        linkedJobCompany: jobItems.company,
-      })
+      .select(inboxRowSelect())
       .from(externalEmailMessages)
       .innerJoin(
         externalEmailAccounts,
@@ -176,21 +205,9 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       )
       .where(and(...conditions))
       .orderBy(desc(externalEmailMessages.receivedAt), desc(externalEmailMessages.id))
-      .limit(Math.min(200, Math.max(1, limit)))) as Array<{
-      message: ExternalEmailMessageRow;
-      accountLabel: string | null;
-      accountEmail: string;
-      linkedJobTitle: string | null;
-      linkedJobCompany: string | null;
-    }>;
+      .limit(Math.min(200, Math.max(1, limit)))) as InboxJoinRow[];
 
-    return rows.map((r) => ({
-      ...r.message,
-      accountLabel: r.accountLabel,
-      accountEmail: r.accountEmail,
-      linkedJobTitle: r.linkedJobTitle,
-      linkedJobCompany: r.linkedJobCompany,
-    }));
+    return rows.map(flattenInboxRow);
   }
 
   async findById(id: string, userId: string): Promise<ExternalEmailMessageRow | null> {
@@ -209,27 +226,22 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     userId: string,
   ): Promise<ExternalEmailInboxRow | null> {
     const rows = (await this.db
-      .select({
-        message: externalEmailMessages,
-        accountLabel: externalEmailAccounts.accountLabel,
-        accountEmail: externalEmailAccounts.accountEmail,
-      })
+      .select(inboxRowSelect())
       .from(externalEmailMessages)
       .innerJoin(
         externalEmailAccounts,
         eq(externalEmailAccounts.id, externalEmailMessages.accountId),
       )
+      .leftJoin(
+        jobItems,
+        eq(jobItems.id, externalEmailMessages.linkedJobId),
+      )
       .where(
         and(eq(externalEmailMessages.id, id), eq(externalEmailMessages.userId, userId)),
       )
-      .limit(1)) as Array<{
-      message: ExternalEmailMessageRow;
-      accountLabel: string | null;
-      accountEmail: string;
-    }>;
+      .limit(1)) as InboxJoinRow[];
     const row = rows[0];
-    if (!row) return null;
-    return { ...row.message, accountLabel: row.accountLabel, accountEmail: row.accountEmail };
+    return row ? flattenInboxRow(row) : null;
   }
 
   async findByAccount(accountId: string): Promise<ExternalEmailMessageRow[]> {

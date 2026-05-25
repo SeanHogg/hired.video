@@ -7,11 +7,11 @@
 import { Hono } from "hono";
 import { and, desc, eq, count, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const whitelabelRoutes = new Hono<{ Variables: Variables }>();
+export const whitelabelRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

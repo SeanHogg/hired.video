@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
 
-export const emailVerifiedMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const emailVerifiedMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = c.var.user;
   if (!user?.emailVerified) {
     return c.json(

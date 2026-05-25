@@ -3,11 +3,11 @@
 
 import { Hono } from "hono";
 import { and, count, desc, eq, sum } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const affiliateRoutes = new Hono<{ Variables: Variables }>();
+export const affiliateRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

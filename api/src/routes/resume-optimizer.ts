@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
 import { persistResumeScoresIfReferenced } from "../services/resume/persist-scores.js";
@@ -24,7 +24,7 @@ import {
   rewriteTextAsXyz,
 } from "../services/resume/rewrite-xyz.js";
 
-export const resumeOptimizerRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const resumeOptimizerRoutes = new Hono<AppEnv>();
 resumeOptimizerRoutes.use("*", attachTokenBudget());
 
 /**

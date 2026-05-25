@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { extractJson as extractJsonShared } from "../services/resume/parse.js";
 
-export const careerRoutes = new Hono<{ Variables: Variables }>();
+export const careerRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string { return c.var.user?.sub as string; }
 function ok<T>(data: T) { return { success: true as const, data }; }

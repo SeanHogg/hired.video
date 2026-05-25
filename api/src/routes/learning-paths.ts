@@ -36,7 +36,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { slugify } from "../../../shared/slugify.js";
@@ -51,7 +51,7 @@ const {
   learningPathEnrollments,
 } = schema;
 
-export const learningPathRoutes = new Hono<{ Variables: Variables }>();
+export const learningPathRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

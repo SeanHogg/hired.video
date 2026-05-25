@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, desc, inArray, sql, ilike } from "drizzle-orm";
-import type { Variables, JwtPayload } from "../types/index.js";
+import type { Variables, JwtPayload, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
@@ -116,7 +116,7 @@ async function createMentionNotifications(
   );
 }
 
-export const feedRoutes = new Hono<{ Variables: Variables }>();
+export const feedRoutes = new Hono<AppEnv>();
 
 // Feed reads are visibility-filtered per-user (privacy + recruiter role +
 // connection graph), so cache is `private` — never CDN-cached. 30s is

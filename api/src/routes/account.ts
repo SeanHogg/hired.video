@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
@@ -22,7 +22,7 @@ import {
   updateAccountSettings,
 } from "../services/user/account.js";
 
-export const accountRoutes = new Hono<{ Variables: Variables }>();
+export const accountRoutes = new Hono<AppEnv>();
 
 function getCurrentUserId(c: any) {
   return (c.var.user?.sub as string | undefined) ?? null;

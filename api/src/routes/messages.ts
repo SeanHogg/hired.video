@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -14,7 +14,7 @@ import {
 
 const { aiChatSessions, aiChatMessages } = schema;
 
-export const messageRoutes = new Hono<{ Variables: Variables }>();
+export const messageRoutes = new Hono<AppEnv>();
 
 function estimateTokens(text: string): number {
   return Math.max(1, Math.round(text.length / 4));

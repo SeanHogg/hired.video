@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { and, avg, count, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
 
-export const analyticsRoutes = new Hono<{ Variables: Variables }>();
+export const analyticsRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // POST /api/analytics/beacon — lightweight client-side event tracker (#53)

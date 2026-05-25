@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, count, eq, gte, inArray, isNull, sql, sum, desc } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
@@ -19,7 +19,7 @@ const PricingConfigSchema = z.object({
   seatPriceCents: z.number().int().min(0).max(100_000_00),
 });
 
-export const adminRoutes = new Hono<{ Variables: Variables }>();
+export const adminRoutes = new Hono<AppEnv>();
 
 // All admin routes require SuperAdmin
 adminRoutes.use("*", superAdminMiddleware);

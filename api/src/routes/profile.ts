@@ -8,7 +8,7 @@
 
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -16,7 +16,7 @@ import {
   type BillingAddress,
 } from "../../../shared/billing-address.js";
 
-export const profileRoutes = new Hono<{ Variables: Variables }>();
+export const profileRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // Column-level <-> domain shape converters.  The DB stores the address as

@@ -11,14 +11,14 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { requirePro } from "../middleware/auth-gates.js";
 import { checkTokenBudget } from "../middleware/token-budget.js";
 import { runProfileAudit } from "../services/profile/ProfileAuditService.js";
 
-export const profileAuditRoutes = new Hono<{ Variables: Variables }>();
+export const profileAuditRoutes = new Hono<AppEnv>();
 
 profileAuditRoutes.post("/", requirePro("Profile Audit"), async (c) => {
   const userId = c.var.user?.sub;

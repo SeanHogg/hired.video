@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -11,7 +11,7 @@ import { servicesProcessor } from "../domains/services-processing/index.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
-export const interviewRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const interviewRoutes = new Hono<AppEnv>();
 interviewRoutes.use("*", attachTokenBudget());
 
 function ok<T>(data: T) {

@@ -13,7 +13,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import {
   findMutualConnections,
@@ -21,7 +21,7 @@ import {
   rankTopIntroducers,
 } from "../services/graph/professionalGraph.js";
 
-export const graphRoutes = new Hono<{ Variables: Variables }>();
+export const graphRoutes = new Hono<AppEnv>();
 
 function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

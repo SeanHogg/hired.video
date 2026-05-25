@@ -18,7 +18,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -27,7 +27,7 @@ import { lockAccount, unlockAccount, isAccountLocked } from "../services/auth/lo
 
 const { users, accountLocks, botBlockEvents, regionWaitlist } = schema;
 
-export const adminSecurityRoutes = new Hono<{ Variables: Variables }>();
+export const adminSecurityRoutes = new Hono<AppEnv>();
 
 adminSecurityRoutes.use("*", authMiddleware, superAdminMiddleware);
 

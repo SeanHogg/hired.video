@@ -20,7 +20,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -34,7 +34,7 @@ import {
 // Recruiter-scoped router
 // ---------------------------------------------------------------------------
 
-export const liveScreenRecruiterRoutes = new Hono<{ Variables: Variables }>();
+export const liveScreenRecruiterRoutes = new Hono<AppEnv>();
 
 function recruiterId(c: any): string {
   return (c.var.user?.sub as string) ?? "";
@@ -340,7 +340,7 @@ liveScreenRecruiterRoutes.post("/sessions/:id/schedule", async (c) => {
 // Public (token-only) router
 // ---------------------------------------------------------------------------
 
-export const liveScreenPublicRoutes = new Hono<{ Variables: Variables }>();
+export const liveScreenPublicRoutes = new Hono<AppEnv>();
 
 const RespondSchema = z.object({
   action: z.enum(["accept", "decline"]),

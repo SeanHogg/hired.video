@@ -3,7 +3,7 @@ import type { Variables } from "../types/index.js";
 import { getModuleStatusMap, isModuleActive } from "../services/auth/moduleStatus.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
-type AppCtx = Context<{ Variables: Variables }>;
+type AppCtx = Context<AppEnv>;
 
 // Role bypass — internal users always see every module, regardless of toggle.
 // Same convention used by tierEnforcement.requirePro.
@@ -41,7 +41,7 @@ function forbidden(c: AppCtx, slug: string): Response {
  * Passes through when the module is active, undefined (not curated), or when
  * the caller is an Admin / SuperAdmin.
  */
-export function requireModuleActive(slug: string): MiddlewareHandler<{ Variables: Variables }> {
+export function requireModuleActive(slug: string): MiddlewareHandler<AppEnv> {
   return async (c: AppCtx, next) => {
     if (isAdminRole(c)) return next();
     if (await isModuleActive(slug)) return next();
@@ -59,7 +59,7 @@ export function requireModuleActive(slug: string): MiddlewareHandler<{ Variables
  */
 export function moduleGateByPath(
   registry: Record<string, string>,
-): MiddlewareHandler<{ Variables: Variables }> {
+): MiddlewareHandler<AppEnv> {
   const sorted = Object.keys(registry).sort((a, b) => b.length - a.length);
   return async (c: AppCtx, next) => {
     const path = c.req.path;

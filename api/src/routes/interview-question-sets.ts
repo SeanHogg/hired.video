@@ -26,14 +26,14 @@
 import { Hono } from "hono";
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 
 const { interviewQuestionSets, userCompanyRoleAssociations } = schema;
 
-export const interviewQuestionSetRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const interviewQuestionSetRoutes = new Hono<AppEnv>();
 interviewQuestionSetRoutes.use("*", attachTokenBudget());
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

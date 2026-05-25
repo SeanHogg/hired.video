@@ -12,7 +12,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { describeDbError } from "../db/errors.js";
@@ -28,7 +28,7 @@ import type { FindInboxOptions } from "../repositories/externalEmailMessagesRepo
 import { requirePro } from "../middleware/auth-gates.js";
 import { servicesProcessor } from "../domains/services-processing/services-processor.js";
 
-export const inboxRoutes = new Hono<{ Variables: Variables }>();
+export const inboxRoutes = new Hono<AppEnv>();
 
 /** Parse the ?accountIds=a,b,c&unread=1&archived=1&emailCursor=… query
  *  into the options shape the repo + service expect. Centralised here so

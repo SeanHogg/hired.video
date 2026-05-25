@@ -21,7 +21,7 @@ import { Hono } from "hono";
 import { and, eq, desc, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
@@ -50,7 +50,7 @@ const {
   studioThumbnails, marketingLeads,
 } = schema;
 
-export const studioFeaturesRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const studioFeaturesRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

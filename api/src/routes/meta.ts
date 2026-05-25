@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { detectCountry } from "../services/auth/geo.js";
 
@@ -10,7 +10,7 @@ import { detectCountry } from "../services/auth/geo.js";
  * Mounted at /api/_meta/* (underscore prefix mirrors the convention for
  * platform-internal endpoints across our stack).
  */
-export const metaRoutes = new Hono<{ Variables: Variables }>();
+export const metaRoutes = new Hono<AppEnv>();
 
 /**
  * GET /api/_meta/geo

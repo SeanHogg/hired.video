@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq, and, desc, inArray, sum, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const advertisingRoutes = new Hono<{ Variables: Variables }>();
+export const advertisingRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string {
   return c.var.user?.sub as string;

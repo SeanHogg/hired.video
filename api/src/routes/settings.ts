@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, eq, gt } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
@@ -50,7 +50,7 @@ async function loadPrivacy(uid: string) {
   return out;
 }
 
-export const settingsRoutes = new Hono<{ Variables: Variables }>();
+export const settingsRoutes = new Hono<AppEnv>();
 
 function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

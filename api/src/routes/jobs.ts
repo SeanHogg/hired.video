@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables, AppContext } from "../types/index.js";
+import type { Variables, AppContext, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job/JobService.js";
@@ -56,7 +56,7 @@ export const JobAlertSchema = z.object({
 // ROUTES
 // ============================================================================
 
-export const jobRoutes = new Hono<{ Variables: Variables }>();
+export const jobRoutes = new Hono<AppEnv>();
 
 /**
  * POST /api/jobs/sentimentprediction — score the sentiment of a saved

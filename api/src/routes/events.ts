@@ -26,7 +26,7 @@
  */
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
@@ -41,7 +41,7 @@ import {
   UpdateEventSchema,
 } from "../../../shared/events.js";
 
-export const eventRoutes = new Hono<{ Variables: Variables }>();
+export const eventRoutes = new Hono<AppEnv>();
 
 function getEnv(c: any): Record<string, string | undefined> {
   return (c?.env ?? {}) as Record<string, string | undefined>;

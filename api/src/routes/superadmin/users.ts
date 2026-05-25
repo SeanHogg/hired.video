@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../../utils/response.js";
 import { getDb, schema } from "../../db/index.js";
 import {
@@ -65,7 +65,7 @@ const GrantTokensSchema = z.object({
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
-export const userMgmtRoutes = new Hono<{ Variables: Variables }>();
+export const userMgmtRoutes = new Hono<AppEnv>();
 
 // ── Bulk actions ──────────────────────────────────────────────────────────────
 // Mounted above the /:id routes so `/bulk/…` can't be captured by `/:id`.

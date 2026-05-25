@@ -3,7 +3,7 @@
 
 import { Hono } from "hono";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -14,7 +14,7 @@ import {
   getPopularCities,
 } from "../services/job/salary-popularity.js";
 
-export const discoveryRoutes = new Hono<{ Variables: Variables }>();
+export const discoveryRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

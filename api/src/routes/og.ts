@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { isUuid } from "../../../shared/value-types.js";
 
@@ -15,7 +15,7 @@ const {
   userProfiles,
 } = schema;
 
-export const ogRoutes = new Hono<{ Variables: Variables }>();
+export const ogRoutes = new Hono<AppEnv>();
 
 // Per-kind copy for OG share previews — kept here (next to the only
 // consumer) rather than in @shared/media-kinds because OG branding is

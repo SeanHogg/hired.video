@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { eq, and, desc } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const hubsRoutes = new Hono<{ Variables: Variables }>();
+export const hubsRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // SSE notification stream

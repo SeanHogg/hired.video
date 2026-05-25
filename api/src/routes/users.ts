@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { getDb, schema } from "../db/index.js";
@@ -100,7 +100,7 @@ const SendConnectionRequestSchema = z.object({
 // ROUTES
 // ============================================================================
 
-export const userRoutes = new Hono<{ Variables: Variables }>();
+export const userRoutes = new Hono<AppEnv>();
 
 /**
  * Standard public card DTO for user listings.

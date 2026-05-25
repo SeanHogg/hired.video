@@ -6,11 +6,11 @@
 import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
 
-export const toolUsageRoutes = new Hono<{ Variables: Variables }>();
+export const toolUsageRoutes = new Hono<AppEnv>();
 
 // ─── GET /summary ────────────────────────────────────────────────────────────
 // One row per tool: total runs, unique user count, avg/median score,

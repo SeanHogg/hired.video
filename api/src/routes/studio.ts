@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { and, count, desc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
@@ -134,7 +134,7 @@ async function ensureUniqueProjectSlug(
   return `${baseSlug}-${Date.now().toString(36).slice(-6)}`;
 }
 
-export const studioRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const studioRoutes = new Hono<AppEnv>();
 
 // All scene types — covers both job-seeker (resume) and advertising use cases
 const SCENE_TYPES = [

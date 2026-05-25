@@ -13,7 +13,7 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
  * Runs on `/api/*` after the route handler. Only touches JSON 4xx/5xx
  * bodies; everything else passes through untouched.
  */
-export const errorSourceFilterMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const errorSourceFilterMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 
   const user = c.var.user;

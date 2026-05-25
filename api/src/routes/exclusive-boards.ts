@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 
-export const exclusiveBoardRoutes = new Hono<{ Variables: Variables }>();
+export const exclusiveBoardRoutes = new Hono<AppEnv>();
 
 const PlaceBidSchema = z.object({
   boardId: z.string().uuid(),

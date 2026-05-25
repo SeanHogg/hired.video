@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, count, desc, eq, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
@@ -71,7 +71,7 @@ import {
 
 const { resumeInformation: resumes, watchedResumes, resumeViews } = schema;
 
-export const resumeRoutes = new Hono<{ Variables: Variables }>();
+export const resumeRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

@@ -28,7 +28,7 @@ import { error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
 import { isUuid } from "../../../../shared/value-types.js";
 
-type AppCtx = Parameters<MiddlewareHandler<{ Variables: Variables }>>[0];
+type AppCtx = Parameters<MiddlewareHandler<AppEnv>>[0];
 
 export interface CompanyAccess {
   companyId: string;

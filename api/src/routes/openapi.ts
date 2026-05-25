@@ -3,9 +3,9 @@
 // In the future this can be generated from @hono/zod-openapi schemas.
 
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 
-export const openapiRoutes = new Hono<{ Variables: Variables }>();
+export const openapiRoutes = new Hono<AppEnv>();
 
 const SPEC = {
   openapi: "3.1.0",

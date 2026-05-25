@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, count, desc, eq, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as billingService from "../services/billing/BillingService.js";
@@ -10,7 +10,7 @@ import { TIER_COPY } from "../../../shared/tier-copy.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import type { UsageInvoice } from "../../../shared/usage-statement.js";
 
-export const billingRoutes = new Hono<{ Variables: Variables }>();
+export const billingRoutes = new Hono<AppEnv>();
 
 const nowIso = () => new Date().toISOString();
 

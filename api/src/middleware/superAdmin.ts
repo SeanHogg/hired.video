@@ -40,7 +40,7 @@ export function pickModelForCaller(
  * Checks both the isSuperAdmin JWT claim and the roles array.
  * Must run after authMiddleware.
  */
-export const superAdminMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+export const superAdminMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = c.var.user;
   if (!user) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);

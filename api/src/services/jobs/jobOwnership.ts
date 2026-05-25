@@ -19,7 +19,7 @@ import type { Variables } from "../../types/index.js";
 import { error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
 
-type AppCtx = Parameters<MiddlewareHandler<{ Variables: Variables }>>[0];
+type AppCtx = Parameters<MiddlewareHandler<AppEnv>>[0];
 
 export interface JobAccess {
   jobId: string;

@@ -11,11 +11,11 @@
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const bulkScoringRoutes = new Hono<{ Variables: Variables }>();
+export const bulkScoringRoutes = new Hono<AppEnv>();
 
 const BulkScoreSchema = z.object({
   resumeIds: z.array(z.string().uuid()).min(1).max(200),

@@ -71,7 +71,7 @@ const {
   xapiStatements,
 } = schema;
 
-export const courseRoutes = new Hono<{ Variables: Variables }>();
+export const courseRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

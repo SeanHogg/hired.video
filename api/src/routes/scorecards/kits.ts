@@ -4,7 +4,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../../types/index.js";
 import {
   CreateKitSchema,
@@ -17,7 +17,7 @@ import type { ScorecardsService } from "../../domains/scorecards/scorecardsServi
 export function kitRoutes(
   service: () => ScorecardsService,
 ): Hono<{ Variables: Variables }> {
-  const r = new Hono<{ Variables: Variables }>();
+  const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
     const auth = requireUser(c);
@@ -99,7 +99,7 @@ export function kitRoutes(
 export function stageRoutes(
   service: () => ScorecardsService,
 ): Hono<{ Variables: Variables }> {
-  const r = new Hono<{ Variables: Variables }>();
+  const r = new Hono<AppEnv>();
 
   r.patch("/:id", async (c) => {
     const auth = requireUser(c);

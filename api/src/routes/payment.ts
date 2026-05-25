@@ -9,7 +9,7 @@
 import { Hono, type Context } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { applySpecialtyBonus } from "../../../shared/sectors.js";
@@ -19,7 +19,7 @@ import * as billingService from "../services/billing/BillingService.js";
 import { tryGetPayoutProvider } from "../services/payout/index.js";
 import { applyPayoutWebhook } from "./payouts.js";
 
-export const paymentRoutes = new Hono<{ Variables: Variables }>();
+export const paymentRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -275,7 +275,7 @@ paymentRoutes.post("/save-payment-method", async (c) => {
 // POST /api/payment/webhook         (generic path)
 // Verifies the provider signature and dispatches normalised events.
 // ---------------------------------------------------------------------------
-async function handleWebhook(c: Context<{ Variables: Variables }>) {
+async function handleWebhook(c: Context<AppEnv>) {
   const provider = tryGetPaymentProvider(getEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
 

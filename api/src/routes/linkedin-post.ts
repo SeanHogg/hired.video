@@ -4,10 +4,10 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
-export const linkedInPostRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const linkedInPostRoutes = new Hono<AppEnv>();
 
 const RequestSchema = z.object({
   videoId:    z.string(),

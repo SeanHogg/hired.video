@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../../utils/response.js";
 import { listModules, createModule, updateModule } from "../../services/auth/adminModules.js";
 
@@ -25,7 +25,7 @@ const UpdateModuleSchema = z.object({
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
-export const moduleRoutes = new Hono<{ Variables: Variables }>();
+export const moduleRoutes = new Hono<AppEnv>();
 
 moduleRoutes.get("/", async (c) => {
   return c.json(ok(await listModules()), 200);

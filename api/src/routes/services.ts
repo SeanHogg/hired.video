@@ -23,7 +23,7 @@
 
 import { Hono } from "hono";
 import { eq, and, desc, inArray, or, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
@@ -38,7 +38,7 @@ const {
   pushSubscriptions,
 } = schema;
 
-export const serviceRoutes = new Hono<{ Variables: Variables }>();
+export const serviceRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

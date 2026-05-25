@@ -16,13 +16,13 @@ import { Hono } from "hono";
 import { eq, and, lt } from "drizzle-orm";
 import { z } from "zod";
 import { SignJWT } from "jose";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
 const { webauthnCredentials, webauthnChallenges, users } = schema;
 
-export const passkeyRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const passkeyRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

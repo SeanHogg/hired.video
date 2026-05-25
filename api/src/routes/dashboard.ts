@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, count, eq, gte, lt, sql, sum, desc } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getOnboardingTasksForUser } from "../lib/onboarding.js";
@@ -11,7 +11,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 
-export const dashboardRoutes = new Hono<{ Variables: Variables }>();
+export const dashboardRoutes = new Hono<AppEnv>();
 
 // Every successful GET on /api/dashboard/* is user-scoped, expensive
 // (6–8 parallel DB queries), and tolerates 60s of staleness. Pair the

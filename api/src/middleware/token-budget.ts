@@ -17,7 +17,7 @@ import {
   TokenBudgetExceededError,
 } from "../domains/billing/token-ledger.js";
 
-type AppCtx = Context<{ Variables: Variables }>;
+type AppCtx = Context<AppEnv>;
 
 /**
  * Forward-looking gate — call inside an LLM handler before issuing the
@@ -59,7 +59,7 @@ export const checkAIUsage = checkTokenBudget;
  * Skips: unauthenticated requests, non-JSON responses, non-2xx responses
  * (errors already carry their own budget in the 429 path).
  */
-export function attachTokenBudget(): MiddlewareHandler<{ Variables: Variables }> {
+export function attachTokenBudget(): MiddlewareHandler<AppEnv> {
   return async (c: AppCtx, next) => {
     await next();
 
@@ -106,7 +106,7 @@ export function attachTokenBudget(): MiddlewareHandler<{ Variables: Variables }>
  * Anonymous requests short-circuit (no `sub` → nothing to meter); pair
  * with the auth middleware upstream when a route requires authentication.
  */
-export function requireTokenBudget(): MiddlewareHandler<{ Variables: Variables }> {
+export function requireTokenBudget(): MiddlewareHandler<AppEnv> {
   return async (c: AppCtx, next) => {
     const blocked = await checkTokenBudget(c);
     if (blocked) return blocked;

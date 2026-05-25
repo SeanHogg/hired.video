@@ -26,7 +26,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import {
   StudioTemplatesService,
@@ -36,7 +36,7 @@ import {
 } from "../services/studio/StudioTemplatesService.js";
 import type { TemplateKind } from "../repositories/index.js";
 
-export const studioTemplatesRoutes = new Hono<{ Variables: Variables }>();
+export const studioTemplatesRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

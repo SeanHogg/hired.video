@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
@@ -15,7 +15,7 @@ import { buildRepos } from "../repositories/index.js";
 import { getDb } from "../db/index.js";
 import type { ResumeContent, SkillEvidence } from "../../../shared/resume.js";
 
-export const skillExtractorRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const skillExtractorRoutes = new Hono<AppEnv>();
 skillExtractorRoutes.use("*", attachTokenBudget());
 
 const ExtractRequestSchema = z

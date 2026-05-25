@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 
 // 32MB matches the frontend `MAX_IMAGE_SIZE` cap raised per #949 —
@@ -22,7 +22,7 @@ const UploadSchema = z.object({
 });
 
 
-export const uploadRoutes = new Hono<{ Variables: Variables }>();
+export const uploadRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

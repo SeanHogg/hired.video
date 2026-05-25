@@ -15,7 +15,7 @@
  */
 import { Hono } from "hono";
 import { and, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { resolveProfileSections } from "../../../shared/profile-sections.js";
@@ -27,7 +27,7 @@ const {
   userProfiles,
 } = schema;
 
-export const mapRoutes = new Hono<{ Variables: Variables }>();
+export const mapRoutes = new Hono<AppEnv>();
 
 interface PinFilter {
   minLat: number;

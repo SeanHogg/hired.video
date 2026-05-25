@@ -15,11 +15,11 @@
 
 import { Hono } from "hono";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const hiringInsightsRoutes = new Hono<{ Variables: Variables }>();
+export const hiringInsightsRoutes = new Hono<AppEnv>();
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

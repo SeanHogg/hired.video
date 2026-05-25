@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 
-export const apiKeyRoutes = new Hono<{ Variables: Variables }>();
+export const apiKeyRoutes = new Hono<AppEnv>();
 
 // Generates a cryptographically random API key: hvk_<32 random hex chars>
 async function generateApiKey(): Promise<{ key: string; prefix: string; hash: string }> {

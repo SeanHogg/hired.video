@@ -8,7 +8,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { requirePro } from "../middleware/auth-gates.js";
 import {
@@ -32,7 +32,7 @@ import {
   type PublishVideoErrorKind,
 } from "../services/youtube/publishVideoUseCase.js";
 
-export const youtubeRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const youtubeRoutes = new Hono<AppEnv>();
 
 const CallbackSchema = z.object({
   code: z.string().min(1),

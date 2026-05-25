@@ -19,13 +19,13 @@
 import { Hono } from "hono";
 import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { scrapeJobSource } from "../services/job/scraper.js";
 
-export const jobScraperAdminRoutes = new Hono<{ Variables: Variables }>();
-export const jobScraperUserRoutes = new Hono<{ Variables: Variables }>();
+export const jobScraperAdminRoutes = new Hono<AppEnv>();
+export const jobScraperUserRoutes = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
 // Helpers

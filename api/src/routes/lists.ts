@@ -16,12 +16,12 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { LIST_ITEM_ENTITY_TYPES, type ListItemEntityType } from "../db/schema/lists.js";
 
-export const listsRoutes = new Hono<{ Variables: Variables }>();
+export const listsRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 

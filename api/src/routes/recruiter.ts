@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, and, desc, count, sum, sql, inArray, ilike, or } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -14,7 +14,7 @@ import {
 	type AgentCriteria,
 } from "../services/recruiter/agent-intake.js";
 
-export const recruiterRoutes = new Hono<{ Variables: Variables }>();
+export const recruiterRoutes = new Hono<AppEnv>();
 
 const responseEnvelope = <T>(data: T) => ({
 	success: true,

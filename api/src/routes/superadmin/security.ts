@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../../utils/response.js";
 import { getDb, schema } from "../../db/index.js";
 
@@ -27,7 +27,7 @@ const ByIpSchema = z.object({
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
-export const securityRoutes = new Hono<{ Variables: Variables }>();
+export const securityRoutes = new Hono<AppEnv>();
 
 /** GET /signups/recent — group user registrations by signup_ip in the
  *  given window, return the IPs with ≥ minCount accounts, sorted by

@@ -41,7 +41,7 @@ const MAX_RESUME_TEXT_LENGTH = 12_000;
 
 export interface ScoreWithLenientLLMArgs<Wire, Canonical> {
   /** Hono request context — used for budget gate and billing. */
-  c: Context<{ Bindings: Env; Variables: Variables }>;
+  c: Context<AppEnv>;
   /** Telemetry slug (e.g. "resume_scorer", "resume_optimizer"). Surfaces in `ai_usage_records.feature_key`. */
   featureKey: string;
   /** Inference-profile key from providers.ts. Both scorer and optimizer use `resume_optimize`. */

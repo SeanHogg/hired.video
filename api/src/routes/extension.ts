@@ -21,7 +21,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { optionalAuthMiddleware } from "../middleware/auth.js";
@@ -66,7 +66,7 @@ const ingestRateLimiter = createIpRateLimiter({
 
 // ── Router ─────────────────────────────────────────────────────────────────
 
-export const extensionRoutes = new Hono<{ Variables: Variables }>();
+export const extensionRoutes = new Hono<AppEnv>();
 
 extensionRoutes.post(
   "/sessions",

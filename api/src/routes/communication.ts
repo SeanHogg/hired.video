@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import {
@@ -8,7 +8,7 @@ import {
   sendMessage,
 } from "../services/messaging/messagingService.js";
 
-export const communicationRoutes = new Hono<{ Variables: Variables }>();
+export const communicationRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

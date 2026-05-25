@@ -5,11 +5,11 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { fetchUserAuditEvents } from "../services/audit/userAuditLog.js";
 
-export const userAuditRoutes = new Hono<{ Variables: Variables }>();
+export const userAuditRoutes = new Hono<AppEnv>();
 
 userAuditRoutes.get("/me", async (c) => {
   const uid = (c.var.user?.sub as string | undefined) ?? null;

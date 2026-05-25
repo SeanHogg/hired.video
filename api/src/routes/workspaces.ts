@@ -17,14 +17,14 @@
 import { Hono } from "hono";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { listAccessibleWorkspaces } from "../services/studio/workspace.js";
 
 const { companyProfiles, users, workspaceGrants } = schema;
 
-export const workspaceRoutes = new Hono<{ Variables: Variables }>();
+export const workspaceRoutes = new Hono<AppEnv>();
 
 function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

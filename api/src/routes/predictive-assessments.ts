@@ -20,7 +20,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
@@ -35,7 +35,7 @@ import { getQuestionBank } from "../../../shared/assessments/question-banks.js";
 import { computeScore } from "../../../shared/assessments/scoring.js";
 import { fetchNorm, percentileForScore } from "../services/assessments/norms.js";
 
-export const predictiveAssessmentRoutes = new Hono<{ Variables: Variables }>();
+export const predictiveAssessmentRoutes = new Hono<AppEnv>();
 
 function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { desc, eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-export const passwordManagementRoutes = new Hono<{ Variables: Variables }>();
+export const passwordManagementRoutes = new Hono<AppEnv>();
 
 // Password policy constants — must match frontend and email copy
 const PASSWORD_EXPIRY_DAYS = 90;

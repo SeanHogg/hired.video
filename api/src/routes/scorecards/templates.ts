@@ -6,7 +6,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../../types/index.js";
 import {
   AttributeInputSchema,
@@ -20,7 +20,7 @@ import { error } from "../../types/index.js";
 export function templateRoutes(
   service: () => ScorecardsService,
 ): Hono<{ Variables: Variables }> {
-  const r = new Hono<{ Variables: Variables }>();
+  const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
     const auth = requireUser(c);
@@ -98,7 +98,7 @@ export function templateRoutes(
 export function attributeRoutes(
   service: () => ScorecardsService,
 ): Hono<{ Variables: Variables }> {
-  const r = new Hono<{ Variables: Variables }>();
+  const r = new Hono<AppEnv>();
 
   r.patch("/:id", async (c) => {
     const auth = requireUser(c);

@@ -12,7 +12,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { and, eq, gte, lte, desc, sql, inArray, isNull, or } from "drizzle-orm";
@@ -57,7 +57,7 @@ import { readClickIds } from "../middleware/clickIdCapture.js";
 import { WorkspaceForbiddenError } from "../services/studio/workspace.js";
 import { listAccessibleWorkspaces } from "../services/studio/workspace.js";
 
-export const paidMediaRoutes = new Hono<{ Variables: Variables }>();
+export const paidMediaRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string {
   return c.var.user?.sub as string;

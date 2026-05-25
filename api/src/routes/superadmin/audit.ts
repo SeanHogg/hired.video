@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../../utils/response.js";
 import { listAuditLog } from "../../utils/audit.js";
 
@@ -9,7 +9,7 @@ const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
-export const auditRoutes = new Hono<{ Variables: Variables }>();
+export const auditRoutes = new Hono<AppEnv>();
 
 auditRoutes.get("/", async (c) => {
   const query = PaginationSchema.safeParse(c.req.query());

@@ -22,7 +22,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -41,7 +41,7 @@ import {
 } from "../services/sync/sync-run-service.js";
 import type { ResumeContent } from "../../../shared/resume.js";
 
-export const vendorSyncRoutes = new Hono<{ Variables: Variables }>();
+export const vendorSyncRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

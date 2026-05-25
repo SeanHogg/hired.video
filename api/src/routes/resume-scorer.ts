@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env, Variables } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { billingFacade } from "../domains/billing/facade.js";
@@ -13,7 +13,7 @@ import {
 } from "../services/resume/analyze.js";
 import type { ResumeAnalysis } from "../../../shared/tool-schemas.js";
 
-export const resumeScorerRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+export const resumeScorerRoutes = new Hono<AppEnv>();
 resumeScorerRoutes.use("*", attachTokenBudget());
 
 /**

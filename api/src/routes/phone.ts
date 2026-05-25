@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as sw from "../services/adapters/signalwire.js";
 
-export const phoneRoutes = new Hono<{ Variables: Variables }>();
+export const phoneRoutes = new Hono<AppEnv>();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

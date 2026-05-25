@@ -10,7 +10,7 @@
  *   POST   /:id/cancel       — cancel a pending request (requester only)
  */
 import { Hono } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { getDb } from "../db/index.js";
@@ -21,7 +21,7 @@ import {
 } from "../../../shared/coffee.js";
 import { resolveProfileSections } from "../../../shared/profile-sections.js";
 
-export const coffeeRoutes = new Hono<{ Variables: Variables }>();
+export const coffeeRoutes = new Hono<AppEnv>();
 
 function getEnv(c: any): Record<string, string | undefined> {
   return (c?.env ?? {}) as Record<string, string | undefined>;

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { ok } from "../../utils/response.js";
 import {
   startImpersonation,
@@ -30,7 +30,7 @@ const PaginationSchema = z.object({
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
-export const sessionRoutes = new Hono<{ Variables: Variables }>();
+export const sessionRoutes = new Hono<AppEnv>();
 
 sessionRoutes.post("/", async (c) => {
   const body = StartSchema.safeParse(await c.req.json().catch(() => ({})));

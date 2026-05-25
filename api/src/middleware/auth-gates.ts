@@ -18,14 +18,14 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
 
-type AppCtx = Context<{ Variables: Variables }>;
+type AppCtx = Context<AppEnv>;
 
 /**
  * `requirePro("Salary Calculator")` — returns 402 for non-pro
  * callers with the canonical PRO_REQUIRED envelope. Admin /
  * SuperAdmin roles bypass.
  */
-export function requirePro(featureName: string): MiddlewareHandler<{ Variables: Variables }> {
+export function requirePro(featureName: string): MiddlewareHandler<AppEnv> {
   return async (c: AppCtx, next) => {
     const userId = c.var.user?.sub;
     if (!userId) {

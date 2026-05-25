@@ -36,7 +36,7 @@
 
 import { Hono } from "hono";
 import { eq, and, or, desc, sql } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
@@ -90,7 +90,7 @@ const ESCROW_AUTO_RELEASE_DAYS = 7;
 const INCLUDED_REVISIONS = 3;
 
 
-export const creatorRoutes = new Hono<{ Variables: Variables }>();
+export const creatorRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

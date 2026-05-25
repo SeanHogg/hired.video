@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { superAdminMiddleware } from "../../middleware/superAdmin.js";
 import { sessionRoutes } from "./sessions.js";
 import { userMgmtRoutes } from "./users.js";
@@ -23,7 +23,7 @@ import { superadminPointsRoutes } from "./points.js";
  *
  * superAdminMiddleware is applied once here — sub-routers do not repeat it.
  */
-export const superadminRoutes = new Hono<{ Variables: Variables }>();
+export const superadminRoutes = new Hono<AppEnv>();
 
 superadminRoutes.use("*", superAdminMiddleware);
 

@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { count, desc, eq } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
 import { workers as registeredWorkers, getWorker } from "../workers/registry.js";
 import { runWorker } from "../workers/runner.js";
 
-export const adminWorkerRoutes = new Hono<{ Variables: Variables }>();
+export const adminWorkerRoutes = new Hono<AppEnv>();
 
 adminWorkerRoutes.use("*", superAdminMiddleware);
 
