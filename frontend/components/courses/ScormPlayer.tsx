@@ -17,6 +17,22 @@ import { useEffect, useRef, useState } from "react";
 import { commitScormState, loadScormState, emitXapi } from "@/lib/courses/courses-api";
 
 type ScormVersion = "1.2" | "2004_1" | "2004_2" | "2004_3" | "2004_4";
+type ScormCompletionStatus = "not_attempted" | "incomplete" | "completed" | "passed" | "failed";
+
+const SCORM_COMPLETION_STATUSES: readonly ScormCompletionStatus[] = [
+  "not_attempted",
+  "incomplete",
+  "completed",
+  "passed",
+  "failed",
+];
+
+function narrowCompletion(raw: string | undefined): ScormCompletionStatus | undefined {
+  if (raw == null) return undefined;
+  return (SCORM_COMPLETION_STATUSES as readonly string[]).includes(raw)
+    ? (raw as ScormCompletionStatus)
+    : undefined;
+}
 
 interface ScormPlayerProps {
   enrollmentId: string;
