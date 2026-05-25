@@ -45,10 +45,11 @@ export default function AffiliateProgram() {
     }
 
     // Register with the default role (job seeker); affiliate is a service layered on top of any role.
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get("ref") || undefined;
+    // Inbound `?ref=` attribution is picked up by `signup()` from the
+    // shared first-touch store (cookie populated by useAttributionCapture
+    // on every route) — no need to re-parse the querystring here.
     try {
-      await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, ref, true, captcha.token);
+      await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, undefined, true, captcha.token);
       setSuccess("Registration successful! Please confirm your email to continue.");
       setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);
     } catch (err) {

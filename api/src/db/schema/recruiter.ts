@@ -245,6 +245,28 @@ export const recruiterAgentRuns = pgTable("recruiter_agent_runs", {
 export type RecruiterAgentRun = typeof recruiterAgentRuns.$inferSelect;
 export type NewRecruiterAgentRun = typeof recruiterAgentRuns.$inferInsert;
 
+// Scheduled follow-up messages produced by Agent v2's orchestration
+// loop. See migration 0117_recruiter_agent_followups.sql for the
+// rationale; the worker `recruiter-agent-followup` flips pending rows
+// to sent / cancelled on the cron tick.
+export const recruiterAgentFollowups = pgTable("recruiter_agent_followups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  runId: uuid("run_id").notNull().references(() => recruiterAgentRuns.id, { onDelete: "cascade" }),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  candidateId: uuid("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  followupKind: varchar("followup_kind", { length: 32 }).notNull(),
+  sequenceIndex: integer("sequence_index").default(1).notNull(),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  body: text("body").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RecruiterAgentFollowup = typeof recruiterAgentFollowups.$inferSelect;
+export type NewRecruiterAgentFollowup = typeof recruiterAgentFollowups.$inferInsert;
+
 // ─── ATS Integration connections ─────────────────────────────────────────────
 // Stores OAuth tokens / API keys for Greenhouse, Lever, Workday, etc.
 

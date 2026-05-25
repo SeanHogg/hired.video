@@ -7,6 +7,12 @@ import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/company/recruiter-match.js";
+import {
+	deriveCriteriaFromBrief,
+	deriveCriteriaFromJobRow,
+	FOLLOWUP_DEFAULTS,
+	type AgentCriteria,
+} from "../services/recruiter/agent-intake.js";
 
 export const recruiterRoutes = new Hono<{ Variables: Variables }>();
 
@@ -875,6 +881,164 @@ recruiterRoutes.get("/agent/runs/:id", async (c) => {
 
 	if (!run) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Run not found" } }, 404);
 	return c.json(responseEnvelope(run), 200);
+});
+
+// ─── Agent v2: brief → criteria intake ────────────────────────────────
+// LinkedIn Hiring Assistant parity: accept a natural-language role
+// description (or an existing jobId) and derive the structured search
+// criteria the /agent/source endpoint expects. Heuristic fallback runs
+// when no LLM key is configured so the surface still returns a usable
+// shape during local dev.
+
+const IntakeSchema = z.object({
+	briefText: z.string().optional(),
+	jobId: z.string().uuid().optional(),
+});
+
+recruiterRoutes.post("/agent/intake", async (c) => {
+	const body = await c.req.json().catch(() => ({}));
+	const parsed = IntakeSchema.safeParse(body);
+	if (!parsed.success) {
+		return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
+	}
+	const { briefText, jobId } = parsed.data;
+	if (!briefText && !jobId) {
+		return c.json(error("VALIDATION_ERROR", "briefText or jobId is required"), 400);
+	}
+
+	const db = getDb();
+	let criteria: AgentCriteria;
+	let source: "brief" | "job" | "fallback";
+
+	if (jobId) {
+		const [row] = await db
+			.select({
+				id: schema.jobItems.id,
+				title: schema.jobItems.title,
+				description: schema.jobItems.description,
+				location: schema.jobItems.location,
+				skillsRequired: schema.jobItems.skillsRequired,
+			})
+			.from(schema.jobItems)
+			.where(eq(schema.jobItems.id, jobId))
+			.limit(1);
+		if (!row) return c.json(error("NOT_FOUND", "Job not found"), 404);
+		criteria = deriveCriteriaFromJobRow(row);
+		source = "job";
+	} else {
+		const llm = hasAnyLLMProviderKey(c.env as any)
+			? createLLMClient(c.env as any, c.var.user)
+			: null;
+		criteria = await deriveCriteriaFromBrief(briefText!, llm);
+		source = llm ? "brief" : "fallback";
+	}
+
+	return c.json(responseEnvelope({ ...criteria, source }), 200);
+});
+
+// ─── Agent v2: follow-up scheduling ───────────────────────────────────
+// Each agent run can spawn a sequence of follow-ups for any candidate
+// in its results. Persisted to recruiter_agent_followups; fired by
+// the `recruiter-agent-followup` worker (workers/recruiter-agent-followup.ts).
+
+const ScheduleFollowupSchema = z.object({
+	runId: z.string().uuid(),
+	candidateId: z.string().uuid(),
+	followupKind: z.string().min(1).max(32).optional().default("first_followup"),
+	sequenceIndex: z.number().int().min(1).max(10).optional().default(1),
+	scheduledFor: z.string().datetime().optional(),
+	dayOffset: z.number().int().min(0).max(180).optional(),
+	body: z.string().min(1).max(8000),
+});
+
+recruiterRoutes.post("/agent/followups/schedule", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => ({}));
+	const parsed = ScheduleFollowupSchema.safeParse(body);
+	if (!parsed.success) {
+		return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
+	}
+	const input = parsed.data;
+	const db = getDb();
+	const followupsTable = (schema as any).recruiterAgentFollowups;
+	if (!followupsTable) {
+		return c.json(error("SERVICE_UNAVAILABLE", "Agent follow-ups unavailable"), 503);
+	}
+
+	const runsTable = (schema as any).recruiterAgentRuns;
+	const [run] = await db
+		.select({ id: runsTable.id, recruiterId: runsTable.recruiterId })
+		.from(runsTable)
+		.where(eq(runsTable.id, input.runId))
+		.limit(1);
+	if (!run || run.recruiterId !== user.sub) {
+		return c.json(error("NOT_FOUND", "Agent run not found"), 404);
+	}
+
+	const scheduledFor = input.scheduledFor
+		? new Date(input.scheduledFor)
+		: new Date(Date.now() + (input.dayOffset ?? FOLLOWUP_DEFAULTS.firstOffsetDays) * 86_400_000);
+
+	const [row] = await (db
+		.insert(followupsTable)
+		.values({
+			runId: input.runId,
+			recruiterId: user.sub,
+			candidateId: input.candidateId,
+			followupKind: input.followupKind,
+			sequenceIndex: input.sequenceIndex,
+			scheduledFor,
+			body: input.body,
+			status: "pending",
+		})
+		.returning() as any);
+
+	return c.json(responseEnvelope(row), 200);
+});
+
+recruiterRoutes.get("/agent/followups", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const followupsTable = (schema as any).recruiterAgentFollowups;
+	if (!followupsTable) return c.json(responseEnvelope([]), 200);
+
+	const status = c.req.query("status") ?? null;
+	const conditions = [eq(followupsTable.recruiterId, user.sub)];
+	if (status) conditions.push(eq(followupsTable.status, status));
+
+	const rows = await db
+		.select()
+		.from(followupsTable)
+		.where(and(...conditions))
+		.orderBy(desc(followupsTable.scheduledFor))
+		.limit(100);
+	return c.json(responseEnvelope(rows), 200);
+});
+
+recruiterRoutes.post("/agent/followups/:id/cancel", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const followupsTable = (schema as any).recruiterAgentFollowups;
+	if (!followupsTable) return c.json(error("NOT_FOUND", "Follow-up not found"), 404);
+
+	const [row] = await db
+		.select({ id: followupsTable.id, recruiterId: followupsTable.recruiterId, status: followupsTable.status })
+		.from(followupsTable)
+		.where(eq(followupsTable.id, c.req.param("id")))
+		.limit(1);
+	if (!row || row.recruiterId !== user.sub) {
+		return c.json(error("NOT_FOUND", "Follow-up not found"), 404);
+	}
+	if (row.status !== "pending") {
+		return c.json(error("INVALID_STATE", `Follow-up is ${row.status}`), 400);
+	}
+
+	const [updated] = await (db
+		.update(followupsTable)
+		.set({ status: "cancelled", updatedAt: new Date() })
+		.where(eq(followupsTable.id, row.id))
+		.returning() as any);
+	return c.json(responseEnvelope(updated), 200);
 });
 
 // ─── Profile Extraction ─────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ import { RegisterGate } from "@/components/security/RegisterGate";
 import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
 import { trackSignUp } from "@/lib/gtm";
 import { readRedirectParam, safeRedirectTo, withRedirectTo } from "@/lib/auth-redirect";
+import { readAttribution } from "@/lib/attribution";
 
 export default function Signup() {
   const location = useLocation();
@@ -64,28 +65,15 @@ export default function Signup() {
     }
   }, [location.search]);
 
-  // Capture referral code from URL (?ref=CODE) and persist; fallback to stored value
+  // Hydrate the visible referral-code field from the shared first-touch
+  // attribution store (cookie, 30-day TTL). The `useAttributionCapture`
+  // hook mounted in App.tsx is responsible for WRITING — this page only
+  // reads. Users can still type a code manually; the input is editable
+  // and `referralCode` (state) wins on submit if they've changed it.
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const code = searchParams.get("ref");
-    if (code) {
-      setReferralCode(code);
-      try {
-        sessionStorage.setItem("ref", code);
-      } catch {
-        // no-op
-      }
-    } else {
-      try {
-        const stored = sessionStorage.getItem("ref");
-        if (stored) {
-          setReferralCode(stored);
-        }
-      } catch {
-        // no-op
-      }
-    }
-  }, [location.search]);
+    const stored = readAttribution().ref;
+    if (stored) setReferralCode(stored);
+  }, []);
 
   // SEO for signup page
   useSEO(location.pathname);

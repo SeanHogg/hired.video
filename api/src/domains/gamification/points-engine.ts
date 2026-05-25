@@ -62,16 +62,24 @@ export type AwardSkipReason =
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export interface PointsEngineOpts {
+  now?: () => Date;
+  /** Hook called when the streak engine awards a milestone bonus
+   *  that has a badge slug. The badge engine listens on this to award
+   *  the user_badges row + the badge_bonus ledger entry. */
+  onBadgeUnlock?: (userId: string, badgeSlug: string) => Promise<void>;
+  /** Resolve the user's IANA timezone for the streak engine's day
+   *  boundary. Injected (rather than fetched inline) so the engine
+   *  stays free of any direct cross-aggregate DB access. Returns null
+   *  when the timezone can't be determined — the streak engine falls
+   *  back to UTC. */
+  getUserTimezone?: (userId: string) => Promise<string | null>;
+}
+
 export class PointsEngine {
   constructor(
     private readonly repo: IPointsRepository,
-    private readonly opts: {
-      now?: () => Date;
-      /** Hook called when the streak engine awards a milestone bonus
-       *  that has a badge slug. The badge engine (phase-2) listens on
-       *  this to award the badge row; in phase-1 it's a no-op. */
-      onBadgeUnlock?: (userId: string, badgeSlug: string) => Promise<void>;
-    } = {},
+    private readonly opts: PointsEngineOpts = {},
   ) {}
 
   private now(): Date {
@@ -158,7 +166,7 @@ export class PointsEngine {
     const updatedBalance = await this.repo.applyBalanceDelta(ctx.userId, pointsToAward, "earn");
 
     await this.maybeAdvanceStreak(action, ctx);
-    await this.maybeUnlockBadges(rule.key, pointsToAward, ctx.userId);
+    await this.maybeUnlockBadges(rule.key, ctx.userId);
 
     // Run fraud heuristics for user-task completions only (v1 scope).
     if (rule.key === ACTIONS.TASK_COMPLETE_USER) {
@@ -249,7 +257,7 @@ export class PointsEngine {
 
     const [current, timezone] = await Promise.all([
       this.repo.findStreak(ctx.userId),
-      this.resolveUserTimezone(ctx.userId),
+      this.opts.getUserTimezone ? this.opts.getUserTimezone(ctx.userId) : Promise.resolve(null),
     ]);
     const out = rollStreak({
       current: current
@@ -292,28 +300,7 @@ export class PointsEngine {
     }
   }
 
-  /** Best-effort user-timezone lookup. The points repo doesn't own the
-   *  users table; we read via the underlying db handle the repo holds.
-   *  Returning null degrades cleanly to UTC. */
-  private async resolveUserTimezone(userId: string): Promise<string | null> {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const repo = this.repo as any;
-      if (!repo.db || typeof repo.db.select !== "function") return null;
-      const { schema } = await import("../../db/index.js");
-      const { eq } = await import("drizzle-orm");
-      const [row] = await repo.db
-        .select({ timezone: schema.users.timezone })
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1);
-      return (row as { timezone: string | null } | undefined)?.timezone ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  private async maybeUnlockBadges(action: string, delta: number, userId: string): Promise<void> {
+  private async maybeUnlockBadges(action: string, userId: string): Promise<void> {
     if (!this.opts.onBadgeUnlock) return;
     const [counters, totalEarns, earned] = await Promise.all([
       this.repo.findCounters(userId),
@@ -335,7 +322,6 @@ export class PointsEngine {
 
     const toUnlock = evaluateBadges({
       action,
-      delta,
       counters,
       totalEarnsForAction: totalEarns,
       alreadyEarnedSlugs: earnedSlugs,

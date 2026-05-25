@@ -43,6 +43,14 @@ export class GamificationService {
 
   constructor(private readonly repos: Repos, opts: GamificationServiceOpts = {}) {
     this.engine = new PointsEngine(repos.points, {
+      getUserTimezone: async (userId) => {
+        try {
+          const u = await this.repos.users.findById(userId);
+          return u?.timezone ?? null;
+        } catch {
+          return null;
+        }
+      },
       onBadgeUnlock: async (userId, slug) => {
         const badge = await this.repos.points.findBadgeBySlug(slug);
         if (!badge) return;

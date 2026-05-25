@@ -516,10 +516,17 @@ export class PointsRepository implements IPointsRepository {
     // constraint was dropped in migration 0099 so repeatable streak
     // badges could accumulate rows; non-repeatable badges keep the
     // once-per-user invariant via this pre-insert check.
+    //
+    // `userId` and `badgeId` are NOT NULL in the schema (FK constraints
+    // would reject a NULL insert anyway), so we validate before the
+    // query rather than papering over with a non-null assertion.
+    if (!input.userId || !input.badgeId) {
+      throw new Error("awardBadgeOnce requires userId + badgeId");
+    }
     const [existing] = await this.db
       .select({ id: userBadges.id })
       .from(userBadges)
-      .where(and(eq(userBadges.userId, input.userId!), eq(userBadges.badgeId, input.badgeId!)))
+      .where(and(eq(userBadges.userId, input.userId), eq(userBadges.badgeId, input.badgeId)))
       .limit(1);
     if (existing) return null;
     const [row] = await this.db.insert(userBadges).values(input).returning();

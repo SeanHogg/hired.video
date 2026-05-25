@@ -1,14 +1,31 @@
-// StudioWizard.tsx — 3-step "create your first video" modal.
+// StudioWizard.tsx — kind-aware "create your first project" modal.
 //
-// Step 1: Pick a content template (drives the import mode + step-2 intake form)
-// Step 2: Pick a visual theme (template) + background preset/color
-// Step 3: Fill in the template's intake form and Generate.
+// Step 1 (always): Pick a content template (drives the import mode +
+//   downstream intake form). Filtered by the same Type (MediaKind) +
+//   Use-for (TemplateCategory) pills the /studio landing chooser uses
+//   — DRY-shared via `<TemplateCatalogFilters>`. The wizard sets
+//   `includeOwnedPills={false}` because it only authors fresh built-in
+//   templates (owned templates are opened directly from the carousel).
+//
+// Step 2 (conditional): Pick a visual theme + background preset. This
+//   step is video-shape chrome — `VISUAL_THEMES` + `BG_PRESETS` carry
+//   video-frame defaults. It mounts only for kinds where those
+//   defaults make sense (`video`, `podcast`). Voice / comic / game /
+//   image / animation / cad skip it — comic uses per-genre palettes,
+//   the non-CanvasState kinds bring their own runtime state shape, and
+//   voice has no visible frame.
+//
+// Step 3 (always): Mount the catalog-defined intake for the active
+//   template. Each template's `IntakeForm` ships its own kind-correct
+//   copy (BasicIntake says "video" because basic is mediaKind=video;
+//   PodcastIntake / VoiceIntake / ComicIntake / GameIntake / ImageIntake
+//   each carry their own).
 //
 // The template catalog (components/studio/templates/catalog) is the single
 // source of truth: the same templates drive the sidebar, the wizard's first
 // step, and the editor's first tab.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Check,
@@ -23,12 +40,18 @@ import { Button } from "@/components/ui/button";
 import { resumeToText, jobToText } from "@/components/PromptEditor";
 import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import TemplateList from "@/components/studio/templates/TemplateList";
+import TemplateCatalogFilters, {
+  filterBuiltinTemplates,
+  type TemplateKindFilter,
+  type TemplateUseForFilter,
+} from "@/components/studio/templates/TemplateCatalogFilters";
 import {
   TEMPLATE_CATALOG,
   getTemplate,
   type ContentTemplate,
   type TemplateDef,
 } from "@/components/studio/templates/catalog";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import {
   TEMPLATES,
   BG_PRESETS,
@@ -99,6 +122,33 @@ function companyToText(c: CompanyMetadata): string {
 }
 
 
+// ─── Step identities ─────────────────────────────────────────────────────────
+//
+// Wizard steps are referenced by stable id rather than positional index
+// because the effective step list shrinks/grows per the selected
+// template's `mediaKind` (see `kindNeedsThemeStep`). Index-based logic
+// would break the moment the theme step disappears.
+
+type StepId = "template" | "theme" | "details";
+
+const ALL_STEP_IDS = ["template", "theme", "details"] as const satisfies readonly StepId[];
+
+const STEP_TITLE: Record<StepId, string> = {
+  template: "Choose Template",
+  theme: "Theme & Style",
+  details: "Your Details",
+};
+
+/** Whether the wizard's video-frame theme + background step applies to
+ *  this kind. Only `video` and `podcast` carry video-frame defaults via
+ *  the shared `VISUAL_THEMES` / `BG_PRESETS` registries; every other
+ *  kind owns its visual defaults inside its own runtime (game / image /
+ *  animation / cad) or per-template palette (comic genres), or has no
+ *  visible frame (voice). */
+function kindNeedsThemeStep(kind: MediaKind): boolean {
+  return kind === "video" || kind === "podcast";
+}
+
 interface Props {
   open: boolean;
   state: StudioProjectState;
@@ -111,8 +161,8 @@ interface Props {
   onClose: () => void;
   /** Deep-link entry — when provided, the wizard pre-runs its template
    *  selection (triggering the same auto-import that a click would) and
-   *  auto-advances past step 0 once the import succeeds. Set by callers
-   *  that read `?contentTemplate=<slug>` from the URL. */
+   *  auto-advances past the template step once the import succeeds. Set
+   *  by callers that read `?contentTemplate=<slug>` from the URL. */
   initialTemplateId?: ContentTemplate;
 }
 
@@ -132,8 +182,15 @@ export default function StudioWizard({
   const [activeTemplateFile, setActiveTemplateFile] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
-  /** Catalog id the user selected on step 0. null until a card is clicked. */
+  /** Catalog id the user selected on the template step. null until a card is clicked. */
   const [selectedTemplateId, setSelectedTemplateId] = useState<ContentTemplate | null>(null);
+
+  // Type + Use-for filters on the template chooser — DRY-shared with
+  // /studio landing via `<TemplateCatalogFilters>`. The wizard hides
+  // the Created / Purchased pills because it only authors fresh built-in
+  // templates (owned templates open from the carousel on /studio).
+  const [kindFilter, setKindFilter] = useState<TemplateKindFilter>("all");
+  const [useForFilter, setUseForFilter] = useState<TemplateUseForFilter>("all");
 
   // Artifact import state
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -150,12 +207,64 @@ export default function StudioWizard({
   const [companiesList, setCompaniesList] = useState<CompanyMetadata[] | null>(null);
   const [companiesLoading, setCompaniesLoading] = useState(false);
 
-  const stepTitles = ["Choose Template", "Theme & Style", "Your Details"];
-  const isFirst = step === 0;
-  const isLast = step === stepTitles.length - 1;
   const selectedTemplate: TemplateDef | null = selectedTemplateId
     ? getTemplate(selectedTemplateId)
     : null;
+
+  // Filtered chooser list — applies the same Type + Use-for predicate
+  // /studio uses. The selected template is force-kept in the list so
+  // changing a filter after selection doesn't visually drop the user's
+  // pick mid-flow (they can still see what they have).
+  const filteredTemplates = useMemo(() => {
+    const filtered = filterBuiltinTemplates(
+      TEMPLATE_CATALOG,
+      kindFilter,
+      useForFilter,
+    );
+    if (
+      selectedTemplate &&
+      !filtered.some((t) => t.id === selectedTemplate.id)
+    ) {
+      return [selectedTemplate, ...filtered];
+    }
+    return filtered;
+  }, [kindFilter, useForFilter, selectedTemplate]);
+
+  // Per-kind step list. `theme` is video-frame chrome (VISUAL_THEMES +
+  // BG_PRESETS) so it only mounts for kinds where those defaults apply
+  // — video + podcast (the latter because the video-podcast branch
+  // rides the same theme + bg). Voice, comic, game, image, animation,
+  // and cad skip it: their authoring surfaces own their own visual
+  // defaults (comic genre palettes, game / image / animation runtimes).
+  const stepIds = useMemo<readonly StepId[]>(() => {
+    const kind = selectedTemplate?.mediaKind;
+    // Pre-selection — show the full set so the indicator dots don't
+    // jump under the user as they make their first pick.
+    if (!kind) return ALL_STEP_IDS;
+    return kindNeedsThemeStep(kind)
+      ? (["template", "theme", "details"] as const)
+      : (["template", "details"] as const);
+  }, [selectedTemplate?.mediaKind]);
+
+  // Clamp `step` when the effective step list shrinks (e.g. user
+  // switches from a video template to a voice template — the theme
+  // step disappears, so a step=2 cursor needs to back off to the new
+  // tail). Runs as an effect so the render that flipped the step list
+  // doesn't also try to mount a missing step.
+  useEffect(() => {
+    if (step >= stepIds.length) setStep(stepIds.length - 1);
+  }, [stepIds, step]);
+
+  const stepId = stepIds[step] ?? "template";
+  const isFirst = step === 0;
+  const isLast = step === stepIds.length - 1;
+
+  // Kind-aware noun for the header + Done button. Falls back to a
+  // generic "project" before any template is picked so the wizard
+  // never reads as "video"-only.
+  const kindNoun = selectedTemplate
+    ? MEDIA_KIND_UI[selectedTemplate.mediaKind].badgeLabel.toLowerCase()
+    : "project";
 
   function resetImportState() {
     setImportStatus("idle");
@@ -268,7 +377,7 @@ export default function StudioWizard({
       }
     }
 
-    // "none" — the intake form on step 2 captures everything; nothing to do.
+    // "none" — the intake form on the details step captures everything; nothing to do.
   }
 
   function handlePickJob(job: JobSummary) {
@@ -299,21 +408,25 @@ export default function StudioWizard({
   }
 
   // Per-step gating
-  // Step 0 (Choose Template): must pick a template + (if it auto-imports) the import must succeed
-  // Step 2 (Details): needs enough input to call generate. Templates with no
-  // import mode use a looser threshold because the intake form captures
-  // structured data, not free-text.
+  //   - template: must pick a template + (if it auto-imports) the import must succeed
+  //   - details:  needs enough input to call generate. Templates with no
+  //               import mode use a looser threshold because the intake
+  //               form captures structured data, not free-text.
   const canGenerate =
     selectedTemplate?.importMode === "none"
       ? state.resumeText.trim().length > 0
       : state.resumeText.trim().length > 50;
 
-  const step0Ready =
+  const templateStepReady =
     selectedTemplate != null &&
     (selectedTemplate.importMode === "none" || importStatus === "success");
 
   const canAdvance =
-    step === 0 ? step0Ready : step === 2 ? canGenerate : true;
+    stepId === "template"
+      ? templateStepReady
+      : stepId === "details"
+        ? canGenerate
+        : true;
 
   // Deep-link bootstrap: when the wizard opens with an initial template id
   // (set from `?contentTemplate=<slug>` in the URL), run the same selection
@@ -327,15 +440,17 @@ export default function StudioWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialTemplateId]);
 
-  // Once the deep-linked template has imported successfully, skip past the
-  // "pick a template" step so the visitor lands on Theme & Style rather
-  // than re-confirming the choice they already made on the marketplace.
+  // Once the deep-linked template has imported successfully, skip past
+  // the "pick a template" step so the visitor lands on the next
+  // applicable step (Theme & Style for video/podcast, Your Details for
+  // every other kind) rather than re-confirming the choice they already
+  // made on the marketplace.
   useEffect(() => {
     if (!initialTemplateId) return;
-    if (step !== 0) return;
-    if (!step0Ready) return;
-    setStep(1);
-  }, [initialTemplateId, step, step0Ready]);
+    if (stepId !== "template") return;
+    if (!templateStepReady) return;
+    if (stepIds.length > 1) setStep(1);
+  }, [initialTemplateId, stepId, templateStepReady, stepIds.length]);
 
   async function handleDone() {
     if (!canGenerate) return;
@@ -358,13 +473,18 @@ export default function StudioWizard({
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-card border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-        {/* Header */}
+        {/* Header — title is kind-aware once a template is picked
+            ("New podcast project", "New comic project", ...) and falls
+            back to a generic "New project wizard" pre-selection so the
+            modal never reads as video-only. */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-2">
             <Wand2 className="w-4 h-4 text-primary" />
-            <h2 className="font-semibold">New Video Wizard</h2>
+            <h2 className="font-semibold">
+              {selectedTemplate ? `New ${kindNoun} project` : "New project wizard"}
+            </h2>
             <span className="text-xs text-muted-foreground">
-              · Step {step + 1} of {stepTitles.length}: {stepTitles[step]}
+              · Step {step + 1} of {stepIds.length}: {STEP_TITLE[stepId]}
             </span>
           </div>
           <button
@@ -377,10 +497,12 @@ export default function StudioWizard({
           </button>
         </div>
 
-        {/* Step indicator dots */}
+        {/* Step indicator dots — count + labels driven by stepIds so a
+            voice / comic / game project shows 2 dots, video / podcast
+            shows 3. */}
         <div className="flex items-center justify-center gap-2 px-5 py-3 border-b bg-muted/30">
-          {stepTitles.map((t, i) => (
-            <div key={t} className="flex items-center gap-2">
+          {stepIds.map((id, i) => (
+            <div key={id} className="flex items-center gap-2">
               <div
                 className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold transition-colors ${
                   i < step
@@ -389,10 +511,11 @@ export default function StudioWizard({
                       ? "bg-primary/20 text-primary border border-primary"
                       : "bg-muted text-muted-foreground"
                 }`}
+                title={STEP_TITLE[id]}
               >
                 {i < step ? <Check className="w-3 h-3" /> : i + 1}
               </div>
-              {i < stepTitles.length - 1 && (
+              {i < stepIds.length - 1 && (
                 <div className={`w-8 h-px ${i < step ? "bg-primary" : "bg-border"}`} />
               )}
             </div>
@@ -401,22 +524,38 @@ export default function StudioWizard({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {step === 0 && (
+          {stepId === "template" && (
             <div className="flex flex-col gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                   Choose a template
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Each template captures different inputs and shapes the video
-                  differently. We'll auto-import the right artifact when there
-                  is one.
+                  Each template captures different inputs and shapes the
+                  output differently. We'll auto-import the right artifact
+                  when there is one.
                 </p>
-                <TemplateList
-                  templates={TEMPLATE_CATALOG}
-                  selected={selectedTemplateId ?? undefined}
-                  onSelect={(id) => void handleTemplateSelect(id)}
+                {/* Type + Use-for filters — DRY-shared with the /studio
+                    landing chooser. `includeOwnedPills={false}` because
+                    the wizard only authors built-ins. */}
+                <TemplateCatalogFilters
+                  kindFilter={kindFilter}
+                  onKindFilterChange={setKindFilter}
+                  useForFilter={useForFilter}
+                  onUseForFilterChange={setUseForFilter}
                 />
+                {filteredTemplates.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 py-8 text-center text-xs text-muted-foreground">
+                    No templates match these filters — try a different
+                    Type or Use-for.
+                  </div>
+                ) : (
+                  <TemplateList
+                    templates={filteredTemplates}
+                    selected={selectedTemplateId ?? undefined}
+                    onSelect={(id) => void handleTemplateSelect(id)}
+                  />
+                )}
               </div>
 
               {/* Import status — auto-import feedback */}
@@ -584,7 +723,7 @@ export default function StudioWizard({
             </div>
           )}
 
-          {step === 1 && (
+          {stepId === "theme" && (
             <div className="flex flex-col gap-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
@@ -664,7 +803,7 @@ export default function StudioWizard({
             </div>
           )}
 
-          {step === 2 && (() => {
+          {stepId === "details" && (() => {
             // Mount the catalog-defined intake for the active template — every
             // template owns its own form so this branch never grows.
             const activeTmpl = getTemplate(contentTemplate);
@@ -691,7 +830,7 @@ export default function StudioWizard({
           {!isLast ? (
             <Button
               size="sm"
-              onClick={() => setStep((s) => Math.min(stepTitles.length - 1, s + 1))}
+              onClick={() => setStep((s) => Math.min(stepIds.length - 1, s + 1))}
               disabled={!canAdvance}
             >
               Next <ChevronRight className="w-4 h-4 ml-1" />

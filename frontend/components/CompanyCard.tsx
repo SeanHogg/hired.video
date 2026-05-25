@@ -26,6 +26,7 @@ import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import EntityVideos from "@/components/studio/EntityVideos";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
+import { ReviewRatingBadge } from "@/components/reviews/ReviewRatingBadge";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface CompanyCardProps {
@@ -254,6 +255,11 @@ export default function CompanyCard({
             {company.size && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{company.size}</span>}
           </div>
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+            <ReviewRatingBadge
+              value={company.reviewAvgOverall}
+              count={company.reviewCount}
+              href={`/companies/${company.slug ?? company.id}/reviews`}
+            />
             {company.activeJobCount > 0 && (
               <Badge variant="outline" className="text-xs">
                 <Briefcase className="h-3 w-3 mr-1" />{company.activeJobCount} Job{company.activeJobCount !== 1 ? "s" : ""}
@@ -323,6 +329,11 @@ export default function CompanyCard({
                 {company.location}
               </div>
             )}
+            <ReviewRatingBadge
+              value={company.reviewAvgOverall}
+              count={company.reviewCount}
+              href={`/companies/${company.slug ?? company.id}/reviews`}
+            />
           </div>
 
           {/* Quick Actions for Jobs */}

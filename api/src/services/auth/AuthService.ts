@@ -51,7 +51,7 @@ import { detectCountry } from "./geo.js";
 import { checkEmailRateLimit } from "./emailRateLimit.js";
 import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
 
-const { users, userProfiles, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
+const { users, userProfiles, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, affiliateReferrals, loginEvents } = schema;
 
 // ---------------------------------------------------------------------------
 // recordLoginEvent — fire-and-forget insert into login_events. Awaited so
@@ -196,6 +196,15 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
   }
 
   const { email, password, role, enableAffiliate } = parsed.data;
+  const referralCodeInput = (parsed.data as { referralCode?: string }).referralCode?.trim() || null;
+  const attribution = {
+    utmSource:       (parsed.data as { utmSource?: string }).utmSource       || null,
+    utmMedium:       (parsed.data as { utmMedium?: string }).utmMedium       || null,
+    utmCampaign:     (parsed.data as { utmCampaign?: string }).utmCampaign   || null,
+    utmTerm:         (parsed.data as { utmTerm?: string }).utmTerm           || null,
+    utmContent:      (parsed.data as { utmContent?: string }).utmContent     || null,
+    landingReferrer: (parsed.data as { landingReferrer?: string }).landingReferrer || null,
+  };
   const name = parsed.data.name
     || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ")
     || email;
@@ -295,6 +304,16 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       // investigation works without scanning request_logs.
       signupIp: deps.clientIp,
       signupUserAgent: deps.userAgent,
+      // Inbound campaign attribution snapshot — first-touch values
+      // forwarded by the signup form (#1195). Nullable: organic signups
+      // arrive with `null` across the board, which is the correct read
+      // for downstream LTV-by-campaign queries.
+      utmSource: attribution.utmSource,
+      utmMedium: attribution.utmMedium,
+      utmCampaign: attribution.utmCampaign,
+      utmTerm: attribution.utmTerm,
+      utmContent: attribution.utmContent,
+      landingReferrer: attribution.landingReferrer,
     } as any)
     .returning({ id: users.id, email: users.email, name: users.name, role: users.role });
 
@@ -367,6 +386,42 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       } as any);
     } catch (err) {
       console.error("[register] Failed to create affiliate profile:", err);
+    }
+  }
+
+  // Inbound referral attribution (#1194). If the visitor arrived via an
+  // affiliate's `?ref=CODE` link, the frontend forwards that code here.
+  // Resolve it to a real `affiliate_profiles` row and stamp the linkage
+  // so the conversion lookup in `recordAffiliateConversion` (payment.ts)
+  // can credit the affiliate when this user eventually pays. Self-
+  // referrals (a user signing up with their own code, theoretically only
+  // possible after enableAffiliate just minted one this same request)
+  // are dropped — the affiliate profile lookup runs before the
+  // enableAffiliate insert above is visible to a fresh select on a
+  // different transaction, so this is best-effort either way and
+  // guarding here keeps the policy explicit.
+  if (referralCodeInput) {
+    try {
+      const [aff] = await deps.db
+        .select({ id: affiliateProfiles.id, userId: affiliateProfiles.userId, status: affiliateProfiles.status })
+        .from(affiliateProfiles)
+        .where(eq(affiliateProfiles.referralCode, referralCodeInput))
+        .limit(1);
+      if (aff && aff.userId !== user.id && aff.status !== "disabled") {
+        await deps.db.insert(affiliateReferrals).values({
+          affiliateId: aff.id,
+          referredUserId: user.id,
+          referralCode: referralCodeInput,
+          ipAddress: deps.clientIp,
+          userAgent: deps.userAgent,
+        } as any);
+      }
+    } catch (err) {
+      // Idempotency: a duplicate insert under the partial unique index
+      // (migration 0116) is the expected outcome for a retried POST
+      // /register. Log + continue — the existing row already attributes
+      // the user to the affiliate.
+      console.error("[register] Failed to record affiliate referral:", err);
     }
   }
 

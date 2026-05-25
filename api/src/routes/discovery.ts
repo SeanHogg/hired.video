@@ -9,6 +9,10 @@ import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { scoreJobsForRanking } from "../services/job/ranking.js";
+import {
+  getPopularRoles,
+  getPopularCities,
+} from "../services/job/salary-popularity.js";
 
 export const discoveryRoutes = new Hono<{ Variables: Variables }>();
 
@@ -240,45 +244,155 @@ Return ONLY valid JSON.`;
 });
 
 /**
- * GET /api/discovery/seo/salary/:jobSlug
- * Returns salary data for a role from the platform DB + AI insights.
+ * GET /api/discovery/seo/salary-index
+ * Returns the popular roles + cities used to seed the /salary index page
+ * and the city × role programmatic SEO grid. Public, cached.
  */
-discoveryRoutes.get("/seo/salary/:jobSlug", async (c) => {
-  const jobSlug = c.req.param("jobSlug").replace(/-/g, " ");
+discoveryRoutes.get("/seo/salary-index", async (c) => {
+  const roles = await getPopularRoles(50);
+  const cities = await getPopularCities(30);
+  c.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+  return c.json(success({ roles, cities }), 200);
+});
+
+/**
+ * Shared handler for /seo/salary/:jobSlug and /seo/salary/:jobSlug/:locationSlug.
+ *
+ * Aggregates salary_min / salary_max from active jobs matching the role
+ * slug (LIKE match against the lowercased title) and — when a
+ * location slug is provided — additionally constrains by a LIKE match
+ * against the free-text `location` column. The city slug is converted
+ * back to a search token (`san-francisco` → `san francisco`) which
+ * tolerates the most common formats in scraped job feeds
+ * ("San Francisco, CA", "San Francisco Bay Area", "San Francisco — Remote").
+ *
+ * Returns related-cities + related-roles when no location constraint is
+ * active, so the page can render Glassdoor-style internal linking.
+ */
+async function handleSalaryQuery(c: any) {
+  const jobSlugRaw = c.req.param("jobSlug") as string;
+  const locationSlugRaw = (c.req.param("locationSlug") as string | undefined) ?? null;
+  const jobSlug = jobSlugRaw.replace(/-/g, " ").toLowerCase();
+  const locationToken = locationSlugRaw?.replace(/-/g, " ").toLowerCase() ?? null;
   const db = getDb();
 
-  // Pull salary data from job listings
+  const whereClauses = [
+    eq(schema.jobItems.isActive, true),
+    sql`lower(${schema.jobItems.title}) like ${"%" + jobSlug + "%"}`,
+  ];
+  if (locationToken) {
+    whereClauses.push(
+      sql`lower(${schema.jobItems.location}) like ${"%" + locationToken + "%"}`,
+    );
+  }
+
   const rows = await db
     .select({
       salaryMin: (schema.jobItems as any).salaryMin,
       salaryMax: (schema.jobItems as any).salaryMax,
     })
     .from(schema.jobItems)
-    .where(and(
-      eq(schema.jobItems.isActive, true),
-      sql`lower(${schema.jobItems.title}) like ${"%" + jobSlug.toLowerCase() + "%"}`,
-    ))
-    .limit(100)
+    .where(and(...whereClauses))
+    .limit(200)
     .catch(() => []);
 
   const salaries = rows
     .flatMap((r: any) => [r.salaryMin, r.salaryMax])
-    .filter((s): s is number => typeof s === "number" && s > 0);
+    .map((v: any) => (typeof v === "string" ? Number(v) : v))
+    .filter((s: any): s is number => typeof s === "number" && Number.isFinite(s) && s > 0);
 
-  const avg = salaries.length ? Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length) : null;
+  const avg = salaries.length
+    ? Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length)
+    : null;
   const min = salaries.length ? Math.min(...salaries) : null;
   const max = salaries.length ? Math.max(...salaries) : null;
 
-  c.header("Cache-Control", "public, max-age=3600");
-  return c.json(success({
-    jobTitle: jobSlug,
-    currency: "USD",
-    averageSalary: avg,
-    minSalary: min,
-    maxSalary: max,
-    sampleSize: rows.length,
-    lastUpdated: new Date().toISOString(),
-  }), 200);
+  // Related links — only when not already drilled down (the location
+  // page links back to cities, the role page links forward to cities;
+  // both link to related roles).
+  const [relatedCities, relatedRoles] = await Promise.all([
+    locationSlugRaw ? Promise.resolve([]) : getPopularCities(12),
+    getPopularRoles(50).then((roles) =>
+      roles
+        .filter((r) => r.slug !== jobSlugRaw && r.title !== jobSlug)
+        .slice(0, 8),
+    ),
+  ]);
+
+  c.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+  return c.json(
+    success({
+      jobTitle: jobSlug,
+      jobSlug: jobSlugRaw,
+      location: locationToken,
+      locationSlug: locationSlugRaw,
+      currency: "USD",
+      averageSalary: avg,
+      minSalary: min,
+      maxSalary: max,
+      sampleSize: rows.length,
+      relatedCities,
+      relatedRoles,
+      lastUpdated: new Date().toISOString(),
+    }),
+    200,
+  );
+}
+
+/**
+ * GET /api/discovery/seo/salary/:jobSlug
+ * GET /api/discovery/seo/salary/:jobSlug/:locationSlug
+ */
+discoveryRoutes.get("/seo/salary/:jobSlug", handleSalaryQuery);
+discoveryRoutes.get("/seo/salary/:jobSlug/:locationSlug", handleSalaryQuery);
+
+/**
+ * GET /api/discovery/companies/top-rated
+ * Companies ranked by review aggregate. Powers the "Top reviewed companies"
+ * surface on Companies.tsx, the homepage, and the reviews-section of
+ * sitemap.xml. Filters out companies with too few reviews so a single
+ * 5-star drive-by doesn't tank the signal — minimum threshold mirrors
+ * Glassdoor's "trusted reviews" cutoff.
+ *
+ * Public (no auth). Cached for an hour at the CDN.
+ */
+discoveryRoutes.get("/companies/top-rated", async (c) => {
+  const db = getDb();
+  const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 12)));
+  const minReviews = Math.max(1, Number(c.req.query("minReviews") ?? 3));
+
+  const rows = await db
+    .select({
+      id: schema.companyProfiles.id,
+      slug: schema.companyProfiles.slug,
+      name: schema.companyProfiles.name,
+      logo: (schema.companyProfiles as any).logo ?? sql`null`,
+      industry: (schema.companyProfiles as any).industry ?? sql`null`,
+      reviewCount: (schema.companyProfiles as any).reviewCount,
+      reviewAvgOverall: (schema.companyProfiles as any).reviewAvgOverall,
+    })
+    .from(schema.companyProfiles)
+    .where(sql`${(schema.companyProfiles as any).reviewCount} >= ${minReviews}`)
+    .orderBy(
+      desc((schema.companyProfiles as any).reviewAvgOverall),
+      desc((schema.companyProfiles as any).reviewCount),
+    )
+    .limit(limit)
+    .catch(() => []);
+
+  c.header("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+  return c.json(
+    success(
+      rows.map((r: any) => ({
+        ...r,
+        reviewAvgOverall:
+          typeof r.reviewAvgOverall === "string"
+            ? Number(r.reviewAvgOverall)
+            : r.reviewAvgOverall,
+      })),
+    ),
+    200,
+  );
 });
 
 // ============================================================================

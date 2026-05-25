@@ -5,6 +5,10 @@
 import { Hono } from "hono";
 import { getDb, schema } from "../db/index.js";
 import { and, eq, desc } from "drizzle-orm";
+import {
+  getPopularRoles,
+  getPopularCities,
+} from "../services/job/salary-popularity.js";
 
 export const sitemapRoutes = new Hono();
 
@@ -33,6 +37,7 @@ const STATIC_PAGES = [
   { loc: "/tools/ai-resume-scorer", changefreq: "monthly", priority: "0.7" },
   { loc: "/tools/job-resume-match", changefreq: "monthly", priority: "0.7" },
   { loc: "/tools/auto-fill", changefreq: "monthly", priority: "0.8" },
+  { loc: "/salary", changefreq: "weekly", priority: "0.9" },
   { loc: "/about", changefreq: "monthly", priority: "0.5" },
   { loc: "/contact", changefreq: "monthly", priority: "0.5" },
   { loc: "/privacy-policy", changefreq: "yearly", priority: "0.3" },
@@ -53,7 +58,12 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       .limit(500),
 
     db
-      .select({ id: schema.companyProfiles.id, slug: schema.companyProfiles.slug, updatedAt: schema.companyProfiles.updatedAt })
+      .select({
+        id: schema.companyProfiles.id,
+        slug: schema.companyProfiles.slug,
+        updatedAt: schema.companyProfiles.updatedAt,
+        reviewCount: (schema.companyProfiles as any).reviewCount ?? null,
+      })
       .from(schema.companyProfiles)
       .orderBy(desc(schema.companyProfiles.updatedAt))
       .limit(300),
@@ -77,12 +87,20 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
   const companyRows = companies.status === "fulfilled" ? companies.value : [];
   const userRows = publicUsers.status === "fulfilled" ? publicUsers.value : [];
 
-  // Build unique job slugs for resume guide + salary SEO pages
+  // Resume-guide slugs keep their legacy derivation so historical URLs
+  // stay stable. Salary URLs now ride off the canonical popular-roles /
+  // popular-cities helper so the city × role grid stays consistent with
+  // the /salary index page and the related-links surfaces on each leaf.
   const jobSlugs = [...new Set(
     jobRows
       .map((j) => j.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
       .filter(Boolean)
   )].slice(0, 200) as string[];
+
+  const [popularRoles, popularCities] = await Promise.all([
+    getPopularRoles(40),
+    getPopularCities(20),
+  ]);
 
   const urls: string[] = [
     // Static pages
@@ -94,13 +112,31 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
     // Dynamic company pages
     ...companyRows.map((c) => url(`/companies/${c.slug ?? c.id}`, c.updatedAt?.toISOString(), "weekly", "0.7")),
 
+    // Company reviews pages — only for companies with at least one
+    // published review (skips the empty-state page which doesn't deserve
+    // an index slot and would dilute crawl budget).
+    ...companyRows
+      .filter((c: any) => (c.reviewCount ?? 0) > 0)
+      .map((c) =>
+        url(`/companies/${c.slug ?? c.id}/reviews`, c.updatedAt?.toISOString(), "weekly", "0.8"),
+      ),
+
     // Dynamic public profiles
     ...userRows.map((u) => url(`/people/${u.slug ?? u.id}`, u.updatedAt?.toISOString(), "weekly", "0.6")),
 
-    // Programmatic SEO: salary pages
-    ...jobSlugs.map((s) => url(`/salary/${s}`, now, "weekly", "0.8")),
+    // Programmatic SEO: role-level salary pages (canonical popular roles).
+    ...popularRoles.map((r) => url(`/salary/${r.slug}`, now, "weekly", "0.8")),
 
-    // Programmatic SEO: resume guide pages
+    // Programmatic SEO: city × role salary leaf pages. Bounded by both
+    // helpers (40 × 20 = 800 max) so the sitemap stays under the 50k-URL
+    // single-file limit even as job inventory grows.
+    ...popularRoles.flatMap((r) =>
+      popularCities.map((city) =>
+        url(`/salary/${r.slug}/${city.slug}`, now, "weekly", "0.7"),
+      ),
+    ),
+
+    // Programmatic SEO: resume guide pages (legacy slug derivation).
     ...jobSlugs.map((s) => url(`/resume-guide/${s}`, now, "weekly", "0.8")),
   ];
 

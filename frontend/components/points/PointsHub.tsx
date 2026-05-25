@@ -144,45 +144,76 @@ export function PointsHub({ showHeader = true }: PointsHubProps) {
 function KpiRow({ data }: { data: PointsSummary }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card className="p-5">
-        <div className="text-xs uppercase text-muted-foreground tracking-wide">Balance</div>
-        <div className="text-3xl font-bold tabular-nums mt-1">
-          {data.balance.toLocaleString()}
-        </div>
-        <div className="text-xs text-muted-foreground mt-2">
-          {data.lifetimeEarned.toLocaleString()} earned ·{" "}
-          {data.lifetimeRedeemed.toLocaleString()} redeemed
-        </div>
-      </Card>
-
-      <Card className="p-5">
-        <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
-          <Flame className="h-3.5 w-3.5" /> Streak
-        </div>
-        <div className="text-3xl font-bold tabular-nums mt-1">
-          {data.streak.current}{" "}
-          <span className="text-base font-normal text-muted-foreground">days</span>
-        </div>
-        <div className="text-xs text-muted-foreground mt-2">
-          Longest: {data.streak.longest} days · Last active:{" "}
-          {data.streak.lastActivityDate ?? "—"}
-        </div>
-      </Card>
-
-      <Card className="p-5">
-        <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
-          <Trophy className="h-3.5 w-3.5" /> Badges
-        </div>
-        <div className="text-3xl font-bold tabular-nums mt-1">
-          {data.badges.filter((b) => b.earned).length}
-          <span className="text-base font-normal text-muted-foreground">
-            {" "}
-            / {data.badges.length}
-          </span>
-        </div>
-        <UserTaskGateRow gate={data.userTaskGate} />
-      </Card>
+      <KpiCard
+        label="Balance"
+        value={data.balance.toLocaleString()}
+        footer={
+          <>
+            {data.lifetimeEarned.toLocaleString()} earned ·{" "}
+            {data.lifetimeRedeemed.toLocaleString()} redeemed
+          </>
+        }
+      />
+      <KpiCard
+        icon={<Flame className="h-3.5 w-3.5" />}
+        label="Streak"
+        value={
+          <>
+            {data.streak.current}{" "}
+            <span className="text-base font-normal text-muted-foreground">days</span>
+          </>
+        }
+        footer={
+          <>
+            Longest: {data.streak.longest} days · Last active:{" "}
+            {data.streak.lastActivityDate ?? "—"}
+          </>
+        }
+      />
+      <KpiCard
+        icon={<Trophy className="h-3.5 w-3.5" />}
+        label="Badges"
+        value={
+          <>
+            {data.badges.filter((b) => b.earned).length}
+            <span className="text-base font-normal text-muted-foreground">
+              {" "}
+              / {data.badges.length}
+            </span>
+          </>
+        }
+        footer={<UserTaskGateRow gate={data.userTaskGate} />}
+      />
     </div>
+  );
+}
+
+/** Single tile in the three-up KPI row. Same card shape regardless of
+ *  what it's showing — caller supplies label + value + optional footer
+ *  node. Extracted from PointsHub so the three tiles share one card
+ *  layout instead of repeating the typography classes. */
+function KpiCard({
+  icon,
+  label,
+  value,
+  footer,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <Card className="p-5">
+      <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-1">
+        {icon}
+        {label}
+      </div>
+      <div className="text-3xl font-bold tabular-nums mt-1">{value}</div>
+      {footer != null && (
+        <div className="text-xs text-muted-foreground mt-2">{footer}</div>
+      )}
+    </Card>
   );
 }
 

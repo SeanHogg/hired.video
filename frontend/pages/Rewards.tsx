@@ -20,12 +20,12 @@ import {
   Gift,
   Loader2,
   Lock,
-  Megaphone,
   ShieldCheck,
   Sparkles,
   Trophy,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,12 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import MarketingFAQ, { type MarketingFAQItem } from "@/components/MarketingFAQ";
 import {
   BadgesGallery,
   type BadgeGalleryItem,
@@ -79,6 +74,9 @@ function showcaseBadgeToGalleryItem(b: ShowcaseBadge): BadgeGalleryItem {
 }
 
 export default function RewardsPage() {
+  useSEO("/rewards");
+  useBreadcrumbs([{ name: "Rewards", url: "/rewards" }]);
+
   const { user } = useAuth();
   const eligible = isPointsEligible(user);
 
@@ -269,16 +267,15 @@ export default function RewardsPage() {
       </Section>
 
       {/* ── FAQ ─────────────────────────────────────────────────── */}
-      <Section icon={<Megaphone className="h-5 w-5" />} title="Frequently asked">
-        <Accordion type="single" collapsible className="w-full">
-          {FAQ.map((qa) => (
-            <AccordionItem value={qa.q} key={qa.q}>
-              <AccordionTrigger className="text-left">{qa.q}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">{qa.a}</AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </Section>
+      {/* MarketingFAQ ships the schema.org FAQPage JSON-LD so each Q is
+          eligible for Google rich results — the SEO surface every other
+          marketing page on the site gets. */}
+      <MarketingFAQ
+        schemaId="rewards"
+        heading="Frequently asked"
+        items={FAQ}
+        className="py-8 px-0"
+      />
 
       {/* ── CTA ─────────────────────────────────────────────────── */}
       <Card className="p-8 mt-12 text-center bg-gradient-to-br from-primary/10 via-primary/5 to-background">
@@ -406,33 +403,33 @@ const STREAK_MILESTONES: Array<{ day: number; bonus: number; name: string }> = [
   { day: 90, bonus: 2500, name: "Legendary" },
 ];
 
-const FAQ: Array<{ q: string; a: string }> = [
+const FAQ: MarketingFAQItem[] = [
   {
-    q: "Do my points ever expire?",
-    a: "No. Points stay in your balance until you redeem them. Lifetime earned and lifetime redeemed are tracked separately so you can see your full history.",
+    question: "Do my points ever expire?",
+    answer: "No. Points stay in your balance until you redeem them. Lifetime earned and lifetime redeemed are tracked separately so you can see your full history.",
   },
   {
-    q: "Can I lose points I've already earned?",
-    a: "Only in three cases. (1) When you redeem, the points are debited. (2) If you refund a purchase that earned points, the original earning is reversed. (3) If our fraud system flags unusual activity, earning is paused until support reviews — confirmed fraud leads to point reversal.",
+    question: "Can I lose points I've already earned?",
+    answer: "Only in three cases. (1) When you redeem, the points are debited. (2) If you refund a purchase that earned points, the original earning is reversed. (3) If our fraud system flags unusual activity, earning is paused until support reviews — confirmed fraud leads to point reversal.",
   },
   {
-    q: "How fast do gift cards arrive?",
-    a: "Tremendous typically delivers the gift-card email within minutes of approval. If you cross the $599 / year reporting threshold, we'll collect a W-9 first.",
+    question: "How fast do gift cards arrive?",
+    answer: "Tremendous typically delivers the gift-card email within minutes of approval. If you cross the $599 / year reporting threshold, we'll collect a W-9 first.",
   },
   {
-    q: "What counts toward my streak?",
-    a: "Almost any meaningful action — submitting an application, tailoring a resume, generating a cover letter, completing a task, posting to the feed, running a saved search, making a purchase, or just showing up daily. One qualifying action per day keeps the streak alive.",
+    question: "What counts toward my streak?",
+    answer: "Almost any meaningful action — submitting an application, tailoring a resume, generating a cover letter, completing a task, posting to the feed, running a saved search, making a purchase, or just showing up daily. One qualifying action per day keeps the streak alive.",
   },
   {
-    q: "Why is there a 100-task gate?",
-    a: "Self-created tasks don't earn points until you've closed 100 of them. This prevents abuse — without the gate, someone could create and close thousands of fake tasks to farm points. System-generated tasks (onboarding flows, AI suggestions) always pay.",
+    question: "Why is there a 100-task gate?",
+    answer: "Self-created tasks don't earn points until you've closed 100 of them. This prevents abuse — without the gate, someone could create and close thousands of fake tasks to farm points. System-generated tasks (onboarding flows, AI suggestions) always pay.",
   },
   {
-    q: "Can I share points with another user?",
-    a: "Not directly. The affiliate program (separate from this) lets you earn commission on referrals; ask in /affiliate-program for details.",
+    question: "Can I share points with another user?",
+    answer: "Not directly. The affiliate program (separate from this) lets you earn commission on referrals; see /affiliate-program for details.",
   },
   {
-    q: "Why didn't my action earn?",
-    a: "A few possibilities: you may have hit the daily cap for that action, your role may not be on the rule's eligibility list, or your points may be paused for review. Check the Activity feed on your points page for the per-action audit trail.",
+    question: "Why didn't my action earn?",
+    answer: "A few possibilities: you may have hit the daily cap for that action, your role may not be on the rule's eligibility list, or your points may be paused for review. Check the Activity feed on your points page for the per-action audit trail.",
   },
 ];

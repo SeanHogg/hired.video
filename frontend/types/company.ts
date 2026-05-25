@@ -134,6 +134,8 @@ export interface CompanyMetadata {
   userId: string;
   teamMembers?: string[];
   onboardingProgress: number; // Percentage of completed onboarding tasks
+  reviewCount?: number;
+  reviewAvgOverall?: number;
 }
 
 export type CompanyOwnership = "owned" | "tracked";

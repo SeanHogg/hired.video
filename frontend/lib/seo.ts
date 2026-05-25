@@ -195,6 +195,13 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  "/rewards": {
+    title: "Rewards & Badges: Earn Points, Win Badges, Cash Out — hired.video",
+    description:
+      "Earn points for every job-hunt step — applications, resumes, AI tools, daily streaks. Trade them for AI credits, a free month of Pro, or a Tremendous gift card. See every badge you can unlock.",
+    keywords:
+      "job seeker rewards, gamification, earn points, badges, gift cards, ai credits, streak bonus",
+  },
   "/tools/resume-roast": {
     title: "Free AI Resume Roast: Brutally Honest Feedback — hired.video",
     description:
@@ -1204,15 +1211,31 @@ export const generateStructuredData = {
     return data;
   },
 
-  organization: (company: any) => ({
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: company.name,
-    description: company.description,
-    url: company.website,
-    logo: company.logo,
-    address: company.address,
-  }),
+  organization: (company: any) => {
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: company.name,
+      description: company.description,
+      url: company.website,
+      logo: company.logo,
+      address: company.address,
+    };
+    if (
+      typeof company.reviewCount === "number" &&
+      company.reviewCount > 0 &&
+      typeof company.reviewAvgOverall === "number"
+    ) {
+      data.aggregateRating = {
+        "@type": "AggregateRating",
+        ratingValue: company.reviewAvgOverall.toFixed(1),
+        reviewCount: String(company.reviewCount),
+        bestRating: "5",
+        worstRating: "1",
+      };
+    }
+    return data;
+  },
 
   person: (person: {
     name: string;

@@ -440,26 +440,46 @@ async function dispatchWebhookEvent(
 // ---------------------------------------------------------------------------
 // Affiliate conversion recording (provider-agnostic)
 // ---------------------------------------------------------------------------
-async function recordAffiliateConversion(
+export async function recordAffiliateConversion(
   db: ReturnType<typeof getDb>,
   userId: string,
   revenue: number,
   _currency: string,
 ): Promise<void> {
+  // Two sequential reads instead of a single join — webhook path runs at
+  // most once per payment, so the extra roundtrip is irrelevant. Splits
+  // cleanly across the join boundary the fake-db harness doesn't model,
+  // which is what keeps the regression tests in
+  // routes/__tests__/recordAffiliateConversion.test.ts viable.
   const [referral] = await db
     .select({
       id: schema.affiliateReferrals.id,
       affiliateId: schema.affiliateReferrals.affiliateId,
       landingSector: schema.affiliateReferrals.landingSector,
-      commissionRate: schema.affiliateProfiles.commissionRate,
-      specialtySectors: schema.affiliateProfiles.specialtySectors,
+      convertedAt: schema.affiliateReferrals.convertedAt,
     })
     .from(schema.affiliateReferrals)
-    .innerJoin(schema.affiliateProfiles, eq(schema.affiliateReferrals.affiliateId, schema.affiliateProfiles.id))
     .where(eq(schema.affiliateReferrals.referredUserId, userId))
     .limit(1);
 
   if (!referral) return;
+  // Idempotency guard (#1196). Without this, every recurring-subscription
+  // webhook would mint a new commission and bump totalEarned — affiliates
+  // would be credited every month for a single referred user. Stamp
+  // `convertedAt` on first conversion; subsequent webhooks for the same
+  // referral short-circuit here.
+  if (referral.convertedAt) return;
+
+  const [profile] = await db
+    .select({
+      commissionRate: schema.affiliateProfiles.commissionRate,
+      specialtySectors: schema.affiliateProfiles.specialtySectors,
+      totalEarned: schema.affiliateProfiles.totalEarned,
+    })
+    .from(schema.affiliateProfiles)
+    .where(eq(schema.affiliateProfiles.id, referral.affiliateId))
+    .limit(1);
+  if (!profile) return; // affiliate profile was deleted after the referral
 
   // Vertical-specialty bonus engine (#1166). Pure shared helper composes
   // baseRate + tier bonus + flat sector-match bonus. Tier bonus is not
@@ -467,9 +487,9 @@ async function recordAffiliateConversion(
   // we pass tierBonus=0 and the specialty multiplier is the only modifier
   // on top of the base commission rate.
   const specialty = applySpecialtyBonus({
-    baseRate: Number(referral.commissionRate),
+    baseRate: Number(profile.commissionRate),
     tierBonus: 0,
-    specialtySectors: (referral.specialtySectors as string[]) ?? [],
+    specialtySectors: (profile.specialtySectors as string[]) ?? [],
     landingSector: referral.landingSector,
   });
   const commission = revenue * specialty.effectiveRate;
@@ -484,13 +504,18 @@ async function recordAffiliateConversion(
     status: "pending",
   });
 
-  const [existing] = await db
-    .select({ totalEarned: schema.affiliateProfiles.totalEarned })
-    .from(schema.affiliateProfiles)
-    .where(eq(schema.affiliateProfiles.id, referral.affiliateId))
-    .limit(1);
+  // Stamp the referral as converted so the guard above blocks re-credit
+  // on the next webhook. Same transaction-ish window as the conversion
+  // insert — best effort under our current non-transactional fan-out.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await db.update(schema.affiliateReferrals).set({ convertedAt: new Date() } as any).where(eq(schema.affiliateReferrals.id, referral.id));
 
-  const newTotal = Number(existing[0]?.totalEarned ?? 0) + commission;
+  // Accumulator fix (#1197). The previous read used `existing[0]?...` on a
+  // value that had already been array-destructured — `existing[0]` was
+  // always undefined and `totalEarned` was overwritten to a single
+  // commission's value on every conversion. Read the column directly off
+  // the destructured row (we already have it from the profile select above).
+  const newTotal = Number(profile.totalEarned ?? 0) + commission;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.update(schema.affiliateProfiles).set({ totalEarned: String(newTotal), updatedAt: new Date() } as any).where(eq(schema.affiliateProfiles.id, referral.affiliateId));
 }

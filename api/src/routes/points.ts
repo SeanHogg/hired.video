@@ -16,23 +16,14 @@ import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
-import { GamificationService } from "../domains/gamification/index.js";
+import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
 import { pickScoringRole } from "../../../shared/user-roles.js";
 
 export const pointsRoutes = new Hono<AppEnv>();
 
-/** Build the service for the current request. Thread the worker env so
- *  the redemption engine can construct a Tremendous client when the
- *  user redeems a gift card. */
-function service(env: Record<string, string | undefined>) {
-  return new GamificationService(buildRepos(getDb()), {
-    workerEnv: env,
-  });
-}
-
 pointsRoutes.get("/me", async (c) => {
   const userId = c.var.user.sub;
-  const summary = await service(c.env as never).getUserSummary(userId);
+  const summary = await gamificationFromContext(c).getUserSummary(userId);
   return c.json(success(summary));
 });
 
@@ -46,12 +37,12 @@ pointsRoutes.get("/activity", async (c) => {
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
   }
-  const items = await service(c.env as never).getActivityPage(userId, parsed.data.limit);
+  const items = await gamificationFromContext(c).getActivityPage(userId, parsed.data.limit);
   return c.json(success({ items }));
 });
 
 pointsRoutes.get("/catalog", async (c) => {
-  return c.json(success(service(c.env as never).getCatalog()));
+  return c.json(success(gamificationFromContext(c).getCatalog()));
 });
 
 /** Public showcase of every active badge — surfaces on the /rewards
@@ -91,7 +82,7 @@ pointsRoutes.post("/session/ping", async (c) => {
   const userId = c.var.user.sub;
   const role = pickScoringRole(c.var.user.roles);
   if (!role) return c.json(success({ awarded: false, reason: "role_mismatch" }));
-  const out = await service(c.env as never).onDailySession({ userId, role });
+  const out = await gamificationFromContext(c).onDailySession({ userId, role });
   return c.json(success({
     awarded: out.status === "awarded",
     delta: out.status === "awarded" ? out.delta : 0,
@@ -115,7 +106,7 @@ pointsRoutes.post("/redeem", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
   }
 
-  const out = await service(c.env as never).redeem({
+  const out = await gamificationFromContext(c).redeem({
     userId,
     skuId: parsed.data.skuId,
     recipientName: parsed.data.recipientName,

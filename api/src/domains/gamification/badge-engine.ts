@@ -20,9 +20,6 @@ export interface BadgeEvaluationInput {
   /** The action that just earned (post-engine, so role + caps + gate
    *  have already filtered). */
   action: string;
-  /** Delta that was awarded; zero when the action was capped/gated
-   *  (still a signal that the user *did* the action). */
-  delta: number;
   /** Snapshot of the user's counters AFTER the engine bumped them. */
   counters: PointsCountersRow | null;
   /** Lifetime-earned action count for this specific action key. The

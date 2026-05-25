@@ -46,11 +46,15 @@ import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet"
 import DeleteProjectConfirm from "@/components/studio/shared/DeleteProjectConfirm";
 import {
   TEMPLATE_CATALOG,
-  TEMPLATE_CATEGORIES,
   type ContentTemplate,
-  type TemplateCategory,
   type TemplateDef,
 } from "@/components/studio/templates/catalog";
+import TemplateCatalogFilters, {
+  filterBuiltinTemplates,
+  type TemplateKindFilter,
+  type TemplateUseForFilter,
+} from "@/components/studio/templates/TemplateCatalogFilters";
+import { CategoryPill, FilterPillRow } from "@/components/studio/shared/FilterPills";
 import { slugToBuiltinId, studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import {
@@ -59,11 +63,7 @@ import {
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
 import { parseStudioSubject } from "@shared/studio-subject";
-import {
-  MEDIA_KINDS,
-  MEDIA_KIND_UI,
-  type MediaKind,
-} from "@shared/media-kinds";
+import { MEDIA_KIND_UI } from "@shared/media-kinds";
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
@@ -89,18 +89,11 @@ import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 const EDITOR_FORWARDED_PARAMS = ["capture", "contentTemplate"] as const;
 
 // The chooser carries TWO orthogonal filter axes per #906 / PRD §6.1:
+// Type (MediaKind) AND Use-for (TemplateCategory | created | purchased).
+// Both rows + the underlying predicate live in
+// `TemplateCatalogFilters` — DRY-shared with the New-project Wizard so
+// both surfaces always render the same pills against the same catalog.
 //
-//   - `kindFilter` (Type)    — MediaKind | "all". Reads `MEDIA_KINDS` so
-//                              adding a kind doesn't touch this file.
-//   - `useForFilter` (Use-for) — TemplateCategory | created | purchased | "all".
-//                                The pre-existing single-axis filter.
-//
-// The two axes AND together: picking `Podcast` + `Promote` shows podcast
-// templates in the promote bucket only. "All" on a row disables that
-// axis. Per the standing DRY rule, both rows render their pills from
-// the canonical registries — no parallel pill arrays here.
-type UseForFilter = "all" | TemplateCategory | "created" | "purchased";
-type KindFilter = "all" | MediaKind;
 // "My projects" visibility filter — projects only carry `isPublic: boolean`
 // today, so a third "unlisted" option would require backend work (see
 // `studio_projects.isPublic` schema in studio-service.ts). Keep this
@@ -133,9 +126,10 @@ export default function StudioLanding() {
   const [projects, setProjects] = useState<StudioProject[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  // Two orthogonal filter axes — see UseForFilter / KindFilter above.
-  const [useForFilter, setUseForFilter] = useState<UseForFilter>("all");
-  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+  // Two orthogonal filter axes — see TemplateCatalogFilters for the
+  // canonical types + pill rendering.
+  const [useForFilter, setUseForFilter] = useState<TemplateUseForFilter>("all");
+  const [kindFilter, setKindFilter] = useState<TemplateKindFilter>("all");
   // "My projects" grid visibility filter — independent from the
   // templates-section filters above (a published template isn't the
   // same as a public project).
@@ -349,16 +343,13 @@ export default function StudioLanding() {
     const showOwned = useForFilter === "all" || useForFilter === "created" || useForFilter === "purchased";
     const showBuiltins = useForFilter === "all" || (useForFilter !== "created" && useForFilter !== "purchased");
 
-    const q = query.trim().toLowerCase();
     const builtinRows: TemplateRow[] = showBuiltins
-      ? TEMPLATE_CATALOG.filter((t) => {
-          if (useForFilter !== "all" && t.category !== useForFilter) return false;
-          if (kindFilter !== "all" && t.mediaKind !== kindFilter) return false;
-          if (!q) return true;
-          return (
-            t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)
-          );
-        }).map((t) => ({ kind: "builtin" as const, template: t }))
+      ? filterBuiltinTemplates(
+          TEMPLATE_CATALOG,
+          kindFilter,
+          useForFilter,
+          query,
+        ).map((t) => ({ kind: "builtin" as const, template: t }))
       : [];
 
     const ownedRows: TemplateRow[] = showOwned
@@ -506,65 +497,16 @@ export default function StudioLanding() {
           </div>
         </div>
 
-        {/* Type axis — MediaKind. Reads MEDIA_KINDS so adding a kind
-            (#894 phases 4/5) doesn't touch this file. Self-hides
-            entirely when the only kind in the catalog is `video` — no
-            point showing a one-option filter row. */}
-        <FilterPillRow
-          label="Type"
-          render={() => (
-            <>
-              <CategoryPill
-                label="All"
-                active={kindFilter === "all"}
-                onClick={() => setKindFilter("all")}
-              />
-              {MEDIA_KINDS.map((kind) => (
-                <CategoryPill
-                  key={kind}
-                  label={MEDIA_KIND_UI[kind].badgeLabel}
-                  active={kindFilter === kind}
-                  onClick={() => setKindFilter(kind)}
-                />
-              ))}
-            </>
-          )}
-        />
-        {/* Use-for axis — the pre-existing category + created/purchased
-            row. AND'd with the Type axis above so picking Podcast +
-            Promote shows podcast templates in the promote bucket. */}
-        <FilterPillRow
-          label="Use for"
-          render={() => (
-            <>
-              <CategoryPill
-                label="All"
-                active={useForFilter === "all"}
-                onClick={() => setUseForFilter("all")}
-              />
-              {TEMPLATE_CATEGORIES.map((c) => (
-                <CategoryPill
-                  key={c.id}
-                  label={c.label}
-                  active={useForFilter === c.id}
-                  onClick={() => setUseForFilter(c.id)}
-                />
-              ))}
-              {/* Owned-template filters — same row as the built-in
-                  categories so the user has one consolidated filter
-                  surface for every template visible on /studio. */}
-              <CategoryPill
-                label="Created"
-                active={useForFilter === "created"}
-                onClick={() => setUseForFilter("created")}
-              />
-              <CategoryPill
-                label="Purchased"
-                active={useForFilter === "purchased"}
-                onClick={() => setUseForFilter("purchased")}
-              />
-            </>
-          )}
+        {/* Type + Use-for filter rows — shared with the New-project
+            Wizard via `<TemplateCatalogFilters>`. `includeOwnedPills`
+            adds the "Created" / "Purchased" pills the wizard hides
+            (the wizard only authors fresh built-in templates). */}
+        <TemplateCatalogFilters
+          kindFilter={kindFilter}
+          onKindFilterChange={setKindFilter}
+          useForFilter={useForFilter}
+          onUseForFilterChange={setUseForFilter}
+          includeOwnedPills
         />
 
         <UnifiedTemplateCarousel
@@ -594,28 +536,23 @@ export default function StudioLanding() {
         {/* Visibility axis — gates the grid below by `isPublic`. Reuses
             the templates-section FilterPillRow so the visual matches
             the Type / Use-for rows above. */}
-        <FilterPillRow
-          label="Visibility"
-          render={() => (
-            <>
-              <CategoryPill
-                label="All"
-                active={visibilityFilter === "all"}
-                onClick={() => setVisibilityFilter("all")}
-              />
-              <CategoryPill
-                label="Public"
-                active={visibilityFilter === "public"}
-                onClick={() => setVisibilityFilter("public")}
-              />
-              <CategoryPill
-                label="Private"
-                active={visibilityFilter === "private"}
-                onClick={() => setVisibilityFilter("private")}
-              />
-            </>
-          )}
-        />
+        <FilterPillRow label="Visibility">
+          <CategoryPill
+            label="All"
+            active={visibilityFilter === "all"}
+            onClick={() => setVisibilityFilter("all")}
+          />
+          <CategoryPill
+            label="Public"
+            active={visibilityFilter === "public"}
+            onClick={() => setVisibilityFilter("public")}
+          />
+          <CategoryPill
+            label="Private"
+            active={visibilityFilter === "private"}
+            onClick={() => setVisibilityFilter("private")}
+          />
+        </FilterPillRow>
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -903,55 +840,6 @@ function StudioVideoCard({
 }
 
 /**
- * Single-axis filter row with a left-rail label and a wrap of pills. ONE
- * component renders both the Type (#894 mediaKind) and Use-for axes so
- * a layout tweak (label position, spacing) lands in one place. Caller
- * supplies the pill JSX via `render` — keeps the row dumb to which axis
- * lives inside it.
- */
-function FilterPillRow({
-  label,
-  render,
-}: {
-  label: string;
-  render: () => ReactNode;
-}) {
-  return (
-    <div className="mb-2 flex flex-wrap items-center gap-2">
-      <span className="mr-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </span>
-      {render()}
-    </div>
-  );
-}
-
-function CategoryPill({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-sm transition",
-        active
-          ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-          : "border-border bg-card text-muted-foreground hover:border-brand-purple/40 hover:text-foreground",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-/**
  * Single carousel that renders the consolidated Templates section —
  * built-in catalog rows and user-owned rows live side-by-side in one
  * horizontal scroller, gated by the same filter pills above. Owned rows
@@ -970,8 +858,8 @@ function UnifiedTemplateCarousel({
 }: {
   rows: TemplateRow[];
   loading: boolean;
-  useForFilter: UseForFilter;
-  kindFilter: KindFilter;
+  useForFilter: TemplateUseForFilter;
+  kindFilter: TemplateKindFilter;
   onPickBuiltin: (id: string) => void;
   onPreviewBuiltin: (id: ContentTemplate) => void;
   onPickOwned: (template: StudioTemplate) => void;

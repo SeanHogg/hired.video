@@ -54,7 +54,8 @@ export type UgcKind =
   | "voiceClone"
   | "course"
   | "channel"
-  | "shareToken";
+  | "shareToken"
+  | "companyReviews";
 
 export type UgcSeoBuilder<R> = (record: R, pathname: string) => SEOData | null;
 
@@ -344,6 +345,38 @@ registerUgcSeo<CompanyRecord>("company", (company, pathname) => {
       website: company.data.contact?.website,
       logo: company.data.logo,
       address,
+      reviewCount: (company as any).reviewCount,
+      reviewAvgOverall: typeof (company as any).reviewAvgOverall === "string"
+        ? Number((company as any).reviewAvgOverall)
+        : (company as any).reviewAvgOverall,
+    }),
+    canonical: absUrl(pathname),
+  };
+});
+
+registerUgcSeo<CompanyRecord>("companyReviews", (company, pathname) => {
+  const count = (company as any).reviewCount ?? 0;
+  const rawAvg = (company as any).reviewAvgOverall;
+  const avg = typeof rawAvg === "string" ? Number(rawAvg) : rawAvg;
+  const ratingFragment =
+    typeof avg === "number" && count > 0 ? ` — ${avg.toFixed(1)}/5 from ${count} review${count === 1 ? "" : "s"}` : "";
+  const title = `${company.data.name} Reviews${ratingFragment} — hired.video`;
+  const description =
+    count > 0
+      ? `Read ${count} review${count === 1 ? "" : "s"} of ${company.data.name} from current and former employees on hired.video.`
+      : `Be the first to share what it's like to work at ${company.data.name}.`;
+  return {
+    title,
+    description,
+    ...mirrorOg(title, description),
+    ogImage: `/api/og/companies/${company.id}`,
+    structuredData: generateStructuredData.organization({
+      name: company.data.name,
+      description: company.data.description,
+      website: company.data.contact?.website,
+      logo: company.data.logo,
+      reviewCount: count,
+      reviewAvgOverall: avg,
     }),
     canonical: absUrl(pathname),
   };

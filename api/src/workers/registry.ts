@@ -1,4 +1,5 @@
 import { jobBodyCleanseWorker } from "./job-body-cleanse.js";
+import { recruiterAgentFollowupWorker } from "./recruiter-agent-followup.js";
 import type { WorkerDefinition } from "./types.js";
 
 // Registered batch workers. Adding a new one is dropping a definition
@@ -7,6 +8,7 @@ import type { WorkerDefinition } from "./types.js";
 // here, even workers that haven't run yet.
 export const workers: readonly WorkerDefinition[] = [
   jobBodyCleanseWorker,
+  recruiterAgentFollowupWorker,
 ];
 
 export function getWorker(name: string): WorkerDefinition | undefined {

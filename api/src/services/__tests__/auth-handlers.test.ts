@@ -88,13 +88,15 @@ function makeFakeDb(seed: {
   passwordResetTokens?: FakeToken[];
   emailVerificationTokens?: FakeToken[];
   twoFactorCodes?: Fake2fa[];
+  affiliateProfiles?: any[];
 } = {}) {
   const fake = buildFakeDb({
     users: (seed.users ?? []) as any,
     password_reset_tokens: (seed.passwordResetTokens ?? []) as any,
     email_verification_tokens: (seed.emailVerificationTokens ?? []) as any,
     two_factor_codes: (seed.twoFactorCodes ?? []) as any,
-    affiliate_profiles: [] as any,
+    affiliate_profiles: (seed.affiliateProfiles ?? []) as any,
+    affiliate_referrals: [] as any,
   });
   const state = fake.state as any;
   Object.defineProperty(state, "passwordResetTokens", {
@@ -108,6 +110,9 @@ function makeFakeDb(seed: {
   });
   Object.defineProperty(state, "affiliateProfiles", {
     get: () => state.affiliate_profiles,
+  });
+  Object.defineProperty(state, "affiliateReferrals", {
+    get: () => state.affiliate_referrals,
   });
   return { db: fake.db, state, calls: fake.calls };
 }
@@ -273,6 +278,165 @@ describe("handleRegister", () => {
     const deps = makeDeps();
     await handleRegister(deps, { email: "a@b.com", password: "password123", name: "A" });
     assert.equal(deps._state.affiliateProfiles.length, 0);
+  });
+
+  // ───────────────────────────────────────────────────────────────────
+  // Inbound referral attribution (#1194) — `?ref=CODE` resolves to an
+  // existing affiliate and writes an `affiliate_referrals` row so the
+  // conversion lookup in payment.ts can credit the affiliate later.
+  // Before the fix, the `referralCode` field was destructured nowhere
+  // and silently dropped — every campaign signup attributed to nobody.
+  // ───────────────────────────────────────────────────────────────────
+  it("inserts an affiliate_referrals row when registering with a valid referralCode (#1194)", async () => {
+    const deps = makeDeps();
+    deps._state.affiliateProfiles.push({
+      id: "aff-1",
+      userId: "owner-1",
+      referralCode: "JANE42",
+      status: "active",
+      commissionRate: "0.10",
+      specialtySectors: [],
+      totalEarned: "0",
+      totalPaid: "0",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await handleRegister(deps, {
+      email: "referred@example.com",
+      password: "password123",
+      name: "Referred User",
+      referralCode: "JANE42",
+    });
+
+    assert.equal(result.status, 201, "signup succeeds");
+    assert.equal(deps._state.affiliateReferrals.length, 1, "exactly one referral row written");
+    const ref = deps._state.affiliateReferrals[0];
+    assert.equal(ref.affiliateId, "aff-1", "referral linked to the right affiliate");
+    assert.equal(ref.referredUserId, deps._state.users[0].id, "referral linked to the new user");
+    assert.equal(ref.referralCode, "JANE42", "referral code stamped for audit");
+  });
+
+  it("does NOT crash or insert when referralCode does not match any affiliate", async () => {
+    const deps = makeDeps();
+    const result = await handleRegister(deps, {
+      email: "ghost@example.com",
+      password: "password123",
+      name: "Ghost",
+      referralCode: "NOSUCHCODE",
+    });
+    assert.equal(result.status, 201, "signup still succeeds on bad code (graceful)");
+    assert.equal(deps._state.affiliateReferrals.length, 0, "no referral row written for unknown code");
+  });
+
+  it("does NOT insert a referral row when referralCode is absent", async () => {
+    const deps = makeDeps();
+    await handleRegister(deps, {
+      email: "organic@example.com",
+      password: "password123",
+      name: "Organic",
+    });
+    assert.equal(deps._state.affiliateReferrals.length, 0);
+  });
+
+  it("ignores referralCode that points to a disabled affiliate profile", async () => {
+    const deps = makeDeps();
+    deps._state.affiliateProfiles.push({
+      id: "aff-d",
+      userId: "owner-d",
+      referralCode: "OFFAIR",
+      status: "disabled",
+      commissionRate: "0.10",
+      specialtySectors: [],
+      totalEarned: "0",
+      totalPaid: "0",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await handleRegister(deps, {
+      email: "via-disabled@example.com",
+      password: "password123",
+      name: "Via Disabled",
+      referralCode: "OFFAIR",
+    });
+
+    assert.equal(deps._state.affiliateReferrals.length, 0, "no row for disabled affiliate");
+  });
+
+  // ───────────────────────────────────────────────────────────────────
+  // Inbound UTM attribution (#1195) — utm_source / utm_medium /
+  // utm_campaign / utm_term / utm_content / landing_referrer are
+  // persisted on the `users` row so server-side LTV-by-campaign queries
+  // work without depending on GA.
+  // ───────────────────────────────────────────────────────────────────
+  it("persists UTM + landingReferrer fields on the user row (#1195)", async () => {
+    const deps = makeDeps();
+    await handleRegister(deps, {
+      email: "utm@example.com",
+      password: "password123",
+      name: "UTM User",
+      utmSource: "linkedin",
+      utmMedium: "social",
+      utmCampaign: "may-launch",
+      utmTerm: "ai-resume",
+      utmContent: "hero-cta",
+      landingReferrer: "https://www.linkedin.com/posts/123",
+    });
+    const u = deps._state.users[0];
+    assert.equal(u.utmSource, "linkedin");
+    assert.equal(u.utmMedium, "social");
+    assert.equal(u.utmCampaign, "may-launch");
+    assert.equal(u.utmTerm, "ai-resume");
+    assert.equal(u.utmContent, "hero-cta");
+    assert.equal(u.landingReferrer, "https://www.linkedin.com/posts/123");
+  });
+
+  it("leaves UTM columns null on organic signup (no attribution params)", async () => {
+    const deps = makeDeps();
+    await handleRegister(deps, {
+      email: "organic-utm@example.com",
+      password: "password123",
+      name: "Organic UTM",
+    });
+    const u = deps._state.users[0];
+    assert.equal(u.utmSource, null);
+    assert.equal(u.utmMedium, null);
+    assert.equal(u.utmCampaign, null);
+    assert.equal(u.utmTerm, null);
+    assert.equal(u.utmContent, null);
+    assert.equal(u.landingReferrer, null);
+  });
+
+  it("attribution + affiliate work together — referralCode + UTMs persist in the same signup", async () => {
+    const deps = makeDeps();
+    deps._state.affiliateProfiles.push({
+      id: "aff-x",
+      userId: "owner-x",
+      referralCode: "BLENDED",
+      status: "active",
+      commissionRate: "0.10",
+      specialtySectors: [],
+      totalEarned: "0",
+      totalPaid: "0",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await handleRegister(deps, {
+      email: "blended@example.com",
+      password: "password123",
+      name: "Blended",
+      referralCode: "BLENDED",
+      utmSource: "google",
+      utmMedium: "cpc",
+      utmCampaign: "spring-promo",
+    });
+
+    assert.equal(deps._state.affiliateReferrals.length, 1, "affiliate referral row written");
+    assert.equal(deps._state.affiliateReferrals[0].affiliateId, "aff-x");
+    assert.equal(deps._state.users[0].utmSource, "google");
+    assert.equal(deps._state.users[0].utmCampaign, "spring-promo");
   });
 
   it("registers a user for each supported role (job_seeker / recruiter / employer / admin)", async () => {

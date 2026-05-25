@@ -32,6 +32,8 @@ import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
 import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error-tracking";
 import { installPaidMediaPixels } from "@/lib/paid-media-pixels";
+import { readAttribution } from "@/lib/attribution";
+import { useAttributionCapture } from "@/lib/hooks/useAttributionCapture";
 
 // Critical components loaded immediately
 import AIChatPanel from "./components/AIChatPanel";
@@ -60,6 +62,7 @@ const BlogIndex = lazy(() => import("./pages/blog/BlogIndex"));
 const BlogPost = lazy(() => import("./pages/blog/BlogPost"));
 const PostAJob = lazy(() => import("./pages/PostAJob"));
 const SalaryPage = lazy(() => import("./pages/seo/SalaryPage"));
+const SalaryIndexPage = lazy(() => import("./pages/seo/SalaryIndexPage"));
 const ResumeGuidePage = lazy(() => import("./pages/seo/ResumeGuidePage"));
 const About = lazy(() => import("./pages/About"));
 const Careers = lazy(() => import("./pages/Careers"));
@@ -69,6 +72,7 @@ const Companies = lazy(() => import("./pages/Companies"));
 const CompanyCreatePage = lazy(() => import("./pages/CompanyCreatePage"));
 const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
 const CompanyEditPage = lazy(() => import("./pages/CompanyEditPage"));
+const CompanyReviewsPage = lazy(() => import("./pages/CompanyReviewsPage"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const Home = lazy(() => import("./pages/Home"));
 const ForRecruiters = lazy(() => import("./pages/ForRecruiters"));
@@ -464,33 +468,28 @@ function ReferralCapture() {
   return null;
 }
 
-// Fires a GTM page_view event on every SPA route change.
-// Also captures UTM parameters into sessionStorage so they survive navigation.
+// Fires a GTM page_view event on every SPA route change. Attribution
+// capture (first-touch `?ref=` + `utm_*` into a 30-day cookie) is
+// delegated to the shared `useAttributionCapture` hook — see
+// `lib/attribution.ts` for the single-source policy.
 function GTMPageTracker() {
   const location = useLocation();
+  useAttributionCapture();
 
   useEffect(() => {
     try {
-      // Capture UTM params on first hit
-      const params = new URLSearchParams(location.search);
-      const utmKeys = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
-      utmKeys.forEach((key) => {
-        const val = params.get(key);
-        if (val) sessionStorage.setItem(key, val);
-      });
-
-      // Push page_view to GTM dataLayer
+      const attr = readAttribution();
       const w = window as any;
       w.dataLayer = w.dataLayer || [];
       w.dataLayer.push({
         event: "page_view",
         page_path: location.pathname + location.search,
         page_title: document.title,
-        utm_source: sessionStorage.getItem("utm_source") || undefined,
-        utm_medium: sessionStorage.getItem("utm_medium") || undefined,
-        utm_campaign: sessionStorage.getItem("utm_campaign") || undefined,
-        utm_term: sessionStorage.getItem("utm_term") || undefined,
-        utm_content: sessionStorage.getItem("utm_content") || undefined,
+        utm_source: attr.utmSource,
+        utm_medium: attr.utmMedium,
+        utm_campaign: attr.utmCampaign,
+        utm_term: attr.utmTerm,
+        utm_content: attr.utmContent,
       });
     } catch {
       // no-op
@@ -548,14 +547,19 @@ const App = () => (
           <CartProvider>
             <AIProvider>
               <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <GlobalErrorHandler />
-                <GlobalAIUsageBanner />
-                <BadgeUnlockToaster />
-                <CookieConsentBanner />
-                <PWAUpdatePrompt />
                 <BrowserRouter>
+                  {/* Global chrome lives inside <BrowserRouter> so any
+                      surface that conditionally renders a <Link> /
+                      useNavigate (e.g. AIUsageLimitErrorBanner) has
+                      router context — mounting above caused a crash on
+                      the first AI_USAGE_LIMIT_REACHED event. */}
+                  <Toaster />
+                  <Sonner />
+                  <GlobalErrorHandler />
+                  <GlobalAIUsageBanner />
+                  <BadgeUnlockToaster />
+                  <CookieConsentBanner />
+                  <PWAUpdatePrompt />
                   <HeaderFiltersProvider>
                   <CommHubProvider>
 	                  <ReferralCapture />
@@ -645,7 +649,9 @@ const App = () => (
                       <Route path="/post-a-job" element={<PostAJob />} />
                       <Route path="/blog" element={<BlogIndex />} />
                       <Route path="/blog/:slug" element={<BlogPost />} />
+                      <Route path="/salary" element={<SalaryIndexPage />} />
                       <Route path="/salary/:jobSlug" element={<SalaryPage />} />
+                      <Route path="/salary/:jobSlug/:locationSlug" element={<SalaryPage />} />
                       <Route path="/resume-guide/:jobSlug" element={<ResumeGuidePage />} />
                       <Route
                         path="/resumes/create/:id"
@@ -697,6 +703,10 @@ const App = () => (
                       <Route
                         path="/companies/edit/:id"
                         element={<CompanyEditPage />}
+                      />
+                      <Route
+                        path="/companies/:slug/reviews"
+                        element={<CompanyReviewsPage />}
                       />
                       <Route
                         path="/companies/:id"

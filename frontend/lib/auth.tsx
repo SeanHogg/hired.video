@@ -5,6 +5,7 @@ import { authService, type UserProfile, type ProfileUpdate, type EmailVerificati
 import * as impersonationService from "./services/impersonation-service";
 import { apiClient, setEmulationTokenGetter } from "./api-client";
 import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
+import { attributionPayload } from "./attribution";
 
 // Role constants to avoid hardcoded strings
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
@@ -366,6 +367,14 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       // Filter out SuperAdmin from registration - it's internal only
       const registrationRole = role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN : role;
 
+      // Inbound attribution — read once at submit time from the shared
+      // first-touch store (cookie, 30-day TTL; populated by
+      // useAttributionCapture on every route). An explicit referralCode
+      // arg (e.g. user typed one in the form) wins over the captured
+      // value; UTMs always flow from the store since the form has no
+      // input for them.
+      const captured = attributionPayload();
+
       // Register returns a verification challenge; do not set any auth
       // state here. Errors propagate so the caller can show the actual
       // server reason (TURNSTILE_FAIL, BREACHED_PASSWORD, etc.) instead
@@ -377,7 +386,13 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         firstName,
         lastName,
         role: registrationRole,
-        referralCode,
+        referralCode: referralCode ?? captured.referralCode,
+        utmSource: captured.utmSource,
+        utmMedium: captured.utmMedium,
+        utmCampaign: captured.utmCampaign,
+        utmTerm: captured.utmTerm,
+        utmContent: captured.utmContent,
+        landingReferrer: captured.landingReferrer,
         enableAffiliate,
         cfTurnstileToken,
       });

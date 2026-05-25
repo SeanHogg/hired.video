@@ -49,6 +49,15 @@ export const RegisterRequestSchema = z.object({
   ]).optional(),
   referralCode: z.string().trim().min(1).max(64).optional(),
   enableAffiliate: z.boolean().optional(),
+  // Inbound campaign attribution — populated by `attributionPayload()`
+  // from the shared first-touch store (cookie). Backend caps at 128 chars
+  // per column; the frontend just forwards what was captured.
+  utmSource: z.string().max(128).optional(),
+  utmMedium: z.string().max(128).optional(),
+  utmCampaign: z.string().max(128).optional(),
+  utmTerm: z.string().max(128).optional(),
+  utmContent: z.string().max(128).optional(),
+  landingReferrer: z.string().max(2048).optional(),
   // Cloudflare Turnstile token from the signup widget. The form must
   // populate this before submit when VITE_TURNSTILE_SITE_KEY is set.
   cfTurnstileToken: z.string().optional(),

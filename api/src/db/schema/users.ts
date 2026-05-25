@@ -63,6 +63,16 @@ export const users = pgTable("users", {
   // login_events for the per-login history.
   signupIp: varchar("signup_ip", { length: 45 }),
   signupUserAgent: text("signup_user_agent"),
+  // Inbound campaign attribution snapshot — taken once at signup so
+  // server-side LTV-by-campaign queries don't depend on GA. Captured by
+  // GTMPageTracker into the attribution cookie on first hit (first-touch),
+  // then sent with the register payload. See migration 0116.
+  utmSource: varchar("utm_source", { length: 128 }),
+  utmMedium: varchar("utm_medium", { length: 128 }),
+  utmCampaign: varchar("utm_campaign", { length: 128 }),
+  utmTerm: varchar("utm_term", { length: 128 }),
+  utmContent: varchar("utm_content", { length: 128 }),
+  landingReferrer: text("landing_referrer"),
   // Stamped by deleteAccount() at user request. Distinct from
   // is_active=false (which also covers admin deactivation / suspension
   // recovery). The nightly purge sweep in services/user/account-purge.ts

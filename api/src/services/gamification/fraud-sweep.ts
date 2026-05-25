@@ -16,9 +16,16 @@
  */
 
 import { and, count, eq, gte, sql } from "drizzle-orm";
-import { schema } from "../../db/index.js";
+import { schema, type getDb } from "../../db/index.js";
 import type { Repos } from "../../repositories/index.js";
 import { evaluate as evaluateFraud } from "../../domains/gamification/fraud-engine.js";
+
+/** The DB handle exposed by `getDb()`. Drizzle's query-chain types are
+ *  not round-trip stable across minor versions, but the call-site
+ *  signature ("a Drizzle DB you can `.select()` from") is — typing the
+ *  parameter against `ReturnType<typeof getDb>` documents the contract
+ *  without the previous `unknown` + `as any` two-step. */
+type Db = ReturnType<typeof getDb>;
 
 export interface FraudSweepResult {
   scanned: number;
@@ -29,7 +36,7 @@ export interface FraudSweepResult {
 
 export async function runFraudSweep(
   repos: Repos,
-  db: unknown,
+  db: Db,
   opts: { now?: () => Date; userLimit?: number } = {},
 ): Promise<FraudSweepResult> {
   const now = opts.now ?? (() => new Date());
@@ -37,10 +44,7 @@ export async function runFraudSweep(
 
   // Pull users with any positive balance or any redemption since
   // yesterday — that's the universe at risk for the Phase-4 heuristics.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dbAny = db as any;
-
-  const candidateRows = await dbAny
+  const candidateRows = await db
     .select({ userId: schema.userPointsBalance.userId })
     .from(schema.userPointsBalance)
     .where(sql`${schema.userPointsBalance.balance} > 0 OR ${schema.userPointsBalance.lifetimeRedeemed} > 0`)
@@ -51,7 +55,7 @@ export async function runFraudSweep(
   for (const row of candidateRows as Array<{ userId: string }>) {
     result.scanned += 1;
     try {
-      const flags = await evaluateOne(repos, dbAny, row.userId, now());
+      const flags = await evaluateOne(repos, db, row.userId, now());
       if (flags.length > 0) {
         result.flagged += 1;
         for (const f of flags) {
@@ -84,8 +88,7 @@ export async function runFraudSweep(
 
 async function evaluateOne(
   repos: Repos,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any,
+  db: Db,
   userId: string,
   now: Date,
 ) {

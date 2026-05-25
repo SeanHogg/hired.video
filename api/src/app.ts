@@ -338,73 +338,73 @@ export function createApp() {
   const PUBLIC_RESUME_DETAIL_ROUTE =
     /^\/api\/resumes\/(?!public(?:$|\/)|embedded(?:$|\/)|getresumesownedbyauthuser(?:$|\/)|withownership(?:$|\/)|mastergroups(?:$|\/)|validateslug(?:$|\/)|save(?:$|\/)|parse(?:$|\/)|createfromfile(?:$|\/)|discover(?:$|\/)|tailor(?:$|\/)|embed(?:$|\/)|upload-file(?:$|\/)|track(?:$|\/)|clone(?:$|\/)|merge(?:$|\/)|stats(?:$|\/)|slug(?:$|\/))[^/]+\/?(?:$|\?)/;
 
-  app.use("/api/*", async (c, next) => {
-    const path = c.req.path;
-    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
-    if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
-    if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
-    if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return next();
-    if (POINTS_PUBLIC_ROUTE.test(path)) return next();
-    if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return next();
-    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path) || PUBLIC_RESUME_DETAIL_ROUTE.test(path))) {
-      return optionalAuthMiddleware(c as any, next);
+  // ─── Single source of truth: access mode per request ────────────────
+  // Replaces the three parallel exemption lists that previously sat in
+  // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
+  // Middleware. Adding a new public route is now one branch here instead
+  // of three duplicated `if (X.test(path))` lines.
+  //
+  // - "public"          → all three gates skip; no c.var.user attached
+  // - "optional-auth"   → auth attaches user IFF a JWT is present, but
+  //                       missing/invalid is not an error; downstream
+  //                       gates skip (handler enforces privacy)
+  // - "authenticated"   → auth required; downstream gates fire unless a
+  //                       per-gate carve-out applies (EMAIL_VERIFY_EXEMPT,
+  //                       PASSWORD_CHANGE_EXEMPT)
+  type AccessMode = "public" | "optional-auth" | "authenticated";
+
+  function resolveAccessMode(path: string, method: string): AccessMode {
+    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return "public";
+    if (INTERVIEW_PUBLIC_ROUTE.test(path)) return "public";
+    if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return "public";
+    if (POINTS_PUBLIC_ROUTE.test(path)) return "public";
+    if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
+
+    if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
+    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return "optional-auth";
+    if (
+      method === "GET" &&
+      (USER_PROFILE_ROUTE.test(path) ||
+        PUBLIC_LISTING_ROUTE.test(path) ||
+        ADS_CONFIG_ROUTE.test(path) ||
+        PUBLIC_RESUME_DETAIL_ROUTE.test(path))
+    ) {
+      return "optional-auth";
     }
+
+    return "authenticated";
+  }
+
+  // ── Auth layer ──────────────────────────────────────────────────────
+  app.use("/api/*", async (c, next) => {
+    const mode = resolveAccessMode(c.req.path, c.req.method);
+    if (mode === "public") return next();
+    if (mode === "optional-auth") return optionalAuthMiddleware(c as any, next);
     return authMiddleware(c as any, next);
   });
 
-  // Enforce email verification on all authenticated routes.
-  // Exemptions: auth (handles unverified flows), password management, and
-  // security settings (so users can still manage 2FA before verifying email).
-  const EMAIL_VERIFY_EXEMPT = ["/api/auth", "/api/passwordmanagement", "/api/settings/security"];
+  // ── Email-verify layer ──────────────────────────────────────────────
+  // Authenticated-but-unverified users can still hit auth routes
+  // (manage their verification status), password management (reset
+  // password via OTP), and security settings (set up 2FA before
+  // verifying email). All three are NOT in PUBLIC_PREFIXES because
+  // they need a JWT — they just shouldn't be gated on email status.
+  const EMAIL_VERIFY_EXEMPT = ["/api/passwordmanagement", "/api/settings/security"];
   app.use("/api/*", async (c, next) => {
-    const path = c.req.path;
-    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
-    if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
-    if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
-    if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return next();
-    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
-    // The OAuth start/callback for email integrations are top-level browser
-    // navigations that bypass authMiddleware above (identity rides on a
-    // `link_token` query JWT). emailVerifiedMiddleware would otherwise see
-    // no `c.var.user` and 403; the route handler does its own verified-state
-    // check + UX-friendly redirect to /verify-email.
-    if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return next();
-    // GET /api/resumes/:id is an optional-auth route — anonymous callers
-    // can see public resumes, owners can see their own private resumes.
-    // The handler (handleGetResume) enforces privacy itself, so this
-    // gate would only block legitimate anonymous reads. Without the
-    // exemption, `emailVerifiedMiddleware` rejects any request where
-    // `c.var.user` is undefined (anonymous) and any authed-but-unverified
-    // user, even when they're looking at their own resume. Both cases
-    // produced 403 EMAIL_NOT_VERIFIED in prod on 2026-04-20.
-    if (c.req.method === "GET" && (
-      USER_PROFILE_ROUTE.test(path) ||
-      PUBLIC_LISTING_ROUTE.test(path) ||
-      ADS_CONFIG_ROUTE.test(path) ||
-      PUBLIC_RESUME_DETAIL_ROUTE.test(path)
-    )) return next();
+    const mode = resolveAccessMode(c.req.path, c.req.method);
+    if (mode !== "authenticated") return next();
+    if (EMAIL_VERIFY_EXEMPT.some((p) => c.req.path.startsWith(p))) return next();
     return emailVerifiedMiddleware(c as any, next);
   });
 
-  // Block users who have mustChangePassword set from accessing anything except
-  // the auth routes and the force-change endpoint itself.
-  const PASSWORD_CHANGE_EXEMPT = ["/api/auth", "/api/passwordmanagement"];
+  // ── Password-change layer ───────────────────────────────────────────
+  // Users with mustChangePassword=true are funnelled through the
+  // password-management surface — same exemption rationale as above.
+  const PASSWORD_CHANGE_EXEMPT = ["/api/passwordmanagement"];
   app.use("/api/*", async (c, next) => {
-    const path = c.req.path;
-    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
-    if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
-    if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
-    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
-    // Same rationale as the email-verify gate just above: the public
-    // resume detail route is optional-auth so the gate must allow
-    // anonymous callers through and let the handler enforce privacy.
-    if (c.req.method === "GET" && (
-      USER_PROFILE_ROUTE.test(path) ||
-      PUBLIC_LISTING_ROUTE.test(path) ||
-      ADS_CONFIG_ROUTE.test(path) ||
-      PUBLIC_RESUME_DETAIL_ROUTE.test(path)
-    )) return next();
+    const mode = resolveAccessMode(c.req.path, c.req.method);
+    if (mode !== "authenticated") return next();
+    if (PASSWORD_CHANGE_EXEMPT.some((p) => c.req.path.startsWith(p))) return next();
     return passwordChangeMiddleware(c as any, next);
   });
 

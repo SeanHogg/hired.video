@@ -195,8 +195,10 @@ export class RedemptionEngine {
       planSlug,
       expiresAt,
       reason: `points_redemption:${sku.id}`,
-      grantedBy: row.userId, // self-granted via points redemption
-    } as never);
+      // Self-granted via points redemption — there's no superadmin in
+      // the loop, so the user is recorded as their own grantor.
+      grantedBy: row.userId,
+    });
 
     return await this.markFulfilled(row);
   }
@@ -345,7 +347,10 @@ export class RedemptionEngine {
       refType: "point_redemption",
       metadata: { reason: args.reason, cancelledBy: args.actorId },
     });
-    await this.deps.repos.points.applyBalanceDelta(row.userId, row.pointsCost, "adjust");
+    // Balance + ledger MUST share a category so lifetime counters line
+    // up — `applyBalanceDelta` bumps lifetimeReversed when category is
+    // "reverse", which matches the ledger row above.
+    await this.deps.repos.points.applyBalanceDelta(row.userId, row.pointsCost, "reverse");
     return this.deps.repos.points.updateRedemption(args.redemptionId, {
       status: "cancelled",
       failureReason: args.reason,
@@ -389,7 +394,9 @@ export class RedemptionEngine {
       refType: "point_redemption",
       metadata: { reason: err instanceof Error ? err.message : String(err) },
     });
-    await this.deps.repos.points.applyBalanceDelta(row.userId, sku.pointsCost, "adjust");
+    // Same category contract as cancel: keep balance + ledger in sync
+    // so lifetimeReversed reflects every reversal path.
+    await this.deps.repos.points.applyBalanceDelta(row.userId, sku.pointsCost, "reverse");
     await this.deps.repos.points.updateRedemption(row.id, {
       status: "failed",
       failureReason: err instanceof Error ? err.message : String(err),

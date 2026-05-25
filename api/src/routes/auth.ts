@@ -194,6 +194,20 @@ export const RegisterSchema = z.object({
   // user still holds one of the four roles above — affiliate status is
   // layered on top.
   enableAffiliate: z.boolean().optional(),
+  // Inbound referral attribution. The frontend captures `?ref=CODE` into
+  // a first-touch cookie and ships it here; `handleRegister` resolves it
+  // to an affiliate_profile and inserts an affiliate_referrals row.
+  // 64-char cap mirrors `affiliate_profiles.referral_code`.
+  referralCode: z.string().trim().min(1).max(64).optional(),
+  // Inbound campaign attribution — captured from `utm_*` querystring on
+  // first hit by useAttributionCapture, persisted onto the new user row.
+  // 128-char cap mirrors `users.utm_*` columns from migration 0116.
+  utmSource: z.string().trim().max(128).optional(),
+  utmMedium: z.string().trim().max(128).optional(),
+  utmCampaign: z.string().trim().max(128).optional(),
+  utmTerm: z.string().trim().max(128).optional(),
+  utmContent: z.string().trim().max(128).optional(),
+  landingReferrer: z.string().trim().max(2048).optional(),
   // Cloudflare Turnstile token from the signup widget. Optional at the
   // schema level so tests / dev don't have to set up Turnstile, but the
   // handler enforces presence + validity when TURNSTILE_SECRET_KEY is set.

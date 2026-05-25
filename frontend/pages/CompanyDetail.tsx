@@ -48,6 +48,7 @@ import { Progress } from "@/components/ui/progress";
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { ReviewsSection } from "@/components/reviews/ReviewsSection";
+import { ReviewRatingBadge } from "@/components/reviews/ReviewRatingBadge";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
@@ -308,6 +309,12 @@ export default function CompanyDetail() {
                                 </span>
                               </div>
                             )}
+                            <ReviewRatingBadge
+                              size="md"
+                              value={(company as any).reviewAvgOverall ?? null}
+                              count={(company as any).reviewCount ?? 0}
+                              href={`/companies/${(company as any).data?.slug ?? (company as any).data?.id ?? ""}/reviews`}
+                            />
                           </div>
                         </div>
 

@@ -18,14 +18,10 @@ import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { getDb } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
-import { GamificationService } from "../../domains/gamification/index.js";
+import { gamificationFromContext } from "../../domains/gamification/with-gamification.js";
 import { auditLog, AUDIT_ACTIONS } from "../../utils/audit.js";
 
 export const superadminPointsRoutes = new Hono<AppEnv>();
-
-function service(env: Record<string, string | undefined>) {
-  return new GamificationService(buildRepos(getDb()), { workerEnv: env });
-}
 
 function actorId(c: { var: { user: { sub: string } } }): string {
   return c.var.user.sub;
@@ -34,9 +30,8 @@ function actorId(c: { var: { user: { sub: string } } }): string {
 // ── Reads ──────────────────────────────────────────────────────────────
 
 superadminPointsRoutes.get("/", async (c) => {
-  const repos = buildRepos(getDb());
-  const game = new GamificationService(repos, { workerEnv: c.env as never });
-  const stats = await repos.points.globalStats();
+  const game = gamificationFromContext(c);
+  const stats = await buildRepos(getDb()).points.globalStats();
   return c.json(success({
     stats,
     catalog: game.getCatalog(),
@@ -56,7 +51,7 @@ superadminPointsRoutes.get("/top", async (c) => {
 superadminPointsRoutes.get("/user/:userId", async (c) => {
   const userId = c.req.param("userId");
   const repos = buildRepos(getDb());
-  const game = new GamificationService(repos, { workerEnv: c.env as never });
+  const game = gamificationFromContext(c);
   const [summary, fullActivity, flags] = await Promise.all([
     game.getUserSummary(userId),
     game.getActivityPage(userId, 200),
@@ -77,7 +72,7 @@ superadminPointsRoutes.post("/user/:userId/adjust", async (c) => {
   const parsed = AdjustBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const game = service(c.env as never);
+  const game = gamificationFromContext(c);
   const row = await game.adminAdjust({
     userId: targetId,
     delta: parsed.data.delta,
@@ -103,7 +98,7 @@ superadminPointsRoutes.post("/user/:userId/suspend", async (c) => {
   const parsed = SuspendBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const row = await service(c.env as never).adminSuspend(targetId, parsed.data.reason, actorId(c));
+  const row = await gamificationFromContext(c).adminSuspend(targetId, parsed.data.reason, actorId(c));
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_SUSPENDED,
     actorId: actorId(c),
@@ -116,7 +111,7 @@ superadminPointsRoutes.post("/user/:userId/suspend", async (c) => {
 
 superadminPointsRoutes.post("/user/:userId/reinstate", async (c) => {
   const targetId = c.req.param("userId");
-  const row = await service(c.env as never).adminReinstate(targetId, actorId(c));
+  const row = await gamificationFromContext(c).adminReinstate(targetId, actorId(c));
   await auditLog({
     action: AUDIT_ACTIONS.POINTS_REINSTATED,
     actorId: actorId(c),
@@ -149,7 +144,7 @@ superadminPointsRoutes.post("/fraud/:flagId/resolve", async (c) => {
   const parsed = ResolveBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const flag = await service(c.env as never).resolveFraudFlag({
+  const flag = await gamificationFromContext(c).resolveFraudFlag({
     flagId,
     decision: parsed.data.decision,
     reviewerId: actorId(c),
@@ -204,7 +199,7 @@ superadminPointsRoutes.post("/redemptions/:id/approve", async (c) => {
   const parsed = ApproveBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const row = await service(c.env as never).approveRedemption({
+  const row = await gamificationFromContext(c).approveRedemption({
     redemptionId: id,
     approverId: actorId(c),
     recipientName: parsed.data.recipientName,
@@ -228,7 +223,7 @@ superadminPointsRoutes.post("/redemptions/:id/cancel", async (c) => {
   const parsed = CancelBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const row = await service(c.env as never).cancelRedemption({
+  const row = await gamificationFromContext(c).cancelRedemption({
     redemptionId: id,
     reason: parsed.data.reason,
     actorId: actorId(c),
@@ -255,7 +250,7 @@ superadminPointsRoutes.post("/user/:userId/w9", async (c) => {
   const parsed = W9Body.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
 
-  const row = await service(c.env as never).markW9Collected({
+  const row = await gamificationFromContext(c).markW9Collected({
     userId: targetId,
     ...parsed.data,
   });
