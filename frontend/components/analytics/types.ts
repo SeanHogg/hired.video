@@ -67,11 +67,27 @@ export interface ArtifactMetrics {
 
 /** Kind label drives the "X viewers" copy and the duration unit shown
  *  in the empty/heatmap states. Optional metadata — the panel renders
- *  fine without it. */
+ *  fine without it.
+ *
+ *  Mirrors `ArtifactKind` from `@shared/artifact-views` for the kinds
+ *  that produce distinct copy. Kinds without distinct labelling fall
+ *  through to "channel" via `metricsPanelKind()` in the dashboard. */
 export type ArtifactKind =
+  // Time-based studio playback — read/watch time + percent-watched copy.
   | "video"
+  | "podcast"
+  | "voice"
+  | "animation"
+  // Static studio rasters / interactive — percent-viewed copy.
+  | "image"
+  | "comic"
+  | "game"
+  | "cad"
+  // Non-studio scrollable text — "read time" copy.
   | "resume"
   | "article"
+  // Non-studio static records — no time label.
   | "job"
   | "profile"
+  // Fallback bucket for company / studio_template / service.
   | "channel";

@@ -151,12 +151,13 @@ describe("seedTemplate", () => {
         // At least one state-shaped field must be populated; which one
         // depends on the kind. Asserting the OR-shape catches "switch
         // returned bare { name }" regressions.
-        const r = result as typeof result & { animationState?: unknown };
+        const r = result as typeof result & { animationState?: unknown; cadState?: unknown };
         const hasSomePayload =
           result.timelineSpec !== undefined ||
           result.gameState !== undefined ||
           result.imageState !== undefined ||
-          r.animationState !== undefined;
+          r.animationState !== undefined ||
+          r.cadState !== undefined;
         expect(hasSomePayload).toBe(true);
       });
     }

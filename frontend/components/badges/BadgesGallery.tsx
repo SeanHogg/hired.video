@@ -42,6 +42,10 @@ export interface BadgesGalleryProps {
   /** Wrap output in a `<Card>` — default true. Pass false when the
    *  caller already supplies its own card chrome. */
   card?: boolean;
+  /** Marketing / incentive view: render every badge in full color (no
+   *  earn-state dim), show "+X pts" + "Repeatable" pills, hide the
+   *  "earned N/total" header counter. Used on /rewards. */
+  showcaseMode?: boolean;
 }
 
 function formatEarned(at: string | Date): string {
@@ -54,6 +58,7 @@ export function BadgesGallery({
   earnedOnly = false,
   title = "Badges",
   card = true,
+  showcaseMode = false,
 }: BadgesGalleryProps) {
   const visible = useMemo(
     () => (earnedOnly ? badges.filter((b) => b.earned) : badges),
@@ -65,9 +70,11 @@ export function BadgesGallery({
       {title && (
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Trophy className="h-4 w-4" /> {title}
-          <span className="text-xs font-normal text-muted-foreground ml-auto">
-            {badges.filter((b) => b.earned).length} / {badges.length} earned
-          </span>
+          {!showcaseMode && (
+            <span className="text-xs font-normal text-muted-foreground ml-auto">
+              {badges.filter((b) => b.earned).length} / {badges.length} earned
+            </span>
+          )}
         </h2>
       )}
       {visible.length === 0 ? (
@@ -77,7 +84,7 @@ export function BadgesGallery({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {visible.map((b) => (
-            <BadgeCard key={b.id} badge={b} />
+            <BadgeCard key={b.id} badge={b} showcaseMode={showcaseMode} />
           ))}
         </div>
       )}
@@ -87,28 +94,40 @@ export function BadgesGallery({
   return card ? <Card className="p-5">{body}</Card> : body;
 }
 
-function BadgeCard({ badge }: { badge: BadgeGalleryItem }) {
+function BadgeCard({
+  badge,
+  showcaseMode,
+}: {
+  badge: BadgeGalleryItem;
+  showcaseMode: boolean;
+}) {
   const shouldShowHistory = badge.isRepeatable && badge.earnCount > 1;
+  const renderEarned = showcaseMode ? true : badge.earned;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div
             className={`p-3 rounded-lg border ${
-              badge.earned ? "border-primary/30 bg-primary/5" : "border-border opacity-60"
+              renderEarned ? "border-primary/30 bg-primary/5" : "border-border opacity-60"
             } flex flex-col items-center gap-2 text-center cursor-default`}
           >
             <BadgeIcon
               iconKey={badge.iconKey}
               tier={badge.tier}
-              earned={badge.earned}
+              earned={renderEarned}
               size="md"
             />
             <div className="font-medium text-sm leading-tight">{badge.name}</div>
             <div className="text-[11px] text-muted-foreground leading-tight">
               {badge.description}
             </div>
-            {badge.earned && badge.earnedAt && (
+            {showcaseMode && badge.isRepeatable && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                Repeatable
+              </span>
+            )}
+            {!showcaseMode && badge.earned && badge.earnedAt && (
               <div className="text-[10px] text-muted-foreground mt-1">
                 {badge.isRepeatable && badge.earnCount > 0
                   ? `× ${badge.earnCount} · latest ${formatEarned(badge.earnedAt)}`

@@ -224,6 +224,7 @@ const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
 const AdminAccountAnalytics = lazy(() => import("./pages/admin/AccountAnalytics"));
 const PointsPage = lazy(() => import("./pages/Points"));
 const AdminPoints = lazy(() => import("./pages/admin/Points"));
+const RewardsPage = lazy(() => import("./pages/Rewards"));
 import AdminLayout from "./components/admin/AdminLayout";
 
 // Loading component
@@ -588,6 +589,7 @@ const App = () => (
                       <Route path="/profile" element={<ProfileRedirect />} />
                       <Route path="/dashboard" element={<Home />} />
                       <Route path="/points" element={<PointsPage />} />
+                      <Route path="/rewards" element={<RewardsPage />} />
                       <Route path="/home" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/feed" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />

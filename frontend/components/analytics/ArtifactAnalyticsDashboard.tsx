@@ -26,12 +26,21 @@ interface Props {
 }
 
 /** Map the polymorphic kind onto the <MetricsPanel> kind enum. Both
- *  share the same string surface for the common kinds; the union here
- *  exists so a future kind that doesn't have a MetricsPanel branch
- *  falls back to a sane default ("channel") rather than runtime-erroring. */
+ *  share the same string surface for the studio + scroll-text kinds;
+ *  company / studio_template / service collapse to "channel" so the
+ *  panel uses generic copy. The exhaustive switch is load-bearing —
+ *  adding a kind to ARTIFACT_KINDS without a branch here is a compile
+ *  error rather than a silent runtime fallback. */
 function metricsPanelKind(kind: ArtifactKindKey): ArtifactKind {
   switch (kind) {
     case "video":
+    case "podcast":
+    case "voice":
+    case "animation":
+    case "image":
+    case "comic":
+    case "game":
+    case "cad":
     case "resume":
     case "article":
     case "job":

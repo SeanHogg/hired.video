@@ -379,6 +379,17 @@ export interface AudioClip {
   /** Per-clip gain 0–1 (defaults to 1). Multiplied by the music-lane
    *  gain from `AudioMixConfig` at playback / render time. */
   volume?: number;
+  /** Fade-in duration in seconds. The scheduler ramps gain from 0 to
+   *  `volume` over this window from `startSec`. Default 0 (#567). */
+  fadeInSec?: number;
+  /** Fade-out duration in seconds. The scheduler ramps gain from
+   *  `volume` to 0 over the last `fadeOutSec` of the clip ending at
+   *  `endSec`. Default 0 (#567). */
+  fadeOutSec?: number;
+  /** Trim — start playback this many seconds INTO the source file.
+   *  Default 0 (play from the beginning). Used by drag-to-trim on
+   *  the timeline bar's left edge (#567). */
+  trimStartSec?: number;
 }
 
 /**

@@ -167,6 +167,7 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
                     >
                       <VideoAnalyticsDashboard
                         projectId={project.id}
+                        mediaKind={project.mediaKind ?? "video"}
                         videoDurationSec={project.script?.video?.duration}
                       />
                     </Suspense>

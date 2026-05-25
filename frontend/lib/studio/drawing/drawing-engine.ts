@@ -211,9 +211,14 @@ export function compositeLayers(
     const layerCanvas = layerCanvases.get(layer.id);
     if (!layerCanvas) continue;
     dest.globalAlpha = layer.opacity;
-    // MVP only supports `normal` blend — the field is on ImageLayer so
-    // a future picker can flip it without state-shape migration.
-    dest.globalCompositeOperation = "source-over";
+    // Per-layer blend mode (#940 — Image Phase 2). The Canvas-2D
+    // `globalCompositeOperation` enum natively supports every blend
+    // mode declared on `ImageLayer.blendMode`, so the mapping is a
+    // straight pass-through except for "normal" which Canvas spells
+    // as "source-over". Falls back to "source-over" for unknown
+    // values so a future blend-mode addition doesn't crash the
+    // compositor before its enum entry lands here.
+    dest.globalCompositeOperation = canvasBlendOperation(layer.blendMode);
     const offsetX = layer.transformOffset?.x ?? 0;
     const offsetY = layer.transformOffset?.y ?? 0;
     const scaleX = layer.transformScale?.x ?? 1;
@@ -633,4 +638,32 @@ export function serializeLayer(canvas: HTMLCanvasElement): string | null {
   }
   if (!hasContent) return null;
   return canvas.toDataURL("image/png");
+}
+
+/** Map an `ImageLayer.blendMode` value to a Canvas-2D
+ *  `globalCompositeOperation`. Every mode declared on `ImageLayer`
+ *  (per `shared/image-state.ts`) maps 1:1 to a native Canvas2D
+ *  operation; the only rename is `normal` → `source-over` (the spec
+ *  default).
+ *
+ *  Single SoT — both the live editor compositor (`compositeLayers`
+ *  above) and any future export path (flatten-to-PNG, PSD writer)
+ *  call through this so a layer's blend mode renders identically
+ *  everywhere. Closes #940's blend-mode half. */
+export function canvasBlendOperation(blendMode: string): GlobalCompositeOperation {
+  switch (blendMode) {
+    case "normal":      return "source-over";
+    case "multiply":    return "multiply";
+    case "screen":      return "screen";
+    case "overlay":     return "overlay";
+    case "darken":      return "darken";
+    case "lighten":     return "lighten";
+    case "color-dodge": return "color-dodge";
+    case "color-burn":  return "color-burn";
+    case "soft-light":  return "soft-light";
+    case "hard-light":  return "hard-light";
+    case "difference":  return "difference";
+    case "exclusion":   return "exclusion";
+    default:            return "source-over";
+  }
 }

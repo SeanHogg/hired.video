@@ -34,6 +34,8 @@ import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import { MediaIconPicker } from "@/components/shared/MediaPicker";
 import { X } from "lucide-react";
 import { ArtifactAnalyticsDashboard } from "@/components/analytics";
+import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
+import { campaignShareUrlFor } from "@/lib/campaigns/bake-utm";
 
 const EngagementToolset = lazy(
   () => import("@/components/studio/shared/EngagementToolset"),
@@ -55,11 +57,19 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const AUTOSAVE_DELAY_MS = 700;
 
-/** Metrics are gated on "this video can be viewed by a third party",
+/** Metrics are gated on "this artifact can be viewed by a third party",
  *  which after the unified-player change (#665) means saved AND public —
- *  no webm render required. */
-function isPublicVideo(project: StudioProject | null): boolean {
+ *  no webm render required. Kind-agnostic: applies to every studio
+ *  MediaKind (video, podcast, voice, animation, game, comic, image). */
+function isPublicArtifact(project: StudioProject | null): boolean {
   return Boolean(project?.isPublic);
+}
+
+/** Resolve the effective mediaKind for analytics + copy. Defaults to
+ *  `video` because every pre-#894 row in `studio_projects` was a video
+ *  before the column was added (per the zod schema default). */
+function effectiveMediaKind(project: StudioProject): MediaKind {
+  return (project.mediaKind ?? "video") as MediaKind;
 }
 
 export default function ProjectDetailsSheet({
@@ -257,7 +267,9 @@ export default function ProjectDetailsSheet({
   }
 
   if (!project) return null;
-  const playable = isPublicVideo(project);
+  const playable = isPublicArtifact(project);
+  const mediaKind = effectiveMediaKind(project);
+  const kindLabel = MEDIA_KIND_UI[mediaKind].badgeLabel.toLowerCase();
 
   const sections: EntityDetailsSection[] = [
     {
@@ -266,10 +278,10 @@ export default function ProjectDetailsSheet({
       icon: BarChart3,
       render: () =>
         playable ? (
-          <ArtifactAnalyticsDashboard kind="video" artifactId={project.id} />
+          <ArtifactAnalyticsDashboard kind={mediaKind} artifactId={project.id} />
         ) : (
           <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
-            Make this video public to start collecting metrics — the
+            Make this {kindLabel} public to start collecting metrics — the
             unified player serves it without a render step.
           </p>
         ),
@@ -511,24 +523,15 @@ function CampaignSection({
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             In these campaigns
           </Label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-1.5">
             {memberOf.map((c) => (
-              <Badge key={c.id} className="gap-1 pr-1" variant="secondary">
-                <span className="truncate max-w-[12rem]">{c.name}</span>
-                <button
-                  type="button"
-                  onClick={() => onToggleMembership(c, false)}
-                  disabled={campaignSaving === c.id}
-                  className="rounded-full p-0.5 hover:bg-muted-foreground/20 disabled:opacity-50"
-                  aria-label={`Remove from ${c.name}`}
-                >
-                  {campaignSaving === c.id ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <X className="h-3 w-3" />
-                  )}
-                </button>
-              </Badge>
+              <CampaignMembershipRow
+                key={c.id}
+                campaign={c}
+                projectId={project.id}
+                saving={campaignSaving === c.id}
+                onRemove={() => onToggleMembership(c, false)}
+              />
             ))}
           </div>
         </div>
@@ -621,6 +624,94 @@ function CampaignSection({
           Adds this project to the new campaign right away. Manage budget,
           UTM params, and stats in the Outreach &gt; Campaigns tab.
         </p>
+      </div>
+    </div>
+  );
+}
+
+/** One row inside the "In these campaigns" list. Self-contained so the
+ *  CampaignSection body stays flat: each row owns its remove button +
+ *  its "Copy share URL with UTM" affordance. The Copy button self-gates
+ *  on whether the campaign has any UTM fields set (returns null when not
+ *  entitled) per the standing DRY rule. */
+function CampaignMembershipRow({
+  campaign,
+  projectId,
+  saving,
+  onRemove,
+}: {
+  campaign: VideoCampaign;
+  projectId: string;
+  saving: boolean;
+  onRemove: () => void;
+}) {
+  const { toast } = useToast();
+  const hasAnyUtm = Boolean(
+    campaign.utmSource || campaign.utmMedium || campaign.utmCampaign,
+  );
+  const utmHint = [
+    campaign.utmSource && `source=${campaign.utmSource}`,
+    campaign.utmMedium && `medium=${campaign.utmMedium}`,
+    campaign.utmCampaign && `campaign=${campaign.utmCampaign}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  async function copyShareUrl() {
+    const url = campaignShareUrlFor(projectId, campaign);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: "Share URL copied",
+        description: hasAnyUtm ? utmHint : "No UTM tags — base URL only.",
+      });
+    } catch {
+      toast({
+        title: "Couldn't copy",
+        description: url,
+        variant: "destructive",
+      });
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{campaign.name}</p>
+        {hasAnyUtm && (
+          <p className="truncate text-xs text-muted-foreground">{utmHint}</p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={copyShareUrl}
+          className="h-7 text-xs"
+          title={
+            hasAnyUtm
+              ? "Copy share URL with UTM tags baked in"
+              : "Copy share URL (no UTM tags configured on this campaign)"
+          }
+        >
+          Copy URL
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={onRemove}
+          disabled={saving}
+          className="h-7 w-7 p-0"
+          aria-label={`Remove from ${campaign.name}`}
+        >
+          {saving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <X className="h-3.5 w-3.5" />
+          )}
+        </Button>
       </div>
     </div>
   );

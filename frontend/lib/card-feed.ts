@@ -52,6 +52,19 @@ export interface CardFeedOptions {
   sort?: CardFeedSort;
   search?: string;
   location?: string;
+  /**
+   * Structured geo filter — see shared/content-locations.ts.
+   * Wired into per-domain fetchers that support content_locations
+   * (jobs today; articles/videos/services to follow in #1144). Fetchers
+   * that don't yet honor it ignore these fields silently.
+   */
+  geo?: {
+    countryId?: number;
+    stateId?: string;
+    cityId?: string;
+    radiusKm?: number;
+    remote?: boolean;
+  };
 }
 
 export interface CardFeedResponse {
@@ -141,9 +154,21 @@ async function fetchResumes(limit: number, page: number): Promise<TypedFetchResu
   }
 }
 
-async function fetchJobs(limit: number, page: number): Promise<TypedFetchResult> {
+async function fetchJobs(
+  limit: number,
+  page: number,
+  geo?: CardFeedOptions["geo"],
+): Promise<TypedFetchResult> {
   try {
-    const result = await jobService.getPublicJobs({ page, limit });
+    const result = await jobService.getPublicJobs({
+      page,
+      limit,
+      countryId: geo?.countryId,
+      stateId: geo?.stateId,
+      cityId: geo?.cityId,
+      radiusKm: geo?.radiusKm,
+      isRemote: geo?.remote,
+    });
     const items = (result.items ?? []).map((j: any) => {
       const item: RawApiItem = {
         ...j,
@@ -454,11 +479,12 @@ export async function fetchCardFeed(
     limitPerType = 8,
     page = 1,
     sort = "recent",
+    geo,
   } = options;
 
   const tasks: Promise<TypedFetchResult>[] = [];
   if (types.includes("resume")) tasks.push(fetchResumes(limitPerType, page));
-  if (types.includes("job")) tasks.push(fetchJobs(limitPerType, page));
+  if (types.includes("job")) tasks.push(fetchJobs(limitPerType, page, geo));
   if (types.includes("company")) tasks.push(fetchCompanies(limitPerType, page));
   if (types.includes("people")) tasks.push(fetchPeople(limitPerType, page));
   if (types.includes("video")) tasks.push(fetchVideos(limitPerType, page));

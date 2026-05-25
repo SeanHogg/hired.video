@@ -305,6 +305,11 @@ export function createApp() {
   // Public interview session share links — no auth required.
   const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;
 
+  // Public gamification catalog + badge showcase — surfaces on the
+  // /rewards article so anonymous visitors can see what they could
+  // earn. Per-user reads (/me, /activity, /redemptions) stay private.
+  const POINTS_PUBLIC_ROUTE = /^\/api\/points\/(?:catalog|badges)(?:$|\?)/;
+
   // Public invite preview for async-interview magic links — candidate
   // visits /interview/:token before they've logged in / signed up.
   // /claim/:token still requires auth.
@@ -334,6 +339,7 @@ export function createApp() {
     if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
     if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return next();
+    if (POINTS_PUBLIC_ROUTE.test(path)) return next();
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path) || PUBLIC_RESUME_DETAIL_ROUTE.test(path))) {

@@ -62,7 +62,12 @@ export const videoAnalytics = pgTable(
     id:        uuid("id").primaryKey().defaultRandom(),
     studioProjectId: uuid("studio_project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
     userId:    text("user_id"),           // null = anonymous viewer
-    event:     text("event").notNull(),   // "view" | "cta_click" | "share"
+    // Event taxonomy. `impression` is for paid-media style counts
+    // posted by off-platform ad networks (Google Display Network, Meta
+    // Ads, etc.) — one row per ad-network-reported impression, distinct
+    // from in-platform `view` events. See `VideoAnalyticsEvent` type in
+    // `frontend/lib/analytics/event-types.ts` for the SSoT enum.
+    event:     text("event").notNull(),   // "view" | "impression" | "cta_click" | "share"
     referrer:  text("referrer"),
     campaignId: text("campaign_id"),
     metadata:  jsonb("metadata"),

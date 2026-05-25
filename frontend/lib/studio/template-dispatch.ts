@@ -34,6 +34,7 @@ import { canvasStateToTimeline } from "./editor-v2/timeline-emit";
 import { seedGameFromTemplate } from "./game/game-seeds";
 import { seedImageFromTemplate } from "./image/image-seeds";
 import { seedAnimationFromTemplate } from "./animation/animation-seeds";
+import { createBlankCadState, type CadState } from "@shared/cad-state";
 import type { GameState } from "@shared/game-state";
 import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
@@ -55,7 +56,10 @@ export interface TemplateSeedPayload {
   /** Animation state JSON for `mediaKind: "animation"` (#1003). Undefined
    *  for other kinds. */
   animationState?: AnimationState;
-  // Future: cadState?, sceneState?, …
+  /** CAD state JSON for `mediaKind: "cad"` (#930). Undefined for
+   *  other kinds. */
+  cadState?: CadState;
+  // Future: sceneState?, …
 }
 
 /**
@@ -76,6 +80,10 @@ export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
       // `animation/animation-seeds.ts`. No timelineSpec emitted —
       // export goes through the GIF/APNG/WebP encoder strategies.
       return { name, animationState: seedAnimationFromTemplate(template.id) };
+    case "cad":
+      // CAD mediaKind (#930) — 2D vector drafting. No template seed
+      // registry yet; every CAD project lands as a blank drawing.
+      return { name, cadState: createBlankCadState() };
     case "video":
     case "podcast":
     case "voice":

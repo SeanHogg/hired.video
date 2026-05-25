@@ -480,6 +480,25 @@ export interface VoiceoverClip {
   gain?: number;
   /** Per-clip mute. Optional — preview / render treat absence as false. */
   muted?: boolean;
+  /** Manual start-offset in seconds, added to the anchor scene's start
+   *  (or composition 0 when no anchor). Lets the user nudge a
+   *  voiceover earlier / later than the scene boundary without
+   *  re-anchoring. Default 0 — pre-#567 rows keep current behavior. */
+  startOffsetSec?: number;
+  /** Fade-in duration in seconds (0..clip-duration). The scheduler
+   *  ramps gain from 0 → effective over this window. Default 0. */
+  fadeInSec?: number;
+  /** Fade-out duration in seconds. Scheduler ramps gain from effective
+   *  → 0 over the final `fadeOutSec` of the clip. Default 0. */
+  fadeOutSec?: number;
+  /** Manual trim — start playback this many seconds INTO the source
+   *  file. Default 0 (play from the beginning). Used by drag-to-trim
+   *  on the timeline bar's left edge. */
+  trimStartSec?: number;
+  /** Manual trim — end playback this many seconds BEFORE the end of
+   *  the source file. Default 0 (play to the end). Used by drag-to-
+   *  trim on the timeline bar's right edge. */
+  trimEndSec?: number;
 }
 
 /** Canvas-level audio mix state — master gain + per-lane gain / mute.

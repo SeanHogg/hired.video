@@ -468,6 +468,39 @@ ogRoutes.get("/r/:id/meta", async (c) => {
   });
 });
 
+// ─── GET /blog ────────────────────────────────────────────────────────────────
+// Social card for a blog post. Driven by query params because blog posts
+// live in the front-end registry (frontend/data/blog-posts.ts), not the
+// database — the page passes its own title/category/date through. The
+// resulting URL is stable for a given post (title + category rarely
+// change) so the response is edge-cached for a day.
+ogRoutes.get("/blog", async (c) => {
+  const title = truncate(c.req.query("title") || "hired.video Blog", 60);
+  const category = truncate(c.req.query("category") || "", 40);
+  const date = truncate(c.req.query("date") || "", 30);
+  const author = truncate(c.req.query("author") || "Sean Hogg", 30);
+
+  const dateLine = [category, date].filter(Boolean).join(" · ");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1080" height="510" rx="24" fill="rgba(255,255,255,0.06)"/>
+  <text x="100" y="170" font-family="system-ui,sans-serif" font-size="24" fill="rgba(255,255,255,0.6)">hired.video Blog</text>
+  <text x="100" y="270" font-family="system-ui,sans-serif" font-size="56" font-weight="700" fill="white">${escapeXml(title)}</text>
+  ${dateLine ? `<text x="100" y="340" font-family="system-ui,sans-serif" font-size="26" fill="rgba(255,255,255,0.7)">${escapeXml(dateLine)}</text>` : ""}
+  <text x="100" y="540" font-family="system-ui,sans-serif" font-size="24" fill="rgba(255,255,255,0.65)">by ${escapeXml(author)}</text>
+  <text x="100" y="580" font-family="system-ui,sans-serif" font-size="20" fill="rgba(255,255,255,0.5)">hired.video/blog</text>
+</svg>`;
+
+  return svgResponse(svg, true);
+});
+
 function genericCard(line1: string, line2: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
     <defs>

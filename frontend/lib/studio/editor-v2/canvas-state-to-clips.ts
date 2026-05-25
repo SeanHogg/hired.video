@@ -105,14 +105,29 @@ function voiceoverClipFor(
 ): AudioClip | null {
   if (!vo.url) return null;
   if (vo.muted) return null;
-  const start = sceneStart(scenes, vo.anchorSceneId);
+  // Anchor + manual offset compose: the editor's UI lets the user
+  // drag the clip relative to the scene boundary without re-anchoring.
+  // Trim from the source's tail shortens the played duration; the
+  // scheduler reads `endSec` as the cutoff.
+  const anchorStart = sceneStart(scenes, vo.anchorSceneId);
+  const offset = vo.startOffsetSec ?? 0;
+  const trimStart = Math.max(0, vo.trimStartSec ?? 0);
+  const trimEnd = Math.max(0, vo.trimEndSec ?? 0);
+  const start = anchorStart + offset;
+  // Effective playable length after both-end trims. Clamp to a
+  // minimum of 50ms so a fully-trimmed clip doesn't crash the
+  // scheduler's interval math.
+  const playableSec = Math.max(0.05, vo.durationSeconds - trimStart - trimEnd);
   return {
     id: vo.id,
     track: vo.url,
     label: vo.label,
     startSec: start,
-    endSec: start + vo.durationSeconds,
+    endSec: start + playableSec,
     volume: effectiveGain(vo.gain, "voiceover", mix),
+    fadeInSec: vo.fadeInSec,
+    fadeOutSec: vo.fadeOutSec,
+    trimStartSec: trimStart,
   };
 }
 

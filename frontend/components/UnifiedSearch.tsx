@@ -47,6 +47,12 @@ import {
 import { resumeService } from "@/lib/services/resume-service";
 import { cn } from "@/lib/utils";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
+import {
+  LocationFilter,
+  locationFilterFromQuery,
+  applyLocationFilterToQuery,
+} from "@/components/location/LocationFilter";
+import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 
 interface UnifiedSearchProps {
   /** Hide the inline search text input (header provides one). */
@@ -150,6 +156,21 @@ export default function UnifiedSearch({
       urlHasMedia === "true" ? true : urlHasMedia === "false" ? false : undefined,
   });
 
+  // Structured geo filter (gap #1139). Hydrated from + written back to URL
+  // via the shared helpers so deep-links share filter state.
+  const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
+    locationFilterFromQuery(searchParams),
+  );
+  React.useEffect(() => {
+    setGeoFilter(locationFilterFromQuery(searchParams));
+  }, [searchParams]);
+  const handleGeoFilterChange = (next: LocationFilterValue) => {
+    setGeoFilter(next);
+    const params = new URLSearchParams(searchParams);
+    applyLocationFilterToQuery(params, next);
+    setSearchParams(params, { replace: true });
+  };
+
   React.useEffect(() => {
     setSearchFilters((prev) => ({
       ...prev,
@@ -235,6 +256,13 @@ export default function UnifiedSearch({
         page: pageToUse,
         limitPerType,
         sort: (searchFilters.sortBy as any) || "recent",
+        geo: {
+          countryId: geoFilter.countryId ?? undefined,
+          stateId: geoFilter.stateId ?? undefined,
+          cityId: geoFilter.cityId ?? undefined,
+          radiusKm: geoFilter.radiusKm ?? undefined,
+          remote: geoFilter.remote,
+        },
       });
       setSearchResults(content);
 
@@ -512,7 +540,7 @@ export default function UnifiedSearch({
       loadContent(selectedCategory, currentPage, itemsPerPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, currentPage, itemsPerPage, hasClientSideFiltering, searchFilters.sortBy]);
+  }, [selectedCategory, currentPage, itemsPerPage, hasClientSideFiltering, searchFilters.sortBy, geoFilter]);
 
   const totalFound = hasClientSideFiltering
     ? filteredItems.length
@@ -541,6 +569,17 @@ export default function UnifiedSearch({
                 onViewModeChange={setViewMode}
               />
             )}
+
+            {/* Geo filter — single LocationFilter component shared with
+             * Jobs.tsx so picker UX + URL state-shape don't drift. Today
+             * the geo filter narrows the Jobs fetcher; other type fetchers
+             * (articles, videos, services) are scheduled to honor it in
+             * gap register #1144. */}
+            <LocationFilter
+              value={geoFilter}
+              onChange={handleGeoFilterChange}
+              compact
+            />
 
             {/* Category chips row. When the header owns the search + advanced
              * filters, the grid/list toggle lives at the far right of this row. */}

@@ -39,6 +39,37 @@ function formatDuration(sec: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+/** Per-kind copy mapping for the engagement StatCards. ONE table feeds
+ *  both the "Avg Watch Time" tile and the "Avg % Watched" tile so adding
+ *  a new kind needs one edit, not two. Kinds not listed fall through to
+ *  the generic "Watch Time" / "% Watched" labels. */
+function engagementLabelFor(kind: ArtifactKind | undefined): {
+  watchTimeLabel: string;
+  percentLabel: string;
+} {
+  switch (kind) {
+    case "resume":
+    case "article":
+      return { watchTimeLabel: "Avg Read Time", percentLabel: "Avg % Read" };
+    case "podcast":
+    case "voice":
+      return { watchTimeLabel: "Avg Listen Time", percentLabel: "Avg % Listened" };
+    case "image":
+    case "comic":
+    case "cad":
+    case "job":
+    case "profile":
+      return { watchTimeLabel: "Avg View Time", percentLabel: "Avg % Viewed" };
+    case "game":
+      return { watchTimeLabel: "Avg Play Time", percentLabel: "Avg % Played" };
+    case "animation":
+    case "video":
+    case "channel":
+    default:
+      return { watchTimeLabel: "Avg Watch Time", percentLabel: "Avg % Watched" };
+  }
+}
+
 interface Props {
   metrics: ArtifactMetrics | null;
   loading?: boolean;
@@ -71,12 +102,11 @@ export default function MetricsPanel({
   const hasCountries = (metrics?.countries?.length ?? 0) > 0;
 
   // Copy adjusts to the kind so a resume's "watch time" reads as
-  // "read time", etc. Everything else stays identical to keep the
-  // panel visually consistent across artifacts.
-  const watchTimeLabel =
-    kind === "resume" || kind === "article" ? "Avg Read Time" : "Avg Watch Time";
-  const percentLabel =
-    kind === "resume" || kind === "article" ? "Avg % Read" : "Avg % Watched";
+  // "read time", an image banner's reads as "view time", etc. Everything
+  // else stays identical to keep the panel visually consistent across
+  // artifacts. Mapping is centralised in `engagementLabelFor()` below
+  // so adding a new kind is one entry — no two-place updates.
+  const { watchTimeLabel, percentLabel } = engagementLabelFor(kind);
 
   const duration = durationSec ?? metrics?.heatmap?.length ?? 0;
   const heatmapUnit = metrics?.heatmapUnit ?? "s";

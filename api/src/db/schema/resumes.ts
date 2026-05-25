@@ -166,6 +166,11 @@ export const studioProjects = pgTable("studio_projects", {
   // background + loop count). Null for every non-animation project.
   // Migration 0106 / #1003.
   animationState: jsonb("animation_state"),
+  // CAD state JSON for mediaKind='cad' projects. Same parallel-column
+  // pattern. Shape lives in `shared/cad-state.ts` (vector shapes +
+  // drawing extents + unit + grid). Null for non-cad projects.
+  // Migration 0107 / #930.
+  cadState: jsonb("cad_state"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   // Project-level visibility. After the Save/Publish split (#665) the

@@ -43,6 +43,13 @@ export async function renderComic(
   if (profile.mediaKind !== "comic") {
     throw new Error(`renderComic: profile is not comic-kind: ${profile.id}`);
   }
+  // Validate the profile id BEFORE the (expensive) rasterise pass so
+  // an unknown id surfaces a clear error instead of cascading into a
+  // misleading "OffscreenCanvas is not defined" from the rasteriser.
+  const KNOWN_IDS = new Set(["comic-cbz", "comic-png-strip", "comic-pdf"]);
+  if (!KNOWN_IDS.has(profile.id)) {
+    throw new Error(`renderComic: unknown profile id ${profile.id}`);
+  }
   const pages = await rasterisePages(state);
   switch (profile.id) {
     case "comic-cbz":
@@ -52,6 +59,7 @@ export async function renderComic(
     case "comic-pdf":
       return { blob: await packPdf(pages, state.width, state.height), pageCount: pages.length };
     default:
+      // Unreachable — KNOWN_IDS check above is the gate.
       throw new Error(`renderComic: unknown profile id ${profile.id}`);
   }
 }

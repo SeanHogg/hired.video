@@ -111,6 +111,7 @@ import {
 } from "@/lib/studio/game/game-state-edit";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
+import CadStage from "@/components/studio/cad/CadStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
 import {
@@ -118,6 +119,7 @@ import {
   createBlankAnimationState,
   updateFramePixels,
 } from "@shared/animation-state";
+import { type CadState, createBlankCadState } from "@shared/cad-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
 import { seedAnimationFromTemplate } from "@/lib/studio/animation/animation-seeds";
 import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
@@ -367,6 +369,18 @@ export default function StudioEditorV2() {
     reset: resetAnimationHistory,
   } = animationHistory;
   const [animationStateHydrated, setAnimationStateHydrated] = useState(false);
+  // CAD runtime state (#930) — same parallel-history pattern as the
+  // image + animation runtimes. The history wrapper is mounted
+  // unconditionally so undo/redo participates without a per-kind
+  // branch.
+  const cadHistory = useCanvasHistory<CadState>(() => createBlankCadState());
+  const {
+    state: cadState,
+    setState: setCadState,
+    commit: cadCommit,
+    reset: resetCadHistory,
+  } = cadHistory;
+  const [cadStateHydrated, setCadStateHydrated] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -496,6 +510,21 @@ export default function StudioEditorV2() {
       }));
     },
     [setImageState],
+  );
+  /** Set a layer's blend mode (#940 Image Phase 2). Routes through the
+   *  same history-aware setter as the opacity handler — undo/redo
+   *  participates by reading from the canvas-history wrapper. */
+  const handleImageSetBlendMode = useCallback(
+    (layerId: string, blendMode: import("@shared/image-state").LayerBlendMode) => {
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layerId ? { ...l, blendMode } : l,
+        ),
+      }));
+      imageCommit();
+    },
+    [setImageState, imageCommit],
   );
   const handleImageMoveLayer = useCallback(
     (layerId: string, direction: "up" | "down") => {
@@ -933,6 +962,18 @@ export default function StudioEditorV2() {
       setAnimationStateHydrated(true);
     },
     unhydrate: () => setAnimationStateHydrated(false),
+  });
+
+  useKindHydration<CadState>({
+    active: currentMediaKind === "cad",
+    hydrated: cadStateHydrated,
+    serverState: persistedProject?.cadState as CadState | null | undefined,
+    seed: () => createBlankCadState(),
+    hydrate: (next) => {
+      resetCadHistory(next);
+      setCadStateHydrated(true);
+    },
+    unhydrate: () => setCadStateHydrated(false),
   });
 
   // Game uses the null-sentinel hydration pattern instead of a
@@ -1827,6 +1868,7 @@ export default function StudioEditorV2() {
           imageState,
           animationState,
           gameState,
+          cadState,
           canvasState: state,
           flattenImage: imageCanvas
             ? async () => flattenCanvasToBlob(imageCanvas, "image/png")
@@ -2057,6 +2099,7 @@ export default function StudioEditorV2() {
         imageState,
         animationState,
         gameState,
+        cadState,
       });
       const res = await studioService.saveDraft({
         name: title,
@@ -2539,6 +2582,17 @@ export default function StudioEditorV2() {
                           {aiChipNode}
                         </div>
                       ),
+                      cad: cadStateHydrated ? (
+                        <CadStage
+                          state={cadState}
+                          setState={setCadState}
+                          commit={cadCommit}
+                          zoom={Math.max(0.5, zoom * 2)}
+                          tool="select"
+                          drawColor="#0f172a"
+                          drawStrokeWidthMm={0.25}
+                        />
+                      ) : null,
                       timeline: (
                   <div className="relative">
                   {/* ONE renderer for both edit + playback: `<CanvasStage>`
@@ -2673,6 +2727,7 @@ export default function StudioEditorV2() {
                     onToggleVisible={handleImageToggleVisible}
                     onRenameLayer={handleImageRenameLayer}
                     onSetOpacity={handleImageSetOpacity}
+                    onSetBlendMode={handleImageSetBlendMode}
                     onMoveLayer={handleImageMoveLayer}
                   />
                 ) : (

@@ -14,11 +14,13 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   Calendar,
   CreditCard,
   Flame,
   Gift,
+  HelpCircle,
   Loader2,
   Lock,
   Sparkles,
@@ -95,11 +97,18 @@ export function PointsHub({ showHeader = true }: PointsHubProps) {
   return (
     <div className="space-y-6">
       {showHeader && (
-        <header>
-          <h1 className="text-3xl font-bold">Points &amp; Rewards</h1>
-          <p className="text-muted-foreground mt-1">
-            Earn for every step. Cash out for AI credits, premium time, or gift cards.
-          </p>
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold">Points &amp; Rewards</h1>
+            <p className="text-muted-foreground mt-1">
+              Earn for every step. Cash out for AI credits, premium time, or gift cards.
+            </p>
+          </div>
+          <Button asChild variant="ghost" size="sm" className="shrink-0">
+            <Link to="/rewards" className="inline-flex items-center gap-1">
+              <HelpCircle className="h-4 w-4" /> How it works
+            </Link>
+          </Button>
         </header>
       )}
 

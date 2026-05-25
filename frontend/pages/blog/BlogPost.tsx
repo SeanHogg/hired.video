@@ -31,8 +31,14 @@ export default function BlogPost() {
   // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
   // ("blogPost" kind) and emits title/description/keywords plus the
   // BlogPosting JSON-LD via generateStructuredData.article.
+  // `heroImageUrl` falls back to the per-post generated SVG at
+  // `/api/og/blog` (see api/src/routes/og.ts) when the post doesn't
+  // supply a real image — so every post gets a per-post share card.
   const blogSeoRecord = useMemo(() => {
     if (!post) return null;
+    const heroImageUrl =
+      post.heroImageUrl ??
+      `/api/og/blog?title=${encodeURIComponent(post.title)}&category=${encodeURIComponent(post.category)}&date=${encodeURIComponent(post.publishedAt.slice(0, 10))}&author=${encodeURIComponent(post.author)}`;
     return {
       title: post.title,
       slug: post.slug,
@@ -41,6 +47,7 @@ export default function BlogPost() {
       publishedAt: post.publishedAt,
       updatedAt: post.updatedAt,
       category: post.category,
+      heroImageUrl,
       wordCount: post.sections.reduce((n, s) => n + s.body.split(/\s+/).length, 0),
     };
   }, [post]);

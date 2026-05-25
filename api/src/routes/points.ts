@@ -54,6 +54,37 @@ pointsRoutes.get("/catalog", async (c) => {
   return c.json(success(service(c.env as never).getCatalog()));
 });
 
+/** Public showcase of every active badge — surfaces on the /rewards
+ *  guide so anonymous visitors see what they can earn. Returns the
+ *  full catalog from the `badges` table, ordered by tier then by name.
+ *  No auth required (exempted in app.ts). */
+pointsRoutes.get("/badges", async (c) => {
+  const repos = buildRepos(getDb());
+  const rows = await repos.points.listBadges();
+  const tierWeight: Record<string, number> = { bronze: 0, silver: 1, gold: 2 };
+  const sorted = rows
+    .slice()
+    .sort((a, b) => {
+      const aw = tierWeight[a.tier] ?? 99;
+      const bw = tierWeight[b.tier] ?? 99;
+      if (aw !== bw) return aw - bw;
+      return a.name.localeCompare(b.name);
+    });
+  return c.json(success({
+    badges: sorted.map((b) => ({
+      id: b.id,
+      slug: b.slug,
+      name: b.name,
+      description: b.description,
+      tier: b.tier,
+      iconKey: b.iconKey,
+      pointsReward: b.pointsReward,
+      roles: b.roles as string[],
+      isRepeatable: b.isRepeatable,
+    })),
+  }));
+});
+
 /** Daily-session ping. The frontend hits this once per app load; the
  *  engine collapses repeated calls via the `daily:YYYY-MM-DD` refId. */
 pointsRoutes.post("/session/ping", async (c) => {

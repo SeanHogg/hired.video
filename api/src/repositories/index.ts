@@ -59,6 +59,10 @@ import {
   ContentLocationsRepository,
   type IContentLocationsRepository,
 } from "./contentLocationsRepository.js";
+import {
+  GeocoderCacheRepository,
+  type IGeocoderCacheRepository,
+} from "./geocoderCacheRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -104,6 +108,8 @@ export interface Repos {
   points: IPointsRepository;
   // polymorphic geo tags shared by every searchable entity
   contentLocations: IContentLocationsRepository;
+  // persistent cache for Mapbox geocoder calls (forward + reverse)
+  geocoderCache: IGeocoderCacheRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -135,6 +141,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     studioTemplates: new StudioTemplatesRepository(db, now),
     points: new PointsRepository(db, now),
     contentLocations: new ContentLocationsRepository(db, now),
+    geocoderCache: new GeocoderCacheRepository(db, now),
   };
 }
 
@@ -169,6 +176,7 @@ export type {
   IStudioTemplatesRepository,
   IPointsRepository,
   IContentLocationsRepository,
+  IGeocoderCacheRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────

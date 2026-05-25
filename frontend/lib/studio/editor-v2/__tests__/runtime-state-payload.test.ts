@@ -22,6 +22,7 @@ function snapshot(opts: Partial<Parameters<typeof runtimeStatePayload>[1]> = {})
     imageState: opts.imageState ?? null,
     animationState: opts.animationState ?? null,
     gameState: opts.gameState ?? null,
+    cadState: opts.cadState ?? null,
   };
 }
 

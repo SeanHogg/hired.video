@@ -16,7 +16,7 @@
  * passed in is non-null by construction (host gates on its presence).
  */
 import { Layers as LayersIcon } from "lucide-react";
-import type { ImageState } from "@shared/image-state";
+import type { ImageState, LayerBlendMode } from "@shared/image-state";
 import FloatingCollapsiblePanel from "@/components/studio/v2/FloatingCollapsiblePanel";
 import DrawingLayersPanel from "./DrawingLayersPanel";
 
@@ -28,6 +28,9 @@ export interface FloatingImageLayersPanelProps {
   onToggleVisible: (layerId: string) => void;
   onRenameLayer: (layerId: string, label: string) => void;
   onSetOpacity: (layerId: string, opacity: number) => void;
+  /** Optional — when wired, the panel surfaces a per-layer blend-mode
+   *  picker (#940 Image Phase 2). */
+  onSetBlendMode?: (layerId: string, blendMode: LayerBlendMode) => void;
   onMoveLayer: (layerId: string, direction: "up" | "down") => void;
   className?: string;
 }

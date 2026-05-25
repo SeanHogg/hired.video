@@ -177,23 +177,118 @@ async function isWebGpuAdapterAvailable(): Promise<boolean> {
   }
 }
 
+/** Cached runtime probe of transformers.js + its `text-to-image`
+ *  pipeline. Closes #1112: the engine seam was registered with a
+ *  hardcoded `return false`, which meant the moment transformers.js
+ *  v3 ships the pipeline we'd need a code change to flip the engine
+ *  on. The probe re-checks at runtime — when the lib ships, the
+ *  engine self-activates without a deploy. */
+let cachedTransformersProbe: Promise<boolean> | null = null;
+async function probeTransformersTextToImage(): Promise<boolean> {
+  if (cachedTransformersProbe) return cachedTransformersProbe;
+  cachedTransformersProbe = (async () => {
+    try {
+      // Dynamic ESM CDN import — same pattern the headshot generator
+      // uses. Vite's `@vite-ignore` keeps the bundle clean; the lib
+      // only loads when the engine is queried.
+      const transformers = await import(
+        // @ts-expect-error — CDN ESM URL has no static type declarations
+        /* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm"
+      ).catch(() => null) as { pipeline?: (task: string) => Promise<unknown>; TASK_TYPE_MAPPING?: Record<string, unknown> } | null;
+      if (!transformers || typeof transformers.pipeline !== "function") return false;
+      // The library throws a deterministic "Unsupported pipeline task"
+      // error today; we capture that as "not yet available" and a
+      // future release of transformers.js will return a real pipeline
+      // factory which the catch path will NOT see. Either way the
+      // engine seam reacts to upstream without a code change here.
+      try {
+        // Don't actually instantiate — that'd download multi-GB
+        // weights. Just check whether the task token is recognised.
+        // transformers.js exposes its task registry; if absent we
+        // fall back to "not available".
+        const taskList = (transformers as { TASK_TYPE_MAPPING?: Record<string, unknown> }).TASK_TYPE_MAPPING;
+        if (taskList && typeof taskList === "object" && "text-to-image" in taskList) return true;
+        return false;
+      } catch {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  })();
+  return cachedTransformersProbe;
+}
+
 registerImageGenEngine({
   id: "webgpu-sd-turbo",
   label: "Stable Diffusion Turbo · WebGPU",
   async isAvailable(): Promise<boolean> {
     if (!(await isWebGpuAdapterAvailable())) return false;
-    // Gate behind a feature flag the user can flip once a real
-    // text-to-image WebGPU implementation ships. Today: always false
-    // so the facade falls through to the server engine. The seam is
-    // here so swapping the body is one file change.
-    return false;
+    // Runtime probe (#1112): when transformers.js v3 ships the
+    // `text-to-image` pipeline, this branch self-activates without a
+    // code change. Until then the lib's task registry doesn't carry
+    // the task token, and the probe returns false — falling through
+    // to the server engine.
+    return probeTransformersTextToImage();
   },
-  async generate(): Promise<ImageGenResult> {
-    throw new Error(
-      "WebGPU SD-Turbo engine is registered but not yet implemented — " +
-        "transformers.js v3 does not expose a text-to-image pipeline " +
-        "(tracked in Consolidated Gap Register under #932 follow-ons).",
-    );
+  async generate(input: ImageGenInput, onProgress?: (p: number) => void): Promise<ImageGenResult> {
+    const startTs = performance.now();
+    // Defer the heavy import to the call site — the bundle stays
+    // clean for users who never invoke an AI-gen engine. Loaded
+    // dynamically via the same CDN ESM pattern the headshot
+    // generator (and `probeTransformersTextToImage` above) uses.
+    // `@ts-expect-error` because the URL has no matching `.d.ts`;
+    // safe because we runtime-probe the shape below.
+    const transformers = await import(
+      // @ts-expect-error — CDN ESM URL has no static type declarations
+      /* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm"
+    ).catch(() => null) as { pipeline?: (task: string, model: string) => Promise<unknown> } | null;
+    if (!transformers || typeof transformers.pipeline !== "function") {
+      throw new Error(
+        "WebGPU SD-Turbo engine: transformers.js text-to-image pipeline " +
+        "not yet available upstream. Falling through to the server engine.",
+      );
+    }
+    onProgress?.(0.05);
+    const pipe = (await transformers.pipeline("text-to-image", "stabilityai/sd-turbo")) as (
+      prompt: string,
+      opts: Record<string, unknown>,
+    ) => Promise<{ images?: Array<{ toBlob?: () => Promise<Blob>; data?: Uint8ClampedArray; width?: number; height?: number }> }>;
+    onProgress?.(0.4);
+    const result = await pipe(input.prompt, {
+      width: input.width ?? 512,
+      height: input.height ?? 512,
+      num_inference_steps: 1, // SD-Turbo's defining feature — 1-step generation
+    });
+    const image = result.images?.[0];
+    if (!image) {
+      throw new Error("WebGPU SD-Turbo engine returned no image");
+    }
+    onProgress?.(0.95);
+    // The result image's surface varies across transformers.js
+    // releases — branch on the actual shape so a future API tweak
+    // doesn't break us.
+    let blob: Blob;
+    if (typeof image.toBlob === "function") {
+      blob = await image.toBlob();
+    } else if (image.data && image.width && image.height) {
+      const canvas = new OffscreenCanvas(image.width, image.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("WebGPU SD-Turbo: no 2D context for raster conversion");
+      const id = new ImageData(image.data, image.width, image.height);
+      ctx.putImageData(id, 0, 0);
+      blob = await canvas.convertToBlob({ type: "image/png" });
+    } else {
+      throw new Error("WebGPU SD-Turbo: unrecognised image surface from pipeline");
+    }
+    onProgress?.(1);
+    return {
+      blob,
+      previewUrl: URL.createObjectURL(blob),
+      engine: "webgpu-sd-turbo",
+      elapsedMs: performance.now() - startTs,
+      mode: input.sourceImageUrl || input.sourceImageDataUrl ? "img2img" : "text2img",
+    };
   },
 });
 

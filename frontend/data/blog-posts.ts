@@ -26,6 +26,15 @@ export interface BlogPost {
   keywords: string;
   /** Hero image alt text (the component renders a gradient placeholder). */
   heroAlt: string;
+  /**
+   * Optional per-post hero image URL. When set, used as the `og:image`
+   * on share previews (LinkedIn / X / iMessage / Slack). When omitted,
+   * the BlogPost page falls back to a generated SVG at
+   * `/api/og/blog?title=…&category=…&date=…` so every post still gets a
+   * per-post share card. Either format may be used: a CDN/R2 URL for
+   * posts with real artwork, or any absolute https URL.
+   */
+  heroImageUrl?: string;
   category: string;
   /**
    * Optional list of resume template IDs to preview inline (rendered as

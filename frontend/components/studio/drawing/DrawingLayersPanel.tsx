@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
-import type { ImageLayer, ImageState } from "@shared/image-state";
+import type { ImageLayer, ImageState, LayerBlendMode } from "@shared/image-state";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ interface DrawingLayersPanelProps {
   onToggleVisible: (layerId: string) => void;
   onRenameLayer: (layerId: string, label: string) => void;
   onSetOpacity: (layerId: string, opacity: number) => void;
+  onSetBlendMode?: (layerId: string, blendMode: LayerBlendMode) => void;
   onMoveLayer: (layerId: string, direction: "up" | "down") => void;
 }
 
@@ -43,6 +44,7 @@ export default function DrawingLayersPanel({
   onToggleVisible,
   onRenameLayer,
   onSetOpacity,
+  onSetBlendMode,
   onMoveLayer,
 }: DrawingLayersPanelProps) {
   // Photoshop-convention display: top of the list = top of the stack.
@@ -80,6 +82,9 @@ export default function DrawingLayersPanel({
             onDelete={() => onDeleteLayer(layer.id)}
             onRename={(label) => onRenameLayer(layer.id, label)}
             onSetOpacity={(opacity) => onSetOpacity(layer.id, opacity)}
+            onSetBlendMode={
+              onSetBlendMode ? (mode) => onSetBlendMode(layer.id, mode) : undefined
+            }
             onMoveUp={() => onMoveLayer(layer.id, "up")}
             onMoveDown={() => onMoveLayer(layer.id, "down")}
           />
@@ -98,9 +103,29 @@ interface LayerRowProps {
   onDelete: () => void;
   onRename: (label: string) => void;
   onSetOpacity: (opacity: number) => void;
+  onSetBlendMode?: (mode: LayerBlendMode) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
 }
+
+/** Blend-mode options the layers panel picker surfaces — matches the
+ *  `LayerBlendMode` enum in `shared/image-state.ts` 1:1. Grouped
+ *  visually (normal / darken family / lighten family / contrast /
+ *  invert) per Photoshop convention. */
+const BLEND_MODE_OPTIONS: ReadonlyArray<{ value: LayerBlendMode; label: string }> = [
+  { value: "normal",      label: "Normal" },
+  { value: "darken",      label: "Darken" },
+  { value: "multiply",    label: "Multiply" },
+  { value: "color-burn",  label: "Color Burn" },
+  { value: "lighten",     label: "Lighten" },
+  { value: "screen",      label: "Screen" },
+  { value: "color-dodge", label: "Color Dodge" },
+  { value: "overlay",     label: "Overlay" },
+  { value: "soft-light",  label: "Soft Light" },
+  { value: "hard-light",  label: "Hard Light" },
+  { value: "difference",  label: "Difference" },
+  { value: "exclusion",   label: "Exclusion" },
+];
 
 function LayerRow({
   layer,
@@ -111,6 +136,7 @@ function LayerRow({
   onDelete,
   onRename,
   onSetOpacity,
+  onSetBlendMode,
   onMoveUp,
   onMoveDown,
 }: LayerRowProps) {
@@ -217,21 +243,44 @@ function LayerRow({
         </div>
       </div>
       {active && (
-        <div className="mt-1.5 flex items-center gap-2 pl-7" onClick={(e) => e.stopPropagation()}>
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Opacity
-          </span>
-          <Slider
-            min={0}
-            max={100}
-            step={1}
-            value={[Math.round(layer.opacity * 100)]}
-            onValueChange={([next]) => onSetOpacity((next ?? 100) / 100)}
-            className="flex-1"
-          />
-          <span className="w-8 text-right text-[10px] tabular-nums text-muted-foreground">
-            {Math.round(layer.opacity * 100)}%
-          </span>
+        <div className="mt-1.5 flex flex-col gap-1.5 pl-7" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <span className="w-12 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Opacity
+            </span>
+            <Slider
+              min={0}
+              max={100}
+              step={1}
+              value={[Math.round(layer.opacity * 100)]}
+              onValueChange={([next]) => onSetOpacity((next ?? 100) / 100)}
+              className="flex-1"
+            />
+            <span className="w-8 text-right text-[10px] tabular-nums text-muted-foreground">
+              {Math.round(layer.opacity * 100)}%
+            </span>
+          </div>
+          {/* Blend-mode picker (#940 Image Phase 2). Self-gates: the
+              row only renders when the caller wires `onSetBlendMode`,
+              so legacy hosts without the handler keep their current
+              opacity-only UX. */}
+          {onSetBlendMode && (
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Blend
+              </span>
+              <select
+                value={layer.blendMode}
+                onChange={(e) => onSetBlendMode(e.target.value as LayerBlendMode)}
+                className="h-6 flex-1 rounded border border-border bg-background px-1 text-[11px]"
+                aria-label="Blend mode"
+              >
+                {BLEND_MODE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
     </div>

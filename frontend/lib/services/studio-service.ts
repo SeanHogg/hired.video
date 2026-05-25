@@ -255,6 +255,10 @@ export const StudioProjectSchema = z.object({
   // <AnimationStage>; server stores verbatim. See
   // shared/animation-state.ts.
   animationState: z.unknown().nullish(),
+  // CAD runtime state for mediaKind='cad' projects (#930). Same
+  // parallel-column pattern. Validated client-side by <CadStage>;
+  // server stores verbatim. See shared/cad-state.ts.
+  cadState: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
@@ -623,6 +627,10 @@ export const studioService = {
        *  (#1003). Sent by `<AnimationStage>` on save; same parallel-
        *  column pattern. See `shared/animation-state.ts`. */
       animationState?: unknown;
+      /** CAD runtime state for mediaKind='cad' projects (#930). Sent
+       *  by `<CadStage>` on save; same parallel-column pattern. See
+       *  `shared/cad-state.ts`. */
+      cadState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -646,6 +654,7 @@ export const studioService = {
       ...(args.gameState !== undefined ? { gameState: args.gameState } : {}),
       ...(args.imageState !== undefined ? { imageState: args.imageState } : {}),
       ...(args.animationState !== undefined ? { animationState: args.animationState } : {}),
+      ...(args.cadState !== undefined ? { cadState: args.cadState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),

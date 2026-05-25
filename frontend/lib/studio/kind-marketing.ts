@@ -30,6 +30,7 @@ import {
   Headphones,
   Image as ImageIcon,
   Mic2,
+  Ruler,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -124,6 +125,17 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
       "Photoshop-shaped raster authoring — single-frame social posts, OG cards, podcast covers. Coming soon (#932).",
     icon: ImageIcon,
     accentClass: "bg-rose-600/10 text-rose-600",
+    isShippable: false,
+  },
+  cad: {
+    // CAD 2D drafting runtime (#930) — Phase 1 scaffolding ships the
+    // canvas surface + state model; full tooling (DXF / STEP / layers /
+    // dimensions UI) lands in Phase 2.
+    title: "Technical drawings",
+    blurb:
+      "2D vector drafting — lines, rectangles, circles, dimensions. Millimetre-accurate. Coming soon (#930).",
+    icon: Ruler,
+    accentClass: "bg-cyan-600/10 text-cyan-600",
     isShippable: false,
   },
 };

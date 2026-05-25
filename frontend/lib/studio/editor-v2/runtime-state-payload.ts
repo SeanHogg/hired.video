@@ -27,6 +27,7 @@ import { mediaKindUsesCanvasStateAuthoring } from "@shared/media-kinds";
 import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
 import type { GameState } from "@shared/game-state";
+import type { CadState } from "@shared/cad-state";
 
 /** Runtime-state snapshot — the editor's live per-kind state at the
  *  moment of save. Each field may be null when the kind isn't active. */
@@ -35,6 +36,7 @@ export interface RuntimeSnapshot {
   imageState: ImageState | null;
   animationState: AnimationState | null;
   gameState: GameState | null;
+  cadState: CadState | null;
 }
 
 /** Per-mediaKind save-draft payload slice. Keys mirror `studioService.saveDraft`'s
@@ -47,6 +49,7 @@ export interface RuntimePayloadSlice {
   imageState?: ImageState;
   animationState?: AnimationState;
   gameState?: GameState;
+  cadState?: CadState;
 }
 
 /** Build the payload slice for the active mediaKind. The runtime owns
@@ -70,6 +73,10 @@ export function runtimeStatePayload(
     case "game":
       return snapshot.gameState !== null
         ? { kind: "scene", gameState: snapshot.gameState }
+        : { kind: "scene" };
+    case "cad":
+      return snapshot.cadState !== null
+        ? { kind: "scene", cadState: snapshot.cadState }
         : { kind: "scene" };
     case "video":
     case "podcast":

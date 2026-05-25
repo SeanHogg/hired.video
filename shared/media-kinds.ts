@@ -55,6 +55,7 @@ export const MEDIA_KINDS = [
   "game",
   "comic",
   "image",
+  "cad",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -122,7 +123,13 @@ export function mediaKindUsesTimelineRuntime(kind: MediaKind): boolean {
  *  WebP) — they do NOT ride the ffmpeg.wasm / WebCodecs path the
  *  Timeline runtime uses. */
 export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
-  return kind !== "game" && kind !== "comic" && kind !== "image" && kind !== "animation";
+  return (
+    kind !== "game" &&
+    kind !== "comic" &&
+    kind !== "image" &&
+    kind !== "animation" &&
+    kind !== "cad"
+  );
 }
 
 /** Whether the kind authors via the v2 editor's `CanvasState` shape
@@ -145,7 +152,12 @@ export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
  *               surfaced for a memory-match game).
  *  Future runtimes (cad / 3d_model) → false. */
 export function mediaKindUsesCanvasStateAuthoring(kind: MediaKind): boolean {
-  return kind !== "game" && kind !== "image" && kind !== "animation";
+  return (
+    kind !== "game" &&
+    kind !== "image" &&
+    kind !== "animation" &&
+    kind !== "cad"
+  );
 }
 
 // ─── Output profiles ─────────────────────────────────────────────────────────
@@ -198,7 +210,14 @@ export type ContainerId =
   // menu render them without a per-kind branch.
   | "png"
   | "jpg"
-  | "svg";
+  | "svg"
+  // CAD runtime — 2D vector drafting (#930). Standard CAD exchange
+  // formats. DXF + DWG are the AutoCAD-family lingua franca; STL +
+  // STEP land alongside the future 3D modeling branch.
+  | "dxf"
+  | "dwg"
+  | "stl"
+  | "step";
 
 export interface OutputProfile {
   /** Stable id — referenced by `studio_projects.timeline_spec.outputProfile`
@@ -588,6 +607,61 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: false,
     fileExt: ".webp",
   },
+
+  // ─── CAD (2D drafting MVP — #930) ──────────────────────────────────────────
+  // Vector drafting; no time axis, no audio. The CadStage emits SVG +
+  // PDF directly from the shape list. DXF + DWG + STL + STEP are
+  // industry-standard CAD exchange formats — initial scaffold registers
+  // the slots; the encoder bodies ship behind these ids when the
+  // CAD-export pipeline matures past the Phase 1 scaffold.
+  {
+    id: "cad-svg",
+    label: "SVG",
+    hint: "Vector · widest support",
+    mediaKind: "cad",
+    container: "svg",
+    mime: "image/svg+xml",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".svg",
+  },
+  {
+    id: "cad-pdf",
+    label: "PDF",
+    hint: "Print-ready · paginated",
+    mediaKind: "cad",
+    container: "pdf",
+    mime: "application/pdf",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".pdf",
+  },
+  {
+    id: "cad-dxf",
+    label: "DXF",
+    hint: "AutoCAD exchange · Pro",
+    mediaKind: "cad",
+    container: "dxf",
+    mime: "application/dxf",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: true,
+    fileExt: ".dxf",
+  },
+  {
+    id: "cad-png",
+    label: "PNG",
+    hint: "Raster preview · social-share",
+    mediaKind: "cad",
+    container: "png",
+    mime: "image/png",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".png",
+  },
 ];
 
 /** Every profile registered for a given mediaKind, in declaration order. */
@@ -651,7 +725,12 @@ export type PublishDestinationId =
   // project (the closed-loop interop tracked in #933). `profile-gallery`
   // is the creator's public image gallery surface.
   | "profile-gallery"
-  | "asset-library";
+  | "asset-library"
+  // CAD (#930) — `cad-gallery` is the no-render-required gallery
+  // surface; `cad-asset-library` writes the flattened SVG/PDF into
+  // R2 so other projects can reference it via MediaPicker.
+  | "cad-gallery"
+  | "cad-asset-library";
 
 export interface PublishDestination {
   id: PublishDestinationId;
@@ -698,6 +777,11 @@ export const PUBLISH_DESTINATIONS: PublishDestination[] = [
   // by any other studio project via MediaPicker (#933).
   { id: "profile-gallery",      label: "Profile gallery",         mediaKinds: ["image"],            requiresRender: false },
   { id: "asset-library",        label: "Save to asset library",   mediaKinds: ["image"],            requiresRender: true  },
+  // CAD (#930) — gallery is the no-render default (live canvas);
+  // `cad-asset-library` writes the rendered drawing to R2 so it can
+  // be picked up by other studio projects via MediaPicker.
+  { id: "cad-gallery",          label: "Profile gallery",         mediaKinds: ["cad"],              requiresRender: false },
+  { id: "cad-asset-library",    label: "Save to asset library",   mediaKinds: ["cad"],              requiresRender: true  },
 ];
 
 export function publishDestinationsFor(kind: MediaKind): PublishDestination[] {
@@ -730,4 +814,7 @@ export const MEDIA_KIND_UI: Record<MediaKind, MediaKindUiHints> = {
   // no time axis, exports as PNG/JPG/SVG. The hint lives here so
   // `Record<MediaKind, …>` typing is total even before the runtime ships.
   image:     { exportVerb: "Export image",   badgeLabel: "Image",     shortLabel: "I" },
+  // `cad` is the 2D drafting runtime (#930). Static vector output;
+  // exports as SVG/PDF/DXF/PNG.
+  cad:       { exportVerb: "Export drawing", badgeLabel: "CAD",       shortLabel: "D" },
 };

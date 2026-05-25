@@ -32,6 +32,7 @@ import {
   stubGeocoder,
   type GeocoderPort,
 } from "./adapters/mapbox.js";
+import { buildCachedGeocoder } from "./adapters/cached-geocoder.js";
 
 export type { GeocoderPort } from "./adapters/mapbox.js";
 
@@ -121,8 +122,16 @@ export interface ApiDeps {
  *  lazily via thin wrappers around the existing adapter modules so no
  *  third-party code runs at module-load time. */
 export function buildApiDeps(env: Record<string, string | undefined> = {}): ApiDeps {
+  const repos = buildRepos(getDb());
+  // CachedGeocoder wraps whichever inner port is live (Mapbox or stub) so
+  // every consumer (LocationService, /api/locations routes, search-time
+  // resolveFreeText) gets read-through caching transparently. See
+  // services/adapters/cached-geocoder.ts for cache-key normalization.
+  const innerGeocoder: GeocoderPort = env.MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN
+    ? buildMapboxGeocoder(env)
+    : stubGeocoder;
   return {
-    repos: buildRepos(getDb()),
+    repos,
     now: () => new Date(),
     randomHex: (bytes) =>
       Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
@@ -134,9 +143,7 @@ export function buildApiDeps(env: Record<string, string | undefined> = {}): ApiD
     signalwire: null,     // wired lazily by phone-using services
     transcription: null,  // wired lazily by the transcription route
     audit: buildAuditPort(),
-    geocoder: env.MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN
-      ? buildMapboxGeocoder(env)
-      : stubGeocoder,
+    geocoder: buildCachedGeocoder(innerGeocoder, repos.geocoderCache),
   };
 }
 

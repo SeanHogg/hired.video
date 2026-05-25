@@ -88,6 +88,9 @@ const DESTINATION_ICON: Record<PublishDestinationId, React.ComponentType<{ class
   // assets, importable into any other studio project).
   "profile-gallery":      UserCheck,
   "asset-library":        UserCheck,
+  // CAD (#930) — same shape as image's gallery + asset-library.
+  "cad-gallery":          UserCheck,
+  "cad-asset-library":    UserCheck,
 };
 
 type PublishHandlers = Partial<Record<PublishDestinationId, () => void>>;

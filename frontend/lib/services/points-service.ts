@@ -101,6 +101,22 @@ export type PointsCatalog = z.infer<typeof CatalogSchema>;
 export type PointsCatalogAction = z.infer<typeof CatalogActionSchema>;
 export type PointsRedemption = z.infer<typeof CatalogRedemptionSchema>;
 
+/** Shape returned by the public /api/points/badges endpoint. Lighter
+ *  than the per-user `PointsBadge` (no `earned` / `earnCount` etc.) —
+ *  surfaces just the catalog. */
+const ShowcaseBadgeSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  description: z.string(),
+  tier: z.string(),
+  iconKey: z.string().nullable().optional(),
+  pointsReward: z.number(),
+  roles: z.array(z.string()),
+  isRepeatable: z.boolean(),
+});
+export type ShowcaseBadge = z.infer<typeof ShowcaseBadgeSchema>;
+
 export const pointsService = {
   async getMe(): Promise<PointsSummary> {
     const res: ApiSuccessResponse<PointsSummary> = await apiClient.get(
@@ -124,6 +140,17 @@ export const pointsService = {
       CatalogSchema,
     );
     return res.data;
+  },
+
+  /** Public badge catalog. No auth required — drives the /rewards
+   *  article so anonymous visitors see what they could win. Returns
+   *  every active badge in the system, tier-sorted bronze → gold. */
+  async listAllBadges(): Promise<ShowcaseBadge[]> {
+    const res: ApiSuccessResponse<{ badges: ShowcaseBadge[] }> = await apiClient.get(
+      "/api/points/badges",
+      z.object({ badges: z.array(ShowcaseBadgeSchema) }),
+    );
+    return res.data.badges;
   },
 
   /** Ping the daily session. Idempotent — backend dedups by UTC day. */

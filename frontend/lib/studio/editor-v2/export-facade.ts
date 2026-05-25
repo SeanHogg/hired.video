@@ -30,6 +30,7 @@ import { defaultOutputProfile, outputProfilesFor } from "@shared/media-kinds";
 import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
 import type { GameState } from "@shared/game-state";
+import type { CadState } from "@shared/cad-state";
 import type { CanvasState } from "./canvas-state";
 
 /** Inputs the facade needs to dispatch per kind. The Timeline branch is
@@ -44,6 +45,7 @@ export interface ExportInputs {
     imageState: ImageState | null;
     animationState: AnimationState | null;
     gameState: GameState | null;
+    cadState: CadState | null;
     /** Canvas state — used by the comic export path which renders each
      *  scene/page through the timeline render facade. */
     canvasState: CanvasState;
@@ -79,6 +81,15 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
       if (!snapshot.gameState) return null;
       const { bundleGame } = await import("@/lib/studio/game/game-export");
       return bundleGame(snapshot.gameState, { title });
+    }
+    case "cad": {
+      if (!snapshot.cadState) return null;
+      // CAD Phase 1 (#930) — SVG is the in-tree default. PDF / DXF
+      // ride the same facade once their encoders land; for now the
+      // SVG profile produces a faithful vector export every CAD
+      // viewer + browser can read.
+      const { renderCadSvg } = await import("@/lib/studio/cad/cad-export");
+      return renderCadSvg(snapshot.cadState);
     }
     case "comic": {
       // Comic Phase 2 (#939) — render via the dedicated comic exporter
@@ -119,6 +130,7 @@ export function extensionForBlob(blob: Blob): string {
   if (blob.type === "image/gif") return "gif";
   if (blob.type === "image/png") return "png";
   if (blob.type === "image/webp") return "webp";
+  if (blob.type === "image/svg+xml") return "svg";
   if (blob.type === "image/apng") return "apng";
   if (blob.type.includes("webm")) return "webm";
   if (blob.type.includes("wav")) return "wav";

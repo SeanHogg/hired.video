@@ -14,7 +14,10 @@
 
 import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import type { ArtifactKind } from "../../../../shared/artifact-views.js";
+import {
+  isStudioArtifactKind,
+  type ArtifactKind,
+} from "../../../../shared/artifact-views.js";
 
 /** Owner-lookup table keyed on artifact kind. One join per kind; the
  *  beacon + analytics endpoints both call this to stamp owner_user_id
@@ -24,15 +27,19 @@ export async function lookupArtifactOwner(
   artifactId: string,
 ): Promise<string | null> {
   const db = getDb();
+  // Every studio MediaKind keys on studio_projects.id — collapse the
+  // per-kind cases into one branch per the DRY rule. `isStudioArtifactKind`
+  // is the SSoT for "is this row in studio_projects?"; adding a new
+  // studio kind to ARTIFACT_KINDS auto-routes through this branch.
+  if (isStudioArtifactKind(kind)) {
+    const [r] = await db
+      .select({ userId: schema.studioProjects.userId })
+      .from(schema.studioProjects)
+      .where(eq(schema.studioProjects.id, artifactId))
+      .limit(1);
+    return r?.userId ?? null;
+  }
   switch (kind) {
-    case "video": {
-      const [r] = await db
-        .select({ userId: schema.studioProjects.userId })
-        .from(schema.studioProjects)
-        .where(eq(schema.studioProjects.id, artifactId))
-        .limit(1);
-      return r?.userId ?? null;
-    }
     case "resume": {
       const [r] = await db
         .select({ userId: schema.resumeInformation.userId })
@@ -155,12 +162,24 @@ export async function buildArtifactMetrics(
     .orderBy(desc(schema.artifactViews.viewedAt))
     .limit(2000);
 
+  // Engagement unit defaults from the kind — time-based studio kinds
+  // (video / podcast / voice / animation) and scrollable text (resume /
+  // article) bucket per second; everything else is percent-scrolled.
+  // Reuses the SSoT predicate from shared/artifact-views.ts so the
+  // wire shape and the in-memory math stay in lockstep.
+  const defaultUnit: "s" | "%" =
+    kind === "video" ||
+    kind === "podcast" ||
+    kind === "voice" ||
+    kind === "animation"
+      ? "s"
+      : "%";
   if (views.length === 0) {
-    return { ...EMPTY_METRICS, heatmapUnit: kind === "video" ? "s" : "%" };
+    return { ...EMPTY_METRICS, heatmapUnit: defaultUnit };
   }
 
   const totalViews = views.length;
-  const engagementUnit = (views[0].engagementUnit as "s" | "%") ?? (kind === "video" ? "s" : "%");
+  const engagementUnit = (views[0].engagementUnit as "s" | "%") ?? defaultUnit;
 
   // Bucket sum. Video buckets are per-second; static buckets are 100
   // percent-scrolled. The math is identical — sum element-wise, then
@@ -253,12 +272,14 @@ export async function buildArtifactMetrics(
     .map(([country, c]) => ({ country, views: c }))
     .sort((a, b) => b.views - a.views);
 
-  // CTA clicks live on the video event-counts table for kind=video.
-  // Future kinds will track CTA clicks via the same cta-tracker.ts
-  // beacon path; the analytics endpoint reads them here when present.
+  // CTA clicks live on the videoAnalytics event-counts table (FK =
+  // studio_project_id, kind-agnostic — see migration 0085). Every
+  // studio MediaKind can carry CTA widgets (display banners → link
+  // target; podcasts → show-notes CTA; comics → buy-now panel) so we
+  // read CTA events for every studio kind via the same SSoT predicate.
   let ctaClicks: number | undefined;
   let ctaClickThroughRate: number | undefined;
-  if (kind === "video") {
+  if (isStudioArtifactKind(kind)) {
     const [row] = await db
       .select({ n: count() })
       .from(schema.videoAnalytics)

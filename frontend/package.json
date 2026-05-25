@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node ./scripts/inject-build-env.mjs",
     "build": "vite build && node ./scripts/update-config.mjs && node ./scripts/prerender.mjs",
     "deploy": "npm run build && wrangler pages deploy dist --project-name hired --commit-dirty=true",
     "deploy:frontend": "wrangler pages deploy dist --project-name hired --commit-dirty=true",

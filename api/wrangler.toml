@@ -95,6 +95,11 @@ PAYMENT_PROVIDER = "helcim"
 # wrangler secret put MICROSOFT_CLIENT_ID     # Azure Portal → App registrations
 # wrangler secret put MICROSOFT_CLIENT_SECRET # Callback: https://api.hired.video/api/auth/oauth/microsoft/callback
 # wrangler secret put API_URL                 # https://api.hired.video (used to build OAuth callback URLs)
+# wrangler secret put TURNSTILE_SECRET_KEY    # Cloudflare dashboard → Turnstile → site → Secret key.
+                                              # Paired with the frontend's VITE_TURNSTILE_SITE_KEY (managed via
+                                              # frontend/scripts/inject-build-env.mjs). Gates every unauthenticated
+                                              # entry endpoint (register / login / forgot-password / magic-link)
+                                              # via the shared captchaSoftCheck — miss is a soft signal per #1122.
 
 [env.production]
 name = "hired-api"

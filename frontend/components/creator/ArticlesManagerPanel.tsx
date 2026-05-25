@@ -31,6 +31,11 @@ import {
 } from "@/lib/services/article-service";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import MediaPicker from "@/components/shared/MediaPicker";
+import { LocationPicker } from "@/components/location/LocationPicker";
+import {
+  locationsService,
+  type ContentLocationSet,
+} from "@/lib/services/locations-service";
 
 type Mode = "list" | "edit";
 
@@ -65,6 +70,13 @@ export default function ArticlesManagerPanel() {
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  // Structured geo tags (gap #1138). Hydrated from the server on edit
+  // open; persisted via locationsService.setForEntity after the article
+  // save resolves. Optional — articles can be country-wide / global.
+  const [locations, setLocations] = useState<ContentLocationSet>({
+    origin: null,
+    serves: [],
+  });
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -93,6 +105,7 @@ export default function ArticlesManagerPanel() {
     setCategory("");
     setTagsInput("");
     setCoverImageUrl("");
+    setLocations({ origin: null, serves: [] });
     setMode("edit");
   };
 
@@ -105,6 +118,39 @@ export default function ArticlesManagerPanel() {
     setTagsInput((a.tags ?? []).join(", "));
     setCoverImageUrl(a.coverImageUrl ?? "");
     setMode("edit");
+    // Hydrate existing geo tags. Failure is non-fatal — the editor just
+    // opens with an empty picker (creator can re-pick on re-save).
+    void locationsService
+      .getForEntity("article", a.id)
+      .then((rows) => {
+        const origin = rows.find((r) => r.role === "origin") ?? null;
+        const serves = rows.filter((r) => r.role === "serves");
+        setLocations({
+          origin: origin
+            ? {
+                countryId: origin.countryId,
+                stateId: origin.stateId,
+                cityId: origin.cityId,
+                postalCode: origin.postalCode,
+                latitude: origin.latitude,
+                longitude: origin.longitude,
+                label: origin.label,
+                isRemote: origin.isRemote,
+              }
+            : null,
+          serves: serves.map((s) => ({
+            countryId: s.countryId,
+            stateId: s.stateId,
+            cityId: s.cityId,
+            postalCode: s.postalCode,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            label: s.label,
+            isRemote: s.isRemote,
+          })),
+        });
+      })
+      .catch(() => setLocations({ origin: null, serves: [] }));
   };
 
   const buildInput = () => ({
@@ -131,6 +177,16 @@ export default function ArticlesManagerPanel() {
         return [saved, ...filtered];
       });
       setEditing(saved);
+      // Persist geo tags via the generic location endpoint. Best-effort:
+      // the article already saved, so a tag-write failure logs + carries
+      // on rather than blocking the user.
+      if (locations.origin || (locations.serves ?? []).length > 0) {
+        try {
+          await locationsService.setForEntity("article", saved.id, locations);
+        } catch (locErr) {
+          console.warn("Failed to save article locations:", locErr);
+        }
+      }
       toast({ title: "Saved" });
     } catch (e: unknown) {
       toast({ title: "Save failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
@@ -369,6 +425,20 @@ export default function ArticlesManagerPanel() {
               <Label htmlFor="tags">Tags (comma-separated)</Label>
               <Input id="tags" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="resume, ats, interview" disabled={locked} />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Geographic relevance (optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Pin a primary location and any audience regions you want this article to reach.
+              Leave empty for global articles.
+            </p>
+            <LocationPicker
+              value={locations}
+              onChange={setLocations}
+              multiRegion
+              showRemote={false}
+              originLabel="Primary location"
+            />
           </div>
           <div>
             <Label htmlFor="body">Body (Markdown)</Label>

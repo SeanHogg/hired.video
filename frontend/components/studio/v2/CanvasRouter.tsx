@@ -54,6 +54,10 @@ export type CanvasRuntimeSurfaces = {
    *  onion-skin overlay; runtime owns its own state shape
    *  (`AnimationState` in `shared/animation-state.ts`). */
   animation?: ReactNode;
+  /** CAD runtime surface (#930). Mounted when `mediaKind === "cad"`.
+   *  2D vector drafting; runtime owns its own state shape
+   *  (`CadState` in `shared/cad-state.ts`). */
+  cad?: ReactNode;
 };
 
 interface CanvasRouterProps {
@@ -75,6 +79,9 @@ export default function CanvasRouter({
   }
   if (mediaKind === "animation" && surfaces.animation !== undefined) {
     return surfaces.animation;
+  }
+  if (mediaKind === "cad" && surfaces.cad !== undefined) {
+    return surfaces.cad;
   }
   return surfaces.timeline;
 }
