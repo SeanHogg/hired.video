@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import type { UserVideo } from "@/lib/services/studio-service";
 import SectionEditButton from "./SectionEditButton";
+import { useProfileSectionVisibility } from "./profile-sections-context";
 
 interface VideoResumeSectionProps {
   // All of the user's published videos for the profile. This section
@@ -20,6 +21,7 @@ export default function VideoResumeSection({
   onEdit,
 }: VideoResumeSectionProps) {
   const { t } = useTranslation();
+  const sectionVisible = useProfileSectionVisibility("videoResume");
 
   // Visibility (project.is_public) is enforced server-side; this filter
   // only narrows by subject association. A v2 NLE project may have a
@@ -27,6 +29,7 @@ export default function VideoResumeSection({
   // `studio_projects.is_public=true`.
   const resumeVideos = videos.filter((v) => (v.subjectKinds ?? []).includes("resume"));
 
+  if (!sectionVisible) return null;
   if (resumeVideos.length === 0 && !isOwner) return null;
 
   return (

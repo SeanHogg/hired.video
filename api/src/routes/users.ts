@@ -10,6 +10,11 @@ import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import {
+  resolveProfileSections,
+  sanitizeProfileSectionsInput,
+  type StoredProfileSections,
+} from "../../../shared/profile-sections.js";
 import { isUuid } from "../../../shared/value-types.js";
 import type { UserActorRow } from "../repositories/usersRepository.js";
 import { splitName, toUserActor } from "../services/user/userActor.js";
@@ -31,6 +36,7 @@ const profileCols = {
   skills: userProfiles.skills, industries: userProfiles.industries, preferredRoles: userProfiles.preferredRoles,
   profileVisibility: userProfiles.profileVisibility, customUrlSlug: userProfiles.customUrlSlug,
   providesServices: userProfiles.providesServices,
+  profileSections: userProfiles.profileSections,
   updatedAt: userProfiles.updatedAt,
 } as const;
 
@@ -79,6 +85,10 @@ const UpdateProfileSchema = z.object({
   preferredRoles: z.array(z.string()).optional(),
   role: z.string().optional(),
   profileVisibility: z.enum(["public", "private", "connections"]).optional(),
+  // Partial of `ProfileSections` (shared/profile-sections.ts). Each key
+  // is optional and merged over current storage via upsert. Unknown keys
+  // are dropped by `sanitizeProfileSectionsInput` server-side.
+  profileSections: z.record(z.string(), z.boolean()).optional(),
 });
 
 const SendConnectionRequestSchema = z.object({
@@ -187,6 +197,7 @@ function toUserProfileDto(
     skills?: string[] | null; industries?: string[] | null; preferredRoles?: string[] | null;
     providesServices?: boolean | null;
     profileVisibility?: string | null;
+    profileSections?: StoredProfileSections | Record<string, boolean> | null;
     updatedAt?: Date | string | null;
   } | null,
   privacyOptions?: {
@@ -275,6 +286,15 @@ function toUserProfileDto(
     industries: profile?.industries ?? [],
     preferredRoles: profile?.preferredRoles ?? [],
     providesServices: profile?.providesServices ?? false,
+    // Resolved client-friendly visibility map. The raw partial lives at
+    // `profileSectionsRaw` (only set if the owner has stored overrides) so
+    // the settings UI knows which keys were explicit vs. inherited from
+    // `getDefaultProfileSections(role)`.
+    profileSections: resolveProfileSections(
+      (profile?.profileSections ?? null) as StoredProfileSections | null,
+      row.role,
+    ),
+    profileSectionsRaw: (profile?.profileSections ?? null) as StoredProfileSections | null,
     isCreator: creator?.isActive === true && creator?.endedAt == null,
     creatorPrograms: {
       video: creator?.videoActive === true,
@@ -458,6 +478,9 @@ function buildProfileUpdates(d: UpdateProfileInput): Record<string, unknown> {
   if (d.industries !== undefined) updates.industries = d.industries;
   if (d.preferredRoles !== undefined) updates.preferredRoles = d.preferredRoles;
   if (d.profileVisibility !== undefined) updates.profileVisibility = d.profileVisibility;
+  if (d.profileSections !== undefined) {
+    updates.profileSections = sanitizeProfileSectionsInput(d.profileSections);
+  }
   return updates;
 }
 

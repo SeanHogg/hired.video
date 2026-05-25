@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { classifyJobSector } from "../../../../shared/sectors.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
 
@@ -301,6 +302,9 @@ export interface JobQuery {
   salaryMin?: number;
   salaryMax?: number;
   isRemote?: boolean;
+  /** Sector filter (#1168). Maps to `job_items.sector` via the partial
+   *  index from migration 0112. */
+  sector?: string;
   /**
    * Pre-resolved geo intersection — list of job ids that matched the
    * structured LocationFilter. Routes call LocationService.applyLocationFilter
@@ -441,7 +445,8 @@ export async function getPublicJobs(filters?: JobQuery,
     filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,
     filters?.isRemote !== undefined ? eq(jobItems.isRemote, filters.isRemote) : undefined,
     filters?.salaryMin !== undefined ? gte(jobItems.salaryMin as any, String(filters.salaryMin)) : undefined,
-    filters?.salaryMax !== undefined ? lte(jobItems.salaryMax as any, String(filters.salaryMax)) : undefined);
+    filters?.salaryMax !== undefined ? lte(jobItems.salaryMax as any, String(filters.salaryMax)) : undefined,
+    filters?.sector ? eq((jobItems as any).sector, filters.sector) : undefined);
 
   const [rows, countResult] = await Promise.all([
     db.select().from(jobItems).where(whereClause).orderBy(desc(jobItems.createdAt)).limit(limit).offset(offset),
@@ -1179,6 +1184,12 @@ export async function createTrackedJob(input: {
     }
   }
 
+  // Heuristic sector tag. Pure shared classifier — see #1172. Null when
+  // no keyword hits with enough confidence; tracked + extracted jobs
+  // then surface in sector search only after a human edits them via
+  // JobCreatePage's <SectorPicker>.
+  const sector = classifyJobSector(input.title, input.description);
+
   const [row] = await db
     .insert(jobItems)
     .values({
@@ -1193,6 +1204,7 @@ export async function createTrackedJob(input: {
       salaryMax: input.salaryMax !== undefined ? String(input.salaryMax) : undefined,
       salaryCurrency: input.salaryCurrency || "USD",
       skillsRequired: input.skills ?? [],
+      sector,
       details,
       isRemote: input.isRemote ?? false,
       isActive: true,

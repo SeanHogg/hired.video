@@ -101,6 +101,7 @@ async function publicJobsFromQuery(
       query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
     salaryMin: query.salaryMin ? Number(query.salaryMin) : undefined,
     salaryMax: query.salaryMax ? Number(query.salaryMax) : undefined,
+    sector: query.sector || undefined,
     entityIdAllowlist: allow,
   });
 }

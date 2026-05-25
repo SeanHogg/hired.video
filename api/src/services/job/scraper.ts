@@ -17,6 +17,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
+import { classifyJobSector } from "../../../../shared/sectors.js";
 
 type Source = typeof schema.jobBoardSources.$inferSelect;
 
@@ -82,6 +83,12 @@ export async function scrapeJobSource(
           continue;
         }
 
+        // Heuristic sector classification — pure keyword match against
+        // the SECTORS enum. Returns null when no sector hits with enough
+        // confidence; we leave the row untagged in that case rather than
+        // guessing. See `classifyJobSector` in shared/sectors.ts (#1172).
+        const sector = classifyJobSector(item.title, item.description);
+
         await db.insert(schema.jobItems).values({
           title: item.title,
           description: item.description ?? "",
@@ -89,6 +96,7 @@ export async function scrapeJobSource(
           location: item.location ?? "",
           jobType: item.jobType ?? "Full-time",
           sourceUrl: dedupUrl,
+          sector,
           isActive: true,
         } as any);
 

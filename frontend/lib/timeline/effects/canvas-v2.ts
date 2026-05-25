@@ -1430,3 +1430,248 @@ function numberOr(v: unknown, fallback: number): number {
 function stringOr(v: unknown, fallback: string): string {
   return typeof v === "string" ? v : fallback;
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Comic widget appliers (#939 Phase 2). The editor's DOM preview path
+// renders these via React; the canvas-2D render path needs equivalent
+// pixel logic so motion-comic exports (mp4 / gif) draw them faithfully
+// instead of as no-op rects.
+//
+// Three primitives:
+//   - `canvas-v2:speech-bubble` — rounded rect with a tail polygon
+//     pointing toward `tailX / tailY` (fractional, 0..1 like the rect).
+//   - `canvas-v2:caption-box` — bordered rect with italic-flagged text.
+//   - `canvas-v2:sfx-burst` — star / jagged / lightning shape with a
+//     short text label centred inside.
+//
+// Per the DRY rule: text-wrap goes through the existing `wrapAndPaint`
+// path the v2 text/cta appliers already use (line breaks + ellipsis
+// for overflow). Shape paths are inline because they're each a few
+// trig lines; no extra primitives module needed yet.
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:speech-bubble",
+  label: "Speech bubble",
+  category: "title",
+  defaults: {
+    x: 0.5,
+    y: 0.2,
+    width: 0.35,
+    height: 0.18,
+    bubbleColor: "#ffffff",
+    strokeColor: "#0f172a",
+    strokeWidth: 3,
+    textColor: "#0f172a",
+    text: "Hello!",
+    fontPx: 24,
+    fontFamily: "sans-serif",
+    fontWeight: "bold",
+    // Tail anchor — fractional canvas coords for the tail tip. The
+    // tail base sits at the bubble's bottom edge; this is where the
+    // pointed end lands (typically over a character's mouth).
+    tailX: 0.55,
+    tailY: 0.42,
+  },
+  paramHints: {
+    bubbleColor: { type: "color" },
+    strokeColor: { type: "color" },
+    textColor:   { type: "color" },
+  },
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
+    ctx.save();
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+
+    const { x, y, w, h } = rect;
+    const radius = Math.min(24, Math.min(w, h) * 0.18);
+    const tailX = numberOr(effect.params.tailX, 0.5) * canvas.width;
+    const tailY = numberOr(effect.params.tailY, (rect.y + rect.h) / canvas.height + 0.05) * canvas.height;
+    // Tail base anchor — clamp to a point along the bubble's bottom
+    // edge that's inside the rounded-corner region.
+    const baseX = Math.max(x + radius, Math.min(x + w - radius, tailX));
+    const baseY = y + h;
+    const baseHalfWidth = Math.max(4, Math.min(w * 0.1, 14));
+
+    // Combined bubble + tail as one closed path so the stroke wraps
+    // both consistently.
+    ctx.fillStyle = stringOr(effect.params.bubbleColor, "#ffffff");
+    ctx.strokeStyle = stringOr(effect.params.strokeColor, "#0f172a");
+    ctx.lineWidth = numberOr(effect.params.strokeWidth, 3);
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    // Rounded rect path
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.arcTo(x + w, y, x + w, y + radius, radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+    // Walk along the bottom toward the tail, jog out and back.
+    ctx.lineTo(baseX + baseHalfWidth, y + h);
+    ctx.lineTo(tailX, tailY);
+    ctx.lineTo(baseX - baseHalfWidth, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.arcTo(x, y + h, x, y + h - radius, radius);
+    ctx.lineTo(x, y + radius);
+    ctx.arcTo(x, y, x + radius, y, radius);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Text content — center-aligned, vertically centered in the
+    // rounded-rect portion (above the tail).
+    const fontPx = numberOr(effect.params.fontPx, 24);
+    const weight = stringOr(effect.params.fontWeight, "bold");
+    const family = stringOr(effect.params.fontFamily, "sans-serif");
+    ctx.font = `${weight === "normal" ? "400" : "700"} ${fontPx}px ${family}`;
+    ctx.fillStyle = stringOr(effect.params.textColor, "#0f172a");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const text = stringOr(effect.params.text, "");
+    wrapText(ctx, text, x + w / 2, y + h / 2, w - 32, fontPx * 1.2);
+
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
+  },
+});
+
+registerEffect({
+  kind: "canvas-v2:caption-box",
+  label: "Caption box",
+  category: "title",
+  defaults: {
+    x: 0.1,
+    y: 0.85,
+    width: 0.8,
+    height: 0.1,
+    bgColor: "#fef9c3", // pale yellow — classic comic narration box
+    strokeColor: "#0f172a",
+    strokeWidth: 2,
+    textColor: "#0f172a",
+    text: "Meanwhile, in the city below…",
+    fontPx: 18,
+    fontFamily: "Georgia, serif",
+    italic: true,
+  },
+  paramHints: {
+    bgColor:     { type: "color" },
+    strokeColor: { type: "color" },
+    textColor:   { type: "color" },
+  },
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
+    ctx.save();
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+
+    const { x, y, w, h } = rect;
+    const bg = stringOr(effect.params.bgColor, "#fef9c3");
+    const stroke = stringOr(effect.params.strokeColor, "#0f172a");
+    const strokeWidth = numberOr(effect.params.strokeWidth, 2);
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeRect(x, y, w, h);
+
+    const fontPx = numberOr(effect.params.fontPx, 18);
+    const italic = effect.params.italic !== false;
+    const family = stringOr(effect.params.fontFamily, "Georgia, serif");
+    ctx.font = `${italic ? "italic " : ""}500 ${fontPx}px ${family}`;
+    ctx.fillStyle = stringOr(effect.params.textColor, "#0f172a");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const text = stringOr(effect.params.text, "");
+    wrapText(ctx, text, x + w / 2, y + h / 2, w - 24, fontPx * 1.3);
+
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
+  },
+});
+
+registerEffect({
+  kind: "canvas-v2:sfx-burst",
+  label: "SFX burst",
+  category: "title",
+  defaults: {
+    x: 0.55,
+    y: 0.55,
+    width: 0.25,
+    height: 0.25,
+    shape: "star", // "star" | "jagged" | "lightning"
+    fillColor: "#facc15",
+    strokeColor: "#0f172a",
+    strokeWidth: 3,
+    textColor: "#0f172a",
+    text: "BOOM!",
+    fontPx: 32,
+    fontFamily: "Impact, sans-serif",
+    rotation: 12, // SFX bursts typically tilt for energy
+  },
+  paramHints: {
+    fillColor:   { type: "color" },
+    strokeColor: { type: "color" },
+    textColor:   { type: "color" },
+  },
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
+    ctx.save();
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+
+    const { x, y, w, h } = rect;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const radiusOuter = Math.min(w, h) / 2;
+    const radiusInner = radiusOuter * 0.55;
+    const shape = stringOr(effect.params.shape, "star");
+    const fill = stringOr(effect.params.fillColor, "#facc15");
+    const stroke = stringOr(effect.params.strokeColor, "#0f172a");
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = numberOr(effect.params.strokeWidth, 3);
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    if (shape === "lightning") {
+      // Two-bolt zigzag inscribed in the bbox.
+      ctx.moveTo(cx - radiusOuter * 0.3, y);
+      ctx.lineTo(cx + radiusOuter * 0.4, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx + radiusOuter * 0.5, y + h);
+      ctx.lineTo(cx - radiusOuter * 0.4, cy + radiusOuter * 0.2);
+      ctx.lineTo(cx + radiusOuter * 0.1, cy + radiusOuter * 0.1);
+      ctx.closePath();
+    } else {
+      // Star / jagged — N-pointed star with alternating inner/outer
+      // radii. Star = 12 points (classic comic "POW"), jagged = 24
+      // (more chaotic). Both rotate by the param's rotation (which
+      // applyWidgetCanvasState already baked into ctx).
+      const pointCount = shape === "jagged" ? 24 : 12;
+      for (let i = 0; i < pointCount * 2; i++) {
+        const r = i % 2 === 0 ? radiusOuter : radiusInner;
+        const angle = (i / (pointCount * 2)) * Math.PI * 2 - Math.PI / 2;
+        const px = cx + Math.cos(angle) * r;
+        const py = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // Label centered inside the star/burst.
+    const fontPx = numberOr(effect.params.fontPx, 32);
+    const family = stringOr(effect.params.fontFamily, "Impact, sans-serif");
+    ctx.font = `900 ${fontPx}px ${family}`;
+    ctx.fillStyle = stringOr(effect.params.textColor, "#0f172a");
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(stringOr(effect.params.text, ""), cx, cy);
+
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
+  },
+});

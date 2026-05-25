@@ -18,7 +18,7 @@
  * — tracked in the gap register as a follow-up.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import {
   type SectorMeta,
 } from "@shared/sectors";
 import { sectorTemplateRec } from "@shared/sector-templates";
+import { resumeService } from "@/lib/services/resume-service";
 
 interface ScoredSector {
   meta: SectorMeta;
@@ -73,10 +74,59 @@ export default function PivotExplorer() {
 
   const [params] = useSearchParams();
   const toParam = params.get("to");
+  const fromResume = params.get("fromResume");
   const focusSector: Sector | null =
     toParam && isValidSector(toParam) ? toParam : null;
 
   const [skillsInput, setSkillsInput] = useState("");
+  const [hydratingFromResume, setHydratingFromResume] = useState(false);
+  const [resumeHydrationError, setResumeHydrationError] = useState<string | null>(null);
+
+  // Hydrate from a resume when ?fromResume=<id> is set (#1170). Each
+  // skill's `name` + its `keywords[]` join into the comma-separated
+  // input so the keyword matcher in `scoreSector` has more bridges to
+  // hit. Best-effort: failure leaves the input untouched and surfaces a
+  // non-blocking note.
+  useEffect(() => {
+    if (!fromResume) return;
+    let alive = true;
+    setHydratingFromResume(true);
+    setResumeHydrationError(null);
+    void resumeService
+      .getResumeById(fromResume)
+      .then((resume) => {
+        if (!alive) return;
+        const tokens: string[] = [];
+        for (const skill of resume.skills ?? []) {
+          if (skill.name) tokens.push(skill.name);
+          for (const kw of skill.keywords ?? []) {
+            if (kw) tokens.push(kw);
+          }
+        }
+        if (tokens.length > 0) {
+          // De-dupe case-insensitively so "Python" + "python" don't both
+          // show up after a sloppy resume parse.
+          const seen = new Set<string>();
+          const unique = tokens.filter((t) => {
+            const k = t.toLowerCase();
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          setSkillsInput(unique.join(", "));
+        }
+      })
+      .catch(() => {
+        if (alive) setResumeHydrationError("Couldn't load that resume — fill in skills manually below.");
+      })
+      .finally(() => {
+        if (alive) setHydratingFromResume(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [fromResume]);
+
   const skills = useMemo(
     () => skillsInput.split(",").map((s) => s.trim()).filter(Boolean),
     [skillsInput],
@@ -114,8 +164,15 @@ export default function PivotExplorer() {
                 value={skillsInput}
                 onChange={(e) => setSkillsInput(e.target.value)}
                 placeholder="e.g. python, on-call rotations, incident response, sql, customer support"
+                disabled={hydratingFromResume}
               />
-              {skills.length > 0 && (
+              {hydratingFromResume && (
+                <p className="text-xs text-muted-foreground">Loading skills from your resume…</p>
+              )}
+              {resumeHydrationError && (
+                <p className="text-xs text-amber-600">{resumeHydrationError}</p>
+              )}
+              {!hydratingFromResume && skills.length > 0 && (
                 <p className="text-xs text-muted-foreground">
                   Matching {skills.length} skill{skills.length === 1 ? "" : "s"} against sector bridges.
                 </p>

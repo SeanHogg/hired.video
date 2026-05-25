@@ -84,10 +84,20 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
     }
     case "cad": {
       if (!snapshot.cadState) return null;
-      // CAD Phase 1 (#930) — SVG is the in-tree default. PDF / DXF
-      // ride the same facade once their encoders land; for now the
-      // SVG profile produces a faithful vector export every CAD
-      // viewer + browser can read.
+      // CAD Phase 1 (#930) — dispatch by output profile. SVG + DXF +
+      // PDF all ship today; STL + STEP are 3D-only and stay deferred
+      // until the `cad_3d` runtime lands. The PNG path falls through
+      // to the canvas-2D rasteriser (a CAD drawing rendered at 150dpi
+      // — same path the PDF encoder uses internally).
+      const profile = (await import("@shared/media-kinds")).defaultOutputProfile("cad");
+      if (profile.container === "dxf") {
+        const { renderCadDxf } = await import("@/lib/studio/cad/cad-dxf-encoder");
+        return renderCadDxf(snapshot.cadState);
+      }
+      if (profile.container === "pdf") {
+        const { renderCadPdf } = await import("@/lib/studio/cad/cad-pdf-encoder");
+        return renderCadPdf(snapshot.cadState);
+      }
       const { renderCadSvg } = await import("@/lib/studio/cad/cad-export");
       return renderCadSvg(snapshot.cadState);
     }
@@ -131,6 +141,7 @@ export function extensionForBlob(blob: Blob): string {
   if (blob.type === "image/png") return "png";
   if (blob.type === "image/webp") return "webp";
   if (blob.type === "image/svg+xml") return "svg";
+  if (blob.type === "application/dxf") return "dxf";
   if (blob.type === "image/apng") return "apng";
   if (blob.type.includes("webm")) return "webm";
   if (blob.type.includes("wav")) return "wav";

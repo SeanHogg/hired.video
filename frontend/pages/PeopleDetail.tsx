@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 
-import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import SkillNetwork from "@/components/SkillNetwork";
 import { JobMatchesCard, SeekerAnalyticsCard, UpcomingInterviewsCard } from "@/components/dashboard/shared";
 
@@ -32,6 +31,8 @@ import ProfileProgramPanel, {
 import SkillsSection from "@/components/profile/sections/SkillsSection";
 import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
 import VideoResumeSection from "@/components/profile/sections/VideoResumeSection";
+import MasterResumeSection from "@/components/profile/sections/MasterResumeSection";
+import { ProfileSectionsProvider } from "@/components/profile/sections/profile-sections-context";
 import VisitorActionsSection, {
   type ConnectionState,
 } from "@/components/profile/sections/VisitorActionsSection";
@@ -500,7 +501,10 @@ function PeopleDetailContent() {
   ];
 
   return (
-    <>
+    <ProfileSectionsProvider
+      stored={(profile as any)?.profileSectionsRaw ?? (profile as any)?.profileSections ?? null}
+      role={(profile as any)?.role ?? null}
+    >
       {shell(
         <div className="max-w-6xl mx-auto p-4 md:p-6">
           {/* Hub-level tab strip — keeps the People / Connections /
@@ -590,19 +594,12 @@ function PeopleDetailContent() {
 
                   <VideoResumeSection videos={videos} isOwner={isOwner} />
 
-                  {masterResume ? (
-                    <div className="-mx-4 md:-mx-6 [&_.max-w-6xl]:max-w-none">
-                      <DeclarativeResumeRenderer
-                        resume={masterResume}
-                        descriptor={resumeDescriptor}
-                        embedded
-                        isOwner={isOwner}
-                        onEditSection={handleSectionEdit}
-                      />
-                    </div>
-                  ) : (
-                    <NoResumeCard isOwner={isOwner} />
-                  )}
+                  <MasterResumeSection
+                    masterResume={masterResume}
+                    descriptor={resumeDescriptor}
+                    isOwner={isOwner}
+                    onEditSection={handleSectionEdit}
+                  />
 
                   <SkillNetwork
                     resumeData={masterResume?.content}
@@ -784,28 +781,7 @@ function PeopleDetailContent() {
           />
         </>
       )}
-    </>
-  );
-}
-
-function NoResumeCard({ isOwner }: { isOwner: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <div className="rounded-lg border bg-card text-card-foreground p-10 text-center">
-      <h3 className="font-semibold text-lg mb-2">
-        {isOwner ? t("messages.noMasterResumeFound") : t("messages.professionalDetailsPrivate")}
-      </h3>
-      <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-        {isOwner
-          ? t("messages.noMasterResumeOwnerCta")
-          : t("messages.noMasterResumeVisitor")}
-      </p>
-      {isOwner && (
-        <Button asChild>
-          <Link to="/resumes">{t("actions.manageResumes")}</Link>
-        </Button>
-      )}
-    </div>
+    </ProfileSectionsProvider>
   );
 }
 

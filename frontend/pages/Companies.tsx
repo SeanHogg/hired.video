@@ -19,7 +19,13 @@ import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
 import Pagination, { usePagination } from "@/components/Pagination";
-import SearchBar, { type SearchFilters } from "@/components/SearchBar";
+import type { SearchFilters } from "@/components/SearchBar";
+import {
+  locationFilterFromQuery,
+  applyLocationFilterToQuery,
+} from "@/components/location/LocationFilter";
+import LocationFilterButton from "@/components/location/LocationFilterButton";
+import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
 import { INDUSTRIES } from "@/lib/constants/industries";
 import { useHeaderFilters } from "@/lib/header-filters";
@@ -49,11 +55,28 @@ export default function Companies() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
   const { isAuthenticated, user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlQuery = searchParams.get("q") ?? "";
   const urlIndustry = searchParams.get("industry") ?? "";
   const urlSize = searchParams.get("size") ?? "";
   const urlLocation = searchParams.get("location") ?? "";
+
+  // Structured geo filter — shared component, same URL state-shape as Jobs /
+  // People / Search so deep-links survive cross-surface nav. company-service
+  // currently honours only the free-text `location` fallback; structured
+  // ids ride along for forward compat (gap entry in README).
+  const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
+    locationFilterFromQuery(searchParams),
+  );
+  useEffect(() => {
+    setGeoFilter(locationFilterFromQuery(searchParams));
+  }, [searchParams]);
+  const handleGeoFilterChange = (next: LocationFilterValue) => {
+    setGeoFilter(next);
+    const params = new URLSearchParams(searchParams);
+    applyLocationFilterToQuery(params, next);
+    setSearchParams(params);
+  };
 
   useHeaderFilters([
     {
@@ -151,7 +174,7 @@ export default function Companies() {
         search: searchFilters.search || undefined,
         industry: searchFilters.industry || undefined,
         size: searchFilters.size || undefined,
-        location: searchFilters.location || undefined,
+        location: geoFilter.text || searchFilters.location || undefined,
         page: currentPage,
         limit: itemsPerPage,
       };
@@ -166,7 +189,7 @@ export default function Companies() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchFilters, currentPage, itemsPerPage]);
+  }, [searchFilters, geoFilter, currentPage, itemsPerPage]);
 
   // Fetch companies when filters or page changes
   useEffect(() => {
@@ -238,18 +261,6 @@ export default function Companies() {
     }
   };
 
-  const handleSearch = (query: string) => {
-    setSearchFilters((prev) => ({ ...prev, search: query }));
-  };
-
-  const handleFilterChange = (filters: SearchFilters) => {
-    setSearchFilters(filters);
-  };
-
-  const handleClearFilters = () => {
-    setSearchFilters({});
-  };
-
   // Owned comes from /api/Companies/me. Tracked (follow graph) ships
   // with #361 follow-up; left empty until that route exists.
   const getCompaniesForUser = () => ({
@@ -262,24 +273,8 @@ export default function Companies() {
     const companiesData = getCompaniesForUser();
     const trackedCompanyCount = companiesData.tracked.length;
 
-    const browseSearchBar = (
-      <div className="mb-6">
-        <SearchBar
-          context="companies"
-          value={searchFilters.search}
-          filters={searchFilters}
-          onSearch={handleSearch}
-          onFilterChange={handleFilterChange}
-          onClearFilters={handleClearFilters}
-          hideSearchInput
-          hideFilters
-        />
-      </div>
-    );
-
     const renderBrowseBody = () => (
       <div className="space-y-6">
-        {browseSearchBar}
         <div>
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Search className="h-5 w-5" />
@@ -441,6 +436,10 @@ export default function Companies() {
 
     const browseActions = (
       <>
+        <LocationFilterButton
+          value={geoFilter}
+          onChange={handleGeoFilterChange}
+        />
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
         <ListsButton entityType="company" />
       </>

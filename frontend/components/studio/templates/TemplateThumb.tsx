@@ -9,6 +9,7 @@ import { COMIC_GENRES, type ComicGenreId } from "@shared/comic-genres";
 import { DRAWING_TEMPLATE_PRESETS } from "@/lib/studio/drawing/drawing-template-presets";
 import DrawingPlaceholderThumbnail from "@/components/studio/drawing/DrawingPlaceholderThumbnail";
 import { getAnimationTemplatePreset } from "@/lib/studio/animation/animation-seeds";
+import { getCadTemplatePreset } from "@/lib/studio/cad/cad-seeds";
 
 interface TemplateThumbProps {
   template: TemplateDef;
@@ -67,6 +68,16 @@ function renderThumb(id: ContentTemplate) {
     const preset = getAnimationTemplatePreset(id);
     if (preset) {
       return <AnimationThumb id={id} preset={preset} />;
+    }
+  }
+  // CAD-template thumbnails (#930). Single SSoT
+  // (`CAD_TEMPLATE_PRESETS` in cad-seeds.ts) drives the visual — a
+  // technical-drawing-shaped grid + dimension callout + scale chip.
+  // Adding a 5th CAD template needs ZERO changes here.
+  if (id.startsWith("cad-")) {
+    const preset = getCadTemplatePreset(id);
+    if (preset) {
+      return <CadThumb id={id} preset={preset} />;
     }
   }
   switch (id) {
@@ -663,6 +674,94 @@ function AnimationThumb({
         <span className={cn("rounded-full px-1.5 py-0.5 text-[7px] font-bold", accent.chip)}>
           {preset.starterFrames}f · {preset.fps}fps
         </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * CAD-template thumbnail — drafting-paper-shaped card with a grid
+ * overlay + scale + dimension chip. All 4 CAD templates share this
+ * component (DRY); the per-template accent + label come from the
+ * preset (sheet dimensions in mm, grid spacing, unit). The visual
+ * reads as "engineering drawing" at a glance — distinct from the
+ * raster-paint look of `<AnimationThumb>` / `<DrawingPlaceholderThumbnail>`.
+ */
+function CadThumb({
+  id,
+  preset,
+}: {
+  id: string;
+  preset: { widthMm: number; heightMm: number; unit: string; grid: { visibleSpacingMm: number } };
+}) {
+  // Per-id accent matches the audience the template targets (architect
+  // = cyan, mechanical = slate, electrical = emerald, blueprint =
+  // indigo). Stay distinct from comic / animation / drawing palettes.
+  const accent =
+    id === "cad-floor-plan"
+      ? { paper: "#f8fafc", grid: "#cbd5e1", ink: "#0f172a", chip: "bg-cyan-600 text-white" }
+      : id === "cad-part-drawing"
+      ? { paper: "#fafaf9", grid: "#d6d3d1", ink: "#1c1917", chip: "bg-slate-700 text-white" }
+      : id === "cad-electrical-schematic"
+      ? { paper: "#f0fdf4", grid: "#bbf7d0", ink: "#14532d", chip: "bg-emerald-600 text-white" }
+      : { paper: "#1e3a8a", grid: "#3b82f6", ink: "#dbeafe", chip: "bg-indigo-300 text-indigo-950" };
+  // Mock a few shapes appropriate to each id so cards read distinct
+  // without proliferating switch cases.
+  const overlay =
+    id === "cad-floor-plan" ? (
+      <>
+        {/* Three rooms: outer rect, two inner walls, a door arc */}
+        <rect x="6" y="6" width="88" height="44" fill="none" stroke={accent.ink} strokeWidth="1.5" />
+        <line x1="40" y1="6" x2="40" y2="32" stroke={accent.ink} strokeWidth="1" />
+        <line x1="40" y1="40" x2="40" y2="50" stroke={accent.ink} strokeWidth="1" />
+        <line x1="6" y1="28" x2="40" y2="28" stroke={accent.ink} strokeWidth="1" />
+        <path d="M 40 32 A 8 8 0 0 1 48 40" fill="none" stroke={accent.ink} strokeWidth="0.5" />
+      </>
+    ) : id === "cad-part-drawing" ? (
+      <>
+        {/* A part with two holes + leader lines */}
+        <rect x="20" y="14" width="60" height="28" rx="3" fill="none" stroke={accent.ink} strokeWidth="1.5" />
+        <circle cx="35" cy="28" r="3" fill="none" stroke={accent.ink} strokeWidth="1" />
+        <circle cx="65" cy="28" r="3" fill="none" stroke={accent.ink} strokeWidth="1" />
+        <line x1="20" y1="46" x2="80" y2="46" stroke={accent.ink} strokeWidth="0.5" />
+        <text x="50" y="51" fontSize="3.5" textAnchor="middle" fill={accent.ink}>60mm</text>
+      </>
+    ) : id === "cad-electrical-schematic" ? (
+      <>
+        {/* A simple circuit: resistor + capacitor + ground */}
+        <line x1="10" y1="28" x2="30" y2="28" stroke={accent.ink} strokeWidth="1" />
+        <polyline points="30,28 33,22 39,34 45,22 51,34 54,28 70,28" fill="none" stroke={accent.ink} strokeWidth="1" />
+        <line x1="70" y1="20" x2="70" y2="36" stroke={accent.ink} strokeWidth="1.5" />
+        <line x1="74" y1="20" x2="74" y2="36" stroke={accent.ink} strokeWidth="1.5" />
+        <line x1="72" y1="36" x2="72" y2="44" stroke={accent.ink} strokeWidth="1" />
+        <line x1="66" y1="44" x2="78" y2="44" stroke={accent.ink} strokeWidth="1.5" />
+        <line x1="68" y1="46" x2="76" y2="46" stroke={accent.ink} strokeWidth="1.5" />
+      </>
+    ) : (
+      <>
+        {/* Blueprint elevation: building outline + windows */}
+        <rect x="10" y="10" width="80" height="40" fill="none" stroke={accent.ink} strokeWidth="1.5" />
+        <polyline points="10,10 50,2 90,10" fill="none" stroke={accent.ink} strokeWidth="1.5" />
+        <rect x="22" y="24" width="10" height="14" fill="none" stroke={accent.ink} strokeWidth="0.8" />
+        <rect x="38" y="24" width="10" height="14" fill="none" stroke={accent.ink} strokeWidth="0.8" />
+        <rect x="54" y="24" width="10" height="14" fill="none" stroke={accent.ink} strokeWidth="0.8" />
+        <rect x="70" y="24" width="10" height="14" fill="none" stroke={accent.ink} strokeWidth="0.8" />
+      </>
+    );
+  return (
+    <div className="absolute inset-0" style={{ backgroundColor: accent.paper }}>
+      <svg viewBox="0 0 100 56" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+        {/* Grid */}
+        <defs>
+          <pattern id={`cad-grid-${id}`} width="6" height="6" patternUnits="userSpaceOnUse">
+            <path d="M 6 0 L 0 0 0 6" fill="none" stroke={accent.grid} strokeWidth="0.3" />
+          </pattern>
+        </defs>
+        <rect width="100" height="56" fill={`url(#cad-grid-${id})`} />
+        {overlay}
+      </svg>
+      <div className={cn("absolute bottom-1 right-1 rounded-sm px-1.5 py-0.5 text-[7px] font-bold", accent.chip)}>
+        {preset.widthMm}×{preset.heightMm}{preset.unit}
       </div>
     </div>
   );

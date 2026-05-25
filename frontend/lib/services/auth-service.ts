@@ -187,6 +187,9 @@ export type ProfileUpdate = Partial<
   >
 > & {
   summary?: string;
+  /** Per-section visibility map for /people/[id]. Partial of `ProfileSections`
+   * (shared/profile-sections.ts); missing keys fall back to role defaults. */
+  profileSections?: Record<string, boolean>;
 };
 
 // ============================================================================
@@ -553,6 +556,7 @@ export class AuthService {
     if (updates.profilePicture !== undefined) payload.avatar = updates.profilePicture;
     if (updates.profileVisibility !== undefined) payload.profileVisibility = updates.profileVisibility;
     if (updates.role !== undefined) payload.role = updates.role;
+    if (updates.profileSections !== undefined) payload.profileSections = updates.profileSections;
 
     logger.info("authService.updateProfile: PUT /api/users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(

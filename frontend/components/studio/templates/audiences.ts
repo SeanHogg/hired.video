@@ -29,7 +29,8 @@ export type Audience =
   | "voice_actor"
   | "game_dev"
   | "illustrator"
-  | "animator";
+  | "animator"
+  | "cad_user";
 
 export interface AudienceDef {
   id: Audience;
@@ -132,6 +133,11 @@ export const AUDIENCES: AudienceDef[] = [
     id: "animator",
     label: "Animators",
     blurb: "Frame-by-frame raster animation with onion-skin overlay — logo loops, reaction GIFs, explainer micro-loops exported as GIF / APNG / WebP.",
+  },
+  {
+    id: "cad_user",
+    label: "CAD users",
+    blurb: "Architects, mechanical engineers, electrical hobbyists drafting 2D plans + part drawings + schematics in the studio — exports as SVG, DXF, and PDF.",
   },
 ];
 

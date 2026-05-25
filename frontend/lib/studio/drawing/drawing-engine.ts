@@ -194,6 +194,15 @@ export function compositeLayers(
     transformOffset?: { x: number; y: number };
     transformScale?: { x: number; y: number };
     transformRotation?: number;
+    filters?: {
+      blur?: number;
+      brightness?: number;
+      contrast?: number;
+      saturate?: number;
+      hueRotate?: number;
+      grayscale?: number;
+      invert?: number;
+    };
   }>,
   layerCanvases: ReadonlyMap<string, HTMLCanvasElement>,
 ): void {
@@ -219,6 +228,12 @@ export function compositeLayers(
     // values so a future blend-mode addition doesn't crash the
     // compositor before its enum entry lands here.
     dest.globalCompositeOperation = canvasBlendOperation(layer.blendMode);
+    // Per-layer filter chain (#940 Image Phase 2 — Photoshop "Smart
+    // Filter" equivalent). Identity = empty string so layers without
+    // filters cost nothing. ctx.filter applies INSIDE the blend +
+    // opacity pass.
+    const filterStr = layerFiltersToCss(layer.filters);
+    dest.filter = filterStr;
     const offsetX = layer.transformOffset?.x ?? 0;
     const offsetY = layer.transformOffset?.y ?? 0;
     const scaleX = layer.transformScale?.x ?? 1;
@@ -228,6 +243,9 @@ export function compositeLayers(
       offsetX !== 0 || offsetY !== 0 || scaleX !== 1 || scaleY !== 1 || rotation !== 0;
     if (!hasNonIdentity) {
       dest.drawImage(layerCanvas, 0, 0);
+      // Reset filter for the next layer's pass — leaving it set
+      // would compound effects across layers.
+      dest.filter = "none";
       continue;
     }
     // Pivot at the layer canvas's centre so rotation + scale feel
@@ -240,6 +258,7 @@ export function compositeLayers(
     if (scaleX !== 1 || scaleY !== 1) dest.scale(scaleX, scaleY);
     dest.drawImage(layerCanvas, -cx, -cy);
     dest.restore();
+    dest.filter = "none";
   }
   dest.restore();
 }
@@ -650,6 +669,52 @@ export function serializeLayer(canvas: HTMLCanvasElement): string | null {
  *  above) and any future export path (flatten-to-PNG, PSD writer)
  *  call through this so a layer's blend mode renders identically
  *  everywhere. Closes #940's blend-mode half. */
+/** Translate a `LayerFilters` shape to the CSS / Canvas-2D `filter`
+ *  string the compositor applies. Returns `"none"` when no filter
+ *  knobs are non-identity — single SoT for the per-layer filter chain
+ *  (#940 Image Phase 2). Both the live editor compositor + future
+ *  export-to-PNG path call through this.
+ *
+ *  Order of operations matches the CSS spec — when multiple filter
+ *  primitives are supplied, they apply LEFT TO RIGHT, so the order
+ *  here is the canonical sequence. */
+export function layerFiltersToCss(
+  filters:
+    | {
+        blur?: number;
+        brightness?: number;
+        contrast?: number;
+        saturate?: number;
+        hueRotate?: number;
+        grayscale?: number;
+        invert?: number;
+      }
+    | undefined,
+): string {
+  if (!filters) return "none";
+  const parts: string[] = [];
+  if (filters.blur && filters.blur > 0) parts.push(`blur(${filters.blur}px)`);
+  if (filters.brightness !== undefined && filters.brightness !== 1) {
+    parts.push(`brightness(${filters.brightness})`);
+  }
+  if (filters.contrast !== undefined && filters.contrast !== 1) {
+    parts.push(`contrast(${filters.contrast})`);
+  }
+  if (filters.saturate !== undefined && filters.saturate !== 1) {
+    parts.push(`saturate(${filters.saturate})`);
+  }
+  if (filters.hueRotate && filters.hueRotate !== 0) {
+    parts.push(`hue-rotate(${filters.hueRotate}deg)`);
+  }
+  if (filters.grayscale && filters.grayscale > 0) {
+    parts.push(`grayscale(${filters.grayscale})`);
+  }
+  if (filters.invert && filters.invert > 0) {
+    parts.push(`invert(${filters.invert})`);
+  }
+  return parts.length === 0 ? "none" : parts.join(" ");
+}
+
 export function canvasBlendOperation(blendMode: string): GlobalCompositeOperation {
   switch (blendMode) {
     case "normal":      return "source-over";

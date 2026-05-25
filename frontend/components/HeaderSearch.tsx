@@ -191,6 +191,13 @@ export default function HeaderSearch() {
     extras?: Record<string, string>;
   }) => {
     const params = new URLSearchParams();
+    // Same-path submit — preserve the active sub-tab so typing in the
+    // header from `/resumes?tab=available` doesn't kick the user back to
+    // `?tab=mine`. Cross-path submits stay clean (no stale state leaks).
+    if (current.path === location.pathname) {
+      const tab = searchParams.get("tab");
+      if (tab) params.set("tab", tab);
+    }
     // Context-pinned params (e.g. category=tools) go first so explicit
     // overrides from the advanced panel can still replace them.
     for (const [key, value] of Object.entries(current.defaultParams ?? {})) {

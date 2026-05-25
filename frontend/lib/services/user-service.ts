@@ -47,6 +47,13 @@ export const UserProfileSchema = z.object({
     .optional(),
   openToWork: nullableBoolean(),
   providesServices: nullableBoolean(),
+  // Per-section visibility for /people/[id]. `profileSections` is
+  // server-resolved (all keys present, role defaults merged in);
+  // `profileSectionsRaw` is the partial of explicit owner overrides
+  // (or null) — the Settings panel reads this to distinguish a user
+  // toggle from an inherited default.
+  profileSections: z.record(z.string(), z.boolean()).nullable().optional(),
+  profileSectionsRaw: z.record(z.string(), z.boolean()).nullable().optional(),
   // When true, the owner has opted into a fully public profile that
   // unauthenticated visitors can view directly (no AuthOverlay). Designed
   // for creators / service providers using their profile as a promotion
@@ -215,6 +222,12 @@ export const PublicUserSchema = z.object({
   // See UserProfileSchema — opt-in flag that lets unauthenticated visitors
   // view the full /people/:slug page.
   promoteWithoutAuth: nullableBoolean(),
+  // Per-section visibility resolved server-side via
+  // resolveProfileSections(stored, role) — every key always set. The raw
+  // partial (only owner-set keys) ships alongside so the Settings UI can
+  // distinguish "user toggled this" from "inherited from role default".
+  profileSections: z.record(z.string(), z.boolean()).nullable().optional(),
+  profileSectionsRaw: z.record(z.string(), z.boolean()).nullable().optional(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
 });

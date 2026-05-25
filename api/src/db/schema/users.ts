@@ -220,6 +220,12 @@ export const userProfiles = pgTable("user_profiles", {
   homeLatitude: doublePrecision("home_latitude"),
   homeLongitude: doublePrecision("home_longitude"),
   homeRadiusKm: integer("home_radius_km"),
+  // Per-section visibility on /people/[id]. Partial of ProfileSections —
+  // missing keys fall back to `getDefaultProfileSections(role)` so every
+  // existing row (which has `{}`) automatically follows role-based
+  // defaults without a backfill. Shape and resolver live in
+  // shared/profile-sections.ts — never spot-check a single key here.
+  profileSections: jsonb("profile_sections").$type<Record<string, boolean>>().default({}).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

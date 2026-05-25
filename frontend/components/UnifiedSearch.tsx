@@ -47,11 +47,7 @@ import {
 import { resumeService } from "@/lib/services/resume-service";
 import { cn } from "@/lib/utils";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
-import {
-  LocationFilter,
-  locationFilterFromQuery,
-  applyLocationFilterToQuery,
-} from "@/components/location/LocationFilter";
+import { locationFilterFromQuery } from "@/components/location/LocationFilter";
 import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 
 interface UnifiedSearchProps {
@@ -156,20 +152,16 @@ export default function UnifiedSearch({
       urlHasMedia === "true" ? true : urlHasMedia === "false" ? false : undefined,
   });
 
-  // Structured geo filter (gap #1139). Hydrated from + written back to URL
-  // via the shared helpers so deep-links share filter state.
+  // Structured geo filter (gap #1139) — URL is the SSoT, fed by the global
+  // header search's Advanced popover. UnifiedSearch reads here so its
+  // card-feed fetch narrows to the chosen location; it no longer renders
+  // its own picker (the header owns that surface, single entry point).
   const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
     locationFilterFromQuery(searchParams),
   );
   React.useEffect(() => {
     setGeoFilter(locationFilterFromQuery(searchParams));
   }, [searchParams]);
-  const handleGeoFilterChange = (next: LocationFilterValue) => {
-    setGeoFilter(next);
-    const params = new URLSearchParams(searchParams);
-    applyLocationFilterToQuery(params, next);
-    setSearchParams(params, { replace: true });
-  };
 
   React.useEffect(() => {
     setSearchFilters((prev) => ({
@@ -569,17 +561,6 @@ export default function UnifiedSearch({
                 onViewModeChange={setViewMode}
               />
             )}
-
-            {/* Geo filter — single LocationFilter component shared with
-             * Jobs.tsx so picker UX + URL state-shape don't drift. Today
-             * the geo filter narrows the Jobs fetcher; other type fetchers
-             * (articles, videos, services) are scheduled to honor it in
-             * gap register #1144. */}
-            <LocationFilter
-              value={geoFilter}
-              onChange={handleGeoFilterChange}
-              compact
-            />
 
             {/* Category chips row. When the header owns the search + advanced
              * filters, the grid/list toggle lives at the far right of this row. */}

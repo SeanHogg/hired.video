@@ -121,6 +121,15 @@ export type ContentTemplate =
   | "animation-spinner"
   | "animation-reaction"
   | "animation-explainer"
+  // ─── CAD templates (#930 — 2D drafting MVP) ──────────────────────────
+  // Each entry opens `<CadStage>` seeded at the sheet size + unit + grid
+  // appropriate for the use case. Phase 1 ships SVG export; DXF + PDF
+  // arrive when the encoders land (this pass). 3D modeling (`cad_3d`)
+  // is its own future runtime — these templates stay 2D.
+  | "cad-floor-plan"
+  | "cad-part-drawing"
+  | "cad-electrical-schematic"
+  | "cad-blueprint"
   // ─── IAB display ad templates (#1041) ─────────────────────────────────
   // mediaKind === "image" — each opens DrawingStage seeded at the IAB
   // banner's official dimensions. Sizes pulled from `video-formats.ts`
@@ -868,6 +877,73 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     mediaKind: "animation",
     audiences: ["animator", "creator", "educator", "designer"],
     defaultName: "Explainer loop",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+
+  // ─── CAD templates (#930 — 2D drafting Phase 1) ───────────────────────
+  // Each entry seeds CadStage with ISO sheet size + sensible unit +
+  // grid spacing for the use case. Audience taxonomy adds `cad_user`
+  // (architects + mechanical engineers + electrical hobbyists). Phase
+  // 1 templates ship empty drawings — the user adds shapes from the
+  // tool palette. AI-generated starter geometry is a Phase 2 follow-on.
+  {
+    id: "cad-floor-plan",
+    label: "Floor plan",
+    desc: "A2 landscape (594×420mm) · 1:50 scale · grid 100mm.",
+    icon: Building2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad",
+    audiences: ["cad_user", "designer", "founder"],
+    defaultName: "Floor plan",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "cad-part-drawing",
+    label: "Part drawing",
+    desc: "A3 landscape (420×297mm) · 1:1 scale · grid 5mm — mechanical part w/ dimensions.",
+    icon: Wrench,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad",
+    audiences: ["cad_user", "developer"],
+    defaultName: "Part drawing",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "cad-electrical-schematic",
+    label: "Electrical schematic",
+    desc: "A3 landscape · grid 2.54mm (0.1\" — IC pitch) · for circuits + breadboard layouts.",
+    icon: Code2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad",
+    audiences: ["cad_user", "developer"],
+    defaultName: "Schematic",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "cad-blueprint",
+    label: "Blueprint",
+    desc: "A1 landscape (841×594mm) · 1:100 scale · grid 250mm — large-format architectural.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad",
+    audiences: ["cad_user", "designer"],
+    defaultName: "Blueprint",
     defaultPrompt: "",
     firstTabLabel: "Setup",
     IntakeForm: BasicIntake,

@@ -37,7 +37,6 @@ import { usePagination } from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
 import DiscoverPeopleGrid from "@/components/DiscoverPeopleGrid";
 import type { SearchFilters } from "@/components/SearchBar";
-import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -545,18 +544,6 @@ export default function People() {
     console.log("Message person:", personId);
   };
 
-  const handleSearch = (query: string) => {
-    setSearchFilters((prev) => ({ ...prev, search: query }));
-  };
-
-  const handleFilterChange = (filters: SearchFilters) => {
-    setSearchFilters(filters);
-  };
-
-  const handleClearFilters = () => {
-    setSearchFilters({});
-  };
-
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
   };
@@ -817,7 +804,7 @@ export default function People() {
               <PageHeader
                 tabs={peopleTabs}
                 activeTabKey={activeTab}
-                title="Professional Network"
+                title="Talent"
                 description={
                   isJobSeeker
                     ? "Connect with recruiters, industry leaders, and fellow professionals"
@@ -886,16 +873,6 @@ export default function People() {
                 <div className="space-y-6">
                   {/* Browse Tab */}
                   {activeTab === "browse" && <div className="space-y-6">
-                    <SearchBar
-                      context="people"
-                      value={searchFilters.search}
-                      filters={searchFilters}
-                      onSearch={handleSearch}
-                      onFilterChange={handleFilterChange}
-                      onClearFilters={handleClearFilters}
-                      hideSearchInput
-                      hideFilters
-                    />
                 {/* #333 — Tracked / Following section dropped from the
                     Browse body; it lives under the Connections tab now so
                     each tab owns one slice. */}
@@ -1171,19 +1148,6 @@ export default function People() {
               ) : (
                 /* Non-recruiter view — same surfaces, just no Talent Pool / Submissions */
                 <div className="space-y-6">
-                  <div className="mb-6">
-                    <SearchBar
-                      context="people"
-                      value={searchFilters.search}
-                      filters={searchFilters}
-                      onSearch={handleSearch}
-                      onFilterChange={handleFilterChange}
-                      onClearFilters={handleClearFilters}
-                      hideSearchInput
-                      hideFilters
-                    />
-                  </div>
-
                   {/* #333 — Tracked / Following section dropped here too;
                       lives under the Connections tab. */}
 

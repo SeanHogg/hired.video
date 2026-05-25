@@ -62,8 +62,13 @@ ON CONFLICT ("email") DO UPDATE
       "updated_at" = NOW();
 
 -- --- Article body inserts ----------------------------------------------
--- Idempotent on (user_id, slug) via uq_articles_user_slug. Re-running
--- the migration is a no-op for already-seeded rows. To replace a body,
+-- Idempotent via the (user_id, slug) inferred conflict target. The
+-- backing unique index `uq_articles_user_slug` was created in 0038 as a
+-- plain UNIQUE INDEX (not a named constraint), so we use the
+-- column-list form `ON CONFLICT (cols) DO NOTHING` rather than
+-- `ON CONFLICT ON CONSTRAINT <name>` (which requires a pg_constraint
+-- row that does not exist for plain unique indexes). Re-running the
+-- migration is a no-op for already-seeded rows. To replace a body,
 -- delete the row and re-run.
 --
 -- Common shape:
@@ -162,7 +167,7 @@ No. Foreman, general foreman, superintendent, estimator, shop owner is the typic
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 2. HVAC Technician (skilled_trades) ===============================
 INSERT INTO "articles" (
@@ -251,7 +256,7 @@ Commercial / VRF / controls + an EPA 608 Universal + a controls cert (BACnet, Tr
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 3. Plumber (skilled_trades) =======================================
 INSERT INTO "articles" (
@@ -338,7 +343,7 @@ Dispatch + scheduling will keep automating. Wrench time will not.$body$,
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 4. Welder (skilled_trades) ========================================
 INSERT INTO "articles" (
@@ -431,7 +436,7 @@ Pipe welder with 6G TIG + per-diem work can clear $100k inside 24 months of fini
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 5. EMT / Paramedic (healthcare) ===================================
 INSERT INTO "articles" (
@@ -521,7 +526,7 @@ Common. Paramedic-to-RN bridge programs are 12-18 months. Many paramedics go RN 
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 6. CNA (healthcare) ===============================================
 INSERT INTO "articles" (
@@ -615,7 +620,7 @@ Hospital med-surg if you can land it -- highest exposure to skills + nurses will
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 7. Phlebotomist (healthcare) ======================================
 INSERT INTO "articles" (
@@ -709,7 +714,7 @@ Phlebotomy + CNA opens medical-assistant roles. Phlebotomy + EKG / lab assistant
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 8. Surgical Tech (healthcare) =====================================
 INSERT INTO "articles" (
@@ -801,7 +806,7 @@ CSFA (first assistant) opens $80k-$130k+ roles. Travel CST works too: 13-week co
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 9. Cosmetologist (beauty_personal_care) ===========================
 INSERT INTO "articles" (
@@ -891,7 +896,7 @@ Build a personal brand on Instagram / TikTok while still in school. A 50k-follow
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 10. Barber (beauty_personal_care) =================================
 INSERT INTO "articles" (
@@ -979,7 +984,7 @@ Booking, retention, content creation get faster. Cutting heads does not.$body$,
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 11. Esthetician (beauty_personal_care) ============================
 INSERT INTO "articles" (
@@ -1074,7 +1079,7 @@ Both are real careers in their own right -- both require separate certifications
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 12. Police Officer (law_enforcement) ==============================
 INSERT INTO "articles" (
@@ -1169,7 +1174,7 @@ Detective / investigations is the most common career pivot after patrol. Federal
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 13. Corrections Officer (law_enforcement) =========================
 INSERT INTO "articles" (
@@ -1258,7 +1263,7 @@ Federal (BOP) = highest pay + benefits + retirement, more rigid mission, sometim
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;
 
 -- == 14. Firefighter (government -- see Gap Register entry) ============
 INSERT INTO "articles" (
@@ -1356,4 +1361,4 @@ Major metros: very. 2,000+ applicants for 30-60 seats per cohort. Rural and mid-
   NOW(),
   5
 )
-ON CONFLICT ON CONSTRAINT "uq_articles_user_slug" DO NOTHING;
+ON CONFLICT ("user_id", "slug") DO NOTHING;

@@ -3,7 +3,10 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+// 32MB matches the frontend `MAX_IMAGE_SIZE` cap raised per #949 —
+// flattened 4K PNGs from DrawingStage routinely exceed 16MB and the
+// old 10MB ceiling silently rejected them.
+const MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024;
 
 const ALLOWED_CONTENT_TYPES = new Set([
   "image/jpeg",

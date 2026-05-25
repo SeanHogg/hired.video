@@ -115,6 +115,9 @@ export const JobFiltersSchema = z.object({
   salaryMax: z.number().optional(),
   isRemote: z.boolean().optional(),
   companyId: z.string().optional(),
+  // AI-resilient sector filter (#1168). Backend `/api/Job/public` reads
+  // this and joins against the partial sector index from migration 0112.
+  sector: z.string().optional(),
   page: z.number().optional(),
   limit: z.number().optional(),
 });

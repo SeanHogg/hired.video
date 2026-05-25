@@ -49,8 +49,9 @@ import { recordFailedLogin } from "./bruteForce.js";
 import { scoreLoginRisk } from "./risk.js";
 import { detectCountry } from "./geo.js";
 import { checkEmailRateLimit } from "./emailRateLimit.js";
+import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
 
-const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
+const { users, userProfiles, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
 
 // ---------------------------------------------------------------------------
 // recordLoginEvent — fire-and-forget insert into login_events. Awaited so
@@ -324,6 +325,23 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     await deps.email.sendVerification(user.email, user.name, verificationToken);
   } catch (err) {
     console.error("[register] Failed to send verification email:", err);
+  }
+  // Seed a user_profiles row with role-based section visibility defaults
+  // so /people/[id] hides resume sections for recruiters/employers from
+  // the moment they sign up. Existing accounts (no profile row, or row
+  // with `{}`) get the same defaults via the resolver fall-through, so
+  // there's no backfill to write. Per-key overrides ship later through
+  // PUT /api/users/me { profileSections: ... }.
+  try {
+    await deps.db
+      .insert(userProfiles)
+      .values({
+        userId: user.id,
+        profileSections: getDefaultProfileSections(user.role ?? "job_seeker"),
+      } as any)
+      .onConflictDoNothing({ target: userProfiles.userId });
+  } catch (err) {
+    console.error("[register] Failed to seed profile section defaults:", err);
   }
   try {
     await deps.onboarding.seedTasks(user.id, user.role ?? "job_seeker");

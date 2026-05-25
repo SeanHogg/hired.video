@@ -18,9 +18,9 @@ interface Props {
 
 /**
  * Single source of truth for the Content Creator section. Composes the header
- * and the tabbed workspace (Offerings / Profile / Marketplace Earnings /
- * Payouts / Portfolio / Account). Mounted on /services (with the Offerings
- * sub-tab wired up) and on /settings (Content Creator → Account sidebar item,
+ * and the tabbed workspace (Offerings / Profile / Payouts & Earnings /
+ * Portfolio / Account). Mounted on /services (with the Offerings sub-tab
+ * wired up) and on /settings (Content Creator → Account sidebar item,
  * without Offerings — services management belongs to /services). Inner forms
  * self-gate on enrollment, so this can be rendered unconditionally.
  */

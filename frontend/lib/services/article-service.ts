@@ -146,10 +146,14 @@ export const articleService = {
     await apiClient.delete(`/api/articles/${id}`);
   },
 
-  async listPublished(opts: { limit?: number; kind?: ArticleKind } = {}): Promise<PublicArticleCard[]> {
+  async listPublished(
+    opts: { limit?: number; kind?: ArticleKind; sector?: string; audience?: string } = {},
+  ): Promise<PublicArticleCard[]> {
     const params = new URLSearchParams();
     if (opts.limit) params.set("limit", String(opts.limit));
     if (opts.kind) params.set("kind", opts.kind);
+    if (opts.sector) params.set("sector", opts.sector);
+    if (opts.audience) params.set("audience", opts.audience);
     const qs = params.toString();
     const res = await apiClient.get<PublicArticleCard[]>(
       `/api/articles/public${qs ? `?${qs}` : ""}`,

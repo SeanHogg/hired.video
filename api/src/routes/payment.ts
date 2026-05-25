@@ -12,6 +12,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { applySpecialtyBonus } from "../../../shared/sectors.js";
 import { tryGetPaymentProvider } from "../services/billing/payment/index.js";
 import { getUserIdByStripeCustomer } from "../services/billing/payment/stripe.js";
 import * as billingService from "../services/billing/BillingService.js";
@@ -449,7 +450,9 @@ async function recordAffiliateConversion(
     .select({
       id: schema.affiliateReferrals.id,
       affiliateId: schema.affiliateReferrals.affiliateId,
+      landingSector: schema.affiliateReferrals.landingSector,
       commissionRate: schema.affiliateProfiles.commissionRate,
+      specialtySectors: schema.affiliateProfiles.specialtySectors,
     })
     .from(schema.affiliateReferrals)
     .innerJoin(schema.affiliateProfiles, eq(schema.affiliateReferrals.affiliateId, schema.affiliateProfiles.id))
@@ -458,7 +461,18 @@ async function recordAffiliateConversion(
 
   if (!referral) return;
 
-  const commission = revenue * Number(referral.commissionRate);
+  // Vertical-specialty bonus engine (#1166). Pure shared helper composes
+  // baseRate + tier bonus + flat sector-match bonus. Tier bonus is not
+  // joined yet (the affiliate-tier ladder is a follow-on table); for now
+  // we pass tierBonus=0 and the specialty multiplier is the only modifier
+  // on top of the base commission rate.
+  const specialty = applySpecialtyBonus({
+    baseRate: Number(referral.commissionRate),
+    tierBonus: 0,
+    specialtySectors: (referral.specialtySectors as string[]) ?? [],
+    landingSector: referral.landingSector,
+  });
+  const commission = revenue * specialty.effectiveRate;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (db.insert(schema.affiliateConversions) as any).values({

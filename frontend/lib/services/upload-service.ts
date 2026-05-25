@@ -24,7 +24,11 @@ export type UploadProgressCallback = (progress: number) => void;
 
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"];
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+// 32MB raised from 5MB per #949 — a flattened DrawingStage at 4096²
+// regularly exceeded 16MB and the old cap silently rejected. 32MB
+// covers most 8K JPEG / 4K PNG exports + leaves headroom for
+// PSD-converted uploads when #940's Phase 2 PSD import lands.
+const MAX_IMAGE_SIZE = 32 * 1024 * 1024;
 
 /**
  * Validate a video file before upload

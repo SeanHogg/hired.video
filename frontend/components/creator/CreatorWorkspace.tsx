@@ -36,14 +36,13 @@ interface PortfolioItem {
 export type CreatorWorkspaceTab =
   | "offerings"
   | "profile"
-  | "earnings"
   | "payouts"
   | "portfolio"
   | "account"
   | "courses"
   | "articles";
 
-const TAB_VALUES = ["offerings", "profile", "earnings", "payouts", "portfolio", "account", "courses", "articles"] as const;
+const TAB_VALUES = ["offerings", "profile", "payouts", "portfolio", "account", "courses", "articles"] as const;
 
 interface Props {
   onProfileChange?: (next: CreatorProfile | null) => void;
@@ -176,8 +175,7 @@ export default function CreatorWorkspace({
           <TabsList>
             {offeringsEnabled && <TabsTrigger value="offerings">Offerings</TabsTrigger>}
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="earnings">Marketplace Earnings</TabsTrigger>
-            <TabsTrigger value="payouts">Payouts</TabsTrigger>
+            <TabsTrigger value="payouts">Payouts &amp; Earnings</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             {profile?.coursesActive && <TabsTrigger value="courses">Courses</TabsTrigger>}
             {profile?.articlesActive && <TabsTrigger value="articles">Articles</TabsTrigger>}
@@ -225,13 +223,14 @@ export default function CreatorWorkspace({
           <CreatorProfileForm onProfileChange={onProfileChange} />
         </TabsContent>
 
-        {/* Template marketplace revenue — self-gates to null when there are no published templates */}
-        <TabsContent value="earnings">
+        {/* Payouts & Earnings — read-only template-marketplace revenue card
+            (self-gates to null when there are no published templates) sits
+            above the tax/payout config + balance ledger so the daily-visit
+            value (earnings) renders before the set-once setup. Same
+            PayoutProfileForm is also rendered on /settings → Content Creator
+            → Payouts. */}
+        <TabsContent value="payouts" className="space-y-6">
           <CreatorTemplateEarnings />
-        </TabsContent>
-
-        {/* Payouts — same shared form rendered on /settings → Content Creator → Payouts */}
-        <TabsContent value="payouts">
           <PayoutProfileForm />
         </TabsContent>
 

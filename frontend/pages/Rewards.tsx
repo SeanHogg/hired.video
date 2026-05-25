@@ -26,6 +26,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,8 +95,10 @@ export default function RewardsPage() {
   });
 
   return (
-    <article className="container mx-auto max-w-4xl py-10 px-4">
-      <header className="space-y-3 mb-10 text-center">
+    <AppShell bgClassName="bg-background">
+      <main className="pt-16">
+        <article className="container mx-auto max-w-4xl py-10 px-4">
+          <header className="space-y-3 mb-10 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
           <Sparkles className="h-3.5 w-3.5" /> hired.video Rewards
         </div>
@@ -302,7 +305,9 @@ export default function RewardsPage() {
           )}
         </div>
       </Card>
-    </article>
+        </article>
+      </main>
+    </AppShell>
   );
 }
 

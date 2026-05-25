@@ -528,6 +528,21 @@ export default function StudioEditorV2() {
     },
     [setImageState, imageCommit],
   );
+  /** Patch a layer's filter chain (#940 Image Phase 2). Non-destructive
+   *  — the layer's `pixelsDataUrl` is untouched; toggling filters off
+   *  restores the original pixels. */
+  const handleImageSetFilters = useCallback(
+    (layerId: string, filters: import("@shared/image-state").LayerFilters | undefined) => {
+      setImageState((prev) => ({
+        ...prev,
+        layers: prev.layers.map((l) =>
+          l.id === layerId ? { ...l, filters } : l,
+        ),
+      }));
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
   const handleImageMoveLayer = useCallback(
     (layerId: string, direction: "up" | "down") => {
       setImageState((prev) => {
@@ -2761,6 +2776,7 @@ export default function StudioEditorV2() {
                     onRenameLayer={handleImageRenameLayer}
                     onSetOpacity={handleImageSetOpacity}
                     onSetBlendMode={handleImageSetBlendMode}
+                    onSetFilters={handleImageSetFilters}
                     onMoveLayer={handleImageMoveLayer}
                   />
                 ) : (

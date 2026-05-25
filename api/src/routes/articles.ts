@@ -83,11 +83,17 @@ articleRoutes.get("/public", async (c) => {
   const db = getDb();
   const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
   const kindFilter = c.req.query("kind");
+  // Sector + audience filters from #1165. Both optional; legacy queries
+  // without these params behave identically to before.
+  const sectorFilter = c.req.query("sector");
+  const audienceFilter = c.req.query("audience");
   try {
     const where = and(
       eq(articles.status, "published"),
       eq(users.emailVerified, true),
       kindFilter ? eq(articles.kind, kindFilter) : undefined,
+      sectorFilter ? eq(articles.sector, sectorFilter) : undefined,
+      audienceFilter ? eq(articles.audience, audienceFilter) : undefined,
     );
     const rows = await db
       .select({

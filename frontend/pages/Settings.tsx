@@ -27,6 +27,7 @@ import {
   UserCircle,
   Share2,
   Trophy,
+  LayoutDashboard,
 } from "lucide-react";
 import { PointsHub } from "@/components/points/PointsHub";
 import { isPointsEligible } from "@/lib/services/points-service";
@@ -71,6 +72,7 @@ import { AccountManagementPanel } from "@/components/account/AccountManagementPa
 import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import RecruitSharingSettings from "@/components/recruit/RecruitSharingSettings";
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
+import ProfileSectionsSettingsCard from "@/components/settings/ProfileSectionsSettingsCard";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
@@ -820,6 +822,10 @@ function SettingsContent() {
                         <Shield className="h-4 w-4" />
                         <span>{t("tabs.privacy")}</span>
                       </TabsTrigger>
+                      <TabsTrigger value="profile-sections" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>Profile Sections</span>
+                      </TabsTrigger>
                       <TabsTrigger value="cookies" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Cookie className="h-4 w-4" />
                         <span>{t("tabs.cookies")}</span>
@@ -919,6 +925,13 @@ function SettingsContent() {
                       >
                         <Shield className="h-4 w-4" />
                         <span>{t("tabs.privacy")}</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="profile-sections"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>Profile Sections</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="cookies"
@@ -1216,6 +1229,11 @@ function SettingsContent() {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Profile Sections Tab — role-defaulted visibility for /people/[id] sections */}
+              <TabsContent value="profile-sections" className="space-y-6">
+                <ProfileSectionsSettingsCard />
               </TabsContent>
 
               {/* Cookies Tab */}

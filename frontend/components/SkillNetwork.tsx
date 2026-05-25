@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useProfileSectionVisibility } from "@/components/profile/sections/profile-sections-context";
 import {
   buildSkillGraphModel,
   dedupeSkillEvidence,
@@ -146,6 +147,7 @@ export default function SkillNetwork({
   ownerUserId,
   onResumeUpdated,
 }: SkillNetworkProps) {
+  const sectionVisible = useProfileSectionVisibility("skillNetwork");
   const items = useMemo(() => listResolvableItems(resumeData ?? undefined), [resumeData]);
   const itemIndex = useMemo(() => indexResolvedItems(items), [items]);
   // Two views of the skill list:
@@ -183,6 +185,7 @@ export default function SkillNetwork({
     !!user?.id && !!ownerUserId && user.id === ownerUserId;
   const canViewGaps = isOwner || isRecruiter || isAdmin || isSuperAdmin;
 
+  if (!sectionVisible) return null;
   if (!hasGraphableData) return null;
 
   return (

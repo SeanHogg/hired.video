@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SectionEditButton from "./SectionEditButton";
+import { useProfileSectionVisibility } from "./profile-sections-context";
 
 interface SkillsSectionProps {
   /** Free-text SEO keywords stored on the profile (separate from resume skills). */
@@ -22,10 +23,12 @@ export default function SkillsSection({
   title,
 }: SkillsSectionProps) {
   const { t } = useTranslation();
+  const sectionVisible = useProfileSectionVisibility("skills");
   const hasKeywords = keywords && keywords.length > 0;
   const hasIndustries = industries && industries.length > 0;
   const hasAnything = hasKeywords || hasIndustries;
 
+  if (!sectionVisible) return null;
   if (!hasAnything && !isOwner) return null;
 
   const sectionTitle = title ?? t("messages.discoverabilityTags");

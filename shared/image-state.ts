@@ -99,6 +99,52 @@ export interface ImageLayer {
    *  semantics). 0 or omitted = no rotation. Set by the Hand /
    *  Move tool's rotation-handle drag. */
   transformRotation?: number;
+  /** Per-layer non-destructive filter chain (#940 Image Phase 2).
+   *  The compositor applies these as a Canvas-2D `ctx.filter` string
+   *  while drawing the layer's pixels onto the destination. Pure
+   *  edits — the layer's `pixelsDataUrl` is untouched; toggling the
+   *  filter on / off, or changing values, doesn't destroy data.
+   *
+   *  Each field maps 1:1 to a CSS / Canvas2D filter primitive:
+   *   - `blur`        — pixels (`blur(Npx)`). Default 0.
+   *   - `brightness`  — 0..2 (`brightness(N)`). Default 1 (= unity).
+   *   - `contrast`    — 0..2. Default 1.
+   *   - `saturate`    — 0..2. Default 1.
+   *   - `hueRotate`   — degrees, 0..360.
+   *   - `grayscale`   — 0..1.
+   *   - `invert`      — 0..1.
+   *
+   *  Stacking order: filter is applied INSIDE the blend-mode +
+   *  opacity pass, so a layer with blend "multiply" + opacity 0.7 +
+   *  filter `{ blur: 8 }` renders the blurred pixels through the
+   *  multiply blend at 70% alpha. Matches Photoshop's "Smart Filter"
+   *  ordering. */
+  filters?: LayerFilters;
+}
+
+/** Per-layer filter parameters. All optional; absent fields default
+ *  to identity (no effect). Reads / writes through the layers panel's
+ *  Filters section (#940 Image Phase 2). */
+export interface LayerFilters {
+  /** Gaussian blur radius in pixels. Default 0. */
+  blur?: number;
+  /** Brightness multiplier — 1 = unity, 0 = full black, 2 = double
+   *  brightness. Default 1. */
+  brightness?: number;
+  /** Contrast multiplier — 1 = unity, 0 = solid grey, 2 = doubled.
+   *  Default 1. */
+  contrast?: number;
+  /** Saturation multiplier — 1 = unity, 0 = full grayscale, 2 =
+   *  oversaturated. Default 1. */
+  saturate?: number;
+  /** Hue rotation in degrees, 0..360. Default 0. */
+  hueRotate?: number;
+  /** Grayscale conversion — 0..1 (0 = colour, 1 = full grayscale).
+   *  Default 0. */
+  grayscale?: number;
+  /** Colour inversion — 0..1 (0 = normal, 1 = full inverse).
+   *  Default 0. */
+  invert?: number;
 }
 
 /** Background fill behind layer 0. `transparent` leaves the canvas

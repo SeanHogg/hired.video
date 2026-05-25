@@ -49,6 +49,12 @@ import {
 } from "@/components/location/LocationFilter";
 import LocationFilterButton from "@/components/location/LocationFilterButton";
 import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
+import SectorFilterButton from "@/components/sector/SectorFilterButton";
+import {
+  sectorFilterFromQuery,
+  applySectorFilterToQuery,
+} from "@/components/sector/SectorFilter";
+import { type Sector } from "@shared/sectors";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -255,6 +261,20 @@ export default function Jobs() {
     setSearchParams(params);
   };
 
+  // Sector filter (#1168). URL-bound so deep-links share state. Reuses
+  // the partial sector index from migration 0112 server-side.
+  const [sectorFilter, setSectorFilter] = useState<Sector | null>(() =>
+    sectorFilterFromQuery(searchParams),
+  );
+  useEffect(() => {
+    setSectorFilter(sectorFilterFromQuery(searchParams));
+  }, [searchParams]);
+  const handleSectorFilterChange = (next: Sector | null) => {
+    setSectorFilter(next);
+    const params = applySectorFilterToQuery(searchParams, next);
+    setSearchParams(params);
+  };
+
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   // Lists filter — same pattern as People page. Null = no filter; Set = restrict.
@@ -339,6 +359,7 @@ export default function Jobs() {
         employmentType: searchFilters.employmentType || undefined,
         experienceLevel: searchFilters.experienceLevel || undefined,
         isRemote: geoFilter.remote ?? searchFilters.remote ?? undefined,
+        sector: sectorFilter ?? undefined,
         page: currentPage,
         limit: itemsPerPage,
       };
@@ -358,7 +379,7 @@ export default function Jobs() {
   // Fetch jobs when filters or page changes
   useEffect(() => {
     fetchJobs();
-  }, [searchFilters, geoFilter, currentPage, itemsPerPage]);
+  }, [searchFilters, geoFilter, sectorFilter, currentPage, itemsPerPage]);
 
   // Lists filter: load list membership when ?list_id changes.
   useEffect(() => {
@@ -730,6 +751,10 @@ export default function Jobs() {
                     )}
                     {effectiveTab === "jobs" && (
                       <>
+                        <SectorFilterButton
+                          value={sectorFilter}
+                          onChange={handleSectorFilterChange}
+                        />
                         <LocationFilterButton
                           value={geoFilter}
                           onChange={handleGeoFilterChange}

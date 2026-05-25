@@ -31,6 +31,13 @@ export interface FloatingImageLayersPanelProps {
   /** Optional — when wired, the panel surfaces a per-layer blend-mode
    *  picker (#940 Image Phase 2). */
   onSetBlendMode?: (layerId: string, blendMode: LayerBlendMode) => void;
+  /** Optional — when wired, the panel surfaces a per-layer filter
+   *  chain (blur / brightness / contrast / saturate / hue / grayscale /
+   *  invert) per #940 Image Phase 2. */
+  onSetFilters?: (
+    layerId: string,
+    filters: import("@shared/image-state").LayerFilters | undefined,
+  ) => void;
   onMoveLayer: (layerId: string, direction: "up" | "down") => void;
   className?: string;
 }

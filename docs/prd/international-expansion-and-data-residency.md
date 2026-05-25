@@ -363,20 +363,25 @@ Add `libphonenumber-js` (already mature, well-maintained, small footprint when t
 
 **Acceptance:** a privacy-conscious US user can sign in with GPC enabled, see no analytics fire, opt out of "sell/share" without contacting support, request a downloadable JSON bundle of their data, and delete their account with a clear statement that purge happens at the end of the retention window.
 
-### Phase 1 — Canada (closes **Gap #1150**)
+### Phase 1 — Canada (gap **#1150** 🟡 partial — core shipped 2026-05-24; remainder in **#1184**)
 
-**Depends on:** P0 complete + §5 dynamic privacy refactor (#1153) shipped.
+**Shipped 2026-05-24:**
 
-- [ ] **Add `fr-CA` locale** to `SUPPORTED_LOCALES`, `/locales/fr-CA.json`, BCP47 region-preserve for `fr` (§4.3)
-- [ ] **Sweep hardcoded English strings** in legal pages + billing + settings + onboarding — extract into `en.json` keys; machine-translate to `fr-CA`; human review of legal copy by certified Quebec-French legal translator
-- [ ] **Mount `<QuebecLaw25Section />`** + `<PIPEDARightsSection />` in the dynamic privacy page (§5)
-- [ ] **Named Privacy Officer** for Canada published on `/privacy?as=CA-QC` per Law 25 § 8.1
-- [ ] **Postal code validation** wired in `BillingAddressSchema` (§7.2)
-- [ ] **Address label keys** flex to "Province" + "Postal code" in CA (§4.4)
-- [ ] **CAD currency** wired in checkout based on billing country — Helcim default for CA
-- [ ] **GST/HST/PST/QST tax** wired via Helcim per province
-- [ ] **CASL-compliant marketing email** — explicit opt-in checkbox at signup for `marketing_emails_optin` if billing country is CA; default false. Transactional email is fine without
-- [ ] **Voice clone marketplace consent** — Quebec Law 25 § 12 says explicit consent for biometric/sensitive — the voice clone flow needs a CA-specific consent gate (the surface already exists per [project_voice_marketplace.md](../../../../Users/seanh/.claude/projects/c--code-hired/memory/project_voice_marketplace.md))
+- [x] **Add `fr-CA` locale** to `SUPPORTED_LOCALES`, `/locales/fr-CA.json`, BCP47 region-preserve for `fr` and `es` (§4.3) — `normalizeLocale` now preserves region when base is in `PRESERVE_REGION_BASE`
+- [x] **Mount `<QuebecLaw25Section />`** + `<PIPEDARightsSection />` in the dynamic privacy page (§5) — both self-gate via `JurisdictionSection` wrapper
+- [x] **Named Privacy Officer** for Canada — `privacy@hired.video` cited in both PIPEDA + Quebec sections; PrivacyPolicy.tsx DPO block also updated
+- [x] **Postal code validation** wired in `BillingAddressSchema` (§7.2) — `shared/postal-codes.ts` is the SoT; Canada `A1A 1A1` pattern enforced via `.superRefine`
+- [x] **Address label keys** flex to "Province" + "Postal code" in CA (§4.4) — `useAddressLabels(country)` hook wired into BillingAddressForm
+- [x] **CASL notice** rendered on BillingAddressForm when country = CA (light-touch — points users to Settings → Notifications)
+
+**Deferred to #1184 (Canada Phase 1 remainder):**
+
+- [ ] **Sweep hardcoded English strings** — ~2,184 strings from the audit file still need extraction into `en.json` keys
+- [ ] **Certified Quebec-French legal translator review** of every fr-CA string on legal + billing surfaces (machine translation present today is dev-quality, not production legal)
+- [ ] **CAD currency + GST/HST/PST/QST tax** wired via Helcim per province
+- [ ] **CASL auto-cascade** — when an existing user flips billing country to CA AND has marketing emails enabled, auto-disable + re-consent toast
+- [ ] **Voice clone marketplace consent** — Quebec Law 25 § 12 explicit-consent gate for biometric / voice clone flow (the surface exists per [[project_voice_marketplace]])
+- [ ] **TermsOfService + CookiePolicy regional refactor** — same JurisdictionSection pattern that landed on PrivacyPolicy
 
 **No data-residency work.** US storage is permitted under PIPEDA with safeguards.
 

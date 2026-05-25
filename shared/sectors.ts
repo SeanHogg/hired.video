@@ -340,3 +340,122 @@ export const ARTICLE_AUDIENCE_LABELS: Record<ArticleAudience, string> = {
   resume_guide: "Resume Guide",
   civic: "Civic / Run for Office",
 };
+
+// ──────────────────────────────────────────────────────────────────────
+// Sector classification — keyword-based heuristic for tagging scraped /
+// untagged jobs (gap #1172). Pure, dependency-free, deterministic; runs
+// inside the Worker without an LLM call. Returns null when no keyword
+// matches confidently (caller leaves the row untagged rather than
+// guessing wrong).
+// ──────────────────────────────────────────────────────────────────────
+
+const SECTOR_KEYWORDS: Record<Sector, RegExp[]> = {
+  healthcare: [
+    /\b(nurse|nursing|rn|lpn|cna|registered\s+nurse|paramedic|emt|cna|medical\s+assistant|phlebotom|surgical\s+tech|physical\s+therapist|occupational\s+therapist|home\s+health|dental\s+hygien|dentist|physician|nurse\s+practitioner|pharmacist|radiolog|sonograph|respiratory\s+therap|hospice|clinic|patient\s+care|caregiver|cna|nursing\s+assistant)\b/i,
+  ],
+  legal: [
+    /\b(attorney|lawyer|paralegal|legal\s+assistant|litigat|counsel|court\s+reporter|stenograph|mediator|bar\s+admitted|esquire|jd|public\s+defender|prosecutor|title\s+agent|escrow\s+officer)\b/i,
+  ],
+  government: [
+    /\b(federal|gs[-\s]?(\d+)|civil\s+service|usajobs|government|agency|department\s+of|state\s+of|county\s+of|city\s+of|public\s+works|inspector\s+(building|food|safety|osha)|postal|park\s+ranger|clearance|secret|top\s+secret|tssci|ts\/sci)\b/i,
+  ],
+  law_enforcement: [
+    /\b(police|sheriff|deputy|officer|patrol|fbi|dea|atf|federal\s+agent|corrections\s+officer|cop|trooper|marshal|swat|detective|crime\s+scene|911\s+dispatch|dispatcher)\b/i,
+  ],
+  security: [
+    /\b(security\s+officer|guard|armed\s+security|unarmed\s+security|executive\s+protection|loss\s+prevention|gsoc|armored\s+transport|event\s+security|bouncer|protective\s+services)\b/i,
+  ],
+  skilled_trades: [
+    /\b(electrician|plumber|hvac|welder|carpenter|pipefitter|millwright|ironworker|sheetmetal|sheet\s+metal|mason|roofer|drywall|painter|tile\s+setter|insulation|solar\s+installer|wind\s+technician|journeyman|master\s+(electrician|plumber)|apprentice|ibew|ua\s+local|trade\s+school)\b/i,
+  ],
+  beauty_personal_care: [
+    /\b(cosmetolog|barber|hair\s+stylist|hairstylist|esthetician|nail\s+tech|nail\s+technician|massage\s+therap|spa|salon|brow\s+tech|lash\s+tech|makeup\s+artist|tattoo\s+artist|booth\s+rental|chair\s+rental)\b/i,
+  ],
+  gig_work: [
+    /\b(rideshare|uber|lyft|doordash|instacart|grubhub|delivery\s+driver|courier|gig|task[-\s]?rabbit|on[-\s]?demand|mover|moving\s+helper|field\s+inspector|mobile\s+notary)\b/i,
+  ],
+  politics_campaigns: [
+    /\b(campaign|field\s+organizer|legislative\s+(aide|director|assistant)|chief\s+of\s+staff|press\s+secretary|communications\s+director|lobbyist|political\s+director|finance\s+director|deputy\s+campaign|state\s+director|regional\s+organizer|opposition\s+research)\b/i,
+  ],
+  tech: [
+    /\b(software\s+engineer|developer|programmer|devops|sre|qa\s+engineer|frontend|backend|fullstack|full[-\s]stack|machine\s+learning|ml\s+engineer|data\s+scientist|data\s+analyst|product\s+manager|ux\s+designer|ui\s+designer|engineering\s+manager|technical\s+lead|tech\s+lead|architect|cto|cio|it\s+(support|admin|manager)|sysadmin|cybersecurity|infosec)\b/i,
+  ],
+  politics_civic: [
+    // Civic / run-for-office is content-only — never auto-classify a job into it.
+  ],
+};
+
+/**
+ * Heuristic sector classification for a job posting. Pure function —
+ * runs inside the Worker without an LLM call. Returns the first sector
+ * whose keyword set matches, scored by match count across title +
+ * description (title weighted 3x since it's the strongest signal).
+ *
+ * Returns `null` when no sector hits — caller leaves the row untagged
+ * rather than guessing. Recruiters can manually tag through the picker.
+ *
+ * Used by:
+ *   - api/src/services/job/scraper.ts insert path (#1172)
+ *   - api/src/services/job/JobService.ts saveScrapedJob (#1172)
+ */
+export function classifyJobSector(
+  title: string | null | undefined,
+  description: string | null | undefined,
+): Sector | null {
+  const titleStr = (title ?? "").trim();
+  const descStr = (description ?? "").trim();
+  if (!titleStr && !descStr) return null;
+
+  let best: { sector: Sector; score: number } | null = null;
+  for (const sector of SECTORS) {
+    const patterns = SECTOR_KEYWORDS[sector];
+    if (!patterns || patterns.length === 0) continue;
+    let score = 0;
+    for (const re of patterns) {
+      if (titleStr && re.test(titleStr)) score += 3;
+      if (descStr && re.test(descStr)) score += 1;
+    }
+    if (score > 0 && (best === null || score > best.score)) {
+      best = { sector, score };
+    }
+  }
+  // Minimum confidence threshold: at least one title hit OR two description hits.
+  if (best && best.score >= 2) return best.sector;
+  return null;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Affiliate specialty bonus — pure helper used by the conversion-path
+// commission calc (gap #1166). When a referral's landing_sector matches
+// one of the affiliate's specialty_sectors, apply a flat +5% multiplier
+// on top of the tier's bonus percentage.
+// ──────────────────────────────────────────────────────────────────────
+
+/** Flat multiplier applied when an affiliate's specialty matches the
+ *  referral's landing sector. Tuned to reward vertical creators without
+ *  cannibalizing the tier ladder (max tier bonus is ~10%). */
+export const SECTOR_SPECIALTY_BONUS = 0.05;
+
+/**
+ * Compute the effective commission rate given the affiliate's specialty
+ * sectors and the referral's landing sector.
+ *
+ *   effective = baseRate + tierBonus + (specialty match ? SECTOR_SPECIALTY_BONUS : 0)
+ *
+ * Pure function — no DB calls. The caller passes in the persisted
+ * `specialtySectors` array and the `landingSector` from the referral row.
+ */
+export function applySpecialtyBonus(opts: {
+  baseRate: number;
+  tierBonus: number;
+  specialtySectors: string[];
+  landingSector: string | null | undefined;
+}): { effectiveRate: number; specialtyMatched: boolean } {
+  const { baseRate, tierBonus, specialtySectors, landingSector } = opts;
+  const matched =
+    !!landingSector &&
+    isValidSector(landingSector) &&
+    specialtySectors.includes(landingSector);
+  const effectiveRate = baseRate + tierBonus + (matched ? SECTOR_SPECIALTY_BONUS : 0);
+  return { effectiveRate, specialtyMatched: matched };
+}
