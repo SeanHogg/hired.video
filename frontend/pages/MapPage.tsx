@@ -145,7 +145,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="relative" style={{ height: "calc(100vh - 64px - 56px)" }}>
+      <div className="relative h-[55vh] md:h-[calc(100vh-64px-56px)] md:max-h-[820px]">
         <MapContainer
           center={[39.5, -98.35]}
           zoom={4}

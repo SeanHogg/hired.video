@@ -283,6 +283,10 @@ export function createApp() {
     "/api/whitelabel/roi-calculator",
     "/api/public/candidate-resume",
     "/api/public/pitch-deck",
+    // /map discovery pins (events + open-to-coffee people) — anonymous
+    // visitors must see the pins so the public /map page works without
+    // a session. Handler reads zero user-scoped data.
+    "/api/map",
     "/api/openapi.json",
     "/api/docs",
     "/sitemap.xml",
