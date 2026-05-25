@@ -8,8 +8,6 @@ import {
   Play,
   Sparkles,
   Mic,
-  Grid,
-  List,
   Newspaper,
   BookOpen,
   Wrench,
@@ -37,7 +35,6 @@ import { useCardRenderer } from "@/lib/card-factory";
 import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { companyService } from "@/lib/services/company-service";
-import { useHeaderFilters } from "@/lib/header-filters";
 import { type SearchFilters } from "@/lib/services/search-service";
 import {
   fetchCardFeed,
@@ -51,8 +48,6 @@ import { locationFilterFromQuery } from "@/components/location/LocationFilter";
 import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 
 interface UnifiedSearchProps {
-  /** Hide the inline search text input (header provides one). */
-  hideSearchInput?: boolean;
   /**
    * Stick the search + category chips bar to the top of the viewport
    * (just under the fixed Navigation header) while the user scrolls.
@@ -128,7 +123,6 @@ const categoryToTypes = (category: string): CardFeedType[] => {
 };
 
 export default function UnifiedSearch({
-  hideSearchInput = false,
   stickySearch = false,
 }: UnifiedSearchProps) {
   const navigate = useNavigate();
@@ -176,28 +170,6 @@ export default function UnifiedSearch({
             : undefined,
     }));
   }, [urlQuery, urlSortBy, urlHasMedia]);
-
-  // When the header provides the search UI (on /search), register our advanced
-  // filters so they render inside HeaderSearch's Advanced popover instead of a
-  // duplicate panel on the page.
-  useHeaderFilters(
-    hideSearchInput
-      ? [
-          {
-            key: "sortBy",
-            label: "Sort by",
-            type: "select",
-            options: [
-              { value: "recent", label: "Recent" },
-              { value: "featured", label: "Featured" },
-              { value: "top", label: "Top" },
-              { value: "latest", label: "Latest" },
-            ],
-          },
-          { key: "hasMedia", label: "Has media", type: "boolean" },
-        ]
-      : [],
-  );
 
   const selectedCategory = urlCategory;
 
@@ -549,21 +521,19 @@ export default function UnifiedSearch({
       >
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col gap-3 sm:gap-4">
-            {!hideSearchInput && (
-              <SearchBar
-                context="all"
-                value={searchFilters.search}
-                filters={searchFilters}
-                onSearch={handleSearch}
-                onFilterChange={handleFilterChange}
-                onClearFilters={handleClearFilters}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-              />
-            )}
+            <SearchBar
+              context="all"
+              value={searchFilters.search}
+              filters={searchFilters}
+              onSearch={handleSearch}
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+            />
 
-            {/* Category chips row. When the header owns the search + advanced
-             * filters, the grid/list toggle lives at the far right of this row. */}
+            {/* Category chips row — SearchBar above already hosts the
+             * grid/list view-mode toggle and Advanced filters. */}
             <div className="flex items-center gap-2">
               <div className="flex gap-2 flex-1 justify-start overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap">
                 {CATEGORIES.map((category) => (
@@ -581,29 +551,6 @@ export default function UnifiedSearch({
                   </Button>
                 ))}
               </div>
-
-              {hideSearchInput && (
-                <div className="flex rounded-md border flex-shrink-0 ml-2">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                    className="rounded-r-none min-h-[44px]"
-                    aria-label="Grid view"
-                  >
-                    <Grid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className="rounded-l-none min-h-[44px]"
-                    aria-label="List view"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </div>

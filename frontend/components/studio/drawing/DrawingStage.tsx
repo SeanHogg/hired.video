@@ -58,6 +58,8 @@ import {
   floodFillAt,
   getLayerContentBbox,
   hydrateLayerCanvas,
+  hydrateTextLayer,
+  hydrateVectorLayer,
   magicWandMask,
   pickColorAt,
   quickSelectAccumulate,
@@ -198,17 +200,39 @@ export default function DrawingStage({
       }
       for (const layer of state.layers) {
         const prevHydrated = snap.get(layer.id);
+        // Per layer kind, compute a hydration key so we re-render only
+        // when the kind-specific content changes (#940 Phase 2 — vector
+        // + text layers don't carry pixelsDataUrl but DO carry shapes /
+        // text content that need re-rasterisation when edited; raster
+        // layers may resolve their pixels from R2 instead of the inline
+        // dataURL via `pixelsR2Key` — #940 dataURL bloat mitigation).
+        const rasterSource = layer.pixelsR2Key ?? layer.pixelsDataUrl;
+        const hydrationKey =
+          layer.kind === "vector"
+            ? `v:${JSON.stringify(layer.vectorShapes ?? [])}`
+            : layer.kind === "text"
+              ? `t:${JSON.stringify(layer.textContent ?? null)}`
+              : rasterSource;
         let canvas = cache.get(layer.id);
-        if (!canvas || canvas.width !== state.width || canvas.height !== state.height) {
+        const rebuild =
+          !canvas || canvas.width !== state.width || canvas.height !== state.height;
+        if (rebuild) {
           canvas = createOffscreenCanvas(state.width, state.height);
           cache.set(layer.id, canvas);
-          await hydrateLayerCanvas(canvas, layer.pixelsDataUrl);
-          snap.set(layer.id, layer.pixelsDataUrl);
-        } else if (prevHydrated !== layer.pixelsDataUrl) {
-          const ctx = canvas.getContext("2d");
-          if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-          await hydrateLayerCanvas(canvas, layer.pixelsDataUrl);
-          snap.set(layer.id, layer.pixelsDataUrl);
+        }
+        if (rebuild || prevHydrated !== hydrationKey) {
+          if (!rebuild && canvas) {
+            const ctx = canvas.getContext("2d");
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+          if (layer.kind === "vector") {
+            hydrateVectorLayer(canvas!, layer.vectorShapes ?? []);
+          } else if (layer.kind === "text" && layer.textContent) {
+            hydrateTextLayer(canvas!, layer.textContent);
+          } else {
+            await hydrateLayerCanvas(canvas!, rasterSource);
+          }
+          snap.set(layer.id, hydrationKey);
         }
       }
       if (!cancelled) recomposite();

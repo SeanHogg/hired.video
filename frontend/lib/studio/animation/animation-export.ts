@@ -34,6 +34,7 @@ import {
 } from "@shared/animation-state";
 import type { OutputProfile } from "@shared/media-kinds";
 import { encodeGif, type GifFrameInput } from "./gif89a-encoder";
+import { toBlobPart } from "../bytes/to-blob-part";
 
 /** Resolve each frame's pixel buffer at the project's dimensions.
  *  Frames carry their pixels as PNG dataURLs; we decode each via an
@@ -112,7 +113,7 @@ export async function renderAnimation(
         loopCount: state.loopCount,
       });
       return {
-        blob: new Blob([bytes], { type: "image/gif" }),
+        blob: new Blob([toBlobPart(bytes)], { type: "image/gif" }),
         durationSec: totalDurationSec(state),
       };
     }
@@ -128,7 +129,7 @@ export async function renderAnimation(
       // the requested mime so consumers tag the file extension correctly.
       const bytes = await encodeViaMediaRecorder(state, frameInputs, profile);
       return {
-        blob: new Blob([bytes], { type: profile.mime }),
+        blob: new Blob([toBlobPart(bytes)], { type: profile.mime }),
         durationSec: totalDurationSec(state),
       };
     }

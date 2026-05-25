@@ -16,17 +16,29 @@
  */
 
 import { useState } from "react";
-import { ChevronUp, ChevronDown, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
-import type { ImageLayer, ImageState, LayerBlendMode, LayerFilters } from "@shared/image-state";
+import { ChevronUp, ChevronDown, Eye, EyeOff, Plus, Trash2, Square, Type as TypeIcon } from "lucide-react";
+import type { ImageLayer, ImageState, LayerBlendMode, LayerFilters, LayerKind } from "@shared/image-state";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 interface DrawingLayersPanelProps {
   state: ImageState;
+  /** Default action — adds a RASTER layer (the historical behaviour).
+   *  The host wires kind-aware `onAddLayerOfKind` when it supports
+   *  vector / text layers (#940 Phase 2). */
   onAddLayer: () => void;
+  /** Optional — when wired, the panel surfaces an "Add layer" dropdown
+   *  with raster / vector / text options. */
+  onAddLayerOfKind?: (kind: LayerKind) => void;
   onDeleteLayer: (layerId: string) => void;
   onSelectLayer: (layerId: string) => void;
   onToggleVisible: (layerId: string) => void;
@@ -40,6 +52,7 @@ interface DrawingLayersPanelProps {
 export default function DrawingLayersPanel({
   state,
   onAddLayer,
+  onAddLayerOfKind,
   onDeleteLayer,
   onSelectLayer,
   onToggleVisible,
@@ -57,20 +70,46 @@ export default function DrawingLayersPanel({
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-end border-b px-2 py-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={onAddLayer}
-              aria-label="Add layer"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Add layer</TooltipContent>
-        </Tooltip>
+        {onAddLayerOfKind ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                aria-label="Add layer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onAddLayerOfKind("raster")}>
+                <Plus className="mr-2 h-3.5 w-3.5" /> Raster layer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAddLayerOfKind("vector")}>
+                <Square className="mr-2 h-3.5 w-3.5" /> Vector layer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAddLayerOfKind("text")}>
+                <TypeIcon className="mr-2 h-3.5 w-3.5" /> Text layer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={onAddLayer}
+                aria-label="Add layer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add layer</TooltipContent>
+          </Tooltip>
+        )}
       </div>
       <div className="flex-1 py-1">
         {displayed.map((layer) => (

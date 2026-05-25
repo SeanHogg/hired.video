@@ -31,9 +31,37 @@
 
 export const CAD_STATE_SCHEMA_VERSION = 1;
 
-/** All shapes share a stable id + a layer name (string today; promoted
- *  to a typed Layer aggregate when layers ship). Coordinates are in
- *  millimetres relative to drawing origin (0,0 = bottom-left). */
+/** Typed layer aggregate (#930 follow-on). Each shape belongs to a
+ *  layer by name; the layer controls visibility / lock / colour
+ *  defaults. Matches AutoCAD's drawing-layer convention so the DXF
+ *  exporter can round-trip layer membership cleanly. */
+export interface CadLayer {
+  /** Stable name — also the foreign key from each `CadShape.layer`. */
+  name: string;
+  /** When false the layer is hidden in the editor + skipped on
+   *  export. */
+  visible: boolean;
+  /** When true the layer is read-only (no new shapes; existing
+   *  shapes can be selected but not moved or deleted). */
+  locked: boolean;
+  /** Layer colour (#rrggbb). Shapes without an explicit `color`
+   *  inherit this when rendering / exporting. */
+  color: string;
+}
+
+/** Default layer that every CAD project ships with. Matches AutoCAD's
+ *  "0" layer convention — every shape lands here when no layer is
+ *  explicitly selected. */
+export const DEFAULT_CAD_LAYER: CadLayer = {
+  name: "0",
+  visible: true,
+  locked: false,
+  color: "#000000",
+};
+
+/** All shapes share a stable id + a layer name (foreign key into
+ *  `state.layers`). Coordinates are in millimetres relative to drawing
+ *  origin (0,0 = bottom-left). */
 export interface CadShapeBase {
   id: string;
   layer: string;
@@ -148,6 +176,14 @@ export interface CadState {
   /** Shapes in z-order. Index 0 is drawn FIRST (back), last is on
    *  top. Same convention as image layers and game sprites. */
   shapes: CadShape[];
+  /** Typed layers (#930 follow-on). When absent, callers fall back to
+   *  the implicit "0" layer; the field becomes required at the next
+   *  schema bump. Layers control visibility + lock + default colour
+   *  for every shape that names them. */
+  layers?: CadLayer[];
+  /** Which layer the drafting tools write to. Defaults to "0" when
+   *  omitted. */
+  activeLayerName?: string;
   grid: CadGridSettings;
   /** Selected shape ids — multi-select is the canonical CAD
    *  interaction, so this is an array, not a single id. */
@@ -172,8 +208,52 @@ export function createBlankCadState(opts: {
     heightMm: opts.heightMm ?? DEFAULT_CAD_HEIGHT_MM,
     unit: opts.unit ?? "mm",
     shapes: [],
+    layers: [{ ...DEFAULT_CAD_LAYER }],
+    activeLayerName: DEFAULT_CAD_LAYER.name,
     grid: { ...DEFAULT_GRID_SETTINGS },
     selectedIds: [],
+  };
+}
+
+/** Append a layer to the state. Names must be unique — duplicate
+ *  names return the state unchanged. */
+export function addLayer(state: CadState, layer: CadLayer): CadState {
+  const existing = state.layers ?? [];
+  if (existing.some((l) => l.name === layer.name)) return state;
+  return { ...state, layers: [...existing, layer] };
+}
+
+/** Remove a layer + every shape that named it. No-op when the layer
+ *  doesn't exist or when it's the last remaining layer (a CAD drawing
+ *  always has at least one layer). */
+export function removeLayer(state: CadState, name: string): CadState {
+  const existing = state.layers ?? [];
+  if (existing.length <= 1) return state;
+  if (!existing.some((l) => l.name === name)) return state;
+  const remainingLayers = existing.filter((l) => l.name !== name);
+  const remainingShapes = state.shapes.filter((s) => s.layer !== name);
+  const nextActive =
+    state.activeLayerName === name
+      ? remainingLayers[0]?.name
+      : state.activeLayerName;
+  return {
+    ...state,
+    layers: remainingLayers,
+    shapes: remainingShapes,
+    activeLayerName: nextActive,
+  };
+}
+
+/** Patch a layer's visible / locked / color fields. */
+export function updateLayer(
+  state: CadState,
+  name: string,
+  patch: Partial<Omit<CadLayer, "name">>,
+): CadState {
+  const existing = state.layers ?? [];
+  return {
+    ...state,
+    layers: existing.map((l) => (l.name === name ? { ...l, ...patch } : l)),
   };
 }
 

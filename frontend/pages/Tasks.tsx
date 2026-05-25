@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { AppShell } from "@/components/AppShell";
+import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
@@ -1063,8 +1064,7 @@ export default function Tasks() {
             <PageHeader
               tabs={taskTabs}
               activeTabKey={currentView}
-              title={t("labels.taskManagement")}
-              description={t("messages.organizeAndTrack")}
+              search={<HeaderSearch />}
               actions={
                 <>
                   <Select

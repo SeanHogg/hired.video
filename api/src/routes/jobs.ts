@@ -705,6 +705,31 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
   );
 });
 
+/** GET /api/jobs/:id/metrics/time-to-hire — manager-only hiring-velocity metric */
+jobRoutes.get("/:id/metrics/time-to-hire", async (c) => {
+  const id = c.req.param("id");
+  const user = c.var.user;
+  // Require the same manager check the job detail uses; the metric
+  // includes per-pipeline timing that competitors price as a Greenhouse-
+  // tier feature, so we don't surface it to non-managers.
+  const viewer = user?.sub
+    ? {
+        userId: user.sub,
+        isSuperAdmin:
+          user.isSuperAdmin === true ||
+          user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true,
+      }
+    : undefined;
+  const job = await jobService.getJobById(id, undefined, viewer);
+  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
+  if (!(job as any).viewerCanManage) {
+    return c.json(error("FORBIDDEN", "Only the job's manager can view hiring metrics"), 403);
+  }
+  const { computeTimeToHire } = await import("../services/job/time-to-hire.js");
+  const metric = await computeTimeToHire(id);
+  return c.json(success(metric));
+});
+
 /** GET /api/jobs/:id — get a specific job */
 jobRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");

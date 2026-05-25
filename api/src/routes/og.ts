@@ -604,6 +604,41 @@ ogRoutes.get("/blog", async (c) => {
   return svgResponse(svg, true);
 });
 
+// ─── GET /articles ────────────────────────────────────────────────────────────
+// Social card fallback for an article. The 14 editorial articles seeded by
+// migration 0113 (and the bulk of creator-authored ones today) ship without
+// a `cover_image_url`, so [ArticleRecord adapter](../../frontend/lib/seo-ugc.ts)
+// + [ArticleView hero](../../frontend/pages/ArticleView.tsx) both fall
+// back here to keep every share preview branded. Driven by query params
+// (title / category / author / date) so the URL is stable per article and
+// the SVG can be edge-cached for a day.
+ogRoutes.get("/articles", async (c) => {
+  const title = truncate(c.req.query("title") || "hired.video Articles", 70);
+  const category = truncate(c.req.query("category") || "", 40);
+  const date = truncate(c.req.query("date") || "", 30);
+  const author = truncate(c.req.query("author") || "hired.video Editorial", 40);
+
+  const metaLine = [category, date].filter(Boolean).join(" · ");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="60" y="60" width="1080" height="510" rx="24" fill="rgba(255,255,255,0.06)"/>
+  <text x="100" y="170" font-family="system-ui,sans-serif" font-size="24" fill="rgba(255,255,255,0.6)">hired.video Articles</text>
+  <text x="100" y="270" font-family="system-ui,sans-serif" font-size="52" font-weight="700" fill="white">${escapeXml(title)}</text>
+  ${metaLine ? `<text x="100" y="340" font-family="system-ui,sans-serif" font-size="26" fill="rgba(255,255,255,0.7)">${escapeXml(metaLine)}</text>` : ""}
+  <text x="100" y="540" font-family="system-ui,sans-serif" font-size="24" fill="rgba(255,255,255,0.65)">by ${escapeXml(author)}</text>
+  <text x="100" y="580" font-family="system-ui,sans-serif" font-size="20" fill="rgba(255,255,255,0.5)">hired.video/articles</text>
+</svg>`;
+
+  return svgResponse(svg, true);
+});
+
 function genericCard(line1: string, line2: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
     <defs>

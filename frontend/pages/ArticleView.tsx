@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Loader2, Clock, Eye } from "lucide-react";
+import { Loader2, Clock, Eye, ChevronRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useUgcSeo } from "@/lib/seo-ugc";
+import { useBreadcrumbs } from "@/lib/seo";
+import { articleCoverImageUrl, useUgcSeo } from "@/lib/seo-ugc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/AppShell";
@@ -56,80 +57,107 @@ export default function ArticleView() {
   // /articles index meta instead of its own title/cover/JSON-LD.
   useUgcSeo("article", article);
 
+  // BreadcrumbList JSON-LD for Google rich results. Visible breadcrumb
+  // below mirrors the same trail so on-page nav and structured data stay
+  // in sync.
+  useBreadcrumbs(
+    article && authorSlug
+      ? [
+          { name: "Articles", url: "/articles" },
+          { name: article.title, url: `/articles/${authorSlug}/${article.slug}` },
+        ]
+      : [{ name: "Articles", url: "/articles" }],
+  );
+
+  const coverUrl = article ? articleCoverImageUrl(article) : null;
+
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16">
-          <article className="max-w-3xl mx-auto px-4 py-8">
-            {loading ? (
-              <Card><CardContent className="p-8 flex items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t("status.loadingArticle")}
-              </CardContent></Card>
-            ) : error || !article ? (
-              <Card><CardContent className="p-8 text-center">
-                <p className="font-medium mb-2">{t("errors.articleNotFound")}</p>
-                <p className="text-sm text-muted-foreground">{t("messages.articleNotFoundDesc")}</p>
-              </CardContent></Card>
-            ) : (
+      <article className="max-w-4xl mx-auto px-4 py-8">
+        {/* Visible breadcrumb — matches the BreadcrumbList JSON-LD emitted
+            via useBreadcrumbs so on-page nav, AppShell sidebar, and rich
+            results agree on the trail. */}
+        <nav aria-label="breadcrumb" className="mb-6 text-sm text-muted-foreground">
+          <ol className="flex flex-wrap items-center gap-1.5">
+            <li><Link to="/articles" className="hover:text-foreground hover:underline">Articles</Link></li>
+            {article && (
               <>
-                {article.coverImageUrl && (
-                  <img src={article.coverImageUrl} alt="" className="w-full aspect-[16/9] object-cover rounded-lg mb-6" />
-                )}
-                <header className="space-y-3 mb-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      {article.category && <Badge variant="secondary">{article.category}</Badge>}
-                      <h1 className="text-3xl font-bold leading-tight">{article.title}</h1>
-                    </div>
-                    <ArtifactDetailsSheet
-                      permission={{
-                        kind: "article",
-                        entity: { id: article.id, authorId: article.author.id },
-                      }}
-                      title={article.title}
-                      activity={{
-                        viewCount: article.viewCount,
-                        createdAt: article.publishedAt,
-                        extra: [
-                          { label: "Read time", value: `${article.readMinutes} min` },
-                        ],
-                      }}
-                    />
-                  </div>
-                  {article.summary && <p className="text-lg text-muted-foreground">{article.summary}</p>}
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground pt-2 border-t">
-                    <Link to={`/people/${article.author.slug}`} className="flex items-center gap-2 hover:underline">
-                      {article.author.avatarUrl ? (
-                        <img src={article.author.avatarUrl} alt="" className="h-7 w-7 rounded-full" />
-                      ) : (
-                        <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
-                          {(article.author.name ?? "?")[0]}
-                        </div>
-                      )}
-                      <span>{article.author.name}</span>
-                    </Link>
-                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {t("labels.minRead", { minutes: article.readMinutes })}</span>
-                    <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {article.viewCount}</span>
-                    {article.publishedAt && (
-                      <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                </header>
-
-                <div className="prose prose-neutral dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.bodyMd}</ReactMarkdown>
-                </div>
-
-                {article.tags && article.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-8 pt-6 border-t">
-                    {article.tags.map((tag) => (
-                      <Badge key={tag} variant="outline">{tag}</Badge>
-                    ))}
-                  </div>
-                )}
+                <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
+                <li className="text-foreground truncate max-w-[60ch]">{article.title}</li>
               </>
             )}
-          </article>
-</div>
-</AppShell>
+          </ol>
+        </nav>
+
+        {loading ? (
+          <Card><CardContent className="p-8 flex items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t("status.loadingArticle")}
+          </CardContent></Card>
+        ) : error || !article ? (
+          <Card><CardContent className="p-8 text-center">
+            <p className="font-medium mb-2">{t("errors.articleNotFound")}</p>
+            <p className="text-sm text-muted-foreground">{t("messages.articleNotFoundDesc")}</p>
+          </CardContent></Card>
+        ) : (
+          <>
+            {coverUrl && (
+              <img src={coverUrl} alt="" className="w-full aspect-[16/9] object-cover rounded-lg mb-6" />
+            )}
+            <header className="space-y-3 mb-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  {article.category && <Badge variant="secondary">{article.category}</Badge>}
+                  <h1 className="text-3xl font-bold leading-tight">{article.title}</h1>
+                </div>
+                <ArtifactDetailsSheet
+                  permission={{
+                    kind: "article",
+                    entity: { id: article.id, authorId: article.author.id },
+                  }}
+                  title={article.title}
+                  activity={{
+                    viewCount: article.viewCount,
+                    createdAt: article.publishedAt,
+                    extra: [
+                      { label: "Read time", value: `${article.readMinutes} min` },
+                    ],
+                  }}
+                />
+              </div>
+              {article.summary && <p className="text-lg text-muted-foreground">{article.summary}</p>}
+              <div className="flex items-center gap-3 text-sm text-muted-foreground pt-2 border-t">
+                <Link to={`/people/${article.author.slug}`} className="flex items-center gap-2 hover:underline">
+                  {article.author.avatarUrl ? (
+                    <img src={article.author.avatarUrl} alt="" className="h-7 w-7 rounded-full" />
+                  ) : (
+                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
+                      {(article.author.name ?? "?")[0]}
+                    </div>
+                  )}
+                  <span>{article.author.name}</span>
+                </Link>
+                <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {t("labels.minRead", { minutes: article.readMinutes })}</span>
+                <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {article.viewCount}</span>
+                {article.publishedAt && (
+                  <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
+                )}
+              </div>
+            </header>
+
+            <div className="prose prose-neutral dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.bodyMd}</ReactMarkdown>
+            </div>
+
+            {article.tags && article.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-8 pt-6 border-t">
+                {article.tags.map((tag) => (
+                  <Badge key={tag} variant="outline">{tag}</Badge>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </article>
+    </AppShell>
   );
 }

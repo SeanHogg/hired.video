@@ -13,7 +13,7 @@ export default function SearchPage() {
   return (
     <AppShell bgClassName="bg-background">
       <h1 className="sr-only">{t("headings.marketplaceAndSearch")}</h1>
-      <UnifiedSearch hideSearchInput stickySearch />
+      <UnifiedSearch stickySearch />
       <MarketplaceHero />
     </AppShell>
   );

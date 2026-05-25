@@ -73,6 +73,7 @@ import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import RecruitSharingSettings from "@/components/recruit/RecruitSharingSettings";
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
 import ProfileSectionsSettingsCard from "@/components/settings/ProfileSectionsSettingsCard";
+import { AccountAuditLogPanel } from "@/components/settings/AccountAuditLogPanel";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
@@ -824,7 +825,7 @@ function SettingsContent() {
                       </TabsTrigger>
                       <TabsTrigger value="profile-sections" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <LayoutDashboard className="h-4 w-4" />
-                        <span>Profile Sections</span>
+                        <span>{t("tabs.profileSections")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="cookies" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Cookie className="h-4 w-4" />
@@ -931,7 +932,7 @@ function SettingsContent() {
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <LayoutDashboard className="h-4 w-4" />
-                        <span>Profile Sections</span>
+                        <span>{t("tabs.profileSections")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="cookies"
@@ -1651,6 +1652,12 @@ function SettingsContent() {
 
               {/* Security Tab */}
               <TabsContent value="security" className="space-y-6">
+                {/* Unified audit log — every login, password / email change,
+                    account lock, impersonation event, and admin action in
+                    one chronological stream. Mounts at the top of the
+                    Security tab so the most security-relevant context is
+                    the first thing the user sees. */}
+                <AccountAuditLogPanel />
                 <Card>
                   <CardHeader>
                     <CardTitle>{t("headings.connectedAccounts")}</CardTitle>

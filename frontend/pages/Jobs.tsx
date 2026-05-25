@@ -109,7 +109,10 @@ import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
 import CreateJobAlertButton from "@/components/CreateJobAlertButton";
 import AdSlot from "@/components/ads/AdSlot";
-import CandidatesPanel from "@/components/recruit/CandidatesPanel";
+import CandidatesPanel, {
+  CandidatesHeaderActions,
+} from "@/components/recruit/CandidatesPanel";
+import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
@@ -292,6 +295,16 @@ export default function Jobs() {
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
   const [candidateCount, setCandidateCount] = useState<number>(0);
+  // Candidates tab — lifted scope so the company picker + import buttons
+  // can sit in the PageHeader actions slot (next to "Post Job") while the
+  // CandidatesPanel body reads the same companyId. The nonce kicks the
+  // panel to refetch after the lifted import controls add a row.
+  const {
+    scope: candidatesScope,
+    companyId: candidatesCompanyId,
+    setCompanyId: setCandidatesCompanyId,
+  } = useCurrentCompanyScope();
+  const [candidatesRefreshNonce, setCandidatesRefreshNonce] = useState(0);
   // Hub tab strip — must call unconditionally (rules of hooks). Returns
   // [] for unauthenticated viewers, who never reach the authed branch.
   const topTabs = useJobsTabs({ totalJobs, candidateCount });
@@ -744,6 +757,14 @@ export default function Jobs() {
                         </Link>
                       </Button>
                     )}
+                    {effectiveTab === "candidates" && canManageJobs && (
+                      <CandidatesHeaderActions
+                        scope={candidatesScope}
+                        companyId={candidatesCompanyId}
+                        onCompanyChange={setCandidatesCompanyId}
+                        onImported={() => setCandidatesRefreshNonce((n) => n + 1)}
+                      />
+                    )}
                     {effectiveTab === "jobs" && (
                       <>
                         <SectorFilterButton
@@ -763,7 +784,13 @@ export default function Jobs() {
               />
 
               {effectiveTab === "candidates" && canManageJobs ? (
-                <CandidatesPanel onCountChange={setCandidateCount} />
+                <CandidatesPanel
+                  onCountChange={setCandidateCount}
+                  hideHeaderControls
+                  scopeOverride={candidatesScope}
+                  companyIdOverride={candidatesCompanyId}
+                  refreshNonce={candidatesRefreshNonce}
+                />
               ) : effectiveTab === "posted" && canManageJobs ? (
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold flex items-center gap-2">

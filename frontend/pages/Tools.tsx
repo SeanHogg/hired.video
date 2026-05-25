@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
+import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -481,8 +482,7 @@ export default function Tools() {
             <PageHeader
               tabs={[{ key: "tools", label: "Tools", icon: Wrench, to: "/tools" }]}
               activeTabKey="tools"
-              title="AI-Powered Career Tools"
-              description="Access powerful AI tools to enhance your career and optimize your job search."
+              search={<HeaderSearch />}
             />
 
             {/* Per-chip count reflects the audience+tier+search filters

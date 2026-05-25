@@ -28,6 +28,7 @@ import {
   renderTimelineFrame,
   disposeRendererState,
 } from "@/lib/timeline/frame-renderer";
+import { toBlobPart } from "@/lib/studio/bytes/to-blob-part";
 
 export interface ComicRenderResult {
   blob: Blob;
@@ -150,7 +151,7 @@ async function packPdf(
   for (const p of pages) {
     pngArrays.push(new Uint8Array(await p.arrayBuffer()));
   }
-  return new Blob([buildPdfBytes(pngArrays, pageWidth, pageHeight)], {
+  return new Blob([toBlobPart(buildPdfBytes(pngArrays, pageWidth, pageHeight))], {
     type: "application/pdf",
   });
 }

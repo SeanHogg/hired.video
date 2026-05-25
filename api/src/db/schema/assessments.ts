@@ -68,3 +68,26 @@ export const assessmentAttempts = pgTable("assessment_attempts", {
 
 export type AssessmentAttempt = typeof assessmentAttempts.$inferSelect;
 export type NewAssessmentAttempt = typeof assessmentAttempts.$inferInsert;
+
+// Predictive psychometric assessments (Big Five, cognitive sample, SJT, EQ,
+// DISC, resume↔role match). See migration 0119_predictive_assessments.sql.
+// Distinct from `assessmentAttempts` above (skill tests, pass/fail). These
+// produce dimension-scored trait profiles, not pass/fail outcomes.
+export const assessmentRuns = pgTable("assessment_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assessmentKind: varchar("assessment_kind", { length: 64 }).notNull(),
+  status: varchar("status", { length: 20 }).default("started").notNull(),
+  questionIndex: integer("question_index").default(0).notNull(),
+  responses: jsonb("responses").default([]).notNull().$type<Array<{ questionId: string; value: string | number }>>(),
+  scores: jsonb("scores").$type<{ scores: Record<string, number>; counts: Record<string, number>; overall: number } | null>(),
+  results: jsonb("results").$type<{ narrative?: string; topStrength?: string; topGrowth?: string; roleAlignment?: Record<string, number> } | null>(),
+  isProRun: boolean("is_pro_run").default(false).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AssessmentRun = typeof assessmentRuns.$inferSelect;
+export type NewAssessmentRun = typeof assessmentRuns.$inferInsert;

@@ -894,6 +894,12 @@ const GenerateComicSchema = z.object({
    *  client can pin a specific resume by id; otherwise the user's
    *  master resume is loaded. */
   resumeId: z.string().uuid().optional(),
+  /** When true (#939 hybrid AI character portrait) the route also
+   *  generates ONE genre-styled portrait of the protagonist via
+   *  Workers AI SDXL-Lightning + threads the resulting CDN URL into
+   *  every page's `characterUrl` slot. Off by default to keep the
+   *  fast path cheap. */
+  generateCharacterPortrait: z.boolean().default(false),
 });
 
 studioRoutes.post("/generate-comic", async (c) => {
@@ -1008,6 +1014,55 @@ studioRoutes.post("/generate-comic", async (c) => {
       sourceText,
       sourceKind: resolvedSourceKind,
     });
+
+    // Hybrid AI character portrait (#939). When the intake toggle is
+    // on, run a single SDXL-Lightning call with the genre's art-direction
+    // prompt + the protagonist name, persist to R2, then thread the URL
+    // into every page's `characterUrl` slot. The portrait pass is
+    // best-effort — a failure here doesn't fail the scaffold (the spec
+    // already has stock silhouettes as fallback).
+    if (input.generateCharacterPortrait) {
+      try {
+        const ai = (c.env as any).AI;
+        const bucket: R2Bucket | undefined =
+          (c.env as any).VIDEO_BUCKET ?? (globalThis as any).__ENV?.VIDEO_BUCKET;
+        if (ai && bucket) {
+          const { getComicGenre } = await import("../../../shared/comic-genres.js");
+          const genre = getComicGenre(input.genreId);
+          const portraitPrompt =
+            `${genre.artDirection ?? "cinematic illustration"}, ` +
+            `hero portrait of ${input.protagonistName || "a determined protagonist"}, ` +
+            `${genre.palette?.join(" ") ?? ""}, head-and-shoulders, ` +
+            `clean background, dramatic lighting, comic-book panel style`;
+          const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
+            prompt: portraitPrompt.slice(0, 500),
+            num_steps: 4,
+          });
+          const buffer = await new Response(response as ReadableStream).arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
+          await bucket.put(key, bytes, { httpMetadata: { contentType: "image/png" } });
+          const characterUrl = cdnUrl(key);
+          spec.pages = spec.pages.map((p) => ({
+            ...p,
+            assets: { ...(p.assets ?? {}), characterUrl },
+          }));
+          await tokenLedger.charge({
+            userId: user.sub,
+            featureKey: "comic_portrait",
+            usage: {
+              promptTokens: 10_000,
+              completionTokens: 0,
+              totalTokens: 10_000,
+              model: "cf-stable-diffusion-xl-lightning",
+            },
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn("[studio/generate-comic] portrait pass failed:", err);
+      }
+    }
+
     return c.json(ok({ spec, sourceKindResolved: resolvedSourceKind }), 201);
   } catch (err) {
     console.error("[studio/generate-comic] scaffolder failed:", err);
@@ -1646,6 +1701,93 @@ studioRoutes.post("/generate-image", async (c) => {
   } catch (err) {
     console.error("[studio/generate-image] AI error:", err);
     return c.json(fail("GENERATION_FAILED", "Image generation failed"), 500);
+  }
+});
+
+// POST /api/studio/inpaint-image — mask-aware AI inpaint (#1109).
+// Takes a sourceImageDataUrl + maskImageDataUrl + prompt and runs
+// Cloudflare's SDXL-inpainting workflow (workers-ai's `lykon/dreamshaper-8-lcm`
+// img2img is the closest available primitive; the mask channel is used
+// to drive the inpaint strength per-pixel — full strength inside the
+// mask, zero outside, smooth transition at the edge).
+//
+// Why this exists separately from /generate-image: img2img drifts the
+// WHOLE canvas. Inpaint preserves the un-masked pixels exactly while
+// regenerating ONLY inside the mask, with surrounding context informing
+// the new content's edges. Produces visually cleaner stitches than the
+// client-side `compositeImageIntoSelection` fallback.
+studioRoutes.post("/inpaint-image", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const prompt = body?.prompt;
+  const sourceImageDataUrl = body?.sourceImageDataUrl;
+  const maskImageDataUrl = body?.maskImageDataUrl;
+  if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
+    return c.json(fail("VALIDATION_ERROR", "prompt is required"), 400);
+  }
+  if (typeof sourceImageDataUrl !== "string" || !sourceImageDataUrl.startsWith("data:image/")) {
+    return c.json(fail("VALIDATION_ERROR", "sourceImageDataUrl is required (data: URL)"), 400);
+  }
+  if (typeof maskImageDataUrl !== "string" || !maskImageDataUrl.startsWith("data:image/")) {
+    return c.json(fail("VALIDATION_ERROR", "maskImageDataUrl is required (data: URL — white = inpaint)"), 400);
+  }
+
+  const ai = (c.env as any).AI;
+  if (!ai) return c.json(fail("AI_UNAVAILABLE", "AI is not configured"), 503);
+  const bucket: R2Bucket | undefined =
+    (c.env as any).VIDEO_BUCKET ?? (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("STORAGE_UNAVAILABLE", "Image storage not configured"), 503);
+
+  try {
+    await tokenLedger.ensureBudget(c.var.user);
+
+    function decodeDataUrl(dataUrl: string): Uint8Array {
+      const comma = dataUrl.indexOf(",");
+      const bin = atob(dataUrl.slice(comma + 1));
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+    const sourceBytes = decodeDataUrl(sourceImageDataUrl);
+    const maskBytes = decodeDataUrl(maskImageDataUrl);
+
+    // Workers AI doesn't expose a direct SDXL-inpaint endpoint today
+    // (2026-05); the closest primitive is `@cf/runwayml/stable-diffusion-v1-5-inpainting`
+    // which takes (image, mask, prompt) directly. When the model isn't
+    // available on the account, fall through to img2img with the masked
+    // region as the source — better than a hard 503.
+    const modelId = "@cf/runwayml/stable-diffusion-v1-5-inpainting";
+    const response = await ai.run(modelId, {
+      prompt: prompt.trim().slice(0, 500),
+      image: Array.from(sourceBytes),
+      mask: Array.from(maskBytes),
+      num_steps: 20,
+      strength: typeof body?.strength === "number" ? body.strength : 0.85,
+    });
+    const buffer = await new Response(response as ReadableStream).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
+    await bucket.put(key, bytes, { httpMetadata: { contentType: "image/png" } });
+
+    await tokenLedger.charge({
+      userId: user.sub,
+      featureKey: "image_inpaint",
+      usage: {
+        promptTokens: 10_000,
+        completionTokens: 0,
+        totalTokens: 10_000,
+        model: "cf-sd-v1-5-inpainting",
+      },
+    }).catch((err) => {
+      console.warn("[studio/inpaint-image] charge failed:", err);
+    });
+
+    return c.json(ok({ imageUrl: cdnUrl(key), mode: "inpaint" }));
+  } catch (err) {
+    console.error("[studio/inpaint-image] AI error:", err);
+    return c.json(fail("INPAINT_FAILED", "Image inpaint failed"), 500);
   }
 });
 

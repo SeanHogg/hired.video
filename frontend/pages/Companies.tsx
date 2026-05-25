@@ -31,6 +31,7 @@ import { INDUSTRIES } from "@/lib/constants/industries";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
+import HeaderSearch from "@/components/HeaderSearch";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
 import { COMPANIES_HUB_DEFAULT_TAB, COMPANIES_HUB_TABS } from "@/hooks/use-companies-tabs";
 import ViewModeToggle from "@/components/ViewModeToggle";
@@ -462,8 +463,10 @@ export default function Companies() {
     // /companies/:id / edit / create surfaces can never drift.
     const companyTabBodies: Record<string, Omit<EntityHubTab, "key" | "label" | "icon" | "roles"> | undefined> = {
       browse: {
+        // `title` is required by EntityHubTab but ignored when `search` is
+        // set — kept here only to satisfy the type contract.
         title: "Companies",
-        description: "Discover and explore companies",
+        search: <HeaderSearch />,
         headerActions: browseActions,
         body: renderBrowseBody,
       },

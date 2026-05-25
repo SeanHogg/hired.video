@@ -71,6 +71,15 @@ export const jobItems = pgTable("job_items", {
   bodyCleansedAt: timestamp("body_cleansed_at", { withTimezone: true }),
   // cleansed | unchanged | failed — what the last cleanse pass did.
   bodyCleanseStatus: varchar("body_cleanse_status", { length: 16 }),
+  // Async video screening attachment. When set, the apply flow auto-creates a
+  // `studio_async_interviews` row bound to the new application and lands the
+  // candidate on `/interview/:token` after submit. See migration 0120 and
+  // routes/interview-question-sets.ts.
+  screeningQuestionSetId: uuid("screening_question_set_id"),
+  // 'none' | 'optional' | 'required' — drives whether the apply flow blocks
+  // submission until the screening starts (required) or just nudges the
+  // candidate after applying (optional).
+  screeningRequired: varchar("screening_required", { length: 16 }).notNull().default("none"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

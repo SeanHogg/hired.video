@@ -42,6 +42,24 @@ const STATIC_PAGES = [
   { loc: "/contact", changefreq: "monthly", priority: "0.5" },
   { loc: "/privacy-policy", changefreq: "yearly", priority: "0.3" },
   { loc: "/terms-of-service", changefreq: "yearly", priority: "0.3" },
+  // AI-resilient sector surfaces (gap #1165). Sector slugs MUST stay in
+  // sync with shared/sectors.ts SECTORS. Tracked as a consolidate-
+  // marketing-route-SSoT follow-up gap.
+  { loc: "/sectors", changefreq: "weekly", priority: "0.8" },
+  { loc: "/sectors/healthcare", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/legal", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/government", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/law_enforcement", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/security", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/skilled_trades", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/beauty_personal_care", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/gig_work", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/politics_campaigns", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/politics_civic", changefreq: "weekly", priority: "0.7" },
+  { loc: "/sectors/tech", changefreq: "weekly", priority: "0.5" },
+  { loc: "/pivot-explorer", changefreq: "weekly", priority: "0.8" },
+  { loc: "/resume-templates", changefreq: "weekly", priority: "0.7" },
+  { loc: "/articles", changefreq: "daily", priority: "0.7" },
 ];
 
 sitemapRoutes.get("/sitemap.xml", async (c) => {

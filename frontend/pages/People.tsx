@@ -102,6 +102,7 @@ import { listsService } from "@/lib/services/lists-service";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { AppShell } from "@/components/AppShell";
+import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
@@ -779,7 +780,6 @@ export default function People() {
   if (isAuthenticated && user) {
     const peopleData: PeopleData = getPeopleForUser() as PeopleData;
     const rolePermissions = createRolePermissions(user.role);
-    const isJobSeeker = rolePermissions.isJobSeeker;
     // Consolidated hiring-side check — fold admin / SA in via the
      // canonical canManageJobs permission (drops the inline drift
      // called out by gap #360).
@@ -804,12 +804,7 @@ export default function People() {
               <PageHeader
                 tabs={peopleTabs}
                 activeTabKey={activeTab}
-                title="Talent"
-                description={
-                  isJobSeeker
-                    ? "Connect with recruiters, industry leaders, and fellow professionals"
-                    : "Discover and connect with talented professionals"
-                }
+                search={<HeaderSearch />}
                 actions={
                   <>
                     <Button asChild variant="outline" className="min-h-[44px]">

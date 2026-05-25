@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useProfileSectionVisibility } from "./profile-sections-context";
 
 interface AdditionalInfoSectionProps {
   languages?: string[];
@@ -20,6 +21,8 @@ export default function AdditionalInfoSection({
   showOwnerMeta = false,
 }: AdditionalInfoSectionProps) {
   const { t } = useTranslation();
+  const sectionVisible = useProfileSectionVisibility("additionalInfo");
+  if (!sectionVisible) return null;
   const hasLanguages = languages.length > 0;
   const hasInterests = interests.length > 0;
   const hasOwnerMeta = showOwnerMeta && (memberSince || lastActive);

@@ -211,6 +211,23 @@ export interface ArticleRecord {
   author: { id?: string; name: string; slug?: string; avatarUrl?: string | null };
 }
 
+/**
+ * Single source of truth for the article cover image URL — used by both
+ * the SEO adapter (ogImage) and the in-page hero in ArticleView. Falls
+ * back to the per-article generated SVG at `/api/og/articles` when the
+ * record has no `coverImageUrl` set, so every article (incl. the 14
+ * seeded editorial pieces from migration 0113) gets a branded share
+ * card + on-page hero without the editor having to upload one.
+ */
+export function articleCoverImageUrl(article: Pick<ArticleRecord, "title" | "category" | "publishedAt" | "coverImageUrl" | "author">): string {
+  if (article.coverImageUrl) return article.coverImageUrl;
+  const params = new URLSearchParams({ title: article.title });
+  if (article.category) params.set("category", article.category);
+  if (article.publishedAt) params.set("date", article.publishedAt.slice(0, 10));
+  if (article.author?.name) params.set("author", article.author.name);
+  return `/api/og/articles?${params.toString()}`;
+}
+
 export interface BlogPostRecord {
   title: string;
   slug: string;
@@ -458,17 +475,18 @@ registerUgcSeo<ArticleRecord>("article", (article, pathname) => {
   const title = `${article.title} — hired.video`;
   const description = clip(article.summary) || clip(article.bodyMd, 160) || `${article.title} on hired.video.`;
   const keywords = joinKeywords([article.category, ...(article.tags ?? [])]);
+  const ogImage = articleCoverImageUrl(article);
   return {
     title,
     description,
     ...mirrorOg(title, description),
-    ...(article.coverImageUrl ? { ogImage: article.coverImageUrl } : {}),
+    ogImage,
     ...(keywords ? { keywords } : {}),
     structuredData: generateStructuredData.article({
       type: "Article",
       headline: article.title,
       description: clip(article.summary, 200),
-      image: article.coverImageUrl ?? undefined,
+      image: ogImage,
       datePublished: article.publishedAt ?? undefined,
       dateModified: article.updatedAt ?? article.publishedAt ?? undefined,
       authorName: article.author?.name,

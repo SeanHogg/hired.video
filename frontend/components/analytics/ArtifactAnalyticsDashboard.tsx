@@ -83,12 +83,37 @@ export default function ArtifactAnalyticsDashboard({
   }, [load]);
 
   return (
-    <MetricsPanel
-      metrics={metrics}
-      loading={loading}
-      error={error}
-      kind={metricsPanelKind(kind)}
-      durationSec={durationSec ?? metrics?.heatmap?.length}
-    />
+    <div className="space-y-4">
+      <MetricsPanel
+        metrics={metrics}
+        loading={loading}
+        error={error}
+        kind={metricsPanelKind(kind)}
+        durationSec={durationSec ?? metrics?.heatmap?.length}
+      />
+      {/* Per-kind extras. TimeToHireCard is mounted for jobs only and
+          self-gates on manager-only access via its own 403 handling, so
+          a non-manager viewer of a job sees nothing here even when this
+          dashboard surfaces in their drawer. */}
+      {kind === "job" && artifactId && <JobMetricExtras jobId={artifactId} />}
+    </div>
   );
+}
+
+function JobMetricExtras({ jobId }: { jobId: string }) {
+  // Deferred import to avoid pulling the recruiter-only TimeToHireCard
+  // chunk into every artifact-dashboard mount.
+  const [TimeToHireCard, setTimeToHireCard] = useState<null | ((p: { jobId: string }) => JSX.Element)>(null);
+  useEffect(() => {
+    let cancelled = false;
+    import("@/components/jobs/TimeToHireCard").then((mod) => {
+      if (cancelled) return;
+      setTimeToHireCard(() => mod.TimeToHireCard);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (!TimeToHireCard) return null;
+  return <TimeToHireCard jobId={jobId} />;
 }

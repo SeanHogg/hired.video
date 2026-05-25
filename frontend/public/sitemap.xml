@@ -408,4 +408,23 @@
     <priority>0.3</priority>
   </url>
 
+  <!-- AI-resilient sector surfaces (gap #1165). Slugs MUST stay in sync
+       with shared/sectors.ts SECTORS. Tracked as a consolidate-marketing-
+       route-SSoT follow-up gap. -->
+  <url><loc>https://hired.video/sectors</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/sectors/healthcare</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/legal</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/government</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/law_enforcement</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/security</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/skilled_trades</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/beauty_personal_care</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/gig_work</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/politics_campaigns</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/politics_civic</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/sectors/tech</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://hired.video/pivot-explorer</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/resume-templates</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/articles</loc><lastmod>2026-05-25</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+
 </urlset>

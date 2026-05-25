@@ -645,6 +645,35 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     showOnHome: true,
     audienceRoles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
   },
+  {
+    // HireVue/PI parity — validated-inspired psychometric battery. Free
+    // tier ships Big Five + cognitive sample; Pro unlocks SJT, EQ, DISC,
+    // and the resume → predictive-index match. History captured per run.
+    id: "predictive-assessments",
+    href: "/tools/predictive-assessments",
+    title: "Predictive Assessments",
+    description:
+      "Big Five, cognitive ability, situational judgment, EQ, DISC — and a resume → predictive-index match.",
+    tier: "free",
+    category: "Career",
+    icon: ClipboardCheck,
+    iconBgClassName: "bg-emerald-100",
+    iconColorClassName: "text-emerald-700",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "5", label: "Instruments", valueClassName: "text-emerald-600" },
+      { value: "Free", label: "Big Five + Cognitive", valueClassName: "text-emerald-600" },
+    ],
+    features: [
+      "Big Five personality (IPIP short form)",
+      "Cognitive ability sample (Wonderlic-style)",
+      "Situational judgment + EQ + DISC (Pro)",
+      "Resume → predictive-index match (Pro)",
+      "Every start + complete saved to your history",
+    ],
+    ctaLabel: "Take Assessment",
+    showOnHome: false,
+  },
 ];
 
 export function getToolsForHome(): ToolCatalogEntry[] {

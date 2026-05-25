@@ -195,6 +195,102 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // AI-resilient sector surfaces (gap #1165). Per the prerender.mjs "keep
+  // in sync" note, these must mirror the ROUTES list there. Sector slug
+  // list comes from shared/sectors.ts SECTORS.
+  "/sectors": {
+    title: "AI-Resilient Sectors: Browse Careers AI Can't Replace — hired.video",
+    description:
+      "Healthcare, skilled trades, law enforcement, beauty, government, and more — sectors built around physical work, licensure, and in-person judgement. Browse jobs, pivot guides, and resume templates by sector.",
+    keywords:
+      "ai resilient jobs, ai proof careers, ai resistant jobs, skilled trades, healthcare careers, law enforcement careers, government jobs",
+  },
+  "/sectors/healthcare": {
+    title: "Healthcare & Medical Careers: AI-Resilient Jobs — hired.video",
+    description:
+      "Patient-facing care, licensed clinicians, EMTs, nursing, surgical tech, and allied health roles. Browse jobs, see licensure requirements, and pivot into healthcare from tech.",
+    keywords: "healthcare jobs, nursing careers, ai resilient healthcare, medical careers, allied health",
+  },
+  "/sectors/legal": {
+    title: "Legal Careers: Bar-Admitted Roles & Legal Adjacent — hired.video",
+    description:
+      "Litigators, court reporters, mediators, compliance officers, and title agents. Honest read on which legal roles AI is replacing vs. which remain durable.",
+    keywords: "legal careers, attorney jobs, court reporter, compliance jobs, ai resilient legal",
+  },
+  "/sectors/government": {
+    title: "Government & Public Service Careers — hired.video",
+    description:
+      "Federal, state, and municipal roles — inspectors, public works, cleared cyber, postal carriers, park rangers. Clearance roles remain in high demand.",
+    keywords: "government jobs, federal careers, civil service, cleared jobs, ts sci clearance, public works",
+  },
+  "/sectors/law_enforcement": {
+    title: "Law Enforcement Careers: Police, Sheriff, Federal Agents — hired.video",
+    description:
+      "Sworn officer paths, federal agent roles (FBI/DEA/ATF), corrections, dispatch, and specialty units. POST certification + academy pathways.",
+    keywords: "law enforcement jobs, police careers, fbi careers, corrections officer, sheriff deputy",
+  },
+  "/sectors/security": {
+    title: "Security & Protective Services Careers — hired.video",
+    description:
+      "Armed and unarmed guards, executive protection, event security, armored transport, GSOC operators. State licensing + firearms endorsement pathways.",
+    keywords: "security jobs, executive protection, armed guard, gsoc, protective services",
+  },
+  "/sectors/skilled_trades": {
+    title: "Skilled Trades Careers: Electrician, Plumber, HVAC, Welding — hired.video",
+    description:
+      "Journeyman and master license pathways for the trades. Union and non-union routes, apprenticeship programs, and the strongest AI-resilient category in the labor market.",
+    keywords:
+      "skilled trades jobs, electrician careers, plumber jobs, hvac technician, welder, journeyman, apprenticeship, ibew",
+  },
+  "/sectors/beauty_personal_care": {
+    title: "Beauty & Personal Care Careers: Cosmetology, Barbering, Massage — hired.video",
+    description:
+      "Licensed cosmetologists, barbers, estheticians, nail technicians, massage therapists, tattoo artists. Booth-rental economics + small-business pathways.",
+    keywords: "cosmetology jobs, barber careers, esthetician, nail tech, massage therapist, beauty careers",
+  },
+  "/sectors/gig_work": {
+    title: "Gig & On-Demand Work: Rideshare, Delivery, TaskRabbit — hired.video",
+    description:
+      "Platform-mediated physical work — rideshare, delivery, mobile services. Best fit for income bridging during pivots rather than a 20-year career.",
+    keywords: "gig work, rideshare jobs, delivery driver, doordash, uber, lyft, taskrabbit",
+  },
+  "/sectors/politics_campaigns": {
+    title: "Political Campaign & Legislative Staff Careers — hired.video",
+    description:
+      "Field organizers, comms directors, legislative aides, chiefs of staff, lobbyists. Cycle-driven careers with concrete entry paths from tech and analytics backgrounds.",
+    keywords: "political jobs, campaign staff, legislative aide, lobbyist, field organizer",
+  },
+  "/sectors/politics_civic": {
+    title: "Running for Office: First-Time Candidate Guide — hired.video",
+    description:
+      "Civic education for first-time candidates — school board, city council, state legislature. Filing rules, budget literacy, and candidate video tools.",
+    keywords: "run for office, first time candidate, school board, city council, state legislature, civic engagement",
+  },
+  "/sectors/tech": {
+    title: "Technology Careers: Software, Data, IT — hired.video",
+    description:
+      "Tech roles browsed on hired.video. Included so pivot-from-tech stories have a \"from\" side — many tech roles are AI-exposed today.",
+    keywords: "tech jobs, software engineer, it careers, ai exposed roles",
+  },
+  "/pivot-explorer": {
+    title: "AI-Resilient Career Pivot Explorer — hired.video",
+    description:
+      "Map your current skills against AI-resilient sectors. Ranks healthcare, trades, government, law enforcement, and more by transferable-skill match. Auto-populate from your resume.",
+    keywords: "career pivot, ai resilient careers, leaving tech, transferable skills, pivot from coding, career change",
+  },
+  "/resume-templates": {
+    title: "Resume Templates by Sector: Medical, Trade, Law Enforcement & More — hired.video",
+    description:
+      "Pick a resume template tuned for your sector. Credential-forward for licensed roles, work-product-forward for trades and beauty, story-led for portfolio careers.",
+    keywords:
+      "resume templates, sector resume templates, medical resume template, trade resume, law enforcement resume, video resume templates",
+  },
+  "/articles": {
+    title: "Career Articles by Sector & Audience — hired.video",
+    description:
+      "Sector-specific career guides for job seekers and recruiters. Filter by sector (healthcare, trades, legal, etc.) and audience (job seekers, recruiters, pivoters).",
+    keywords: "career articles, sector guides, job seeker articles, recruiter playbooks, pivot guides",
+  },
   "/rewards": {
     title: "Rewards & Badges: Earn Points, Win Badges, Cash Out — hired.video",
     description:

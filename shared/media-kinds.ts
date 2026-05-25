@@ -662,6 +662,18 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: false,
     fileExt: ".png",
   },
+  {
+    id: "cad-stl",
+    label: "STL",
+    hint: "3D-printable · ASCII",
+    mediaKind: "cad",
+    container: "stl",
+    mime: "model/stl",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: true,
+    fileExt: ".stl",
+  },
 ];
 
 /** Every profile registered for a given mediaKind, in declaration order. */

@@ -419,10 +419,25 @@ export const studioAsyncInterviews = pgTable(
     resendCount:    integer("resend_count").notNull().default(0),
     lastResentAt:   timestamp("last_resent_at", { withTimezone: true }),
     sourceResumeId: uuid("source_resume_id"),          // resume used to generate questions, if any
-    sourceContext:  text("source_context"),            // 'tool' | 'ai-coach' | 'career-360' | 'pipeline'
+    sourceContext:  text("source_context"),            // 'tool' | 'ai-coach' | 'career-360' | 'pipeline' | 'job-screening'
     targetRole:     text("target_role"),               // role title passed in from Career 360 / ad-hoc
     extractedSkills: jsonb("extracted_skills"),        // snapshot of skills the questions were generated against
-    assignmentType: text("assignment_type").notNull().default("assign"), // 'assign' | 'invite' | 'self'
+    assignmentType: text("assignment_type").notNull().default("assign"), // 'assign' | 'invite' | 'self' | 'screening'
+    // -- Added in 0120: reusable-set provenance + apply-flow link --
+    questionSetId:  uuid("question_set_id"),           // ref interview_question_sets — kept loose to avoid circular import
+    applicationId:  uuid("application_id"),            // ref job_applications — set when the interview was triggered by a job apply
+    // Recruiter decision (shortlist / maybe / reject) + AI overall summary
+    decision:       text("decision"),                  // 'shortlist' | 'maybe' | 'reject' | null
+    decisionReason: text("decision_reason"),
+    decisionBy:     text("decision_by"),               // user id of recruiter who decided
+    decisionAt:     timestamp("decision_at", { withTimezone: true }),
+    aiOverallScore:   real("ai_overall_score"),        // 0–10 aggregated across answers
+    aiOverallSummary: text("ai_overall_summary"),
+    aiScoredAt:       timestamp("ai_scored_at", { withTimezone: true }),
+    // Recorder behaviour applied to every question (mirror of the set's defaults)
+    prepTimeSec:    integer("prep_time_sec").notNull().default(10),
+    maxRetakes:     integer("max_retakes").notNull().default(1),
+    proctoringOn:   boolean("proctoring_on").notNull().default(true),
     createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -430,6 +445,7 @@ export const studioAsyncInterviews = pgTable(
     index("idx_async_interviews_recruiter").on(t.recruiterId),
     index("idx_async_interviews_candidate").on(t.candidateId),
     index("idx_async_interviews_token").on(t.inviteToken),
+    index("idx_async_interviews_application").on(t.applicationId),
   ],
 );
 
@@ -450,6 +466,15 @@ export const studioAsyncResponses = pgTable(
     // -- Added in 0104: text-mode answers + per-question response mode --
     textAnswer:    text("text_answer"),
     responseMode:  text("response_mode").notNull().default("video"), // 'text' | 'video'
+    // -- Added in 0120: AI scoring + proctoring + retake bookkeeping --
+    aiScore:           real("ai_score"),                  // 0.00 – 10.00
+    aiScoreBreakdown:  jsonb("ai_score_breakdown"),       // { situation, task, action, result, skillProbe }
+    aiSummary:         text("ai_summary"),
+    aiStrengths:       jsonb("ai_strengths"),             // string[]
+    aiConcerns:        jsonb("ai_concerns"),              // string[]
+    aiScoredAt:        timestamp("ai_scored_at", { withTimezone: true }),
+    proctoringFlags:   jsonb("proctoring_flags").notNull().default({}),
+    attempt:           integer("attempt").notNull().default(1),
     createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -457,6 +482,39 @@ export const studioAsyncResponses = pgTable(
     index("idx_async_responses_candidate").on(t.candidateId),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Reusable question-set library — saved sets a recruiter / employer can
+// attach to multiple jobs or send ad-hoc. See migration 0120.
+// ---------------------------------------------------------------------------
+export const interviewQuestionSets = pgTable(
+  "interview_question_sets",
+  {
+    id:              uuid("id").primaryKey().defaultRandom(),
+    ownerUserId:     uuid("owner_user_id"),       // xor with ownerCompanyId (constraint enforced in SQL)
+    ownerCompanyId:  uuid("owner_company_id"),
+    title:           varchar("title", { length: 200 }).notNull(),
+    description:     text("description"),
+    targetRole:      varchar("target_role", { length: 120 }),
+    style:           varchar("style", { length: 20 }).notNull().default("mixed"), // mixed | behavioral | technical
+    questions:       jsonb("questions").notNull().default([]),
+    skills:          jsonb("skills").notNull().default([]),
+    prepTimeSec:     integer("prep_time_sec").notNull().default(10),
+    maxRetakes:      integer("max_retakes").notNull().default(1),
+    proctoringOn:    boolean("proctoring_on").notNull().default(true),
+    isArchived:      boolean("is_archived").notNull().default(false),
+    useCount:        integer("use_count").notNull().default(0),
+    createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_interview_question_sets_owner_user").on(t.ownerUserId, t.updatedAt),
+    index("idx_interview_question_sets_owner_company").on(t.ownerCompanyId, t.updatedAt),
+  ],
+);
+
+export type InterviewQuestionSet = typeof interviewQuestionSets.$inferSelect;
+export type NewInterviewQuestionSet = typeof interviewQuestionSets.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Advanced Video Analytics — per-second engagement heatmap

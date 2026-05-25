@@ -98,6 +98,10 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
         const { renderCadPdf } = await import("@/lib/studio/cad/cad-pdf-encoder");
         return renderCadPdf(snapshot.cadState);
       }
+      if (profile.container === "stl") {
+        const { renderCadStlBlob } = await import("@/lib/studio/cad/cad-stl-encoder");
+        return renderCadStlBlob(snapshot.cadState);
+      }
       const { renderCadSvg } = await import("@/lib/studio/cad/cad-export");
       return renderCadSvg(snapshot.cadState);
     }
@@ -142,6 +146,7 @@ export function extensionForBlob(blob: Blob): string {
   if (blob.type === "image/webp") return "webp";
   if (blob.type === "image/svg+xml") return "svg";
   if (blob.type === "application/dxf") return "dxf";
+  if (blob.type === "model/stl") return "stl";
   if (blob.type === "image/apng") return "apng";
   if (blob.type.includes("webm")) return "webm";
   if (blob.type.includes("wav")) return "wav";

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useProfileSectionVisibility } from "./profile-sections-context";
 
 interface SalaryExpectation {
   min?: number;
@@ -22,6 +23,8 @@ export default function OpportunityPreferencesSection({
   salaryExpectation,
 }: OpportunityPreferencesSectionProps) {
   const { t } = useTranslation();
+  const sectionVisible = useProfileSectionVisibility("opportunityPreferences");
+  if (!sectionVisible) return null;
   if (!openToWork) return null;
 
   const hasTypes = opportunityTypes.length > 0;

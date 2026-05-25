@@ -41,7 +41,15 @@ interface NavigationProps {
  * `/jobs/123`) are unaffected — they keep the global search because they
  * don't host an inline one.
  */
-const INLINE_HEADER_SEARCH_ROUTES: ReadonlySet<string> = new Set(["/jobs"]);
+const INLINE_HEADER_SEARCH_ROUTES: ReadonlySet<string> = new Set([
+  "/jobs",
+  "/tasks",
+  "/tools",
+  "/people",
+  "/companies",
+  "/search",
+  "/studio",
+]);
 
 function pathIsInlineHeaderSearch(pathname: string): boolean {
   return INLINE_HEADER_SEARCH_ROUTES.has(pathname);

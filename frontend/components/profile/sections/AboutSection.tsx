@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SectionEditButton from "./SectionEditButton";
+import { useProfileSectionVisibility } from "./profile-sections-context";
 
 interface AboutSectionProps {
   bio?: string;
@@ -10,6 +11,8 @@ interface AboutSectionProps {
 
 export default function AboutSection({ bio, isOwner, onEdit }: AboutSectionProps) {
   const { t } = useTranslation();
+  const sectionVisible = useProfileSectionVisibility("about");
+  if (!sectionVisible) return null;
   if (!bio && !isOwner) return null;
 
   return (

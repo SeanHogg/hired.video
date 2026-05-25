@@ -50,11 +50,39 @@ export type LayerBlendMode =
   | "difference"
   | "exclusion";
 
-/** What kind of content a layer carries. The MVP only ships `raster`;
- *  `vector`, `text`, and `adjustment` layers ride later phases of #932
- *  and are reserved here so readers can fall through cleanly when the
- *  fields land. */
+/** What kind of content a layer carries. The MVP shipped `raster`;
+ *  `vector` + `text` landed in #940 Phase 2 (basic shape + text authoring,
+ *  full control-point editing for vector deferred to a follow-on);
+ *  `adjustment` layers remain reserved. */
 export type LayerKind = "raster" | "vector" | "text" | "adjustment";
+
+/** Vector shape primitive carried by `kind: "vector"` layers. Each
+ *  shape is positioned in CANVAS-LOCAL coordinates (top-left origin,
+ *  same frame as raster `pixelsDataUrl`). All shapes are renderable
+ *  through a single `path2d` walk so the compositor branch is small. */
+export type VectorShape =
+  | { id: string; kind: "rect"; x: number; y: number; width: number; height: number; fill?: string; stroke?: string; strokeWidth?: number; cornerRadius?: number }
+  | { id: string; kind: "ellipse"; cx: number; cy: number; rx: number; ry: number; fill?: string; stroke?: string; strokeWidth?: number }
+  | { id: string; kind: "line"; x1: number; y1: number; x2: number; y2: number; stroke?: string; strokeWidth?: number }
+  | { id: string; kind: "path"; d: string; fill?: string; stroke?: string; strokeWidth?: number };
+
+/** Text content carried by `kind: "text"` layers. The MVP renders the
+ *  text on a single line via canvas `fillText`; multi-line + rich text
+ *  editing land in a follow-on. */
+export interface TextLayerContent {
+  text: string;
+  fontFamily: string;
+  /** Pixel size — matches Canvas-2D `ctx.font` convention. */
+  fontSize: number;
+  /** CSS colour. */
+  color: string;
+  /** Top-left anchor of the text baseline rect, in canvas pixels. */
+  x: number;
+  y: number;
+  /** Bold / italic style hints — applied to the canvas `font` string. */
+  bold?: boolean;
+  italic?: boolean;
+}
 
 export interface ImageLayer {
   /** Stable id — referenced by the editor's selection state. */
@@ -82,9 +110,17 @@ export interface ImageLayer {
    *  Trade-off: dataURL inflation (~33% over the raw bytes) is the
    *  cost of round-tripping through JSONB; the cap on canvas
    *  dimensions (see ImageState.width/height) plus PNG compression
-   *  keep the payload modest for the MVP. The "spill big layers to
-   *  R2" path is logged as a follow-on. */
+   *  keep the payload modest for the MVP. When the layer's flattened
+   *  PNG would exceed `LAYER_DATAURL_SPILL_BYTES` the host uploads
+   *  the pixels to R2 and stores the key in `pixelsR2Key` instead
+   *  (#940 brush dataURL bloat mitigation). */
   pixelsDataUrl: string | null;
+  /** R2 object key for spilled layer pixels (#940 brush dataURL bloat
+   *  mitigation). When set, the editor fetches the PNG from R2 instead
+   *  of decoding `pixelsDataUrl`. Mutually exclusive with
+   *  `pixelsDataUrl` carrying real data — the spill helper clears
+   *  the dataURL when promoting to R2. */
+  pixelsR2Key?: string;
   /** Translation offset applied to the layer's pixels when
    *  compositing — set by the Hand / Move tool's drag. Pixels still
    *  live in their natural top-left frame on the dataURL; the offset
@@ -99,6 +135,13 @@ export interface ImageLayer {
    *  semantics). 0 or omitted = no rotation. Set by the Hand /
    *  Move tool's rotation-handle drag. */
   transformRotation?: number;
+  /** Vector shapes for `kind: "vector"` layers. Null/empty for non-vector
+   *  layers. Rendered onto the layer's offscreen canvas via
+   *  `hydrateVectorLayer` (#940 Image Phase 2). */
+  vectorShapes?: VectorShape[];
+  /** Text content for `kind: "text"` layers. Null for non-text layers
+   *  (#940 Image Phase 2). */
+  textContent?: TextLayerContent;
   /** Per-layer non-destructive filter chain (#940 Image Phase 2).
    *  The compositor applies these as a Canvas-2D `ctx.filter` string
    *  while drawing the layer's pixels onto the destination. Pure
@@ -177,7 +220,19 @@ export interface ImageState {
    *  picker so the user can iterate without retyping. Capped at 50
    *  entries client-side; older entries fall off in FIFO order. */
   aiPromptHistory: AiPromptHistoryEntry[];
+  /** Current selection rect in canvas-local pixels (#940 Phase 2
+   *  selection tools). Brush / fill / clear / inpaint operations gate
+   *  on this rect when present — pixels outside are untouched.
+   *  Cleared when the user clicks "Deselect" or starts a non-selection
+   *  tool. */
+  selection?: { x: number; y: number; width: number; height: number };
 }
+
+/** Threshold above which a layer's flattened PNG should spill to R2
+ *  instead of being inlined as a base64 dataURL in the JSONB row.
+ *  1MB of compressed PNG ≈ 1.33MB dataURL; over this the row bloats
+ *  noticeably + autosaves get sluggish. */
+export const LAYER_DATAURL_SPILL_BYTES = 1024 * 1024;
 
 export interface AiPromptHistoryEntry {
   /** Stable id so the panel can key the list without index churn. */
@@ -241,6 +296,49 @@ export function createBlankImageState(
  *  editor falls back to the top layer in that case. */
 export function findLayer(state: ImageState, layerId: string): ImageLayer | null {
   return state.layers.find((l) => l.id === layerId) ?? null;
+}
+
+/** Build a fresh vector layer (#940 Phase 2). Empty by default; callers
+ *  add shapes via the layers panel's "Add shape" affordance. */
+export function makeVectorLayer(label: string = "Vector layer"): ImageLayer {
+  return {
+    id: `layer-${Math.random().toString(36).slice(2, 10)}`,
+    label,
+    kind: "vector",
+    opacity: 1,
+    visible: true,
+    locked: false,
+    blendMode: "normal",
+    pixelsDataUrl: null,
+    vectorShapes: [],
+  };
+}
+
+/** Build a fresh text layer (#940 Phase 2). Seeds with a sample
+ *  string + sensible defaults so the layer renders something the user
+ *  can see immediately. */
+export function makeTextLayer(
+  label: string = "Text layer",
+  text: string = "Text",
+): ImageLayer {
+  return {
+    id: `layer-${Math.random().toString(36).slice(2, 10)}`,
+    label,
+    kind: "text",
+    opacity: 1,
+    visible: true,
+    locked: false,
+    blendMode: "normal",
+    pixelsDataUrl: null,
+    textContent: {
+      text,
+      fontFamily: "Inter",
+      fontSize: 48,
+      color: "#000000",
+      x: 48,
+      y: 96,
+    },
+  };
 }
 
 /** Return the first layer (bottom-up) that has any pixel content —

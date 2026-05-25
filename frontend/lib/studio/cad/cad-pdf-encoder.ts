@@ -14,6 +14,7 @@
 
 import type { CadState } from "@shared/cad-state";
 import { drawCad } from "./cad-renderer";
+import { toBlobPart } from "../bytes/to-blob-part";
 
 /** Render the CAD state to a one-page PDF. Returns a Blob with
  *  `application/pdf` mime. Caller is responsible for download +
@@ -114,7 +115,7 @@ export async function renderCadPdf(state: CadState): Promise<Blob> {
     out.set(c, off);
     off += c.length;
   }
-  return new Blob([out], { type: "application/pdf" });
+  return new Blob([toBlobPart(out)], { type: "application/pdf" });
 }
 
 function asciiBytes(text: string): Uint8Array {

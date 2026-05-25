@@ -16,13 +16,16 @@
  * passed in is non-null by construction (host gates on its presence).
  */
 import { Layers as LayersIcon } from "lucide-react";
-import type { ImageState, LayerBlendMode } from "@shared/image-state";
+import type { ImageState, LayerBlendMode, LayerKind } from "@shared/image-state";
 import FloatingCollapsiblePanel from "@/components/studio/v2/FloatingCollapsiblePanel";
 import DrawingLayersPanel from "./DrawingLayersPanel";
 
 export interface FloatingImageLayersPanelProps {
   state: ImageState;
   onAddLayer: () => void;
+  /** Optional — when wired, the layers panel surfaces an "Add layer"
+   *  dropdown with raster / vector / text options (#940 Phase 2). */
+  onAddLayerOfKind?: (kind: LayerKind) => void;
   onDeleteLayer: (layerId: string) => void;
   onSelectLayer: (layerId: string) => void;
   onToggleVisible: (layerId: string) => void;

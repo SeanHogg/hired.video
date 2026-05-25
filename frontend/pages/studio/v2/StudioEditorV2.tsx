@@ -115,7 +115,8 @@ import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
 import CadStage from "@/components/studio/cad/CadStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
-import { type ImageState, createBlankImageState, findLayer as findImageLayer } from "@shared/image-state";
+import { type ImageState, createBlankImageState, findLayer as findImageLayer, makeVectorLayer, makeTextLayer } from "@shared/image-state";
+import { spillLayersIfNeeded } from "@/lib/studio/drawing/layer-r2-spill";
 import {
   type AnimationState,
   createBlankAnimationState,
@@ -431,26 +432,39 @@ export default function StudioEditorV2() {
   // rule the rules ("can't delete the last layer", "active layer
   // selection follows deletion") live ONCE here.
   const handleImageAddLayer = useCallback(() => {
-    const id = `layer-${Math.random().toString(36).slice(2, 10)}`;
-    setImageState((prev) => ({
-      ...prev,
-      layers: [
-        ...prev.layers,
-        {
-          id,
-          label: `Layer ${prev.layers.length + 1}`,
-          kind: "raster",
-          opacity: 1,
-          visible: true,
-          locked: false,
-          blendMode: "normal",
-          pixelsDataUrl: null,
-        },
-      ],
-      activeLayerId: id,
-    }));
-    imageCommit();
-  }, [setImageState, imageCommit]);
+    handleImageAddLayerOfKind("raster");
+  }, []);
+  const handleImageAddLayerOfKind = useCallback(
+    (kind: import("@shared/image-state").LayerKind) => {
+      setImageState((prev) => {
+        let layer: import("@shared/image-state").ImageLayer;
+        const baseLabel = `Layer ${prev.layers.length + 1}`;
+        if (kind === "vector") {
+          layer = makeVectorLayer(baseLabel);
+        } else if (kind === "text") {
+          layer = makeTextLayer(baseLabel);
+        } else {
+          layer = {
+            id: `layer-${Math.random().toString(36).slice(2, 10)}`,
+            label: baseLabel,
+            kind: "raster",
+            opacity: 1,
+            visible: true,
+            locked: false,
+            blendMode: "normal",
+            pixelsDataUrl: null,
+          };
+        }
+        return {
+          ...prev,
+          layers: [...prev.layers, layer],
+          activeLayerId: layer.id,
+        };
+      });
+      imageCommit();
+    },
+    [setImageState, imageCommit],
+  );
   const handleImageDeleteLayer = useCallback(
     (layerId: string) => {
       setImageState((prev) => {
@@ -1129,21 +1143,27 @@ export default function StudioEditorV2() {
     };
   }, [studioTemplateSlug, projectId, toast, resetHistory]);
 
-  // Local autosave so unsaved work survives reloads.
+  // Local autosave so unsaved work survives reloads. The single effect
+  // covers BOTH the Timeline-kind `state` (CanvasState) and the
+  // image-kind `imageState` (#940 Phase 2 image autosave) — kind-aware
+  // snapshot keeps storage shape unified so the hydration step at
+  // `/studio/:id` knows which slice to rehydrate.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handle = window.setTimeout(() => {
       try {
+        const snapshot: Record<string, unknown> = { title, state };
+        if (currentMediaKind === "image") snapshot.imageState = imageState;
         window.localStorage.setItem(
           LOCAL_STORAGE_PREFIX + projectId,
-          JSON.stringify({ title, state }),
+          JSON.stringify(snapshot),
         );
       } catch {
         // Quota / private-mode — drop silently.
       }
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
-  }, [projectId, title, state]);
+  }, [projectId, title, state, imageState, currentMediaKind]);
 
   const fitZoom = useCallback(() => {
     const el = stageContainerRef.current;
@@ -2142,9 +2162,21 @@ export default function StudioEditorV2() {
       // VideoScript projection onto the project row — the slice's
       // `kind` discriminator + the runtime-specific state column is
       // the canonical representation.
+      // R2 spill: for image kind, promote any layer whose flattened
+      // PNG exceeds LAYER_DATAURL_SPILL_BYTES to R2 BEFORE persisting
+      // (#940 brush dataURL bloat mitigation). The helper is a no-op
+      // when nothing needs spilling.
+      let imageStateToPersist = imageState;
+      if (currentMediaKind === "image") {
+        const spilledLayers = await spillLayersIfNeeded(imageState.layers);
+        if (spilledLayers !== imageState.layers) {
+          imageStateToPersist = { ...imageState, layers: spilledLayers };
+          setImageState(imageStateToPersist);
+        }
+      }
       const runtimeSlice = runtimeStatePayload(currentMediaKind, {
         canvasState: state,
-        imageState,
+        imageState: imageStateToPersist,
         animationState,
         gameState,
         cadState,
@@ -2770,6 +2802,7 @@ export default function StudioEditorV2() {
                   <FloatingImageLayersPanel
                     state={imageState}
                     onAddLayer={handleImageAddLayer}
+                    onAddLayerOfKind={handleImageAddLayerOfKind}
                     onDeleteLayer={handleImageDeleteLayer}
                     onSelectLayer={handleImageSelectLayer}
                     onToggleVisible={handleImageToggleVisible}

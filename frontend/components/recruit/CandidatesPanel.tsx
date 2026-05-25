@@ -4,7 +4,7 @@
 // Self-gating row action "Add to Job" bridges pool → pipeline.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation, Trans } from "react-i18next";
 import {
   Briefcase,
@@ -13,7 +13,6 @@ import {
   Eye,
   MapPin,
   Plus,
-  Search,
   Sparkles,
   UserCheck,
   Upload,
@@ -29,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -109,10 +107,15 @@ export default function CandidatesPanel({
   const setSelectedCompanyId = internalScope.setCompanyId;
 
   const unnamedFallback = t("labels.unnamedCandidate");
+  // Read the search query from the URL (`?q=`) — the global HeaderSearch
+  // above this panel writes there. Filtering here instead of via a second
+  // local search input keeps a single search box on /jobs?tab=candidates
+  // and /resumes?tab=sourced.
+  const [searchParams] = useSearchParams();
+  const searchText = searchParams.get("q") ?? "";
 
   const [candidates, setCandidates] = useState<CandidateResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkScoreOpen, setBulkScoreOpen] = useState(false);
   // Pool → pipeline bridge: clicking "Add to Job" on a row opens the
@@ -207,17 +210,6 @@ export default function CandidatesPanel({
           </div>
         </div>
       )}
-
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          type="search"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          placeholder={t("status.searchByNameTitleLocation")}
-          className="pl-9"
-        />
-      </div>
 
       {scope && scope.companies.length === 0 && !loading && (
         <div className="rounded-lg border bg-muted/30 p-10 text-center">

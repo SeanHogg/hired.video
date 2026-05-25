@@ -52,6 +52,10 @@ export interface EntityHubTab {
   title: ReactNode;
   /** Header description (small text under the title). */
   description?: ReactNode;
+  /** Inline search slot. When provided, PageHeader replaces the title/
+   *  description block with this node. Used on hub tabs (e.g. Companies
+   *  browse) that relocated the global HeaderSearch inline. */
+  search?: ReactNode;
   /** Optional badge value for the tab strip (count / status). */
   badge?: ReactNode;
   /** Right-side header buttons specific to this tab. */
@@ -139,8 +143,9 @@ export default function EntityHubShell({
           <PageHeader
             tabs={headerTabs}
             activeTabKey={activeTab?.key}
-            title={activeTab?.title}
-            description={activeTab?.description}
+            title={activeTab?.search ? undefined : activeTab?.title}
+            description={activeTab?.search ? undefined : activeTab?.description}
+            search={activeTab?.search}
             actions={resolveNode(activeTab?.headerActions)}
             meta={resolveNode(activeTab?.meta)}
           />

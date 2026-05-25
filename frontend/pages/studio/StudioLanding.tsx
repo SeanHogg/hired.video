@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { projectVisibilityVisual } from "@/lib/studio/visibility";
 import { Button } from "@/components/ui/button";
+import HeaderSearch from "@/components/HeaderSearch";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -456,11 +457,12 @@ export default function StudioLanding() {
     <AppShell>
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Studio</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Start a new project from a template — videos, podcasts, voice, animations, games, comics, images, and IAB-standard ads + banners — or pick up where you left off.
-          </p>
+        {/* Site-wide search relocated inline (was docked in the top bar;
+            users routinely missed it there). Page title + description are
+            dropped — the chooser body labels itself with the "Templates"
+            and "My projects" section headings below. */}
+        <div className="min-w-0 flex-1">
+          <HeaderSearch />
         </div>
         <div className="flex items-center gap-3">
           {/* Wizard launcher — opens the 3-step "create your first video"

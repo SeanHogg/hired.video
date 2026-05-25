@@ -35,6 +35,7 @@ import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
+import { TimeToHireCard } from "@/components/jobs/TimeToHireCard";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
@@ -373,6 +374,14 @@ export default function JobDetail() {
                 <SourcingFeePanel jobId={job.id} />
               </div>
             )}
+
+            {/* Time-to-hire metric. Self-gates on manager-only access via
+                the backend's 403 — no `if (isOwner)` wrapping needed at
+                the call site per the platform's "shared components decide
+                their own visibility" rule. */}
+            <div className="mb-4">
+              <TimeToHireCard jobId={job.id} />
+            </div>
 
             <DeclarativeJobRenderer
               job={{

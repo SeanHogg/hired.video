@@ -1,6 +1,7 @@
 import { Mail, Phone, MapPin, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SectionEditButton from "./SectionEditButton";
+import { useProfileSectionVisibility } from "./profile-sections-context";
 
 interface ContactSidebarProps {
   email?: string;
@@ -27,6 +28,8 @@ export default function ContactSidebar({
   onEdit,
   visibility,
 }: ContactSidebarProps) {
+  const sectionVisible = useProfileSectionVisibility("contact");
+  if (!sectionVisible) return null;
   const showEmail = isOwner || visibility?.showEmail;
   const showPhone = isOwner || visibility?.showPhone;
   const showLocation = isOwner || visibility?.showLocation;

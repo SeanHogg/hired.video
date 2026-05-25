@@ -4,7 +4,8 @@
  * Two layers:
  *   1. Role-based defaults from `getDefaultProfileSections(role)` — what a
  *      brand-new account shows out of the box. Recruiters and employers
- *      hide resume-centric sections; job seekers show everything.
+ *      hide candidate-only sections (Video Resume, Master Resume, Skill
+ *      Network, Opportunity Preferences); job seekers show everything.
  *   2. Per-user overrides persisted on `user_profiles.profile_sections`
  *      (JSONB partial of `ProfileSections`). Stored as a partial so the
  *      shape can evolve without rewriting historical rows.
@@ -13,6 +14,14 @@
  * single source of truth — every render site and gate must call it
  * rather than spot-checking a single key, so missing-key behaviour stays
  * consistent.
+ *
+ * Adding a section: append to PROFILE_SECTION_KEYS, add its boolean to
+ * JOB_SEEKER_DEFAULTS + HIRING_SIDE_DEFAULTS, add an entry to
+ * PROFILE_SECTION_I18N (label + description i18n keys), translate those
+ * keys in `frontend/public/locales/*.json`, and drop a
+ * `useProfileSectionVisibility("<key>")` self-gate at the top of the
+ * section component. The Settings panel and gap register pick it up
+ * automatically.
  */
 import { USER_ROLES } from "./user-roles.js";
 
@@ -21,6 +30,12 @@ export const PROFILE_SECTION_KEYS = [
   "masterResume",
   "skillNetwork",
   "skills",
+  "about",
+  "contact",
+  "social",
+  "opportunityPreferences",
+  "additionalInfo",
+  "profileVideos",
 ] as const;
 
 export type ProfileSectionKey = (typeof PROFILE_SECTION_KEYS)[number];
@@ -34,13 +49,29 @@ const JOB_SEEKER_DEFAULTS: ProfileSections = {
   masterResume: true,
   skillNetwork: true,
   skills: true,
+  about: true,
+  contact: true,
+  social: true,
+  opportunityPreferences: true,
+  additionalInfo: true,
+  profileVideos: true,
 };
 
+// Recruiters and employers hide candidate-only sections by default but
+// keep Skills/Industries (discoverability tags), About, Contact, Social,
+// AdditionalInfo, and ProfileVideos — those are equally useful for
+// hiring-side accounts presenting themselves to candidates.
 const HIRING_SIDE_DEFAULTS: ProfileSections = {
   videoResume: false,
   masterResume: false,
   skillNetwork: false,
   skills: true,
+  about: true,
+  contact: true,
+  social: true,
+  opportunityPreferences: false,
+  additionalInfo: true,
+  profileVideos: true,
 };
 
 export function getDefaultProfileSections(role: string | null | undefined): ProfileSections {
@@ -78,11 +109,56 @@ export function isProfileSectionVisible(
   return resolveProfileSections(stored, role)[key];
 }
 
-export const PROFILE_SECTION_LABELS: Record<ProfileSectionKey, string> = {
-  videoResume: "Video Resume",
-  masterResume: "Master Resume",
-  skillNetwork: "Skill Network",
-  skills: "Skills, Industries & SEO Keywords",
+/**
+ * i18n key map. Settings panel + any consumer that needs to display a
+ * section name does `t(PROFILE_SECTION_I18N[key].label)`. Keep this
+ * shared module free of `react-i18next` so it can be imported from the
+ * server too.
+ */
+export const PROFILE_SECTION_I18N: Record<
+  ProfileSectionKey,
+  { label: string; description: string }
+> = {
+  videoResume: {
+    label: "settings.profileSections.videoResume.label",
+    description: "settings.profileSections.videoResume.desc",
+  },
+  masterResume: {
+    label: "settings.profileSections.masterResume.label",
+    description: "settings.profileSections.masterResume.desc",
+  },
+  skillNetwork: {
+    label: "settings.profileSections.skillNetwork.label",
+    description: "settings.profileSections.skillNetwork.desc",
+  },
+  skills: {
+    label: "settings.profileSections.skills.label",
+    description: "settings.profileSections.skills.desc",
+  },
+  about: {
+    label: "settings.profileSections.about.label",
+    description: "settings.profileSections.about.desc",
+  },
+  contact: {
+    label: "settings.profileSections.contact.label",
+    description: "settings.profileSections.contact.desc",
+  },
+  social: {
+    label: "settings.profileSections.social.label",
+    description: "settings.profileSections.social.desc",
+  },
+  opportunityPreferences: {
+    label: "settings.profileSections.opportunityPreferences.label",
+    description: "settings.profileSections.opportunityPreferences.desc",
+  },
+  additionalInfo: {
+    label: "settings.profileSections.additionalInfo.label",
+    description: "settings.profileSections.additionalInfo.desc",
+  },
+  profileVideos: {
+    label: "settings.profileSections.profileVideos.label",
+    description: "settings.profileSections.profileVideos.desc",
+  },
 };
 
 export function sanitizeProfileSectionsInput(input: unknown): StoredProfileSections {

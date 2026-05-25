@@ -92,6 +92,7 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const Tools = lazy(() => import("./pages/Tools"));
 const SentimentAnalysis = lazy(() => import("./pages/tools/SentimentAnalysis"));
+const PredictiveAssessments = lazy(() => import("./pages/tools/PredictiveAssessments"));
 const JobResumeMatch = lazy(() => import("./pages/tools/JobResumeMatch"));
 const SummarizeResume = lazy(() => import("./pages/tools/SummarizeResume"));
 const PdfToJson = lazy(() => import("./pages/tools/PdfToJson"));
@@ -755,6 +756,7 @@ const App = () => (
                           ambiguity for crawlers and analytics outright. */}
                       <Route path="/Tools/SentimentAnalysis" element={<Navigate to="/tools/sentiment-analysis" replace />} />
                       <Route path="/tools/sentiment-analysis" element={<SentimentAnalysis />} />
+                      <Route path="/tools/predictive-assessments" element={<PredictiveAssessments />} />
                       <Route path="/Tools/JobResumeMatch" element={<Navigate to="/tools/job-resume-match" replace />} />
                       <Route path="/tools/job-resume-match" element={<JobResumeMatch />} />
                       <Route path="/Tools/SummarizeResume" element={<Navigate to="/tools/summarize-resume" replace />} />

@@ -175,6 +175,96 @@ export async function hydrateLayerCanvas(
   ctx.drawImage(img, 0, 0);
 }
 
+/** Render a vector layer's shape list onto its offscreen canvas
+ *  (#940 Phase 2). Pure — clears the canvas first then walks
+ *  `shapes` in order. Caller resolves the canvas to the project's
+ *  dimensions; shapes are in canvas-local pixel coordinates. */
+export function hydrateVectorLayer(
+  canvas: HTMLCanvasElement,
+  shapes: ReadonlyArray<{
+    id: string;
+    kind: "rect" | "ellipse" | "line" | "path";
+    [key: string]: unknown;
+  }>,
+): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D canvas context unavailable");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const shape of shapes) {
+    ctx.save();
+    if (shape.kind === "rect") {
+      const s = shape as unknown as {
+        x: number; y: number; width: number; height: number;
+        fill?: string; stroke?: string; strokeWidth?: number; cornerRadius?: number;
+      };
+      const radius = s.cornerRadius ?? 0;
+      ctx.beginPath();
+      if (radius > 0 && (ctx as CanvasRenderingContext2D & { roundRect?: Function }).roundRect) {
+        (ctx as CanvasRenderingContext2D & { roundRect: Function }).roundRect(s.x, s.y, s.width, s.height, radius);
+      } else {
+        ctx.rect(s.x, s.y, s.width, s.height);
+      }
+      if (s.fill) { ctx.fillStyle = s.fill; ctx.fill(); }
+      if (s.stroke) { ctx.strokeStyle = s.stroke; ctx.lineWidth = s.strokeWidth ?? 1; ctx.stroke(); }
+    } else if (shape.kind === "ellipse") {
+      const s = shape as unknown as {
+        cx: number; cy: number; rx: number; ry: number;
+        fill?: string; stroke?: string; strokeWidth?: number;
+      };
+      ctx.beginPath();
+      ctx.ellipse(s.cx, s.cy, s.rx, s.ry, 0, 0, Math.PI * 2);
+      if (s.fill) { ctx.fillStyle = s.fill; ctx.fill(); }
+      if (s.stroke) { ctx.strokeStyle = s.stroke; ctx.lineWidth = s.strokeWidth ?? 1; ctx.stroke(); }
+    } else if (shape.kind === "line") {
+      const s = shape as unknown as {
+        x1: number; y1: number; x2: number; y2: number;
+        stroke?: string; strokeWidth?: number;
+      };
+      ctx.beginPath();
+      ctx.moveTo(s.x1, s.y1);
+      ctx.lineTo(s.x2, s.y2);
+      ctx.strokeStyle = s.stroke ?? "#000000";
+      ctx.lineWidth = s.strokeWidth ?? 1;
+      ctx.stroke();
+    } else if (shape.kind === "path") {
+      const s = shape as unknown as {
+        d: string; fill?: string; stroke?: string; strokeWidth?: number;
+      };
+      const p = new Path2D(s.d);
+      if (s.fill) { ctx.fillStyle = s.fill; ctx.fill(p); }
+      if (s.stroke) { ctx.strokeStyle = s.stroke; ctx.lineWidth = s.strokeWidth ?? 1; ctx.stroke(p); }
+    }
+    ctx.restore();
+  }
+}
+
+/** Render a text layer's content onto its offscreen canvas (#940
+ *  Phase 2). Pure — clears first, then `fillText` at the configured
+ *  baseline anchor. Multi-line + rich text are follow-ons. */
+export function hydrateTextLayer(
+  canvas: HTMLCanvasElement,
+  text: {
+    text: string;
+    fontFamily: string;
+    fontSize: number;
+    color: string;
+    x: number;
+    y: number;
+    bold?: boolean;
+    italic?: boolean;
+  },
+): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D canvas context unavailable");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const weight = text.bold ? "bold" : "normal";
+  const style = text.italic ? "italic" : "normal";
+  ctx.font = `${style} ${weight} ${text.fontSize}px ${text.fontFamily}`;
+  ctx.fillStyle = text.color;
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(text.text, text.x, text.y);
+}
+
 /** Composite the background + all visible layers onto `dest`. Caller
  *  supplies the per-layer offscreen canvases keyed by layer id; the
  *  function reads layer order, opacity, visibility, transformOffset,
