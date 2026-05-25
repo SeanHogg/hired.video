@@ -308,6 +308,13 @@ feedRoutes.post("/posts", async (c) => {
   // name fetch is needed here.
   c.executionCtx?.waitUntil(createMentionNotifications(content, post.id, userId, db));
 
+  // Gamification award (fire-and-forget). Drives the `first_post` badge
+  // + streak signal.
+  const { withGamification } = await import("../domains/gamification/with-gamification.js");
+  await withGamification(c, "feed-post-created", (game, role, uid) =>
+    game.onFeedPostCreated({ userId: uid, role, postId: post.id }),
+  );
+
   const [dto] = await fetchPostDtos([post], userId, db);
   return c.json(success(dto), 201);
 });

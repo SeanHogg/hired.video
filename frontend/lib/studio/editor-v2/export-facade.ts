@@ -26,10 +26,11 @@
  * `lib/studio/<kind>/`.
  */
 import type { MediaKind } from "@shared/media-kinds";
-import { defaultOutputProfile } from "@shared/media-kinds";
+import { defaultOutputProfile, outputProfilesFor } from "@shared/media-kinds";
 import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
 import type { GameState } from "@shared/game-state";
+import type { CanvasState } from "./canvas-state";
 
 /** Inputs the facade needs to dispatch per kind. The Timeline branch is
  *  injected so the facade module doesn't pull the heavy Timeline
@@ -43,6 +44,9 @@ export interface ExportInputs {
     imageState: ImageState | null;
     animationState: AnimationState | null;
     gameState: GameState | null;
+    /** Canvas state — used by the comic export path which renders each
+     *  scene/page through the timeline render facade. */
+    canvasState: CanvasState;
     /** Flatten-active-image-canvas-to-PNG handler — supplied by the
      *  host because it needs access to the live DrawingStage canvas
      *  ref. Returns the PNG blob the facade downloads. */
@@ -76,14 +80,27 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
       const { bundleGame } = await import("@/lib/studio/game/game-export");
       return bundleGame(snapshot.gameState, { title });
     }
+    case "comic": {
+      // Comic Phase 2 (#939) — render via the dedicated comic exporter
+      // (CBZ / PNG-strip / PDF). Motion-comic profiles (`comic-mp4` /
+      // `comic-gif`) fall back to the Timeline render path because
+      // they ARE Timeline outputs.
+      const profile = outputProfilesFor("comic")[0];
+      const isMotionProfile = profile.container === "mp4" || profile.container === "gif";
+      if (isMotionProfile) {
+        if (!snapshot.renderTimeline) return null;
+        return snapshot.renderTimeline();
+      }
+      const { renderComic } = await import("@/lib/studio/comic/comic-export");
+      const { blob } = await renderComic(snapshot.canvasState, profile);
+      return blob;
+    }
     case "video":
     case "podcast":
-    case "voice":
-    case "comic": {
-      // Timeline-runtime kinds + comic (which authors via CanvasState
-      // even though its export pipeline is non-Timeline today — Phase 2
-      // will swap this branch for the comic-specific PDF/CBZ exporter
-      // per gap #939).
+    case "voice": {
+      // Timeline-runtime kinds — route through the caller's
+      // renderTimeline callback so the heavy render imports don't
+      // enter the facade's bundle.
       if (!snapshot.renderTimeline) return null;
       return snapshot.renderTimeline();
     }
@@ -96,7 +113,9 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
  *  here (not inline in the host) so each kind's MIME → extension
  *  mapping is single-sourced. */
 export function extensionForBlob(blob: Blob): string {
+  if (blob.type === "application/vnd.comicbook+zip") return "cbz";
   if (blob.type === "application/zip") return "zip";
+  if (blob.type === "application/pdf") return "pdf";
   if (blob.type === "image/gif") return "gif";
   if (blob.type === "image/png") return "png";
   if (blob.type === "image/webp") return "webp";

@@ -437,11 +437,28 @@ async function runGenerateImage(ctx: ToolRunContext): Promise<NormalizedToolRunR
   const { data } = await studioService.generateImage(prompt, {
     sourceImageUrl,
   });
-  const { imageUrl, mode } = data;
+  return buildGenerateImageResult({
+    imageUrl: data.imageUrl,
+    mode: data.mode,
+    prompt,
+  });
+}
+
+/** Build the canonical `NormalizedToolRunResult` for a successful image
+ *  generation. Exported so the CHRO Brain's quick-action chip can
+ *  synthesize the same tool-run card the model-invoked path produces,
+ *  without spending a round-trip + tokens on a chat reply. Both call
+ *  sites end up with byte-identical cards (per the DRY rule). */
+export function buildGenerateImageResult(args: {
+  imageUrl: string;
+  mode?: "img2img" | "text2img";
+  prompt: string;
+}): NormalizedToolRunResult {
+  const { imageUrl, mode, prompt } = args;
   return {
-    summary: `Generated image and saved to your library.${mode === "img2img" ? " (Rewrote source.)" : ""}`,
+    summary: `Generated image${mode === "img2img" ? " (rewrote source)" : ""} and saved to your library.`,
+    mediaPreviewUrl: imageUrl,
     extras: [
-      { label: "URL", value: imageUrl },
       { label: "Mode", value: mode ?? "text2img" },
       { label: "Prompt", value: prompt },
     ],

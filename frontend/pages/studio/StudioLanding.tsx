@@ -468,7 +468,7 @@ export default function StudioLanding() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Studio</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Start a new project from a template — videos, podcasts, voice, animations, games, comics, images — or pick up where you left off.
+            Start a new project from a template — videos, podcasts, voice, animations, games, comics, images, and IAB-standard ads + banners — or pick up where you left off.
           </p>
         </div>
         <div className="flex items-center gap-3">

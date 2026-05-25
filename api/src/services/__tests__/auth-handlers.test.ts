@@ -385,8 +385,9 @@ describe("handleRegister", () => {
     );
     // The register loginEvent records the soft signal so postmortems
     // can correlate the bot_block_events row to the created account.
+    // Table is `login_events` (snake_case) in the fake-db state.
     assert.ok(
-      (deps._state.loginEvents ?? []).some(
+      (deps._state.login_events ?? []).some(
         (e: any) => e.kind === "register" && e.success === true && e.failureReason?.startsWith("soft:"),
       ),
       "register loginEvent annotated with the soft signal",

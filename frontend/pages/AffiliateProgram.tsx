@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
 import { EmailField } from "@/components/auth/EmailField";
 import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
@@ -165,11 +165,7 @@ export default function AffiliateProgram() {
                         <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
                         <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
                       </div>
-                      {captcha.configured && (
-                        <div className="flex justify-center pt-2">
-                          <TurnstileWidget ref={captcha.ref} onToken={captcha.onToken} />
-                        </div>
-                      )}
+                      <AuthCaptchaSlot captcha={captcha} />
                       {error && <p className="text-sm text-red-600">{error}</p>}
                       {success && <p className="text-sm text-green-600">{success}</p>}
                       <Button type="submit" className="w-full" disabled={isLoading || !captcha.ready}>

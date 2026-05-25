@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/AppShell";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import {
   recruitService,
   type PublicCandidateResumeShare,
@@ -94,11 +94,11 @@ export default function SharedCandidateResume() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // Shared reviewer links should never be indexed.
-  useSEO("/share/candidate-resume", {
-    title: "Candidate Resume — hired.video",
+  // Shared reviewer links should never be indexed — the "shareToken"
+  // adapter in [lib/seo-ugc.ts] hard-pins `robots: noindex, nofollow`.
+  useUgcSeo("shareToken", {
+    title: "Candidate Resume",
     description: "Shared candidate resume — review via hired.video agency tooling.",
-    robots: "noindex, nofollow",
   });
 
   useEffect(() => {

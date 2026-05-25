@@ -100,6 +100,14 @@ export const CreateJobSchema = z.object({
 export const JobFiltersSchema = z.object({
   search: z.string().optional(),
   location: z.string().optional(),
+  // Structured geo filter — see shared/content-locations.ts. When set,
+  // the backend resolves to a job-id allowlist via LocationService and
+  // returns only matching jobs. Coexists with `location` free-text
+  // (legacy fallback for un-geocoded rows).
+  countryId: z.number().optional(),
+  stateId: z.string().optional(),
+  cityId: z.string().optional(),
+  radiusKm: z.number().optional(),
   skills: z.array(z.string()).optional(),
   employmentType: z.string().optional(),
   experienceLevel: z.string().optional(),

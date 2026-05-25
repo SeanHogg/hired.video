@@ -18,7 +18,7 @@ import TemplatePreview from "@/components/templates/TemplatePreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { resumeService } from "@/lib/services/resume-service";
 import { useTemplate } from "@/lib/templates/registry";
 import { priceLabel } from "@/lib/templates/use-apply-template";
@@ -31,32 +31,16 @@ const KIND_PITCH: Record<TemplateMeta["kind"], string> = {
   "studio-creator": "creator video templates",
 };
 
-// Mounted as the seo slot so useSEO only fires here, not on every parent
-// re-render path. Title/description follow the meta so each template
-// gets a distinct indexable page.
+// Mounted as the seo slot so useUgcSeo only fires when the template is
+// resolved. Builder lives in lib/seo-ugc.ts ("templateListing" kind).
 function TemplateSEO({ meta }: { meta: TemplateMeta }) {
-  useSEO(`/marketplace/templates/${meta.slug}`, {
-    title: `${meta.name} — hired.video Marketplace`,
-    description:
-      `Preview the "${meta.name}" template — a hired.video Marketplace template. ` +
-      (meta.blurb || "Buy once, apply to any of your work."),
-    keywords: `${meta.name}, ${meta.industry ?? ""}, ${meta.tags.join(", ")}, hired.video marketplace, templates`,
-    ogTitle: `${meta.name} — hired.video Marketplace`,
-    ogDescription: meta.blurb || `${meta.industry ?? ""}`.trim(),
-    structuredData: {
-      "@context": "https://schema.org",
-      "@type": "Product",
-      name: meta.name,
-      category: meta.industry ?? "Templates",
-      brand: { "@type": "Organization", name: "hired.video" },
-      offers: {
-        "@type": "Offer",
-        price: (meta.priceCents / 100).toFixed(2),
-        priceCurrency: "USD",
-        availability: "https://schema.org/InStock",
-        url: `https://hired.video/marketplace/templates/${meta.slug}`,
-      },
-    },
+  useUgcSeo("templateListing", {
+    slug: meta.slug,
+    name: meta.name,
+    blurb: meta.blurb,
+    industry: meta.industry,
+    tags: meta.tags,
+    priceCents: meta.priceCents,
   });
   return null;
 }

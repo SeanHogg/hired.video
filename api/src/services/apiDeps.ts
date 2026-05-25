@@ -27,6 +27,13 @@
 import type { Repos } from "../repositories/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { getDb } from "../db/index.js";
+import {
+  buildMapboxGeocoder,
+  stubGeocoder,
+  type GeocoderPort,
+} from "./adapters/mapbox.js";
+
+export type { GeocoderPort } from "./adapters/mapbox.js";
 
 // ─── Adapter ports ────────────────────────────────────────────────────────────
 // Lightweight interfaces for the third-party integrations services call.
@@ -101,6 +108,10 @@ export interface ApiDeps {
   transcription: TranscriptionPort | null;
   /** Audit log — every state-changing admin/system op writes here. */
   audit: AuditPort;
+  /** Forward + reverse geocoder. Always present; returns empty results
+   *  when no MAPBOX_TOKEN is configured so dev environments still work
+   *  via the seeded reference data. */
+  geocoder: GeocoderPort;
 }
 
 // ─── Production wiring ───────────────────────────────────────────────────────
@@ -123,6 +134,9 @@ export function buildApiDeps(env: Record<string, string | undefined> = {}): ApiD
     signalwire: null,     // wired lazily by phone-using services
     transcription: null,  // wired lazily by the transcription route
     audit: buildAuditPort(),
+    geocoder: env.MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN
+      ? buildMapboxGeocoder(env)
+      : stubGeocoder,
   };
 }
 

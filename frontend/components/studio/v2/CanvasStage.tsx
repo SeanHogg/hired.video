@@ -40,6 +40,7 @@ import {
   type WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { applyChromaKeyToPixels } from "@/lib/studio/chroma-key";
+import { useVideoWidgetSync } from "@/lib/studio/editor-v2/use-video-widget-sync";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
 import {
@@ -489,7 +490,11 @@ function WidgetView({
         className="h-full w-full overflow-hidden"
         style={widgetEffectsToCss(widget.effects, animateInput)}
       >
-        <WidgetBody widget={widget} />
+        <WidgetBody
+          widget={widget}
+          clipTimeSec={animateInput.clipTimeSec}
+          isPlayback={!interactive}
+        />
       </div>
       {interactive && selected && (
         <div
@@ -533,7 +538,20 @@ function WidgetView({
   );
 }
 
-function WidgetBody({ widget }: { widget: Widget }) {
+function WidgetBody({
+  widget,
+  clipTimeSec,
+  isPlayback,
+}: {
+  widget: Widget;
+  /** Clip-local time — threaded down so video / webcam bodies can
+   *  sync their elements to the editor's central playhead (#559). */
+  clipTimeSec: number;
+  /** True when the parent stage is in playback mode (interactive=false
+   *  on the WidgetView). Video / webcam bodies drive `play()` / `pause()`
+   *  off this. */
+  isPlayback: boolean;
+}) {
   const p = widget.params;
   switch (p.kind) {
     case "text":
@@ -577,6 +595,8 @@ function WidgetBody({ widget }: { widget: Widget }) {
           url={p.data.source.kind === "url" ? p.data.source.url : ""}
           muted={p.data.muted}
           chromaKey={p.data.chromaKey ?? null}
+          clipTimeSec={clipTimeSec}
+          isPlayback={isPlayback}
         />
       );
     case "shape-rect":
@@ -639,7 +659,15 @@ function WidgetBody({ widget }: { widget: Widget }) {
         </Suspense>
       );
     case "webcam":
-      return <WebcamBody url={p.data.recordingUrl ?? ""} mirror={!!p.data.mirror} muted={!!p.data.muted} />;
+      return (
+        <WebcamBody
+          url={p.data.recordingUrl ?? ""}
+          mirror={!!p.data.mirror}
+          muted={!!p.data.muted}
+          clipTimeSec={clipTimeSec}
+          isPlayback={isPlayback}
+        />
+      );
     case "chips":
       return <ChipsBody data={p.data} />;
     case "cta":
@@ -990,7 +1018,21 @@ function ChipsBody({
   );
 }
 
-function WebcamBody({ url, mirror, muted }: { url: string; mirror: boolean; muted: boolean }) {
+function WebcamBody({
+  url,
+  mirror,
+  muted,
+  clipTimeSec,
+  isPlayback,
+}: {
+  url: string;
+  mirror: boolean;
+  muted: boolean;
+  /** #559 — same playhead sync as VideoBody. */
+  clipTimeSec: number;
+  isPlayback: boolean;
+}) {
+  const videoRef = useVideoWidgetSync({ clipTimeSec, isPlayback });
   if (!url) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/40 text-[10px] text-muted-foreground">
@@ -1001,6 +1043,7 @@ function WebcamBody({ url, mirror, muted }: { url: string; mirror: boolean; mute
   }
   return (
     <video
+      ref={videoRef}
       src={url}
       muted={muted}
       className="h-full w-full object-cover"
@@ -1034,11 +1077,22 @@ function VideoBody({
   url,
   muted,
   chromaKey,
+  clipTimeSec,
+  isPlayback,
 }: {
   url: string;
   muted: boolean;
   chromaKey: ChromaKeyParams | null;
+  /** Editor's clip-local playhead (#559) — drives `<video>.currentTime`
+   *  + play/pause through `useVideoWidgetSync`. */
+  clipTimeSec: number;
+  isPlayback: boolean;
 }) {
+  // Sync the element to the editor's central playhead — play when the
+  // editor is playing, pause when paused, seek when the user scrubs.
+  // Per #559: video-widget audio + frames now follow the same clock
+  // as music + voiceover.
+  const videoRef = useVideoWidgetSync({ clipTimeSec, isPlayback });
   if (!url) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted/40 text-xs text-muted-foreground">
@@ -1051,10 +1105,11 @@ function VideoBody({
   // only kicks in when the user has actually configured chromaKey, so
   // every existing video widget continues at its current cost.
   if (chromaKey) {
-    return <ChromaVideoBody url={url} muted={muted} chromaKey={chromaKey} />;
+    return <ChromaVideoBody url={url} muted={muted} chromaKey={chromaKey} clipTimeSec={clipTimeSec} isPlayback={isPlayback} />;
   }
   return (
     <video
+      ref={videoRef}
       src={url}
       muted={muted}
       className="h-full w-full object-cover"
@@ -1076,12 +1131,22 @@ function ChromaVideoBody({
   url,
   muted,
   chromaKey,
+  clipTimeSec,
+  isPlayback,
 }: {
   url: string;
   muted: boolean;
   chromaKey: ChromaKeyParams;
+  /** #559 — same playhead-sync path as the plain VideoBody so the
+   *  chroma-keyed preview also follows the editor's central clock. */
+  clipTimeSec: number;
+  isPlayback: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Reuse the shared sync hook (same play/pause/seek behaviour as the
+  // plain VideoBody) — passes our pre-existing ref so we don't end up
+  // with two refs on one element.
+  useVideoWidgetSync({ clipTimeSec, isPlayback }, videoRef);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Stable per-render snapshot — the RAF loop closes over `chromaKey`
   // via this ref so the effect dep list doesn't have to re-mount the
@@ -1136,7 +1201,6 @@ function ChromaVideoBody({
         src={url}
         muted={muted}
         crossOrigin="anonymous"
-        autoPlay
         loop
         playsInline
         controls={false}

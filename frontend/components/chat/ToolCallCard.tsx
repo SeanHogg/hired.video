@@ -115,6 +115,23 @@ export function ToolCallCard({ toolId, result, onResultChange }: ToolCallCardPro
         <p className="text-muted-foreground">{current.summary}</p>
       )}
 
+      {current.mediaPreviewUrl && (
+        <a
+          href={current.mediaPreviewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block overflow-hidden rounded border bg-muted/40"
+          title="Open full size"
+        >
+          <img
+            src={current.mediaPreviewUrl}
+            alt={current.summary ?? "Generated image"}
+            className="max-h-64 w-full object-contain"
+            loading="lazy"
+          />
+        </a>
+      )}
+
       {current.previewText && (
         <pre className="text-xs whitespace-pre-wrap bg-muted/40 rounded p-2 max-h-48 overflow-y-auto">
           {current.previewText}

@@ -7,6 +7,8 @@ import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job/JobService.js";
 import { handleJobSentimentPrediction } from "../services/job/job-sentiment-handler.js";
 import { buildRepos } from "../repositories/index.js";
+import { buildApiDeps } from "../services/apiDeps.js";
+import { LocationService } from "../services/location/LocationService.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
@@ -62,20 +64,47 @@ jobRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
   return c.json(result.body as any, result.status as any);
 });
 
-// Public listing endpoint. Frontend legacy calls /api/Job with query params.
-jobRoutes.get("/", async (c) => {
+/** Shared between `/` and `/public` — single seam that parses the search
+ *  query string AND resolves the structured LocationFilter into a job-id
+ *  allowlist. Both legacy callers (no countryId/stateId/cityId set) and
+ *  modern picker-driven callers (structured ids) work through this. */
+async function publicJobsFromQuery(
+  c: AppContext,
+): Promise<Awaited<ReturnType<typeof jobService.getPublicJobs>>> {
   const query = c.req.query();
-  const data = await jobService.getPublicJobs({
+  const hasGeo = Boolean(query.countryId || query.stateId || query.cityId);
+  let allow: string[] | null = null;
+  if (hasGeo) {
+    const env = (c.env ?? {}) as Record<string, string | undefined>;
+    const deps = buildApiDeps(env);
+    const svc = new LocationService(deps);
+    allow = await svc.applyLocationFilter("job", {
+      countryId: query.countryId ? Number(query.countryId) : undefined,
+      stateId: query.stateId || undefined,
+      cityId: query.cityId || undefined,
+      radiusKm: query.radiusKm ? Number(query.radiusKm) : undefined,
+      remote:
+        query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
+    });
+  }
+  return jobService.getPublicJobs({
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
     search: query.search,
     location: query.location,
     employmentType: query.employmentType,
     experienceLevel: query.experienceLevel,
-    isRemote: query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
+    isRemote:
+      query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
     salaryMin: query.salaryMin ? Number(query.salaryMin) : undefined,
     salaryMax: query.salaryMax ? Number(query.salaryMax) : undefined,
+    entityIdAllowlist: allow,
   });
+}
+
+// Public listing endpoint. Frontend legacy calls /api/Job with query params.
+jobRoutes.get("/", async (c) => {
+  const data = await publicJobsFromQuery(c);
   return c.json(success(data));
 });
 
@@ -120,18 +149,7 @@ jobRoutes.get("/saved", async (c) => {
 
 /** GET /api/jobs/public — explicit public listing */
 jobRoutes.get("/public", async (c) => {
-  const query = c.req.query();
-  const data = await jobService.getPublicJobs({
-    page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 10,
-    search: query.search,
-    location: query.location,
-    employmentType: query.employmentType,
-    experienceLevel: query.experienceLevel,
-    isRemote: query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
-    salaryMin: query.salaryMin ? Number(query.salaryMin) : undefined,
-    salaryMax: query.salaryMax ? Number(query.salaryMax) : undefined,
-  });
+  const data = await publicJobsFromQuery(c);
   return c.json(success(data));
 });
 

@@ -12,7 +12,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
 import { EmailField } from "@/components/auth/EmailField";
+import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { useSEO } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
 
@@ -23,6 +25,7 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const captcha = useTurnstile();
 
   // SEO for forgot password page
   useSEO(location.pathname);
@@ -49,7 +52,7 @@ export default function ForgotPassword() {
         "/api/auth/forgot-password",
         {
           method: "POST",
-          body: { email },
+          body: { email, cfTurnstileToken: captcha.token },
         },
       );
 
@@ -57,6 +60,8 @@ export default function ForgotPassword() {
     } catch (err) {
       setError(t("errors.sendResetEmailFailed"));
     } finally {
+      // Token is one-shot — reset so the user can retry without a soft-lock.
+      captcha.reset();
       setLoading(false);
     }
   };
@@ -151,7 +156,9 @@ export default function ForgotPassword() {
                     disabled={loading}
                   />
 
-                  <Button type="submit" className="w-full min-h-[44px]" disabled={loading}>
+                  <AuthCaptchaSlot captcha={captcha} />
+
+                  <Button type="submit" className="w-full min-h-[44px]" disabled={loading || !captcha.ready}>
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />

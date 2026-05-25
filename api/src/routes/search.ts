@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
@@ -7,8 +7,11 @@ import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { getPublicJobs, getHiredVideoCommunityCompanyId, JobEntity } from "../services/job/JobService.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
+import { buildApiDeps } from "../services/apiDeps.js";
+import { LocationService } from "../services/location/LocationService.js";
+import type { ContentLocationKind, LocationFilter } from "../../../shared/content-locations.js";
 
-const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos } = schema;
+const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles } = schema;
 
 export const searchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -150,6 +153,27 @@ function toTemplateItem(
   };
 }
 
+function toArticleItem(a: typeof articles.$inferSelect) {
+  // Articles surface in the unified results so location-tagged creator
+  // content shows up alongside jobs / videos / services for viewers in
+  // the same region. Only `published` articles ever reach here (filter
+  // applied at query time).
+  return {
+    id: a.id,
+    type: "article" as const,
+    title: a.title,
+    description: a.summary ?? "",
+    summary: a.summary ?? "",
+    avatar: a.coverImageUrl ?? undefined,
+    category: a.category ?? undefined,
+    kind: a.kind,
+    readMinutes: a.readMinutes,
+    createdAt: (a.publishedAt ?? a.createdAt).toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+    isFeatured: false,
+  };
+}
+
 function toMediaItem(video: typeof videos.$inferSelect, ownerName: string | null) {
   const title = video.title || `${ownerName ?? "Unknown"}'s Video Resume`;
   return {
@@ -192,6 +216,60 @@ searchRoutes.get("/public", async (c) => {
   const includeVoices = category === "all" || category === "voices";
   const includeMedia = category === "all" || category === "media";
   const includeTemplates = category === "all" || category === "templates";
+  const includeArticles = category === "all" || category === "articles";
+
+  // Structured geo filter — every kind shares one LocationService call
+  // per kind to translate the filter into an entity_id allowlist.
+  // Free-text `location` continues to work as a fallback for callers
+  // that haven't migrated their UI to the picker.
+  const geoFilter: LocationFilter = {
+    countryId: c.req.query("countryId") ? Number(c.req.query("countryId")) : undefined,
+    stateId: c.req.query("stateId") || undefined,
+    cityId: c.req.query("cityId") || undefined,
+    latitude: c.req.query("lat") ? Number(c.req.query("lat")) : undefined,
+    longitude: c.req.query("lng") ? Number(c.req.query("lng")) : undefined,
+    radiusKm: c.req.query("radiusKm") ? Number(c.req.query("radiusKm")) : undefined,
+    remote: isRemote,
+    text: location || undefined,
+  };
+  const hasStructuredGeo =
+    geoFilter.countryId != null ||
+    geoFilter.stateId != null ||
+    geoFilter.cityId != null ||
+    (geoFilter.latitude != null && geoFilter.longitude != null);
+  const env = (c.env ?? {}) as Record<string, string | undefined>;
+  const deps = buildApiDeps(env);
+  const locationService = new LocationService(deps);
+
+  /** Resolve the allowlist for one entity_kind. Returns null when no
+   *  geo filter is set OR when the kind is excluded by category. */
+  const allowlistFor = async (
+    kind: ContentLocationKind,
+    enabled: boolean,
+  ): Promise<string[] | null> => {
+    if (!enabled || !hasStructuredGeo) return null;
+    return locationService.applyLocationFilter(kind, geoFilter);
+  };
+
+  const [
+    jobsAllow,
+    peopleAllow,
+    resumesAllow,
+    voicesAllow,
+    templatesAllow,
+    mediaAllow,
+    articlesAllow,
+    companiesAllow,
+  ] = await Promise.all([
+    allowlistFor("job", includeJobs),
+    allowlistFor("user_profile", includePeople),
+    allowlistFor("resume", includeResumes),
+    allowlistFor("voice", includeVoices),
+    allowlistFor("template", includeTemplates),
+    allowlistFor("video", includeMedia),
+    allowlistFor("article", includeArticles),
+    allowlistFor("company", includeCompanies),
+  ]);
 
   const jobsPromise = includeJobs
     ? getPublicJobs({
@@ -204,24 +282,36 @@ searchRoutes.get("/public", async (c) => {
         isRemote,
         salaryMin,
         salaryMax,
+        entityIdAllowlist: jobsAllow,
       })
     : Promise.resolve({ items: [], total: 0, page: 1, limit: 0, totalPages: 0, hasNext: false, hasPrev: false });
 
   const db = getDb();
 
+  /** True when an allowlist was applied but matched zero entities —
+   *  short-circuit the corresponding query. */
+  const allowEmpty = (allow: string[] | null) => allow !== null && allow.length === 0;
+
+  /** Returns a drizzle expression that intersects the candidate column
+   *  with the allowlist when set, or `undefined` when no filter. */
+  const allowClause = <T>(col: T, allow: string[] | null) =>
+    allow !== null && allow.length > 0 ? inArray(col as any, allow) : undefined;
+
   // Companies: only list active profiles (soft-delete / hidden companies stay out).
   const companyActiveClause = eq(companyProfiles.isActive, true);
-  const companyWhere = search
-    ? and(
-        companyActiveClause,
-        or(ilike(companyProfiles.name, `%${search}%`), ilike(companyProfiles.description, `%${search}%`)),
-      )
-    : companyActiveClause;
-  const companyPromise = includeCompanies
+  const companyWhereParts = [companyActiveClause];
+  if (search) {
+    companyWhereParts.push(
+      or(ilike(companyProfiles.name, `%${search}%`), ilike(companyProfiles.description, `%${search}%`))!,
+    );
+  }
+  const compAllow = allowClause(companyProfiles.id, companiesAllow);
+  if (compAllow) companyWhereParts.push(compAllow);
+  const companyPromise = includeCompanies && !allowEmpty(companiesAllow)
     ? db
         .select()
         .from(companyProfiles)
-        .where(companyWhere)
+        .where(and(...companyWhereParts))
         .orderBy(desc(companyProfiles.createdAt))
         .limit(100)
     : Promise.resolve([] as typeof companyProfiles.$inferSelect[]);
@@ -235,18 +325,22 @@ searchRoutes.get("/public", async (c) => {
     eq(userProfiles.profileVisibility, "public"),
     eq(users.emailVerified, true),
   );
-  const peopleWhere = search
-    ? and(
-        peopleVisibilityClause,
-        or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`)),
-      )
-    : peopleVisibilityClause;
-  const peoplePromise = includePeople
+  const peopleWhereParts: any[] = [peopleVisibilityClause];
+  if (search) {
+    peopleWhereParts.push(
+      or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!,
+    );
+  }
+  // user_profile content_locations key on user_id (= users.id), matching
+  // how we backfilled user_profiles.user_id in migration 0109.
+  const peopleAllowCl = allowClause(users.id, peopleAllow);
+  if (peopleAllowCl) peopleWhereParts.push(peopleAllowCl);
+  const peoplePromise = includePeople && !allowEmpty(peopleAllow)
     ? db
         .select({ user: users, profile: userProfiles })
         .from(users)
         .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
-        .where(peopleWhere)
+        .where(and(...peopleWhereParts))
         .orderBy(desc(users.createdAt))
         .limit(100)
     : Promise.resolve([] as Array<{ user: typeof users.$inferSelect; profile: typeof userProfiles.$inferSelect | null }>);
@@ -256,22 +350,33 @@ searchRoutes.get("/public", async (c) => {
   // search surface — this endpoint is anonymous. Goes through
   // ResumeRepository.searchPublicByTitle so resume-table access stays at
   // one seam; the repo enforces the privacy filter internally.
-  const resumesPromise = includeResumes
-    ? buildRepos(db).resumes.searchPublicByTitle(search ?? "", 100)
+  const resumesPromise = includeResumes && !allowEmpty(resumesAllow)
+    ? buildRepos(db)
+        .resumes.searchPublicByTitle(search ?? "", 100)
+        .then((rows) => {
+          if (!resumesAllow || resumesAllow.length === 0) return rows;
+          const allow = new Set(resumesAllow);
+          return rows.filter((r) => allow.has(r.id));
+        })
     : Promise.resolve([] as typeof resumeInformation.$inferSelect[]);
 
   // Voice marketplace listings — only public clones; rank by recency.
-  const voicesWhere = search
-    ? and(eq(studioVoiceClones.visibility, "public"), or(
+  const voicesWhereParts: any[] = [eq(studioVoiceClones.visibility, "public")];
+  if (search) {
+    voicesWhereParts.push(
+      or(
         ilike(studioVoiceClones.name, `%${search}%`),
         ilike(studioVoiceClones.description, `%${search}%`),
-      ))
-    : eq(studioVoiceClones.visibility, "public");
-  const voicesPromise = includeVoices
+      )!,
+    );
+  }
+  const voicesAllowCl = allowClause(studioVoiceClones.id, voicesAllow);
+  if (voicesAllowCl) voicesWhereParts.push(voicesAllowCl);
+  const voicesPromise = includeVoices && !allowEmpty(voicesAllow)
     ? db
         .select()
         .from(studioVoiceClones)
-        .where(voicesWhere)
+        .where(and(...voicesWhereParts))
         .orderBy(desc(studioVoiceClones.createdAt))
         .limit(100)
     : Promise.resolve([] as typeof studioVoiceClones.$inferSelect[]);
@@ -294,8 +399,10 @@ searchRoutes.get("/public", async (c) => {
   if (firstPartyOnly && hvCommunityCompanyId) {
     templatesWhereParts.push(eq(studioTemplates.companyId, hvCommunityCompanyId));
   }
+  const templatesAllowCl = allowClause(studioTemplates.id, templatesAllow);
+  if (templatesAllowCl) templatesWhereParts.push(templatesAllowCl);
   const templatesWhere = templatesWhereParts.length === 1 ? templatesWhereParts[0] : and(...templatesWhereParts);
-  const templatesPromise = includeTemplates
+  const templatesPromise = includeTemplates && !allowEmpty(templatesAllow)
     ? db
         .select()
         .from(studioTemplates)
@@ -305,23 +412,47 @@ searchRoutes.get("/public", async (c) => {
     : Promise.resolve([] as typeof studioTemplates.$inferSelect[]);
 
   // Media (public video resumes)
-  const mediaWhere = search
-    ? and(
-        eq(videos.privacyStatus, "public"),
-        or(ilike(videos.title, `%${search}%`), ilike(videos.description, `%${search}%`)),
-      )
-    : eq(videos.privacyStatus, "public");
-  const mediaPromise = includeMedia
+  const mediaWhereParts: any[] = [eq(videos.privacyStatus, "public")];
+  if (search) {
+    mediaWhereParts.push(
+      or(ilike(videos.title, `%${search}%`), ilike(videos.description, `%${search}%`))!,
+    );
+  }
+  const mediaAllowCl = allowClause(videos.id, mediaAllow);
+  if (mediaAllowCl) mediaWhereParts.push(mediaAllowCl);
+  const mediaPromise = includeMedia && !allowEmpty(mediaAllow)
     ? db
         .select({ video: videos, ownerName: users.name })
         .from(videos)
         .innerJoin(users, eq(videos.userId, users.id))
-        .where(mediaWhere)
+        .where(and(...mediaWhereParts))
         .orderBy(desc(videos.createdAt))
         .limit(100)
     : Promise.resolve([] as Array<{ video: typeof videos.$inferSelect; ownerName: string | null }>);
 
-  const [jobs, companies, people, resumes, voices, templates, media] = await Promise.all([
+  // Articles — creator-authored published articles. New in this pass:
+  // were previously not in unified search at all (Gap Register hole).
+  const articlesWhereParts: any[] = [eq(articles.status, "published")];
+  if (search) {
+    articlesWhereParts.push(
+      or(
+        ilike(articles.title, `%${search}%`),
+        ilike(articles.summary, `%${search}%`),
+      )!,
+    );
+  }
+  const articlesAllowCl = allowClause(articles.id, articlesAllow);
+  if (articlesAllowCl) articlesWhereParts.push(articlesAllowCl);
+  const articlesPromise = includeArticles && !allowEmpty(articlesAllow)
+    ? db
+        .select()
+        .from(articles)
+        .where(and(...articlesWhereParts))
+        .orderBy(desc(articles.publishedAt))
+        .limit(100)
+    : Promise.resolve([] as typeof articles.$inferSelect[]);
+
+  const [jobs, companies, people, resumes, voices, templates, media, articlesList] = await Promise.all([
     jobsPromise,
     companyPromise,
     peoplePromise,
@@ -329,6 +460,7 @@ searchRoutes.get("/public", async (c) => {
     voicesPromise,
     templatesPromise,
     mediaPromise,
+    articlesPromise,
   ]);
 
   // When searching "all", we merge and paginate by createdAt.
@@ -340,6 +472,7 @@ searchRoutes.get("/public", async (c) => {
     ...voices.map(toVoiceItem),
     ...templates.map((t) => toTemplateItem(t, hvCommunityCompanyId)),
     ...media.map(({ video, ownerName }) => toMediaItem(video, ownerName)),
+    ...articlesList.map(toArticleItem),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));
 
@@ -401,6 +534,12 @@ const RecruiterSearchSchema = z.object({
   query: z.string().max(500).default(""),
   skills: z.array(z.string()).default([]),
   location: z.string().max(200).optional(),
+  // Structured geo filter — viewer-side. Same shape as LocationFilter in
+  // shared/content-locations.ts but spelled inline for the request body.
+  countryId: z.number().int().positive().optional(),
+  stateId: z.string().uuid().optional(),
+  cityId: z.string().uuid().optional(),
+  radiusKm: z.number().int().positive().max(20000).optional(),
   experienceLevel: z.enum(["entry", "mid", "senior", "lead", "executive"]).optional(),
   role: z.string().max(100).optional(),
   page: z.number().int().min(1).default(1),
@@ -413,12 +552,38 @@ searchRoutes.post("/recruiter", async (c) => {
   const parsed = RecruiterSearchSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: { code: "VALIDATION_ERROR" } }, 400);
 
-  const { query, skills, location, experienceLevel, page, limit } = parsed.data;
+  const { query, skills, location, experienceLevel, countryId, stateId, cityId, radiusKm, page, limit } = parsed.data;
   const offset = (page - 1) * limit;
   const db = getDb();
 
   // Build WHERE conditions
   const conditions: ReturnType<typeof sql>[] = [];
+
+  // Structured geo filter — resolved once via LocationService against
+  // user_profile content_locations rows (back-populated by migration 0109
+  // from user_profiles.location). When no structured filter is set we
+  // still honor the free-text `location` fallback below.
+  const hasGeo = countryId != null || stateId != null || cityId != null;
+  if (hasGeo) {
+    const env = (c.env ?? {}) as Record<string, string | undefined>;
+    const deps = buildApiDeps(env);
+    const svc = new LocationService(deps);
+    const allow = await svc.applyLocationFilter("user_profile", {
+      countryId,
+      stateId,
+      cityId,
+      radiusKm,
+    });
+    if (allow !== null) {
+      if (allow.length === 0) {
+        return c.json(
+          success({ candidates: [], total: 0, page, limit, totalPages: 1, hasNextPage: false }),
+          200,
+        );
+      }
+      conditions.push(sql`${users.id} = ANY(${allow}::uuid[])`);
+    }
+  }
 
   if (query.trim()) {
     const tsQuery = booleanToTsquery(query);
@@ -442,7 +607,10 @@ searchRoutes.post("/recruiter", async (c) => {
     }
   }
 
-  if (location) {
+  if (location && !hasGeo) {
+    // Legacy free-text fallback — only when no structured geo was set,
+    // so a viewer who picks a city in the LocationFilter doesn't also
+    // get noise from a stale free-text string.
     conditions.push(ilike(userProfiles.location, `%${location}%`));
   }
 

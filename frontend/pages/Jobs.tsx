@@ -46,6 +46,12 @@ import { listsService } from "@/lib/services/lists-service";
 import Pagination, { usePagination } from "@/components/Pagination";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
+import {
+  LocationFilter,
+  locationFilterFromQuery,
+  applyLocationFilterToQuery,
+} from "@/components/location/LocationFilter";
+import type { LocationFilter as LocationFilterValue } from "@/lib/services/locations-service";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -309,10 +315,17 @@ export default function Jobs() {
 
       const filters: JobFilters = {
         search: searchFilters.search || undefined,
-        location: searchFilters.location || undefined,
+        // Free-text `location` is now the legacy fallback — when the
+        // viewer picks something in the LocationFilter the structured
+        // ids below take over.
+        location: geoFilter.text || searchFilters.location || undefined,
+        countryId: geoFilter.countryId ?? undefined,
+        stateId: geoFilter.stateId ?? undefined,
+        cityId: geoFilter.cityId ?? undefined,
+        radiusKm: geoFilter.radiusKm ?? undefined,
         employmentType: searchFilters.employmentType || undefined,
         experienceLevel: searchFilters.experienceLevel || undefined,
-        isRemote: searchFilters.remote || undefined,
+        isRemote: geoFilter.remote ?? searchFilters.remote ?? undefined,
         page: currentPage,
         limit: itemsPerPage,
       };
@@ -332,7 +345,7 @@ export default function Jobs() {
   // Fetch jobs when filters or page changes
   useEffect(() => {
     fetchJobs();
-  }, [searchFilters, currentPage, itemsPerPage]);
+  }, [searchFilters, geoFilter, currentPage, itemsPerPage]);
 
   // Lists filter: load list membership when ?list_id changes.
   useEffect(() => {
@@ -412,6 +425,22 @@ export default function Jobs() {
 
   const handleClearFilters = () => {
     setSearchFilters({});
+  };
+
+  // Structured geo filter — wired into URL so deep-links share state.
+  // Falls back to the existing free-text `location` searchParam for
+  // backwards compatibility with old saved searches + email-alert links.
+  const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
+    locationFilterFromQuery(searchParams),
+  );
+  useEffect(() => {
+    setGeoFilter(locationFilterFromQuery(searchParams));
+  }, [searchParams]);
+  const handleGeoFilterChange = (next: LocationFilterValue) => {
+    setGeoFilter(next);
+    const params = new URLSearchParams(searchParams);
+    applyLocationFilterToQuery(params, next);
+    setSearchParams(params);
   };
 
   const handleTabChange = (value: string) => {
@@ -802,6 +831,16 @@ export default function Jobs() {
                     hideSearchInput
                     hideFilters
                   />
+                  <div className="rounded-md border border-border bg-card p-3">
+                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Location
+                    </div>
+                    <LocationFilter
+                      value={geoFilter}
+                      onChange={handleGeoFilterChange}
+                      compact={false}
+                    />
+                  </div>
 
                   {/* Owned Jobs (for recruiters/employers) */}
                   {canManageJobs &&

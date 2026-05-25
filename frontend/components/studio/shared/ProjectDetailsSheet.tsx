@@ -12,11 +12,12 @@
  */
 
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { BarChart3, Loader2, MessageSquare, Tag } from "lucide-react";
+import { BarChart3, Loader2, Megaphone, MessageSquare, Plus, Tag } from "lucide-react";
 
 import EntityDetailsSheet, {
   type EntityDetailsSection,
 } from "@/components/shared/EntityDetailsSheet";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,7 @@ import { useEntityDetailsPermission } from "@/hooks/use-entity-details-permissio
 import {
   studioService,
   type StudioProject,
+  type VideoCampaign,
 } from "@/lib/services/studio-service";
 import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
 import UrlPickerInput from "@/components/shared/UrlPickerInput";
@@ -84,6 +86,15 @@ export default function ProjectDetailsSheet({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const lastSavedRef = useRef<string>("");
 
+  // Campaign membership for the Campaign section. Lazy-loaded on first
+  // sheet open via `loadCampaignsIfNeeded()` — most users browse the
+  // Metrics tab, no reason to fetch /api/studio/campaigns up front.
+  const [campaigns, setCampaigns] = useState<VideoCampaign[] | null>(null);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignSaving, setCampaignSaving] = useState<string | null>(null);
+  const [newCampaignName, setNewCampaignName] = useState("");
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
+
   // Re-seed on project change.
   useEffect(() => {
     if (!project) return;
@@ -137,6 +148,95 @@ export default function ProjectDetailsSheet({
     }, AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(handle);
   }, [metaDescription, slug, keywords, socialCardImage, project?.id]);
+
+  // First-load fetch of the user's campaigns. Runs once per sheet open.
+  // The wrapping `useEffect` re-runs when project.id changes (the parent
+  // can swap which project the sheet inspects), so re-opening for a
+  // different project re-uses the same cached list.
+  useEffect(() => {
+    if (!project) return;
+    if (campaigns !== null) return;
+    let cancelled = false;
+    setCampaignsLoading(true);
+    studioService
+      .getCampaigns()
+      .then((res) => {
+        if (cancelled) return;
+        setCampaigns(res.data ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Empty list on failure so the section renders the "no campaigns yet"
+        // empty state rather than spinning forever. The toast surface is
+        // reserved for user-initiated actions; a silent first-load failure
+        // is the right trade-off here.
+        setCampaigns([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCampaignsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, campaigns]);
+
+  async function toggleCampaignMembership(
+    campaign: VideoCampaign,
+    nextMember: boolean,
+  ) {
+    if (!project) return;
+    setCampaignSaving(campaign.id);
+    const nextIds = nextMember
+      ? Array.from(new Set([...campaign.projectIds, project.id]))
+      : campaign.projectIds.filter((id) => id !== project.id);
+    try {
+      const res = await studioService.updateCampaign(campaign.id, {
+        projectIds: nextIds,
+      });
+      if (res.data) {
+        setCampaigns((prev) =>
+          prev ? prev.map((c) => (c.id === campaign.id ? res.data : c)) : prev,
+        );
+      }
+    } catch (err) {
+      toast({
+        title: "Couldn't update campaign",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setCampaignSaving(null);
+    }
+  }
+
+  async function createCampaignAndAttach() {
+    if (!project) return;
+    const name = newCampaignName.trim();
+    if (!name) return;
+    setCreatingCampaign(true);
+    try {
+      const res = await studioService.createCampaign({
+        name,
+        projectIds: [project.id],
+      });
+      if (res.data) {
+        setCampaigns((prev) => (prev ? [res.data, ...prev] : [res.data]));
+        setNewCampaignName("");
+        toast({
+          title: "Campaign created",
+          description: `"${name}" now includes this project.`,
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Couldn't create campaign",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingCampaign(false);
+    }
+  }
 
   function commitKeywordDraft() {
     const trimmed = keywordDraft.trim().replace(/,$/, "");
@@ -283,6 +383,24 @@ export default function ProjectDetailsSheet({
       ),
     },
     {
+      key: "campaign",
+      label: "Campaign",
+      icon: Megaphone,
+      render: () => (
+        <CampaignSection
+          project={project}
+          campaigns={campaigns}
+          campaignsLoading={campaignsLoading}
+          campaignSaving={campaignSaving}
+          onToggleMembership={toggleCampaignMembership}
+          newCampaignName={newCampaignName}
+          setNewCampaignName={setNewCampaignName}
+          onCreate={createCampaignAndAttach}
+          creating={creatingCampaign}
+        />
+      ),
+    },
+    {
       key: "engagement",
       label: "Engagement",
       icon: MessageSquare,
@@ -334,6 +452,178 @@ export default function ProjectDetailsSheet({
     );
   }
   return <EntityDetailsSheet {...sharedProps} />;
+}
+
+/** Lets the user attach the active project to one or more video
+ *  campaigns from the same place SEO + engagement live. Reuses the
+ *  existing `/api/studio/campaigns` endpoints (no new schema) — the
+ *  campaign carries the project membership via its `projectIds[]`
+ *  array, so a toggle here is a one-call `updateCampaign({ projectIds })`.
+ *  The Outreach Campaigns tab reads the SAME list and surfaces the
+ *  membership symmetrically (DRY: ONE storage location, two UIs).
+ *
+ *  Marketers can also spin up a new campaign inline so the studio
+ *  doesn't bounce them to /outreach mid-flow. */
+function CampaignSection({
+  project,
+  campaigns,
+  campaignsLoading,
+  campaignSaving,
+  onToggleMembership,
+  newCampaignName,
+  setNewCampaignName,
+  onCreate,
+  creating,
+}: {
+  project: StudioProject;
+  campaigns: VideoCampaign[] | null;
+  campaignsLoading: boolean;
+  campaignSaving: string | null;
+  onToggleMembership: (campaign: VideoCampaign, nextMember: boolean) => Promise<void>;
+  newCampaignName: string;
+  setNewCampaignName: (value: string) => void;
+  onCreate: () => Promise<void>;
+  creating: boolean;
+}) {
+  if (campaignsLoading && !campaigns) {
+    return (
+      <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Loading your campaigns…
+      </div>
+    );
+  }
+  const list = campaigns ?? [];
+  const memberOf = list.filter((c) => c.projectIds.includes(project.id));
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          Group this project with other ads, banners, and videos so the
+          Outreach dashboard can roll up performance per launch, season,
+          or audience. Membership is editable from either side — this
+          panel or the Campaigns tab in Outreach.
+        </p>
+      </div>
+
+      {memberOf.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            In these campaigns
+          </Label>
+          <div className="flex flex-wrap gap-1.5">
+            {memberOf.map((c) => (
+              <Badge key={c.id} className="gap-1 pr-1" variant="secondary">
+                <span className="truncate max-w-[12rem]">{c.name}</span>
+                <button
+                  type="button"
+                  onClick={() => onToggleMembership(c, false)}
+                  disabled={campaignSaving === c.id}
+                  className="rounded-full p-0.5 hover:bg-muted-foreground/20 disabled:opacity-50"
+                  aria-label={`Remove from ${c.name}`}
+                >
+                  {campaignSaving === c.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <X className="h-3 w-3" />
+                  )}
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+          Add to existing campaign
+        </Label>
+        {list.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border bg-muted/20 py-4 px-3 text-xs text-muted-foreground">
+            No campaigns yet. Create one below — the Outreach tab will
+            roll up performance once metrics start arriving.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {list
+              .filter((c) => !c.projectIds.includes(project.id))
+              .map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onToggleMembership(c, true)}
+                  disabled={campaignSaving === c.id}
+                  className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-left text-sm hover:border-brand-purple disabled:opacity-50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{c.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {c.projectIds.length} project
+                      {c.projectIds.length === 1 ? "" : "s"} ·{" "}
+                      {c.status}
+                    </p>
+                  </div>
+                  {campaignSaving === c.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+              ))}
+            {list.every((c) => c.projectIds.includes(project.id)) && list.length > 0 && (
+              <p className="rounded-md border border-dashed border-border bg-muted/20 py-3 px-3 text-xs text-muted-foreground">
+                This project is in every campaign you've created. Spin up
+                a new one below.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="pds-new-campaign" className="text-xs uppercase tracking-wider text-muted-foreground">
+          New campaign
+        </Label>
+        <div className="flex items-center gap-2">
+          <Input
+            id="pds-new-campaign"
+            value={newCampaignName}
+            onChange={(e) => setNewCampaignName(e.target.value.slice(0, 80))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (newCampaignName.trim()) void onCreate();
+              }
+            }}
+            placeholder="Spring product launch"
+            className="h-9"
+          />
+          <Button
+            type="button"
+            onClick={() => void onCreate()}
+            disabled={!newCampaignName.trim() || creating}
+            size="sm"
+          >
+            {creating ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                Creating
+              </>
+            ) : (
+              <>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Create
+              </>
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Adds this project to the new campaign right away. Manage budget,
+          UTM params, and stats in the Outreach &gt; Campaigns tab.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function SaveStatusBadge({ status }: { status: SaveStatus }) {

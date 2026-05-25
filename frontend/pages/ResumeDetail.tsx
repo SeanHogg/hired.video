@@ -50,6 +50,7 @@ import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
@@ -397,6 +398,12 @@ export default function ResumeDetail() {
   // server compared against `resume.userId`. See ResumeEditPage for the
   // 2026-04-20 bug this local comparison caused.
   const isOwner = !!resume && resume.isOwner;
+
+  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
+  // ("resume" kind) and emits a ProfilePage JSON-LD with embedded
+  // Person mainEntity, plus title/description/keywords derived from
+  // the resume's basics + skills.
+  useUgcSeo("resume", resume);
   const isSample = id === "sample";
   // Single source of truth for "what can this viewer do with this resume".
   // Don't derive can* flags inline — let the hook decide so the rules

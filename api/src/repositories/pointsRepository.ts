@@ -125,7 +125,21 @@ export interface IPointsRepository {
   listBadges(): Promise<BadgeRow[]>;
   findBadgeBySlug(slug: string): Promise<BadgeRow | null>;
   listUserBadges(userId: string): Promise<UserBadgeRow[]>;
-  awardBadge(input: UserBadgeInsert): Promise<UserBadgeRow | null>;
+  /** Insert a user_badges row only if no row exists for (userId, badgeId).
+   *  Use for non-repeatable badges. Returns null when already earned. */
+  awardBadgeOnce(input: UserBadgeInsert): Promise<UserBadgeRow | null>;
+  /** Always insert a new user_badges row. Use for repeatable badges
+   *  (streak rungs); each call records another earn. */
+  awardBadgeRepeatable(input: UserBadgeInsert): Promise<UserBadgeRow>;
+  /** Per-user roll-up: for each badge id the user has earned, return the
+   *  total count + the latest awardedAt + the full earn-timestamp list.
+   *  Drives the gallery's "earned N times, latest on…" rendering. */
+  listUserBadgeEarns(userId: string): Promise<Array<{
+    badgeId: string;
+    earnCount: number;
+    latestAwardedAt: Date;
+    earnedAt: Date[];
+  }>>;
 
   // ── redemptions ─────────────────────────────────────────────────────
   insertRedemption(input: PointRedemptionInsert): Promise<PointRedemptionRow>;
@@ -497,13 +511,54 @@ export class PointsRepository implements IPointsRepository {
     return rows as UserBadgeRow[];
   }
 
-  async awardBadge(input: UserBadgeInsert): Promise<UserBadgeRow | null> {
-    const [row] = await this.db
-      .insert(userBadges)
-      .values(input)
-      .onConflictDoNothing()
-      .returning();
-    return (row as UserBadgeRow) ?? null;
+  async awardBadgeOnce(input: UserBadgeInsert): Promise<UserBadgeRow | null> {
+    // Application-side guard against duplicate award. The unique
+    // constraint was dropped in migration 0099 so repeatable streak
+    // badges could accumulate rows; non-repeatable badges keep the
+    // once-per-user invariant via this pre-insert check.
+    const [existing] = await this.db
+      .select({ id: userBadges.id })
+      .from(userBadges)
+      .where(and(eq(userBadges.userId, input.userId!), eq(userBadges.badgeId, input.badgeId!)))
+      .limit(1);
+    if (existing) return null;
+    const [row] = await this.db.insert(userBadges).values(input).returning();
+    return row as UserBadgeRow;
+  }
+
+  async awardBadgeRepeatable(input: UserBadgeInsert): Promise<UserBadgeRow> {
+    const [row] = await this.db.insert(userBadges).values(input).returning();
+    return row as UserBadgeRow;
+  }
+
+  async listUserBadgeEarns(userId: string) {
+    const rows = await this.db
+      .select({
+        badgeId: userBadges.badgeId,
+        awardedAt: userBadges.awardedAt,
+      })
+      .from(userBadges)
+      .where(eq(userBadges.userId, userId))
+      .orderBy(desc(userBadges.awardedAt));
+    const map = new Map<
+      string,
+      { earnCount: number; latestAwardedAt: Date; earnedAt: Date[] }
+    >();
+    for (const r of rows as Array<{ badgeId: string; awardedAt: Date }>) {
+      const cur = map.get(r.badgeId);
+      if (cur) {
+        cur.earnCount += 1;
+        cur.earnedAt.push(r.awardedAt);
+        if (r.awardedAt > cur.latestAwardedAt) cur.latestAwardedAt = r.awardedAt;
+      } else {
+        map.set(r.badgeId, {
+          earnCount: 1,
+          latestAwardedAt: r.awardedAt,
+          earnedAt: [r.awardedAt],
+        });
+      }
+    }
+    return Array.from(map.entries()).map(([badgeId, v]) => ({ badgeId, ...v }));
   }
 
   // ── redemptions ───────────────────────────────────────────────────────

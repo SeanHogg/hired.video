@@ -11,6 +11,7 @@ export * from "./recruiter.js";
 export * from "./analytics.js";
 export * from "./productivity.js";
 export * from "./locations.js";
+export * from "./contentLocations.js";
 export * from "./ai.js";
 export * from "./feed.js";
 export * from "./interviews.js";

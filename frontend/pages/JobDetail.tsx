@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useState, useEffect } from "react";
-import { useParams, Link , useLocation, useSearchParams } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
@@ -40,7 +40,7 @@ import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import { Briefcase } from "lucide-react";
 import { jobPipelineService } from "@/lib/services/job-pipeline-service";
-import { useSEO, generateStructuredData } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { SAMPLE_JOB } from "@/lib/sample-job";
 import { DEFAULT_JOB_DESCRIPTOR, getJobTemplateById } from "@/types/job-template";
 import { mapApiJobToUI, type UIJob } from "@/lib/jobs/api-job-mapper";
@@ -50,7 +50,7 @@ export default function JobDetail() {
   const { id: slug } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
   const { format: formatTz } = useUserTimezone();
-  const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };  const location = useLocation();
+  const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
   const [searchParams] = useSearchParams();
 
   const [job, setJob] = useState<UIJob | null>(null);
@@ -113,42 +113,10 @@ export default function JobDetail() {
   // templateId, then to the hired.video default descriptor.
   const templateQueryId = searchParams.get("template");
 
-  // SEO: compute and apply at top-level to respect Rules of Hooks
-  const jobSeoTitle = job
-    ? `${job.data.title} at ${job.data.company.name} — hired.video`
-    : undefined;
-  const jobSeoDescription = job
-    ? `${job.data.title} at ${job.data.company.name}${job.data.location?.remote ? " (Remote)" : job.data.location?.city ? ` in ${job.data.location.city}, ${job.data.location.state}` : ""}. ${job.data.description?.slice(0, 150)}`
-    : undefined;
-  const jobStructuredData = job
-    ? generateStructuredData.jobPosting({
-        id: job.id,
-        title: job.data.title,
-        description: job.data.description,
-        postedDate: job.createdAt,
-        validThrough: (job as any).data?.expiresAt || (job as any).expiresAt,
-        employmentType: job.data.employmentType,
-        companyName: job.data.company.name,
-        companyLogoUrl: (job.data.company as any).logo || (job.data.company as any).logoUrl,
-        companyWebsite: (job.data.company as any).website,
-        isRemote: !!job.data.location?.remote,
-        city: job.data.location?.city,
-        state: job.data.location?.state,
-        country: (job.data.location as any)?.country,
-        salaryMin: job.data.salaryMin,
-        salaryMax: job.data.salaryMax,
-        salaryCurrency: (job.data as any).salaryCurrency || "USD",
-        skills: (job.data as any).skills || (job.data as any).skillsRequired,
-      })
-    : undefined;
-
-  useSEO(location.pathname, {
-    title: jobSeoTitle,
-    description: jobSeoDescription,
-    ogTitle: jobSeoTitle,
-    ogDescription: jobSeoDescription,
-    structuredData: jobStructuredData,
-  });
+  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts ("job"
+  // kind) and emits title/description, company-logo og:image, keywords
+  // from skills_required, and the JobPosting JSON-LD.
+  useUgcSeo("job", job);
 
   const isOwner = user && job && job.userId === user.id;
   const permissions = useJobPermissions(job);

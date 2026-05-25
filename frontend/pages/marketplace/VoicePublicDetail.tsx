@@ -30,7 +30,7 @@ import { CardContent } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
 import { useCart } from "@/lib/cart-context";
 import { buildShareAction } from "@/lib/card-share-action";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "sonner";
 
 interface VoiceCloneDetail {
@@ -58,28 +58,13 @@ function formatPrice(cents: number, currency: string): string {
 }
 
 function VoiceSEO({ clone }: { clone: VoiceCloneDetail }) {
-  useSEO(`/marketplace/voices/${clone.id}`, {
-    title: `${clone.name} — Voice Clone on hired.video`,
-    description:
-      clone.description ||
-      `Use the "${clone.name}" AI voice in your hired.video Studio projects.`,
-    keywords: `${clone.name}, ${clone.language ?? ""}, AI voice, hired.video marketplace, voice clone`,
-    ogTitle: `${clone.name} — Voice Clone`,
-    ogDescription: clone.description || "",
-    structuredData: {
-      "@context": "https://schema.org",
-      "@type": "Product",
-      name: clone.name,
-      category: "Voice Clones",
-      brand: { "@type": "Organization", name: "hired.video" },
-      offers: {
-        "@type": "Offer",
-        price: (clone.priceCents / 100).toFixed(2),
-        priceCurrency: clone.currency || "USD",
-        availability: "https://schema.org/InStock",
-        url: `https://hired.video/marketplace/voices/${clone.id}`,
-      },
-    },
+  useUgcSeo("voiceClone", {
+    id: clone.id,
+    name: clone.name,
+    description: clone.description,
+    language: clone.language,
+    priceCents: clone.priceCents,
+    currency: clone.currency,
   });
   return null;
 }

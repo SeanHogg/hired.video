@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { useParams, useLocation, Link, Navigate } from "react-router-dom";
+import { useMemo } from "react";
+import { useParams, Link, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -7,7 +7,8 @@ import {
   Calendar,
   RefreshCw,
 } from "lucide-react";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { useBreadcrumbs } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,17 +26,25 @@ import remarkGfm from "remark-gfm";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
-  const location = useLocation();
   const post = slug ? getBlogPost(slug) : undefined;
 
-  // SEO — dynamic per post
-  useSEO(location.pathname, post ? {
-    title: `${post.title} — hired.video`,
-    description: post.description,
-    keywords: post.keywords,
-    ogTitle: post.title,
-    ogDescription: post.description,
-  } : undefined);
+  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
+  // ("blogPost" kind) and emits title/description/keywords plus the
+  // BlogPosting JSON-LD via generateStructuredData.article.
+  const blogSeoRecord = useMemo(() => {
+    if (!post) return null;
+    return {
+      title: post.title,
+      slug: post.slug,
+      description: post.description,
+      keywords: post.keywords,
+      publishedAt: post.publishedAt,
+      updatedAt: post.updatedAt,
+      category: post.category,
+      wordCount: post.sections.reduce((n, s) => n + s.body.split(/\s+/).length, 0),
+    };
+  }, [post]);
+  useUgcSeo("blogPost", blogSeoRecord);
 
   useBreadcrumbs(
     post
@@ -45,48 +54,6 @@ export default function BlogPost() {
         ]
       : [{ name: "Blog", url: "/blog" }],
   );
-
-  // Article + BlogPosting JSON-LD
-  useEffect(() => {
-    if (!post) return;
-    const scriptId = "blog-article-jsonld";
-    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement("script");
-      script.type = "application/ld+json";
-      script.id = scriptId;
-      document.head.appendChild(script);
-    }
-    script.textContent = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "BlogPosting",
-      headline: post.title,
-      description: post.description,
-      datePublished: post.publishedAt,
-      dateModified: post.updatedAt,
-      author: {
-        "@type": "Person",
-        name: "Sean Hogg",
-        jobTitle: "Founder & CEO",
-        worksFor: { "@type": "Organization", name: "hired.video", url: "https://hired.video" },
-      },
-      publisher: {
-        "@type": "Organization",
-        name: "hired.video",
-        url: "https://hired.video",
-        logo: { "@type": "ImageObject", url: "https://hired.video/og-image.svg" },
-      },
-      mainEntityOfPage: {
-        "@type": "WebPage",
-        "@id": `https://hired.video/blog/${post.slug}`,
-      },
-      wordCount: post.sections.reduce((n, s) => n + s.body.split(/\s+/).length, 0),
-      keywords: post.keywords,
-    });
-    return () => {
-      document.getElementById(scriptId)?.remove();
-    };
-  }, [post]);
 
   // Related posts (same category, excluding current)
   const related = useMemo(() => {

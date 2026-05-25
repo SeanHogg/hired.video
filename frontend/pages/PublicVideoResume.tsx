@@ -5,58 +5,10 @@ import { AppShell } from "@/components/AppShell";
 import StudioVideoSurface, {
   PublicVideoSchema,
   isReady,
-  type PublicVideoReady,
   type PublicVideoPayload as PublicVideo,
 } from "@/components/studio/StudioVideoSurface";
 import { recordProjectView } from "@/lib/services/studio-features-service";
-
-// ─── Meta helpers ─────────────────────────────────────────────────────────────
-function setMeta(name: string, content: string) {
-  let el = document.querySelector<HTMLMetaElement>(`meta[property="${name}"],meta[name="${name}"]`);
-  if (!el) {
-    el = document.createElement("meta");
-    el.setAttribute(name.startsWith("og:") || name.startsWith("twitter:") ? "property" : "name", name);
-    document.head.appendChild(el);
-  }
-  el.setAttribute("content", content);
-}
-
-// Combine the owner-authored Meta-tab fields (metaDescription / keywords /
-// socialCardImage) with the video's default title/description/thumbnail.
-// Meta-tab values win when set — the share preview reflects what the owner
-// typed in the Details drawer, not the raw render fallback. Empty/null
-// fields fall through silently so a partially-filled Meta tab still gets
-// the missing slots filled from the video defaults.
-function applyOgTags(video: PublicVideoReady) {
-  const title = video.title;
-  const desc =
-    video.metaDescription ||
-    video.description ||
-    "Watch this video resume on hired.video";
-  const thumb =
-    video.socialCardImage ||
-    video.thumbnailUrl ||
-    "https://hired.video/og-default.png";
-  const url = `https://hired.video/v/${video.id}`;
-  const keywords = video.keywords?.length ? video.keywords.join(", ") : null;
-
-  document.title = title;
-  setMeta("description", desc);
-  setMeta("og:title", title);
-  setMeta("og:description", desc);
-  setMeta("og:image", thumb);
-  setMeta("og:url", url);
-  setMeta("og:type", "video.other");
-  setMeta("twitter:card", "summary_large_image");
-  setMeta("twitter:title", title);
-  setMeta("twitter:description", desc);
-  setMeta("twitter:image", thumb);
-  if (keywords) setMeta("keywords", keywords);
-  if (video.youtubeUrl) {
-    setMeta("og:video", video.youtubeUrl);
-    setMeta("og:video:type", "text/html");
-  }
-}
+import { useUgcSeo } from "@/lib/seo-ugc";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function PublicVideoResume() {
@@ -64,6 +16,14 @@ export default function PublicVideoResume() {
   const [video, setVideo] = useState<PublicVideo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
+  // ("videoResume" kind) and emits owner-authored Meta-tab fields
+  // (metaDescription / socialCardImage / keywords) with fallbacks to
+  // the video's default title/description/thumbnail. Replaces the
+  // hand-rolled applyOgTags() / setMeta() helpers that previously
+  // bypassed the platform SEO defaults merge.
+  useUgcSeo("videoResume", video && isReady(video) ? video : null);
 
   useEffect(() => {
     if (!videoId) return;
@@ -76,7 +36,6 @@ export default function PublicVideoResume() {
         if (result.success) {
           setVideo(result.data);
           if (isReady(result.data)) {
-            applyOgTags(result.data);
             // Authoritative view counter for the Total Views / CTR
             // denominator on the owner's analytics dashboard. The
             // per-second heatmap tracker (mounted by StudioVideoSurface

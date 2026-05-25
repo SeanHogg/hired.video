@@ -57,8 +57,15 @@ export function evaluateBadges(input: BadgeEvaluationInput): string[] {
       const systemCount = input.counters?.systemTaskCompletions ?? 0;
       const userCount = input.counters?.userTaskCompletions ?? 0;
       const total = systemCount + userCount;
-      considerBadge("first_task", total >= 1);
+      // Renamed from `first_task` → `get_it_done` in migration 0099.
+      considerBadge("get_it_done", total >= 1);
       considerBadge("hundred_tasks", userCount >= 100);
+      break;
+    }
+
+    // ─── Social feed ──────────────────────────────────────────────────
+    case "feed.post.created": {
+      considerBadge("first_post", input.totalEarnsForAction >= 1);
       break;
     }
 

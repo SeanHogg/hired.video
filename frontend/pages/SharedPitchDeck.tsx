@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import {
   recruitService,
   type PublicPitchDeck,
@@ -100,10 +100,9 @@ export default function SharedPitchDeck() {
   const [notFound, setNotFound] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
 
-  useSEO("/share/pitch-deck", {
-    title: "Candidate Pitch Deck — hired.video",
+  useUgcSeo("shareToken", {
+    title: "Candidate Pitch Deck",
     description: "Curated candidate shortlist shared via hired.video.",
-    robots: "noindex, nofollow",
   });
 
   useEffect(() => {

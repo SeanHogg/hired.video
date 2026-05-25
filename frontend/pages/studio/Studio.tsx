@@ -16,19 +16,20 @@
 import { lazy, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
 import StudioLayout from "./StudioLayout";
+import StudioLoadingShell from "./StudioLoadingShell";
 
 const StudioLanding = lazy(() => import("./StudioLanding"));
 const StudioEditorV2 = lazy(() => import("./v2/StudioEditorV2"));
 
 export default function StudioRoot() {
   const { user, isLoading } = useAuth();
-  if (isLoading) return <Loading />;
+  if (isLoading) return <StudioLoadingShell />;
   // Unauthenticated visitors still see the marketing surface that lives
   // inside StudioLayout — the layout self-gates and returns its
   // <Landing /> when `!user`, so the v1 editor never mounts.
   if (!user) return <StudioLayout />;
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<StudioLoadingShell />}>
       <StudioLanding />
     </Suspense>
   );
@@ -36,16 +37,8 @@ export default function StudioRoot() {
 
 export function StudioProjectRoute() {
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<StudioLoadingShell />}>
       <StudioEditorV2 />
     </Suspense>
-  );
-}
-
-function Loading() {
-  return (
-    <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-      Loading…
-    </div>
   );
 }

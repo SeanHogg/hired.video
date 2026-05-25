@@ -13,7 +13,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
 import { EmailField } from "@/components/auth/EmailField";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
 import { mapAuthError } from "@/lib/services/auth-errors";
@@ -408,11 +408,7 @@ export default function Signup() {
                     </div>
                   </div>
 
-                  {captcha.configured && (
-                    <div className="flex justify-center pt-2">
-                      <TurnstileWidget ref={captcha.ref} onToken={captcha.onToken} />
-                    </div>
-                  )}
+                  <AuthCaptchaSlot captcha={captcha} />
 
                   <Button
                     type="submit"

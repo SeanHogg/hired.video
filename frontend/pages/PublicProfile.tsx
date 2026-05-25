@@ -22,18 +22,25 @@ import {
   channelService,
   type ChannelPayload,
 } from "@/lib/services/channel-service";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import ChannelLayout from "@/components/channel/ChannelLayout";
 import ResumeProfileLayout from "@/components/channel/ResumeProfileLayout";
 
 export default function PublicProfile() {
-  useSEO("/u");
   const params = useParams<{ handle: string }>();
   const handle = params.handle ?? "";
 
   const [data, setData] = useState<ChannelPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // SEO — single adapter call. The "channel" builder in lib/seo-ugc.ts
+  // emits ProfilePage JSON-LD; falls back gracefully when the channel
+  // record lacks tagline/bio/avatar (the current ChannelPayload shape).
+  useUgcSeo(
+    "channel",
+    data ? { handle, displayName: data.user.name, mode: data.mode } : null,
+  );
 
   useEffect(() => {
     if (!handle) return;

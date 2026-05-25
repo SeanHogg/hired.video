@@ -7,6 +7,7 @@ import {
   timestamp,
   integer,
   jsonb,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -191,6 +192,17 @@ export const userProfiles = pgTable("user_profiles", {
   // for the document shape. Single document per user (one active target
   // — multi-target comparison is a separate roadmap item).
   careerTarget: jsonb("career_target").$type<Record<string, unknown>>(),
+  // Structured home location — distinct from free-text `location` (legacy)
+  // and `billing_*` (mailing address). Drives "show me content for my
+  // city" personalization across every feed + search surface. See
+  // migration 0108_content_locations.sql.
+  homeCountryId: integer("home_country_id"),
+  homeStateId: uuid("home_state_id"),
+  homeCityId: uuid("home_city_id"),
+  homePostalCode: varchar("home_postal_code", { length: 20 }),
+  homeLatitude: doublePrecision("home_latitude"),
+  homeLongitude: doublePrecision("home_longitude"),
+  homeRadiusKm: integer("home_radius_km"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

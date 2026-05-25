@@ -1,6 +1,6 @@
 import { ArrowLeft, Building2, Loader2, User as UserIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -65,7 +65,7 @@ import {
   type CreatorProgram,
 } from "@/lib/services/creator-service";
 import { userService } from "@/lib/services/user-service";
-import { generateStructuredData, useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { useProfileView, type ProfileViewTarget } from "@/hooks/useProfileView";
 import {
   DEFAULT_DESCRIPTOR,
@@ -86,7 +86,6 @@ function PeopleDetailContent() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user: authUser, isAuthenticated } = useAuth();  const { addItem, openCart } = useCart();
 
@@ -187,57 +186,32 @@ function PeopleDetailContent() {
   }, [masterResume?.content?.meta?.template]);
 
   // ---------------------------------------------------------------------
-  // SEO + profile-view tracking
+  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts ("person"
+  // kind) and decides title/description/ogImage/keywords/JSON-LD.
   // ---------------------------------------------------------------------
-  const seoTitle = profile
-    ? `${fullName || "User"}, ${getRoleDisplayLabel((profile as any).role ?? "")} — hired.video`
-    : undefined;
-  const seoDescription = profile
-    ? profile.bio ||
-      `${fullName || "User"} is a ${getRoleDisplayLabel((profile as any).role ?? "")}.`
-    : undefined;
-
-  // Combine resume skills (canonical source), profile-level SEO keywords,
-  // and industries into a single discoverability vocabulary used both as
-  // <meta name="keywords"> and Person.knowsAbout JSON-LD.
-  const discoverabilityTags = useMemo<string[]>(() => {
-    if (!profile) return [];
-    const resumeSkills = (masterResume?.content?.skills ?? []).flatMap((s: any) => [
+  const resumeSkillTokens = useMemo<string[]>(() => {
+    return (masterResume?.content?.skills ?? []).flatMap((s: any) => [
       ...(s?.name ? [s.name as string] : []),
       ...((s?.keywords ?? []) as string[]),
     ]);
-    const profileKeywords = (profile.skills ?? []) as string[];
-    const profileIndustries = ((profile as any).industries ?? []) as string[];
-    const seen = new Set<string>();
-    return [...resumeSkills, ...profileKeywords, ...profileIndustries]
-      .map((v) => (typeof v === "string" ? v.trim() : ""))
-      .filter((v) => {
-        if (!v) return false;
-        const key = v.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-  }, [profile, masterResume]);
+  }, [masterResume]);
 
-  const structuredData = profile
-    ? generateStructuredData.person({
-        name: fullName,
-        title: getRoleDisplayLabel((profile as any).role ?? ""),
-        bio: profile.bio ?? undefined,
-        avatar: profile.profilePicture ?? undefined,
-        id: profile.id ?? "",
-        knowsAbout: discoverabilityTags.length > 0 ? discoverabilityTags : undefined,
-      })
-    : undefined;
-  useSEO(location.pathname, {
-    title: seoTitle,
-    description: seoDescription,
-    ogTitle: seoTitle,
-    ogDescription: seoDescription,
-    keywords: discoverabilityTags.length > 0 ? discoverabilityTags.join(", ") : undefined,
-    structuredData,
-  });
+  const personSeoRecord = useMemo(() => {
+    if (!profile) return null;
+    return {
+      id: profile.id ?? "",
+      fullName: fullName || undefined,
+      bio: profile.bio ?? undefined,
+      profilePicture: profile.profilePicture ?? undefined,
+      role: (profile as any).role,
+      roleLabel: getRoleDisplayLabel((profile as any).role ?? ""),
+      skills: profile.skills ?? undefined,
+      industries: (profile as any).industries ?? undefined,
+      resumeSkills: resumeSkillTokens,
+    };
+  }, [profile, fullName, resumeSkillTokens]);
+
+  useUgcSeo("person", personSeoRecord);
 
   // Track profile view — only authenticated visitors viewing someone else's
   // profile. Self-views would pollute the analytics.

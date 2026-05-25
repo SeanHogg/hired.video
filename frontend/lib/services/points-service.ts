@@ -29,8 +29,11 @@ const BadgeSchema = z.object({
   description: z.string(),
   tier: z.string(),
   iconKey: z.string().nullable().optional(),
+  isRepeatable: z.boolean().default(false),
   earned: z.boolean(),
   earnedAt: z.union([z.string(), z.null()]).optional(),
+  earnCount: z.number().default(0),
+  earnedHistory: z.array(z.string()).default([]),
 });
 
 const ActivityItemSchema = z.object({

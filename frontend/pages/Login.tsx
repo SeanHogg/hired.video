@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import OAuthProviders from "@/components/OAuthProviders";
 import { LoginGate } from "@/components/security/RegisterGate";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
 import { EmailField } from "@/components/auth/EmailField";
 import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
@@ -100,32 +100,12 @@ export default function Login() {
         return;
       }
     } catch (err) {
-      const mapped = mapAuthError(err);
-      // TURNSTILE_FAIL recovery. If the captcha gate rejects (token
-      // missing, timed out, or VITE_TURNSTILE_SITE_KEY isn't even set in
-      // this build) we don't want to leave the user staring at a "solve
-      // it again" error with no out. /api/auth/magic-link has no captcha
-      // enforcement, so fire one to the email they already typed and
-      // switch the form into the existing "we sent you a link" state.
-      // Same surface the explicit magic-link tab uses — no second UI.
-      if (mapped.code === "TURNSTILE_FAIL" && email) {
-        try {
-          // suppressErrorEvent so a backend hiccup on the rescue path doesn't
-          // pile a second red toast on top of the (now suppressed) login error.
-          await apiClient.request("/api/auth/magic-link", {
-            method: "POST",
-            body: { email, redirect: redirectParam },
-            suppressErrorEvent: true,
-          });
-          setMagicLinkMode(true);
-          setMagicLinkSent(true);
-          setError("");
-        } catch {
-          setError(t(mapped.messageKey));
-        }
-      } else {
-        setError(t(mapped.messageKey));
-      }
+      // Per #1122 the login backend no longer returns TURNSTILE_FAIL —
+      // a captcha miss is treated as a soft signal that escalates to
+      // email-OTP step-up (the requiresTwoFactor branch above). Any
+      // surface error here is a real auth failure (bad password,
+      // locked account, rate limit) — surface it directly.
+      setError(t(mapAuthError(err).messageKey));
       // Token is one-shot — reset so the user can retry without a soft-lock.
       captcha.reset();
     } finally {
@@ -160,12 +140,17 @@ export default function Login() {
     try {
       await apiClient.request("/api/auth/magic-link", {
         method: "POST",
-        body: { email, redirect: redirectParam },
+        body: { email, redirect: redirectParam, cfTurnstileToken: captcha.token },
         suppressErrorEvent: true,
       });
       setMagicLinkSent(true);
     } catch { setError(t("errors.magicLinkFailed")); }
-    finally { setMagicLinkLoading(false); }
+    finally {
+      // Token is one-shot — reset so a follow-up "try a different email"
+      // attempt gets a fresh challenge.
+      captcha.reset();
+      setMagicLinkLoading(false);
+    }
   };
 
   return (
@@ -237,7 +222,8 @@ export default function Login() {
                             label={t("fields.email.label")}
                             placeholder={t("fields.email.placeholder")}
                           />
-                          <Button type="submit" className="w-full min-h-[44px]" disabled={magicLinkLoading}>
+                          <AuthCaptchaSlot captcha={captcha} />
+                          <Button type="submit" className="w-full min-h-[44px]" disabled={magicLinkLoading || !captcha.ready}>
                             {magicLinkLoading ? t("status.sending") : t("actions.sendSignInLink")}
                           </Button>
                         </form>
@@ -260,11 +246,7 @@ export default function Login() {
                             </Button>
                           </div>
                         </div>
-                        {captcha.configured && (
-                          <div className="flex justify-center pt-2">
-                            <TurnstileWidget ref={captcha.ref} onToken={captcha.onToken} />
-                          </div>
-                        )}
+                        <AuthCaptchaSlot captcha={captcha} />
                         <Button type="submit" className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]" disabled={isLoading || !captcha.ready}>
                           {isLoading ? t("status.signingIn") : t("actions.signIn")}
                         </Button>

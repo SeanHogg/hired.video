@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Coins, Flame, Lock } from "lucide-react";
+import { Coins, Flame, Lock, Trophy } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +14,7 @@ import {
   isPointsEligible,
   type PointsSummary,
 } from "@/lib/services/points-service";
+import { BadgeIcon } from "@/components/badges/BadgeIcon";
 
 /**
  * Sidebar pill mirroring AITokenPill's idiom — balance + streak summary,
@@ -58,6 +59,17 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
   const suspended = data.isSuspended;
   const streakActive = data.streak.current > 0 && !suspended;
   const nextStreak = nextMilestone(data.streak.current);
+  const earnedBadges = data.badges.filter((b) => b.earned);
+  const earnedCount = earnedBadges.length;
+  // Most-recent earn drives the collapsed-view badge thumbnail + the
+  // expanded-view "latest" tooltip line.
+  const latestBadge = earnedBadges
+    .slice()
+    .sort((a, b) => {
+      const at = a.earnedAt ? new Date(a.earnedAt).getTime() : 0;
+      const bt = b.earnedAt ? new Date(b.earnedAt).getTime() : 0;
+      return bt - at;
+    })[0];
 
   if (collapsed) {
     return (
@@ -100,6 +112,12 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
                   {data.streak.current}-day streak
                   {nextStreak != null && ` · ${nextStreak - data.streak.current} to ${nextStreak}-day`}
                 </div>
+                {earnedCount > 0 && (
+                  <div className="text-muted-foreground">
+                    {earnedCount} of {data.badges.length} badges
+                    {latestBadge && ` · latest: ${latestBadge.name}`}
+                  </div>
+                )}
               </div>
             )}
           </TooltipContent>
@@ -164,6 +182,26 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
           </span>
         )}
       </div>
+
+      {(earnedCount > 0 || data.badges.length > 0) && (
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1 pt-1 border-t border-border/60">
+          <span className="flex items-center gap-1">
+            {latestBadge ? (
+              <BadgeIcon
+                iconKey={latestBadge.iconKey}
+                tier={latestBadge.tier}
+                earned
+                size="sm"
+                className="!h-3.5 !w-3.5 [&>svg]:!h-2 [&>svg]:!w-2"
+              />
+            ) : (
+              <Trophy className="h-3 w-3" />
+            )}
+            <span className="tabular-nums">{earnedCount} badges</span>
+          </span>
+          <span className="text-[10px]">View →</span>
+        </div>
+      )}
     </Link>
   );
 }

@@ -46,6 +46,11 @@ import { useActiveFormBridge } from "@/lib/hooks/use-active-form-bridge";
 import { JOB_CREATE_FORM_ID } from "@/lib/tools/registry";
 import MediaPicker from "@/components/shared/MediaPicker";
 import EntityEditShell from "@/components/EntityEditShell";
+import { LocationPicker } from "@/components/location/LocationPicker";
+import {
+  locationsService,
+  type ContentLocationSet,
+} from "@/lib/services/locations-service";
 
 
 // Job creation form schema
@@ -147,6 +152,14 @@ export default function JobCreatePage() {
   const [documentError, setDocumentError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [activeMethod, setActiveMethod] = useState<JobCreationMethod>("manual");
+
+  // Structured geo tags — persisted via the generic location endpoint
+  // after the job save succeeds. Decoupled from the form schema so we
+  // don't have to touch every nested form-handler path.
+  const [jobLocations, setJobLocations] = useState<ContentLocationSet>({
+    origin: null,
+    serves: [],
+  });
 
   // File upload states (uploadedFile state removed — write-only #390 dead code)
   const [isProcessingFile, setIsProcessingFile] = useState(false);
@@ -534,6 +547,21 @@ export default function JobCreatePage() {
       console.log("✅ API call successful, result:", result);
       console.log("Job created successfully:", result);
 
+      // Persist structured geo tags via the generic location endpoint.
+      // No-op when the picker is empty (origin === null && serves is empty).
+      const createdJobId =
+        (result as any)?.data?.id ?? (result as any)?.id ?? null;
+      if (createdJobId && (jobLocations.origin || (jobLocations.serves ?? []).length > 0)) {
+        try {
+          await locationsService.setForEntity("job", createdJobId, jobLocations);
+        } catch (locErr) {
+          // Geo tagging is a best-effort enhancement — the job already
+          // saved successfully, so we log + continue rather than blocking
+          // the user on a separate request failure.
+          console.warn("Failed to save job locations:", locErr);
+        }
+      }
+
       setSubmitSuccess(true);
 
       // Don't auto-redirect, let user choose next action
@@ -917,7 +945,10 @@ export default function JobCreatePage() {
                         )}
                       </div>
 
-                      {/* Location */}
+                      {/* Location — free-text required for legacy backend
+                          fallback; the LocationPicker below also persists
+                          structured ids via /api/locations/entities/job/:id
+                          after the job save completes. */}
                       <div className="space-y-2">
                         <Label htmlFor="location">Location *</Label>
                         <Input
@@ -931,6 +962,12 @@ export default function JobCreatePage() {
                             {errors.location.message}
                           </p>
                         )}
+                        <LocationPicker
+                          value={jobLocations}
+                          onChange={setJobLocations}
+                          multiRegion={false}
+                          originLabel="Pin location to map (optional)"
+                        />
                       </div>
 
                       {/* Remote Work Option */}

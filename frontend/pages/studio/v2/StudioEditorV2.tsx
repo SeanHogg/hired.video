@@ -52,6 +52,7 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import { NotFoundError } from "@/lib/errors";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import StudioLoadingShell from "../StudioLoadingShell";
 import { cn } from "@/lib/utils";
 
 import {
@@ -1509,6 +1510,13 @@ export default function StudioEditorV2() {
     url?: string;
     dataUrl?: string;
     placeholder?: string;
+    /** Selection bbox in viewport pixels (design pixels × current zoom),
+     *  relative to the per-surface `<div className="relative">` wrapper
+     *  in which the chip mounts. Game sprites + timeline widgets supply
+     *  one (chip anchors above the element); drawing layers + animation
+     *  frames omit it (chip falls back to top-right of canvas — correct
+     *  because the canvas IS the selection). */
+    bbox?: { x: number; y: number; width: number; height: number };
     onGenerated: (result: ImageGenResult, prompt: string) => void | Promise<void>;
   } | null>(() => {
     if (currentMediaKind === "image") {
@@ -1545,14 +1553,30 @@ export default function StudioEditorV2() {
       const asset = sprite
         ? gameState.assets.find((a) => a.id === sprite.assetId)
         : null;
-      if (!asset?.url) return null;
+      if (!asset?.url || !sprite) return null;
       return {
         kindNoun: "sprite",
-        label: `Sprite ${sprite!.id}`,
+        label: `Sprite ${sprite.id}`,
         url: asset.url,
         placeholder: "Same silhouette, neon cyberpunk palette…",
-        onGenerated: (result, prompt) =>
-          handleGameAiGenerated(result, prompt),
+        bbox: {
+          x: sprite.x * zoom,
+          y: sprite.y * zoom,
+          width: sprite.width * zoom,
+          height: sprite.height * zoom,
+        },
+        // In-place asset URL update — keeps the sprite's id, position,
+        // size, behavior, scripts; only the bitmap changes. The chip
+        // came from a selected sprite (img→img mode), so "update this
+        // sprite" is the intuitive UX vs the right-rail panel's
+        // "create a new sprite" path. `addCustomSpriteAsset` is
+        // idempotent — re-adding the same id rewrites the URL.
+        onGenerated: (result) => {
+          const newUrl = result.resultUrl ?? result.previewUrl;
+          setGameState((prev) =>
+            prev ? gameAddCustomSpriteAsset(prev, { id: asset.id, url: newUrl }) : prev,
+          );
+        },
       };
     }
     if (usesTimelineChrome && selection.kind === "widget") {
@@ -1567,6 +1591,15 @@ export default function StudioEditorV2() {
         label: "Selected image",
         url,
         placeholder: "Same composition, dramatic golden-hour light…",
+        // Timeline widgets store fractional position (0..1). Multiply
+        // by canvas dims then by zoom to land in the canvas wrapper's
+        // pixel coordinate space (the wrapper is sized `width × zoom`).
+        bbox: {
+          x: widget.position.x * state.width * zoom,
+          y: widget.position.y * state.height * zoom,
+          width: widget.position.width * state.width * zoom,
+          height: widget.position.height * state.height * zoom,
+        },
         onGenerated: (result) => {
           // Replace the image widget's source URL in place — keeps
           // the widget's position / window / motion / z-index, just
@@ -1593,11 +1626,32 @@ export default function StudioEditorV2() {
     usesTimelineChrome,
     selection,
     activeScene,
+    state.width,
+    state.height,
+    zoom,
     handleImageAiGenerated,
     handleAnimationAiGenerated,
     handleGameAiGenerated,
     updateWidgetParams,
   ]);
+
+  // Single chip ReactNode — composed once, mounted as a sibling inside
+  // each per-kind canvas wrapper (via CanvasRouter's `surfaces` slots).
+  // The chip self-gates on `aiChipSource` being non-null so each
+  // surface mount can include `{aiChipNode}` unconditionally without a
+  // per-kind canX check (per the shared-component visibility rule).
+  const aiChipNode = aiChipSource ? (
+    <AiSelectionChip
+      alwaysVisible
+      kindNoun={aiChipSource.kindNoun}
+      selectionLabel={aiChipSource.label}
+      sourceImageUrl={aiChipSource.url}
+      sourceImageDataUrl={aiChipSource.dataUrl}
+      placeholder={aiChipSource.placeholder}
+      bbox={aiChipSource.bbox}
+      onGenerated={aiChipSource.onGenerated}
+    />
+  ) : null;
 
   // V2-native audio mixer adapters (#645). Patch the canvas-level
   // audioMix slice + per-clip voiceover gain/muted. Defaults merge in
@@ -1773,6 +1827,7 @@ export default function StudioEditorV2() {
           imageState,
           animationState,
           gameState,
+          canvasState: state,
           flattenImage: imageCanvas
             ? async () => flattenCanvasToBlob(imageCanvas, "image/png")
             : undefined,
@@ -2044,11 +2099,7 @@ export default function StudioEditorV2() {
   }
 
   if (authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading…
-      </div>
-    );
+    return <StudioLoadingShell />;
   }
 
   if (!user) {
@@ -2058,6 +2109,38 @@ export default function StudioEditorV2() {
         <Button onClick={() => navigate("/login")}>Sign in</Button>
       </div>
     );
+  }
+
+  // Project-ready gate — closes the "wrong-chrome flash" bug where
+  // opening an existing image/game/animation project via direct URL
+  // mounted the video chrome first (because `currentMediaKind` falls
+  // back to `mountTimeTemplateKind` = "video" before `persistedProject`
+  // arrives), then repainted the left/right rails into the correct
+  // kind 300–800 ms later. The gate has two parts:
+  //   • `projectId === "new"` short-circuits — the URL's
+  //     `?contentTemplate=` already gave us the right kind synchronously
+  //     so there's no wait, no flash.
+  //   • For existing projects we wait until either `persistedProject`
+  //     loads OR the load failed (`missingProject` — surfaces the empty
+  //     editor with a "doesn't exist" banner instead of looping
+  //     forever).
+  // `runtimeHydrated` waits the additional tick that per-kind
+  // runtimes need to seed (image / animation / game canvases mount
+  // null until their state hydrates). Timeline kinds always return
+  // true because `state` is seeded synchronously by useState.
+  const runtimeHydrated =
+    currentMediaKind === "image"
+      ? imageStateHydrated
+      : currentMediaKind === "animation"
+        ? animationStateHydrated
+        : currentMediaKind === "game"
+          ? gameState !== null
+          : true;
+  const projectReady =
+    (projectId === "new" || persistedProject !== null || missingProject) &&
+    runtimeHydrated;
+  if (!projectReady) {
+    return <StudioLoadingShell />;
   }
 
   return (
@@ -2108,7 +2191,7 @@ export default function StudioEditorV2() {
             currentMediaKind === "game"
               ? !!gameState && gameState.levels.length > 0
               : currentMediaKind === "image"
-                ? imageStateHydrated
+                ? true
                 : state.scenes.some((s) => s.widgets.length > 0)
           }
           onOpenPreview={() => setPreviewOpen(true)}
@@ -2410,47 +2493,54 @@ export default function StudioEditorV2() {
                           >
                             {gamePlaying ? "■ Stop" : "▶ Playtest"}
                           </button>
+                          {aiChipNode}
                         </div>
                       ),
-                      image: imageStateHydrated ? (
-                        <DrawingStage
-                          state={imageState}
-                          setState={setImageState}
-                          commit={imageCommit}
-                          zoom={zoom}
-                          tool={imageTool}
-                          brush={imageBrush}
-                          onBrushChange={setImageBrush}
-                          onRecentColor={pushImageRecentColor}
-                          marquee={imageMarquee}
-                          onMarqueeChange={setImageMarquee}
-                          onMarqueeDelete={
-                            imageMarquee ? handleImageMarqueeDelete : undefined
-                          }
-                          onMarqueeFill={
-                            imageMarquee ? handleImageMarqueeFill : undefined
-                          }
-                          onMarqueeInpaint={
-                            imageMarquee ? handleImageMarqueeInpaint : undefined
-                          }
-                          onLayerTransform={handleImageLayerTransform}
-                          onCanvasReady={setImageCanvas}
-                        />
-                      ) : null,
-                      animation: animationStateHydrated ? (
-                        <AnimationStage
-                          state={animationState}
-                          setState={setAnimationState}
-                          commit={animationCommit}
-                          zoom={zoom}
-                          tool={imageTool}
-                          brush={imageBrush}
-                          onBrushChange={setImageBrush}
-                          onRecentColor={pushImageRecentColor}
-                        />
-                      ) : null,
+                      image: (
+                        <div className="relative">
+                          <DrawingStage
+                            state={imageState}
+                            setState={setImageState}
+                            commit={imageCommit}
+                            zoom={zoom}
+                            tool={imageTool}
+                            brush={imageBrush}
+                            onBrushChange={setImageBrush}
+                            onRecentColor={pushImageRecentColor}
+                            marquee={imageMarquee}
+                            onMarqueeChange={setImageMarquee}
+                            onMarqueeDelete={
+                              imageMarquee ? handleImageMarqueeDelete : undefined
+                            }
+                            onMarqueeFill={
+                              imageMarquee ? handleImageMarqueeFill : undefined
+                            }
+                            onMarqueeInpaint={
+                              imageMarquee ? handleImageMarqueeInpaint : undefined
+                            }
+                            onLayerTransform={handleImageLayerTransform}
+                            onCanvasReady={setImageCanvas}
+                          />
+                          {aiChipNode}
+                        </div>
+                      ),
+                      animation: (
+                        <div className="relative">
+                          <AnimationStage
+                            state={animationState}
+                            setState={setAnimationState}
+                            commit={animationCommit}
+                            zoom={zoom}
+                            tool={imageTool}
+                            brush={imageBrush}
+                            onBrushChange={setImageBrush}
+                            onRecentColor={pushImageRecentColor}
+                          />
+                          {aiChipNode}
+                        </div>
+                      ),
                       timeline: (
-                  <>
+                  <div className="relative">
                   {/* ONE renderer for both edit + playback: `<CanvasStage>`
                       in `mode="edit"` honours selection/drag/resize chrome,
                       in `mode="playback"` it filters widgets by the current
@@ -2535,7 +2625,8 @@ export default function StudioEditorV2() {
                     }
                     defaultFontId={state.fontFamily}
                   />
-                  </>
+                  {aiChipNode}
+                  </div>
                       ),
                     }}
                   />
@@ -2573,7 +2664,7 @@ export default function StudioEditorV2() {
                   `imageState.layers`. Same `<FloatingCollapsiblePanel/>`
                   chrome; different body. */}
               <div className="pointer-events-none absolute left-1/2 bottom-3 z-10 -translate-x-1/2">
-                {currentMediaKind === "image" && imageStateHydrated ? (
+                {currentMediaKind === "image" ? (
                   <FloatingImageLayersPanel
                     state={imageState}
                     onAddLayer={handleImageAddLayer}
@@ -2606,29 +2697,13 @@ export default function StudioEditorV2() {
               <div className="pointer-events-none absolute right-3 bottom-3 z-10">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
-              {/* Floating selection chip — quick in-canvas trigger for
-                  the same AI prompt the right-rail panel hosts, with
-                  img→img pre-populated from the currently-selected
-                  element. The chip self-gates on a usable source per
-                  the standing DRY rule (it returns null when no
-                  selection has an image to rewrite — see
-                  `aiChipSource` derivation in the host). Same
-                  `useMediaAiPrompt` hook, same engine, same metering. */}
-              {aiChipSource && (
-                <div className="pointer-events-none absolute right-3 top-3 z-20">
-                  <div className="pointer-events-auto">
-                    <AiSelectionChip
-                      alwaysVisible
-                      kindNoun={aiChipSource.kindNoun}
-                      selectionLabel={aiChipSource.label}
-                      sourceImageUrl={aiChipSource.url}
-                      sourceImageDataUrl={aiChipSource.dataUrl}
-                      placeholder={aiChipSource.placeholder}
-                      onGenerated={aiChipSource.onGenerated}
-                    />
-                  </div>
-                </div>
-              )}
+              {/* The floating AI selection chip is no longer mounted
+                  here — it lives inside each per-kind surface wrapper
+                  via `aiChipNode` so its bbox prop (passed for game
+                  sprites + timeline widgets) resolves against the
+                  canvas's own coordinate space rather than the
+                  viewport's. See the `surfaces` slots on
+                  `<CanvasRouter/>` below. */}
             </div>
             {/* Bottom Timeline rail — Timeline-runtime scene/widget
                 strip. Self-hides for game / image kinds per #936's
@@ -2779,7 +2854,7 @@ export default function StudioEditorV2() {
                 onSelectionChange={setGameSelection}
               />
             </CollapsiblePanel>
-          ) : currentMediaKind === "image" && imageStateHydrated ? (
+          ) : currentMediaKind === "image" ? (
             <CollapsiblePanel
               side="right"
               label="AI Prompt"
@@ -2829,7 +2904,7 @@ export default function StudioEditorV2() {
                     handleGameAiGenerated(result, prompt)
                   }
                 />
-              ) : currentMediaKind === "animation" && animationStateHydrated ? (
+              ) : currentMediaKind === "animation" ? (
                 <MediaAiPromptPanel
                   kindNoun="frame"
                   placeholder="A bouncing ball, current frame mid-arc…"

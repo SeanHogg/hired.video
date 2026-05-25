@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Clock, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/AppShell";
@@ -28,7 +28,6 @@ interface ArticleData {
 }
 
 export default function ArticleView() {
-  useSEO("/articles");
   const { t } = useTranslation();
   const { authorSlug, slug } = useParams<{ authorSlug: string; slug: string }>();
   const [article, setArticle] = useState<ArticleData | null>(null);
@@ -51,6 +50,11 @@ export default function ArticleView() {
     artifactId: article?.id ?? null,
     ownerUserId: article?.author?.id ?? null,
   });
+
+  // SEO — single adapter call. Replaces the previous bug of passing the
+  // hardcoded "/articles" path key, which meant every article shared the
+  // /articles index meta instead of its own title/cover/JSON-LD.
+  useUgcSeo("article", article);
 
   return (
     <AppShell bgClassName="bg-background">

@@ -96,6 +96,9 @@ export const ACTIONS = {
   OFFER_EXTENDED: "employer.offer.extended",
   HIRE_CONFIRMED: "employer.hire.confirmed",
 
+  // Social feed
+  FEED_POST_CREATED: "feed.post.created",
+
   // Streak milestones (written by the streak engine, not callers)
   STREAK_BONUS: "streak.bonus",
 
@@ -209,6 +212,15 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     points: 25,
     category: "earn",
     source: "purchase",
+  },
+  [ACTIONS.FEED_POST_CREATED]: {
+    key: ACTIONS.FEED_POST_CREATED,
+    label: "Posted to the social feed",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 10,
+    category: "earn",
+    dailyCapPoints: 30,
+    source: "feed",
   },
   [ACTIONS.STREAK_BONUS]: {
     key: ACTIONS.STREAK_BONUS,
@@ -327,6 +339,7 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.PURCHASE_TOKEN_PACK,
   ACTIONS.PURCHASE_SUBSCRIPTION,
   ACTIONS.PURCHASE_ANY,
+  ACTIONS.FEED_POST_CREATED,
   // recruiter
   ACTIONS.CANDIDATE_SOURCED,
   ACTIONS.CANDIDATE_SUBMITTED,
@@ -342,17 +355,18 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
 
 /**
  * Streak milestone schedule. Award once per milestone per active streak;
- * resets when the streak resets. Tuned for "7-day streak" as the
- * marquee moment (per product spec), with 14 and 30 as motivating
- * stretch goals.
+ * resets when the streak resets. Each milestone is tied to a REPEATABLE
+ * badge (`is_repeatable=true` in the catalog) so re-achieving 7 days
+ * after a break re-earns "On Fire" with a fresh timestamp.
+ *
+ * Rungs match product spec: 7 (On Fire), 14, 30, 60, 90.
  */
 export const STREAK_MILESTONES: ReadonlyArray<{ day: number; bonus: number; badgeSlug?: string }> = [
-  { day: 3, bonus: 25 },
-  { day: 7, bonus: 100, badgeSlug: "streak_7" },
-  { day: 14, bonus: 250 },
+  { day: 7, bonus: 100, badgeSlug: "on_fire" },
+  { day: 14, bonus: 250, badgeSlug: "streak_14" },
   { day: 30, bonus: 500, badgeSlug: "streak_30" },
-  { day: 60, bonus: 1000 },
-  { day: 100, bonus: 2500 },
+  { day: 60, bonus: 1000, badgeSlug: "streak_60" },
+  { day: 90, bonus: 2500, badgeSlug: "streak_90" },
 ];
 
 /** Threshold above which user-generated tasks start earning. */

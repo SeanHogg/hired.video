@@ -1236,6 +1236,155 @@ export const generateStructuredData = {
     }
     return data;
   },
+
+  article: (input: {
+    type?: "Article" | "BlogPosting" | "NewsArticle";
+    headline: string;
+    description?: string;
+    image?: string;
+    datePublished?: string;
+    dateModified?: string;
+    authorName?: string;
+    authorUrl?: string;
+    keywords?: string[];
+    url: string;
+    wordCount?: number;
+  }) => {
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": input.type ?? "Article",
+      headline: input.headline,
+      mainEntityOfPage: { "@type": "WebPage", "@id": input.url },
+      publisher: {
+        "@type": "Organization",
+        name: "hired.video",
+        logo: { "@type": "ImageObject", url: "https://hired.video/og-image.svg" },
+      },
+    };
+    if (input.description) data.description = input.description;
+    if (input.image) data.image = input.image;
+    if (input.datePublished) data.datePublished = input.datePublished;
+    if (input.dateModified) data.dateModified = input.dateModified;
+    if (input.authorName) {
+      data.author = {
+        "@type": "Person",
+        name: input.authorName,
+        ...(input.authorUrl ? { url: input.authorUrl } : {}),
+      };
+    }
+    if (input.keywords && input.keywords.length > 0) data.keywords = input.keywords.join(", ");
+    if (typeof input.wordCount === "number") data.wordCount = input.wordCount;
+    return data;
+  },
+
+  course: (input: {
+    name: string;
+    description?: string;
+    image?: string;
+    instructorName?: string;
+    instructorUrl?: string;
+    url: string;
+  }) => {
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "Course",
+      name: input.name,
+      provider: { "@type": "Organization", name: "hired.video", sameAs: "https://hired.video" },
+      url: input.url,
+    };
+    if (input.description) data.description = input.description;
+    if (input.image) data.image = input.image;
+    if (input.instructorName) {
+      data.instructor = {
+        "@type": "Person",
+        name: input.instructorName,
+        ...(input.instructorUrl ? { url: input.instructorUrl } : {}),
+      };
+    }
+    return data;
+  },
+
+  product: (input: {
+    name: string;
+    description?: string;
+    image?: string;
+    category?: string;
+    priceCents?: number;
+    currency?: string;
+    url: string;
+  }) => {
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: input.name,
+      brand: { "@type": "Organization", name: "hired.video" },
+      url: input.url,
+    };
+    if (input.description) data.description = input.description;
+    if (input.image) data.image = input.image;
+    if (input.category) data.category = input.category;
+    if (typeof input.priceCents === "number") {
+      data.offers = {
+        "@type": "Offer",
+        price: (input.priceCents / 100).toFixed(2),
+        priceCurrency: input.currency ?? "USD",
+        availability: "https://schema.org/InStock",
+        url: input.url,
+      };
+    }
+    return data;
+  },
+
+  videoObject: (input: {
+    name: string;
+    description?: string;
+    thumbnailUrl?: string;
+    uploadDate?: string;
+    contentUrl?: string;
+    embedUrl?: string;
+    url: string;
+  }) => {
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      name: input.name,
+      url: input.url,
+    };
+    if (input.description) data.description = input.description;
+    if (input.thumbnailUrl) data.thumbnailUrl = input.thumbnailUrl;
+    if (input.uploadDate) data.uploadDate = input.uploadDate;
+    if (input.contentUrl) data.contentUrl = input.contentUrl;
+    if (input.embedUrl) data.embedUrl = input.embedUrl;
+    return data;
+  },
+
+  /**
+   * ProfilePage with embedded Person mainEntity — the Google-preferred
+   * markup for someone's resume / public profile page.
+   */
+  profilePage: (input: {
+    name: string;
+    headline?: string;
+    description?: string;
+    image?: string;
+    url: string;
+    knowsAbout?: string[];
+  }) => {
+    const person: Record<string, unknown> = {
+      "@type": "Person",
+      name: input.name,
+    };
+    if (input.headline) person.jobTitle = input.headline;
+    if (input.description) person.description = input.description;
+    if (input.image) person.image = input.image;
+    if (input.knowsAbout && input.knowsAbout.length > 0) person.knowsAbout = input.knowsAbout;
+    return {
+      "@context": "https://schema.org",
+      "@type": "ProfilePage",
+      url: input.url,
+      mainEntity: person,
+    };
+  },
 };
 
 /**

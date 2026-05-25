@@ -29,7 +29,11 @@ import {
 import { useAI } from "@/lib/ai-context";
 import { type ChatMessage } from "@/lib/services/ai-service";
 import { apiClient } from "@/lib/api-client";
-import { getCoachToolSpecs, getTool } from "@/lib/tools/registry";
+import {
+  getCoachToolSpecs,
+  getTool,
+  buildGenerateImageResult,
+} from "@/lib/tools/registry";
 import type { NormalizedToolRunResult } from "@/lib/tools/types";
 import { ToolCallCard } from "@/components/chat/ToolCallCard";
 import { cn } from "@/lib/utils";
@@ -1187,11 +1191,37 @@ export default function AIChatPanel() {
                       kindNoun="image"
                       placeholder="A clean studio backdrop, soft warm lighting…"
                       onGenerated={(result, prompt) => {
+                        // Synthesize a tool-run card directly — no
+                        // model round-trip, no token spend on a chat
+                        // reply. The image is already in the user's
+                        // library (the route persisted it); we surface
+                        // it inline with the same `ToolCallCard` the
+                        // model-invoked path uses. The result shape
+                        // comes from `buildGenerateImageResult` so the
+                        // local + model paths produce byte-identical
+                        // cards.
                         const url = result.resultUrl ?? result.previewUrl;
                         setAiImagePromptOpen(false);
-                        handleSendMessage(
-                          `I just generated an image for "${prompt}". URL: ${url}\n\nIt's been saved to my media library — what should I do with it next?`,
-                        );
+                        setMessages((prev) => [
+                          ...prev,
+                          {
+                            id: `gen-image-${Date.now()}`,
+                            content: "Generated and saved to your library.",
+                            sender: "ai",
+                            timestamp: new Date(),
+                            toolRuns: [
+                              {
+                                toolId: "generate_image",
+                                toolCallId: `local-${Date.now()}`,
+                                result: buildGenerateImageResult({
+                                  imageUrl: url,
+                                  mode: result.mode,
+                                  prompt,
+                                }),
+                              },
+                            ],
+                          },
+                        ]);
                       }}
                     />
                   </PopoverContent>

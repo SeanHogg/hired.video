@@ -26,7 +26,10 @@ import {
   Video,
   UserCircle,
   Share2,
+  Trophy,
 } from "lucide-react";
+import { PointsHub } from "@/components/points/PointsHub";
+import { isPointsEligible } from "@/lib/services/points-service";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -397,6 +400,10 @@ function SettingsContent() {
     user?.role === USER_ROLES.EMPLOYER ||
     user?.role === USER_ROLES.ADMIN ||
     user?.role === USER_ROLES.SUPER_ADMIN;
+
+  // Points & Rewards tab visibility — uses the SSoT helper that backs
+  // the sidebar pill, so the tab + pill always agree.
+  const showPointsTab = isPointsEligible(user);
 
 
 
@@ -791,6 +798,12 @@ function SettingsContent() {
                         <CreditCard className="h-4 w-4" />
                         <span>{t("tabs.accountBilling")}</span>
                       </TabsTrigger>
+                      {showPointsTab && (
+                        <TabsTrigger value="points" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                          <Trophy className="h-4 w-4" />
+                          <span>Points &amp; Rewards</span>
+                        </TabsTrigger>
+                      )}
                       <TabsTrigger value="creator-profile" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <UserCircle className="h-4 w-4" />
                         <span>Creator Account</span>
@@ -857,6 +870,15 @@ function SettingsContent() {
                         <CreditCard className="h-4 w-4" />
                         <span>{t("tabs.accountBilling")}</span>
                       </TabsTrigger>
+                      {showPointsTab && (
+                        <TabsTrigger
+                          value="points"
+                          className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                        >
+                          <Trophy className="h-4 w-4" />
+                          <span>Points &amp; Rewards</span>
+                        </TabsTrigger>
+                      )}
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                         <Video className="h-3 w-3" />
@@ -1961,6 +1983,14 @@ function SettingsContent() {
                   ?tab=account, and ?tab=billing all remap here. */}
               <TabsContent value="account-billing" className="space-y-6">
                 <AccountManagementPanel />
+              </TabsContent>
+
+              {/* Points & Rewards — same hub as the /points route; this is
+                  where users cash out their balance + see their badge wall
+                  alongside their billing controls. Self-gates on role via
+                  isPointsEligible(user). */}
+              <TabsContent value="points" className="space-y-6">
+                <PointsHub showHeader />
               </TabsContent>
 
               {/* Content Creator → Account. Mirrors the /services dashboard

@@ -7,13 +7,16 @@
  */
 import {
   BarChart3,
+  ExternalLink,
   Layers,
   Mail,
+  Megaphone,
   Plus,
   Target,
   Trash2,
   Video,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import Pagination from "@/components/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,11 +121,11 @@ export function CampaignsTab({
             <HierarchyTile
               tone="primary"
               level="Level 3"
-              title="Ad"
-              description="Video creatives from Studio, attached via Video Campaigns below."
+              title="Ad creative"
+              description="Videos, IAB display banners, social-video ads, and outdoor formats produced in Studio — attached to any campaign below."
               status="live"
-              actionLabel="Manage Content →"
-              onAction={() => onNavigateTo("content")}
+              actionLabel="Open Studio →"
+              onAction={() => { window.location.href = "/studio"; }}
             />
             <HierarchyTile
               tone="muted"
@@ -169,7 +172,10 @@ export function CampaignsTab({
       {filteredCampaigns.video.length > 0 && (
         <>
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Video className="h-4 w-4" /> Video Campaigns
+            <Megaphone className="h-4 w-4" /> Studio Campaigns
+            <span className="text-xs font-normal text-muted-foreground">
+              · videos, IAB banners, social-ad creatives
+            </span>
           </h3>
           <div
             className={
@@ -193,8 +199,15 @@ export function CampaignsTab({
                         </p>
                       </div>
                       <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
-                        <span>{vc.projectIds.length} videos</span>
+                        <span>{vc.projectIds.length} asset{vc.projectIds.length === 1 ? "" : "s"}</span>
                         <span>{new Date(vc.createdAt).toLocaleDateString()}</span>
+                        <Link
+                          to="/studio"
+                          className="flex items-center gap-1 text-brand-purple hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Studio
+                        </Link>
                       </div>
                       <Badge
                         variant={vc.status === "active" ? "default" : "secondary"}
@@ -243,13 +256,22 @@ export function CampaignsTab({
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <Stat label="Videos" value={vc.projectIds.length} />
+                        <Stat label="Studio assets" value={vc.projectIds.length} />
                         <Stat label="UTM Source" value={vc.utmSource || "—"} />
                         <Stat label="UTM Medium" value={vc.utmMedium || "—"} />
                         <Stat
                           label="Created"
                           value={new Date(vc.createdAt).toLocaleDateString()}
                         />
+                      </div>
+                      <div className="mt-4 flex items-center justify-end">
+                        <Link
+                          to="/studio"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-brand-purple hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Manage assets in Studio
+                        </Link>
                       </div>
                     </CardContent>
                   </>

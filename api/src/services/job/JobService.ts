@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
@@ -301,6 +301,13 @@ export interface JobQuery {
   salaryMin?: number;
   salaryMax?: number;
   isRemote?: boolean;
+  /**
+   * Pre-resolved geo intersection — list of job ids that matched the
+   * structured LocationFilter. Routes call LocationService.applyLocationFilter
+   * and pass the result here. `null`/omitted = no geo filter; `[]` = filter
+   * applied but matched zero rows (return empty page).
+   */
+  entityIdAllowlist?: string[] | null;
 }
 
 export interface JobEntity extends JobSummaryDTO {
@@ -402,10 +409,33 @@ export async function getPublicJobs(filters?: JobQuery,
       ilike(jobItems.company, `%${trimmed}%`));
   };
 
+  // Short-circuit: a structured geo filter that matched no rows wins
+  // over every other clause. Avoids paying for a full table scan only
+  // to filter the result down to zero.
+  if (filters?.entityIdAllowlist && filters.entityIdAllowlist.length === 0) {
+    return {
+      items: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: page > 1,
+    };
+  }
+
   const whereClause = and(
     eq(jobItems.isActive, true),
     filters?.search ? buildSearchClause(filters.search) : undefined,
-    filters?.location ? ilike(jobItems.location, `%${filters.location}%`) : undefined,
+    // The free-text `location` ilike stays as a *fallback* when no
+    // structured allowlist is set — preserves search for legacy rows
+    // whose location hasn't been geocoded yet (see migration 0109).
+    filters?.location && !filters.entityIdAllowlist
+      ? ilike(jobItems.location, `%${filters.location}%`)
+      : undefined,
+    filters?.entityIdAllowlist && filters.entityIdAllowlist.length > 0
+      ? inArray(jobItems.id, filters.entityIdAllowlist)
+      : undefined,
     filters?.employmentType ? eq(jobItems.jobType, filters.employmentType) : undefined,
     filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,
     filters?.isRemote !== undefined ? eq(jobItems.isRemote, filters.isRemote) : undefined,

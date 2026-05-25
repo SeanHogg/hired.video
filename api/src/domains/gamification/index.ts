@@ -46,21 +46,34 @@ export class GamificationService {
       onBadgeUnlock: async (userId, slug) => {
         const badge = await this.repos.points.findBadgeBySlug(slug);
         if (!badge) return;
-        const awarded = await this.repos.points.awardBadge({
-          userId,
-          badgeId: badge.id,
-          awardedFor: { trigger: "badge_engine", slug },
-        });
+        const awarded = badge.isRepeatable
+          ? await this.repos.points.awardBadgeRepeatable({
+              userId,
+              badgeId: badge.id,
+              awardedFor: { trigger: "badge_engine", slug },
+            })
+          : await this.repos.points.awardBadgeOnce({
+              userId,
+              badgeId: badge.id,
+              awardedFor: { trigger: "badge_engine", slug },
+            });
         if (awarded && badge.pointsReward > 0) {
+          // Synthesize a refId that's unique per earn for repeatable
+          // badges (so the badge_bonus ledger row dedup-uniq doesn't
+          // collapse repeat earns of the same badge); for once-per-user
+          // badges the row is naturally one-per-badge.
+          const refId = badge.isRepeatable
+            ? `badge:${badge.id}:${awarded.id}`
+            : `badge:${badge.id}`;
           await this.engine.writeManualLedger({
             userId,
             delta: badge.pointsReward,
             category: "badge_bonus",
             action: ACTIONS.BADGE_UNLOCKED,
             source: "badge",
-            refId: `badge:${badge.id}`,
+            refId,
             refType: "badge",
-            metadata: { badgeSlug: slug, badgeName: badge.name },
+            metadata: { badgeSlug: slug, badgeName: badge.name, repeatable: badge.isRepeatable },
           });
         }
       },
@@ -199,6 +212,14 @@ export class GamificationService {
     });
   }
 
+  async onFeedPostCreated(args: AwardArgs & { postId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.FEED_POST_CREATED, {
+      ...args,
+      refId: args.postId,
+      refType: "feed_post",
+    });
+  }
+
   // ── Recruiter helpers ──────────────────────────────────────────────
 
   onCandidateSourced(args: AwardArgs & { candidateId: string }): Promise<AwardOutcome> {
@@ -278,16 +299,16 @@ export class GamificationService {
   // ── reads for routes ────────────────────────────────────────────────
 
   async getUserSummary(userId: string) {
-    const [balance, streak, counters, badgesEarned, allBadges, recent] = await Promise.all([
+    const [balance, streak, counters, earns, allBadges, recent] = await Promise.all([
       this.repos.points.findBalance(userId),
       this.repos.points.findStreak(userId),
       this.repos.points.findCounters(userId),
-      this.repos.points.listUserBadges(userId),
+      this.repos.points.listUserBadgeEarns(userId),
       this.repos.points.listBadges(),
       this.repos.points.findRecentLedger(userId, 20),
     ]);
 
-    const earnedBadgeIds = new Set(badgesEarned.map((b) => b.badgeId));
+    const earnsById = new Map(earns.map((e) => [e.badgeId, e]));
     const userTaskCompletions = counters?.userTaskCompletions ?? 0;
 
     return {
@@ -306,16 +327,24 @@ export class GamificationService {
         threshold: 100,
         unlocked: userTaskCompletions >= 100,
       },
-      badges: allBadges.map((b) => ({
-        id: b.id,
-        slug: b.slug,
-        name: b.name,
-        description: b.description,
-        tier: b.tier,
-        iconKey: b.iconKey,
-        earned: earnedBadgeIds.has(b.id),
-        earnedAt: badgesEarned.find((ub) => ub.badgeId === b.id)?.awardedAt ?? null,
-      })),
+      badges: allBadges.map((b) => {
+        const earn = earnsById.get(b.id);
+        return {
+          id: b.id,
+          slug: b.slug,
+          name: b.name,
+          description: b.description,
+          tier: b.tier,
+          iconKey: b.iconKey,
+          isRepeatable: b.isRepeatable,
+          earned: !!earn,
+          /** Backwards-compat: callers reading `earnedAt` see the latest
+           *  earn. New callers should use `earnCount` + `earnedHistory`. */
+          earnedAt: earn?.latestAwardedAt ?? null,
+          earnCount: earn?.earnCount ?? 0,
+          earnedHistory: earn?.earnedAt ?? [],
+        };
+      }),
       recentActivity: recent.map((r) => ({
         id: r.id,
         delta: r.delta,

@@ -29,8 +29,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddToListMenu from "@/components/lists/AddToListMenu";
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
-import { useSEO, generateStructuredData } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "@/components/ui/use-toast";
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -63,7 +63,6 @@ export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const location = useLocation();
 
 
 
@@ -99,38 +98,10 @@ export default function CompanyDetail() {
     fetchCompany();
   }, [id]);
 
-  // SEO: compute SEO data when company loads
-  const seoData = useMemo(() => {
-    if (!company) return null;
-    const title = `${company.data.name} Company Profile — hired.video`;
-    const description =
-      company.data.tagline ||
-      (company.data.description ? company.data.description.slice(0, 160) : "Company profile on hired.video");
-    return {
-      title,
-      description,
-      ogTitle: title,
-      ogDescription: description,
-      // Per-company OG card — server-rendered SVG with the cached
-      // star rating + review count baked in. Cached at the edge for
-      // an hour; updated automatically whenever the rating changes
-      // because the URL is stable but the SVG content reflects the
-      // current company_profiles row.
-      ogImage: `/api/og/companies/${company.id}`,
-      structuredData: generateStructuredData.organization({
-        name: company.data.name,
-        description: company.data.description,
-        website: company.data.contact?.website,
-        logo: company.data.logo,
-        address: company.data.headquarters && company.data.headquarters.city && company.data.headquarters.state
-          ? `${company.data.headquarters.city}, ${company.data.headquarters.state}`
-          : undefined,
-      }),
-    };
-  }, [company]);
-
-  // Apply SEO data
-  useSEO(location.pathname, seoData || {});
+  // SEO — delegated to the shared "company" adapter ([lib/seo-ugc.ts]).
+  // The per-company OG card lives at `/api/og/companies/:id` (server-
+  // rendered SVG; edge-cached one hour, content reflects current row).
+  useUgcSeo("company", company);
 
   // Team membership is folded into useEntityOwnership so the edit
   // affordances on this page agree with every other entity surface

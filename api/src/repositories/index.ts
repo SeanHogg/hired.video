@@ -55,6 +55,10 @@ import {
   type IEmailSyncRunsRepository,
 } from "./emailSyncRunsRepository.js";
 import { PointsRepository, type IPointsRepository } from "./pointsRepository.js";
+import {
+  ContentLocationsRepository,
+  type IContentLocationsRepository,
+} from "./contentLocationsRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -98,6 +102,8 @@ export interface Repos {
   studioTemplates: IStudioTemplatesRepository;
   // gamification aggregate (points, streaks, badges, fraud flags)
   points: IPointsRepository;
+  // polymorphic geo tags shared by every searchable entity
+  contentLocations: IContentLocationsRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -128,6 +134,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     platform: new PlatformRepository(db, now),
     studioTemplates: new StudioTemplatesRepository(db, now),
     points: new PointsRepository(db, now),
+    contentLocations: new ContentLocationsRepository(db, now),
   };
 }
 
@@ -161,6 +168,7 @@ export type {
   IPlatformRepository,
   IStudioTemplatesRepository,
   IPointsRepository,
+  IContentLocationsRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────

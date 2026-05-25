@@ -202,6 +202,12 @@ export const badges = pgTable("badges", {
   pointsReward: integer("points_reward").default(0).notNull(),
   /** Roles eligible (JSON array of UserRole). Empty = all roles. */
   roles: jsonb("roles").default([]).notNull(),
+  /** True for badges that can be earned multiple times (streak rungs,
+   *  seasonal recurrences). Drops the once-per-user invariant — each
+   *  earn writes a new `user_badges` row so the UI can show count + per-
+   *  earn timestamps. Non-repeatable badges are enforced application-
+   *  side via `awardBadgeOnce`. */
+  isRepeatable: boolean("is_repeatable").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -209,6 +215,9 @@ export const badges = pgTable("badges", {
 export type Badge = typeof badges.$inferSelect;
 export type NewBadge = typeof badges.$inferInsert;
 
+/** One row per earn. Non-repeatable badges still cap at one row per user
+ *  via application-side guards in `awardBadgeOnce`; repeatable badges
+ *  (streaks) accumulate one row per re-achievement. */
 export const userBadges = pgTable(
   "user_badges",
   {
@@ -223,8 +232,8 @@ export const userBadges = pgTable(
     awardedAt: timestamp("awarded_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    userBadgeUniq: uniqueIndex("user_badges_user_badge_uniq").on(t.userId, t.badgeId),
     userAwardedIdx: index("user_badges_user_awarded_idx").on(t.userId, t.awardedAt),
+    userBadgeIdx: index("user_badges_user_badge_idx").on(t.userId, t.badgeId),
   }),
 );
 

@@ -63,6 +63,10 @@ export interface NormalizedToolRunResult {
    *  button when this is set on a successfully-applied result. App-local
    *  path, leading slash — no external URLs. */
   redirectUrl?: string;
+  /** Inline image preview — ToolCallCard renders this as an `<img>`
+   *  below the summary. Used by `generate_image` so the user sees the
+   *  result without clicking through the URL. Public CDN URL only. */
+  mediaPreviewUrl?: string;
   raw?: unknown;
 }
 

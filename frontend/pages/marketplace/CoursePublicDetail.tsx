@@ -29,7 +29,7 @@ import { CardContent } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { buildShareAction } from "@/lib/card-share-action";
-import { useSEO } from "@/lib/seo";
+import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "@/components/ui/use-toast";
 
 interface CourseAuthor {
@@ -100,29 +100,15 @@ function formatDuration(minutes: number | null): string | null {
 }
 
 function CourseSEO({ course }: { course: CourseDetail }) {
-  useSEO(`/courses/${course.author.slug}/${course.slug}`, {
-    title: `${course.title} — Course by ${course.author.name}`,
-    description:
-      course.summary ||
-      `Learn ${course.title} on hired.video. Taught by ${course.author.name}.`,
-    keywords: `${course.title}, ${course.category ?? ""}, ${(course.tags ?? []).join(", ")}, hired.video courses`,
-    ogTitle: course.title,
-    ogDescription: course.summary || "",
-    ogImage: course.coverImageUrl ?? undefined,
-    structuredData: {
-      "@context": "https://schema.org",
-      "@type": "Course",
-      name: course.title,
-      description: course.summary || course.description || "",
-      provider: {
-        "@type": "Organization",
-        name: "hired.video",
-      },
-      instructor: {
-        "@type": "Person",
-        name: course.author.name,
-      },
-    },
+  useUgcSeo("course", {
+    slug: course.slug,
+    title: course.title,
+    summary: course.summary,
+    description: course.description,
+    coverImageUrl: course.coverImageUrl,
+    category: course.category,
+    tags: course.tags,
+    author: { name: course.author.name, slug: course.author.slug },
   });
   return null;
 }
