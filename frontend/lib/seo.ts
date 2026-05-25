@@ -221,6 +221,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Discover career events and members open to coffee in your area on the interactive map.",
     keywords: "career map, networking near me, coffee chats near me, events near me",
   },
+  "/events/:idOrSlug/manage": {
+    title: "Manage event — hired.video",
+    description:
+      "Host tools for your event: RSVP funnel, attendee list, CSV export, host blast messaging.",
+    keywords: "event host tools, manage event, RSVP analytics, attendee management",
+  },
   // AI-resilient sector surfaces (gap #1165). Per the prerender.mjs "keep
   // in sync" note, these must mirror the ROUTES list there. Sector slug
   // list comes from shared/sectors.ts SECTORS.
@@ -369,6 +375,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
     title: "Sign In — hired.video",
     description:
       "Sign in to hired.video to access your AI video resumes, resume scoring history, job matches, and career dashboard. Sign in with Google, LinkedIn, GitHub, Microsoft, or email.",
+    robots: "noindex, nofollow",
+  },
+  "/onboarding": {
+    title: "Get Started — hired.video",
+    description:
+      "Set up your hired.video profile in a few quick steps so the AI coach, resume scorer, and job matcher are tuned to you from day one.",
     robots: "noindex, nofollow",
   },
   "/forgot-password": {

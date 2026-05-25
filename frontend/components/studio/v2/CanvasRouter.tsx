@@ -58,6 +58,16 @@ export type CanvasRuntimeSurfaces = {
    *  2D vector drafting; runtime owns its own state shape
    *  (`CadState` in `shared/cad-state.ts`). */
   cad?: ReactNode;
+  /** 3D CAD runtime surface (#930 follow-on). Mounted when
+   *  `mediaKind === "cad_3d"`. Primitive solids + Three.js viewer;
+   *  runtime owns its own state shape (`Cad3DState` in
+   *  `shared/cad-3d-state.ts`). */
+  cad_3d?: ReactNode;
+  /** Interactive comic runtime surface (#929). Mounted when
+   *  `mediaKind === "interactive_comic"`. Branching page graph +
+   *  reader pacing; runtime owns its own state shape
+   *  (`InteractiveComicState` in `shared/interactive-comic-state.ts`). */
+  interactive_comic?: ReactNode;
 };
 
 interface CanvasRouterProps {
@@ -82,6 +92,12 @@ export default function CanvasRouter({
   }
   if (mediaKind === "cad" && surfaces.cad !== undefined) {
     return surfaces.cad;
+  }
+  if (mediaKind === "cad_3d" && surfaces.cad_3d !== undefined) {
+    return surfaces.cad_3d;
+  }
+  if (mediaKind === "interactive_comic" && surfaces.interactive_comic !== undefined) {
+    return surfaces.interactive_comic;
   }
   return surfaces.timeline;
 }

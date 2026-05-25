@@ -138,7 +138,32 @@ export const eventsService = {
     });
     return res.data;
   },
+
+  async getAnalytics(id: string): Promise<EventAnalytics> {
+    const res = await apiClient.get<EventAnalytics>(`/api/events/${id}/analytics`);
+    return res.data;
+  },
+
+  attendeeCsvUrl(id: string): string {
+    return `/api/events/${id}/attendees/export.csv`;
+  },
 };
+
+export interface EventAnalytics {
+  counts: {
+    going: number;
+    maybe: number;
+    declined: number;
+    waitlist: number;
+    pendingApproval: number;
+    checkedIn: number;
+  };
+  capacity: number | null;
+  attendeeCount: number;
+  waitlistCount: number;
+  published: boolean;
+  cancelled: boolean;
+}
 
 export interface EventMatch {
   userId: string;

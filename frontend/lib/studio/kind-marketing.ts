@@ -25,6 +25,7 @@
 
 import {
   BookOpen,
+  Box,
   Film,
   Gamepad2,
   Headphones,
@@ -32,6 +33,7 @@ import {
   Mic2,
   Ruler,
   Sparkles,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import type { MediaKind } from "@shared/media-kinds";
@@ -136,6 +138,27 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
       "2D vector drafting — lines, rectangles, circles, dimensions. Millimetre-accurate. Coming soon (#930).",
     icon: Ruler,
     accentClass: "bg-cyan-600/10 text-cyan-600",
+    isShippable: false,
+  },
+  cad_3d: {
+    // 3D CAD runtime (#930 follow-on). Primitive solids + boolean ops;
+    // STL / STEP / PNG export. BREP analytic surfaces land with the
+    // replicad kernel integration.
+    title: "3D models",
+    blurb:
+      "Primitive solids, boolean ops, STL + STEP export for 3D printing and downstream CAM. Coming soon (#930).",
+    icon: Box,
+    accentClass: "bg-teal-600/10 text-teal-600",
+    isShippable: false,
+  },
+  interactive_comic: {
+    // Branching comic runtime (#929). Pages = scenes; reader picks
+    // branches at runtime.
+    title: "Branching comics",
+    blurb:
+      "Choose-your-own-adventure comics — reader picks panels' next page, flags unlock branches. Coming soon (#929).",
+    icon: Workflow,
+    accentClass: "bg-indigo-600/10 text-indigo-600",
     isShippable: false,
   },
 };

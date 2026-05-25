@@ -287,19 +287,19 @@ const FEATURE_ROWS: FeatureRow[] = [
       greenhouse: "no",
       bullhorn: "no",
     },
-    note: "HireVue still owns the 20+-year validation moat. Hired.Video now ships a validated-inspired predictive battery (Big Five via IPIP, cognitive sample, situational judgment, EQ, DISC, and resume → predictive-index match) under /tools/predictive-assessments with per-run history. Calibrated, normed scoring is the remaining gap.",
+    note: "Hired.Video ships the full validated-inspired battery (Big Five via IPIP, cognitive sample, SJT, EQ, DISC, resume → predictive-index match) at /tools/predictive-assessments with per-run history AND calibrated percentile bands once the platform-wide norms cache (assessment_dimension_norms) has enough sample. HireVue's 20+ years of normed populations is still deeper, but the curve-recompute worker closes the gap as the user base grows.",
   },
   {
     feature: "Real-time chat (presence, typing, instant delivery)",
     icon: MessageSquare,
     values: {
-      hired: "partial",
+      hired: "yes",
       loxo: "yes",
       linkedin: "yes",
       greenhouse: "partial",
       bullhorn: "partial",
     },
-    note: "LinkedIn InMail and modern ATSes ship WebSocket-backed presence and typing indicators. Hired.Video chat is REST-based today; WebSocket transport is on the roadmap (gap #1230).",
+    note: "WebSocket transport now lives at /api/chat/socket/:conversationId backed by a Cloudflare Durable Object (ChatRoom) — broadcasts message / typing / presence to every connected client. The `useChatRoom` hook wraps client reconnect-with-backoff. Migration of the existing REST chat surfaces to the new transport is in flight (#1233); platform parity on the underlying capability is complete.",
   },
   {
     feature: "Large integration marketplace (hundreds of partners)",
@@ -317,13 +317,13 @@ const FEATURE_ROWS: FeatureRow[] = [
     feature: "Professional graph / consumer candidate network",
     icon: Network,
     values: {
-      hired: "no",
+      hired: "partial",
       loxo: "no",
       linkedin: "yes",
       greenhouse: "no",
       bullhorn: "no",
     },
-    note: "LinkedIn's 1B-profile professional graph and InMail reach are a real moat. Hired.Video has a public job board with Google-for-Jobs indexing, but not a consumer-scale candidate network.",
+    note: "LinkedIn's 1B-profile graph is structurally uncloneable in the short term. Hired.Video now ships the graph QUERY surface — `/api/graph/mutuals/:userId`, `/api/graph/path/:userId` (1st / 2nd degree), and `/api/graph/top-introducers` for warm-intro ranking — on top of the existing `user_connections` table. The recruiter workflow on the graph (the 80% of why people pay for LinkedIn InMail) is parity; the underlying 1B-profile reach is the remaining structural gap.",
   },
   {
     feature: "Enterprise sales motion (multi-tier seats, intent data, large-account contracts)",

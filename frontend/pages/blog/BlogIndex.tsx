@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AppShell } from "@/components/AppShell";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import ContentCard from "@/components/search/ContentCard";
-import { BLOG_POSTS, type BlogPost } from "@/data/blog-posts";
+import { BLOG_POSTS } from "@/data/blog-posts";
 import { articleService, type PublicArticleCard } from "@/lib/services/article-service";
+import { mergeUnifiedPosts, type UnifiedPost } from "@/lib/unified-posts";
 import { slugify } from "@shared/slugify";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -34,62 +35,6 @@ function categoryEmoji(category: string) {
     default:
       return "📄";
   }
-}
-
-// Unified shape consumed by the /blog index after merging the static
-// BLOG_POSTS registry (frontend/data/blog-posts.ts) and the DB-backed
-// articles table. Pre-#1230, /blog only listed BLOG_POSTS; articles
-// lived on the separate /articles surface — duplicating discovery and
-// hiding editorial articles from anyone who landed on /blog from the
-// Footer link.
-//
-// Detail routes are intentionally dual:
-//   - `source: "blog"`    → /blog/<slug>           (static, MDX-like)
-//   - `source: "article"` → /articles/<author>/<s> (DB-backed, multi-author)
-//
-// The index page is the single discovery surface ("Blog & Guides"); the
-// detail pages keep their existing URLs so external backlinks + the
-// sector landing CTAs continue to work.
-interface UnifiedPost {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  href: string;
-  publishedAt: string;
-  readingTime: number;
-  keywords: string;
-  source: "blog" | "article";
-}
-
-function blogPostToUnified(p: BlogPost): UnifiedPost {
-  return {
-    id: `blog:${p.slug}`,
-    title: p.title,
-    description: p.description,
-    category: p.category,
-    href: `/blog/${p.slug}`,
-    publishedAt: p.publishedAt,
-    readingTime: p.readingTime,
-    keywords: [p.keywords ?? "", p.toolName ?? ""].filter(Boolean).join(" "),
-    source: "blog",
-  };
-}
-
-function articleCardToUnified(a: PublicArticleCard): UnifiedPost {
-  // Articles without a publishedAt are filtered server-side; this fallback
-  // is purely a defence against partial responses.
-  return {
-    id: `article:${a.id}`,
-    title: a.title,
-    description: a.summary ?? "",
-    category: a.category ?? (a.kind === "guide" ? "Guides" : "Articles"),
-    href: `/articles/${a.author.slug}/${a.slug}`,
-    publishedAt: a.publishedAt ?? new Date(0).toISOString(),
-    readingTime: a.readMinutes,
-    keywords: [a.tags ?? [], a.sector, a.audience].flat().filter(Boolean).join(" "),
-    source: "article",
-  };
 }
 
 function categorySlug(category: string): string {
@@ -129,15 +74,10 @@ export default function BlogIndex() {
     };
   }, []);
 
-  const sortedPosts = useMemo<UnifiedPost[]>(() => {
-    const merged: UnifiedPost[] = [
-      ...BLOG_POSTS.map(blogPostToUnified),
-      ...dbArticles.map(articleCardToUnified),
-    ];
-    return merged.sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-    );
-  }, [dbArticles]);
+  const sortedPosts = useMemo<UnifiedPost[]>(
+    () => mergeUnifiedPosts(BLOG_POSTS, dbArticles),
+    [dbArticles],
+  );
 
   // Category chip list derived from whatever's in the merged catalogue.
   // Ordered by first appearance in `sortedPosts` so the newest-publishing

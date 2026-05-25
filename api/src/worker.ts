@@ -1,6 +1,11 @@
 import { createApp } from "./app.js";
 import { seedSuperAdminAndCompany } from "./seed.js";
 import { runScheduled } from "./scheduled.js";
+// Real-time chat transport (gap #1230). Cloudflare needs the Durable
+// Object class to be re-exported from the worker module so the runtime
+// can construct instances. The binding name in wrangler.toml is
+// CHAT_ROOM → class_name = "ChatRoom".
+export { ChatRoom } from "./durable/ChatRoom.js";
 
 // NOTE: `wrangler dev` will inject env vars via `wrangler.toml` or your shell.
 // This file intentionally avoids bundling `dotenv` to keep the worker bundle small.

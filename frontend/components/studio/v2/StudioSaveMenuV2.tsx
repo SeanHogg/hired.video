@@ -91,6 +91,8 @@ const DESTINATION_ICON: Record<PublishDestinationId, React.ComponentType<{ class
   // CAD (#930) — same shape as image's gallery + asset-library.
   "cad-gallery":          UserCheck,
   "cad-asset-library":    UserCheck,
+  // Training / e-learning (#160) — opens a course/lesson picker.
+  "course-lesson":        Upload,
 };
 
 type PublishHandlers = Partial<Record<PublishDestinationId, () => void>>;

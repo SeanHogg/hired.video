@@ -25,6 +25,9 @@ import type {
   LinkedContentWidgetParams,
   ContainerStyle,
   WidgetKind,
+  SpeechBubbleWidgetParams,
+  CaptionBoxWidgetParams,
+  SfxBurstWidgetParams,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { DEFAULT_CHROMA_KEY } from "@/lib/studio/chroma-key";
 import {
@@ -1233,6 +1236,200 @@ function LinkedContentInspector({
   );
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Comic widget Content sections (#939 Phase 2).
+// ───────────────────────────────────────────────────────────────────────────
+
+const SPEECH_BUBBLE_SHAPE_OPTIONS = [
+  { value: "speech" as const,  label: "Speech (oval + tail)" },
+  { value: "thought" as const, label: "Thought (cloud)" },
+  { value: "shout" as const,   label: "Shout (jagged star)" },
+  { value: "whisper" as const, label: "Whisper (dashed)" },
+];
+
+const SFX_SHAPE_OPTIONS = [
+  { value: "star" as const,          label: "Star (12-point)" },
+  { value: "jagged" as const,        label: "Jagged polygon" },
+  { value: "circle-jagged" as const, label: "Bumpy impact" },
+  { value: "lightning" as const,     label: "Lightning bolt" },
+];
+
+const SPEECH_BUBBLE_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "speech-bubble") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<SpeechBubbleWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "speech-bubble", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Text">
+          <AutoSizeTextarea
+            value={data.text}
+            onChange={(e) => set({ text: e.target.value })}
+            className="min-h-[60px] text-xs"
+          />
+        </Field>
+        <Field label="Shape">
+          <select
+            value={data.shape}
+            onChange={(e) => set({ shape: e.target.value as SpeechBubbleWidgetParams["shape"] })}
+            className="h-8 w-full rounded border border-border bg-background px-2 text-xs"
+          >
+            {SPEECH_BUBBLE_SHAPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Bubble fill">
+          <ColorInput value={data.bgColor} onChange={(bgColor) => set({ bgColor })} />
+        </Field>
+        <Field label="Text colour">
+          <ColorInput value={data.color} onChange={(color) => set({ color })} />
+        </Field>
+        <Field label="Stroke colour">
+          <ColorInput value={data.strokeColor} onChange={(strokeColor) => set({ strokeColor })} />
+        </Field>
+        <Field label="Stroke width">
+          <NumberField value={data.strokeWidth} min={0} onChange={(strokeWidth) => set({ strokeWidth })} />
+        </Field>
+        <Field label="Font size (px)">
+          <NumberField value={data.fontPx} min={6} onChange={(fontPx) => set({ fontPx })} />
+        </Field>
+        <Field label="Tail anchor X (0..1)">
+          <NumberField
+            value={data.tail?.anchorX ?? 0.5}
+            min={0}
+            max={1}
+            onChange={(anchorX) =>
+              set({
+                tail: { anchorX, anchorY: data.tail?.anchorY ?? 0.9 },
+              })
+            }
+          />
+        </Field>
+        <Field label="Tail anchor Y (0..1)">
+          <NumberField
+            value={data.tail?.anchorY ?? 0.9}
+            min={0}
+            max={1}
+            onChange={(anchorY) =>
+              set({
+                tail: { anchorX: data.tail?.anchorX ?? 0.5, anchorY },
+              })
+            }
+          />
+        </Field>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-full text-[11px]"
+          onClick={() => set({ tail: data.tail ? null : { anchorX: 0.5, anchorY: 0.9 } })}
+        >
+          {data.tail ? "Remove tail" : "Add tail"}
+        </Button>
+      </div>
+    );
+  },
+};
+
+const CAPTION_BOX_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "caption-box") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<CaptionBoxWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "caption-box", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Text">
+          <AutoSizeTextarea
+            value={data.text}
+            onChange={(e) => set({ text: e.target.value })}
+            className="min-h-[60px] text-xs"
+          />
+        </Field>
+        <Field label="Italic">
+          <input
+            type="checkbox"
+            checked={data.italic}
+            onChange={(e) => set({ italic: e.target.checked })}
+            className="h-4 w-4"
+          />
+        </Field>
+        <Field label="Box fill">
+          <ColorInput value={data.bgColor} onChange={(bgColor) => set({ bgColor })} />
+        </Field>
+        <Field label="Text colour">
+          <ColorInput value={data.color} onChange={(color) => set({ color })} />
+        </Field>
+        <Field label="Stroke colour">
+          <ColorInput value={data.strokeColor} onChange={(strokeColor) => set({ strokeColor })} />
+        </Field>
+        <Field label="Stroke width">
+          <NumberField value={data.strokeWidth} min={0} onChange={(strokeWidth) => set({ strokeWidth })} />
+        </Field>
+        <Field label="Font size (px)">
+          <NumberField value={data.fontPx} min={6} onChange={(fontPx) => set({ fontPx })} />
+        </Field>
+      </div>
+    );
+  },
+};
+
+const SFX_BURST_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "sfx-burst") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<SfxBurstWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "sfx-burst", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Text">
+          <Input
+            value={data.text}
+            onChange={(e) => set({ text: e.target.value })}
+            className="h-8 text-xs"
+          />
+        </Field>
+        <Field label="Shape">
+          <select
+            value={data.shape}
+            onChange={(e) => set({ shape: e.target.value as SfxBurstWidgetParams["shape"] })}
+            className="h-8 w-full rounded border border-border bg-background px-2 text-xs"
+          >
+            {SFX_SHAPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Burst fill">
+          <ColorInput value={data.bgColor} onChange={(bgColor) => set({ bgColor })} />
+        </Field>
+        <Field label="Text colour">
+          <ColorInput value={data.color} onChange={(color) => set({ color })} />
+        </Field>
+        <Field label="Stroke colour">
+          <ColorInput value={data.strokeColor} onChange={(strokeColor) => set({ strokeColor })} />
+        </Field>
+        <Field label="Stroke width">
+          <NumberField value={data.strokeWidth} min={0} onChange={(strokeWidth) => set({ strokeWidth })} />
+        </Field>
+        <Field label="Font size (px)">
+          <NumberField value={data.fontPx} min={6} onChange={(fontPx) => set({ fontPx })} />
+        </Field>
+      </div>
+    );
+  },
+};
+
 export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   text: [LAYOUT_SECTION, textContentSection("text"), ...SHARED_TAIL],
   heading: [LAYOUT_SECTION, textContentSection("heading"), ...SHARED_TAIL],
@@ -1246,13 +1443,14 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   chips: [LAYOUT_SECTION, CHIPS_CONTENT_SECTION, ...SHARED_TAIL],
   cta: [LAYOUT_SECTION, CTA_CONTENT_SECTION, ...SHARED_TAIL],
   "linked-content": [LAYOUT_SECTION, LINKED_CONTENT_SECTION, ...SHARED_TAIL],
-  // Comic widget primitives (#929) — share the generic layout +
-  // tail sections until kind-specific inspector sections land with
-  // the comic runtime build-out. Text + colour + position are all the
-  // user can usefully edit pre-runtime.
-  "speech-bubble": [LAYOUT_SECTION, ...SHARED_TAIL],
-  "caption-box":   [LAYOUT_SECTION, ...SHARED_TAIL],
-  "sfx-burst":     [LAYOUT_SECTION, ...SHARED_TAIL],
+  // Comic widget primitives (#939 Phase 2 — kind-specific Content
+  // sections). Each surfaces the kind's data fields (text + shape
+  // picker + per-fill colour + italic toggle + tail anchor) so the
+  // user no longer has to drop into the generic effects-params panel
+  // to tune a balloon's shape or a caption's italic state.
+  "speech-bubble": [LAYOUT_SECTION, SPEECH_BUBBLE_CONTENT_SECTION, ...SHARED_TAIL],
+  "caption-box":   [LAYOUT_SECTION, CAPTION_BOX_CONTENT_SECTION, ...SHARED_TAIL],
+  "sfx-burst":     [LAYOUT_SECTION, SFX_BURST_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {

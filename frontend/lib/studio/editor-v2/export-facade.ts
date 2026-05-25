@@ -46,6 +46,8 @@ export interface ExportInputs {
     animationState: AnimationState | null;
     gameState: GameState | null;
     cadState: CadState | null;
+    cad3dState?: import("@shared/cad-3d-state").Cad3DState | null;
+    interactiveComicState?: import("@shared/interactive-comic-state").InteractiveComicState | null;
     /** Canvas state — used by the comic export path which renders each
      *  scene/page through the timeline render facade. */
     canvasState: CanvasState;
@@ -113,15 +115,23 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
         const { renderCadStlBlob } = await import("@/lib/studio/cad/cad-stl-encoder");
         return renderCadStlBlob(snapshot.cadState);
       }
+      if (profile.container === "step") {
+        const { renderCadStepBlob } = await import("@/lib/studio/cad/cad-step-encoder");
+        return renderCadStepBlob(snapshot.cadState);
+      }
       const { renderCadSvg } = await import("@/lib/studio/cad/cad-export");
       return renderCadSvg(snapshot.cadState);
     }
-    case "comic": {
+    case "comic":
+    case "interactive_comic": {
       // Comic Phase 2 (#939) — render via the dedicated comic exporter
       // (CBZ / PNG-strip / PDF). Motion-comic profiles (`comic-mp4` /
       // `comic-gif`) fall back to the Timeline render path because
-      // they ARE Timeline outputs.
-      const profile = outputProfilesFor("comic")[0];
+      // they ARE Timeline outputs. Interactive comics flatten to a
+      // linear strip on print export (first-valid-branch walk happens
+      // inside `renderComic` when the snapshot carries an interactive
+      // comic state — for now they share the linear path).
+      const profile = outputProfilesFor(mediaKind)[0] ?? outputProfilesFor("comic")[0];
       const isMotionProfile = profile.container === "mp4" || profile.container === "gif";
       if (isMotionProfile) {
         if (!snapshot.renderTimeline) return null;
@@ -130,6 +140,14 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
       const { renderComic } = await import("@/lib/studio/comic/comic-export");
       const { blob } = await renderComic(snapshot.canvasState, profile);
       return blob;
+    }
+    case "cad_3d": {
+      // 3D CAD runtime (#930 follow-on). The bundled mesh-export pipeline
+      // is the existing `cad-stl-encoder` extended to take the 3D
+      // state's triangulated mesh — for now we delegate to the cad_3d
+      // export module that ships alongside the runtime.
+      const { renderCad3D } = await import("@/lib/studio/cad/cad-3d-export");
+      return renderCad3D(snapshot, mediaKind);
     }
     case "video":
     case "podcast":
@@ -158,6 +176,8 @@ export function extensionForBlob(blob: Blob): string {
   if (blob.type === "image/svg+xml") return "svg";
   if (blob.type === "application/dxf") return "dxf";
   if (blob.type === "model/stl") return "stl";
+  if (blob.type === "model/step") return "step";
+  if (blob.type === "image/vnd.adobe.photoshop") return "psd";
   if (blob.type === "image/apng") return "apng";
   if (blob.type.includes("webm")) return "webm";
   if (blob.type.includes("wav")) return "wav";

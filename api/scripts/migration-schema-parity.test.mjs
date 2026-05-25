@@ -61,11 +61,19 @@ function stripSqlComments(sql) {
 function readCreatedTables() {
   const files = readdirSync(DRIZZLE_DIR).filter((f) => f.endsWith(".sql"));
   const names = new Set();
-  const re = /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?/gi;
+  const createRe = /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?/gi;
+  // Scratch tables that exist only inside a single migration (created
+  // then RENAMEd to their permanent name, e.g. the job_items rebuild
+  // pattern in 0122c_job_items_rebuild.sql) shouldn't count as orphans
+  // since they never persist past the migration.
+  const renameRe = /ALTER\s+TABLE\s+(?:"?[a-z_][a-z0-9_]*"?\.)?"?([a-z_][a-z0-9_]*)"?\s+RENAME\s+TO\s+"?([a-z_][a-z0-9_]*)"?/gi;
   for (const f of files) {
     const text = stripSqlComments(readFileSync(join(DRIZZLE_DIR, f), "utf8"));
-    for (const m of text.matchAll(re)) {
-      names.add(m[1].toLowerCase());
+    const renamedAway = new Set();
+    for (const m of text.matchAll(renameRe)) renamedAway.add(m[1].toLowerCase());
+    for (const m of text.matchAll(createRe)) {
+      const name = m[1].toLowerCase();
+      if (!renamedAway.has(name)) names.add(name);
     }
   }
   return names;
@@ -106,11 +114,9 @@ const KNOWN_MISSING_CREATE_TABLE = new Set([
   "application_notes",
   "assessment_attempts",
   "ats_connections",
-  "availability_slots",
   "billing_events",
   "boards",
   "business_phone_numbers",
-  "calendar_connections",
   "call_logs",
   "candidate_interactions",
   "candidate_submissions",
@@ -178,7 +184,6 @@ const KNOWN_MISSING_CREATE_TABLE = new Set([
   "roles",
   "saved_jobs",
   "saved_searches",
-  "scheduled_events",
   "skill_assessments",
   "sms_messages",
   "state_provinces",

@@ -70,7 +70,7 @@ import type { VideoScript } from "@/types/video-script";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import { defaultStudioState } from "@/types/studio";
 
-import Footer from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
@@ -145,9 +145,8 @@ function Landing() {
   }, []);
 
   return (
-    <div className="pt-16">
+    <>
       <div className="max-w-6xl mx-auto px-4 py-16">
-
         {/* Hero — kind-agnostic copy. The studio ships multiple media
             kinds (video / podcast / voice / animation / game / comic);
             the hero used to hardcode "Video Studio" + "Video Resume"
@@ -490,9 +489,7 @@ function Landing() {
           </div>
         </div>
       </div>
-
-      <Footer />
-    </div>
+    </>
   );
 }
 
@@ -1742,21 +1739,11 @@ export default function StudioLayout() {
 
   if (!user) {
     return (
-      <div className="studio-page min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={cn("transition-all duration-500", sidebarCollapsed ? "lg:ml-16" : "lg:ml-80")}>
-          <Navigation
-            onMenuClick={() => setSidebarOpen(true)}
-            onSidebarToggle={() => setSidebarCollapsed((c) => !c)}
-            sidebarCollapsed={sidebarCollapsed}
-          />
+      <AppShell>
+        <div className="studio-page">
           <Landing />
         </div>
-      </div>
+      </AppShell>
     );
   }
 

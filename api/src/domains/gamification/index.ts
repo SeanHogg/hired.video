@@ -228,6 +228,61 @@ export class GamificationService {
     });
   }
 
+  // ── Learning loop helpers ──────────────────────────────────────────
+  //
+  // Synthetic refIds combine course/path/cert + lesson so the points-
+  // ledger dedup-uniq collapses repeated "marked complete" calls into
+  // a single ledger row per lesson per learner. SCORM lessons that go
+  // passed → failed → passed don't accidentally re-earn.
+
+  async onLessonCompleted(
+    args: AwardArgs & { courseId: string; lessonId: string; enrollmentId: string },
+  ): Promise<AwardOutcome> {
+    return this.award(ACTIONS.LESSON_COMPLETED, {
+      ...args,
+      refId: `lesson:${args.enrollmentId}:${args.lessonId}`,
+      refType: "course_lesson",
+    });
+  }
+
+  async onCoursePassed(
+    args: AwardArgs & { courseId: string; enrollmentId: string },
+  ): Promise<AwardOutcome> {
+    return this.award(ACTIONS.COURSE_PASSED, {
+      ...args,
+      refId: `course:${args.enrollmentId}`,
+      refType: "course_enrollment",
+    });
+  }
+
+  async onCertificateEarned(
+    args: AwardArgs & { certificateId: string },
+  ): Promise<AwardOutcome> {
+    return this.award(ACTIONS.CERTIFICATE_EARNED, {
+      ...args,
+      refId: args.certificateId,
+      refType: "course_certificate",
+    });
+  }
+
+  async onLearningPathCompleted(
+    args: AwardArgs & { pathId: string; enrollmentId: string },
+  ): Promise<AwardOutcome> {
+    return this.award(ACTIONS.LEARNING_PATH_COMPLETED, {
+      ...args,
+      refId: `path:${args.enrollmentId}`,
+      refType: "learning_path_enrollment",
+    });
+  }
+
+  async onCoursePublished(args: AwardArgs & { courseId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.COURSE_PUBLISHED, {
+      ...args,
+      refId: args.courseId,
+      refType: "course",
+    });
+  }
+
   // ── Recruiter helpers ──────────────────────────────────────────────
 
   onCandidateSourced(args: AwardArgs & { candidateId: string }): Promise<AwardOutcome> {

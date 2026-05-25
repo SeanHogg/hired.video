@@ -12,7 +12,7 @@ export default function Footer() {
       <div id="footer-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo and Description */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 md:pl-4">
             <Link to="/" className="flex items-center space-x-2 mb-4">
               <div className="relative">
                 <Video className="h-8 w-8 text-primary" />
@@ -60,7 +60,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Section */}
-        <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
+        <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row md:px-4 justify-between items-center">
           <div className="mb-4 md:mb-0">
             <Copyright />
             <p className="text-xs text-muted-foreground mt-1">

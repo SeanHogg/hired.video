@@ -15,8 +15,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,7 +51,12 @@ function roleToPersona(role: string | undefined): "job_seeker" | "recruiter" | "
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useTranslation();
   const { user: authUser } = useAuth();
+
+  useSEO(location.pathname);
+  useBreadcrumbs([{ name: t("labels.onboarding", "Onboarding"), url: "/onboarding" }]);
 
   const persona = roleToPersona(authUser?.role);
   const displayName = authUser?.name || authUser?.firstName || "";

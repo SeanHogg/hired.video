@@ -220,12 +220,6 @@ export interface ImageState {
    *  picker so the user can iterate without retyping. Capped at 50
    *  entries client-side; older entries fall off in FIFO order. */
   aiPromptHistory: AiPromptHistoryEntry[];
-  /** Current selection rect in canvas-local pixels (#940 Phase 2
-   *  selection tools). Brush / fill / clear / inpaint operations gate
-   *  on this rect when present — pixels outside are untouched.
-   *  Cleared when the user clicks "Deselect" or starts a non-selection
-   *  tool. */
-  selection?: { x: number; y: number; width: number; height: number };
 }
 
 /** Threshold above which a layer's flattened PNG should spill to R2

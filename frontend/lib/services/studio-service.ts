@@ -822,6 +822,44 @@ export const studioService = {
     );
   },
 
+  /** Canvas-expanding AI outpaint (#940). Same model pool as inpaint;
+   *  the route adds expansion deltas + builds the outer mask
+   *  server-side. The client passes the source image data URL + the
+   *  per-edge expansion in pixels. */
+  async outpaintImage(
+    prompt: string,
+    sourceImageDataUrl: string,
+    expand: { top: number; right: number; bottom: number; left: number },
+    opts?: { strength?: number },
+  ): Promise<ApiSuccessResponse<{
+    imageUrl: string;
+    mode?: "outpaint";
+    expand: { top: number; right: number; bottom: number; left: number };
+  }>> {
+    return apiClient.post(
+      "/api/studio/outpaint-image",
+      {
+        prompt,
+        sourceImageDataUrl,
+        expandTop: expand.top,
+        expandRight: expand.right,
+        expandBottom: expand.bottom,
+        expandLeft: expand.left,
+        ...(typeof opts?.strength === "number" ? { strength: opts.strength } : {}),
+      },
+      z.object({
+        imageUrl: z.string(),
+        mode: z.enum(["outpaint"]).optional(),
+        expand: z.object({
+          top: z.number(),
+          right: z.number(),
+          bottom: z.number(),
+          left: z.number(),
+        }),
+      }),
+    );
+  },
+
   /**
    * Upload a scene background image file to persistent storage (R2/S3).
    * Returns a CDN URL that can be saved in the script and reloaded later.

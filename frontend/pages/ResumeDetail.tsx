@@ -19,12 +19,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
-import Footer from "@/components/Footer";
 import MetadataModal from "@/components/MetadataModal";
-import Navigation from "@/components/Navigation";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { EmbedSheet } from "@/components/EmbedSheet";
@@ -33,7 +32,6 @@ import QRCodeDialog from "@/components/QRCodeDialog";
 import ShareModal from "@/components/ShareModal";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import ResumeStatsSheet from "@/components/ResumeStatsSheet";
-import Sidebar from "@/components/Sidebar";
 import SkillNetwork from "@/components/SkillNetwork";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +42,6 @@ import {
 import { SplitButton } from "@/components/ui/split-button";
 import { buildTemplateAssignmentContent } from "@/lib/utils/resume-template-assignment";
 import { useToast } from "@/hooks/use-toast";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
@@ -168,7 +165,6 @@ export default function ResumeDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const printMode = searchParams.get("print") === "1";
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
@@ -491,12 +487,9 @@ export default function ResumeDetail() {
   const assignedEmbeddedId = resume?.content?.meta?.embeddedTemplate ?? null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
+    <>
+      <AppShell bgClassName="bg-background">
+        <div className={!isAuthenticated ? "relative" : ""}>
           {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || "Resume"} />}
 
           {/* Hub-level tab strip — keeps the My Resumes / Available /
@@ -782,9 +775,8 @@ export default function ResumeDetail() {
             </div>
           )}
 
-          <Footer />
         </div>
-      </div>
+      </AppShell>
 
       {resume && !isSample && (
         <MetadataModal
@@ -860,6 +852,6 @@ export default function ResumeDetail() {
           views={resume.viewCount ?? 0}
         />
       )}
-    </div>
+    </>
   );
 }

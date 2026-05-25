@@ -81,7 +81,7 @@ export default function PostAJob() {
         {/* Hero */}
         <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 py-16 px-4 sm:px-6 lg:px-8">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[400px] w-[700px] rounded-full bg-primary/5 blur-3xl" />
+            <div className="h-[400px] w-full max-w-[700px] rounded-full bg-primary/5 blur-3xl" />
           </div>
 
           <div className="relative max-w-5xl mx-auto grid lg:grid-cols-2 gap-12 items-center">

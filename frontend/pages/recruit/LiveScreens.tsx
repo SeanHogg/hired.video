@@ -41,12 +41,14 @@ import { USER_ROLES } from "@shared/user-roles";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useLocation } from "react-router-dom";
 import {
+  autoMatchLiveScreenSession,
   createLiveScreenSession,
   getLiveScreenSession,
   listLiveScreenSessions,
   type LiveScreenInvite,
   type LiveScreenSession,
 } from "@/lib/services/live-screen-service";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LiveScreens() {
@@ -392,4 +394,46 @@ export function formatSessionWindow(startIso: string, endIso: string): string {
 export function formatTime(input: string | Date): string {
   const d = typeof input === "string" ? new Date(input) : input;
   return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** Auto-match button — pulls top-scored candidates from the recruiter's
+ *  most recent AI Recruiter Agent run for this session's job and fills
+ *  the back-to-back slots. Self-gates on success/failure with toast
+ *  feedback; parent re-fetches to render the new invite rows. */
+function AutoMatchButton({
+  sessionId,
+  onMatched,
+}: {
+  sessionId: string;
+  onMatched: () => Promise<void> | void;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      onClick={async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          const r = await autoMatchLiveScreenSession(sessionId);
+          if (r.scheduled === 0) {
+            toast.message("No candidates to match", {
+              description: "Run /agent/source for this role first, or schedule manually.",
+            });
+          } else {
+            toast.success(`Auto-matched ${r.scheduled} candidate${r.scheduled === 1 ? "" : "s"}`);
+          }
+          await onMatched();
+        } catch (e: any) {
+          toast.error(e?.message ?? "Auto-match failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+      disabled={busy}
+      className="gap-1.5"
+    >
+      <Sparkles className="h-4 w-4" />
+      {busy ? "Matching…" : "Auto-match from agent run"}
+    </Button>
+  );
 }

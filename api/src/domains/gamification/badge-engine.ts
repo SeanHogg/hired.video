@@ -90,6 +90,29 @@ export function evaluateBadges(input: BadgeEvaluationInput): string[] {
       break;
     }
 
+    // ─── Learning loop ────────────────────────────────────────────────
+    case "lesson.completed": {
+      considerBadge("first_lesson_passed", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "course.passed": {
+      considerBadge("first_course_passed", input.totalEarnsForAction >= 1);
+      considerBadge("courses_completed_5", input.totalEarnsForAction >= 5);
+      break;
+    }
+    case "certificate.earned": {
+      considerBadge("first_certificate_earned", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "learning.path.completed": {
+      considerBadge("first_path_completed", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "course.published": {
+      considerBadge("instructor_first_course", input.totalEarnsForAction >= 1);
+      break;
+    }
+
     default:
       // Streak badges are awarded by the streak engine via the
       // milestone path — not this evaluator.

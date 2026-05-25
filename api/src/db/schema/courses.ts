@@ -65,6 +65,12 @@ export const courses = pgTable(
     issuesCertificate: boolean("issues_certificate").default(false).notNull(),
     passingScorePct: integer("passing_score_pct"),
 
+    // Authoring path tag — true when an employer published the course
+    // outside the creator program. Matches migration 0126; lets the
+    // marketplace scope listings (internal training stays off the public
+    // creator marketplace by default).
+    isEmployerAuthored: boolean("is_employer_authored").default(false).notNull(),
+
     enrollmentCount: integer("enrollment_count").default(0).notNull(),
     completionCount: integer("completion_count").default(0).notNull(),
     averageRating: real("average_rating"),

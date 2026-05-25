@@ -33,6 +33,7 @@ import {
 } from "../../../shared/assessments/kinds.js";
 import { getQuestionBank } from "../../../shared/assessments/question-banks.js";
 import { computeScore } from "../../../shared/assessments/scoring.js";
+import { fetchNorm, percentileForScore } from "../services/assessments/norms.js";
 
 export const predictiveAssessmentRoutes = new Hono<{ Variables: Variables }>();
 
@@ -221,10 +222,28 @@ predictiveAssessmentRoutes.post("/:id/complete", async (c) => {
   dimEntries.sort((a, b) => b.score - a.score);
   const topStrength = dimEntries[0]?.label ?? null;
   const topGrowth = dimEntries[dimEntries.length - 1]?.label ?? null;
+
+  // Calibrated percentiles per dimension. The norms table is empty
+  // until the recompute worker has had a chance to scan the population
+  // of completed runs; until then `fetchNorm` returns null and
+  // `percentiles` stays empty — the UI shows the raw band only.
+  const percentiles: Record<string, number> = {};
+  let normSampleSize: number | null = null;
+  await Promise.all(
+    descriptor.dimensions.map(async (dim) => {
+      const norm = await fetchNorm(run.assessmentKind, dim.key);
+      if (!norm) return;
+      normSampleSize = normSampleSize ?? norm.sampleSize;
+      percentiles[dim.key] = percentileForScore(norm.curve, scoreResult.scores[dim.key] ?? 0);
+    }),
+  );
+
   const results = {
     narrative: `Highest dimension: ${topStrength ?? "—"}. Greatest growth opportunity: ${topGrowth ?? "—"}.`,
     topStrength,
     topGrowth,
+    percentiles: Object.keys(percentiles).length > 0 ? percentiles : undefined,
+    normSampleSize: normSampleSize ?? undefined,
   };
 
   const [updated] = await (db

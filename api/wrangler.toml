@@ -54,6 +54,19 @@ preview_id = "e1b7ddb50cb14765bfb3a8375544ca55"
 [ai]
 binding = "AI"
 
+# Real-time chat backbone (gap #1230). One Durable Object per
+# conversationId holds open WebSocket pairs for every connected client
+# and broadcasts message / typing / presence events. Hibernation keeps
+# the DO cheap when idle. Created lazily on first connect via
+# `env.CHAT_ROOM.idFromName(conversationId)`.
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ChatRoom"]
+
 [vars]
 # Partner domains are sourced from shared/security/partnerDomains.ts.
 # This var is only for env-specific extras (preview deploys, staging
@@ -133,6 +146,14 @@ id = "8be133d4c3554532bc42fa4587fbf260"
 
 [env.production.ai]
 binding = "AI"
+
+[[env.production.durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[env.production.migrations]]
+tag = "v1"
+new_classes = ["ChatRoom"]
 
 # To expose the worker via your custom domains, set your Cloudflare zone_id below and
 # add routes for both the new and legacy domains.

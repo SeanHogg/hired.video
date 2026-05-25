@@ -28,9 +28,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -56,7 +54,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useSidebar } from "@/hooks/use-sidebar";
 import {
   recruitService,
   type CandidateResumeRow,
@@ -88,13 +85,6 @@ export default function PitchDeckBuilder() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const peopleTabs = usePeopleTabs();
 
   const [deck, setDeck] = useState<PitchDeckRow | null>(null);
@@ -380,19 +370,7 @@ export default function PitchDeckBuilder() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
+    <AppShell bgClassName="bg-background">
         <div>
           <div className="max-w-6xl mx-auto p-6">
             <PageHeader tabs={peopleTabs} activeTabKey="pitch-decks" />
@@ -776,9 +754,7 @@ export default function PitchDeckBuilder() {
               </div>
             )}
           </div>
-          <Footer />
         </div>
-      </div>
 
       {/* Add candidate dialog */}
       <Dialog open={addSlideOpen} onOpenChange={setAddSlideOpen}>
@@ -883,7 +859,7 @@ export default function PitchDeckBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppShell>
   );
 }
 

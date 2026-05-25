@@ -91,3 +91,21 @@ export const assessmentRuns = pgTable("assessment_runs", {
 
 export type AssessmentRun = typeof assessmentRuns.$inferSelect;
 export type NewAssessmentRun = typeof assessmentRuns.$inferInsert;
+
+// Predictive-assessment norming cache. See migration 0120 and the
+// recompute worker (workers/assessment-norms-recompute.ts).
+export const assessmentDimensionNorms = pgTable("assessment_dimension_norms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  assessmentKind: varchar("assessment_kind", { length: 64 }).notNull(),
+  dimension: varchar("dimension", { length: 64 }).notNull(),
+  // 101 entries indexed 0..100; entry i = raw score (0..1) at the i-th
+  // percentile across the platform's completed runs.
+  percentileCurve: jsonb("percentile_curve").notNull().$type<number[]>(),
+  sampleSize: integer("sample_size").notNull(),
+  recomputedAt: timestamp("recomputed_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AssessmentDimensionNorm = typeof assessmentDimensionNorms.$inferSelect;
+export type NewAssessmentDimensionNorm = typeof assessmentDimensionNorms.$inferInsert;

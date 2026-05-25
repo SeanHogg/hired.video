@@ -60,7 +60,10 @@ export interface TemplateSeedPayload {
   /** CAD state JSON for `mediaKind: "cad"` (#930). Undefined for
    *  other kinds. */
   cadState?: CadState;
-  // Future: sceneState?, …
+  /** 3D CAD state JSON for `mediaKind: "cad_3d"` (#930 follow-on). */
+  cad3dState?: import("@shared/cad-3d-state").Cad3DState;
+  /** Interactive comic branching graph for `mediaKind: "interactive_comic"` (#929). */
+  interactiveComicState?: import("@shared/interactive-comic-state").InteractiveComicState;
 }
 
 /**
@@ -85,6 +88,23 @@ export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
       // CAD mediaKind (#930) — 2D vector drafting. No template seed
       // registry yet; every CAD project lands as a blank drawing.
       return { name, cadState: seedCadFromTemplate(template.id) };
+    case "cad_3d": {
+      // 3D CAD runtime stub (#930 follow-on). Blank scene; the editor's
+      // primitive palette is the entry path.
+      const { createBlankCad3DState } = require("@shared/cad-3d-state") as typeof import("@shared/cad-3d-state");
+      return { name, cad3dState: createBlankCad3DState() };
+    }
+    case "interactive_comic": {
+      // Interactive comic (#929) — branching graph. Ride the existing
+      // linear-comic canvas seed for the pages, and seed a blank branch
+      // graph on top.
+      const { createBlankInteractiveComicState } = require("@shared/interactive-comic-state") as typeof import("@shared/interactive-comic-state");
+      return {
+        name,
+        timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),
+        interactiveComicState: createBlankInteractiveComicState(),
+      };
+    }
     case "video":
     case "podcast":
     case "voice":

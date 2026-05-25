@@ -46,6 +46,7 @@ export * from "./reviews.js";
 export * from "./articles.js";
 export * from "./reports.js";
 export * from "./courses.js";
+export * from "./learning.js";
 export * from "./platformpricing.js";
 export * from "./jobpipeline.js";
 export * from "./lists.js";

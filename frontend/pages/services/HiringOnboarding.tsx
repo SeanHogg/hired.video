@@ -19,9 +19,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +38,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { TIER_COPY } from "@shared/tier-copy";
 import {
@@ -114,14 +111,6 @@ function formatDate(value: string | null | undefined): string {
 export default function HiringOnboarding() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   const peopleTabs = usePeopleTabs();
 
   // Data
@@ -361,15 +350,7 @@ export default function HiringOnboarding() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
+    <AppShell bgClassName="bg-background">
         <div>
           <div className="max-w-5xl mx-auto p-6">
             <PageHeader tabs={peopleTabs} activeTabKey="hiring" />
@@ -547,9 +528,7 @@ export default function HiringOnboarding() {
               </>
             )}
           </div>
-          <Footer />
         </div>
-      </div>
 
       {/* ─── Offer dialog ─────────────────────────────────────────────────── */}
       <Dialog open={offerDialogOpen} onOpenChange={setOfferDialogOpen}>
@@ -788,7 +767,7 @@ export default function HiringOnboarding() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppShell>
   );
 }
 

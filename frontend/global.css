@@ -196,19 +196,6 @@ body[data-print-mode] [data-print-hide] {
   }
 }
 
-/* ─── Footer padding ────────────────────────────────────────────────── */
-@media (min-width: 768px) {
-  .md\:col-span-2 {
-    grid-column: span 2 / span 2;
-    padding-left: 15px;
-  }
-  .md\:flex-row {
-    flex-direction: row;
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-}
-
 @layer base {
   * {
     @apply border-border;

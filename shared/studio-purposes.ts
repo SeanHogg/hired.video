@@ -27,6 +27,12 @@ export const STUDIO_PURPOSES = [
   "recruiter_brand",
   "product_launch",
   "personal_brand",
+  // Training / e-learning lessons (#160 — Course → Module → Lesson schema).
+  // Storyboard generator branches into learning-objective + concept +
+  // worked-example + knowledge-check + summary scene shapes. Lessons
+  // saved via the v2 editor's Save menu route to "Save as Course Lesson"
+  // and attach to a course as `sourceType: "studio_video"`.
+  "course_lesson",
 ] as const;
 
 export type StudioPurpose = (typeof STUDIO_PURPOSES)[number];

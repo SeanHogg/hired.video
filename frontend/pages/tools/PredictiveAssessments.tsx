@@ -276,12 +276,22 @@ export default function PredictiveAssessments() {
                       const score = activeRun.scores!.scores[dim.key] ?? 0;
                       const band = scoreBand(score);
                       const pct = Math.round(score * 100);
+                      // Calibrated percentile from the platform-wide
+                      // norms cache (gap #1232 / migration 0120). Only
+                      // shown once the population is large enough for
+                      // the norms worker to publish a curve.
+                      const percentile = activeRun.results?.percentiles?.[dim.key];
                       return (
                         <div key={dim.key}>
                           <div className="flex items-center justify-between text-sm">
                             <span className="font-medium">{dim.label}</span>
                             <span className="text-muted-foreground">
                               {pct}% · <span className="font-medium text-foreground">{BAND_LABEL[band]}</span>
+                              {typeof percentile === "number" && (
+                                <span className="ml-2 text-xs text-emerald-700">
+                                  Top {Math.max(1, 100 - percentile)}%
+                                </span>
+                              )}
                             </span>
                           </div>
                           <Progress value={pct} className="mt-1" />
@@ -289,6 +299,12 @@ export default function PredictiveAssessments() {
                         </div>
                       );
                     })}
+                    {activeRun.results?.normSampleSize && (
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Percentiles calibrated against {activeRun.results.normSampleSize}{" "}
+                        completed runs on the platform.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -229,7 +229,7 @@ export default function InterviewQuestions() {
           </CardHeader>
           <CardContent>
             <Tabs value={mode} onValueChange={(v) => setMode(v as SourceMode)}>
-              <TabsList className="grid grid-cols-4 w-full max-w-2xl bg-muted/50">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full max-w-2xl bg-muted/50 h-auto">
                 <TabsTrigger
                   value="resume"
                   className="data-[state=active]:bg-brand-purple data-[state=active]:text-white data-[state=active]:shadow"

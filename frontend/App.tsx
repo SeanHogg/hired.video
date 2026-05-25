@@ -112,6 +112,7 @@ const VideoPitchLab = lazy(() => import("./pages/tools/VideoPitchLab"));
 const MyInterviewAssignments = lazy(() => import("./pages/MyInterviewAssignments"));
 const LiveScreenInvite = lazy(() => import("./pages/LiveScreenInvite"));
 const LiveScreens = lazy(() => import("./pages/recruit/LiveScreens"));
+const AgentRuns = lazy(() => import("./pages/recruit/AgentRuns"));
 const VendorSync = lazy(() => import("./pages/tools/VendorSync"));
 const ToolDetail = lazy(() => import("./pages/ToolDetail"));
 const Outreach = lazy(() => import("./pages/Outreach"));
@@ -135,6 +136,7 @@ const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const EventsIndex = lazy(() => import("./pages/EventsIndex"));
 const EventDetail = lazy(() => import("./pages/EventDetail"));
 const EventNew = lazy(() => import("./pages/EventNew"));
+const EventManage = lazy(() => import("./pages/EventManage"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const SectorsIndex = lazy(() => import("./pages/SectorsIndex"));
 const SectorLanding = lazy(() => import("./pages/SectorLanding"));
@@ -703,6 +705,7 @@ const App = () => (
                       <Route path="/events" element={<EventsIndex />} />
                       <Route path="/events/new" element={<EventNew />} />
                       <Route path="/events/:idOrSlug" element={<EventDetail />} />
+                      <Route path="/events/:idOrSlug/manage" element={<EventManage />} />
                       <Route path="/map" element={<MapPage />} />
 
                       {/* AI-resilient sector surfaces — see shared/sectors.ts SSoT. */}
@@ -829,6 +832,10 @@ const App = () => (
                       <Route
                         path="/recruit/live-screens"
                         element={<LiveScreens />}
+                      />
+                      <Route
+                        path="/recruit/agent"
+                        element={<AgentRuns />}
                       />
                       <Route
                         path="/live-screen/:token"

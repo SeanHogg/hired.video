@@ -99,6 +99,15 @@ export const ACTIONS = {
   // Social feed
   FEED_POST_CREATED: "feed.post.created",
 
+  // Learning loop (courses + paths + certificates). Eligible for all
+  // three scoring roles so a recruiter watching compliance training and
+  // an employer completing onboarding both earn alongside job_seekers.
+  LESSON_COMPLETED: "lesson.completed",
+  COURSE_PASSED: "course.passed",
+  CERTIFICATE_EARNED: "certificate.earned",
+  LEARNING_PATH_COMPLETED: "learning.path.completed",
+  COURSE_PUBLISHED: "course.published",
+
   // Streak milestones (written by the streak engine, not callers)
   STREAK_BONUS: "streak.bonus",
 
@@ -222,6 +231,49 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     dailyCapPoints: 30,
     source: "feed",
   },
+
+  // ── Learning loop ──────────────────────────────────────────────────
+  [ACTIONS.LESSON_COMPLETED]: {
+    key: ACTIONS.LESSON_COMPLETED,
+    label: "Completed a course lesson",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 10,
+    category: "earn",
+    dailyCapPoints: 80,
+    source: "learning",
+  },
+  [ACTIONS.COURSE_PASSED]: {
+    key: ACTIONS.COURSE_PASSED,
+    label: "Passed a course",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 100,
+    category: "earn",
+    source: "learning",
+  },
+  [ACTIONS.CERTIFICATE_EARNED]: {
+    key: ACTIONS.CERTIFICATE_EARNED,
+    label: "Earned a verifiable certificate",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 50,
+    category: "earn",
+    source: "learning",
+  },
+  [ACTIONS.LEARNING_PATH_COMPLETED]: {
+    key: ACTIONS.LEARNING_PATH_COMPLETED,
+    label: "Completed a learning pathway",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 250,
+    category: "earn",
+    source: "learning",
+  },
+  [ACTIONS.COURSE_PUBLISHED]: {
+    key: ACTIONS.COURSE_PUBLISHED,
+    label: "Published a course",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 200,
+    category: "earn",
+    source: "learning",
+  },
   [ACTIONS.STREAK_BONUS]: {
     key: ACTIONS.STREAK_BONUS,
     label: "Streak milestone reached",
@@ -340,6 +392,12 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.PURCHASE_SUBSCRIPTION,
   ACTIONS.PURCHASE_ANY,
   ACTIONS.FEED_POST_CREATED,
+  // learning loop — daily course activity counts as an active day
+  ACTIONS.LESSON_COMPLETED,
+  ACTIONS.COURSE_PASSED,
+  ACTIONS.CERTIFICATE_EARNED,
+  ACTIONS.LEARNING_PATH_COMPLETED,
+  ACTIONS.COURSE_PUBLISHED,
   // recruiter
   ACTIONS.CANDIDATE_SOURCED,
   ACTIONS.CANDIDATE_SUBMITTED,

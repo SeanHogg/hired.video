@@ -28,6 +28,8 @@ import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
 import type { GameState } from "@shared/game-state";
 import type { CadState } from "@shared/cad-state";
+import type { Cad3DState } from "@shared/cad-3d-state";
+import type { InteractiveComicState } from "@shared/interactive-comic-state";
 
 /** Runtime-state snapshot — the editor's live per-kind state at the
  *  moment of save. Each field may be null when the kind isn't active. */
@@ -37,6 +39,8 @@ export interface RuntimeSnapshot {
   animationState: AnimationState | null;
   gameState: GameState | null;
   cadState: CadState | null;
+  cad3dState?: Cad3DState | null;
+  interactiveComicState?: InteractiveComicState | null;
 }
 
 /** Per-mediaKind save-draft payload slice. Keys mirror `studioService.saveDraft`'s
@@ -50,6 +54,8 @@ export interface RuntimePayloadSlice {
   animationState?: AnimationState;
   gameState?: GameState;
   cadState?: CadState;
+  cad3dState?: Cad3DState;
+  interactiveComicState?: InteractiveComicState;
 }
 
 /** Build the payload slice for the active mediaKind. The runtime owns
@@ -78,6 +84,25 @@ export function runtimeStatePayload(
       return snapshot.cadState !== null
         ? { kind: "scene", cadState: snapshot.cadState }
         : { kind: "scene" };
+    case "cad_3d":
+      return snapshot.cad3dState
+        ? { kind: "scene", cad3dState: snapshot.cad3dState }
+        : { kind: "scene" };
+    case "interactive_comic":
+      // Interactive comics carry BOTH the CanvasState (per-page widgets,
+      // same as linear comic) AND the branching graph. The Timeline
+      // emitter handles the CanvasState half; the branching graph rides
+      // alongside in `interactiveComicState`.
+      return snapshot.interactiveComicState
+        ? {
+            kind: "nle",
+            timelineSpec: canvasStateToTimeline(snapshot.canvasState),
+            interactiveComicState: snapshot.interactiveComicState,
+          }
+        : {
+            kind: "nle",
+            timelineSpec: canvasStateToTimeline(snapshot.canvasState),
+          };
     case "video":
     case "podcast":
     case "voice":

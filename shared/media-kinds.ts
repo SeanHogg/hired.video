@@ -54,8 +54,10 @@ export const MEDIA_KINDS = [
   "animation",
   "game",
   "comic",
+  "interactive_comic",
   "image",
   "cad",
+  "cad_3d",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -74,7 +76,8 @@ export function mediaKindHasAudio(kind: MediaKind): boolean {
     kind === "podcast" ||
     kind === "voice" ||
     kind === "game" ||
-    kind === "comic"
+    kind === "comic" ||
+    kind === "interactive_comic"
   );
 }
 
@@ -87,7 +90,13 @@ export function mediaKindHasAudio(kind: MediaKind): boolean {
  *  about time-based visual frames (video-track UI, scrubber, playhead),
  *  none of which apply to a single still raster. */
 export function mediaKindHasVideo(kind: MediaKind): boolean {
-  return kind === "video" || kind === "animation" || kind === "game" || kind === "comic";
+  return (
+    kind === "video" ||
+    kind === "animation" ||
+    kind === "game" ||
+    kind === "comic" ||
+    kind === "interactive_comic"
+  );
 }
 
 /** Whether the kind permits both audio + video tracks (a podcast may
@@ -126,9 +135,11 @@ export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
   return (
     kind !== "game" &&
     kind !== "comic" &&
+    kind !== "interactive_comic" &&
     kind !== "image" &&
     kind !== "animation" &&
-    kind !== "cad"
+    kind !== "cad" &&
+    kind !== "cad_3d"
   );
 }
 
@@ -156,7 +167,8 @@ export function mediaKindUsesCanvasStateAuthoring(kind: MediaKind): boolean {
     kind !== "game" &&
     kind !== "image" &&
     kind !== "animation" &&
-    kind !== "cad"
+    kind !== "cad" &&
+    kind !== "cad_3d"
   );
 }
 
@@ -686,6 +698,86 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: true,
     fileExt: ".stl",
   },
+  {
+    id: "cad-step",
+    label: "STEP",
+    hint: "ISO 10303 · interoperable",
+    mediaKind: "cad",
+    container: "step",
+    mime: "model/step",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: true,
+    fileExt: ".step",
+  },
+  // Interactive Comic (#929) — same exporters as linear comic (CBZ /
+  // PDF / PNG-strip) plus a JSON bundle that captures the page graph
+  // for the reader runtime. The reader resolves branches at runtime;
+  // print-style exports walk a deterministic "first valid branch"
+  // path so the static artefact still renders the comic as a strip.
+  {
+    id: "interactive-comic-cbz",
+    label: "CBZ",
+    hint: "Comic archive · linear flatten",
+    mediaKind: "interactive_comic",
+    container: "cbz",
+    mime: "application/vnd.comicbook+zip",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".cbz",
+  },
+  {
+    id: "interactive-comic-pdf",
+    label: "PDF",
+    hint: "Print-ready · linear flatten",
+    mediaKind: "interactive_comic",
+    container: "pdf",
+    mime: "application/pdf",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".pdf",
+  },
+  // CAD 3D (#930 follow-on) — STL / STEP / glTF. The 3D runtime
+  // emits STL today via its triangulated mesh, STEP for downstream
+  // BREP-aware tools, and PNG renders for thumbnails.
+  {
+    id: "cad-3d-stl",
+    label: "STL",
+    hint: "3D-printable · binary",
+    mediaKind: "cad_3d",
+    container: "stl",
+    mime: "model/stl",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".stl",
+  },
+  {
+    id: "cad-3d-step",
+    label: "STEP",
+    hint: "ISO 10303 · interoperable",
+    mediaKind: "cad_3d",
+    container: "step",
+    mime: "model/step",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: true,
+    fileExt: ".step",
+  },
+  {
+    id: "cad-3d-png",
+    label: "PNG",
+    hint: "Render · social-share",
+    mediaKind: "cad_3d",
+    container: "png",
+    mime: "image/png",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".png",
+  },
 ];
 
 /** Every profile registered for a given mediaKind, in declaration order. */
@@ -754,7 +846,10 @@ export type PublishDestinationId =
   // surface; `cad-asset-library` writes the flattened SVG/PDF into
   // R2 so other projects can reference it via MediaPicker.
   | "cad-gallery"
-  | "cad-asset-library";
+  | "cad-asset-library"
+  // Training / e-learning (#160) — attaches the project to a course
+  // as `sourceType: studio_video`. Available for every time-based kind.
+  | "course-lesson";
 
 export interface PublishDestination {
   id: PublishDestinationId;
@@ -806,6 +901,11 @@ export const PUBLISH_DESTINATIONS: PublishDestination[] = [
   // be picked up by other studio projects via MediaPicker.
   { id: "cad-gallery",          label: "Profile gallery",         mediaKinds: ["cad"],              requiresRender: false },
   { id: "cad-asset-library",    label: "Save to asset library",   mediaKinds: ["cad"],              requiresRender: true  },
+  // Training / e-learning (#160). The course picker mounts a list of
+  // the author's draft courses; "Save as Course Lesson" attaches the
+  // current project as `sourceType: studio_video`. Available for every
+  // time-based kind; not for image / cad / game.
+  { id: "course-lesson",        label: "Save as Course Lesson",   mediaKinds: ["video", "podcast", "voice", "animation", "comic"], requiresRender: false },
 ];
 
 export function publishDestinationsFor(kind: MediaKind): PublishDestination[] {
@@ -849,4 +949,13 @@ export const MEDIA_KIND_UI: Record<MediaKind, MediaKindUiHints> = {
   // `cad` is the 2D drafting runtime (#930). Static vector output;
   // exports as SVG/PDF/DXF/PNG.
   cad:       { exportVerb: "Export drawing", badgeLabel: "CAD",       shortLabel: "D", createVerb: "Create drawing"     },
+  // `cad_3d` is the 3D modelling runtime (#930 follow-on). Triangulated
+  // mesh exports as STL / STEP / PNG. BREP analytic surfaces land when
+  // the replicad kernel is wired through the editor.
+  cad_3d:    { exportVerb: "Export model",   badgeLabel: "3D",        shortLabel: "M", createVerb: "Create 3D model"    },
+  // `interactive_comic` is the branching comic runtime (#929). Pages
+  // are CanvasState scenes; the branching graph rides in
+  // interactiveComicState. Exports CBZ / PDF via a "first valid branch"
+  // linear walk; reader runtime resolves choices live.
+  interactive_comic: { exportVerb: "Export comic", badgeLabel: "Comic+", shortLabel: "B", createVerb: "Create interactive comic" },
 };

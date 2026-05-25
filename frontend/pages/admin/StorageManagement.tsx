@@ -188,7 +188,7 @@ function TabButton({ active, onClick, icon: Icon, children }: {
 function UsageTab({ usage }: { usage: Usage }) {
   return (
     <>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <SummaryCard label="Total bytes" value={formatBytes(usage.totalBytes)} />
         <SummaryCard label="Objects" value={usage.objectCount.toLocaleString()} />
         <SummaryCard label="Users with storage" value={usage.breakdown.length.toString()} />

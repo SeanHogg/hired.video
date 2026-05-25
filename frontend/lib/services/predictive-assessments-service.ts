@@ -24,6 +24,12 @@ export interface AssessmentRun {
     topStrength?: string | null;
     topGrowth?: string | null;
     roleAlignment?: Record<string, { resume: number; role: number; gap: number }>;
+    /** Calibrated percentile per dimension key (0..100). Populated only
+     *  once the norms-recompute worker has seen enough completed runs
+     *  to back the curve — empty until then. */
+    percentiles?: Record<string, number>;
+    /** Size of the population the percentile curve was computed against. */
+    normSampleSize?: number;
   } | null;
   isProRun: boolean;
   startedAt: string;

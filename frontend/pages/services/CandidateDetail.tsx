@@ -27,9 +27,7 @@ import {
   X,
 } from "lucide-react";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import ServicesNav from "@/components/services/ServicesNav";
 import ShareCreationDialog from "@/components/services/ShareCreationDialog";
 import { CandidateScoringPanel } from "@/components/scorecards/CandidateScoringPanel";
@@ -39,7 +37,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { usePermissions } from "@/hooks/use-permissions";
 import { canRedactAndShare } from "@/lib/persona";
 import {
@@ -115,13 +112,6 @@ export default function CandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
 
   // Recruiters (and admin / SA) get the redaction + share-link UI used to
   // present candidates to external hiring clients. Direct-hiring employers
@@ -281,19 +271,7 @@ export default function CandidateDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
+    <AppShell bgClassName="bg-background">
         <div>
           <div className="max-w-6xl mx-auto p-6">
             <ServicesNav />
@@ -590,9 +568,7 @@ export default function CandidateDetail() {
               </div>
             )}
           </div>
-          <Footer />
         </div>
-      </div>
 
       {row && showShareUI && (
         <ShareCreationDialog
@@ -604,6 +580,6 @@ export default function CandidateDetail() {
           onShareCreated={(share) => setShares((prev) => [share, ...prev])}
         />
       )}
-    </div>
+    </AppShell>
   );
 }

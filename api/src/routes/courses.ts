@@ -36,9 +36,9 @@
  *     PATCH  /api/courses/enrollments/:enrollmentId/progress  — update lesson progress
  */
 import { Hono } from "hono";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -46,24 +46,40 @@ import {
   COURSE_DIFFICULTIES,
   SCORM_VERSIONS,
 } from "../db/schema/courses.js";
+import { SCORM_COMPLETION_STATUSES, XAPI_VERBS } from "../db/schema/learning.js";
 import { slugify } from "../../../shared/slugify.js";
 import { isUuid } from "../../../shared/value-types.js";
+import { USER_ROLES, pickScoringRole } from "../../../shared/user-roles.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
+import { LearningPathService } from "../services/learning/learning-path-service.js";
+import { CertificateService } from "../services/learning/certificate-service.js";
+import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
+import { getJwtSecret } from "../utils/jwt.js";
 
 const {
   courses,
   courseModules,
   courseLessons,
   courseEnrollments,
+  courseCertificates,
   creatorProfiles,
   users,
   userProfiles,
+  coursePrerequisites,
+  learningPathCourses,
+  scormCmiStates,
+  xapiStatements,
 } = schema;
 
 export const courseRoutes = new Hono<{ Variables: Variables }>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+function userRoles(c: any): string[] {
+  const r = c.var.user?.roles;
+  return Array.isArray(r) ? (r as string[]) : [];
 }
 
 async function getCoursesEnrollment(db: ReturnType<typeof getDb>, userId: string) {
@@ -76,6 +92,26 @@ async function getCoursesEnrollment(db: ReturnType<typeof getDb>, userId: string
     ))
     .limit(1);
   return row ?? null;
+}
+
+/** Authoring eligibility for courses + paths. Creator-program enrollees
+ *  OR users holding the `employer` role. Single seam used by every
+ *  create / publish handler in courses.ts + learning-paths.ts (rule:
+ *  feedback_extract_on_duplication). Employers get
+ *  `isEmployerAuthored=true` on the row so the public marketplace can
+ *  scope listings. */
+async function resolveAuthorEligibility(
+  db: ReturnType<typeof getDb>,
+  c: any,
+): Promise<{ ok: true; isEmployerAuthored: boolean } | { ok: false }> {
+  const userId = uid(c);
+  if (!userId) return { ok: false };
+  if (userRoles(c).includes(USER_ROLES.EMPLOYER)) {
+    return { ok: true, isEmployerAuthored: true };
+  }
+  const creator = await getCoursesEnrollment(db, userId);
+  if (creator) return { ok: true, isEmployerAuthored: false };
+  return { ok: false };
 }
 
 async function ownsCourse(db: ReturnType<typeof getDb>, userId: string, courseId: string) {
@@ -359,12 +395,12 @@ courseRoutes.post("/", async (c) => {
   }
   const db = getDb();
 
-  const enrollment = await getCoursesEnrollment(db, userId);
-  if (!enrollment) {
+  const eligibility = await resolveAuthorEligibility(db, c);
+  if (!eligibility.ok) {
     return c.json(
       error(
-        "PROGRAM_NOT_ENROLLED",
-        "Authoring courses requires enrollment in the Courses Creator Program. Visit /services to enroll.",
+        "AUTHORING_NOT_ELIGIBLE",
+        "Authoring courses requires the Courses Creator Program (creators) or the employer role. Visit /services to enroll.",
       ),
       403,
     );
@@ -400,6 +436,7 @@ courseRoutes.post("/", async (c) => {
     priceVisible: parsed.data.priceVisible ?? true,
     issuesCertificate: parsed.data.issuesCertificate ?? false,
     passingScorePct: parsed.data.passingScorePct ?? null,
+    isEmployerAuthored: eligibility.isEmployerAuthored,
     status: "draft",
   } as any).returning();
   return c.json(success(created), 201);
@@ -475,9 +512,9 @@ courseRoutes.post("/:id/publish", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
 
-  const enrollment = await getCoursesEnrollment(db, userId);
-  if (!enrollment) {
-    return c.json(error("PROGRAM_NOT_ENROLLED", "Re-enable the Courses Creator Program at /services to publish."), 403);
+  const eligibility = await resolveAuthorEligibility(db, c);
+  if (!eligibility.ok) {
+    return c.json(error("AUTHORING_NOT_ELIGIBLE", "Re-enable the Courses Creator Program at /services to publish (or hold the employer role)."), 403);
   }
 
   const [existing] = await db.select().from(courses)
@@ -491,11 +528,28 @@ courseRoutes.post("/:id/publish", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Add at least one lesson before publishing."), 400);
   }
 
+  // Republish is a no-op for gamification; only flip-to-published from
+  // never-published earns the COURSE_PUBLISHED action. The dedup-uniq
+  // on refId=courseId in the points ledger collapses re-publish attempts.
+  const wasUnpublished = existing.publishedAt == null;
+
   const [updated] = await db.update(courses).set({
     status: "published",
     publishedAt: new Date(),
     updatedAt: new Date(),
   } as any).where(eq(courses.id, existing.id)).returning();
+
+  if (wasUnpublished) {
+    await withGamification(c, "course-published", (game, role, uid2) =>
+      game.onCoursePublished({
+        userId: uid2,
+        role,
+        courseId: existing.id,
+        metadata: { title: existing.title, isEmployerAuthored: existing.isEmployerAuthored },
+      }),
+    );
+  }
+
   return c.json(success(updated), 200);
 });
 
@@ -759,6 +813,18 @@ courseRoutes.post("/:id/enroll", async (c) => {
     .limit(1);
   if (!course) return c.json(error("NOT_FOUND", "Course not found"), 404);
 
+  // Prerequisite gate (#161 sub-of-#160). Every direct prereq must already
+  // be passed by this user; the closure-walk happens in the service.
+  const pathService = new LearningPathService(db);
+  const unlockState = await pathService.computeUnlockState(userId, [course.id]);
+  if (!unlockState.unlocked.has(course.id)) {
+    const missing = unlockState.locked.get(course.id) ?? [];
+    return c.json(
+      error("PREREQUISITES_NOT_MET", `Pass the prerequisite course(s) first: ${missing.join(", ")}`),
+      409,
+    );
+  }
+
   // Free courses only for now — paid enrolment goes through the existing cart
   // checkout flow, which posts the payment_ref + paid_at on success. Returns
   // 402 to signal frontend to route to checkout instead.
@@ -809,7 +875,9 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
   if (!existing) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
 
   const lessonId = parsed.data.lessonId;
+  const wasPassed = existing.passed;
   const now = new Date().toISOString();
+  const prevLessonStatus = (existing.progress?.[lessonId] as { status?: string } | undefined)?.status;
   const nextProgress = {
     ...(existing.progress ?? {}),
     [lessonId]: {
@@ -821,11 +889,420 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
     },
   };
 
+  // Course completion check: every required lesson now passed.
+  const allLessons = await db.select({
+      id: courseLessons.id,
+      isRequired: courseLessons.isRequired,
+    })
+    .from(courseLessons)
+    .where(eq(courseLessons.courseId, existing.courseId));
+  const requiredIds = allLessons.filter((l) => l.isRequired).map((l) => l.id);
+  const passedRequired = requiredIds.filter((id) =>
+    (nextProgress as Record<string, { status?: string }>)[id]?.status === "passed",
+  );
+  const courseNowPassed = requiredIds.length > 0 && passedRequired.length === requiredIds.length;
+
+  // Compute aggregate final score (avg of scoreRaw/scoreMax * 100 for
+  // lessons that reported a score). Falls back to null when no lessons
+  // reported a score (Studio-video lessons without an assessment).
+  let scoreSum = 0;
+  let scoreCount = 0;
+  for (const l of allLessons) {
+    const lp = (nextProgress as Record<string, { scoreRaw?: number; scoreMax?: number }>)[l.id];
+    if (lp?.scoreRaw != null && lp?.scoreMax && lp.scoreMax > 0) {
+      scoreSum += (lp.scoreRaw / lp.scoreMax) * 100;
+      scoreCount += 1;
+    }
+  }
+  const finalScorePct = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
+
+  const [enrollmentRow] = await db.select({ courseId: courseEnrollments.courseId }).from(courseEnrollments)
+    .where(eq(courseEnrollments.id, existing.id)).limit(1);
+  const [courseRow] = await db.select({ passingScorePct: courses.passingScorePct, issuesCertificate: courses.issuesCertificate }).from(courses)
+    .where(eq(courses.id, enrollmentRow!.courseId)).limit(1);
+
+  const meetsPassingScore = courseRow?.passingScorePct == null
+    || (finalScorePct ?? 0) >= courseRow.passingScorePct;
+  const flipToPassed = !wasPassed && courseNowPassed && meetsPassingScore;
+
   const [updated] = await db.update(courseEnrollments).set({
     progress: nextProgress,
     startedAt: existing.startedAt ?? new Date(),
+    completedAt: flipToPassed ? new Date() : existing.completedAt,
+    passed: flipToPassed ? true : existing.passed,
+    finalScorePct,
     updatedAt: new Date(),
   } as any).where(eq(courseEnrollments.id, existing.id)).returning();
 
+  // ── Gamification + cert + path completion fan-out ────────────────
+  // Only fire on transitions (not idempotent "passed again" PATCHes).
+  if (parsed.data.status === "passed" && prevLessonStatus !== "passed") {
+    await withGamification(c, "lesson-completed", (game, role, uid2) =>
+      game.onLessonCompleted({
+        userId: uid2,
+        role,
+        courseId: existing.courseId,
+        lessonId,
+        enrollmentId: existing.id,
+      }),
+    );
+  }
+
+  if (flipToPassed) {
+    await db.update(courses)
+      .set({ completionCount: sql`${courses.completionCount} + 1` } as any)
+      .where(eq(courses.id, existing.courseId))
+      .catch(() => undefined);
+
+    await withGamification(c, "course-passed", (game, role, uid2) =>
+      game.onCoursePassed({
+        userId: uid2,
+        role,
+        courseId: existing.courseId,
+        enrollmentId: existing.id,
+        metadata: { finalScorePct },
+      }),
+    );
+
+    // Auto-issue cert if the course offers one.
+    if (courseRow?.issuesCertificate) {
+      try {
+        const certService = new CertificateService(db, getJwtSecret());
+        const issued = await certService.issueForEnrollment(userId, existing.id);
+        if (issued?.newlyIssued) {
+          await withGamification(c, "certificate-earned", (game, role, uid2) =>
+            game.onCertificateEarned({
+              userId: uid2,
+              role,
+              certificateId: issued.certificate.id,
+              metadata: { certNumber: issued.certificate.certNumber, courseId: existing.courseId },
+            }),
+          );
+        }
+      } catch (e) {
+        console.warn("[courses] cert issuance failed", e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    // Path completion fan-out — for every path this course belongs to,
+    // check whether the user has now finished it.
+    try {
+      const pathSlots = await db.select({ pathId: learningPathCourses.pathId })
+        .from(learningPathCourses)
+        .where(eq(learningPathCourses.courseId, existing.courseId));
+      const role = pickScoringRole(c.var.user?.roles);
+      if (role && pathSlots.length > 0) {
+        const pathService = new LearningPathService(db);
+        const game = gamificationFromContext(c);
+        for (const slot of pathSlots) {
+          const { newlyCompleted, enrollmentId: pathEnrollmentId } =
+            await pathService.maybeCompletePathEnrollment(userId, slot.pathId);
+          if (newlyCompleted && pathEnrollmentId) {
+            await game.onLearningPathCompleted({
+              userId,
+              role,
+              pathId: slot.pathId,
+              enrollmentId: pathEnrollmentId,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[courses] path-completion fan-out failed", e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return c.json(success(updated), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Prerequisites (DAG edges)
+// ---------------------------------------------------------------------------
+
+const PrerequisiteSchema = z.object({
+  prerequisiteCourseId: z.string().uuid(),
+});
+
+courseRoutes.get("/:id/prerequisites", async (c) => {
+  const db = getDb();
+  const courseId = c.req.param("id");
+  const service = new LearningPathService(db);
+  const prereqIds = await service.listPrerequisites(courseId);
+  if (prereqIds.length === 0) return c.json(success([]), 200);
+  const rows = await db.select({
+      id: courses.id,
+      title: courses.title,
+      slug: courses.slug,
+      coverImageUrl: courses.coverImageUrl,
+    })
+    .from(courses)
+    .where(inArray(courses.id, prereqIds));
+  return c.json(success(rows), 200);
+});
+
+courseRoutes.post("/:id/prerequisites", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = PrerequisiteSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const db = getDb();
+  const courseId = c.req.param("id");
+  if (!(await ownsCourse(db, userId, courseId))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
+  // Validate the prereq exists (any visibility — author may chain to a
+  // draft of their own; cross-author chaining is allowed).
+  const [prereq] = await db.select({ id: courses.id }).from(courses)
+    .where(eq(courses.id, parsed.data.prerequisiteCourseId)).limit(1);
+  if (!prereq) return c.json(error("VALIDATION_ERROR", "Prerequisite course not found"), 400);
+
+  try {
+    const service = new LearningPathService(db);
+    const result = await service.addPrerequisite(courseId, parsed.data.prerequisiteCourseId);
+    return c.json(success(result), result.created ? 201 : 200);
+  } catch (e) {
+    return c.json(error("CYCLE", e instanceof Error ? e.message : "Cycle"), 409);
+  }
+});
+
+courseRoutes.delete("/:id/prerequisites/:prereqId", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const courseId = c.req.param("id");
+  if (!(await ownsCourse(db, userId, courseId))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
+  const service = new LearningPathService(db);
+  const result = await service.removePrerequisite(courseId, c.req.param("prereqId"));
+  return c.json(success(result), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Certificate issuance + listing
+// ---------------------------------------------------------------------------
+
+courseRoutes.post("/enrollments/:enrollmentId/certificate", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const certService = new CertificateService(db, getJwtSecret());
+  const result = await certService.issueForEnrollment(userId, c.req.param("enrollmentId"));
+  if (!result) {
+    return c.json(error("NOT_ELIGIBLE", "Enrollment is not eligible for a certificate (must be passed, and the course must issue certs)."), 409);
+  }
+  if (result.newlyIssued) {
+    await withGamification(c, "certificate-earned", (game, role, uid2) =>
+      game.onCertificateEarned({
+        userId: uid2,
+        role,
+        certificateId: result.certificate.id,
+        metadata: { certNumber: result.certificate.certNumber },
+      }),
+    );
+  }
+  return c.json(success(result.certificate), result.newlyIssued ? 201 : 200);
+});
+
+courseRoutes.get("/me/certificates", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const rows = await db.select().from(courseCertificates)
+    .where(eq(courseCertificates.userId, userId))
+    .orderBy(desc(courseCertificates.issuedAt));
+  return c.json(success(rows), 200);
+});
+
+// ---------------------------------------------------------------------------
+// SCORM CMI persistence (#161) — runtime calls this from the lesson player
+// ---------------------------------------------------------------------------
+
+const ScormCommitSchema = z.object({
+  lessonId: z.string().uuid(),
+  scormVersion: z.enum(SCORM_VERSIONS),
+  cmi: z.record(z.unknown()),
+  completionStatus: z.enum(SCORM_COMPLETION_STATUSES).optional(),
+  scoreRaw: z.number().optional(),
+  scoreMin: z.number().optional(),
+  scoreMax: z.number().optional(),
+  totalTimeSec: z.number().int().min(0).optional(),
+  suspendData: z.string().optional(),
+});
+
+courseRoutes.post("/scorm/:enrollmentId/commit", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = ScormCommitSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const db = getDb();
+  const enrollmentId = c.req.param("enrollmentId");
+  // Authorise via enrollment ownership.
+  const [enrollment] = await db.select({ id: courseEnrollments.id, courseId: courseEnrollments.courseId })
+    .from(courseEnrollments)
+    .where(and(
+      eq(courseEnrollments.id, enrollmentId),
+      eq(courseEnrollments.userId, userId),
+    ))
+    .limit(1);
+  if (!enrollment) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
+
+  // Lesson must belong to the enrollment's course.
+  const [lesson] = await db.select({ id: courseLessons.id })
+    .from(courseLessons)
+    .where(and(
+      eq(courseLessons.id, parsed.data.lessonId),
+      eq(courseLessons.courseId, enrollment.courseId),
+    ))
+    .limit(1);
+  if (!lesson) return c.json(error("NOT_FOUND", "Lesson not found on this course"), 404);
+
+  const [existing] = await db.select().from(scormCmiStates)
+    .where(and(
+      eq(scormCmiStates.enrollmentId, enrollmentId),
+      eq(scormCmiStates.lessonId, parsed.data.lessonId),
+    ))
+    .limit(1);
+
+  if (existing) {
+    const [updated] = await db.update(scormCmiStates).set({
+      cmi: parsed.data.cmi,
+      completionStatus: parsed.data.completionStatus ?? existing.completionStatus,
+      scoreRaw: parsed.data.scoreRaw ?? existing.scoreRaw,
+      scoreMin: parsed.data.scoreMin ?? existing.scoreMin,
+      scoreMax: parsed.data.scoreMax ?? existing.scoreMax,
+      totalTimeSec: parsed.data.totalTimeSec ?? existing.totalTimeSec,
+      suspendData: parsed.data.suspendData ?? existing.suspendData,
+      scormVersion: parsed.data.scormVersion,
+      updatedAt: new Date(),
+    } as never).where(eq(scormCmiStates.id, existing.id)).returning();
+    return c.json(success(updated), 200);
+  }
+
+  const [created] = await db.insert(scormCmiStates).values({
+    enrollmentId,
+    lessonId: parsed.data.lessonId,
+    scormVersion: parsed.data.scormVersion,
+    cmi: parsed.data.cmi,
+    completionStatus: parsed.data.completionStatus ?? null,
+    scoreRaw: parsed.data.scoreRaw ?? null,
+    scoreMin: parsed.data.scoreMin ?? null,
+    scoreMax: parsed.data.scoreMax ?? null,
+    totalTimeSec: parsed.data.totalTimeSec ?? 0,
+    suspendData: parsed.data.suspendData ?? null,
+  } as never).returning();
+  return c.json(success(created), 201);
+});
+
+courseRoutes.get("/scorm/:enrollmentId/:lessonId", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [enrollment] = await db.select({ id: courseEnrollments.id })
+    .from(courseEnrollments)
+    .where(and(
+      eq(courseEnrollments.id, c.req.param("enrollmentId")),
+      eq(courseEnrollments.userId, userId),
+    ))
+    .limit(1);
+  if (!enrollment) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
+
+  const [row] = await db.select().from(scormCmiStates)
+    .where(and(
+      eq(scormCmiStates.enrollmentId, c.req.param("enrollmentId")),
+      eq(scormCmiStates.lessonId, c.req.param("lessonId")),
+    ))
+    .limit(1);
+  return c.json(success(row ?? null), 200);
+});
+
+// ---------------------------------------------------------------------------
+// xAPI / Tin Can statement ingest (#161 sub) — accepts statements from the
+// Studio-video lesson player as well as SCORM runtimes. Single internal LRS
+// table; external-LRS mirroring lands later for enterprise customers.
+// ---------------------------------------------------------------------------
+
+const XapiStatementSchema = z.object({
+  enrollmentId: z.string().uuid().optional(),
+  lessonId: z.string().uuid().optional(),
+  courseId: z.string().uuid().optional(),
+  verb: z.object({
+    id: z.string().min(1).max(255),
+    display: z.string().max(80).optional(),
+  }),
+  object: z.object({
+    id: z.string().min(1).max(255),
+    objectType: z.string().max(40).optional(),
+  }),
+  result: z.object({
+    score: z.object({ scaled: z.number().optional(), raw: z.number().optional() }).optional(),
+    success: z.boolean().optional(),
+    completion: z.boolean().optional(),
+    duration: z.string().optional(),
+  }).optional(),
+  context: z.record(z.unknown()).optional(),
+  timestamp: z.string().optional(),
+});
+
+courseRoutes.post("/xapi/statements", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = XapiStatementSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const db = getDb();
+  // Authorise enrollment ownership when one is provided.
+  if (parsed.data.enrollmentId) {
+    const [e] = await db.select({ id: courseEnrollments.id })
+      .from(courseEnrollments)
+      .where(and(
+        eq(courseEnrollments.id, parsed.data.enrollmentId),
+        eq(courseEnrollments.userId, userId),
+      ))
+      .limit(1);
+    if (!e) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
+  }
+
+  const resultScore = parsed.data.result?.score?.scaled
+    ?? parsed.data.result?.score?.raw
+    ?? null;
+
+  const [created] = await db.insert(xapiStatements).values({
+    userId,
+    enrollmentId: parsed.data.enrollmentId ?? null,
+    lessonId: parsed.data.lessonId ?? null,
+    courseId: parsed.data.courseId ?? null,
+    verbId: parsed.data.verb.id,
+    verbDisplay: parsed.data.verb.display ?? null,
+    objectId: parsed.data.object.id,
+    objectType: parsed.data.object.objectType ?? "Activity",
+    resultScore,
+    resultSuccess: parsed.data.result?.success ?? null,
+    statement: parsed.data as Record<string, unknown>,
+  } as never).returning({ id: xapiStatements.id });
+
+  // If this xAPI statement is a passed/completed verb against a known
+  // lesson, mirror it into PATCH-progress so the gamification + cert
+  // pipeline fires once. We don't double-fire — the dedup-uniq on the
+  // lesson-completed action collapses repeats.
+  const isCompletion = parsed.data.verb.id === XAPI_VERBS.PASSED.id
+    || parsed.data.verb.id === XAPI_VERBS.COMPLETED.id;
+  if (isCompletion && parsed.data.enrollmentId && parsed.data.lessonId) {
+    await withGamification(c, "xapi-completed", (game, role, uid2) =>
+      game.onLessonCompleted({
+        userId: uid2,
+        role,
+        courseId: parsed.data.courseId ?? "",
+        lessonId: parsed.data.lessonId!,
+        enrollmentId: parsed.data.enrollmentId!,
+      }),
+    );
+  }
+
+  return c.json(success({ id: created!.id }), 201);
 });

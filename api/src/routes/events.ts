@@ -361,6 +361,107 @@ eventRoutes.get("/:id/matches", async (c) => {
   return c.json(success({ matches: out }), 200);
 });
 
+// ─── GET /:id/analytics — host-only RSVP funnel + counters ────────────
+eventRoutes.get("/:id/analytics", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const deps = buildApiDeps(getEnv(c));
+  const event = await deps.repos.events.findById(c.req.param("id"));
+  if (!event) return c.json(error("NOT_FOUND", "Event not found"), 404);
+
+  const isHost = event.hostUserId === userId || event.userId === userId;
+  const coHosts = await deps.repos.events.findCoHostsByEvent(event.id);
+  const isCoHost = coHosts.some((c) => c.userId === userId);
+  if (!isHost && !isCoHost) {
+    return c.json(error("FORBIDDEN", "Host or co-host access required"), 403);
+  }
+
+  const [going, maybe, declined, waitlist, pending] = await Promise.all([
+    deps.repos.events.countAttendees(event.id, "going"),
+    deps.repos.events.countAttendees(event.id, "maybe"),
+    deps.repos.events.countAttendees(event.id, "declined"),
+    deps.repos.events.countAttendees(event.id, "waitlist"),
+    deps.repos.events.countAttendees(event.id, "going").then(async () => {
+      // Approved-pending split: count attendees whose approvalStatus = 'pending'.
+      const all = await deps.repos.events.findAttendeesByEvent(event.id);
+      return all.filter((a) => a.approvalStatus === "pending").length;
+    }),
+  ]);
+
+  const all = await deps.repos.events.findAttendeesByEvent(event.id);
+  const checkedIn = all.filter((a) => a.checkedInAt).length;
+
+  return c.json(
+    success({
+      counts: { going, maybe, declined, waitlist, pendingApproval: pending, checkedIn },
+      capacity: event.capacity,
+      attendeeCount: event.attendeeCount,
+      waitlistCount: event.waitlistCount,
+      published: Boolean(event.publishedAt),
+      cancelled: Boolean(event.cancelledAt),
+    }),
+    200,
+  );
+});
+
+// ─── GET /:id/attendees/export.csv — host-only attendee CSV ───────────
+eventRoutes.get("/:id/attendees/export.csv", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const deps = buildApiDeps(getEnv(c));
+  const event = await deps.repos.events.findById(c.req.param("id"));
+  if (!event) return c.json(error("NOT_FOUND", "Event not found"), 404);
+
+  const isHost = event.hostUserId === userId || event.userId === userId;
+  const coHosts = await deps.repos.events.findCoHostsByEvent(event.id);
+  const isCoHost = coHosts.some((c) => c.userId === userId);
+  if (!isHost && !isCoHost) {
+    return c.json(error("FORBIDDEN", "Host or co-host access required"), 403);
+  }
+
+  const attendees = await deps.repos.events.findAttendeesByEvent(event.id);
+  const userIds = attendees.map((a) => a.userId).filter(Boolean) as string[];
+  const users = await Promise.all(userIds.map((id) => deps.repos.users.findById(id)));
+  const byId = new Map(userIds.map((id, i) => [id, users[i] as any]));
+
+  const esc = (v: string | null | undefined) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [
+    "name,email,rsvp_status,approval_status,plus_ones,rsvped_at,checked_in_at,cancelled_at",
+  ];
+  for (const a of attendees) {
+    const u = a.userId ? byId.get(a.userId) : null;
+    const name =
+      u?.profile?.displayName ??
+      [u?.firstName, u?.lastName].filter(Boolean).join(" ") ??
+      a.guestName ??
+      "";
+    const email = u?.email ?? a.guestEmail ?? "";
+    lines.push(
+      [
+        esc(name),
+        esc(email),
+        esc(a.rsvpStatus),
+        esc(a.approvalStatus),
+        esc(String(a.plusOneCount)),
+        esc(a.rsvpedAt?.toISOString() ?? null),
+        esc(a.checkedInAt?.toISOString() ?? null),
+        esc(a.cancelledAt?.toISOString() ?? null),
+      ].join(","),
+    );
+  }
+
+  return new Response(lines.join("\n"), {
+    status: 200,
+    headers: {
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="event-${event.slug ?? event.id}-attendees.csv"`,
+    },
+  });
+});
+
 // ─── POST /:id/blast — host announcement to all approved attendees ────
 eventRoutes.post("/:id/blast", async (c) => {
   const userId = c.var.user?.sub;

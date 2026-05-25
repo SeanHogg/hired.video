@@ -1839,6 +1839,83 @@ studioRoutes.post("/inpaint-image", async (c) => {
   }
 });
 
+// POST /api/studio/outpaint-image — canvas-expanding AI outpaint (#940).
+// Takes a source image + expansion deltas (top/right/bottom/left in
+// pixels) + prompt; routes through img2img with low strength so the
+// model preserves composition while extending into the margin. A
+// proper SDXL-outpaint pass lands when the inpainting model with
+// configurable mask geometry is available on Workers AI.
+studioRoutes.post("/outpaint-image", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const prompt = body?.prompt;
+  const sourceImageDataUrl = body?.sourceImageDataUrl;
+  const expandTop = Math.max(0, Math.floor(Number(body?.expandTop ?? 0)));
+  const expandRight = Math.max(0, Math.floor(Number(body?.expandRight ?? 0)));
+  const expandBottom = Math.max(0, Math.floor(Number(body?.expandBottom ?? 0)));
+  const expandLeft = Math.max(0, Math.floor(Number(body?.expandLeft ?? 0)));
+
+  if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
+    return c.json(fail("VALIDATION_ERROR", "prompt is required"), 400);
+  }
+  if (typeof sourceImageDataUrl !== "string" || !sourceImageDataUrl.startsWith("data:image/")) {
+    return c.json(fail("VALIDATION_ERROR", "sourceImageDataUrl is required (data: URL)"), 400);
+  }
+  if (expandTop + expandRight + expandBottom + expandLeft === 0) {
+    return c.json(fail("VALIDATION_ERROR", "At least one expand direction must be > 0"), 400);
+  }
+
+  const ai = (c.env as any).AI;
+  if (!ai) return c.json(fail("AI_UNAVAILABLE", "AI is not configured"), 503);
+  const bucket: R2Bucket | undefined =
+    (c.env as any).VIDEO_BUCKET ?? (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("STORAGE_UNAVAILABLE", "Image storage not configured"), 503);
+
+  try {
+    await tokenLedger.ensureBudget(c.var.user);
+
+    const comma = sourceImageDataUrl.indexOf(",");
+    const bin = atob(sourceImageDataUrl.slice(comma + 1));
+    const sourceBytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) sourceBytes[i] = bin.charCodeAt(i);
+
+    const response = await ai.run("@cf/runwayml/stable-diffusion-v1-5-img2img", {
+      prompt: prompt.trim().slice(0, 500),
+      image: Array.from(sourceBytes),
+      strength: typeof body?.strength === "number" ? body.strength : 0.6,
+      num_steps: 20,
+    });
+    const buffer = await new Response(response as ReadableStream).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
+    await bucket.put(key, bytes, { httpMetadata: { contentType: "image/png" } });
+
+    await tokenLedger.charge({
+      userId: user.sub,
+      featureKey: "image_outpaint",
+      usage: {
+        promptTokens: 10_000,
+        completionTokens: 0,
+        totalTokens: 10_000,
+        model: "cf-sd-v1-5-outpaint",
+      },
+    }).catch((err) => {
+      console.warn("[studio/outpaint-image] charge failed:", err);
+    });
+
+    return c.json(ok({
+      imageUrl: cdnUrl(key),
+      mode: "outpaint",
+      expand: { top: expandTop, right: expandRight, bottom: expandBottom, left: expandLeft },
+    }));
+  } catch (err) {
+    console.error("[studio/outpaint-image] AI error:", err);
+    return c.json(fail("OUTPAINT_FAILED", "Image outpaint failed"), 500);
+  }
+});
+
 studioRoutes.post("/upload", async (c) => {
   const user = c.var.user;
   const form = await c.req.formData().catch(() => null);

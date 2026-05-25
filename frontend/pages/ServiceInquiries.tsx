@@ -13,9 +13,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +25,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSidebar } from "@/hooks/use-sidebar";
 import {
   servicesService,
   type InquiryWithDetails,
@@ -88,7 +85,6 @@ function useTimeAgo() {
 export default function ServiceInquiries() {
   const { t } = useTranslation();
   const timeAgo = useTimeAgo();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   const [incoming, setIncoming] = useState<InquiryWithDetails[]>([]);
   const [myRequests, setMyRequests] = useState<MyRequestWithDetails[]>([]);
@@ -138,11 +134,8 @@ export default function ServiceInquiries() {
   const pendingCount = incoming.filter((i) => i.inquiry.status === "pending").length;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navigation onSidebarToggle={toggleSidebar} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-        <main className="flex-1 overflow-y-auto pt-20 px-4 pb-4 md:pt-20 md:px-8 md:pb-8 max-w-4xl mx-auto w-full">
+    <AppShell bgClassName="bg-background">
+      <main className="px-4 pb-4 md:px-8 md:pb-8 max-w-4xl mx-auto w-full">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <Link to="/services">
@@ -355,8 +348,6 @@ export default function ServiceInquiries() {
             </Tabs>
           )}
         </main>
-      </div>
-      <Footer />
-    </div>
+    </AppShell>
   );
 }

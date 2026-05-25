@@ -182,7 +182,7 @@ export default function Workers() {
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">{w.description}</p>
 
-                <div className="grid grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <Metric label={t("labels.cadence")} value={formatCadence(w.cadenceMs)} />
                   <Metric label={t("labels.batchSize")} value={String(w.batchSize)} />
                   <Metric
@@ -192,7 +192,7 @@ export default function Workers() {
                 </div>
 
                 {w.latestRun && (
-                  <div className="grid grid-cols-4 gap-3 text-xs border-t pt-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs border-t pt-3">
                     <Metric label={t("labels.scanned")} value={String(w.latestRun.itemsScanned)} />
                     <Metric label={t("labels.changed")} value={String(w.latestRun.itemsChanged)} />
                     <Metric label={t("labels.skipped")} value={String(w.latestRun.itemsSkipped)} />
@@ -451,7 +451,7 @@ function RunDetailDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-4 gap-3 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <Metric label={t("labels.scanned")} value={String(run.itemsScanned)} />
               <Metric label={t("labels.changed")} value={String(run.itemsChanged)} />
               <Metric label={t("labels.skipped")} value={String(run.itemsSkipped)} />

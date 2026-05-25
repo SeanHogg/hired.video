@@ -17,7 +17,7 @@
  * inline), but the chip dimensions + colour palette + label text are all
  * driven from `@shared/media-kinds` so a rename in one place propagates.
  */
-import { AudioWaveform, BookOpen, Film, Gamepad2, Headphones, Image as ImageIcon, Ruler, Sparkles } from "lucide-react";
+import { AudioWaveform, BookOpen, Box, Film, Gamepad2, Headphones, Image as ImageIcon, Ruler, Sparkles, Workflow } from "lucide-react";
 import {
   MEDIA_KIND_UI,
   type MediaKind,
@@ -39,6 +39,8 @@ const KIND_VISUAL: Record<MediaKind, {
   comic:     { Icon: BookOpen,       pillClassName: "bg-sky-600/90 text-white" },
   image:     { Icon: ImageIcon,      pillClassName: "bg-rose-600/90 text-white" },
   cad:       { Icon: Ruler,          pillClassName: "bg-cyan-600/90 text-white" },
+  cad_3d:    { Icon: Box,             pillClassName: "bg-teal-600/90 text-white" },
+  interactive_comic: { Icon: Workflow, pillClassName: "bg-indigo-600/90 text-white" },
 };
 
 interface MediaKindBadgeProps {
