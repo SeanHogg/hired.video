@@ -299,7 +299,7 @@ const FEATURE_ROWS: FeatureRow[] = [
       greenhouse: "partial",
       bullhorn: "partial",
     },
-    note: "WebSocket transport now lives at /api/chat/socket/:conversationId backed by a Cloudflare Durable Object (ChatRoom) — broadcasts message / typing / presence to every connected client. The `useChatRoom` hook wraps client reconnect-with-backoff. Migration of the existing REST chat surfaces to the new transport is in flight (#1233); platform parity on the underlying capability is complete.",
+    note: "WebSocket transport now lives at /api/chat/socket/:conversationId backed by a Cloudflare Durable Object (ChatRoom) — broadcasts message / typing / presence to every connected client. The `useChatRoom` hook wraps client reconnect-with-backoff. Migration of the existing REST chat surfaces to the new transport is in flight (#1261); platform parity on the underlying capability is complete.",
   },
   {
     feature: "Large integration marketplace (hundreds of partners)",
