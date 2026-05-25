@@ -1,0 +1,150 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": [
+        "#1e293b",
+        "#facc15",
+        "#0f172a",
+        "#fef9c3"
+      ],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "solid"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "POST-certified officer. 6 years patrol. Open to specialty units.",
+      "subtitle": "Your Name — POST cert [State], #XXXXX",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.1,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 1.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "credentials",
+      "start": 5,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Certification & training",
+      "items": [
+        "POST certified ([State], YYYY)",
+        "Crisis intervention (CIT), 2023",
+        "Field training officer, 2024",
+        "Firearms instructor certification"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "recent",
+      "start": 18,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Assignments",
+      "items": [
+        "Patrol division — first responder",
+        "Detective unit rotation (property crimes)",
+        "K9 handler — accelerant detection (specialty)"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "bring",
+      "start": 31,
+      "duration": 13,
+      "type": "skills",
+      "title": "What I bring",
+      "skills": [
+        "De-escalation training applied daily",
+        "Clean record, current background OK to re-run",
+        "Report writing that holds up in court",
+        "Comfortable rotating shifts + on-call"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "scaleIn",
+          "start": 0.5,
+          "duration": 0.6,
+          "easing": "spring"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 44,
+      "duration": 16,
+      "type": "closing",
+      "title": "Open to specialty unit roles — detective, K9, SWAT, training.",
+      "subtitle": "[email or department channel] · let's talk.",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 0.9,
+          "duration": 0.4,
+          "easing": "easeOut"
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "sector": "law_enforcement",
+    "recommendation": "POST cert / academy graduation + agency + assignment history. Specialty units (K9, SWAT, digital forensics) get callouts."
+  }
+}

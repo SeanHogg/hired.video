@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
-import type { ImageLayer, ImageState, LayerBlendMode } from "@shared/image-state";
+import type { ImageLayer, ImageState, LayerBlendMode, LayerFilters } from "@shared/image-state";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ interface DrawingLayersPanelProps {
   onRenameLayer: (layerId: string, label: string) => void;
   onSetOpacity: (layerId: string, opacity: number) => void;
   onSetBlendMode?: (layerId: string, blendMode: LayerBlendMode) => void;
+  onSetFilters?: (layerId: string, filters: LayerFilters | undefined) => void;
   onMoveLayer: (layerId: string, direction: "up" | "down") => void;
 }
 
@@ -45,6 +46,7 @@ export default function DrawingLayersPanel({
   onRenameLayer,
   onSetOpacity,
   onSetBlendMode,
+  onSetFilters,
   onMoveLayer,
 }: DrawingLayersPanelProps) {
   // Photoshop-convention display: top of the list = top of the stack.
@@ -85,6 +87,9 @@ export default function DrawingLayersPanel({
             onSetBlendMode={
               onSetBlendMode ? (mode) => onSetBlendMode(layer.id, mode) : undefined
             }
+            onSetFilters={
+              onSetFilters ? (filters) => onSetFilters(layer.id, filters) : undefined
+            }
             onMoveUp={() => onMoveLayer(layer.id, "up")}
             onMoveDown={() => onMoveLayer(layer.id, "down")}
           />
@@ -104,6 +109,7 @@ interface LayerRowProps {
   onRename: (label: string) => void;
   onSetOpacity: (opacity: number) => void;
   onSetBlendMode?: (mode: LayerBlendMode) => void;
+  onSetFilters?: (filters: LayerFilters | undefined) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
 }
@@ -137,6 +143,7 @@ function LayerRow({
   onRename,
   onSetOpacity,
   onSetBlendMode,
+  onSetFilters,
   onMoveUp,
   onMoveDown,
 }: LayerRowProps) {
@@ -281,8 +288,102 @@ function LayerRow({
               </select>
             </div>
           )}
+          {/* Per-layer filter chain (#940 Image Phase 2). Self-gates
+              on `onSetFilters` so legacy hosts without the handler
+              don't render the section. Each slider updates ONE filter
+              field; "Reset" clears the whole chain. */}
+          {onSetFilters && <LayerFiltersControls layer={layer} onChange={onSetFilters} />}
         </div>
       )}
     </div>
+  );
+}
+
+/** Per-layer filter sliders (#940 Image Phase 2). Each slider patches
+ *  one field of `layer.filters`; the compositor applies the chain via
+ *  Canvas-2D `ctx.filter` (see `layerFiltersToCss` in drawing-engine.ts).
+ *  Non-destructive — toggling values doesn't touch the raster. */
+const FILTER_DEFINITIONS: ReadonlyArray<{
+  key: keyof LayerFilters;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  identity: number;
+  formatter: (value: number) => string;
+}> = [
+  { key: "blur",       label: "Blur",       min: 0,   max: 40,  step: 0.5, identity: 0, formatter: (v) => `${v.toFixed(1)}px` },
+  { key: "brightness", label: "Brightness", min: 0,   max: 2,   step: 0.05, identity: 1, formatter: (v) => `${Math.round(v * 100)}%` },
+  { key: "contrast",   label: "Contrast",   min: 0,   max: 2,   step: 0.05, identity: 1, formatter: (v) => `${Math.round(v * 100)}%` },
+  { key: "saturate",   label: "Saturation", min: 0,   max: 2,   step: 0.05, identity: 1, formatter: (v) => `${Math.round(v * 100)}%` },
+  { key: "hueRotate",  label: "Hue",        min: 0,   max: 360, step: 1,   identity: 0, formatter: (v) => `${Math.round(v)}°` },
+  { key: "grayscale",  label: "Grayscale",  min: 0,   max: 1,   step: 0.05, identity: 0, formatter: (v) => `${Math.round(v * 100)}%` },
+  { key: "invert",     label: "Invert",     min: 0,   max: 1,   step: 0.05, identity: 0, formatter: (v) => `${Math.round(v * 100)}%` },
+];
+
+function LayerFiltersControls({
+  layer,
+  onChange,
+}: {
+  layer: ImageLayer;
+  onChange: (filters: LayerFilters | undefined) => void;
+}) {
+  const filters = layer.filters ?? {};
+  // Active = any field deviates from identity. Drives whether the
+  // "Reset" button is enabled.
+  const active = FILTER_DEFINITIONS.some(
+    (def) => filters[def.key] !== undefined && filters[def.key] !== def.identity,
+  );
+
+  function patch(key: keyof LayerFilters, value: number, identity: number): void {
+    const next: LayerFilters = { ...filters };
+    if (value === identity) {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+    // Empty object → undefined so the layer's filters field stays
+    // minimal in the persisted JSONB row.
+    const isEmpty = Object.values(next).every((v) => v === undefined);
+    onChange(isEmpty ? undefined : next);
+  }
+
+  return (
+    <details className="rounded border border-border/40 bg-muted/20 px-1.5 py-1">
+      <summary className="cursor-pointer text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        Filters {active && <span className="ml-1 rounded bg-brand-purple/20 px-1 text-brand-purple">on</span>}
+      </summary>
+      <div className="mt-1.5 space-y-1.5">
+        {FILTER_DEFINITIONS.map((def) => {
+          const value = filters[def.key] ?? def.identity;
+          return (
+            <div key={def.key} className="flex items-center gap-2">
+              <span className="w-16 text-[10px] text-muted-foreground">{def.label}</span>
+              <Slider
+                min={def.min}
+                max={def.max}
+                step={def.step}
+                value={[value]}
+                onValueChange={([next]) => patch(def.key, next ?? def.identity, def.identity)}
+                className="flex-1"
+              />
+              <span className="w-10 text-right text-[10px] tabular-nums text-muted-foreground">
+                {def.formatter(value)}
+              </span>
+            </div>
+          );
+        })}
+        {active && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-full text-[10px]"
+            onClick={() => onChange(undefined)}
+          >
+            Reset all filters
+          </Button>
+        )}
+      </div>
+    </details>
   );
 }

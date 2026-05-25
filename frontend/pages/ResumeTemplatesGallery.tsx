@@ -18,7 +18,7 @@ import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { SectorFilter, sectorFilterFromQuery, applySectorFilterToQuery } from "@/components/sector/SectorFilter";
 import { allSectors, sectorMeta, type Sector } from "@shared/sectors";
-import { sectorTemplateRec } from "@shared/sector-templates";
+import { sectorTemplateRec, sectorTemplateFile } from "@shared/sector-templates";
 import { VISUAL_THEMES } from "@/lib/studio/visual-themes";
 
 export default function ResumeTemplatesGallery() {
@@ -118,7 +118,18 @@ export default function ResumeTemplatesGallery() {
                   />
                   <p className="text-sm text-muted-foreground">{theme.desc}</p>
                   <Button asChild variant={isRecommended ? "default" : "outline"} className="w-full">
-                    <Link to={`/studio?template=${theme.file}`}>
+                    {/* When a sector is selected AND this is the
+                        recommended base theme, link to the sector-specific
+                        storyboard file (#1167) instead of the generic one
+                        — it pre-fills credentialing-forward scenes the
+                        sector needs. */}
+                    <Link
+                      to={`/studio?template=${
+                        isRecommended && selectedSector
+                          ? sectorTemplateFile(selectedSector)
+                          : theme.file
+                      }`}
+                    >
                       Open in studio
                     </Link>
                   </Button>

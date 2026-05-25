@@ -361,6 +361,8 @@ export class UserService {
       isCreator: payload.isCreator ?? undefined,
       creatorPrograms: payload.creatorPrograms ?? undefined,
       creatorProfile: payload.creatorProfile ?? undefined,
+      profileSections: payload.profileSections ?? undefined,
+      profileSectionsRaw: payload.profileSectionsRaw ?? undefined,
       slug: payload.slug || undefined,
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,

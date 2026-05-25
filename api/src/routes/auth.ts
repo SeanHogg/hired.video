@@ -314,11 +314,51 @@ authRoutes.post("/reset-password", authWriteRateLimiterMiddleware, async (c) => 
   return c.json(result.body as any, result.status as any);
 });
 
-/** POST /api/auth/verify-email — thin Hono adapter over handleVerifyEmail. */
+/** POST /api/auth/verify-email — thin Hono adapter over handleVerifyEmail.
+ *  On success, issues a fresh JWT carrying `emailVerified: true` so the
+ *  caller's NEXT request lands without bouncing off emailVerifiedMiddleware.
+ *  Without this, the user's stored token still has the pre-verification
+ *  claim and the first post-verify request 403s — even though the DB
+ *  row is correct. */
 authRoutes.post("/verify-email", async (c) => {
   const body = await c.req.json().catch(() => null);
   const result = await handleVerifyEmail(buildAuthDeps(c), body);
-  return c.json(result.body as any, result.status as any);
+  if (result.status !== 200) {
+    return c.json(result.body as any, result.status as any);
+  }
+
+  const payload = (result.body as { data?: { userId?: string } }).data;
+  const userId = payload?.userId;
+  if (!userId) return c.json(result.body as any, 200);
+
+  // Re-fetch the user so the new JWT carries the latest role list +
+  // mustChangePassword flag. Don't fail the verification if signing
+  // breaks — the DB write already succeeded; just return the no-token
+  // shape and let the caller fall back to a manual /auth/refresh.
+  try {
+    const db = getDb();
+    const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!u) return c.json(result.body as any, 200);
+    const token = await createJwt(
+      {
+        sub: u.id,
+        email: u.email,
+        roles: [u.role],
+        emailVerified: true,
+        mustChangePassword: u.mustChangePassword ?? false,
+      },
+      getJwtSecret(),
+    );
+    return c.json(
+      success({
+        token,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    );
+  } catch (e) {
+    console.warn("[verify-email] failed to issue fresh JWT", e);
+    return c.json(result.body as any, 200);
+  }
 });
 
 /** POST /api/auth/verify-2fa */

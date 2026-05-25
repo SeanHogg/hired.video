@@ -97,7 +97,7 @@ export default function PivotExplorer() {
       .then((resume) => {
         if (!alive) return;
         const tokens: string[] = [];
-        for (const skill of resume.skills ?? []) {
+        for (const skill of resume.content?.skills ?? []) {
           if (skill.name) tokens.push(skill.name);
           for (const kw of skill.keywords ?? []) {
             if (kw) tokens.push(kw);

@@ -8,13 +8,16 @@
  *   1. Hero — sector label + tagline + honest AI-resilience badge
  *   2. AI-resilience reality check — quotes `aiResilienceNotes`
  *   3. Example roles + licensure notes
- *   4. Live jobs in this sector (top 8 from /api/Job/public?sector=…)
- *   5. Articles split by audience (job_seeker / recruiter / pivot / resume_guide)
+ *   4. Live jobs in this sector (top 8 from `/api/Job?sector=…`,
+ *      omitted for content-only sectors like politics_civic)
+ *   5. Top articles in this sector (top 4 from `/api/articles/public?sector=…`)
  *   6. Recommended resume template + link to gallery
- *   7. CTA: post a job (employers) / start a pivot (seekers)
+ *   7. CTA: pivot from tech (job seekers)
  */
 
+import { useEffect, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
+import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,8 +27,12 @@ import {
   isValidSector,
   sectorMeta,
   type AIResilience,
+  type Sector,
 } from "@shared/sectors";
 import { sectorTemplateRec } from "@shared/sector-templates";
+import { jobService, type JobSummary } from "@/lib/services/job-service";
+import { articleService, type PublicArticleCard } from "@/lib/services/article-service";
+import { ArticleCard } from "@/components/article/ArticleCard";
 
 const RESILIENCE_LABEL: Record<AIResilience, string> = {
   high: "AI-resilient (high)",
@@ -38,6 +45,45 @@ const RESILIENCE_VARIANT: Record<AIResilience, "default" | "secondary" | "outlin
   medium: "secondary",
   low: "outline",
 };
+
+interface SectorLiveData {
+  jobs: JobSummary[];
+  articles: PublicArticleCard[];
+  loading: boolean;
+}
+
+/**
+ * Co-located fetch hook — keeps the data dependencies of SectorLanding
+ * in one place. Skips the jobs fetch for content-only sectors since
+ * `politics_civic` has no recruitable jobs by design.
+ */
+function useSectorLiveData(sector: Sector, contentOnly: boolean): SectorLiveData {
+  const [jobs, setJobs] = useState<JobSummary[]>([]);
+  const [articles, setArticles] = useState<PublicArticleCard[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const jobsPromise = contentOnly
+      ? Promise.resolve({ items: [] as JobSummary[] })
+      : jobService.getPublicJobs({ sector, limit: 8 }).catch(() => ({ items: [] as JobSummary[] }));
+    const articlesPromise = articleService
+      .listPublished({ sector, limit: 4 })
+      .catch(() => [] as PublicArticleCard[]);
+    void Promise.all([jobsPromise, articlesPromise]).then(([jobsRes, articlesRes]) => {
+      if (!alive) return;
+      setJobs((jobsRes as { items: JobSummary[] }).items ?? []);
+      setArticles(articlesRes);
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [sector, contentOnly]);
+
+  return { jobs, articles, loading };
+}
 
 export default function SectorLanding() {
   const { sector: rawSector } = useParams<{ sector: string }>();
@@ -57,6 +103,7 @@ export default function SectorLanding() {
 
   const meta = sectorMeta(rawSector);
   const rec = sectorTemplateRec(rawSector);
+  const { jobs, articles, loading } = useSectorLiveData(meta.slug, meta.contentOnly);
 
   return (
     <AppShell bgClassName="bg-background">
@@ -128,6 +175,62 @@ export default function SectorLanding() {
           )}
         </section>
 
+        {/* Live jobs — omitted for content-only sectors. */}
+        {!meta.contentOnly && (
+          <section className="max-w-6xl mx-auto px-6 py-8 space-y-4">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-2xl font-semibold tracking-tight">Open roles</h2>
+              <Link to={`/jobs?sector=${meta.slug}`} className="text-sm text-primary hover:underline">
+                See all →
+              </Link>
+            </div>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading jobs…</p>
+            ) : jobs.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  No {meta.label} jobs tagged yet — be the first to{" "}
+                  <Link to="/jobs/create" className="underline">
+                    post one
+                  </Link>
+                  .
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {jobs.map((job) => (
+                  <SectorJobTile key={job.id} job={job} />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Articles */}
+        <section className="max-w-6xl mx-auto px-6 py-8 space-y-4">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-2xl font-semibold tracking-tight">Sector guides</h2>
+            <Link to={`/articles?sector=${meta.slug}`} className="text-sm text-primary hover:underline">
+              See all →
+            </Link>
+          </div>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading articles…</p>
+          ) : articles.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                No articles published for {meta.label} yet.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {articles.map((a) => (
+                <ArticleCard key={a.id} article={a} />
+              ))}
+            </div>
+          )}
+        </section>
+
         {/* Recommended resume template */}
         <section className="max-w-6xl mx-auto px-6 py-8">
           <Card>
@@ -178,5 +281,33 @@ export default function SectorLanding() {
         )}
       </main>
     </AppShell>
+  );
+}
+
+function SectorJobTile({ job }: { job: JobSummary }) {
+  return (
+    <Link to={`/jobs/${job.id}`}>
+      <Card className="h-full hover:border-primary/50 transition-colors">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm line-clamp-2">{job.title}</CardTitle>
+          {job.company && (
+            <p className="text-xs text-muted-foreground line-clamp-1">{job.company}</p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-1 text-xs text-muted-foreground">
+          {job.location && (
+            <div className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              <span className="line-clamp-1">{job.location}</span>
+            </div>
+          )}
+          {job.isRemote && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              Remote
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

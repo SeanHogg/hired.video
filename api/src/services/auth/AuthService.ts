@@ -722,5 +722,10 @@ export async function handleVerifyEmail(deps: AuthDeps, body: unknown): Promise<
     .set({ used: true } as any)
     .where(eq(emailVerificationTokens.id, tokenRow.id));
 
-  return ok(null);
+  // Return the userId so the route adapter can issue a fresh JWT.
+  // Without this the caller's stored token still carries
+  // `emailVerified: false` and every subsequent request bounces off
+  // emailVerifiedMiddleware → 403, even though the DB row now reads
+  // verified.
+  return ok({ userId: tokenRow.userId });
 }

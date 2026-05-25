@@ -1,0 +1,150 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": [
+        "#831843",
+        "#f472b6",
+        "#500724",
+        "#fce7f3"
+      ],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "gradient"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Master stylist. 6 years behind the chair. Building my book.",
+      "subtitle": "Your Name — Licensed Cosmetologist, [State]",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.1,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 1.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "credentials",
+      "start": 5,
+      "duration": 13,
+      "type": "achievement",
+      "title": "License & training",
+      "items": [
+        "[State] Cosmetology license #XXXXX (active)",
+        "Advanced color training — [brand academy]",
+        "Extensions certified (NBR / Bellami)",
+        "Bridal updos — destination weddings, 2024"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "recent",
+      "start": 18,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Recent work",
+      "items": [
+        "Booth rental at [salon] — full book, 3-month waitlist",
+        "Editorial: [publication / shoot, 2023]",
+        "Specializing in lived-in color + curtain bangs"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "bring",
+      "start": 31,
+      "duration": 13,
+      "type": "skills",
+      "title": "What I bring",
+      "skills": [
+        "Portable book — clients follow me",
+        "Social media — IG @yourhandle (followers, engagement)",
+        "Mentor for newer stylists",
+        "Booth rental savvy — I run myself like a business"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "scaleIn",
+          "start": 0.5,
+          "duration": 0.6,
+          "easing": "spring"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 44,
+      "duration": 16,
+      "type": "closing",
+      "title": "Open to chair rental in [city] — modern salon, color-focused.",
+      "subtitle": "@yourhandle · DM to book a chair tour.",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 0.9,
+          "duration": 0.4,
+          "easing": "easeOut"
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "sector": "beauty_personal_care",
+    "recommendation": "Booth-rental practitioners + chair-rental + freelance work — your work IS the resume. Story-led emphasizes the visual portfolio over chronology."
+  }
+}

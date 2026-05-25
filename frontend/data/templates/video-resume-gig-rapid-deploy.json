@@ -1,0 +1,150 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": [
+        "#365314",
+        "#a3e635",
+        "#1a2e05",
+        "#f7fee7"
+      ],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "energetic",
+      "transition": "fade",
+      "background": "gradient"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Multi-app gig driver. 4 years, 12,000 rides, 4.97★.",
+      "subtitle": "Your Name — Rideshare, Delivery, On-Demand",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.1,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 1.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "credentials",
+      "start": 5,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Platforms & status",
+      "items": [
+        "Uber: Diamond tier, 4.97★",
+        "Lyft: Platinum, 5,200+ rides",
+        "DoorDash: Top Dasher, 99% on-time",
+        "Vehicle: [year/make], inspected current"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "recent",
+      "start": 18,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Recent stretch",
+      "items": [
+        "120+ hours/month, stable income tier",
+        "Multi-app stacked for peak earnings",
+        "Specialty: airport runs + late-night"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "bring",
+      "start": 31,
+      "duration": 13,
+      "type": "skills",
+      "title": "What I bring",
+      "skills": [
+        "Reliable — never deactivated, never suspended",
+        "Customer service rating in top 1%",
+        "Clean driving record (current MVR available)",
+        "Available [shifts you want]"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "scaleIn",
+          "start": 0.5,
+          "duration": 0.6,
+          "easing": "spring"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 44,
+      "duration": 16,
+      "type": "closing",
+      "title": "Open to W-2 driving roles — courier, last-mile, fleet.",
+      "subtitle": "[phone] · ready to start [date].",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 0.9,
+          "duration": 0.4,
+          "easing": "easeOut"
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "sector": "gig_work",
+    "recommendation": "Platform onboarding is the screen — what you need is reliability + availability + vehicle/equipment status. Keep it short."
+  }
+}

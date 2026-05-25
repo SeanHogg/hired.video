@@ -26,7 +26,7 @@ export default function VerifyEmail(): JSX.Element {
 
   useSEO(location.pathname);
 
-  const { user, isAuthenticated, resendEmailVerification, getVerificationStatus, logout } = useAuth();
+  const { user, isAuthenticated, resendEmailVerification, getVerificationStatus, logout, loginWithToken } = useAuth();
 
   const [email, setEmail] = useState<string | undefined>(hintedEmail);
   const [statusLoading, setStatusLoading] = useState<boolean>(false);
@@ -45,14 +45,28 @@ export default function VerifyEmail(): JSX.Element {
     if (!verifyToken) return;
     setTokenVerifying(true);
     apiClient
-      .post("/api/auth/verify-email", { token: verifyToken })
-      .then(async () => {
+      .post<{ token?: string }>("/api/auth/verify-email", { token: verifyToken })
+      .then(async (res) => {
         setTokenVerified(true);
         setTokenVerifying(false);
-        try {
-          await getVerificationStatus();
-        } catch {
-          // gate will re-check on next request
+        // The backend returns a fresh JWT carrying `emailVerified: true`
+        // so the next API call doesn't bounce off emailVerifiedMiddleware
+        // with the stale claim. Swap it into the auth context BEFORE we
+        // navigate to the redirect target. Falls back to a status refetch
+        // for legacy responses without the token field.
+        const freshToken = res?.data?.token;
+        if (freshToken) {
+          try {
+            await loginWithToken(freshToken);
+          } catch (e) {
+            console.warn("verify-email: loginWithToken failed", e);
+          }
+        } else {
+          try {
+            await getVerificationStatus();
+          } catch {
+            // gate will re-check on next request
+          }
         }
         setTimeout(() => navigate(redirect, { replace: true }), 2500);
       })

@@ -1,0 +1,150 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": [
+        "#1e3a8a",
+        "#93c5fd",
+        "#172554",
+        "#eff6ff"
+      ],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "minimal",
+      "transition": "fade",
+      "background": "solid"
+    }
+  },
+  "scenes": [
+    {
+      "id": "open",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "Cleared cyber analyst — TS/SCI. 8 years federal contractor.",
+      "subtitle": "Your Name, Cleared Cybersecurity Analyst",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.1,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 1.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "credentials",
+      "start": 5,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Clearance & credentials",
+      "items": [
+        "TS/SCI with current poly (renewed YYYY-MM)",
+        "CISSP, Security+, OSCP",
+        "DoD 8570 IAT Level III",
+        "[Prime contractor] — current"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "recent",
+      "start": 18,
+      "duration": 13,
+      "type": "achievement",
+      "title": "Mission work",
+      "items": [
+        "Hunt operations on [agency] networks",
+        "Authored SOPs adopted across 3 sub-agencies",
+        "Built detection pipelines (Splunk, Elastic, MISP)"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "slideIn",
+          "start": 0.6,
+          "duration": 0.6,
+          "easing": "easeOut"
+        }
+      }
+    },
+    {
+      "id": "bring",
+      "start": 31,
+      "duration": 13,
+      "type": "skills",
+      "title": "What I bring",
+      "skills": [
+        "On-mission cyber operations, not just compliance",
+        "Cross-prime experience — quick to plug in",
+        "Comfortable on closed networks + SCIFs",
+        "Cleared and stays cleared"
+      ],
+      "animation": {
+        "titleEnter": {
+          "type": "fadeIn",
+          "start": 0.2,
+          "duration": 0.4,
+          "easing": "easeOut"
+        },
+        "textEnter": {
+          "type": "scaleIn",
+          "start": 0.5,
+          "duration": 0.6,
+          "easing": "spring"
+        }
+      }
+    },
+    {
+      "id": "ask",
+      "start": 44,
+      "duration": 16,
+      "type": "closing",
+      "title": "Open to cleared cyber / SOC roles in [metro].",
+      "subtitle": "Reach out via [cleared messaging] · ready to interview.",
+      "animation": {
+        "titleEnter": {
+          "type": "slideUp",
+          "start": 0.2,
+          "duration": 0.5,
+          "easing": "easeOut"
+        },
+        "subtitleEnter": {
+          "type": "fadeIn",
+          "start": 0.9,
+          "duration": 0.4,
+          "easing": "easeOut"
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "sector": "government",
+    "recommendation": "Clearance level (Secret / TS / TS-SCI) and grade (GS-13/14/15) lead. Agency tenure is the second screen."
+  }
+}

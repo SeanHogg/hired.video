@@ -82,7 +82,7 @@ export default function Dashboard() {
           </div>
           {isAuthenticated && (
             <Button asChild variant="outline" size="sm" className="shrink-0">
-              <Link to="/articles" aria-label={t("labels.writeArticleAria")}>
+              <Link to="/services/creator/articles" aria-label={t("labels.writeArticleAria")}>
                 <PenLine className="h-4 w-4 mr-1" /> {t("actions.writeArticle")}
               </Link>
             </Button>

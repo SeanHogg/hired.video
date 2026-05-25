@@ -201,7 +201,7 @@ const JobEditPage = lazy(() => import("./pages/JobEditPage"));
 const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
-const ArticlesManager = lazy(() => import("./pages/ArticlesManager"));
+const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
 const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
@@ -849,7 +849,7 @@ const App = () => (
                         path="/services/settings"
                         element={<Navigate to="/settings?tab=recruiter-sharing" replace />}
                       />
-                      <Route path="/articles" element={<ArticlesManager />} />
+                      <Route path="/articles" element={<ArticlesIndex />} />
                       <Route path="/articles/:authorSlug/:slug" element={<ArticleView />} />
                       {/* Folded into the Content Creator workspace as a sub-tab.
                           Keep this redirect for legacy deep-links from emails / docs. */}
