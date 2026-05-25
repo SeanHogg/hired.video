@@ -21,9 +21,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,7 +33,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import {
   servicesService,
@@ -123,7 +120,6 @@ function MetricCard({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ServicesManagement() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user, isAuthenticated } = useAuth();
   const effectiveRole = useEffectiveRole();
   const [searchParams] = useSearchParams();
@@ -286,16 +282,8 @@ export default function ServicesManagement() {
   // Marketing page for unauthenticated visitors
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div>
-            <div className="max-w-6xl mx-auto px-4 py-16">
+      <AppShell>
+        <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -429,25 +417,14 @@ export default function ServicesManagement() {
                   </CardContent>
                 </Card>
               </div>
-            </div>
-          </div>
-          <Footer />
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-        <div>
-        <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
+    <AppShell bgClassName="bg-background">
+      <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
           <ServicesNav />
 
@@ -825,16 +802,13 @@ export default function ServicesManagement() {
             </TabsContent>
 
           </Tabs>
-        </main>
-        </div>
-        <Footer />
-      </div>
+      </main>
 
       <CreatorEnrollmentWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         onEnrolled={(p) => handleCreatorProfileChange(p)}
       />
-    </div>
+    </AppShell>
   );
 }

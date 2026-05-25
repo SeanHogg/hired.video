@@ -40,6 +40,8 @@ const KIND_PALETTE: Record<MediaKind, { bg: string; bar: string; label: string }
   comic:     { bg: "from-sky-700/40 to-slate-900",      bar: "#38bdf8", label: "#bae6fd" },
   image:     { bg: "from-rose-700/40 to-slate-900",     bar: "#fb7185", label: "#fecdd3" },
   cad:       { bg: "from-cyan-700/40 to-slate-900",     bar: "#22d3ee", label: "#a5f3fc" },
+  cad_3d:    { bg: "from-teal-700/40 to-slate-900",     bar: "#2dd4bf", label: "#99f6e4" },
+  interactive_comic: { bg: "from-indigo-700/40 to-slate-900", bar: "#818cf8", label: "#c7d2fe" },
 };
 
 const BAR_COUNT = 56;

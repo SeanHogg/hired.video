@@ -23,9 +23,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,7 +62,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import {
   phoneService,
@@ -118,7 +115,6 @@ function callStatusIcon(status: CallLog["status"]) {
 
 export default function PhoneDashboard() {
   const { t } = useTranslation();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"overview" | "calls" | "messages" | "numbers" | "balance">("overview");
@@ -325,25 +321,18 @@ export default function PhoneDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-          <div className="flex items-center justify-center min-h-screen">
-            <p className="text-muted-foreground">{t("messages.signInForBusinessPhone")}</p>
-          </div>
+      <AppShell bgClassName="bg-background">
+        <div className="flex items-center justify-center min-h-screen">
+          <p className="text-muted-foreground">{t("messages.signInForBusinessPhone")}</p>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main>
-          <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <AppShell bgClassName="bg-background">
+      <main>
+        <div className="container mx-auto px-4 py-8 max-w-6xl">
 
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
@@ -879,10 +868,8 @@ export default function PhoneDashboard() {
                 </TabsContent>
               </Tabs>
             )}
-          </div>
-        </main>
-      </div>
-      <Footer />
+        </div>
+      </main>
 
       {/* ── Provision Number Dialog ─────────────────────────────────────────── */}
       <Dialog open={showProvisionDialog} onOpenChange={setShowProvisionDialog}>
@@ -1099,6 +1086,6 @@ export default function PhoneDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppShell>
   );
 }

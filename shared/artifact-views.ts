@@ -29,8 +29,10 @@ export const ARTIFACT_KINDS = [
   "animation",
   "game",
   "comic",
+  "interactive_comic",
   "image",
   "cad",
+  "cad_3d",
   // ─── Non-studio artifacts (own entity tables) ───────────────────────────
   "resume",
   "article",

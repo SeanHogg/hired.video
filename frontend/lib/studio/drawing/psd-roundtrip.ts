@@ -55,7 +55,7 @@ export async function exportImageStateToPsd(state: ImageState): Promise<ArrayBuf
       name: layer.label,
       opacity: layer.opacity,
       hidden: !layer.visible,
-      blendMode: blendModeToPsd(layer.blendMode),
+      blendMode: blendModeToPsd(layer.blendMode) as Layer["blendMode"],
       canvas,
     });
   }

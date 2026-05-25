@@ -1268,7 +1268,7 @@ const SPEECH_BUBBLE_CONTENT_SECTION: WidgetInspectorSection = {
         <Field label="Text">
           <AutoSizeTextarea
             value={data.text}
-            onChange={(e) => set({ text: e.target.value })}
+            onChange={(next) => set({ text: next })}
             className="min-h-[60px] text-xs"
           />
         </Field>
@@ -1349,7 +1349,7 @@ const CAPTION_BOX_CONTENT_SECTION: WidgetInspectorSection = {
         <Field label="Text">
           <AutoSizeTextarea
             value={data.text}
-            onChange={(e) => set({ text: e.target.value })}
+            onChange={(next) => set({ text: next })}
             className="min-h-[60px] text-xs"
           />
         </Field>

@@ -229,7 +229,9 @@ export type ContainerId =
   | "dxf"
   | "dwg"
   | "stl"
-  | "step";
+  | "step"
+  // Photoshop round-trip via ag-psd (#940 Phase 2).
+  | "psd";
 
 export interface OutputProfile {
   /** Stable id — referenced by `studio_projects.timeline_spec.outputProfile`

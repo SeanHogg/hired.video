@@ -87,125 +87,14 @@ function readAllMigrationsText() {
   );
 }
 
-// ─── Drift baseline (gap #1187) ────────────────────────────────────────
-// pgTables declared in Drizzle but never created by any migration in
-// api/drizzle/. These were bootstrapped by an out-of-tree
-// `drizzle-kit push` before migrations were source-controlled.
-//
-// **Do NOT add new entries here.** If you add a pgTable, ship the
-// corresponding `CREATE TABLE IF NOT EXISTS` migration in the same
-// PR. The test below fails loud if a new pgTable lands without one.
-//
-// **Remove entries here whenever you backfill a migration** for one of
-// these tables — the test will then enforce that the migration stays.
-//
-// Snapshot taken 2026-05-25 after migration 0114 created the six
-// affiliate tables. Backfill progress tracked in gap #1187.
-const KNOWN_MISSING_CREATE_TABLE = new Set([
-  "account_invitations",
-  "account_preferences",
-  "activity_logs",
-  "ai_chat_messages",
-  "ai_chat_sessions",
-  "ai_usage_records",
-  "answer_cache",
-  "api_keys",
-  "application_form_answers",
-  "application_notes",
-  "assessment_attempts",
-  "ats_connections",
-  "billing_events",
-  "boards",
-  "business_phone_numbers",
-  "call_logs",
-  "candidate_interactions",
-  "candidate_submissions",
-  "cities",
-  "communication_tracking",
-  "company_followers",
-  "company_profiles",
-  "company_subscriptions",
-  "conversation_participants",
-  "conversations",
-  "countries",
-  "dashboard_metrics",
-  "email_campaign_recipients",
-  "email_campaigns",
-  "email_templates",
-  "email_verification_tokens",
-  "employer_branding_pages",
-  "feature_flags",
-  "feed_post_comments",
-  "feed_post_likes",
-  "feed_post_reports",
-  "feed_posts",
-  "follow_up_enrollments",
-  "follow_up_logs",
-  "follow_up_sequences",
-  "follow_up_steps",
-  "interviews",
-  "invoice_line_items",
-  "invoices",
-  "job_alerts",
-  "job_applications",
-  "job_board_postings",
-  "job_board_sources",
-  "job_board_sync_log",
-  "job_boards",
-  "job_items",
-  "job_preferences",
-  "job_websites",
-  "magic_link_tokens",
-  "marketing_leads",
-  "message_read_receipts",
-  "messages",
-  "meta_resumes",
-  "notifications",
-  "oauth_accounts",
-  "password_history",
-  "password_reset_tokens",
-  "payment_methods",
-  "performance_cycles",
-  "performance_goals",
-  "performance_reviews",
-  "phone_balance_transactions",
-  "phone_balances",
-  "placements",
-  "postal_zip_codes",
-  "profile_views",
-  "queue_job_to_process",
-  "queue_job_to_resume",
-  "recruiter_talent_pools",
-  "refresh_tokens",
-  "refund_requests",
-  "request_logs",
-  "resume_information",
-  "resume_templates",
-  "roles",
-  "saved_jobs",
-  "saved_searches",
-  "skill_assessments",
-  "sms_messages",
-  "state_provinces",
-  "studio_projects",
-  "subscription_plans",
-  "subscriptions",
-  "system_settings",
-  "talent_pool_candidates",
-  "tasks",
-  "two_factor_codes",
-  "usage_records",
-  "user_company_role_associations",
-  "user_connections",
-  "user_engagement_metrics",
-  "user_profiles",
-  "user_roles",
-  "users",
-  "videos",
-  "watched_resumes",
-  "webauthn_challenges",
-  "webauthn_credentials",
-]);
+// ─── Drift baseline (gap #1187) — CLOSED 2026-05-25 ───────────────────
+// Every legacy table that used to live here now has a CREATE TABLE
+// migration in api/drizzle/ — introspected from production into
+// 0127-0129 (75 live tables) + generated from pgTable declarations into
+// 0130 (28 absent-from-prod tables). The empty set below keeps the
+// regression test wired but enforces "every pgTable needs a CREATE
+// TABLE migration, no exceptions" going forward.
+const KNOWN_MISSING_CREATE_TABLE = new Set([]);
 
 // ─── Test suite ────────────────────────────────────────────────────────
 
