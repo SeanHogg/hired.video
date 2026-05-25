@@ -80,9 +80,26 @@ CREATE INDEX IF NOT EXISTS "idx_affiliate_referrals_sector"
 
 -- Track sector on every click for the click-attribution funnel; lets us
 -- compute "healthcare landing page CTR" per affiliate.
-ALTER TABLE "affiliate_link_clicks"
-  ADD COLUMN IF NOT EXISTS "landing_sector" varchar(64);
+--
+-- Guarded with a table-exists check because the `affiliate_link_clicks`
+-- table was missing from `api/drizzle/` for the lifetime of the schema
+-- (fixed in 0114). Without the guard, fresh DBs (and any deploy where
+-- the runner re-runs every statement) hit "relation does not exist"
+-- here. Production has the column applied to the legacy-pushed table,
+-- so this DO block is a no-op there; on a fresh DB it skips quietly
+-- and 0114 creates the table with the `landing_sector` column already
+-- baked in. See gap #1186 in README for the full root cause.
+DO $migration$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_tables
+    WHERE schemaname = 'public' AND tablename = 'affiliate_link_clicks'
+  ) THEN
+    ALTER TABLE "affiliate_link_clicks"
+      ADD COLUMN IF NOT EXISTS "landing_sector" varchar(64);
 
-CREATE INDEX IF NOT EXISTS "idx_affiliate_link_clicks_sector"
-  ON "affiliate_link_clicks" ("landing_sector", "clicked_at" DESC)
-  WHERE "landing_sector" IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS "idx_affiliate_link_clicks_sector"
+      ON "affiliate_link_clicks" ("landing_sector", "clicked_at" DESC)
+      WHERE "landing_sector" IS NOT NULL;
+  END IF;
+END $migration$;
