@@ -65,7 +65,11 @@ class_name = "ChatRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["ChatRoom"]
+# SQLite-backed Durable Object — required on the Workers free plan (the
+# classic `new_classes` storage backend is paid-only as of 2024-08).
+# SQLite-backed DOs are the recommended default going forward and gain
+# the same hibernation / WebSocket APIs we use in ChatRoom.
+new_sqlite_classes = ["ChatRoom"]
 
 [vars]
 # Partner domains are sourced from shared/security/partnerDomains.ts.
@@ -153,7 +157,8 @@ class_name = "ChatRoom"
 
 [[env.production.migrations]]
 tag = "v1"
-new_classes = ["ChatRoom"]
+# SQLite-backed DO — see comment on the top-level [[migrations]] block.
+new_sqlite_classes = ["ChatRoom"]
 
 # To expose the worker via your custom domains, set your Cloudflare zone_id below and
 # add routes for both the new and legacy domains.
