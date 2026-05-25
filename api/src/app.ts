@@ -100,6 +100,7 @@ import { performanceRoutes } from "./routes/performance.js";
 import { calendarRoutes } from "./routes/calendar.js";
 import { eventRoutes } from "./routes/events.js";
 import { coffeeRoutes } from "./routes/coffee.js";
+import { mapRoutes } from "./routes/map.js";
 import { exclusiveBoardRoutes } from "./routes/exclusive-boards.js";
 import { communityRoutes } from "./routes/community.js";
 import { analyticsRoutes } from "./routes/analytics.js";
@@ -579,6 +580,7 @@ export function createApp() {
   app.route("/api/calendar", calendarRoutes);
   app.route("/api/events", eventRoutes);
   app.route("/api/coffee", coffeeRoutes);
+  app.route("/api/map", mapRoutes);
   app.route("/api/boards", exclusiveBoardRoutes);
   app.route("/api/community", communityRoutes);
   app.route("/api/analytics", analyticsRoutes);
