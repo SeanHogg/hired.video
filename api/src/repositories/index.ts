@@ -63,6 +63,11 @@ import {
   GeocoderCacheRepository,
   type IGeocoderCacheRepository,
 } from "./geocoderCacheRepository.js";
+import { EventsRepository, type IEventsRepository } from "./eventsRepository.js";
+import {
+  CoffeeRequestsRepository,
+  type ICoffeeRequestsRepository,
+} from "./coffeeRequestsRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
