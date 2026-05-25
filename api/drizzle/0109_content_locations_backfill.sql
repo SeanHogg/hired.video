@@ -27,9 +27,12 @@
 --   - "State" or "ST" alone        → state-only row.
 --   - "Country" alone              → country-only row.
 --
--- All inserts use ON CONFLICT DO NOTHING against the partial unique
--- index `content_locations_one_origin_per_entity` so re-running the
--- migration is idempotent.
+-- All inserts use the predicate form of ON CONFLICT (matching the
+-- partial unique index created in 0108) so re-running is idempotent.
+-- Note: must use `ON CONFLICT (cols) WHERE predicate DO NOTHING`, not
+-- `ON CONFLICT ON CONSTRAINT name` — partial unique indexes are
+-- indexes, not constraints, and the latter form errors at parse time
+-- ("constraint does not exist").
 
 -- ─── Helpers (inline CTEs) ──────────────────────────────────────────────
 
@@ -71,7 +74,7 @@ SELECT
   COALESCE(cm.is_remote, false),
   NULL
 FROM city_match cm
-ON CONFLICT ON CONSTRAINT "content_locations_one_origin_per_entity" DO NOTHING;
+ON CONFLICT ("entity_kind", "entity_id") WHERE "role" = 'origin' DO NOTHING;
 
 -- "City" alone (no comma) — best-effort: take the first matching
 -- seeded city by name. Skipped if the entity already got an origin row
@@ -117,7 +120,7 @@ SELECT
   COALESCE(r.is_remote, false)
 FROM ranked r
 WHERE r.rn = 1
-ON CONFLICT ON CONSTRAINT "content_locations_one_origin_per_entity" DO NOTHING;
+ON CONFLICT ("entity_kind", "entity_id") WHERE "role" = 'origin' DO NOTHING;
 
 -- "Remote" / "Anywhere" sentinel — mark is_remote on the origin row.
 INSERT INTO "content_locations" (
@@ -132,7 +135,7 @@ WHERE ji.location IS NOT NULL
     SELECT 1 FROM "content_locations" cl
     WHERE cl.entity_kind = 'job' AND cl.entity_id = ji.id AND cl.role = 'origin'
   )
-ON CONFLICT ON CONSTRAINT "content_locations_one_origin_per_entity" DO NOTHING;
+ON CONFLICT ("entity_kind", "entity_id") WHERE "role" = 'origin' DO NOTHING;
 
 -- Mirror: job_items.is_remote=true rows get a remote origin even if
 -- the location string is empty (covers fully-remote postings).
@@ -146,7 +149,7 @@ WHERE ji.is_remote = true
     SELECT 1 FROM "content_locations" cl
     WHERE cl.entity_kind = 'job' AND cl.entity_id = ji.id AND cl.role = 'origin'
   )
-ON CONFLICT ON CONSTRAINT "content_locations_one_origin_per_entity" DO NOTHING;
+ON CONFLICT ("entity_kind", "entity_id") WHERE "role" = 'origin' DO NOTHING;
 
 -- ─── user_profiles: free-text → content_locations + home_* columns ─────
 -- Same parser strategy as jobs, but we ALSO populate the structured
@@ -225,7 +228,7 @@ SELECT
   cm.country_id, cm.state_id, cm.city_id,
   cm.latitude, cm.longitude
 FROM city_match cm
-ON CONFLICT ON CONSTRAINT "content_locations_one_origin_per_entity" DO NOTHING;
+ON CONFLICT ("entity_kind", "entity_id") WHERE "role" = 'origin' DO NOTHING;
 
 -- ─── Anything that didn't match stays free-text-only for now ────────────
 -- The original `location` varchar columns are intentionally left in

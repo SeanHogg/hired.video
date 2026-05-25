@@ -8,7 +8,8 @@
  *     `visibleFrom`/`visibleTo` within the scene. Drag the bar to move
  *     it; drag either edge to trim. Sceneless durations imply
  *     "visible the whole scene" (visibleFrom = null).
- *   - A playhead column (visual only — no playback engine yet).
+ *   - An "Audio" track with bars for music + voiceovers — drag to
+ *     move, trim, or fade (#1115).
  *
  * Operates directly on CanvasState so every mutation lands in the same
  * editor state the canvas + properties panel read from — no parallel
@@ -17,13 +18,22 @@
  * the same source of truth (DRY rule).
  */
 import { useMemo, useRef } from "react";
-import type { CanvasState, Scene, Widget } from "@/lib/studio/editor-v2/canvas-state";
+import type { CanvasState, Scene, VoiceoverClip, Widget } from "@/lib/studio/editor-v2/canvas-state";
+import type { MusicSource } from "@/lib/studio/music-catalog";
+import { findMusicTrack } from "@/lib/studio/music-catalog";
+import AudioBar, { type AudioBarValue } from "./AudioBar";
 import { cn } from "@/lib/utils";
 
 const TRACK_HEIGHT = 32;
 const TRACK_LABEL_WIDTH = 96;
 const MIN_SCENE_SECONDS = 0.5;
 const MIN_WIDGET_SECONDS = 0.1;
+
+/** Audio-bar selection — kind discriminator so the host's "selected
+ *  bar" state can be a single union instead of a per-source boolean. */
+export type AudioSelection =
+  | { kind: "music" }
+  | { kind: "voiceover"; id: string };
 
 export interface AdvancedTimelineProps {
   state: CanvasState;
@@ -37,6 +47,28 @@ export interface AdvancedTimelineProps {
     visibleFrom: number | null,
     visibleTo: number | null,
   ) => void;
+  /** Audio-track props — optional so the timeline can mount without
+   *  the audio row on kinds that don't carry audio (image/cad/etc.).
+   *  When `onVoiceoverChange` OR `onMusicChange` is provided, the
+   *  audio row renders + per-source drags route through them. */
+  selectedAudio?: AudioSelection | null;
+  onSelectAudio?: (selection: AudioSelection) => void;
+  onVoiceoverChange?: (voiceoverId: string, patch: AudioPatch) => void;
+  onMusicChange?: (patch: AudioPatch) => void;
+  /** Fires once on pointer-up of any audio-bar drag — host commits
+   *  history here so a multi-tick drag becomes one undo step. */
+  onAudioCommit?: () => void;
+}
+
+/** Audio-clip timing patch — what an AudioBar drag emits. Both
+ *  voiceover + music clips accept the same field set; per-source
+ *  callbacks decide which mutators to call. */
+export interface AudioPatch {
+  startOffsetSec?: number;
+  trimStartSec?: number;
+  trimEndSec?: number;
+  fadeInSec?: number;
+  fadeOutSec?: number;
 }
 
 export default function AdvancedTimeline({
@@ -47,6 +79,11 @@ export default function AdvancedTimeline({
   onSelectWidget,
   onSceneDurationChange,
   onWidgetWindowChange,
+  selectedAudio,
+  onSelectAudio,
+  onVoiceoverChange,
+  onMusicChange,
+  onAudioCommit,
 }: AdvancedTimelineProps) {
   const total = useMemo(
     () => state.scenes.reduce((sum, s) => sum + s.durationSeconds, 0),
@@ -106,9 +143,128 @@ export default function AdvancedTimeline({
             ));
           })}
         </TrackRow>
+
+        {/* Audio track — voiceovers + music (#1115). Self-gates: only
+            renders when the host wired audio handlers. Music bars use
+            an amber accent; voiceover bars use violet so the rows are
+            visually distinct. */}
+        {(onVoiceoverChange || onMusicChange) && (
+          <TrackRow label="Audio">
+            <div data-audio-track className="absolute inset-0">
+              {state.musicSource && onMusicChange && (
+                <AudioBar
+                  value={musicBarValue(state.musicSource, total)}
+                  totalSeconds={total}
+                  label={musicLabel(state.musicSource)}
+                  selected={selectedAudio?.kind === "music"}
+                  accentClass="border-amber-500/40 bg-amber-500/15 hover:border-amber-500"
+                  onChange={(next) =>
+                    onMusicChange(barValueToPatch(next, /* anchorStart */ 0))
+                  }
+                  onCommit={() => onAudioCommit?.()}
+                  onSelect={() => onSelectAudio?.({ kind: "music" })}
+                />
+              )}
+              {onVoiceoverChange && state.voiceovers.map((vo) => {
+                const anchorStart = resolveAnchorStart(vo, state.scenes, sceneOffsets);
+                return (
+                  <AudioBar
+                    key={vo.id}
+                    value={voiceoverBarValue(vo, anchorStart)}
+                    totalSeconds={total}
+                    label={vo.label || "Voiceover"}
+                    selected={selectedAudio?.kind === "voiceover" && selectedAudio.id === vo.id}
+                    accentClass="border-violet-500/40 bg-violet-500/15 hover:border-violet-500"
+                    onChange={(next) =>
+                      onVoiceoverChange(vo.id, barValueToPatch(next, anchorStart))
+                    }
+                    onCommit={() => onAudioCommit?.()}
+                    onSelect={() => onSelectAudio?.({ kind: "voiceover", id: vo.id })}
+                  />
+                );
+              })}
+            </div>
+          </TrackRow>
+        )}
       </div>
     </div>
   );
+}
+
+// ─── Audio-bar helpers ─────────────────────────────────────────────────────
+// Pure functions that translate between CanvasState's per-clip shape +
+// the AudioBar's flat timing snapshot. Per the DRY rule the math lives
+// in ONE place: both the voiceover + music paths route through the
+// same translation so the bar component stays kind-agnostic.
+
+/** Resolve a voiceover's anchor scene start in composition time. Null
+ *  anchor + missing scene both resolve to 0. Pure — exported for the
+ *  bar-snapshot translator above. */
+function resolveAnchorStart(
+  vo: VoiceoverClip,
+  scenes: Scene[],
+  sceneOffsets: number[],
+): number {
+  if (!vo.anchorSceneId) return 0;
+  const idx = scenes.findIndex((s) => s.id === vo.anchorSceneId);
+  return idx >= 0 ? sceneOffsets[idx] : 0;
+}
+
+function voiceoverBarValue(
+  vo: VoiceoverClip,
+  anchorStart: number,
+): AudioBarValue {
+  const offset = vo.startOffsetSec ?? 0;
+  const trimStart = vo.trimStartSec ?? 0;
+  const trimEnd = vo.trimEndSec ?? 0;
+  const playable = Math.max(0.05, vo.durationSeconds - trimStart - trimEnd);
+  return {
+    startSec: anchorStart + offset,
+    endSec: anchorStart + offset + playable,
+    trimStartSec: trimStart,
+    trimEndSec: trimEnd,
+    fadeInSec: vo.fadeInSec ?? 0,
+    fadeOutSec: vo.fadeOutSec ?? 0,
+    sourceDurationSec: vo.durationSeconds,
+  };
+}
+
+function musicBarValue(source: MusicSource, total: number): AudioBarValue {
+  const offset = source.startOffsetSec ?? 0;
+  // Music can be either custom (carries `durationSeconds`) or stock
+  // (procedurally generated — duration matches the composition by
+  // design, so we use `total` as the source duration). Either way the
+  // bar's `sourceDurationSec` is the cap on trim drags.
+  const sourceDur = source.kind === "custom" ? source.durationSeconds : total;
+  return {
+    startSec: offset,
+    endSec: Math.min(total, offset + sourceDur),
+    trimStartSec: 0,
+    trimEndSec: 0,
+    fadeInSec: source.fadeInSec ?? 0,
+    fadeOutSec: source.fadeOutSec ?? 0,
+    sourceDurationSec: sourceDur,
+  };
+}
+
+function musicLabel(source: MusicSource): string {
+  if (source.kind === "custom") return source.label || "Music";
+  const track = findMusicTrack(source.trackId);
+  return track?.label ?? "Music";
+}
+
+/** Translate a bar value to the absolute patch the model wants. The
+ *  bar emits composition-time `startSec`; the model stores
+ *  `startOffsetSec` relative to the anchor, so we subtract anchor.
+ *  Music passes anchor = 0 (no anchor; absolute timeline position). */
+function barValueToPatch(next: AudioBarValue, anchorStart: number): AudioPatch {
+  return {
+    startOffsetSec: next.startSec - anchorStart,
+    trimStartSec: next.trimStartSec,
+    trimEndSec: next.trimEndSec,
+    fadeInSec: next.fadeInSec,
+    fadeOutSec: next.fadeOutSec,
+  };
 }
 
 // ───────────────────────────────────────────────────────────────────────────

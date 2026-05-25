@@ -84,7 +84,22 @@ function musicClipsFor(
   if (!resolved) return [];
   const baseGain = effectiveGain(1, "music", mix);
   if (baseGain === 0) return [];
-  const segments = computeDuckingSegments(totalSec, voiceoverIntervals, {
+  // Per-source timing controls (#1115 audio-timeline UI). Music can be
+  // offset later in the composition + faded in / out at the edges.
+  // Read directly off the (possibly absent) controls — defaults are 0.
+  const offset = state.musicSource?.startOffsetSec ?? 0;
+  const fadeIn = state.musicSource?.fadeInSec ?? 0;
+  const fadeOut = state.musicSource?.fadeOutSec ?? 0;
+  // The shared `computeDuckingSegments` carves the music timeline by
+  // voiceover intervals; we slice from the offset onward so the music
+  // doesn't play before its start point. Pre-offset silence is just an
+  // absent clip; the scheduler treats gaps as silence by default.
+  const audibleStart = Math.max(0, offset);
+  if (audibleStart >= totalSec) return [];
+  const segments = computeDuckingSegments(totalSec - audibleStart, voiceoverIntervals.map((iv) => ({
+    startSec: Math.max(0, iv.startSec - audibleStart),
+    endSec: Math.max(0, iv.endSec - audibleStart),
+  })), {
     enabled: Boolean(mix.duckMusicUnderVoiceover),
     duckAmount: mix.duckAmount,
   });
@@ -92,9 +107,14 @@ function musicClipsFor(
     id: segments.length === 1 ? "v2-music" : `v2-music-${i}`,
     track: resolved.track,
     label: resolved.label,
-    startSec: seg.startSec,
-    endSec: seg.endSec,
+    startSec: seg.startSec + audibleStart,
+    endSec: seg.endSec + audibleStart,
     volume: baseGain * seg.gainMultiplier,
+    // Only the FIRST segment carries the fade-in; only the LAST carries
+    // the fade-out. Intermediate segments are inside the duck windows
+    // and don't get re-faded.
+    ...(i === 0 && fadeIn > 0 ? { fadeInSec: fadeIn } : {}),
+    ...(i === segments.length - 1 && fadeOut > 0 ? { fadeOutSec: fadeOut } : {}),
   }));
 }
 

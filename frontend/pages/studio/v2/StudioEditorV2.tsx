@@ -71,6 +71,8 @@ import {
   emptyScene,
   makeLinkedContentWidget,
   totalDurationSeconds,
+  updateMusicTiming,
+  updateVoiceoverClip,
 } from "@/lib/studio/editor-v2/canvas-state";
 import {
   resolveLinkedContentColors,
@@ -289,7 +291,7 @@ export default function StudioEditorV2() {
   const history = useCanvasHistory<CanvasState>(() =>
     hydrateInitialState(projectId, templateHint),
   );
-  const { state, setState, undo, redo, canUndo, canRedo, reset: resetHistory } = history;
+  const { state, setState, undo, redo, canUndo, canRedo, reset: resetHistory, commit: commitHistory } = history;
   const [title, setTitle] = useState<string>("Untitled video");
   const [persistedProjectId, setPersistedProjectId] = useState<string | null>(
     projectId === "new" ? null : projectId,
@@ -1405,6 +1407,37 @@ export default function StudioEditorV2() {
     },
     [],
   );
+
+  // Audio-timeline drag UI (#1115). One selection union for the
+  // currently-active audio bar (music OR a specific voiceover); per-
+  // source change handlers route through the shared mutator helpers in
+  // canvas-state.ts. Commit fires on drag-end so a multi-tick drag
+  // becomes one undo step.
+  const [selectedAudio, setSelectedAudio] = useState<
+    import("@/components/studio/v2/AdvancedTimeline").AudioSelection | null
+  >(null);
+  const handleVoiceoverChange = useCallback(
+    (
+      voiceoverId: string,
+      patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch,
+    ) => {
+      setState((prev) => updateVoiceoverClip(prev, voiceoverId, patch));
+    },
+    [setState],
+  );
+  const handleMusicChange = useCallback(
+    (patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => {
+      setState((prev) => updateMusicTiming(prev, patch));
+    },
+    [setState],
+  );
+  const handleAudioCommit = useCallback(() => {
+    // The history wrapper's `commit` records the current state as one
+    // undo step. The drag emitted many setState calls during the drag;
+    // they coalesced into the live state but didn't push a history
+    // entry. Calling commit() at the end captures the final snapshot.
+    commitHistory();
+  }, [commitHistory]);
 
   // Generic widget patch mutator — used by inspector sections (e.g.
   // Motion, Timing) that mutate Widget-level fields outside of
@@ -2788,6 +2821,11 @@ export default function StudioEditorV2() {
                   updateScene(sceneId, { durationSeconds })
                 }
                 onWidgetWindowChange={updateWidgetWindow}
+                selectedAudio={selectedAudio}
+                onSelectAudio={setSelectedAudio}
+                onVoiceoverChange={handleVoiceoverChange}
+                onMusicChange={handleMusicChange}
+                onAudioCommit={handleAudioCommit}
               />
             </CollapsiblePanel>
             )}
@@ -3344,6 +3382,11 @@ function TimelineDock({
   onSelectWidget,
   onSceneDurationChange,
   onWidgetWindowChange,
+  selectedAudio,
+  onSelectAudio,
+  onVoiceoverChange,
+  onMusicChange,
+  onAudioCommit,
 }: {
   state: CanvasState;
   activeSceneId: string | null;
@@ -3358,6 +3401,11 @@ function TimelineDock({
     visibleFrom: number | null,
     visibleTo: number | null,
   ) => void;
+  selectedAudio: import("@/components/studio/v2/AdvancedTimeline").AudioSelection | null;
+  onSelectAudio: (sel: import("@/components/studio/v2/AdvancedTimeline").AudioSelection) => void;
+  onVoiceoverChange: (id: string, patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => void;
+  onMusicChange: (patch: import("@/components/studio/v2/AdvancedTimeline").AudioPatch) => void;
+  onAudioCommit: () => void;
 }) {
   const total = totalDurationSeconds(state);
   const selectedWidgetId =
@@ -3377,6 +3425,11 @@ function TimelineDock({
           onSelectWidget={onSelectWidget}
           onSceneDurationChange={onSceneDurationChange}
           onWidgetWindowChange={onWidgetWindowChange}
+          selectedAudio={selectedAudio}
+          onSelectAudio={onSelectAudio}
+          onVoiceoverChange={onVoiceoverChange}
+          onMusicChange={onMusicChange}
+          onAudioCommit={onAudioCommit}
         />
       )}
       <div className="px-4 py-3">

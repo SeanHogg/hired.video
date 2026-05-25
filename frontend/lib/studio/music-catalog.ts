@@ -81,9 +81,23 @@ export function findMusicTrack(id: string): MusicTrack | null {
  * composer, usePreviewPlayback, canvasStateToTimeline) reads + writes
  * through this shape so there's ONE seam to update.
  */
+/** Per-source timing controls — `startOffsetSec` shifts the music's
+ *  composition start, `fadeInSec` / `fadeOutSec` ramp gain at the
+ *  edges (parity with VoiceoverClip per #1115). Optional; absent
+ *  fields default to 0. Both stock + custom sources carry them so
+ *  the audio-timeline UI can render fade handles identically. */
+export interface MusicTimingControls {
+  /** Manual start-offset in seconds from composition 0. Default 0. */
+  startOffsetSec?: number;
+  /** Fade-in duration in seconds. Default 0. */
+  fadeInSec?: number;
+  /** Fade-out duration in seconds. Default 0. */
+  fadeOutSec?: number;
+}
+
 export type MusicSource =
-  | { kind: "stock"; trackId: string }
-  | { kind: "custom"; url: string; label: string; durationSeconds: number };
+  | ({ kind: "stock"; trackId: string } & MusicTimingControls)
+  | ({ kind: "custom"; url: string; label: string; durationSeconds: number } & MusicTimingControls);
 
 export interface ResolvedMusic {
   /** Playable URL — public asset path for stock, blob:/cdn for custom. */

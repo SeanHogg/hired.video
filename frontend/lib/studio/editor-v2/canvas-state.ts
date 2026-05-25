@@ -1019,3 +1019,58 @@ export function applyThemeToState(
   };
 }
 
+// ─── Audio-timeline mutators (#1115) ──────────────────────────────────────
+//
+// Single seam for the audio-timeline drag UI's per-clip edits. The
+// AudioBar component fires `onChange` per drag tick with the next
+// timing snapshot; the host translates that into one of these calls.
+// Mutators are STRUCTURAL-SHARE pure functions matching the rest of
+// the canvas-state mutators — undo/redo participates via the same
+// `useCanvasHistory` wrapper.
+
+/** Patch a voiceover clip's timing fields in place. Per-clip fields
+ *  on `VoiceoverClip` (`startOffsetSec` / `fadeInSec` / `fadeOutSec` /
+ *  `trimStartSec` / `trimEndSec` / `gain` / `muted`) are all optional;
+ *  passing `undefined` keeps the existing value, passing `0` writes
+ *  it. Unknown ids are no-ops. */
+export function updateVoiceoverClip(
+  state: CanvasState,
+  voiceoverId: string,
+  patch: Partial<Pick<VoiceoverClip,
+    | "startOffsetSec"
+    | "fadeInSec"
+    | "fadeOutSec"
+    | "trimStartSec"
+    | "trimEndSec"
+    | "gain"
+    | "muted"
+    | "anchorSceneId"
+  >>,
+): CanvasState {
+  return {
+    ...state,
+    voiceovers: state.voiceovers.map((vo) =>
+      vo.id === voiceoverId ? { ...vo, ...patch } : vo,
+    ),
+  };
+}
+
+/** Patch the music source's timing controls. No-op when no music
+ *  source is set (the audio-timeline bar self-hides in that case).
+ *  Both stock + custom sources accept the same `MusicTimingControls`
+ *  fields. */
+export function updateMusicTiming(
+  state: CanvasState,
+  patch: {
+    startOffsetSec?: number;
+    fadeInSec?: number;
+    fadeOutSec?: number;
+  },
+): CanvasState {
+  if (!state.musicSource) return state;
+  return {
+    ...state,
+    musicSource: { ...state.musicSource, ...patch },
+  };
+}
+

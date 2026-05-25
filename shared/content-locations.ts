@@ -60,10 +60,16 @@ export type ContentLocationInput = z.infer<typeof ContentLocationInputSchema>;
  * Payload a content form sends on create/edit: exactly one optional
  * origin + 0..N serves regions. Form components serialize their state
  * into this shape and the backend writes one DB row per element.
+ *
+ * Everything is `.partial()` because picker state is built up field-by-
+ * field as the user makes selections — `isRemote` doesn't get a value
+ * until the toggle is touched, `role` is filled in by LocationService.
+ * Defaults (isRemote=false, role='origin') are applied at write time in
+ * LocationService.toSaveInput + ContentLocationsRepository.toInsertRow.
  */
 export const ContentLocationSetSchema = z.object({
-  origin: ContentLocationInputSchema.partial({ role: true }).nullable().optional(),
-  serves: z.array(ContentLocationInputSchema.partial({ role: true })).default([]),
+  origin: ContentLocationInputSchema.partial().nullable().optional(),
+  serves: z.array(ContentLocationInputSchema.partial()).default([]),
 });
 export type ContentLocationSet = z.infer<typeof ContentLocationSetSchema>;
 

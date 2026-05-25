@@ -242,6 +242,23 @@ export default function Jobs() {
     urlSalaryMax,
     urlLocation,
   ]);
+  // Structured geo filter — wired into URL so deep-links share state.
+  // Falls back to the existing free-text `location` searchParam for
+  // backwards compatibility with old saved searches + email-alert links.
+  // Declared above fetchJobs so the effect deps array sees it in scope.
+  const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
+    locationFilterFromQuery(searchParams),
+  );
+  useEffect(() => {
+    setGeoFilter(locationFilterFromQuery(searchParams));
+  }, [searchParams]);
+  const handleGeoFilterChange = (next: LocationFilterValue) => {
+    setGeoFilter(next);
+    const params = new URLSearchParams(searchParams);
+    applyLocationFilterToQuery(params, next);
+    setSearchParams(params);
+  };
+
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   // Lists filter — same pattern as People page. Null = no filter; Set = restrict.
@@ -425,22 +442,6 @@ export default function Jobs() {
 
   const handleClearFilters = () => {
     setSearchFilters({});
-  };
-
-  // Structured geo filter — wired into URL so deep-links share state.
-  // Falls back to the existing free-text `location` searchParam for
-  // backwards compatibility with old saved searches + email-alert links.
-  const [geoFilter, setGeoFilter] = useState<LocationFilterValue>(() =>
-    locationFilterFromQuery(searchParams),
-  );
-  useEffect(() => {
-    setGeoFilter(locationFilterFromQuery(searchParams));
-  }, [searchParams]);
-  const handleGeoFilterChange = (next: LocationFilterValue) => {
-    setGeoFilter(next);
-    const params = new URLSearchParams(searchParams);
-    applyLocationFilterToQuery(params, next);
-    setSearchParams(params);
   };
 
   const handleTabChange = (value: string) => {

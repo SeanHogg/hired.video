@@ -66,16 +66,15 @@ jobRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
 
 /** Shared between `/` and `/public` — single seam that parses the search
  *  query string AND resolves the structured LocationFilter into a job-id
- *  allowlist. Both legacy callers (no countryId/stateId/cityId set) and
- *  modern picker-driven callers (structured ids) work through this. */
+ *  allowlist. Takes primitives (query + env) instead of the Hono Context
+ *  so it stays decoupled from per-route Bindings typing. */
 async function publicJobsFromQuery(
-  c: AppContext,
+  query: Record<string, string | undefined>,
+  env: Record<string, string | undefined>,
 ): Promise<Awaited<ReturnType<typeof jobService.getPublicJobs>>> {
-  const query = c.req.query();
   const hasGeo = Boolean(query.countryId || query.stateId || query.cityId);
   let allow: string[] | null = null;
   if (hasGeo) {
-    const env = (c.env ?? {}) as Record<string, string | undefined>;
     const deps = buildApiDeps(env);
     const svc = new LocationService(deps);
     allow = await svc.applyLocationFilter("job", {
@@ -104,7 +103,7 @@ async function publicJobsFromQuery(
 
 // Public listing endpoint. Frontend legacy calls /api/Job with query params.
 jobRoutes.get("/", async (c) => {
-  const data = await publicJobsFromQuery(c);
+  const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
   return c.json(success(data));
 });
 
@@ -149,7 +148,7 @@ jobRoutes.get("/saved", async (c) => {
 
 /** GET /api/jobs/public — explicit public listing */
 jobRoutes.get("/public", async (c) => {
-  const data = await publicJobsFromQuery(c);
+  const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
   return c.json(success(data));
 });
 
