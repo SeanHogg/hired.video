@@ -19,7 +19,7 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
-import type { Env, Variables } from "../../types/index.js";
+import type { Env, Variables, AppEnv } from "../../types/index.js";
 import {
   ResumeAnalysisSchema,
   ResumeRecommendationSchema,

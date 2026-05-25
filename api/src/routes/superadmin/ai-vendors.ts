@@ -12,7 +12,7 @@
 
 import { Hono } from "hono";
 import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
-import type { Env, Variables, AppEnv } from "../types/index.js";
+import type { Env, Variables, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import {
   USE_CASE_PROFILES,

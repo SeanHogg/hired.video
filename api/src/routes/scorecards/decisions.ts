@@ -4,7 +4,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { Variables, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { CreateDecisionSchema } from "../../domains/scorecards/schemas.js";
 import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
@@ -12,7 +12,7 @@ import type { ScorecardsService } from "../../domains/scorecards/scorecardsServi
 
 export function decisionRoutes(
   service: () => ScorecardsService,
-): Hono<{ Variables: Variables }> {
+): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {

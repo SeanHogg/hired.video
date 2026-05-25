@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import type { JwtPayload, Variables } from "../types/index.js";
+import type { JwtPayload, Variables, AppEnv } from "../types/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
 /**

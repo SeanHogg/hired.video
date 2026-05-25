@@ -13,7 +13,7 @@
  */
 
 import type { Context } from "hono";
-import type { Env, Variables } from "../../types/index.js";
+import type { Env, Variables, AppEnv } from "../../types/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { getDb } from "../../db/index.js";
 import { isUuid } from "../../../../shared/value-types.js";

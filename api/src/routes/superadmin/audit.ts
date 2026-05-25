@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { Variables, AppEnv } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
 import { listAuditLog } from "../../utils/audit.js";
 

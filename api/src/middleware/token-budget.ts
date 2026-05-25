@@ -9,7 +9,7 @@
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { buildTokenBudgetDTO } from "../services/billing/BillingService.js";
 import {
   buildTokenBudgetExceededResponse,

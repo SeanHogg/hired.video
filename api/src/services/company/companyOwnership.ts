@@ -23,7 +23,7 @@
  */
 import type { MiddlewareHandler } from "hono";
 import { and, eq } from "drizzle-orm";
-import type { Variables } from "../../types/index.js";
+import type { Variables, AppEnv } from "../../types/index.js";
 import { error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
 import { isUuid } from "../../../../shared/value-types.js";

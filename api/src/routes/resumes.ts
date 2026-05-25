@@ -1455,7 +1455,7 @@ resumeRoutes.post("/:id/versions/:vid/restore", async (c) => {
     .set({ content: version.resumeData as any, updatedAt: new Date() })
     .where(eq(schema.resumeInformation.id, id))
     .returning();
-  return c.json(success({ resume: restored }), 200);
+  return c.json(ok({ resume: restored }), 200);
 });
 
 resumeRoutes.post("/:id/clone", async (c) => {

@@ -21,7 +21,7 @@
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { sql } from "drizzle-orm";
-import type { JwtPayload, Variables } from "../../types/index.js";
+import type { JwtPayload, Variables, AppEnv } from "../../types/index.js";
 import type { TokenBudgetDTO } from "../../../../shared/billing.js";
 import { getDb, schema } from "../../db/index.js";
 import {

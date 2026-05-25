@@ -13,7 +13,7 @@
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";

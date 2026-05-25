@@ -26,7 +26,7 @@
  */
 
 import type { Context } from "hono";
-import type { Env, Variables } from "../../types/index.js";
+import type { Env, Variables, AppEnv } from "../../types/index.js";
 import {
   createLLMClient,
   hasAnyLLMProviderKey,

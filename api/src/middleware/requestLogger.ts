@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppEnv } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { schema } from "../db/index.js";
 

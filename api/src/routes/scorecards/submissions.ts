@@ -4,7 +4,7 @@
  */
 
 import { Hono } from "hono";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { Variables, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import {
   CreateSubmissionSchema,
@@ -15,7 +15,7 @@ import type { ScorecardsService } from "../../domains/scorecards/scorecardsServi
 
 export function submissionRoutes(
   service: () => ScorecardsService,
-): Hono<{ Variables: Variables }> {
+): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {
@@ -98,7 +98,7 @@ export function submissionRoutes(
 
 export function debriefRoutes(
   service: () => ScorecardsService,
-): Hono<{ Variables: Variables }> {
+): Hono<AppEnv> {
   const r = new Hono<AppEnv>();
 
   r.get("/", async (c) => {

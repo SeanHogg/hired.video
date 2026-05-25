@@ -40,11 +40,15 @@ export function gamificationFromContext(c: Context<AppEnv>): GamificationService
   });
 }
 
+/** Callback runs inside withGamification's try/catch; the return value
+ *  is awaited but discarded, so callers can simply return
+ *  `game.onXxx(...)` (which resolves to `AwardOutcome`) without an extra
+ *  `void` cast. */
 export type GamificationCallback = (
   game: GamificationService,
   role: ScoringRole,
   userId: string,
-) => Promise<void>;
+) => Promise<unknown>;
 
 export async function withGamification(
   c: Context<AppEnv>,

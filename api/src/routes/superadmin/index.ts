@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Variables, AppEnv } from "../types/index.js";
+import type { Variables, AppEnv } from "../../types/index.js";
 import { superAdminMiddleware } from "../../middleware/superAdmin.js";
 import { sessionRoutes } from "./sessions.js";
 import { userMgmtRoutes } from "./users.js";

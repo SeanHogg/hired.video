@@ -1,6 +1,6 @@
 import { jwtVerify } from "jose";
 import type { MiddlewareHandler } from "hono";
-import type { Variables, JwtPayload } from "../types/index.js";
+import type { Variables, JwtPayload, AppEnv } from "../types/index.js";
 import { getJwtSecret, getJwtSecretOptional } from "../utils/jwt.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { getDb } from "../db/index.js";
