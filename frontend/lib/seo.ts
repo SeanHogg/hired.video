@@ -215,6 +215,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Event details, RSVP, and attendee list on hired.video — the career network with AI-matched introductions for every event.",
     keywords: "event, networking, RSVP, attendees, professional event",
   },
+  "/map": {
+    title: "Map — Events & Coffee Near You | hired.video",
+    description:
+      "Discover career events and members open to coffee in your area on the interactive map.",
+    keywords: "career map, networking near me, coffee chats near me, events near me",
+  },
   // AI-resilient sector surfaces (gap #1165). Per the prerender.mjs "keep
   // in sync" note, these must mirror the ROUTES list there. Sector slug
   // list comes from shared/sectors.ts SECTORS.

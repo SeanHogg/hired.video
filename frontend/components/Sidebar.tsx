@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Store,
+  BookOpen,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -72,6 +73,11 @@ export default function Sidebar({
     { name: t("labels.events", { defaultValue: "Events" }), href: "/events", icon: Calendar, exactMatch: false },
     { name: t("labels.map", { defaultValue: "Map" }), href: "/map", icon: MapPin, exactMatch: false },
     { name: t("labels.tools"), href: "/tools", icon: Wrench, exactMatch: false },
+    // Blog & Guides is the unified discovery surface at /blog (#1315) —
+    // lists both static BLOG_POSTS and DB-backed published articles in
+    // one feed. The `/articles` route still exists as a sector-filtered
+    // variant for sector landing CTAs (#1314).
+    { name: t("labels.blog", { defaultValue: "Blog & Guides" }), href: "/blog", icon: BookOpen, exactMatch: false },
     { name: t("labels.tasksAndEvents", { defaultValue: "Tasks / Events" }), href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false },
     { name: t("labels.marketplace"), href: "/search", icon: Store, exactMatch: false },
@@ -111,6 +117,15 @@ export default function Sidebar({
       return (
         location.pathname.startsWith("/search") ||
         location.pathname.startsWith("/marketplace")
+      );
+    }
+
+    // Blog & Guides covers the unified surface — /blog/* AND /articles/*
+    // both highlight the same nav item per the #1315 unification.
+    if (item.href === "/blog") {
+      return (
+        location.pathname.startsWith("/blog") ||
+        location.pathname.startsWith("/articles")
       );
     }
 

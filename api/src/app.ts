@@ -116,6 +116,7 @@ import { assessmentRoutes } from "./routes/assessments.js";
 import { predictiveAssessmentRoutes } from "./routes/predictive-assessments.js";
 import { userAuditRoutes } from "./routes/user-audit.js";
 import { hiringInsightsRoutes } from "./routes/hiring-insights.js";
+import { graphRoutes } from "./routes/graph.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { autofillRoutes } from "./routes/autofill.js";
 import { discoveryRoutes } from "./routes/discovery.js";
@@ -595,6 +596,7 @@ export function createApp() {
   app.route("/api/predictive-assessments", predictiveAssessmentRoutes);
   app.route("/api/audit", userAuditRoutes);
   app.route("/api/recruiter/hiring-insights", hiringInsightsRoutes);
+  app.route("/api/graph", graphRoutes);
   app.route("/api/auto-apply", autoApplyRoutes);
   app.route("/api/autofill", autofillRoutes);
   app.route("/api/discovery", discoveryRoutes);

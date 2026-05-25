@@ -21,6 +21,9 @@ import { isWorkerDue, runWorker } from "./workers/runner.js";
 import { runMonthClose } from "./domains/services-processing/month-close.js";
 import { runFraudSweep } from "./services/gamification/fraud-sweep.js";
 import { buildRepos } from "./repositories/index.js";
+import { EventReminderService } from "./services/event/EventReminderService.js";
+import { EventBlastService } from "./services/event/EventBlastService.js";
+import { buildApiDeps } from "./services/apiDeps.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -300,6 +303,61 @@ async function processGamificationFraudSweep(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Event reminder cadence + post-event connect prompts (gap #1244)
+// ---------------------------------------------------------------------------
+// Every /5 cron tick, scan upcoming public events whose start time falls
+// inside any of the reminder windows (1w / 24h / 1h / start). The
+// `event_reminders_sent` unique constraint guarantees idempotency, so
+// re-runs are safe. Same path fires the post-event "connect with people
+// you met" prompt for events that just ended.
+
+async function processEventReminders(): Promise<void> {
+  try {
+    const env = (globalThis as any).__ENV ?? {};
+    const deps = buildApiDeps(env);
+    const reminder = new EventReminderService(deps);
+    const blast = new EventBlastService(deps);
+
+    const result = await reminder.runCadence(getDb());
+    if (result.scanned > 0) {
+      console.log(
+        `[scheduled] event reminders: scanned=${result.scanned} sent=${result.sent} skipped=${result.skipped}`,
+      );
+    }
+
+    // Post-event connect prompt: events that ended in the last 2 hours.
+    // Drives the "Connect with the people you met" notification + the
+    // gamification points loop downstream.
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const db = getDb();
+    const justEnded = await db
+      .select({ id: schema.scheduledEvents.id })
+      .from(schema.scheduledEvents)
+      .where(
+        and(
+          sql`${schema.scheduledEvents.type} IN ('event', 'coffee')`,
+          isNotNull(schema.scheduledEvents.endAt),
+          lte(schema.scheduledEvents.endAt, now),
+          sql`${schema.scheduledEvents.endAt} >= ${twoHoursAgo.toISOString()}`,
+          sql`${schema.scheduledEvents.cancelledAt} IS NULL`,
+        ),
+      )
+      .limit(50);
+
+    for (const ev of justEnded) {
+      try {
+        await blast.sendPostEventConnectPrompt(ev.id);
+      } catch (err) {
+        console.error(`[scheduled] post-event prompt for ${ev.id} failed:`, err);
+      }
+    }
+  } catch (err) {
+    console.error("[scheduled] event reminders failed:", err);
+  }
+}
+
 async function processMonthlyUsageClose(): Promise<void> {
   const now = new Date();
   const isFirstOfMonth = now.getUTCDate() === 1;
@@ -327,5 +385,6 @@ export async function runScheduled(): Promise<void> {
     processRegisteredWorkers(),
     processMonthlyUsageClose(),
     processGamificationFraudSweep(),
+    processEventReminders(),
   ]);
 }

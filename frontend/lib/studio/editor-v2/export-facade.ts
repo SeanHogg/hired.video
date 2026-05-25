@@ -67,6 +67,17 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
   const { mediaKind, title, snapshot } = inputs;
   switch (mediaKind) {
     case "image": {
+      // PSD dispatch (#940 Phase 2 — Photoshop round-trip via ag-psd).
+      // Falls through to the flatten path for every other container
+      // (png/jpg/webp) so the existing image export flow doesn't change.
+      const profile = defaultOutputProfile("image");
+      if (profile.container === "psd") {
+        if (!snapshot.imageState) return null;
+        const { exportImageStateToPsd } = await import("@/lib/studio/drawing/psd-roundtrip");
+        const buffer = await exportImageStateToPsd(snapshot.imageState);
+        const { toBlobPart } = await import("@/lib/studio/bytes/to-blob-part");
+        return new Blob([toBlobPart(new Uint8Array(buffer))], { type: "image/vnd.adobe.photoshop" });
+      }
       if (!snapshot.flattenImage) return null;
       return snapshot.flattenImage();
     }

@@ -135,6 +135,7 @@ const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const EventsIndex = lazy(() => import("./pages/EventsIndex"));
 const EventDetail = lazy(() => import("./pages/EventDetail"));
 const EventNew = lazy(() => import("./pages/EventNew"));
+const MapPage = lazy(() => import("./pages/MapPage"));
 const SectorsIndex = lazy(() => import("./pages/SectorsIndex"));
 const SectorLanding = lazy(() => import("./pages/SectorLanding"));
 const ResumeTemplatesGallery = lazy(() => import("./pages/ResumeTemplatesGallery"));
@@ -702,6 +703,7 @@ const App = () => (
                       <Route path="/events" element={<EventsIndex />} />
                       <Route path="/events/new" element={<EventNew />} />
                       <Route path="/events/:idOrSlug" element={<EventDetail />} />
+                      <Route path="/map" element={<MapPage />} />
 
                       {/* AI-resilient sector surfaces — see shared/sectors.ts SSoT. */}
                       <Route path="/sectors" element={<SectorsIndex />} />

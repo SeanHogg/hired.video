@@ -146,6 +146,134 @@ const ScheduleCandidatesSchema = z.object({
     .max(200),
 });
 
+/**
+ * POST /sessions/:id/auto-match
+ *
+ * ZipIntro parity #1208: instead of forcing the recruiter to POST a
+ * candidate list, pull the top N scored candidates from their most
+ * recent `recruiter_agent_runs` row that matches this session's
+ * `job_id`, then run them through the same scheduler the manual
+ * `/schedule` endpoint uses. Net result for the recruiter: "I declared
+ * the window — fill it for me from the agent."
+ *
+ * Body: { runId?: string, limit?: number } — runId is optional; if
+ * omitted, the latest completed agent run for this job is used.
+ */
+liveScreenRecruiterRoutes.post("/sessions/:id/auto-match", async (c) => {
+  const rId = recruiterId(c);
+  if (!rId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const db = getDb();
+  const sessionsTable = (schema as any).liveScreeningSessions;
+  const invitesTable = (schema as any).liveScreeningInvites;
+  const runsTable = (schema as any).recruiterAgentRuns;
+  if (!sessionsTable || !invitesTable || !runsTable) {
+    return c.json(error("SERVICE_UNAVAILABLE", "Live screening or agent runs unavailable"), 503);
+  }
+
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.id, c.req.param("id")), eq(sessionsTable.recruiterId, rId)))
+    .limit(1);
+  if (!session) return c.json(error("NOT_FOUND", "Session not found"), 404);
+
+  const body = await c.req.json().catch(() => ({}));
+  const limit = Math.min(50, Math.max(1, Number(body.limit ?? 25)));
+
+  // Prefer the explicit run; otherwise fall back to the latest completed
+  // run for this session's job. The job match is the discriminator —
+  // an agent run from a different role shouldn't fill a different role's
+  // slots.
+  let run: any = null;
+  if (body.runId) {
+    const [explicit] = await db
+      .select()
+      .from(runsTable)
+      .where(and(eq(runsTable.id, body.runId), eq(runsTable.recruiterId, rId)))
+      .limit(1);
+    run = explicit ?? null;
+  } else if (session.jobId) {
+    const [latest] = await db
+      .select()
+      .from(runsTable)
+      .where(and(eq(runsTable.recruiterId, rId), eq(runsTable.jobId, session.jobId), eq(runsTable.status, "completed")))
+      .orderBy(desc(runsTable.completedAt))
+      .limit(1);
+    run = latest ?? null;
+  }
+
+  if (!run) {
+    return c.json(error("NOT_FOUND", "No agent run found for this session. Run /agent/source first or pass runId explicitly."), 404);
+  }
+
+  // results is an array of { candidateId, name, email, score, ... }
+  const results = Array.isArray(run.results) ? run.results : [];
+  if (results.length === 0) {
+    return c.json(error("INVALID_STATE", "Agent run has no scored candidates"), 400);
+  }
+
+  // Already-invited candidates for this session — skip them on a re-run
+  // so the scheduler isn't fighting the unique partial index in 0118.
+  const existingInvites = await db
+    .select({ candidateId: invitesTable.candidateId })
+    .from(invitesTable)
+    .where(eq(invitesTable.sessionId, session.id));
+  const alreadyInvited = new Set(
+    (existingInvites as any[]).map((r) => r.candidateId).filter((id): id is string => !!id),
+  );
+
+  const ranked: ScheduleCandidate[] = results
+    .filter((r: any) => r.candidateId && !alreadyInvited.has(r.candidateId))
+    .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, limit)
+    .map((r: any) => ({
+      candidateId: r.candidateId,
+      candidateName: r.name ?? "Candidate",
+      candidateEmail: r.email ?? null,
+    }));
+
+  if (ranked.length === 0) {
+    return c.json(success({ capacity: 0, scheduled: 0, unscheduled: [], invites: [], sourceRunId: run.id }), 200);
+  }
+
+  const schedule = buildBackToBackSchedule(
+    new Date(session.startTime),
+    new Date(session.endTime),
+    session.slotMinutes,
+    ranked,
+  );
+
+  const created: unknown[] = [];
+  for (const slot of schedule.slots) {
+    const [row] = await (db
+      .insert(invitesTable)
+      .values({
+        sessionId: session.id,
+        candidateId: slot.candidate.candidateId,
+        candidateName: slot.candidate.candidateName,
+        candidateEmail: slot.candidate.candidateEmail ?? null,
+        slotStart: slot.slotStart,
+        slotEnd: slot.slotEnd,
+        inviteToken: generateInviteToken(),
+        status: "pending",
+      })
+      .returning() as any);
+    created.push(row);
+  }
+
+  return c.json(
+    success({
+      sourceRunId: run.id,
+      capacity: schedule.capacity,
+      scheduled: schedule.scheduled,
+      unscheduled: schedule.unscheduled,
+      invites: created,
+    }),
+    200,
+  );
+});
+
 liveScreenRecruiterRoutes.post("/sessions/:id/schedule", async (c) => {
   const rId = recruiterId(c);
   if (!rId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);

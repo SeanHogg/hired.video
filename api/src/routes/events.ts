@@ -32,6 +32,8 @@ import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
 import { EventService } from "../services/event/EventService.js";
 import { EventRsvpService } from "../services/event/EventRsvpService.js";
+import { EventMatchmakingService } from "../services/event/EventMatchmakingService.js";
+import { EventBlastService } from "../services/event/EventBlastService.js";
 import {
   CreateEventSchema,
   EventSearchFilterSchema,
@@ -318,6 +320,71 @@ eventRoutes.post("/:id/attendees/:attendeeId/check-in", async (c) => {
   const ok = await rsvp.checkIn(c.req.param("id"), c.req.param("attendeeId"), userId);
   if (!ok) return c.json(error("FORBIDDEN", "Cannot check in this attendee"), 403);
   return c.json(success({ checkedIn: true }), 200);
+});
+
+// ─── GET /:id/matches — AI introductions for the viewer ───────────────
+// Read-through: returns cached scores first; refreshes from heuristic if
+// the cache is empty for (event, viewer). Backed by EventMatchmakingService
+// (gap #1244 — LLM upgrade is the v2).
+eventRoutes.get("/:id/matches", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const deps = buildApiDeps(getEnv(c));
+  const matchmaking = new EventMatchmakingService(deps);
+
+  let matches = await matchmaking.topForViewer(c.req.param("id"), userId, 10);
+  if (matches.length === 0) {
+    const refreshed = await matchmaking.refreshForViewer(c.req.param("id"), userId, 10);
+    matches = refreshed.map((m) => ({ ...m, reason: m.reason as string | null }));
+  }
+
+  // Hydrate names + avatars in one shot.
+  const userIds = matches.map((m) => m.matchUserId);
+  const users = await Promise.all(userIds.map((id) => deps.repos.users.findById(id)));
+  const out = matches.map((m, i) => {
+    const u: any = users[i];
+    return {
+      userId: m.matchUserId,
+      score: m.score,
+      reason: m.reason,
+      name:
+        u?.profile?.displayName ||
+        [u?.firstName, u?.lastName].filter(Boolean).join(" ") ||
+        u?.email ||
+        "Attendee",
+      avatarUrl: u?.avatarUrl ?? null,
+      headline: u?.profile?.headline ?? null,
+    };
+  });
+
+  return c.json(success({ matches: out }), 200);
+});
+
+// ─── POST /:id/blast — host announcement to all approved attendees ────
+eventRoutes.post("/:id/blast", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => ({}));
+  const subject = String(body?.subject ?? "").trim();
+  const message = String(body?.message ?? "").trim();
+  if (!subject || !message) {
+    return c.json(error("VALIDATION_ERROR", "Subject and message are required"), 400);
+  }
+
+  const deps = buildApiDeps(getEnv(c));
+  const blast = new EventBlastService(deps);
+  if (!(await blast.canBlast(c.req.param("id"), userId))) {
+    return c.json(error("FORBIDDEN", "Only the host or co-hosts can blast attendees"), 403);
+  }
+
+  try {
+    const res = await blast.send(c.req.param("id"), userId, subject, message);
+    return c.json(success(res), 200);
+  } catch {
+    return c.json(error("NOT_FOUND", "Event not found"), 404);
+  }
 });
 
 eventRoutes.all("*", (c) =>

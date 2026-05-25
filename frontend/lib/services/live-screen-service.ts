@@ -109,6 +109,24 @@ export async function scheduleLiveScreenSession(
   return res.data;
 }
 
+export interface AutoMatchResult extends ScheduleResult {
+  sourceRunId: string;
+}
+
+/** ZipIntro parity #1208: pull top scored candidates from the latest
+ *  agent run for this session's job (or an explicit runId) and run
+ *  them through the back-to-back scheduler. One-button intent. */
+export async function autoMatchLiveScreenSession(
+  id: string,
+  input?: { runId?: string; limit?: number },
+): Promise<AutoMatchResult> {
+  const res = await apiClient.post<AutoMatchResult>(
+    `/api/recruiter/live-screen/sessions/${id}/auto-match`,
+    input ?? {},
+  );
+  return res.data;
+}
+
 // ─── Candidate magic-link (public, token-only) ─────────────────────────────
 
 export interface LiveScreenInvitePreview {

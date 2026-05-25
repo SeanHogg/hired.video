@@ -607,6 +607,18 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: false,
     fileExt: ".webp",
   },
+  {
+    id: "image-psd",
+    label: "PSD",
+    hint: "Photoshop · layers preserved",
+    mediaKind: "image",
+    container: "psd",
+    mime: "image/vnd.adobe.photoshop",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: true,
+    fileExt: ".psd",
+  },
 
   // ─── CAD (2D drafting MVP — #930) ──────────────────────────────────────────
   // Vector drafting; no time axis, no audio. The CadStage emits SVG +

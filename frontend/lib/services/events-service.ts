@@ -121,4 +121,30 @@ export const eventsService = {
   async checkInAttendee(id: string, attendeeId: string): Promise<void> {
     await apiClient.post(`/api/events/${id}/attendees/${attendeeId}/check-in`, {});
   },
+
+  async getMatches(id: string): Promise<{ matches: EventMatch[] }> {
+    const res = await apiClient.get<{ matches: EventMatch[] }>(`/api/events/${id}/matches`);
+    return res.data ?? { matches: [] };
+  },
+
+  async sendBlast(
+    id: string,
+    subject: string,
+    message: string,
+  ): Promise<{ sentTo: number }> {
+    const res = await apiClient.post<{ sentTo: number }>(`/api/events/${id}/blast`, {
+      subject,
+      message,
+    });
+    return res.data;
+  },
 };
+
+export interface EventMatch {
+  userId: string;
+  score: number;
+  reason: string | null;
+  name: string;
+  avatarUrl: string | null;
+  headline: string | null;
+}

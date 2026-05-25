@@ -16,6 +16,7 @@ import { Calendar, MapPin, Users, Video, Share2, ExternalLink, Sparkles } from "
 import { eventsService, type EventAttendeePublic } from "@/lib/services/events-service";
 import { RsvpButton } from "@/components/events/RsvpButton";
 import { EventBadge } from "@/components/events/EventBadge";
+import { AttendeeMatches } from "@/components/events/AttendeeMatches";
 import type { ResolvedEvent } from "@shared/events";
 
 export default function EventDetail() {
@@ -170,6 +171,9 @@ export default function EventDetail() {
                 {event.description}
               </div>
             )}
+
+            {/* AI matches — self-gates on matchmakingEnabled + viewer RSVP */}
+            <AttendeeMatches event={event} />
 
             {/* Attendees */}
             {attendees.length > 0 && (

@@ -336,11 +336,22 @@ function SessionDetailDialog({ sessionId, onClose }: { sessionId: string; onClos
               {data.invites.length === 1 ? "" : "s"}
             </div>
             {data.invites.length === 0 ? (
-              <Alert>
-                <AlertDescription>
-                  No invites scheduled yet. Use the talent-pool picker (coming soon) or contact your recruiter ops to seed candidates.
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-3">
+                <Alert>
+                  <AlertDescription>
+                    No invites scheduled yet. Auto-match fills this block from your latest AI Recruiter Agent run for this role.
+                  </AlertDescription>
+                </Alert>
+                <AutoMatchButton sessionId={data.session.id} onMatched={async () => {
+                  setLoading(true);
+                  try {
+                    const fresh = await getLiveScreenSession(data.session.id);
+                    setData(fresh);
+                  } finally {
+                    setLoading(false);
+                  }
+                }} />
+              </div>
             ) : (
               <div className="space-y-2">
                 {data.invites.map((i) => (
