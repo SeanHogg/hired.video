@@ -17,6 +17,7 @@
  */
 
 import { paidMediaService } from "./services/paid-media-service";
+import { hasStoredConsentFor } from "./legal/consent-mode";
 
 const CLICK_ID_PARAMS = ["fbclid", "gclid", "li_fat_id", "ttclid", "msclkid"] as const;
 type ClickIdParam = (typeof CLICK_ID_PARAMS)[number];
@@ -168,7 +169,17 @@ export interface InstallPixelsOptions {
 }
 
 export async function installPaidMediaPixels(opts: InstallPixelsOptions = {}): Promise<void> {
+  // Click-ID capture is allowed pre-consent: cookies are first-party, the
+  // values are stored only for our own attribution use, and capturing here
+  // is the parsing of the URL the user navigated to (not a third-party
+  // beacon). The platform-pixel scripts BELOW are what need consent.
   captureClickIds();
+
+  // CPRA / GDPR / Quebec Law 25 all require explicit opt-in before loading
+  // third-party ad/marketing pixels. Without `marketing` consent the cfg
+  // fetch still runs (it's our own API) but the injection short-circuits.
+  if (!hasStoredConsentFor("marketing")) return;
+
   try {
     const cfg = await paidMediaService.getPublicPixelConfig(opts.workspaceUserId, opts.workspaceCompanyId ?? null);
     if (cfg.configured === false) return;

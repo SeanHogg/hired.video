@@ -140,7 +140,9 @@ describe("applyDelta — invariants across all modes", () => {
   for (const mode of modes) {
     it(`${mode}: playable length stays ≥ 0.05`, () => {
       const next = applyDelta(snap({ startSec: 0, endSec: 5 }), 100, mode);
-      expect(next.endSec - next.startSec).toBeGreaterThanOrEqual(0.05);
+      // 1e-9 FP tolerance — Math.min on values close to MIN_PLAYABLE
+      // sometimes lands a sub-ULP short. The model invariant holds.
+      expect(next.endSec - next.startSec).toBeGreaterThanOrEqual(0.05 - 1e-9);
     });
     it(`${mode}: trimStart ≥ 0`, () => {
       const next = applyDelta(snap({ trimStartSec: 0 }), -100, mode);

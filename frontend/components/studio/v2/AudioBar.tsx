@@ -197,6 +197,19 @@ export default function AudioBar({
   );
 }
 
+/** Shrink fade-in + fade-out so their sum doesn't exceed the new
+ *  playable length. Fade-in keeps priority (it was authored first);
+ *  fade-out fills the remainder. */
+function fitFadesToPlayable(
+  fadeIn: number,
+  fadeOut: number,
+  playable: number,
+): { fadeIn: number; fadeOut: number } {
+  const cappedFadeIn = Math.max(0, Math.min(fadeIn, playable));
+  const cappedFadeOut = Math.max(0, Math.min(fadeOut, playable - cappedFadeIn));
+  return { fadeIn: cappedFadeIn, fadeOut: cappedFadeOut };
+}
+
 /** Pure delta application — exported for tests + future reuse from
  *  keyboard-nudge handlers. Per-mode clamps live HERE so the parent
  *  doesn't re-derive them. */
@@ -228,10 +241,21 @@ export function applyDelta(
       );
       const trimDelta = nextStart - snap.startSec;
       const nextTrimStart = Math.max(0, snap.trimStartSec + trimDelta);
+      const nextPlayable = snap.endSec - nextStart;
+      // If the new playable is shorter than the existing fade budget,
+      // shrink the fades to fit. Fade-in scaling first; fade-out picks
+      // up whatever's left.
+      const { fadeIn, fadeOut } = fitFadesToPlayable(
+        snap.fadeInSec,
+        snap.fadeOutSec,
+        nextPlayable,
+      );
       return {
         ...snap,
         startSec: nextStart,
         trimStartSec: nextTrimStart,
+        fadeInSec: fadeIn,
+        fadeOutSec: fadeOut,
       };
     }
     case "trim-end": {
@@ -247,10 +271,18 @@ export function applyDelta(
       );
       const trimDelta = snap.endSec - nextEnd;
       const nextTrimEnd = Math.max(0, snap.trimEndSec + trimDelta);
+      const nextPlayable = nextEnd - snap.startSec;
+      const { fadeIn, fadeOut } = fitFadesToPlayable(
+        snap.fadeInSec,
+        snap.fadeOutSec,
+        nextPlayable,
+      );
       return {
         ...snap,
         endSec: nextEnd,
         trimEndSec: nextTrimEnd,
+        fadeInSec: fadeIn,
+        fadeOutSec: fadeOut,
       };
     }
     case "fade-in": {

@@ -11,6 +11,11 @@
  * authenticated fetch seeds the server from localStorage *only if* the server
  * has no row yet — so a first login doesn't clobber an existing saved choice
  * from another device.
+ *
+ * GPC: when the browser asserts `navigator.globalPrivacyControl`, the very
+ * first visit records an implicit reject-optional consent so the banner stops
+ * showing AND every tag manager / paid pixel sees the denied state on first
+ * render. CPRA explicitly requires honoring this signal as an opt-out.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -19,6 +24,7 @@ import {
   type CookiePreferences,
   settingsService,
 } from "@/lib/services/settings-service";
+import { applyConsentToTagManagers, isGpcEnabled } from "@/lib/legal/consent-mode";
 
 const STORAGE_KEY = "hv_cookie_prefs";
 
@@ -32,11 +38,25 @@ const DEFAULTS: CookiePreferences = {
   consentedAt: null,
 };
 
+/** Default state for a first-time visitor. When GPC is set, we stamp
+ *  `consentedAt` immediately and persist the implicit reject so the banner
+ *  doesn't keep showing on every page. */
+function initialDefaults(): CookiePreferences {
+  if (!isGpcEnabled()) return DEFAULTS;
+  return {
+    essential: true,
+    analytics: false,
+    marketing: false,
+    personalization: false,
+    consentedAt: new Date().toISOString(),
+  };
+}
+
 function readLocal(): CookiePreferences {
   if (typeof window === "undefined") return DEFAULTS;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULTS;
+    if (!raw) return initialDefaults();
     const parsed = JSON.parse(raw);
     return {
       essential: true,
@@ -46,7 +66,7 @@ function readLocal(): CookiePreferences {
       consentedAt: typeof parsed.consentedAt === "string" ? parsed.consentedAt : null,
     };
   } catch {
-    return DEFAULTS;
+    return initialDefaults();
   }
 }
 
@@ -76,8 +96,25 @@ export type UseCookiePreferencesApi = {
 
 export function useCookiePreferences(): UseCookiePreferencesApi {
   const apiReady = useApiReady();
-  const [preferences, setPreferences] = useState<CookiePreferences>(() => readLocal());
+  const [preferences, setPreferences] = useState<CookiePreferences>(() => {
+    const initial = readLocal();
+    // Fan out the bootstrap state to Consent Mode v2 immediately so any
+    // tag that loaded between the index.html consent default and this hook
+    // mounting sees the user's actual choice (or implicit GPC opt-out).
+    applyConsentToTagManagers(initial);
+    return initial;
+  });
   const [loading, setLoading] = useState<boolean>(apiReady);
+
+  // If the visitor was bootstrapped via GPC into an implicit reject, persist
+  // that to localStorage immediately so subsequent reads short-circuit and
+  // we don't re-stamp `consentedAt` on every refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isGpcEnabled()) return;
+    if (window.localStorage.getItem(STORAGE_KEY)) return;
+    writeLocal(preferences);
+  }, [preferences]);
 
   // On api-ready transition: pull server prefs. If the server has no record
   // yet and the anonymous visitor had already made a choice, push the local
@@ -106,9 +143,11 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
           if (cancelled) return;
           setPreferences(synced);
           writeLocal(synced);
+          applyConsentToTagManagers(synced);
         } else {
           setPreferences(server);
           writeLocal(server);
+          applyConsentToTagManagers(server);
         }
       })
       .catch(() => {
@@ -132,11 +171,13 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
       };
       setPreferences(stamped);
       writeLocal(stamped);
+      applyConsentToTagManagers(stamped);
       if (apiReady) {
         try {
           const saved = await settingsService.updateCookiePreferences(next);
           setPreferences(saved);
           writeLocal(saved);
+          applyConsentToTagManagers(saved);
         } catch (e) {
           console.error("Failed to save cookie preferences", e);
         }

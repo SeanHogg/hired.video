@@ -20,13 +20,17 @@
  *
  *   1. `webgpu-sd-turbo` — Stable Diffusion Turbo via transformers.js
  *      on WebGPU. Zero infra cost, runs entirely in the user's browser,
- *      ~1.5GB first download cached for subsequent runs. CURRENTLY
- *      REGISTERED AS A PLACEHOLDER — `isAvailable()` returns false
- *      until a transformers.js text-to-image pipeline lands; this lets
- *      the seam exist now so swapping it in is one file change. The
- *      headshot-engine.ts comment notes the same constraint: "transformers.js
- *      v3 does NOT expose a text-to-image pipeline … SDXL-Turbo via
- *      transformers.js isn't shipping yet."
+ *      ~1.5GB first download cached for subsequent runs. Loads the lib
+ *      lazily from the jsDelivr CDN (same pattern as headshot-engine.ts)
+ *      and caches the pipeline module-level so first-call pays the
+ *      load cost and subsequent calls reuse the warmed runtime.
+ *      `isAvailable()` self-gates on (a) a WebGPU adapter, (b) a
+ *      runtime probe of the transformers.js task registry, AND
+ *      (c) the request being text→img (img→img defers to the server
+ *      engine — Cloudflare's SD-v1.5-img2img path). When the upstream
+ *      task registry lacks `text-to-image` the probe falls through
+ *      cleanly — engine seam reacts to upstream changes without a
+ *      deploy. Closes gap #1112.
  *
  *   2. `server-cf-sdxl-lightning` — the EXISTING `/api/studio/generate-image`
  *      endpoint, which routes through Cloudflare Workers AI's
@@ -104,8 +108,13 @@ export interface ImageGenEngine {
   label: string;
   /** Cheap readiness check (no model load). The facade calls this
    *  every pick so a browser that gains/loses WebGPU mid-session
-   *  resolves correctly. */
-  isAvailable(): Promise<boolean>;
+   *  resolves correctly. Receives the request's `input` so engines
+   *  can DECLINE per-request — e.g. the WebGPU engine returns false
+   *  when `sourceImageUrl`/`sourceImageDataUrl` is present so the
+   *  server engine handles img→img (which the WebGPU runtime doesn't
+   *  support today). Passed-in input is the ALREADY-VALIDATED request;
+   *  engines do not re-trim/cap. */
+  isAvailable(input?: ImageGenInput): Promise<boolean>;
   generate(
     input: ImageGenInput,
     onProgress?: (p: number) => void,
@@ -128,12 +137,17 @@ const ENGINE_PRIORITY: ImageGenEngineId[] = [
 
 /** Pick the best engine. WebGPU first, server fallback. Single source
  *  of truth — every caller routes through `generateImage()` which
- *  routes through this. */
-export async function pickAvailableImageGenEngine(): Promise<ImageGenEngine> {
+ *  routes through this. Passes the request `input` through to each
+ *  engine's `isAvailable()` so engines can decline per-request (e.g.
+ *  WebGPU declines img→img requests, falling back to the server
+ *  engine that supports them). */
+export async function pickAvailableImageGenEngine(
+  input?: ImageGenInput,
+): Promise<ImageGenEngine> {
   for (const id of ENGINE_PRIORITY) {
     const engine = ENGINES.get(id);
     if (!engine) continue;
-    if (await engine.isAvailable()) return engine;
+    if (await engine.isAvailable(input)) return engine;
   }
   throw new Error("No image generation engine is available.");
 }
@@ -146,14 +160,9 @@ export async function generateImage(
   if (trimmed.length < 3) {
     throw new Error("Prompt must be at least 3 characters.");
   }
-  const engine = await pickAvailableImageGenEngine();
-  return engine.generate(
-    {
-      ...input,
-      prompt: trimmed.slice(0, 500),
-    },
-    onProgress,
-  );
+  const normalized: ImageGenInput = { ...input, prompt: trimmed.slice(0, 500) };
+  const engine = await pickAvailableImageGenEngine(normalized);
+  return engine.generate(normalized, onProgress);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,46 +228,99 @@ async function probeTransformersTextToImage(): Promise<boolean> {
   return cachedTransformersProbe;
 }
 
+/** Module-level pipeline cache — the SD-Turbo weights are multi-GB and
+ *  ~5-15s to instantiate. Caching means the first generation pays the
+ *  load cost; subsequent generations reuse the warmed pipeline (until
+ *  the tab unloads). Stored as a Promise so concurrent first-calls
+ *  share one load. Cleared on failure so the next call can retry. */
+type WebGpuTextToImagePipeline = (
+  prompt: string,
+  opts: Record<string, unknown>,
+) => Promise<{
+  images?: Array<{
+    toBlob?: () => Promise<Blob>;
+    data?: Uint8ClampedArray;
+    width?: number;
+    height?: number;
+  }>;
+}>;
+
+let cachedSdTurboPipeline: Promise<WebGpuTextToImagePipeline> | null = null;
+
+async function loadSdTurboPipeline(
+  onProgress?: (p: number) => void,
+): Promise<WebGpuTextToImagePipeline> {
+  if (cachedSdTurboPipeline) return cachedSdTurboPipeline;
+  cachedSdTurboPipeline = (async () => {
+    const transformers = await import(
+      // @ts-expect-error — CDN ESM URL has no static type declarations
+      /* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm"
+    ).catch(() => null) as {
+      pipeline?: (
+        task: string,
+        model: string,
+        opts?: Record<string, unknown>,
+      ) => Promise<unknown>;
+    } | null;
+    if (!transformers || typeof transformers.pipeline !== "function") {
+      throw new Error(
+        "WebGPU SD-Turbo engine: transformers.js text-to-image pipeline " +
+        "not yet available upstream.",
+      );
+    }
+    // `device: "webgpu"` is what actually pulls work off the CPU. The
+    // `dtype: "fp16"` halves VRAM use vs fp32, fitting more devices.
+    // `progress_callback` mirrors the headshot engine's pattern — the
+    // 0 → 0.4 range of the caller's progress bar covers the model
+    // download + compilation.
+    return (await transformers.pipeline("text-to-image", "Xenova/sd-turbo", {
+      device: "webgpu",
+      dtype: "fp16",
+      progress_callback: (event: { progress?: number }) => {
+        if (typeof event.progress === "number") {
+          onProgress?.(Math.min(0.4, event.progress * 0.4));
+        }
+      },
+    })) as WebGpuTextToImagePipeline;
+  })();
+  try {
+    return await cachedSdTurboPipeline;
+  } catch (err) {
+    cachedSdTurboPipeline = null;
+    throw err;
+  }
+}
+
 registerImageGenEngine({
   id: "webgpu-sd-turbo",
   label: "Stable Diffusion Turbo · WebGPU",
-  async isAvailable(): Promise<boolean> {
+  async isAvailable(input?: ImageGenInput): Promise<boolean> {
+    // Img→img isn't on the WebGPU path (#1112's scope was text→img only;
+    // the server engine handles img→img via SD-v1.5-img2img). Declining
+    // here lets the facade fall through cleanly without forcing the
+    // user into a "not supported" error mid-request.
+    if (input?.sourceImageUrl || input?.sourceImageDataUrl) return false;
     if (!(await isWebGpuAdapterAvailable())) return false;
-    // Runtime probe (#1112): when transformers.js v3 ships the
-    // `text-to-image` pipeline, this branch self-activates without a
-    // code change. Until then the lib's task registry doesn't carry
-    // the task token, and the probe returns false — falling through
-    // to the server engine.
+    // Runtime probe: when transformers.js v3 ships the
+    // `text-to-image` task token, the engine self-activates without a
+    // code change. Until then the probe returns false and we fall
+    // through to the server engine.
     return probeTransformersTextToImage();
   },
   async generate(input: ImageGenInput, onProgress?: (p: number) => void): Promise<ImageGenResult> {
     const startTs = performance.now();
-    // Defer the heavy import to the call site — the bundle stays
-    // clean for users who never invoke an AI-gen engine. Loaded
-    // dynamically via the same CDN ESM pattern the headshot
-    // generator (and `probeTransformersTextToImage` above) uses.
-    // `@ts-expect-error` because the URL has no matching `.d.ts`;
-    // safe because we runtime-probe the shape below.
-    const transformers = await import(
-      // @ts-expect-error — CDN ESM URL has no static type declarations
-      /* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/+esm"
-    ).catch(() => null) as { pipeline?: (task: string, model: string) => Promise<unknown> } | null;
-    if (!transformers || typeof transformers.pipeline !== "function") {
-      throw new Error(
-        "WebGPU SD-Turbo engine: transformers.js text-to-image pipeline " +
-        "not yet available upstream. Falling through to the server engine.",
-      );
-    }
-    onProgress?.(0.05);
-    const pipe = (await transformers.pipeline("text-to-image", "stabilityai/sd-turbo")) as (
-      prompt: string,
-      opts: Record<string, unknown>,
-    ) => Promise<{ images?: Array<{ toBlob?: () => Promise<Blob>; data?: Uint8ClampedArray; width?: number; height?: number }> }>;
+    onProgress?.(0);
+    // Load (or reuse) the cached pipeline. First call pays the
+    // ~1.5GB weight download + WebGPU shader compilation; subsequent
+    // calls reuse the warmed pipeline. Onprogress 0 → 0.4 is the
+    // load + compile range; 0.4 → 1.0 is inference + raster convert.
+    const pipe = await loadSdTurboPipeline(onProgress);
     onProgress?.(0.4);
     const result = await pipe(input.prompt, {
       width: input.width ?? 512,
       height: input.height ?? 512,
       num_inference_steps: 1, // SD-Turbo's defining feature — 1-step generation
+      guidance_scale: 0, // SD-Turbo is trained for classifier-free guidance OFF
     });
     const image = result.images?.[0];
     if (!image) {
@@ -287,7 +349,7 @@ registerImageGenEngine({
       previewUrl: URL.createObjectURL(blob),
       engine: "webgpu-sd-turbo",
       elapsedMs: performance.now() - startTs,
-      mode: input.sourceImageUrl || input.sourceImageDataUrl ? "img2img" : "text2img",
+      mode: "text2img", // WebGPU engine declines img→img — see isAvailable
     };
   },
 });
