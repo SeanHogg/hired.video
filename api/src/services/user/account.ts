@@ -558,7 +558,12 @@ export async function deleteAccount(userId: string,
   }
 
   // Soft delete: disable the account and revoke existing authentication artifacts.
-  // This matches legacy behavior where the account is no longer usable but records remain.
+  // `deletedAt` is the trigger the nightly purge sweep (account-purge.ts)
+  // watches — without it, an admin-deactivated row (is_active=false) would
+  // never become a purge candidate. Setting both keeps the existing
+  // "account inaccessible" gate working while opting the row into the
+  // retention-window count-down published in the Privacy Policy.
+  const now = new Date();
   await db
     .update(users)
     .set({
@@ -567,7 +572,8 @@ export async function deleteAccount(userId: string,
       passwordHash: Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("") as any,
-      updatedAt: new Date(),
+      deletedAt: now,
+      updatedAt: now,
     } as any)
     .where(eq(users.id, userId));
 

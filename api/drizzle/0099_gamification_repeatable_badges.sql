@@ -11,6 +11,22 @@ DROP INDEX IF EXISTS "user_badges_user_badge_uniq";
 ALTER TABLE "badges"
   ADD COLUMN IF NOT EXISTS "is_repeatable" boolean NOT NULL DEFAULT false;
 
+-- The SQL migration runner re-applies every file on every deploy, so 0097
+-- keeps re-inserting `first_task` / `streak_7` (with ON CONFLICT DO NOTHING
+-- against the slug) after this migration has already renamed those rows.
+-- On the second deploy the table holds BOTH the freshly-re-seeded source
+-- slug AND the previously-renamed target slug, and the UPDATE rename below
+-- blows up on the unique constraint. The re-seeded source rows have no
+-- user_badges pointing at them (the badge engine only references the new
+-- slugs), so dropping them is safe.
+DELETE FROM "badges"
+ WHERE slug='first_task'
+   AND EXISTS (SELECT 1 FROM "badges" b2 WHERE b2.slug='get_it_done');
+
+DELETE FROM "badges"
+ WHERE slug='streak_7'
+   AND EXISTS (SELECT 1 FROM "badges" b2 WHERE b2.slug='on_fire');
+
 -- Rename `first_task` → `get_it_done` per product language.
 UPDATE "badges"
    SET slug='get_it_done',

@@ -156,10 +156,24 @@ export default function PrivacyPolicy() {
                   <div className="space-y-2">
                     <h4 className="font-medium">Data Protection Officer</h4>
                     <p className="text-sm text-muted-foreground">
-                      You may establish direct and effective communication with
-                      hired.video by written communication sent to any of the
-                      indicated addresses or by sending an email to the address:
-                      info@hired.video
+                      For privacy inquiries, data subject access / deletion /
+                      portability requests, or to exercise any rights described
+                      in this policy, contact our Data Protection Officer at{" "}
+                      <a
+                        href="mailto:privacy@hired.video"
+                        className="underline hover:text-foreground"
+                      >
+                        privacy@hired.video
+                      </a>
+                      . For residents of California, you may also use our{" "}
+                      <a
+                        href="/privacy/opt-out"
+                        className="underline hover:text-foreground"
+                      >
+                        Do Not Sell or Share My Personal Information
+                      </a>{" "}
+                      page. For residents of Canada, our designated Privacy
+                      Officer can be reached at the same address.
                     </p>
                   </div>
                 </div>

@@ -192,6 +192,56 @@ settingsRoutes.put("/cookies", async (c) => {
   }), 200);
 });
 
+// ============================================================================
+// CCPA / CPRA "Do Not Sell or Share My Personal Information"
+//
+// GET  → returns the user's current opt-out status.
+// PUT  → flips `users.do_not_share` AND zeroes the marketing /
+//        personalization cookie categories so the next pixel-install pass
+//        short-circuits. The do_not_share row-level flag is the seam the
+//        server-side CAPI fan-out reads to suppress identifier sharing
+//        independently of cookie state (a returning user with a stale
+//        local consent cookie still gets respected via this column).
+// ============================================================================
+
+settingsRoutes.get("/privacy/do-not-share", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [row] = await db.select({ doNotShare: users.doNotShare }).from(users).where(eq(users.id, uid)).limit(1);
+  return c.json(success({ doNotShare: row?.doNotShare ?? false }), 200);
+});
+
+settingsRoutes.put("/privacy/do-not-share", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const doNotShare = Boolean(body?.doNotShare);
+  const db = getDb();
+  const now = new Date();
+  await db.update(users).set({ doNotShare, updatedAt: now } as any).where(eq(users.id, uid));
+  // When opting OUT, force marketing/personalization cookies off so the
+  // next pixel-install / CAPI pass picks up the new state without
+  // requiring a separate Settings → Cookies trip from the user.
+  if (doNotShare) {
+    await db
+      .insert(cookiePreferences)
+      .values({
+        userId: uid,
+        analytics: false,
+        marketing: false,
+        personalization: false,
+        consentedAt: now,
+        updatedAt: now,
+      } as any)
+      .onConflictDoUpdate({
+        target: cookiePreferences.userId,
+        set: { marketing: false, personalization: false, consentedAt: now, updatedAt: now } as any,
+      });
+  }
+  return c.json(success({ doNotShare }), 200);
+});
+
 settingsRoutes.get("/job-preferences", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);

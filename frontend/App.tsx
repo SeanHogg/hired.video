@@ -12,6 +12,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import GlobalErrorHandler from "@/components/GlobalErrorHandler";
 import GlobalAIUsageBanner from "@/components/GlobalAIUsageBanner";
 import { BadgeUnlockToaster } from "@/components/badges/BadgeUnlockToaster";
+import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -547,6 +548,7 @@ const App = () => (
                 <GlobalErrorHandler />
                 <GlobalAIUsageBanner />
                 <BadgeUnlockToaster />
+                <CookieConsentBanner />
                 <PWAUpdatePrompt />
                 <BrowserRouter>
                   <HeaderFiltersProvider>

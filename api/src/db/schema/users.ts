@@ -57,6 +57,17 @@ export const users = pgTable("users", {
   // login_events for the per-login history.
   signupIp: varchar("signup_ip", { length: 45 }),
   signupUserAgent: text("signup_user_agent"),
+  // Stamped by deleteAccount() at user request. Distinct from
+  // is_active=false (which also covers admin deactivation / suspension
+  // recovery). The nightly purge sweep in services/user/account-purge.ts
+  // hard-deletes rows where deletedAt is older than the retention window
+  // published in the Privacy Policy.
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  // CPRA opt-out: "Do not sell or share my personal information". Set
+  // via /privacy/opt-out (token-form for unauthenticated requests) or
+  // Settings → Privacy. Read by paid-media-pixels.installPaidMediaPixels
+  // and the CAPI fan-out to suppress identifier sharing.
+  doNotShare: boolean("do_not_share").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

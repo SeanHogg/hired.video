@@ -20,6 +20,7 @@ import { workers as registeredWorkers } from "./workers/registry.js";
 import { isWorkerDue, runWorker } from "./workers/runner.js";
 import { runMonthClose } from "./domains/services-processing/month-close.js";
 import { runFraudSweep } from "./services/gamification/fraud-sweep.js";
+import { processAccountPurge } from "./services/user/account-purge.js";
 import { buildRepos } from "./repositories/index.js";
 
 // ---------------------------------------------------------------------------
@@ -300,6 +301,25 @@ async function processGamificationFraudSweep(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Account purge — hard-delete soft-deleted users past the retention window
+// ---------------------------------------------------------------------------
+// Closes the gap between PrivacyPolicy.tsx (which promises permanent purge
+// after 36 months) and deleteAccount() (which only soft-deletes). The
+// processAccountPurge helper self-gates to a once-per-day UTC window so
+// the /5 cron tick doesn't run it 288 times.
+
+async function processAccountPurgeSafe(): Promise<void> {
+  try {
+    const result = await processAccountPurge();
+    if (!result.skippedNotDue) {
+      console.log("[scheduled] account-purge sweep", result);
+    }
+  } catch (err) {
+    console.error("[scheduled] account-purge sweep failed:", err);
+  }
+}
+
 async function processMonthlyUsageClose(): Promise<void> {
   const now = new Date();
   const isFirstOfMonth = now.getUTCDate() === 1;
@@ -327,5 +347,6 @@ export async function runScheduled(): Promise<void> {
     processRegisteredWorkers(),
     processMonthlyUsageClose(),
     processGamificationFraudSweep(),
+    processAccountPurgeSafe(),
   ]);
 }

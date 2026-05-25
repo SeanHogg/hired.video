@@ -473,6 +473,27 @@ export class SettingsService {
     return response.data;
   }
 
+  // ============================================================================
+  // CCPA / CPRA "Do Not Sell or Share My Personal Information"
+  // ============================================================================
+
+  async getDoNotShare(): Promise<{ doNotShare: boolean }> {
+    const response = await apiClient.get<{ doNotShare: boolean }>(
+      "/api/Settings/privacy/do-not-share",
+      z.object({ doNotShare: z.boolean() }),
+    );
+    return response.data;
+  }
+
+  async setDoNotShare(doNotShare: boolean): Promise<{ doNotShare: boolean }> {
+    const response = await apiClient.put<{ doNotShare: boolean }>(
+      "/api/Settings/privacy/do-not-share",
+      { doNotShare },
+      z.object({ doNotShare: z.boolean() }),
+    );
+    return response.data;
+  }
+
   /**
    * Update security settings
    */
