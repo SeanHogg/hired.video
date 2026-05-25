@@ -37,6 +37,10 @@ import { companyRoutes } from "./routes/companies.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { boostRoutes } from "./routes/boosts.js";
 import { recruiterRoutes } from "./routes/recruiter.js";
+import {
+  liveScreenRecruiterRoutes,
+  liveScreenPublicRoutes,
+} from "./routes/live-screen.js";
 import { matchRoutes } from "./routes/match.js";
 import { messageRoutes } from "./routes/messages.js";
 import { notificationRoutes } from "./routes/notifications.js";
@@ -321,6 +325,12 @@ export function createApp() {
   const INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE =
     /^\/api\/interview-assignments\/invite\/[^/]+$/;
 
+  // Public live-screening invite endpoints — candidate visits the magic
+  // link from their invite email to view slot details and accept/decline.
+  // Token is unguessable (32-byte random) so it's safe to leave unauth.
+  const LIVE_SCREEN_PUBLIC_ROUTE =
+    /^\/api\/live-screen\/invites\/[^/]+(?:\/respond)?$/;
+
   // Email-integration OAuth start + callback. These are top-level browser
   // navigations (consent screen redirect) so they can't carry an
   // Authorization header. The route reads the user id from a short-lived
@@ -357,6 +367,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return "public";
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return "public";
     if (INTERVIEW_ASSIGNMENT_PUBLIC_ROUTE.test(path)) return "public";
+    if (LIVE_SCREEN_PUBLIC_ROUTE.test(path)) return "public";
     if (POINTS_PUBLIC_ROUTE.test(path)) return "public";
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
 
@@ -485,6 +496,8 @@ export function createApp() {
   app.route("/api/reviews", reviewRoutes);
   app.route("/api/boosts", boostRoutes);
   app.route("/api/recruiter", recruiterRoutes);
+  app.route("/api/recruiter/live-screen", liveScreenRecruiterRoutes);
+  app.route("/api/live-screen", liveScreenPublicRoutes);
   app.route("/api/match", matchRoutes);
   app.route("/api/messages", messageRoutes);
   app.route("/api/chat", messageRoutes); // legacy AI chat endpoint alias
