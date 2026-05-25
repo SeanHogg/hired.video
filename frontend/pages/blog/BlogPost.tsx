@@ -72,7 +72,7 @@ export default function BlogPost() {
 
   return (
     <AppShell bgClassName="bg-background">
-<article className="container mx-auto px-4 pt-20 pb-8 max-w-3xl">
+<article className="container mx-auto px-4 pb-8 max-w-3xl">
           {/* Back link */}
           <Link
             to="/blog"

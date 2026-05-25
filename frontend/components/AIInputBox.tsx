@@ -53,13 +53,13 @@ export function AIInputBox({
         placeholder={placeholder ?? t("marketing.index.chroPlaceholder")}
         className="min-h-[80px] resize-none border-0 bg-transparent text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
       />
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-        <p className="text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-border/50">
+        <p className="text-xs text-muted-foreground min-w-0 flex-1">
           {helpText ?? t("marketing.index.chroHelpText")}
         </p>
         <Button
           size="sm"
-          className="gap-2"
+          className="gap-2 flex-shrink-0"
           disabled={!canSubmit}
           onClick={submit}
         >

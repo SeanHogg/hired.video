@@ -756,7 +756,7 @@ export default function ResumeDetail() {
               </div>
 
               {editorOpen && (
-                <aside className="w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
+                <aside className="hidden lg:block w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
                   <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold">Template Design</h3>

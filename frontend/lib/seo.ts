@@ -195,6 +195,26 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  "/events": {
+    title: "Career Networking Events — Meetups, Workshops, Coffee Chats | hired.video",
+    description:
+      "Find in-person and remote career events near you — meetups, workshops, panels, coffee chats. Free RSVP, AI-matched introductions to the people you should meet. Hosting is free for everyone.",
+    keywords:
+      "career events, networking events, professional meetups, career workshops, in person networking, coffee chats, career conferences",
+  },
+  "/events/new": {
+    title: "Host an Event — Free Networking Events | hired.video",
+    description:
+      "Host a free networking event in minutes. Invite anyone, accept RSVPs, manage waitlists, and use AI matchmaking to introduce attendees by complementary skills.",
+    keywords:
+      "host event, free event hosting, meetup hosting, networking event, event management, RSVP",
+  },
+  "/events/:idOrSlug": {
+    title: "Event — hired.video",
+    description:
+      "Event details, RSVP, and attendee list on hired.video — the career network with AI-matched introductions for every event.",
+    keywords: "event, networking, RSVP, attendees, professional event",
+  },
   // AI-resilient sector surfaces (gap #1165). Per the prerender.mjs "keep
   // in sync" note, these must mirror the ROUTES list there. Sector slug
   // list comes from shared/sectors.ts SECTORS.

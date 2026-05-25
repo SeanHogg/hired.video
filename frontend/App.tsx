@@ -132,6 +132,9 @@ const SecuritySessions = lazy(() => import("./pages/SecuritySessions"));
 const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
+const EventsIndex = lazy(() => import("./pages/EventsIndex"));
+const EventDetail = lazy(() => import("./pages/EventDetail"));
+const EventNew = lazy(() => import("./pages/EventNew"));
 const SectorsIndex = lazy(() => import("./pages/SectorsIndex"));
 const SectorLanding = lazy(() => import("./pages/SectorLanding"));
 const ResumeTemplatesGallery = lazy(() => import("./pages/ResumeTemplatesGallery"));
@@ -694,6 +697,11 @@ const App = () => (
                       />
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
                       <Route path="/affiliate/dashboard" element={<Navigate to="/services" replace />} />
+
+                      {/* Public events + coffee networking (gap #1240) */}
+                      <Route path="/events" element={<EventsIndex />} />
+                      <Route path="/events/new" element={<EventNew />} />
+                      <Route path="/events/:idOrSlug" element={<EventDetail />} />
 
                       {/* AI-resilient sector surfaces — see shared/sectors.ts SSoT. */}
                       <Route path="/sectors" element={<SectorsIndex />} />

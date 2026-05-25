@@ -36,6 +36,7 @@ import { ProfileSectionsProvider } from "@/components/profile/sections/profile-s
 import VisitorActionsSection, {
   type ConnectionState,
 } from "@/components/profile/sections/VisitorActionsSection";
+import { GrabCoffeeButton } from "@/components/events/GrabCoffeeButton";
 import EmployerCompaniesTab from "@/components/company/EmployerCompaniesTab";
 import ConnectionRequestDialog from "@/components/profile/dialogs/ConnectionRequestDialog";
 import EditAboutDialog from "@/components/profile/dialogs/EditAboutDialog";
@@ -546,7 +547,7 @@ function PeopleDetailContent() {
           </div>
 
           {!isOwner && (
-            <div className="mb-6">
+            <div className="mb-6 flex flex-wrap items-center gap-3">
               <VisitorActionsSection
                 isAuthenticated={isAuthenticated}
                 connectionState={connectionState}
@@ -569,6 +570,11 @@ function PeopleDetailContent() {
                 onShare={handleShare}
                 onAddToTalentPool={handleAddToTalentPool}
                 onSubmitToJob={handleSubmitToJob}
+              />
+              <GrabCoffeeButton
+                targetUserId={profile.id ?? ""}
+                targetName={[profile.firstName, profile.lastName].filter(Boolean).join(" ") || null}
+                isSelf={isOwner}
               />
             </div>
           )}

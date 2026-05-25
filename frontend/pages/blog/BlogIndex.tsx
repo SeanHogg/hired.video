@@ -1,6 +1,6 @@
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock, Calendar, Grid, List } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSEO } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { AppShell } from "@/components/AppShell";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import ContentCard from "@/components/search/ContentCard";
 import { BLOG_POSTS, type BlogPost } from "@/data/blog-posts";
+import { articleService, type PublicArticleCard } from "@/lib/services/article-service";
 import { slugify } from "@shared/slugify";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -35,35 +36,69 @@ function categoryEmoji(category: string) {
   }
 }
 
-const sortedPosts = [...BLOG_POSTS].sort(
-  (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-);
+// Unified shape consumed by the /blog index after merging the static
+// BLOG_POSTS registry (frontend/data/blog-posts.ts) and the DB-backed
+// articles table. Pre-#1230, /blog only listed BLOG_POSTS; articles
+// lived on the separate /articles surface — duplicating discovery and
+// hiding editorial articles from anyone who landed on /blog from the
+// Footer link.
+//
+// Detail routes are intentionally dual:
+//   - `source: "blog"`    → /blog/<slug>           (static, MDX-like)
+//   - `source: "article"` → /articles/<author>/<s> (DB-backed, multi-author)
+//
+// The index page is the single discovery surface ("Blog & Guides"); the
+// detail pages keep their existing URLs so external backlinks + the
+// sector landing CTAs continue to work.
+interface UnifiedPost {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  href: string;
+  publishedAt: string;
+  readingTime: number;
+  keywords: string;
+  source: "blog" | "article";
+}
+
+function blogPostToUnified(p: BlogPost): UnifiedPost {
+  return {
+    id: `blog:${p.slug}`,
+    title: p.title,
+    description: p.description,
+    category: p.category,
+    href: `/blog/${p.slug}`,
+    publishedAt: p.publishedAt,
+    readingTime: p.readingTime,
+    keywords: [p.keywords ?? "", p.toolName ?? ""].filter(Boolean).join(" "),
+    source: "blog",
+  };
+}
+
+function articleCardToUnified(a: PublicArticleCard): UnifiedPost {
+  // Articles without a publishedAt are filtered server-side; this fallback
+  // is purely a defence against partial responses.
+  return {
+    id: `article:${a.id}`,
+    title: a.title,
+    description: a.summary ?? "",
+    category: a.category ?? (a.kind === "guide" ? "Guides" : "Articles"),
+    href: `/articles/${a.author.slug}/${a.slug}`,
+    publishedAt: a.publishedAt ?? new Date(0).toISOString(),
+    readingTime: a.readMinutes,
+    keywords: [a.tags ?? [], a.sector, a.audience].flat().filter(Boolean).join(" "),
+    source: "article",
+  };
+}
 
 function categorySlug(category: string): string {
   return slugify(category, { fallback: "uncategorized" });
 }
 
-// Stable category list derived from the post catalog. Ordered by first
-// appearance in `sortedPosts` so newest-publishing categories surface
-// earliest in the chip row.
-const CATEGORY_LIST: { slug: string; label: string }[] = (() => {
-  const seen = new Map<string, string>();
-  for (const p of sortedPosts) {
-    const slug = categorySlug(p.category);
-    if (!seen.has(slug)) seen.set(slug, p.category);
-  }
-  return Array.from(seen, ([slug, label]) => ({ slug, label }));
-})();
-
-function matchesQuery(post: BlogPost, q: string): boolean {
+function matchesQuery(post: UnifiedPost, q: string): boolean {
   if (!q) return true;
-  const haystack = [
-    post.title,
-    post.description,
-    post.category,
-    post.keywords,
-    post.toolName,
-  ]
+  const haystack = [post.title, post.description, post.category, post.keywords]
     .join(" ")
     .toLowerCase();
   return haystack.includes(q.toLowerCase());
@@ -74,6 +109,49 @@ export default function BlogIndex() {
   const [searchParams, setSearchParams] = useSearchParams();
   useSEO(location.pathname);
 
+  // DB-backed articles (kind in {article, guide}) — merged with the
+  // static BLOG_POSTS registry into a single unified list. Failures are
+  // silently swallowed: /blog has always rendered BLOG_POSTS without a
+  // network call, so a flaky articles endpoint must not break the index.
+  const [dbArticles, setDbArticles] = useState<PublicArticleCard[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void articleService
+      .listPublished({ limit: 120 })
+      .then((rows) => {
+        if (alive) setDbArticles(rows.filter((r) => r.kind !== "faq"));
+      })
+      .catch(() => {
+        if (alive) setDbArticles([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const sortedPosts = useMemo<UnifiedPost[]>(() => {
+    const merged: UnifiedPost[] = [
+      ...BLOG_POSTS.map(blogPostToUnified),
+      ...dbArticles.map(articleCardToUnified),
+    ];
+    return merged.sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+    );
+  }, [dbArticles]);
+
+  // Category chip list derived from whatever's in the merged catalogue.
+  // Ordered by first appearance in `sortedPosts` so the newest-publishing
+  // category surfaces earliest in the chip row — same contract the
+  // /blog-only version had pre-#1230.
+  const categoryList = useMemo<{ slug: string; label: string }[]>(() => {
+    const seen = new Map<string, string>();
+    for (const p of sortedPosts) {
+      const slug = categorySlug(p.category);
+      if (!seen.has(slug)) seen.set(slug, p.category);
+    }
+    return Array.from(seen, ([slug, label]) => ({ slug, label }));
+  }, [sortedPosts]);
+
   const query = searchParams.get("q") ?? "";
   const viewMode = (searchParams.get("view") === "list" ? "list" : "grid") as
     | "grid"
@@ -83,8 +161,8 @@ export default function BlogIndex() {
   // the full catalogue rather than an empty grid.
   const categoryFilter: string = useMemo(() => {
     if (!rawCategory) return "all";
-    return CATEGORY_LIST.some((c) => c.slug === rawCategory) ? rawCategory : "all";
-  }, [rawCategory]);
+    return categoryList.some((c) => c.slug === rawCategory) ? rawCategory : "all";
+  }, [rawCategory, categoryList]);
 
   const setViewMode = (mode: "grid" | "list") => {
     const next = new URLSearchParams(searchParams);
@@ -104,7 +182,7 @@ export default function BlogIndex() {
   // numbers always reflect what the user will see if they click that chip.
   const postsAfterQuery = useMemo(
     () => sortedPosts.filter((p) => matchesQuery(p, query)),
-    [query],
+    [sortedPosts, query],
   );
 
   const categoryCounts = useMemo(() => {
@@ -124,7 +202,7 @@ export default function BlogIndex() {
   const activeCategoryLabel =
     categoryFilter === "all"
       ? null
-      : CATEGORY_LIST.find((c) => c.slug === categoryFilter)?.label ?? null;
+      : categoryList.find((c) => c.slug === categoryFilter)?.label ?? null;
 
   return (
     <AppShell bgClassName="bg-background">
@@ -133,12 +211,11 @@ export default function BlogIndex() {
             {/* Header */}
             <div className="text-center">
               <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                Career Guides & AI Tool Tutorials
+                Blog & Guides
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Actionable guides to help you score, optimize, and tailor your
-                resume — land more interviews — and negotiate the salary you
-                deserve. Powered by hired.video&apos;s free AI career tools.
+                Career guides, AI tool tutorials, sector deep-dives, and editorial
+                articles — everything we publish on hired.video, in one place.
               </p>
             </div>
 
@@ -149,7 +226,7 @@ export default function BlogIndex() {
               value={categoryFilter}
               onChange={setCategoryFilter}
               allCount={postsAfterQuery.length}
-              options={CATEGORY_LIST.map((c) => ({
+              options={categoryList.map((c) => ({
                 value: c.slug,
                 label: c.label,
                 count: categoryCounts.get(c.slug) ?? 0,
@@ -225,17 +302,18 @@ export default function BlogIndex() {
               // Grid mode renders the shared search/article ContentCard so
               // /blog and /?category=articles look identical (#326). List
               // mode is intentionally a different denser layout — kept
-              // inline below.
+              // inline below. Both surfaces consume the unified
+              // BLOG_POSTS + DB-articles list (#1230).
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {posts.map((post) => (
                   <ContentCard
-                    key={post.slug}
+                    key={post.id}
                     item={{
-                      id: post.slug,
+                      id: post.id,
                       type: "article",
                       title: post.title,
                       summary: post.description,
-                      href: `/blog/${post.slug}`,
+                      href: post.href,
                       category: post.category,
                       readingTime: post.readingTime,
                     }}
@@ -245,7 +323,7 @@ export default function BlogIndex() {
             ) : (
               <div className="space-y-3">
                 {posts.map((post) => (
-                  <Link key={post.slug} to={`/blog/${post.slug}`} className="group block">
+                  <Link key={post.id} to={post.href} className="group block">
                     <Card className="hover:shadow-md transition-shadow border-border/50">
                       <CardContent className="p-4 flex items-center gap-4">
                         <div className="h-14 w-14 flex-shrink-0 rounded-md bg-gradient-to-br from-primary/20 via-primary/10 to-blue-500/20 flex items-center justify-center text-2xl">

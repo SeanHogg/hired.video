@@ -4479,6 +4479,8 @@
   "settings.profileSections.masterResume.label": "Master Resume",
   "settings.profileSections.opportunityPreferences.desc": "Show your open-to-work status, preferred roles, and salary expectations on your public profile.",
   "settings.profileSections.opportunityPreferences.label": "Opportunity Preferences",
+  "settings.profileSections.openToCoffee.desc": "Make the \"Grab a coffee\" button visible on your profile and pin yourself on the /map page so other members can invite you to meet up.",
+  "settings.profileSections.openToCoffee.label": "Open to coffee invites",
   "settings.profileSections.profileVideos.desc": "Show profile-header videos (subject = profile) in the header video carousel.",
   "settings.profileSections.profileVideos.label": "Profile Videos",
   "settings.profileSections.saveFailed": "Failed to update profile sections",

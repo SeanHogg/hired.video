@@ -4,18 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Clock, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useBreadcrumbs } from "@/lib/seo";
 import { articleCoverImageUrl, useUgcSeo } from "@/lib/seo-ugc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AppShell } from "@/components/AppShell";
 import { articleService } from "@/lib/services/article-service";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
@@ -65,46 +57,22 @@ export default function ArticleView() {
   // /articles index meta instead of its own title/cover/JSON-LD.
   useUgcSeo("article", article);
 
-  // BreadcrumbList JSON-LD for Google rich results. Visible breadcrumb
-  // below mirrors the same trail so on-page nav and structured data stay
-  // in sync.
-  useBreadcrumbs(
+  // Single trail powers BOTH the visible breadcrumb and the
+  // BreadcrumbList JSON-LD (via the shared <Breadcrumbs> component).
+  const trail =
     article && authorSlug
       ? [
           { name: "Articles", url: "/articles" },
           { name: article.title, url: `/articles/${authorSlug}/${article.slug}` },
         ]
-      : [{ name: "Articles", url: "/articles" }],
-  );
+      : [{ name: "Articles", url: "/articles" }];
 
   const coverUrl = article ? articleCoverImageUrl(article) : null;
 
   return (
     <AppShell bgClassName="bg-background">
       <article className="max-w-4xl mx-auto px-4 py-8">
-        {/* Visible breadcrumb — matches the BreadcrumbList JSON-LD emitted
-            via useBreadcrumbs so on-page nav, AppShell sidebar, and rich
-            results agree on the trail. Uses the shared Breadcrumb primitive
-            (#1229) so every future "show a trail" surface has one seam. */}
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/articles">Articles</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            {article && (
-              <>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="truncate max-w-[60ch]">
-                    {article.title}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </>
-            )}
-          </BreadcrumbList>
-        </Breadcrumb>
+        <Breadcrumbs items={trail} />
 
         {loading ? (
           <Card><CardContent className="p-8 flex items-center justify-center text-muted-foreground">

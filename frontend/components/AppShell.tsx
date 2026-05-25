@@ -77,7 +77,7 @@ function MinimalShell({
   bgClassName: string;
 }): JSX.Element {
   return (
-    <div className={cn("min-h-screen flex flex-col", bgClassName)}>
+    <div className={cn("min-h-screen flex flex-col overflow-x-clip", bgClassName)}>
       <BrandHeader />
       <div className="pt-16 flex-1">
         <EmailVerificationBanner />
@@ -99,7 +99,7 @@ export function AppShell({
   const bg = bgClassName ?? DEFAULT_BG;
 
   if (variant === "bare") {
-    return <div className={cn("min-h-screen", bg)}>{children}</div>;
+    return <div className={cn("min-h-screen overflow-x-clip", bg)}>{children}</div>;
   }
 
   if (variant === "public" || (variant === "app" && !showAppChrome)) {
@@ -107,9 +107,9 @@ export function AppShell({
   }
 
   return (
-    <div className={cn("min-h-screen", bg)}>
+    <div className={cn("min-h-screen overflow-x-clip", bg)}>
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+      <div className={cn("min-w-0", sidebarCollapsed ? "lg:ml-16" : "lg:ml-80")}>
         <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}

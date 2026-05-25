@@ -175,19 +175,25 @@ body[data-print-mode] [data-print-hide] {
   }
 }
 
-.mx-auto {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
+/* Edge-to-edge content on desktop only — on mobile we keep Tailwind's
+ * `mx-auto` / `max-w-*` centering so content stays within the viewport.
+ * Without the media-query gate these rules let descendants push the
+ * page past the viewport on small screens (root-page overflow). */
+@media (min-width: 1024px) {
+  .mx-auto {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
 
-.max-w-7xl,
-.max-w-6xl,
-.max-w-4xl {
-  max-width: none !important;
-}
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-4xl {
+    max-width: none !important;
+  }
 
-.space-x-3 > :not([hidden]) ~ :not([hidden]) {
-  margin-left: 0 !important;
+  .space-x-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-left: 0 !important;
+  }
 }
 
 /* ─── Footer padding ────────────────────────────────────────────────── */

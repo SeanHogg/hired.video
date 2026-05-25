@@ -116,8 +116,8 @@ export default function Navigation({
 
   return (
     <nav className={navCls}>
-      <div id="nav-bar-wrapper" className="max-w-7xl mx-auto pr-4 sm:px-6 lg:px-8">
-        <div id="nav-bar" className="flex justify-between items-center h-16 sm:pl-2.5">
+      <div id="nav-bar-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div id="nav-bar" className="flex justify-between items-center h-16">
           {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
           <div className="flex items-center space-x-3">
             {/* Hamburger must stay `lg:hidden` to match Sidebar's `lg:translate-x-0` dock — anything tighter (e.g. `md:hidden`) leaves a 768–1023px dead zone. */}

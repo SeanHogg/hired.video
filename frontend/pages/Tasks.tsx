@@ -69,6 +69,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import { MyEventsTab } from "@/components/events/MyEventsTab";
+import { CoffeeTab } from "@/components/events/CoffeeTab";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
   Sheet,
@@ -136,12 +138,28 @@ export default function Tasks() {
   // shareable + back-button friendly. Default is Kanban (preserves the
   // pre-2026-05-04 default). Legacy `?view=` is honored alongside `?tab=`.
   type TaskView = "calendar" | "table" | "kanban";
-  const [searchParams] = useSearchParams();
-  const viewParam = searchParams.get("tab") ?? searchParams.get("view");
+  type TaskSurface = "tasks" | "events" | "coffee";
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Top-level surface tab — Tasks / Events / Coffee — drives which inner
+  // panel renders. Default 'tasks' preserves the legacy /tasks URL.
+  const surfaceParam = searchParams.get("surface");
+  const currentSurface: TaskSurface =
+    surfaceParam === "events" ? "events" :
+    surfaceParam === "coffee" ? "coffee" :
+    "tasks";
+  const viewParam = currentSurface === "tasks" ? (searchParams.get("tab") ?? searchParams.get("view")) : null;
   const currentView: TaskView =
     viewParam === "calendar" ? "calendar" :
     viewParam === "table" || viewParam === "list" ? "table" :
     "kanban";
+  const switchSurface = (next: TaskSurface) => {
+    const sp = new URLSearchParams(searchParams);
+    if (next === "tasks") sp.delete("surface");
+    else sp.set("surface", next);
+    sp.delete("tab");
+    sp.delete("view");
+    setSearchParams(sp, { replace: false });
+  };
   const [calendarView, setCalendarView] = useState<"week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
@@ -1057,8 +1075,67 @@ export default function Tasks() {
     { key: "kanban",   label: t("labels.kanbanView"),         icon: List,         to: "/tasks" },
   ];
 
+  // ─── Top-level surface tab strip ───────────────────────────────────────
+  // Renders above the page content, switching between Tasks (existing
+  // kanban/table/calendar UI), Events (hosting + attending), and Coffee
+  // (incoming + outgoing "Grab a coffee" requests). Per the user's
+  // [Tasks layout] decision, this is one URL with internal tabs, not
+  // separate pages.
+  const SurfaceTabsStrip = (
+    <div className="border-b">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 flex gap-1 -mb-px">
+        {(["tasks", "events", "coffee"] as TaskSurface[]).map((key) => {
+          const active = currentSurface === key;
+          const label = key === "tasks" ? "Tasks" : key === "events" ? "Events" : "Coffee";
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => switchSurface(key)}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                active
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // Non-tasks surfaces render their own component bodies — short-circuit
+  // before the heavy tasks-tab JSX.
+  if (currentSurface === "events") {
+    return (
+      <AppShell bgClassName="bg-background">
+        {SurfaceTabsStrip}
+        <div className="p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <MyEventsTab />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+  if (currentSurface === "coffee") {
+    return (
+      <AppShell bgClassName="bg-background">
+        {SurfaceTabsStrip}
+        <div className="p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <CoffeeTab viewerUserId={user.id} />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell bgClassName="bg-background">
+      {SurfaceTabsStrip}
       <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <PageHeader

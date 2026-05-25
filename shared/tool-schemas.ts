@@ -79,7 +79,7 @@ export const ResumeRecommendationSchema = z.object({
   description: z.string(),
   impact: z.union([z.number(), z.string()]).optional(),
   actionId: WandActionIdSchema.optional(),
-  actionArgs: z.record(z.unknown()).optional(),
+  actionArgs: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Merged response from the analysis engine. Every field except scores +
