@@ -92,7 +92,7 @@ const CatalogActionSchema = z.object({
 
 const CatalogRedemptionSchema = z.object({
   id: z.string(),
-  kind: z.enum(["ai_credits", "premium_month", "gift_card"]),
+  kind: z.enum(["ai_credits", "premium_month", "gift_card", "campaign_dollars"]),
   label: z.string(),
   pointsCost: z.number(),
 });

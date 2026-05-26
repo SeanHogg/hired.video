@@ -20,6 +20,7 @@ export type DragKind =
   | "music"
   | "media-url"
   | "linked-content"
+  | "engagement-asset"
   | "screenshot";
 
 /**
@@ -35,12 +36,14 @@ export const DRAG_MIME: Record<DragKind, string> = {
   music: "application/x-studio-music-id",
   "media-url": "application/x-studio-media-url",
   "linked-content": "application/x-studio-linked-content-ref",
+  "engagement-asset": "application/x-studio-engagement-asset-ref",
   screenshot: "application/x-studio-screenshot-trigger",
 };
 
 const KIND_ORDER: DragKind[] = [
   "widget",
   "linked-content",
+  "engagement-asset",
   "media-url",
   "screenshot",
   "background",
@@ -158,6 +161,7 @@ export const DRAG_KIND_META: Record<DragKind, DragKindMeta> = {
   music: { label: "Drop on the timeline", accent: "rose-500" },
   "media-url": { label: "Drop to add media", accent: "sky-500" },
   "linked-content": { label: "Drop to embed your content", accent: "indigo-500" },
+  "engagement-asset": { label: "Drop to add engagement asset", accent: "amber-500" },
   screenshot: { label: "Drop to capture a screenshot", accent: "sky-500" },
 };
 

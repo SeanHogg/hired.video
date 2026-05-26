@@ -23,6 +23,7 @@ import {
   HelpCircle,
   Loader2,
   Lock,
+  Megaphone,
   Sparkles,
   Trophy,
 } from "lucide-react";
@@ -305,6 +306,7 @@ function RedemptionGrid({
     { kind: "ai_credits", label: "AI Credits", icon: Sparkles },
     { kind: "premium_month", label: "Pro Time", icon: Calendar },
     { kind: "gift_card", label: "Gift Cards", icon: Gift },
+    { kind: "campaign_dollars", label: "Campaign $", icon: Megaphone },
   ];
 
   return (
@@ -313,7 +315,8 @@ function RedemptionGrid({
         <CreditCard className="h-4 w-4" /> Cash out
       </h2>
       <p className="text-xs text-muted-foreground mb-4">
-        Convert points to AI credits, a free month of Pro, or a Tremendous gift card.
+        Convert points to AI credits, a free month of Pro, a Tremendous gift card, or
+        Campaign $ to boost your posts.
       </p>
       <div className="space-y-5">
         {groups.map(({ kind, label, icon: Icon }) => {

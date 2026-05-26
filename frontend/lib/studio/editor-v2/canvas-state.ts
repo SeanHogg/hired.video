@@ -50,7 +50,16 @@ export type WidgetKind =
   // TTS engine's `onBoundary` callback; baked into the exported MP4 at
   // render time from the same painter + the caption-cue timeline. Closes
   // the Synthesia / HeyGen avatar gap (#1557).
-  | "avatar";
+  | "avatar"
+  // Engagement asset — embeds a per-project authored engagement artifact
+  // (in-video lead form, chapter marker, thumbnail stamp, reviewer pin)
+  // as a draggable widget on the canvas. Closes the orphan-binding gap
+  // (#1579): forms / chapters / thumbnails / reviews authored via the
+  // ActionsPanel Engagement section now have a visible canvas presence,
+  // not just a server-side row. Like `linked-content`, the kind sub-axis
+  // lives in `engagement-assets.ts`'s registry — one row there per new
+  // engagement kind.
+  | "engagement-asset";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -376,6 +385,28 @@ export interface AvatarWidgetParams {
   accentColor?: string | null;
 }
 
+/** Engagement asset widget — embeds a per-project authored engagement
+ *  artifact (lead form, chapter marker, thumbnail stamp, reviewer pin)
+ *  at a fractional position on the canvas. The kind sub-axis lives in
+ *  `lib/studio/editor-v2/engagement-assets.ts`'s registry so adding a
+ *  new engagement kind is one row there + one inline-body component,
+ *  no `WidgetKind` change here. See [[project_gap_register]] #1579. */
+export interface EngagementAssetWidgetParams {
+  assetKind: import("./engagement-assets").EngagementAssetKind;
+  /** Server-side id of the bound artifact (form id, chapter id,
+   *  thumbnail id, comment thread id). Empty string means the widget
+   *  hasn't been bound yet — the body renders an empty state prompting
+   *  the user to pick from the inspector. */
+  assetId: string;
+  /** Card colours — stamped at insert time so a form dropped onto a
+   *  dark template adopts that template's look. Same pattern as
+   *  LinkedContentWidgetParams. */
+  bgColor?: string;
+  textColor?: string;
+  accentColor?: string;
+  accentTextColor?: string;
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -390,7 +421,8 @@ export type WidgetParams =
   | { kind: "speech-bubble"; data: SpeechBubbleWidgetParams }
   | { kind: "caption-box"; data: CaptionBoxWidgetParams }
   | { kind: "sfx-burst"; data: SfxBurstWidgetParams }
-  | { kind: "avatar"; data: AvatarWidgetParams };
+  | { kind: "avatar"; data: AvatarWidgetParams }
+  | { kind: "engagement-asset"; data: EngagementAssetWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /

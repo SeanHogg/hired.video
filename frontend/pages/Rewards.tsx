@@ -20,6 +20,7 @@ import {
   Gift,
   Loader2,
   Lock,
+  Megaphone,
   ShieldCheck,
   Sparkles,
   Trophy,
@@ -226,14 +227,14 @@ export default function RewardsPage() {
       {/* ── Cashout ─────────────────────────────────────────────── */}
       <Section icon={<CreditCard className="h-5 w-5" />} title="Cash out your points">
         <p className="text-muted-foreground mb-5">
-          Three ways to spend what you earn. AI credits and Pro time fulfill instantly;
-          gift cards dispatch through Tremendous within minutes (or after a short
-          review if you cross IRS reporting thresholds).
+          Four ways to spend what you earn. AI credits, Pro time, and Campaign $
+          fulfill instantly; gift cards dispatch through Tremendous within minutes
+          (or after a short review if you cross IRS reporting thresholds).
         </p>
         {catalog.isLoading || !catalog.data ? (
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <CashoutColumn
               icon={<Sparkles className="h-5 w-5" />}
               title="AI Credits"
@@ -251,6 +252,12 @@ export default function RewardsPage() {
               title="Gift Cards"
               subtitle="Amazon, Visa, Target & more"
               items={catalog.data.redemptions.filter((r) => r.kind === "gift_card")}
+            />
+            <CashoutColumn
+              icon={<Megaphone className="h-5 w-5" />}
+              title="Campaign $"
+              subtitle="Platform credit for paid boosts"
+              items={catalog.data.redemptions.filter((r) => r.kind === "campaign_dollars")}
             />
           </div>
         )}
