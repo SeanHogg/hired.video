@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
+import { eq, or, and, lte, isNull, inArray, notInArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -9,7 +9,7 @@ import { buildRepos } from "../repositories/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { USER_ROLES, NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 import {
   resolveProfileSections,
   sanitizeProfileSectionsInput,
@@ -354,6 +354,10 @@ userRoutes.get("/public", async (c) => {
     // Hide unverified accounts — keeps spam signups out of the public
     // directory until they prove ownership of the email address.
     eq(users.emailVerified, true),
+    // Hide workforce members + platform staff from candidate discovery.
+    // SSoT is shared/user-roles.ts NON_CANDIDATE_ROLES so other surfaces
+    // (talent pools, pitch decks) read the same list (#1407, DRY rule).
+    notInArray(users.role, NON_CANDIDATE_ROLES as unknown as string[]),
     or(
       eq(userProfiles.profileVisibility, "public"),
       // Users without a userProfiles row fall through the left join with

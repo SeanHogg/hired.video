@@ -22,6 +22,7 @@ import {
   type RatingScale,
   type ScorecardTemplate,
 } from "@/lib/services/scorecards-service";
+import { CompetencyPicker } from "./CompetencyPicker";
 
 interface Props {
   companyId: string;
@@ -255,32 +256,42 @@ function NewTemplateForm({
           </div>
           <div className="space-y-2">
             {attributes.map((a, i) => (
-              <div key={i} className="flex items-center gap-2 rounded border p-2">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="flex-1"
-                  placeholder="Attribute name (e.g. Communication)"
-                  value={a.name}
-                  onChange={(e) => setAttr(i, { name: e.target.value })}
-                />
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs text-muted-foreground">Weight</Label>
+              <div key={i} className="rounded border p-2 space-y-2">
+                <div className="flex items-center gap-2">
+                  <GripVertical className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    className="w-16"
-                    value={a.weight ?? 1}
-                    onChange={(e) => setAttr(i, { weight: Number(e.target.value) || 1 })}
+                    className="flex-1"
+                    placeholder="Attribute name (e.g. Communication)"
+                    value={a.name}
+                    onChange={(e) => setAttr(i, { name: e.target.value })}
                   />
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs text-muted-foreground">Weight</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      className="w-16"
+                      value={a.weight ?? 1}
+                      onChange={(e) =>
+                        setAttr(i, { weight: Number(e.target.value) || 1 })
+                      }
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setAttributes((arr) => arr.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setAttributes((arr) => arr.filter((_, j) => j !== i))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <CompetencyPicker
+                  companyId={companyId}
+                  value={a.competencyId}
+                  onChange={(competencyId) => setAttr(i, { competencyId })}
+                  compact
+                />
               </div>
             ))}
           </div>
@@ -307,6 +318,7 @@ function TemplateDetailEditor({
   template: ScorecardTemplate;
   onClose: () => void;
 }) {
+  const companyId = template.companyId;
   const [tpl, setTpl] = useState<ScorecardTemplate>(template);
   const [savingMeta, setSavingMeta] = useState(false);
 
@@ -421,44 +433,54 @@ function TemplateDetailEditor({
         </CardHeader>
         <CardContent className="space-y-2">
           {(tpl.attributes ?? []).map((a) => (
-            <div key={a.id} className="flex items-center gap-2 rounded border p-2">
-              <Input
-                className="flex-1"
-                value={a.name}
-                onBlur={(e) => updateAttr(a.id, { name: e.target.value })}
-                onChange={(e) =>
-                  setTpl({
-                    ...tpl,
-                    attributes: (tpl.attributes ?? []).map((x) =>
-                      x.id === a.id ? { ...x, name: e.target.value } : x,
-                    ),
-                  })
-                }
-              />
-              <div className="flex items-center gap-1">
-                <Label className="text-xs text-muted-foreground">Weight</Label>
+            <div key={a.id} className="rounded border p-2 space-y-2">
+              <div className="flex items-center gap-2">
                 <Input
-                  type="number"
-                  min={1}
-                  max={10}
-                  className="w-16"
-                  value={a.weight}
-                  onBlur={(e) =>
-                    updateAttr(a.id, { weight: Number(e.target.value) || 1 })
-                  }
+                  className="flex-1"
+                  value={a.name}
+                  onBlur={(e) => updateAttr(a.id, { name: e.target.value })}
                   onChange={(e) =>
                     setTpl({
                       ...tpl,
                       attributes: (tpl.attributes ?? []).map((x) =>
-                        x.id === a.id ? { ...x, weight: Number(e.target.value) || 1 } : x,
+                        x.id === a.id ? { ...x, name: e.target.value } : x,
                       ),
                     })
                   }
                 />
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs text-muted-foreground">Weight</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10}
+                    className="w-16"
+                    value={a.weight}
+                    onBlur={(e) =>
+                      updateAttr(a.id, { weight: Number(e.target.value) || 1 })
+                    }
+                    onChange={(e) =>
+                      setTpl({
+                        ...tpl,
+                        attributes: (tpl.attributes ?? []).map((x) =>
+                          x.id === a.id
+                            ? { ...x, weight: Number(e.target.value) || 1 }
+                            : x,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => deleteAttr(a.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => deleteAttr(a.id)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <CompetencyPicker
+                companyId={companyId}
+                value={a.competencyId}
+                onChange={(competencyId) => updateAttr(a.id, { competencyId })}
+                compact
+              />
             </div>
           ))}
         </CardContent>

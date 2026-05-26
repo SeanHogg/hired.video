@@ -192,7 +192,6 @@ export default function VideoPitchLab() {
         show: showAuthOverlay,
         message: authMessage,
       }}
-      containerClassName="max-w-4xl mx-auto"
     >
       <div className="space-y-6 mt-4">
         {step === "setup" && (

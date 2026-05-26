@@ -191,10 +191,14 @@ export default function VendorSync() {
         icon: <Chrome className="h-6 w-6 text-blue-600" />,
         iconBgClassName: "bg-blue-100 dark:bg-blue-900/30",
         title: "LinkedIn & Profile Sync",
+        // Honest framing: extension-driven sync works today for a subset
+        // (LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster); the rest
+        // are paste-ready blocks the user copies into the profile editor
+        // themselves. The "Extension" badge on each card signals which is
+        // which. Pairs with #1417 from the Gap Register.
         description:
-          "Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back.",
+          "Render your master resume into paste-ready blocks for LinkedIn, Indeed, Glassdoor, GitHub, ZipRecruiter and more — and pull updates back from supported sites via the Chrome extension.",
       }}
-      containerClassName="max-w-7xl mx-auto space-y-6"
     >
         {/* Extension highlight */}
         <Card className="border-blue-300/50 bg-blue-50/30 dark:bg-blue-950/20">

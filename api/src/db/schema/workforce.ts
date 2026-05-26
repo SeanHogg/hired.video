@@ -140,3 +140,44 @@ export const timesheetTouchpoints = pgTable("timesheet_touchpoints", {
 
 export type TimesheetTouchpoint = typeof timesheetTouchpoints.$inferSelect;
 export type NewTimesheetTouchpoint = typeof timesheetTouchpoints.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Phase 4 — placement_documents (compliance doc vault)
+//
+// One row per signed / required document attached to a placement or to a
+// company-bound employee (e.g. annual I-9 reverification). The actual
+// file storage is R2 (filePath) or a third-party e-sign provider that
+// owns the canonical artifact (providerRef + providerName).
+// ---------------------------------------------------------------------------
+
+export const placementDocuments = pgTable("placement_documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Either placementId OR (companyId + userId) is set. Placement-bound
+  // docs travel with the engagement; company-bound docs (I-9, W-9) outlive
+  // any single placement. NOT a polymorphic kind enum because the two
+  // axes are orthogonal (a doc can be both).
+  placementId: uuid("placement_id"),
+  companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  // i9 | w9 | w8ben | coi | bg_check | msa | sow | offer_letter | nda | other
+  kind: varchar("kind", { length: 32 }).notNull(),
+  filePath: text("file_path"),
+  // For e-signed docs: which provider holds the canonical signed PDF.
+  // docusign | anvil | hellosign | dropbox-sign | native
+  providerName: varchar("provider_name", { length: 32 }),
+  providerRef: varchar("provider_ref", { length: 200 }),
+  signedAt: timestamp("signed_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  // pending | signed | expired | revoked
+  status: varchar("status", { length: 16 }).default("pending").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_placement_docs_placement").on(t.placementId),
+  index("idx_placement_docs_company_user").on(t.companyId, t.userId),
+  index("idx_placement_docs_expiry").on(t.expiresAt).where(/* sql */`expires_at IS NOT NULL`),
+]);
+
+export type PlacementDocument = typeof placementDocuments.$inferSelect;
+export type NewPlacementDocument = typeof placementDocuments.$inferInsert;

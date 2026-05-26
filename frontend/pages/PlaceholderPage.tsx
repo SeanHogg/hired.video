@@ -25,7 +25,7 @@ export default function PlaceholderPage({
     <AppShell bgClassName="bg-background">
 <div>
           <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-4xl mx-auto">
+            <div>
               <Card className="border-dashed border-2 border-muted-foreground/30">
                 <CardHeader className="text-center py-12">
                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">

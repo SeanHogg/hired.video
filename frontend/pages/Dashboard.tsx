@@ -70,7 +70,7 @@ export default function Dashboard() {
   const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({
     children,
   }) => (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex-1">
@@ -136,7 +136,7 @@ export default function Dashboard() {
   const renderDashboardContent = () => {
     if (dashboardLoading) {
       return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
             <p className="text-sm sm:text-base text-muted-foreground">{t("status.loadingDashboard")}</p>
@@ -147,7 +147,7 @@ export default function Dashboard() {
 
     if (dashboardError) {
       return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -169,7 +169,7 @@ export default function Dashboard() {
 
     if (!dashboardData) {
       return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center">
             <p className="text-sm sm:text-base text-muted-foreground">{t("messages.noDashboardData")}</p>
           </div>
@@ -216,7 +216,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <PageLayout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
             <p className="text-sm sm:text-base text-muted-foreground">{t("status.loadingDashboard")}</p>
@@ -231,7 +231,7 @@ export default function Dashboard() {
     return (
       <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
 <div>
-            <div className="max-w-6xl mx-auto px-4 py-16">
+            <div className="px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">

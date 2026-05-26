@@ -53,19 +53,24 @@ export function shouldHidePeerScorecards(
   return mode === "hide_peer_scorecards" || mode === "both";
 }
 
+/** Optional decoration flag the frontend uses to render the masking badge. */
+export type MaskedSubmissionView = ScorecardSubmissionRow & { _anonymized?: true };
+
 /**
  * Returns a view of a submission with candidate identity stripped when
  * the caller is the evaluator and the kit policy demands it. HMs / admins
- * (`requesterIsEvaluator = false`) always see the unmasked row.
+ * (`requesterIsEvaluator = false`) always see the unmasked row. When
+ * masking is applied, `_anonymized = true` is set so the frontend can
+ * render an "Identity hidden" badge without re-deriving the policy.
  */
 export function maskCandidateIdentity(
   submission: ScorecardSubmissionRow,
   kit: Pick<InterviewKitRow, "blindReviewMode"> | null,
   requesterIsEvaluator: boolean,
-): ScorecardSubmissionRow {
+): MaskedSubmissionView {
   if (!requesterIsEvaluator) return submission;
   if (!shouldAnonymizeCandidate(kit)) return submission;
-  return { ...submission, candidateUserId: null };
+  return { ...submission, candidateUserId: null, _anonymized: true };
 }
 
 /**

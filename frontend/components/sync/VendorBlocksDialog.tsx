@@ -153,6 +153,17 @@ function BlockCard({ block, onCopy }: { block: ExportBlock; onCopy: () => void }
           {block.format === "markdown" && (
             <Badge variant="outline" className="text-xs">Markdown</Badge>
           )}
+          {block.openTargetUrl && (
+            <Button size="sm" variant="ghost" asChild>
+              <a
+                href={block.openTargetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="h-3 w-3 mr-1" /> Open
+              </a>
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onCopy}>
             <Copy className="h-3 w-3 mr-1" /> Copy
           </Button>

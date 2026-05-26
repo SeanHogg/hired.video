@@ -66,7 +66,7 @@ export default function SalaryIndexPage() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-10 sm:px-6 lg:px-8 space-y-8">
+      <div className="px-4 py-10 sm:px-6 lg:px-8 space-y-8">
         <nav className="text-xs text-muted-foreground flex items-center gap-1.5">
           <Link to="/" className="hover:text-foreground">
             Home

@@ -69,7 +69,7 @@ export default function CompanyReviewsPage() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-10 sm:px-6 lg:px-8 space-y-6">
+      <div className="px-4 py-10 sm:px-6 lg:px-8 space-y-6">
         {loading && (
           <div className="space-y-4">
             <Skeleton className="h-8 w-1/3" />

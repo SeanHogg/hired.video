@@ -28,6 +28,7 @@ import {
   Share2,
   Trophy,
   LayoutDashboard,
+  Briefcase,
 } from "lucide-react";
 import { PointsHub } from "@/components/points/PointsHub";
 import { isPointsEligible } from "@/lib/services/points-service";
@@ -37,6 +38,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { buildAuthLinkTo } from "@/lib/auth-redirect";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { EmailSettingsTab } from "@/components/email/EmailSettingsTab";
+import { WorkforceSettings } from "@/components/workforce/WorkforceSettings";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,7 +64,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useAuth } from "@/lib/auth";
-import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { getRoleDisplayLabel, roleUtils } from "@/lib/role-utils";
 import { useTranslation, Trans } from "react-i18next";
 import { applyLocale } from "@/lib/i18n/i18n";
 import { PUBLIC_LOCALES, type Locale } from "@shared/i18n";
@@ -408,6 +410,12 @@ function SettingsContent() {
   // the sidebar pill, so the tab + pill always agree.
   const showPointsTab = isPointsEligible(user);
 
+  // Workforce tab visibility — gated on `roleUtils.canManageWorkforce`,
+  // the same SSoT that the <WorkforceSettings/> component reads
+  // internally. Trigger + content stay in sync; no two-place gate
+  // drift (DRY rule).
+  const showWorkforceTab = roleUtils.canManageWorkforce(user?.role);
+
 
 
 
@@ -504,7 +512,7 @@ function SettingsContent() {
       const currentPathWithSearch = `${location.pathname}${location.search}`;
       return (
         <AppShell>
-          <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="px-4 py-16">
             <div className="text-center mb-12">
               <div className="inline-flex items-center justify-center mb-6 bg-emerald-100 rounded-2xl p-4">
                 <Mail className="h-12 w-12 text-emerald-600" />
@@ -566,7 +574,7 @@ function SettingsContent() {
     return (
       <AppShell>
         <div>
-            <div className="max-w-6xl mx-auto px-4 py-16">
+            <div className="px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -763,7 +771,7 @@ function SettingsContent() {
   return (
     <AppShell bgClassName="bg-background">
       <div className="p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
@@ -801,6 +809,12 @@ function SettingsContent() {
                         <CreditCard className="h-4 w-4" />
                         <span>{t("tabs.accountBilling")}</span>
                       </TabsTrigger>
+                      {showWorkforceTab && (
+                        <TabsTrigger value="workforce" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                          <Briefcase className="h-4 w-4" />
+                          <span>Workforce</span>
+                        </TabsTrigger>
+                      )}
                       {showPointsTab && (
                         <TabsTrigger value="points" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                           <Trophy className="h-4 w-4" />
@@ -877,6 +891,15 @@ function SettingsContent() {
                         <CreditCard className="h-4 w-4" />
                         <span>{t("tabs.accountBilling")}</span>
                       </TabsTrigger>
+                      {showWorkforceTab && (
+                        <TabsTrigger
+                          value="workforce"
+                          className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                        >
+                          <Briefcase className="h-4 w-4" />
+                          <span>Workforce</span>
+                        </TabsTrigger>
+                      )}
                       {showPointsTab && (
                         <TabsTrigger
                           value="points"
@@ -2008,6 +2031,15 @@ function SettingsContent() {
                   ?tab=account, and ?tab=billing all remap here. */}
               <TabsContent value="account-billing" className="space-y-6">
                 <AccountManagementPanel />
+              </TabsContent>
+
+              {/* Workforce (#1349) — employer-only back-office surface.
+                  <WorkforceSettings/> self-gates on canManageWorkforce so
+                  consumers can mount it unconditionally; we still gate the
+                  trigger via showWorkforceTab so non-employers don't see
+                  an empty Tabs slot in the sidebar. */}
+              <TabsContent value="workforce" className="space-y-6">
+                <WorkforceSettings />
               </TabsContent>
 
               {/* Points & Rewards — same hub as the /points route; this is

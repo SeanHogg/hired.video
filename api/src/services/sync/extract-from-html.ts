@@ -110,6 +110,10 @@ const VENDOR_HINTS: Record<string, string> = {
     "Indeed Resume page. Sections: Headline, Summary, Work experience, Education, Skills. Map directly to JSON Resume fields.",
   glassdoor:
     "Glassdoor profile page. Sections: About, Work history, Education, Skills.",
+  ziprecruiter:
+    "ZipRecruiter candidate profile. Sections: Profile blurb (basics.summary, ~600 char soft limit), Work experience, Education, Skills.",
+  monster:
+    "Monster profile page. Sections: Highlights (basics.summary), Experience, Education, Skills.",
 };
 
 export interface ExtractFromHtmlInput {

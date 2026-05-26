@@ -419,7 +419,7 @@ function PeopleDetailContent() {
 
   if (loading) {
     return shell(
-      <div className="max-w-4xl mx-auto p-6 text-center">
+      <div className="p-6 text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
         <h1 className="text-2xl font-bold mb-2">{t("status.loadingProfile")}</h1>
       </div>,
@@ -428,7 +428,7 @@ function PeopleDetailContent() {
 
   if (error || !profile) {
     return shell(
-      <div className="max-w-4xl mx-auto p-6 text-center">
+      <div className="p-6 text-center">
         <Alert className="mb-6">
           <AlertDescription>{error ?? t("messages.profileNotFound")}</AlertDescription>
         </Alert>
@@ -508,7 +508,7 @@ function PeopleDetailContent() {
       role={(profile as any)?.role ?? null}
     >
       {shell(
-        <div className="max-w-6xl mx-auto p-4 md:p-6">
+        <div className="p-4 md:p-6">
           {/* Hub-level tab strip — keeps the People / Connections /
               Talent Pool / etc. context visible across profile pages. */}
           <EntityHubTabStrip entity="person" />

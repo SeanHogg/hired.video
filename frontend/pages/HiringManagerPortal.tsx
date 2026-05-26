@@ -68,7 +68,7 @@ export default function HiringManagerPortal() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Briefcase className="w-6 h-6 text-primary" />
             <div>
@@ -85,7 +85,7 @@ export default function HiringManagerPortal() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6">
+      <main className="p-6">
         <div className="flex gap-3 overflow-x-auto pb-4">
           {visibleStages.map((g) => (
             <div key={g.stage} className="flex-shrink-0 w-[280px]">

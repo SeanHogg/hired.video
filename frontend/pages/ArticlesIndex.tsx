@@ -95,7 +95,7 @@ export default function ArticlesIndex() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="pb-20 max-w-6xl mx-auto px-6">
+      <main className="pb-20 px-6">
         <section className="py-10 space-y-3">
           <h1 className="text-4xl font-bold tracking-tight">{heading}</h1>
           <p className="text-lg text-muted-foreground max-w-3xl">{subheading}</p>

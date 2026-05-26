@@ -314,6 +314,11 @@ export const roleUtils = {
     return permissions.canViewResumes;
   },
 
+  canManageWorkforce: (role: string | number | undefined | null): boolean => {
+    const permissions = new RolePermissions(role);
+    return permissions.canManageWorkforce;
+  },
+
   getDashboardType: (
     role: string | number | undefined | null,
   ): DashboardType => {

@@ -86,7 +86,7 @@ export default function LiveScreens() {
   if (!isAuthenticated || !isRecruiter) {
     return (
       <AppShell>
-        <div className="container mx-auto px-4 py-6 max-w-3xl">
+        <div className="px-4 py-6">
           <Alert>
             <AlertDescription>
               Live screens are a recruiter/employer feature. Sign in with the right account to use them.
@@ -99,7 +99,7 @@ export default function LiveScreens() {
 
   return (
     <AppShell>
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
+      <div className="px-4 py-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
           <div>
             <h1 className="text-2xl font-bold">Live screens</h1>

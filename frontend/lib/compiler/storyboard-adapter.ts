@@ -4,6 +4,7 @@
 
 import type { VideoScript, SceneScript, SceneType } from "../../types/video-script";
 import type { Storyboard } from "../services/studio-service";
+import { SCENE_TYPES } from "@shared/scene-types";
 
 export function storyboardToVideoScript(sb: Storyboard): VideoScript {
   const palette: string[] = sb.style?.color_palette?.length
@@ -25,7 +26,7 @@ export function storyboardToVideoScript(sb: Storyboard): VideoScript {
       : undefined;
 
     const type: SceneType =
-      ["intro", "achievement", "skills", "closing", "job-details", "company-culture", "cta", "testimonial", "product-feature", "brand-story", "requirements", "benefits"].includes(s.type)
+      (SCENE_TYPES as readonly string[]).includes(s.type)
         ? (s.type as SceneType)
         : "intro";
 

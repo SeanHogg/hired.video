@@ -95,7 +95,7 @@ export default function RewardsPage() {
   return (
     <AppShell bgClassName="bg-background">
       <main>
-        <article className="container mx-auto max-w-4xl py-10 px-4">
+        <article className="py-10 px-4">
           <header className="space-y-3 mb-10 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
           <Sparkles className="h-3.5 w-3.5" /> hired.video Rewards

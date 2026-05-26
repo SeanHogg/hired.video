@@ -257,7 +257,7 @@ export default function CoursePublicDetail() {
       badges={badges}
       actions={actions}
       preview={
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        <div className="px-4 sm:px-6 py-8 space-y-6">
           {course.coverImageUrl && (
             <div className="aspect-video overflow-hidden rounded-xl border bg-muted">
               <img

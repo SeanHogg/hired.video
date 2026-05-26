@@ -66,7 +66,7 @@ export default function MagicLinkVerify() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-4 max-w-sm mx-auto px-4">
+      <div className="text-center space-y-4 px-4">
         <XCircle className="h-12 w-12 text-destructive mx-auto" />
         <p className="font-medium">{t("headings.linkExpired")}</p>
         <p className="text-sm text-muted-foreground">{errorMsg}</p>

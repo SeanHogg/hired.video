@@ -158,7 +158,7 @@ export default function MarketplaceTemplatePreview() {
     meta.kind === "resume" ? (
       <TemplatePreview meta={meta} resume={previewResume} />
     ) : (
-      <div className="mx-auto w-full max-w-5xl px-4 py-6">
+      <div className="w-full px-4 py-6">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
           <TemplatePlayer meta={meta} />
         </div>

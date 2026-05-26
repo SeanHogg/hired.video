@@ -214,7 +214,6 @@ export default function ResumeRoast() {
         description: "Brutally honest AI feedback on your resume",
         tier: "free",
       }}
-      containerClassName="max-w-3xl mx-auto space-y-6"
     >
           {/* Input */}
           {!result && (

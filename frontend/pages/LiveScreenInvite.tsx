@@ -94,7 +94,7 @@ export default function LiveScreenInvite() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <div className="max-w-2xl mx-auto px-4 py-12">
+      <div className="px-4 py-12">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

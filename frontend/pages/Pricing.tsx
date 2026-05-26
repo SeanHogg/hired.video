@@ -360,7 +360,7 @@ export default function Pricing() {
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
 <div>
-          <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="px-4 py-8">
             {/* Hero + Controls — compact */}
             <div className="text-center mb-6">
               <h1 className="text-3xl md:text-4xl font-bold mb-2">
@@ -373,7 +373,7 @@ export default function Pricing() {
             </div>
 
             {upgradeBanner && (
-              <Card className="border-2 border-primary/40 bg-primary/5 max-w-4xl mx-auto mb-6">
+              <Card className="border-2 border-primary/40 bg-primary/5 mb-6">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary" />
@@ -454,7 +454,7 @@ export default function Pricing() {
             </div>
 
             {/* Pricing Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
               {/* Free Plan */}
               <Card className="relative border-2 border-border hover:border-primary/20 transition-colors">
                 <CardHeader className="text-center pb-8">

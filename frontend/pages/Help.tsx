@@ -147,7 +147,7 @@ export default function Help() {  const location = useLocation();
   return (
     <AppShell bgClassName="bg-background">
 <div className="p-6">
-          <div className="max-w-6xl mx-auto space-y-8">
+          <div className="space-y-8">
             {/* Header */}
             <div className="text-center">
               <div className="inline-flex items-center space-x-2 mb-4">
@@ -165,7 +165,7 @@ export default function Help() {  const location = useLocation();
 
             {/* Active search query indicator */}
             {searchQuery && (
-              <div className="max-w-2xl mx-auto text-center">
+              <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   Showing results for{" "}
                   <span className="font-medium text-foreground">

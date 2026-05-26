@@ -66,7 +66,7 @@ export default function EventDetail() {
   if (loading) {
     return (
       <AppShell bgClassName="bg-background">
-        <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <main className="px-4 sm:px-6 lg:px-8 py-10">
           <div className="aspect-[3/1] bg-muted rounded-md animate-pulse mb-6" />
           <div className="h-8 bg-muted rounded w-3/4 mb-3 animate-pulse" />
           <div className="h-4 bg-muted rounded w-1/2 mb-6 animate-pulse" />
@@ -78,7 +78,7 @@ export default function EventDetail() {
   if (notFound || !event) {
     return (
       <AppShell bgClassName="bg-background">
-        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <main className="px-4 sm:px-6 lg:px-8 py-16 text-center">
           <h1 className="text-2xl font-semibold mb-2">Event not found</h1>
           <p className="text-muted-foreground mb-6">
             This event may have been removed or you don't have access.
@@ -113,7 +113,7 @@ export default function EventDetail() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <main className="px-4 sm:px-6 lg:px-8 pb-12">
         {/* Cover */}
         <div className="relative aspect-[3/1] bg-gradient-to-br from-blue-50 to-violet-100 rounded-md overflow-hidden mt-6">
           {event.coverImageUrl ? (

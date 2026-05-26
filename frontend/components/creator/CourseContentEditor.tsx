@@ -9,8 +9,10 @@ import {
   Link as LinkIcon,
   Package,
   Pencil,
+  Upload,
 } from "lucide-react";
 import { SortableList, SortableDragHandle } from "@/components/resume-sections/SortableList";
+import { extractAndUploadScormZip, type ScormUploadProgress } from "@/lib/courses/scorm-upload";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -152,6 +154,9 @@ export default function CourseContentEditor({ courseId }: Props) {
   const [lessonForm, setLessonForm] = useState<LessonFormState>(emptyLessonForm(null));
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [savingLesson, setSavingLesson] = useState(false);
+  // #1410 — client-side SCORM zip extract + per-file R2 upload progress.
+  // Null when no upload is in flight.
+  const [scormProgress, setScormProgress] = useState<ScormUploadProgress | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -447,7 +452,7 @@ export default function CourseContentEditor({ courseId }: Props) {
                   <div className="text-xs text-muted-foreground">Lessons not yet grouped into a module.</div>
                 </div>
               </div>
-              <LessonList lessons={unsorted} onEdit={openEditLesson} onDelete={removeLesson} />
+              <LessonList lessons={unsorted} onEdit={openEditLesson} onDelete={removeLesson} onReorder={(next) => reorderLessons(next)} />
             </div>
           )}
         </div>
@@ -560,13 +565,81 @@ export default function CourseContentEditor({ courseId }: Props) {
 
               {lessonForm.sourceType === "scorm_package" && (
                 <div className="space-y-3">
+                  {/* Primary path: upload a .zip and let the client extract +
+                      push every asset to R2 via /api/upload/single. The
+                      returned manifest + entry URLs auto-fill the form
+                      fields below, which stay editable for the "paste URLs
+                      of a pre-hosted package" power-user path. */}
+                  <div className="rounded-md border border-dashed p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <Label className="text-sm">Upload SCORM zip</Label>
+                        <p className="text-xs text-muted-foreground">
+                          We extract <code>imsmanifest.xml</code>, parse the
+                          version, push every asset to R2, and fill the URLs
+                          below. SCORM 1.2 + 2004 1st–4th supported.
+                        </p>
+                      </div>
+                      <label>
+                        <input
+                          type="file"
+                          accept=".zip,application/zip,application/x-zip-compressed"
+                          className="hidden"
+                          disabled={!!scormProgress}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = ""; // allow re-picking the same file
+                            if (!file) return;
+                            setScormProgress({ done: 0, total: 0, lastPath: file.name });
+                            try {
+                              const result = await extractAndUploadScormZip(file, (p) => setScormProgress(p));
+                              setLessonForm((f) => ({
+                                ...f,
+                                scormManifestUrl: result.manifestUrl,
+                                scormEntryUrl: result.entryUrl,
+                                scormVersion: result.version,
+                              }));
+                              toast({
+                                title: "SCORM package uploaded",
+                                description: `${result.fileCount} files extracted, SCORM ${result.version}.`,
+                              });
+                            } catch (err: unknown) {
+                              toast({
+                                title: "SCORM upload failed",
+                                description: err instanceof Error ? err.message : "Try again",
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setScormProgress(null);
+                            }
+                          }}
+                        />
+                        <Button asChild type="button" size="sm" variant="outline" disabled={!!scormProgress}>
+                          <span>
+                            {scormProgress ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                            ) : (
+                              <Upload className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            {scormProgress ? "Uploading…" : "Choose .zip"}
+                          </span>
+                        </Button>
+                      </label>
+                    </div>
+                    {scormProgress && scormProgress.total > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        {scormProgress.done} / {scormProgress.total} files — {scormProgress.lastPath}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <Label htmlFor="l-scorm-manifest">imsmanifest.xml URL</Label>
                     <Input
                       id="l-scorm-manifest"
                       value={lessonForm.scormManifestUrl}
                       onChange={(e) => setLessonForm((f) => ({ ...f, scormManifestUrl: e.target.value }))}
-                      placeholder="https://r2.example.com/scorm-packages/abc123/imsmanifest.xml"
+                      placeholder="Auto-filled after upload, or paste a URL for a pre-hosted package"
                     />
                   </div>
                   <div>
@@ -575,7 +648,7 @@ export default function CourseContentEditor({ courseId }: Props) {
                       id="l-scorm-entry"
                       value={lessonForm.scormEntryUrl}
                       onChange={(e) => setLessonForm((f) => ({ ...f, scormEntryUrl: e.target.value }))}
-                      placeholder="https://r2.example.com/scorm-packages/abc123/index.html"
+                      placeholder="Auto-filled after upload"
                     />
                   </div>
                   <div>
@@ -591,10 +664,6 @@ export default function CourseContentEditor({ courseId }: Props) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      SCORM zip upload + R2 ingest pipeline is tracked as gap #1400.
-                      For now, paste the URLs of a package already hosted on R2 / S3.
-                    </p>
                   </div>
                 </div>
               )}
@@ -654,10 +723,14 @@ function LessonList({
   lessons,
   onEdit,
   onDelete,
+  onReorder,
 }: {
   lessons: CourseLesson[];
   onEdit: (l: CourseLesson) => void;
   onDelete: (l: CourseLesson) => void;
+  /** Optional drag-handle reorder via SortableList. Omit to render a
+   *  plain static list (no handles, no DndContext). */
+  onReorder?: (next: CourseLesson[]) => void;
 }) {
   if (lessons.length === 0) {
     return (
@@ -667,29 +740,32 @@ function LessonList({
     );
   }
   return (
-    <ul className="divide-y">
-      {lessons.map((l) => {
-        const Icon = SOURCE_ICON[l.sourceType];
-        return (
-          <li key={l.id} className="flex items-center gap-2 p-3 hover:bg-muted/30">
-            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{l.title}</div>
-              <div className="text-xs text-muted-foreground truncate">
-                {l.sourceType.replace("_", " ")}
-                {l.estimatedMinutes ? ` · ${l.estimatedMinutes}m` : ""}
-                {!l.isRequired ? " · optional" : ""}
+    <div className="divide-y">
+      <SortableList items={lessons} getId={(l) => l.id} onReorder={onReorder}>
+        {(l) => {
+          const Icon = SOURCE_ICON[l.sourceType];
+          return (
+            <div className="flex items-center gap-2 p-3 hover:bg-muted/30">
+              <SortableDragHandle className="!h-6 !w-6 shrink-0" />
+              <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{l.title}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {l.sourceType.replace("_", " ")}
+                  {l.estimatedMinutes ? ` · ${l.estimatedMinutes}m` : ""}
+                  {!l.isRequired ? " · optional" : ""}
+                </div>
               </div>
+              <Button size="sm" variant="ghost" onClick={() => onEdit(l)} aria-label="Edit lesson">
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onDelete(l)} aria-label="Delete lesson">
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </Button>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => onEdit(l)} aria-label="Edit lesson">
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onDelete(l)} aria-label="Delete lesson">
-              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-            </Button>
-          </li>
-        );
-      })}
-    </ul>
+          );
+        }}
+      </SortableList>
+    </div>
   );
 }

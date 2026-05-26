@@ -71,7 +71,7 @@ export default function ArticleView() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <article className="max-w-4xl mx-auto px-4 py-8">
+      <article className="px-4 py-8">
         <Breadcrumbs items={trail} />
 
         {loading ? (

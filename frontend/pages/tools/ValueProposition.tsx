@@ -183,7 +183,6 @@ export default function ValueProposition() {
         message: t("messages.signInToGenerateValueProp"),
       }}
       breadcrumbLabel={t("tools.valueProposition.title")}
-      containerClassName="max-w-4xl mx-auto"
     >
             {/* Progress Steps */}
             <div className="mb-8">

@@ -109,7 +109,7 @@ export default function SectorLanding() {
     <AppShell bgClassName="bg-background">
       <main className="pb-20">
         {/* Hero */}
-        <section className="max-w-6xl mx-auto px-6 py-12">
+        <section className="px-6 py-12">
           <div className="space-y-4">
             <Badge variant={RESILIENCE_VARIANT[meta.aiResilience]}>
               {RESILIENCE_LABEL[meta.aiResilience]}
@@ -135,7 +135,7 @@ export default function SectorLanding() {
         </section>
 
         {/* AI-resilience reality check */}
-        <section className="max-w-6xl mx-auto px-6 py-8">
+        <section className="px-6 py-8">
           <Card>
             <CardHeader>
               <CardTitle>AI-resilience: the honest read</CardTitle>
@@ -147,7 +147,7 @@ export default function SectorLanding() {
         </section>
 
         {/* Example roles + licensure */}
-        <section className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="px-6 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Roles worth targeting</CardTitle>
@@ -177,7 +177,7 @@ export default function SectorLanding() {
 
         {/* Live jobs — omitted for content-only sectors. */}
         {!meta.contentOnly && (
-          <section className="max-w-6xl mx-auto px-6 py-8 space-y-4">
+          <section className="px-6 py-8 space-y-4">
             <div className="flex items-baseline justify-between">
               <h2 className="text-2xl font-semibold tracking-tight">Open roles</h2>
               <Link to={`/jobs?sector=${meta.slug}`} className="text-sm text-primary hover:underline">
@@ -207,7 +207,7 @@ export default function SectorLanding() {
         )}
 
         {/* Articles */}
-        <section className="max-w-6xl mx-auto px-6 py-8 space-y-4">
+        <section className="px-6 py-8 space-y-4">
           <div className="flex items-baseline justify-between">
             <h2 className="text-2xl font-semibold tracking-tight">Sector guides</h2>
             <Link to={`/articles?sector=${meta.slug}`} className="text-sm text-primary hover:underline">
@@ -232,7 +232,7 @@ export default function SectorLanding() {
         </section>
 
         {/* Recommended resume template */}
-        <section className="max-w-6xl mx-auto px-6 py-8">
+        <section className="px-6 py-8">
           <Card>
             <CardHeader>
               <CardTitle>Recommended resume template</CardTitle>
@@ -253,7 +253,7 @@ export default function SectorLanding() {
 
         {/* Pivot CTA */}
         {meta.transferableFromTech.length > 0 && meta.slug !== "tech" && (
-          <section className="max-w-6xl mx-auto px-6 py-8">
+          <section className="px-6 py-8">
             <Card className="bg-muted/30">
               <CardHeader>
                 <CardTitle>Pivoting from tech?</CardTitle>

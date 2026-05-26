@@ -19,7 +19,7 @@ export default function PointsPage() {
   return (
     <AppShell bgClassName="bg-background">
       <main>
-        <div className="container mx-auto max-w-5xl py-8 px-4">
+        <div className="py-8 px-4">
           <PointsHub />
         </div>
       </main>

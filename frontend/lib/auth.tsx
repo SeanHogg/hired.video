@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { logger } from "./logger";
 import { authService, type UserProfile, type ProfileUpdate, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 import * as impersonationService from "./services/impersonation-service";
+import { fetchBootstrap } from "./services/bootstrap-service";
+import { clearInboxSeed } from "./inbox-seed";
 import { apiClient, setEmulationTokenGetter } from "./api-client";
 import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
 import { attributionPayload } from "./attribution";
@@ -199,15 +201,27 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
             );
           }
 
-          // Prime verification state early so route guards behave correctly
+          // Single-round-trip bootstrap (gap #1367) — collapses
+          // verification-status + token-budget + feature-flags +
+          // unread-count into one /api/bootstrap call and seeds the
+          // downstream caches so per-slice hooks read from memory.
+          // Falls back to per-endpoint fetches on any sub-slice failure.
           try {
-            const status = await authService.getVerificationStatus();
-            setIsEmailVerified(status.emailConfirmed);
-            if (!status.emailConfirmed) {
-              await maybeResendVerificationEmail(status.sentAt);
+            const bootstrap = await fetchBootstrap();
+            if (bootstrap?.verification) {
+              setIsEmailVerified(bootstrap.verification.emailConfirmed);
+              if (!bootstrap.verification.emailConfirmed) {
+                await maybeResendVerificationEmail();
+              }
+            } else {
+              const status = await authService.getVerificationStatus();
+              setIsEmailVerified(status.emailConfirmed);
+              if (!status.emailConfirmed) {
+                await maybeResendVerificationEmail(status.sentAt);
+              }
             }
           } catch (err) {
-            logger.warn?.("AuthProvider: failed to fetch verification status on init", err);
+            logger.warn?.("AuthProvider: bootstrap init failed", err);
             setIsEmailVerified(undefined);
           }
 
@@ -334,12 +348,22 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         const user = userProfileToUser(profile);
         console.log("AuthContext.login: Converted profile to user", user);
         setUser(user);
-        // After login, prime verification state lazily
+        // Post-login bootstrap (gap #1367) — same single round-trip the
+        // refresh path uses. Seeds verification + flags + tokenBudget +
+        // unread-count before the dashboard mounts.
         try {
-          const status = await authService.getVerificationStatus();
-          setIsEmailVerified(status.emailConfirmed);
-          if (!status.emailConfirmed) {
-            await maybeResendVerificationEmail(status.sentAt);
+          const bootstrap = await fetchBootstrap();
+          if (bootstrap?.verification) {
+            setIsEmailVerified(bootstrap.verification.emailConfirmed);
+            if (!bootstrap.verification.emailConfirmed) {
+              await maybeResendVerificationEmail();
+            }
+          } else {
+            const status = await authService.getVerificationStatus();
+            setIsEmailVerified(status.emailConfirmed);
+            if (!status.emailConfirmed) {
+              await maybeResendVerificationEmail(status.sentAt);
+            }
           }
         } catch {
           setIsEmailVerified(undefined);

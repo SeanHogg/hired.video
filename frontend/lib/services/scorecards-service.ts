@@ -2,17 +2,29 @@
 //
 // Covers the structured-hiring stack: scorecard templates + attributes,
 // interview kits + stages, evaluator submissions, debrief aggregates,
-// and final hiring decisions.
+// final hiring decisions, and the competency library (#1382).
 
 import { apiClient } from "../api-client";
+import type { BlindReviewMode } from "../scorecards/blind-review";
 
 export type RatingScale = "1-4" | "1-5" | "thumbs" | "yes-no";
 export type Recommendation = "strong_yes" | "yes" | "no" | "strong_no";
 export type Decision = "approve" | "reject" | "hold" | "withdraw";
+/** Migration 0132 / gap #1386. */
+export type StageKind = "interview" | "async_video" | "take_home" | "assessment";
+/** Migration 0132 / gap #1382. */
+export type CompetencyTaxonomy =
+  | "technical"
+  | "behavioral"
+  | "leadership"
+  | "execution"
+  | "other";
 
 export interface ScorecardAttribute {
   id: string;
   templateId: string;
+  /** Migration 0132 / gap #1382. */
+  competencyId: string | null;
   name: string;
   description: string | null;
   displayOrder: number;
@@ -41,6 +53,8 @@ export interface AttributeInput {
   displayOrder?: number;
   weight?: number;
   anchors?: Record<string, string>;
+  /** Migration 0132 / gap #1382. */
+  competencyId?: string | null;
 }
 
 export interface CreateTemplateInput {
@@ -57,6 +71,8 @@ export interface InterviewKitStage {
   kitId: string;
   name: string;
   description: string | null;
+  /** Migration 0132 / gap #1386. */
+  stageKind: StageKind;
   displayOrder: number;
   durationMinutes: number | null;
   suggestedQuestions: string[] | null;
@@ -71,6 +87,10 @@ export interface InterviewKit {
   createdByUserId: string;
   name: string;
   description: string | null;
+  /** Migration 0132 / gap #1380. */
+  blindReviewMode: BlindReviewMode;
+  /** Migration 0132 / gap #1383. */
+  escalateToUserId: string | null;
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -80,6 +100,7 @@ export interface InterviewKit {
 export interface StageInput {
   name: string;
   description?: string;
+  stageKind?: StageKind;
   displayOrder?: number;
   durationMinutes?: number;
   suggestedQuestions?: string[];
@@ -91,6 +112,8 @@ export interface CreateKitInput {
   jobId?: string;
   name: string;
   description?: string;
+  blindReviewMode?: BlindReviewMode;
+  escalateToUserId?: string | null;
   stages: StageInput[];
 }
 
@@ -123,6 +146,16 @@ export interface ScorecardSubmission {
   concerns: string | null;
   status: "draft" | "submitted";
   submittedAt: string | null;
+  /** Migration 0132 / gap #1383. */
+  dueAt: string | null;
+  remindedAt: string | null;
+  escalatedAt: string | null;
+  /**
+   * Migration 0132 / gap #1380. Set to `true` by the API when the
+   * candidate identity was masked for this requester — the frontend uses
+   * it to render an "Identity hidden" badge without re-deriving policy.
+   */
+  _anonymized?: true;
   createdAt: string;
   updatedAt: string;
   ratings?: SubmissionRating[];
@@ -139,6 +172,8 @@ export interface CreateSubmissionInput {
   summary?: string;
   strengths?: string;
   concerns?: string;
+  /** Migration 0132 / gap #1383. ISO timestamp. */
+  dueAt?: string;
 }
 
 export interface DebriefAggregate {
@@ -146,6 +181,51 @@ export interface DebriefAggregate {
   avgScore: number | null;
   recommendations: Partial<Record<Recommendation, number>>;
   attributes: { attributeId: string; name: string; avg: number | null; samples: number }[];
+}
+
+// ─── Competency framework (#1382) ────────────────────────────────────────────
+
+export interface CompetencyLevel {
+  id: string;
+  competencyId: string;
+  level: number;
+  label: string;
+  anchor: string;
+  createdAt: string;
+}
+
+export interface Competency {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string | null;
+  taxonomy: CompetencyTaxonomy;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  levels?: CompetencyLevel[];
+}
+
+export interface CompetencyLevelInput {
+  level: number;
+  label: string;
+  anchor: string;
+}
+
+export interface CreateCompetencyInput {
+  companyId: string;
+  name: string;
+  description?: string;
+  taxonomy?: CompetencyTaxonomy;
+  levels?: CompetencyLevelInput[];
+}
+
+export interface UpdateCompetencyInput {
+  name?: string;
+  description?: string | null;
+  taxonomy?: CompetencyTaxonomy;
+  isArchived?: boolean;
+  levels?: CompetencyLevelInput[];
 }
 
 export interface HiringDecisionRecord {
@@ -212,7 +292,17 @@ export const scorecardsService = {
   },
   async updateKit(
     id: string,
-    patch: Partial<Pick<InterviewKit, "name" | "description" | "jobId" | "isArchived">>,
+    patch: Partial<
+      Pick<
+        InterviewKit,
+        | "name"
+        | "description"
+        | "jobId"
+        | "isArchived"
+        | "blindReviewMode"
+        | "escalateToUserId"
+      >
+    >,
   ): Promise<InterviewKit> {
     return (await apiClient.patch<InterviewKit>(`/api/scorecards/kits/${id}`, patch)).data!;
   },
@@ -281,5 +371,23 @@ export const scorecardsService = {
     reason?: string;
   }): Promise<HiringDecisionRecord> {
     return (await apiClient.post<HiringDecisionRecord>("/api/scorecards/decisions", input)).data!;
+  },
+
+  // Competencies (#1382)
+  async listCompetencies(companyId?: string): Promise<Competency[]> {
+    const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+    return (await apiClient.get<Competency[]>(`/api/scorecards/competencies${qs}`)).data ?? [];
+  },
+  async getCompetency(id: string): Promise<Competency | null> {
+    return (
+      (await apiClient.get<Competency>(`/api/scorecards/competencies/${id}`)).data ?? null
+    );
+  },
+  async createCompetency(input: CreateCompetencyInput): Promise<Competency> {
+    return (await apiClient.post<Competency>("/api/scorecards/competencies", input)).data!;
+  },
+  async updateCompetency(id: string, patch: UpdateCompetencyInput): Promise<Competency> {
+    return (await apiClient.patch<Competency>(`/api/scorecards/competencies/${id}`, patch))
+      .data!;
   },
 };

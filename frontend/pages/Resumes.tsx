@@ -863,7 +863,7 @@ export default function Resumes() {
   if (!isAuthenticated || !user) {
     return (
       <AppShell>
-        <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -1223,7 +1223,7 @@ export default function Resumes() {
             />
 
             {/* Final CTA */}
-            <div className="max-w-4xl mx-auto px-4 pb-16">
+            <div className="px-4 pb-16">
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
                 <h3 className="text-3xl font-bold mb-4">
                   Ready to Create Your Video Resume?
@@ -1676,7 +1676,7 @@ export default function Resumes() {
     return (
       <AppShell bgClassName="bg-background">
         <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div>
             {/* Keep the hub-level tab strip visible even in the in-page
                 viewer / builder modes — the user is still "inside" the
                 Resumes section and shouldn't lose that context. */}

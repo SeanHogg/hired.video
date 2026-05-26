@@ -23,6 +23,8 @@ import {
   type ScorecardSubmission,
   type ScorecardTemplate,
 } from "@/lib/services/scorecards-service";
+import { BlindReviewBadge } from "./BlindReviewBadge";
+import { DueInBadge } from "./DueInBadge";
 
 interface Props {
   templateId: string;
@@ -194,11 +196,15 @@ export function ScorecardSubmissionForm({
             <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
           )}
         </div>
-        {isSubmitted && (
-          <Badge className="bg-green-600 text-white">
-            <CheckCircle2 className="mr-1 h-3 w-3" /> Submitted
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <BlindReviewBadge submission={submission} />
+          <DueInBadge submission={submission} />
+          {isSubmitted && (
+            <Badge className="bg-green-600 text-white">
+              <CheckCircle2 className="mr-1 h-3 w-3" /> Submitted
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {(template.attributes ?? []).map((a) => (

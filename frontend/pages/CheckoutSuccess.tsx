@@ -44,7 +44,7 @@ export default function CheckoutSuccess() {  const { user, isAuthenticated } = u
   return (
     <AppShell bgClassName="bg-background">
 <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-          <div className="max-w-4xl mx-auto p-6">
+          <div className="p-6">
             <div className="text-center space-y-8">
               {/* Success Icon */}
               <div className="flex justify-center">

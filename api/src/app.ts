@@ -85,6 +85,7 @@ import { feedRoutes } from "./routes/feed.js";
 import { salaryRoutes } from "./routes/salary.js";
 import { valuePropositionRoutes } from "./routes/value-proposition.js";
 import { featureFlagRoutes } from "./routes/featureflag.js";
+import { bootstrapRoutes } from "./routes/bootstrap.js";
 import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
 import { interviewAssignmentRoutes } from "./routes/interview-assignments.js";
@@ -555,6 +556,7 @@ export function createApp() {
   app.route("/api/settings", settingsRoutes);
   app.route("/api/export", settingsRoutes); // legacy export alias — /api/export/csv maps to /api/settings/export/csv
   app.route("/api/featureflag", featureFlagRoutes);
+  app.route("/api/bootstrap", bootstrapRoutes);
   app.route("/api/task", taskRoutes);
   app.route("/api/points", pointsRoutes);
   app.route("/api/upload", uploadRoutes);

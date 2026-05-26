@@ -188,7 +188,6 @@ export default function ProfileAudit() {
         message:
           "Sign in to audit your candidate profile — we'll grade your headline, summary, and recruiter signals, then propose a rewrite.",
       }}
-      containerClassName="max-w-7xl mx-auto space-y-6"
     >
             {showProUpsell ? (
               <ProUpsell />

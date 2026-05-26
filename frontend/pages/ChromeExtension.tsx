@@ -60,7 +60,7 @@ export default function ChromeExtension() {
 <main>
           {/* Hero */}
           <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-6">
-            <div className="max-w-6xl mx-auto text-center">
+            <div className="text-center">
               <Badge className="mb-4 bg-blue-100 text-blue-800 hover:bg-blue-100">
                 <Chrome className="h-4 w-4 mr-1" /> Chrome Extensions
               </Badge>
@@ -91,7 +91,7 @@ export default function ChromeExtension() {
 
           {/* Two-plugin split */}
           <section className="py-16 px-6">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Job Seeker card */}
                 <Card id="job-seeker" className="border-blue-200 hover:border-blue-400 transition-colors scroll-mt-20">
@@ -177,7 +177,7 @@ export default function ChromeExtension() {
 
           {/* Job Seeker feature detail */}
           <section className="py-16 px-6 bg-gray-50">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="text-center mb-12">
                 <Badge className="mb-3 bg-blue-100 text-blue-800 hover:bg-blue-100">
                   <Briefcase className="h-3 w-3 mr-1" /> Job Seeker Extension
@@ -233,7 +233,7 @@ export default function ChromeExtension() {
 
           {/* Recruiter feature detail */}
           <section className="py-16 px-6">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="text-center mb-12">
                 <Badge className="mb-3 bg-purple-100 text-purple-800 hover:bg-purple-100">
                   <Users className="h-3 w-3 mr-1" /> Recruiter Extension
@@ -289,7 +289,7 @@ export default function ChromeExtension() {
 
           {/* Supported sites */}
           <section className="py-16 px-6 bg-gray-50">
-            <div className="max-w-6xl mx-auto text-center">
+            <div className="text-center">
               <h2 className="text-3xl font-bold mb-4">Works Everywhere Your Workflow Lives</h2>
               <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
                 Both extensions auto-detect jobs, profiles, and companies across 16+ major sites — and fall back to
@@ -346,7 +346,7 @@ export default function ChromeExtension() {
 
           {/* Final CTA */}
           <section className="py-16 px-6 bg-gradient-to-r from-blue-600 to-purple-600">
-            <div className="max-w-4xl mx-auto text-center text-white">
+            <div className="text-center text-white">
               <h2 className="text-3xl font-bold mb-4">Pick the Extension That Fits Your Role</h2>
               <p className="text-xl mb-8 opacity-90">
                 Job seekers get tailored resumes. Recruiters get a talent pipeline. Both without ever leaving the job board.

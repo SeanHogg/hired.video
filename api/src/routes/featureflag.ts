@@ -34,7 +34,10 @@ export function invalidateFeatureFlagCache(): void {
   cachedAt = 0;
 }
 
-async function loadFlags(): Promise<typeof schema.featureFlags.$inferSelect[]> {
+// Exported so the /api/bootstrap aggregate (gap #1367) can include flags
+// in the same response that returns the user + billing + verification — the
+// cache + invalidator are shared so admin flips still propagate correctly.
+export async function loadFlags(): Promise<typeof schema.featureFlags.$inferSelect[]> {
   if (cachedFlags && Date.now() - cachedAt < FLAGS_TTL_MS) return cachedFlags;
   const db = getDb();
   let flags: typeof schema.featureFlags.$inferSelect[] = [];
@@ -63,7 +66,7 @@ async function loadFlags(): Promise<typeof schema.featureFlags.$inferSelect[]> {
 
 // Evaluate whether a flag is active for a given user.
 // Rollout is deterministic: hash(userId + flagKey) % 100 < rolloutPercentage
-function isEnabledForUser(flag: { enabled: boolean; rolloutPercentage: number }, userId: string, flagKey: string): boolean {
+export function isEnabledForUser(flag: { enabled: boolean; rolloutPercentage: number }, userId: string, flagKey: string): boolean {
   if (!flag.enabled) return false;
   if (flag.rolloutPercentage >= 100) return true;
   if (flag.rolloutPercentage <= 0) return false;

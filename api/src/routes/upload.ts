@@ -174,6 +174,69 @@ uploadRoutes.post("/single", async (c) => {
   return c.json(ok({ url: cdnUrl(key) }), 201);
 });
 
+/**
+ * POST /api/upload/scorm-file — multipart upload that preserves the
+ * caller-supplied path inside the package (#1431).
+ *
+ * Form fields:
+ *   - file: the asset blob
+ *   - pkgId: opaque package id chosen by the client (a uuid v4) so every
+ *     file in the same SCORM package lands under one prefix
+ *   - path: the in-zip relative path of this asset (e.g.
+ *     "scormcontent/index.html"). Path traversal segments ("..", absolute
+ *     paths) are rejected to keep every write strictly inside the package
+ *     prefix.
+ *
+ * R2 key layout:
+ *   `uploads/<userId>/scorm/<pkgId>/<path>`
+ *
+ * Why this exists instead of /single: SCORM packages reference sibling
+ * assets via relative paths in the entry HTML (`<script src="loader.js">`
+ * resolves against the page's URL). /single's flat `uploads/<userId>/
+ * files/<uuid>.<ext>` layout breaks every reference because each file
+ * ends up at a different uuid. Preserving the in-zip layout under a
+ * shared pkgId prefix means relative refs Just Work — the entry HTML at
+ * `<prefix>/index.html` resolves `loader.js` to `<prefix>/loader.js`,
+ * which exists. Pairs with [scorm-upload.ts](frontend/lib/courses/scorm-upload.ts).
+ */
+uploadRoutes.post("/scorm-file", async (c) => {
+  const user = c.var.user;
+  const form = await c.req.formData().catch(() => null);
+  const part = form?.get("file") as File | null;
+  const pkgId = (form?.get("pkgId") as string | null)?.trim() ?? "";
+  const path = (form?.get("path") as string | null)?.trim() ?? "";
+
+  if (!part || typeof part.arrayBuffer !== "function") {
+    return c.json(fail("VALIDATION_ERROR", "Missing uploaded file"), 400);
+  }
+  // pkgId must be a uuid v4 — anything else risks collision with another
+  // user's package and lets a caller scribble into arbitrary R2 prefixes
+  // by passing "../somebody-elses-package".
+  if (!/^[0-9a-f-]{36}$/i.test(pkgId)) {
+    return c.json(fail("VALIDATION_ERROR", "pkgId must be a uuid v4"), 400);
+  }
+  // path validation — reject empty, absolute, dotdot, backslash, and
+  // anything that decodes to a different shape after stripping. The
+  // surviving path is a slash-separated relative file path safe to
+  // concatenate with the user-scoped prefix.
+  if (!path
+      || path.startsWith("/")
+      || path.includes("\\")
+      || path.split("/").some((seg) => seg === "" || seg === ".." || seg === ".")) {
+    return c.json(fail("VALIDATION_ERROR", "path must be a non-empty, relative, traversal-free POSIX path"), 400);
+  }
+
+  const bytes = await part.arrayBuffer();
+  const key = `uploads/${user.sub}/scorm/${pkgId}/${path}`;
+
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+
+  await bucket.put(key, bytes, { httpMetadata: { contentType: part.type || "application/octet-stream" } });
+
+  return c.json(ok({ url: cdnUrl(key), key }), 201);
+});
+
 /** POST /api/upload/video — multipart video upload used by resume/video flows */
 uploadRoutes.post("/video", async (c) => {
   const user = c.var.user;

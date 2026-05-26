@@ -102,7 +102,7 @@ export default function AgentRuns() {
   if (!isRecruiterOrEmployer) {
     return (
       <AppShell bgClassName="bg-background">
-        <div className="max-w-3xl mx-auto p-6">
+        <div className="p-6">
           <Card>
             <CardHeader>
               <CardTitle>Recruiter-only</CardTitle>
@@ -119,7 +119,7 @@ export default function AgentRuns() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
+      <div className="p-6 space-y-6">
         <header className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
             <Brain className="w-5 h-5 text-primary" />

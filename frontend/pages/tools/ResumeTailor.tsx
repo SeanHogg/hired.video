@@ -264,7 +264,6 @@ export default function ResumeTailor() {
         message:
           "Sign in to tailor your resume — we'll keep the job description you've pasted and generate the tailored version as soon as you're back.",
       }}
-      containerClassName="max-w-7xl mx-auto space-y-8"
     >
             {(
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

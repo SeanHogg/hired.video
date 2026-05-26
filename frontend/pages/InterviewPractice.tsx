@@ -97,7 +97,7 @@ function SetupStep({
   ];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
+    <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">AI Interview Practice</h1>
         <p className="text-muted-foreground">
@@ -177,7 +177,7 @@ function QuestionsPreviewStep({
   const totalMinutes = Math.round(totalSeconds / 60);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-2">
           <Badge variant="outline" className="capitalize">{interviewType}</Badge>
@@ -375,7 +375,7 @@ function RecordingStep({
   const progressPct = ((question.timeLimit - timeLeft) / question.timeLimit) * 100;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -519,7 +519,7 @@ function RecordingStep({
 
 function AnalyzingStep({ questionIndex, total }: { questionIndex: number; total: number }) {
   return (
-    <div className="max-w-md mx-auto text-center space-y-6 py-16">
+    <div className="text-center space-y-6 py-16">
       <div className="relative mx-auto w-20 h-20">
         <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-ping" />
         <div className="absolute inset-0 flex items-center justify-center">
@@ -574,7 +574,7 @@ function ResultsStep({
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Overall Score */}
       <Card className="border-2 border-primary/20">
         <CardContent className="pt-6 pb-5">
@@ -735,7 +735,7 @@ function ResultsStep({
 
 function Landing() {
   return (
-    <div className="max-w-6xl mx-auto px-4 py-16">
+    <div className="px-4 py-16">
 
         {/* Hero */}
         <div className="text-center mb-16">
@@ -1115,7 +1115,7 @@ export default function InterviewPractice() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="px-4 py-8">
         {step === "setup" && (
           <SetupStep onStart={generateQuestions} loading={loading} />
         )}

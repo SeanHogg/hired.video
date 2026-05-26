@@ -237,7 +237,6 @@ export default function FormAutofill() {
         message: t("messages.signInToAutofill"),
       }}
       breadcrumbLabel={t("tools.formAutofill.title")}
-      containerClassName="max-w-7xl mx-auto space-y-8"
     >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left: Input Section */}

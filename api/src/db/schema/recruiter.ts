@@ -135,6 +135,27 @@ export const placements = pgTable("placements", {
   guaranteeEndDate: timestamp("guarantee_end_date", { withTimezone: true }),
   guaranteeMetStatus: boolean("guarantee_met_status"),
   notes: text("notes"),
+  // ---- #1349 Phase 3 — back-office extensions ----
+  // direct_hire | contract | contract_to_hire — short string kind
+  // alongside the FK to workspace_job_types. The FK is the legacy
+  // commission-engine-facing taxonomy; this kind is the Bullhorn-lite
+  // back-office axis (drives whether timesheets are required).
+  placementKind: varchar("placement_kind", { length: 32 }),
+  endDate: timestamp("end_date", { withTimezone: true }),
+  billRateHourly: numeric("bill_rate_hourly", { precision: 10, scale: 2 }),
+  payRateHourly: numeric("pay_rate_hourly", { precision: 10, scale: 2 }),
+  currency: varchar("currency", { length: 8 }).default("USD"),
+  burdenPct: numeric("burden_pct", { precision: 5, scale: 2 }),
+  poNumber: varchar("po_number", { length: 100 }),
+  msaRef: varchar("msa_ref", { length: 100 }),
+  // For extension chains: the previous placement this row replaces.
+  // Audit trail of "Acme renewed Jane's contract three times" without
+  // mutating the original row.
+  parentPlacementId: uuid("parent_placement_id"),
+  // Contract placements require timesheets; direct-hire does not.
+  // Defaults to NULL — service layer derives from placementKind on
+  // insert if not set explicitly.
+  timesheetRequired: boolean("timesheet_required"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

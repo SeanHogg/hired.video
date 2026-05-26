@@ -332,7 +332,7 @@ export default function AffiliateDashboard() {
   return (
     <AppShell bgClassName="bg-background">
       <main>
-        <section className="max-w-6xl mx-auto px-6 py-10 space-y-6">
+        <section className="px-6 py-10 space-y-6">
           <StandaloneHeader />
           <ReferralLinkCard />
           <AffiliateSpecialtySectorsPanel />

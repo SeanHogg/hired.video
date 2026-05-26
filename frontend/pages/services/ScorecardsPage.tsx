@@ -12,6 +12,7 @@ import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScorecardTemplateEditor } from "@/components/scorecards/ScorecardTemplateEditor";
 import { InterviewKitEditor } from "@/components/scorecards/InterviewKitEditor";
+import { CompetencyLibraryEditor } from "@/components/scorecards/CompetencyLibraryEditor";
 
 export default function ScorecardsPage() {
   const location = useLocation();
@@ -27,7 +28,7 @@ export default function ScorecardsPage() {
   return (
     <AppShell bgClassName="bg-background">
       <main className="px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="max-w-4xl mx-auto pt-6 space-y-6">
+        <div className="pt-6 space-y-6">
           <PageHeader tabs={peopleTabs} activeTabKey="scorecards" />
 
           <div>
@@ -53,12 +54,16 @@ export default function ScorecardsPage() {
               <TabsList>
                 <TabsTrigger value="templates">Templates</TabsTrigger>
                 <TabsTrigger value="kits">Interview kits</TabsTrigger>
+                <TabsTrigger value="competencies">Competency library</TabsTrigger>
               </TabsList>
               <TabsContent value="templates" className="mt-4">
                 <ScorecardTemplateEditor companyId={companyId} />
               </TabsContent>
               <TabsContent value="kits" className="mt-4">
                 <InterviewKitEditor companyId={companyId} />
+              </TabsContent>
+              <TabsContent value="competencies" className="mt-4">
+                <CompetencyLibraryEditor companyId={companyId} />
               </TabsContent>
             </Tabs>
           )}

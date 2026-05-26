@@ -75,24 +75,28 @@ describe("blindReview", () => {
   });
 
   describe("maskCandidateIdentity", () => {
-    it("strips candidateUserId when requester is evaluator + policy is on", () => {
+    it("strips candidateUserId + flags _anonymized when requester is evaluator + policy is on", () => {
       const masked = maskCandidateIdentity(sub(), kit("anonymize_candidate"), true);
       expect(masked.candidateUserId).toBeNull();
+      expect(masked._anonymized).toBe(true);
     });
 
-    it("returns row unchanged for HM (requesterIsEvaluator = false)", () => {
+    it("returns row unchanged for HM (requesterIsEvaluator = false), no _anonymized flag", () => {
       const masked = maskCandidateIdentity(sub(), kit("anonymize_candidate"), false);
       expect(masked.candidateUserId).toBe("candidate-1");
+      expect(masked._anonymized).toBeUndefined();
     });
 
     it("returns row unchanged when policy is off", () => {
       const masked = maskCandidateIdentity(sub(), kit("off"), true);
       expect(masked.candidateUserId).toBe("candidate-1");
+      expect(masked._anonymized).toBeUndefined();
     });
 
     it("returns row unchanged when no governing kit", () => {
       const masked = maskCandidateIdentity(sub(), null, true);
       expect(masked.candidateUserId).toBe("candidate-1");
+      expect(masked._anonymized).toBeUndefined();
     });
   });
 

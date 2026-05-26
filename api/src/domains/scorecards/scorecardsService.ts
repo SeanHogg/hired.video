@@ -21,6 +21,8 @@ import {
   type ScorecardSubmissionRow,
   type ScorecardSubmissionRatingRow,
   type HiringDecisionRow,
+  type CompetencyRow,
+  type CompetencyLevelRow,
   type UpdateAttributePatch,
   type UpdateStagePatch,
 } from "../../repositories/scorecardsRepository.js";
@@ -51,6 +53,8 @@ import type {
   UpdateKitInput,
   UpdateSubmissionInput,
   UpdateTemplateInput,
+  CreateCompetencyInput,
+  UpdateCompetencyInput,
 } from "./schemas.js";
 
 // ─── Errors ────────────────────────────────────────────────────────────────
@@ -90,6 +94,10 @@ export interface Debrief {
   avgScore: AggregateSnapshot["avgScore"];
   recommendations: AggregateSnapshot["recommendations"];
   attributes: AttributeAverage[];
+}
+
+export interface CompetencyWithLevels extends CompetencyRow {
+  levels: CompetencyLevelRow[];
 }
 
 // ─── Service ───────────────────────────────────────────────────────────────
@@ -608,5 +616,94 @@ export class ScorecardsService {
       reason: input.reason,
       aggregateSnapshot,
     });
+  }
+
+  // ─── Competencies (#1382) ─────────────────────────────────────────────────
+
+  async listCompetencies(
+    userId: string,
+    onlyCompanyId?: string,
+  ): Promise<CompetencyWithLevels[]> {
+    const companyIds = await this.deps.getCompanyIdsForUser(userId);
+    if (companyIds.length === 0) return [];
+    if (onlyCompanyId && !companyIds.includes(onlyCompanyId)) return [];
+    const target = onlyCompanyId ? [onlyCompanyId] : companyIds;
+    const comps = await this.deps.repo.findActiveCompetenciesForCompanies(target);
+    if (comps.length === 0) return [];
+    const levels = await this.deps.repo.findLevelsForCompetencies(
+      comps.map((c) => c.id),
+    );
+    const byCompetency = new Map<string, CompetencyLevelRow[]>();
+    for (const lv of levels) {
+      const bucket = byCompetency.get(lv.competencyId) ?? [];
+      bucket.push(lv);
+      byCompetency.set(lv.competencyId, bucket);
+    }
+    return comps.map((c) => ({ ...c, levels: byCompetency.get(c.id) ?? [] }));
+  }
+
+  async getCompetency(userId: string, id: string): Promise<CompetencyWithLevels> {
+    const comp = await this.deps.repo.findCompetencyById(id);
+    if (!comp) throw new ServiceError("NOT_FOUND", "Competency not found");
+    await this.assertCompanyAccess(userId, comp.companyId);
+    const levels = await this.deps.repo.findLevelsForCompetencies([comp.id]);
+    return { ...comp, levels };
+  }
+
+  async createCompetency(
+    userId: string,
+    input: CreateCompetencyInput,
+  ): Promise<CompetencyWithLevels> {
+    await this.assertCompanyAccess(userId, input.companyId);
+    const comp = await this.deps.repo.insertCompetency({
+      companyId: input.companyId,
+      createdByUserId: userId,
+      name: input.name,
+      description: input.description,
+      taxonomy: input.taxonomy,
+    });
+    const levels =
+      input.levels && input.levels.length > 0
+        ? await this.deps.repo.insertCompetencyLevels(
+            input.levels.map((lv) => ({
+              competencyId: comp.id,
+              level: lv.level,
+              label: lv.label,
+              anchor: lv.anchor,
+            })),
+          )
+        : [];
+    return { ...comp, levels };
+  }
+
+  async updateCompetency(
+    userId: string,
+    id: string,
+    patch: UpdateCompetencyInput & { levels?: CreateCompetencyInput["levels"] },
+  ): Promise<CompetencyWithLevels> {
+    const existing = await this.deps.repo.findCompetencyById(id);
+    if (!existing) throw new ServiceError("NOT_FOUND", "Competency not found");
+    await this.assertCompanyAccess(userId, existing.companyId);
+    const { levels, ...metaPatch } = patch;
+    const updated = await this.deps.repo.updateCompetency(id, metaPatch);
+    // Replace-all semantics on levels when provided — keeps the editor
+    // simple (the UI sends the full leveled rubric every save).
+    if (levels) {
+      await this.deps.repo.deleteLevelsForCompetency(id);
+      const inserted =
+        levels.length > 0
+          ? await this.deps.repo.insertCompetencyLevels(
+              levels.map((lv) => ({
+                competencyId: id,
+                level: lv.level,
+                label: lv.label,
+                anchor: lv.anchor,
+              })),
+            )
+          : [];
+      return { ...updated, levels: inserted };
+    }
+    const existingLevels = await this.deps.repo.findLevelsForCompetencies([id]);
+    return { ...updated, levels: existingLevels };
   }
 }

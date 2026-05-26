@@ -237,8 +237,50 @@ export async function removeAccountUser(currentUserId: string, userId: string,
   deps?: Partial<AccountDeps>): Promise<void> {
   const d = resolveDeps(deps); const db = d.db;
   const [currentUser] = await db.select().from(users).where(eq(users.id, currentUserId)).limit(1);
-  if (!currentUser || currentUser.role.toLowerCase() !== "admin") return;
-  await db.update(users).set({ isActive: false } as any).where(eq(users.id, userId));
+  if (!currentUser) return;
+  const role = currentUser.role.toLowerCase();
+  if (role === "admin" || role === "super_admin") {
+    // Platform admins can deactivate anyone, full stop.
+    await db.update(users).set({ isActive: false } as any).where(eq(users.id, userId));
+    return;
+  }
+  if (role === "employer") {
+    // Employers can deactivate employees of THEIR company only. The check
+    // is workspace-scoped: confirm there's an active UCRA row binding both
+    // the current user (as employer) and the target user (as employee) to
+    // the same company. Without that match the call is a no-op (#1406).
+    const sharedWorkspaces = await db
+      .select({ companyId: userCompanyRoleAssociations.companyId })
+      .from(userCompanyRoleAssociations)
+      .where(and(
+        eq(userCompanyRoleAssociations.userId, currentUserId),
+        eq(userCompanyRoleAssociations.role, "employer"),
+        eq(userCompanyRoleAssociations.isActive, true),
+      ));
+    if (sharedWorkspaces.length === 0) return;
+    const employerCompanyIds = sharedWorkspaces.map((r) => r.companyId);
+    const [targetEmployment] = await db
+      .select({ id: userCompanyRoleAssociations.id, companyId: userCompanyRoleAssociations.companyId })
+      .from(userCompanyRoleAssociations)
+      .where(and(
+        eq(userCompanyRoleAssociations.userId, userId),
+        eq(userCompanyRoleAssociations.role, "employee"),
+        eq(userCompanyRoleAssociations.isActive, true),
+      ))
+      .limit(1);
+    if (!targetEmployment || !employerCompanyIds.includes(targetEmployment.companyId)) return;
+    // Deactivate the workspace membership; leave users.isActive alone since
+    // the employee can still be a job_seeker / employee elsewhere.
+    await db.update(userCompanyRoleAssociations)
+      .set({ isActive: false, updatedAt: new Date() } as any)
+      .where(eq(userCompanyRoleAssociations.id, targetEmployment.id));
+    // Reconcile seat billing — fewer active employees, fewer seats charged.
+    // Imported dynamically to avoid a service-layer cycle (workforce → account
+    // is the natural direction; the reverse import would be).
+    const { recalculateWorkforceSeats } = await import("../workforce/index.js");
+    await recalculateWorkforceSeats(targetEmployment.companyId, db);
+    return;
+  }
 }
 
 export async function getAvailableAccounts(currentUserId: string, currentUserRole: string,
@@ -358,6 +400,13 @@ export async function acceptInvitation(invitationId: string,
         role: invite.role as string,
         isActive: true,
       } as any);
+    }
+    // Reconcile workforce seat billing whenever the accepted role is an
+    // employee — that's the workforce-billable role per #1349 + #1409.
+    // Dynamic import to keep the service-layer dependency graph acyclic.
+    if (String(invite.role).toLowerCase() === "employee") {
+      const { recalculateWorkforceSeats } = await import("../workforce/index.js");
+      await recalculateWorkforceSeats(invite.companyId, db);
     }
   }
 

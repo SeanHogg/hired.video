@@ -159,7 +159,7 @@ export default function PitchDecksList() {
   return (
     <AppShell bgClassName="bg-background">
         <div>
-          <div className="max-w-6xl mx-auto p-6">
+          <div className="p-6">
             <PageHeader tabs={peopleTabs} activeTabKey="pitch-decks" />
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">

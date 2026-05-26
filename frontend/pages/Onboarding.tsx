@@ -218,7 +218,7 @@ export default function Onboarding() {
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex flex-col">
       {/* Header - Fixed */}
       <div className="flex-shrink-0 container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold">Welcome to hired.video!</h1>
@@ -235,7 +235,7 @@ export default function Onboarding() {
 
       {/* Main Content - Flexible */}
       <div className="flex-1 container mx-auto px-4 pb-6 flex flex-col min-h-0">
-        <div className="max-w-4xl mx-auto flex flex-col h-full gap-6">
+        <div className="flex flex-col h-full gap-6">
           {/* Progress Overview - Fixed */}
           <Card className="flex-shrink-0">
             <CardHeader>
@@ -340,7 +340,7 @@ export default function Onboarding() {
 
       {/* Navigation - Fixed at bottom */}
       <div className="flex-shrink-0 container mx-auto px-4 py-4 border-t bg-background/80 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <Button
             variant="outline"
             onClick={handlePrevious}

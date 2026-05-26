@@ -220,7 +220,7 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
   return (
     <AppShell bgClassName="bg-background">
 <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-          <div className="max-w-6xl mx-auto p-6">
+          <div className="p-6">
             <div className="mb-8">
               <Link
                 to="/pricing"

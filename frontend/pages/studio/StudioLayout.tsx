@@ -146,7 +146,7 @@ function Landing() {
 
   return (
     <>
-      <div className="max-w-6xl mx-auto px-4 py-16">
+      <div className="px-4 py-16">
         {/* Hero — kind-agnostic copy. The studio ships multiple media
             kinds (video / podcast / voice / animation / game / comic);
             the hero used to hardcode "Video Studio" + "Video Resume"
@@ -462,7 +462,7 @@ function Landing() {
       />
 
       {/* Final CTA */}
-      <div className="max-w-4xl mx-auto px-4 pb-16">
+      <div className="px-4 pb-16">
         <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
           <h3 className="text-3xl font-bold mb-4">
             Ready to Make Something?

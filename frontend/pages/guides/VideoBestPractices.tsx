@@ -27,7 +27,7 @@ export default function VideoBestPractices() {
   return (
     <AppShell bgClassName="bg-background">
 <div className="p-6">
-          <div className="max-w-4xl mx-auto space-y-8">
+          <div className="space-y-8">
             <Link to="/help" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               <ArrowLeft className="h-4 w-4" /> Back to Help & Support
             </Link>

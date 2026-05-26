@@ -110,7 +110,7 @@ export default function About() {
 <div>
           {/* Hero Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-            <div className="max-w-6xl mx-auto text-center">
+            <div className="text-center">
               <div className="inline-flex items-center space-x-2 mb-6">
                 <div className="relative">
                   <Video className="h-12 w-12 text-primary" />
@@ -149,7 +149,7 @@ export default function About() {
 
           {/* Stats Section */}
           <section className="py-16 px-4 sm:px-6 lg:px-8 border-b border-border">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                 {stats.map((stat, index) => (
                   <div key={index} className="text-center">
@@ -167,7 +167,7 @@ export default function About() {
 
           {/* Mission Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                 <div>
                   <h2 className="text-3xl md:text-4xl font-bold mb-6">
@@ -209,7 +209,7 @@ export default function About() {
 
           {/* Values Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/20">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="text-center mb-16">
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
                   {t("marketing.about.valuesTitle")}
@@ -240,7 +240,7 @@ export default function About() {
 
           {/* Team Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <div className="text-center mb-16">
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
                   {t("marketing.about.teamTitle")}
@@ -259,7 +259,7 @@ export default function About() {
 
           {/* Technology Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/20">
-            <div className="max-w-6xl mx-auto text-center">
+            <div className="text-center">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
                 {t("marketing.about.techTitle")}
               </h2>
@@ -325,7 +325,7 @@ export default function About() {
 
           {/* CTA Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-4xl mx-auto text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-12 rounded-2xl">
+            <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-12 rounded-2xl">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
                 {t("marketing.about.ctaTitle")}
               </h2>

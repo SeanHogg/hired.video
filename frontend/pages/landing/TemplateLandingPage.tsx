@@ -52,7 +52,7 @@ export default function TemplateLandingPage(): JSX.Element {
       <div>
         {/* Hero */}
         <section className="px-4 py-16 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-          <div className="mx-auto max-w-5xl">
+          <div>
             <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
               <Link to="/studio" className="hover:underline">Studio</Link>
               <span>·</span>
@@ -73,7 +73,7 @@ export default function TemplateLandingPage(): JSX.Element {
 
         {/* Best for + Output panel — side-by-side on desktop */}
         <section className="px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
             {audienceDefs.length > 0 && (
               <Card>
                 <CardContent className="space-y-3 p-6">
@@ -102,7 +102,7 @@ export default function TemplateLandingPage(): JSX.Element {
 
         {/* How it works */}
         <section className="bg-muted/30 px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl">
+          <div>
             <h2 className="mb-8 text-center text-2xl font-bold">How it works</h2>
             <div className="grid gap-6 md:grid-cols-3">
               <Step
@@ -127,7 +127,7 @@ export default function TemplateLandingPage(): JSX.Element {
         {/* Related templates */}
         {related.length > 0 && (
           <section className="px-4 py-12 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">
+            <div>
               <h2 className="mb-6 text-2xl font-bold">
                 More for {audienceDefs[0]?.label.toLowerCase() ?? "you"}
               </h2>
@@ -142,7 +142,7 @@ export default function TemplateLandingPage(): JSX.Element {
 
         {/* Final CTA */}
         <section className="bg-gradient-to-br from-brand-purple/5 to-brand-blue/5 px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
+          <div className="text-center">
             <h2 className="mb-4 text-3xl font-bold">Make your {template.label.toLowerCase()}</h2>
             <p className="mb-6 text-lg text-muted-foreground">{template.desc}</p>
             <StudioOpenCTA templateId={template.id} />

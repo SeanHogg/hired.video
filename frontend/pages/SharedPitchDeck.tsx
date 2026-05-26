@@ -169,7 +169,7 @@ export default function SharedPitchDeck() {
     return (
       <AppShell variant="public">
         <div className="flex items-center justify-center px-6 py-16">
-          <div className="max-w-md text-center space-y-3">
+          <div className="text-center space-y-3">
             <ShieldCheck className="w-12 h-12 mx-auto text-muted-foreground" />
             <h1 className="text-2xl font-bold">{t("headings.deckUnavailable")}</h1>
             <p className="text-sm text-muted-foreground">
@@ -193,7 +193,7 @@ export default function SharedPitchDeck() {
           background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
         }}
       >
-        <div className="max-w-5xl mx-auto px-6 py-6 flex items-center justify-between gap-4">
+        <div className="px-6 py-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {brand?.logoUrl && (
               <Avatar className="w-12 h-12 border-2 border-white/40 bg-white/10">
@@ -242,7 +242,7 @@ export default function SharedPitchDeck() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="px-6 py-8">
         {/* Deck title + slide meta */}
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>

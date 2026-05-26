@@ -22,6 +22,7 @@ import { useSignalR } from "@/hooks/use-signalr";
 import { apiClient } from "@/lib/api-client";
 import { chatBus } from "@/lib/chat-bus";
 import { userService } from "@/lib/services/user-service";
+import { consumeInboxSeed } from "@/lib/inbox-seed";
 import type { ConversationListItem } from "@/types/communication";
 import type { Connection } from "@/lib/services/user-service";
 import type { Notification as LiveNotification } from "@/lib/services/signalr-service";
@@ -255,7 +256,29 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
       // chip or unread/archived flag flips the dep and the gated hook
       // re-runs the fetcher.
       deps: [filterQuery],
+      // Unfiltered mount inherits the /api/bootstrap payload (#1368) so
+      // the hub paints from memory and the first /api/inbox round-trip
+      // is skipped. Filtered fetches must NOT use the seed — the chip
+      // selection wouldn't match the unfiltered aggregate.
+      seedFn:
+        filterQuery === ""
+          ? () => (consumeInboxSeed() as InboxResponse | null) ?? null
+          : undefined,
     });
+
+  // Late-arriving hydrate event: if bootstrap dispatches `inbox:hydrate`
+  // AFTER this hook mounted (e.g. cross-tab sign-in propagates), adopt
+  // the new payload without waiting for the next poll. Only honoured for
+  // the unfiltered mount — filtered consumers ignore it.
+  useEffect(() => {
+    if (filterQuery !== "") return undefined;
+    const onHydrate = (event: Event) => {
+      const detail = (event as CustomEvent<InboxResponse>).detail;
+      if (detail) setInbox(detail);
+    };
+    window.addEventListener("inbox:hydrate", onHydrate);
+    return () => window.removeEventListener("inbox:hydrate", onHydrate);
+  }, [filterQuery, setInbox]);
 
   // Pages 2+ live outside the gated cache so polling doesn't wipe them.
   // The dedup pass in the items memo keeps a row from appearing twice

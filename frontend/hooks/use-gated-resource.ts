@@ -21,6 +21,13 @@ export interface UseGatedResourceOptions<T> {
   /** Extra deps that should trigger a re-fetch. The api-ready predicate is
    *  always part of the dependency set; callers don't need to add it. */
   deps?: ReadonlyArray<unknown>;
+  /** Optional seed function. If it returns non-null on mount, that value
+   *  becomes the initial `data` AND the first fetch is skipped (subsequent
+   *  poll ticks still fire normally). Use this when an upstream aggregate
+   *  (e.g. /api/bootstrap) already hydrated what this hook would fetch —
+   *  collapses the second round-trip without losing the polling cadence.
+   *  Re-evaluated on api-ready transitions, not on every render. */
+  seedFn?: () => T | null;
 }
 
 export interface UseGatedResourceResult<T> {
@@ -57,6 +64,7 @@ export function useGatedResource<T>({
   defaults,
   pollMs,
   deps = [],
+  seedFn,
 }: UseGatedResourceOptions<T>): UseGatedResourceResult<T> {
   const apiReady = useApiReady();
   const [data, setData] = useState<T>(defaults);
@@ -110,7 +118,16 @@ export function useGatedResource<T>({
       setIsLoading(false);
       return;
     }
-    void refresh();
+    // Seed-skip: if an upstream aggregate already hydrated this resource,
+    // adopt the seed and skip the initial fetch. Subsequent poll ticks
+    // still fire normally so freshness recovers within `pollMs`. Caller
+    // is responsible for TTL'ing the seed (see lib/inbox-seed.ts).
+    const seed = seedFn?.() ?? null;
+    if (seed !== null) {
+      setData(seed);
+    } else {
+      void refresh();
+    }
     if (!(pollMs && pollMs > 0)) return undefined;
     const tick = () => {
       // Hidden tabs don't need fresh data; browsers throttle to ~1/min

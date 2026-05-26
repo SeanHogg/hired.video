@@ -155,7 +155,7 @@ export default function CompanyDetail() {
       <AppShell bgClassName="bg-background">
 <div>
             <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
-              <div className="max-w-7xl mx-auto">
+              <div>
                 <div className="animate-pulse">
                   <div className="h-8 bg-gray-200 rounded w-1/4 mb-4" />
                   <div className="h-64 bg-gray-200 rounded mb-6" />
@@ -180,7 +180,7 @@ export default function CompanyDetail() {
     return (
       <AppShell bgClassName="bg-background">
 <div className="p-6">
-            <div className="max-w-4xl mx-auto text-center">
+            <div className="text-center">
               <h1 className="text-2xl font-bold mb-4">Company Not Found</h1>
               <p className="text-muted-foreground mb-6">
                 The company you're looking for doesn't exist or has been
@@ -227,7 +227,7 @@ export default function CompanyDetail() {
 
   return (
     <AppShell bgClassName="bg-background">
-        <div className="max-w-6xl mx-auto p-4 md:p-6">
+        <div className="p-4 md:p-6">
           {/* Hub-level tab strip — keeps the Companies / Following /
               My Companies / Team context visible across detail pages. */}
           <EntityHubTabStrip entity="company" />

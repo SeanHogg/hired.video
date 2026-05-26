@@ -56,7 +56,7 @@ export default function ResumeGuidePage() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="max-w-3xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <div className="px-4 py-12 sm:px-6 lg:px-8">
 
           {/* Breadcrumb */}
           <nav className="text-xs text-muted-foreground mb-6 flex items-center gap-1.5">

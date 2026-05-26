@@ -2,7 +2,7 @@
 // each stage backed by a scorecard template).
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Save, Archive, GripVertical } from "lucide-react";
+import { Plus, Trash2, Save, Archive, GripVertical, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +22,51 @@ import {
   type ScorecardTemplate,
   type StageInput,
 } from "@/lib/services/scorecards-service";
+import {
+  BLIND_REVIEW_MODES,
+  BLIND_REVIEW_MODE_META,
+  parseBlindReviewMode,
+  type BlindReviewMode,
+} from "@/lib/scorecards/blind-review";
+
+// Shared blind-review mode picker — used by both the new-kit form and the
+// kit detail editor. Self-renders the help text from the canonical
+// BLIND_REVIEW_MODE_META so the two callsites never drift (#1380, DRY).
+function BlindReviewModeField({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: BlindReviewMode;
+  onChange: (v: BlindReviewMode) => void;
+  disabled?: boolean;
+}) {
+  const meta = BLIND_REVIEW_MODE_META[value];
+  return (
+    <div>
+      <Label className="flex items-center gap-1.5">
+        <EyeOff className="h-3.5 w-3.5" /> Blind-review policy
+      </Label>
+      <Select
+        value={value}
+        onValueChange={(v) => onChange(parseBlindReviewMode(v))}
+        disabled={disabled}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {BLIND_REVIEW_MODES.map((m) => (
+            <SelectItem key={m} value={m}>
+              {BLIND_REVIEW_MODE_META[m].label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground mt-1">{meta.description}</p>
+    </div>
+  );
+}
 
 interface Props {
   companyId: string;
@@ -161,6 +206,7 @@ function NewKitForm({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [blindReviewMode, setBlindReviewMode] = useState<BlindReviewMode>("off");
   const [stages, setStages] = useState<StageInput[]>([
     { name: "Recruiter screen", durationMinutes: 30, displayOrder: 0 },
     { name: "Hiring manager", durationMinutes: 45, displayOrder: 1 },
@@ -185,6 +231,7 @@ function NewKitForm({
         jobId,
         name: name.trim(),
         description: description.trim() || undefined,
+        blindReviewMode,
         stages: cleaned,
       });
       onCreated(kit);
@@ -221,6 +268,7 @@ function NewKitForm({
             rows={2}
           />
         </div>
+        <BlindReviewModeField value={blindReviewMode} onChange={setBlindReviewMode} />
         <div>
           <div className="flex items-center justify-between mb-2">
             <Label>Stages</Label>
@@ -320,6 +368,7 @@ function KitDetailEditor({
       const updated = await scorecardsService.updateKit(k.id, {
         name: k.name,
         description: k.description,
+        blindReviewMode: k.blindReviewMode,
       });
       setK({ ...updated, stages: k.stages });
     } finally {
@@ -376,6 +425,10 @@ function KitDetailEditor({
               rows={2}
             />
           </div>
+          <BlindReviewModeField
+            value={parseBlindReviewMode(k.blindReviewMode)}
+            onChange={(v) => setK({ ...k, blindReviewMode: v })}
+          />
           <div className="flex justify-between gap-2">
             <Button variant="outline" onClick={archive}>
               <Archive className="mr-2 h-4 w-4" /> Archive

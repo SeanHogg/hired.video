@@ -132,7 +132,7 @@ export default function ForRecruiters() {
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
 <main>
-          <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="px-4 py-16">
             {/* Hero */}
             <div className="text-center mb-16">
               <div className="inline-flex items-center space-x-2 mb-6">
@@ -322,7 +322,7 @@ export default function ForRecruiters() {
           />
 
           {/* Final CTA */}
-          <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="px-4 py-16">
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
               <h3 className="text-3xl font-bold mb-4">
                 {t("marketing.recruiters.ctaTitle")}

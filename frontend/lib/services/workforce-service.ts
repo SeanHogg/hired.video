@@ -58,47 +58,52 @@ export interface RosterRow {
   last7DaysHours: string;
 }
 
+async function unwrap<T>(p: Promise<{ data: T }>): Promise<T> {
+  const r = await p;
+  return r.data;
+}
+
 class WorkforceService {
   punchIn(args: { taskId?: string | null; notes?: string | null; billable?: boolean } = {}) {
-    return apiClient.post<TaskTimeEntry>("/api/workforce/punch-in", args);
+    return unwrap(apiClient.post<TaskTimeEntry>("/api/workforce/punch-in", args));
   }
 
   punchOut() {
-    return apiClient.post<TaskTimeEntry | null>("/api/workforce/punch-out", {});
+    return unwrap(apiClient.post<TaskTimeEntry | null>("/api/workforce/punch-out", {}));
   }
 
   getActive() {
-    return apiClient.get<TaskTimeEntry | null>("/api/workforce/active");
+    return unwrap(apiClient.get<TaskTimeEntry | null>("/api/workforce/active"));
   }
 
   getWeek(periodStart: string) {
-    return apiClient.get<{ entries: TaskTimeEntry[] }>(
+    return unwrap(apiClient.get<{ entries: TaskTimeEntry[] }>(
       `/api/workforce/week?periodStart=${encodeURIComponent(periodStart)}`,
-    );
+    ));
   }
 
   submitTimesheet(periodStart: string) {
-    return apiClient.post<Timesheet>("/api/workforce/timesheets/submit", { periodStart });
+    return unwrap(apiClient.post<Timesheet>("/api/workforce/timesheets/submit", { periodStart }));
   }
 
   approveTimesheet(id: string) {
-    return apiClient.post<Timesheet>(`/api/workforce/timesheets/${id}/approve`, {});
+    return unwrap(apiClient.post<Timesheet>(`/api/workforce/timesheets/${id}/approve`, {}));
   }
 
   rejectTimesheet(id: string, reason: string) {
-    return apiClient.post<Timesheet>(`/api/workforce/timesheets/${id}/reject`, { reason });
+    return unwrap(apiClient.post<Timesheet>(`/api/workforce/timesheets/${id}/reject`, { reason }));
   }
 
   listMyTimesheets() {
-    return apiClient.get<{ timesheets: Timesheet[] }>("/api/workforce/timesheets");
+    return unwrap(apiClient.get<{ timesheets: Timesheet[] }>("/api/workforce/timesheets"));
   }
 
   getApprovalQueue() {
-    return apiClient.get<{ queue: ApprovalQueueRow[] }>("/api/workforce/approval-queue");
+    return unwrap(apiClient.get<{ queue: ApprovalQueueRow[] }>("/api/workforce/approval-queue"));
   }
 
   getRoster() {
-    return apiClient.get<{ roster: RosterRow[] }>("/api/workforce/roster");
+    return unwrap(apiClient.get<{ roster: RosterRow[] }>("/api/workforce/roster"));
   }
 }
 

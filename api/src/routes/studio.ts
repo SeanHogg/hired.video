@@ -14,6 +14,7 @@ import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-co
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
 import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
+import { SCENE_TYPES, type SceneType } from "../../../shared/scene-types.js";
 import { MEDIA_KINDS } from "../../../shared/media-kinds.js";
 import { isUuid } from "../../../shared/value-types.js";
 import {
@@ -136,14 +137,9 @@ async function ensureUniqueProjectSlug(
 
 export const studioRoutes = new Hono<AppEnv>();
 
-// All scene types — covers both job-seeker (resume) and advertising use cases
-const SCENE_TYPES = [
-  "intro", "achievement", "skills", "closing",
-  // Advertising / promotional scene types
-  "job-details", "company-culture", "cta", "testimonial",
-  "product-feature", "brand-story", "requirements", "benefits",
-] as const;
-type SceneType = typeof SCENE_TYPES[number];
+// SCENE_TYPES + SceneType now live in shared/scene-types.ts (#1430) so the
+// frontend Zod schemas in studio-service.ts stay in lock-step with the api
+// union. Imported above.
 
 const StoryboardSceneSchema = z.object({
   duration: z.number(),
@@ -552,10 +548,22 @@ function buildStudioSystemPrompt(
   const ctaBlock = ctaUrl ? `\n- For the "cta" scene: ctaUrl: "${ctaUrl}", ctaText: "${ctaText ?? "Learn More"}"` : "";
   const typeInterface = `"intro"|"achievement"|"skills"|"closing"|"job-details"|"company-culture"|"cta"|"testimonial"|"product-feature"|"brand-story"|"requirements"|"benefits"`;
 
+  // Course-lesson scene shapes (#160 / #1412) — pedagogy-specific scene
+  // types layered on top of the existing union. The mock storyboard
+  // already uses these literal strings so keeping them in the type union
+  // means the LLM output passes Zod validation against VideoScriptSchema.
+  const lessonTypeInterface = `"intro"|"concept"|"worked-example"|"knowledge-check"|"summary"|"cta"`;
+
   const baseInterface = `TypeScript interface:
 interface VideoScript {
   video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; purpose: string; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
   scenes: Array<{ id: string; start: number; duration: number; type: ${typeInterface}; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[]; ctaUrl?: string; ctaText?: string }>
+}`;
+
+  const lessonInterface = `TypeScript interface:
+interface VideoScript {
+  video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; purpose: "course_lesson"; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
+  scenes: Array<{ id: string; start: number; duration: number; type: ${lessonTypeInterface}; title?: string; subtitle?: string; text?: string; items?: string[]; ctaUrl?: string; ctaText?: string }>
 }`;
 
   if (purpose === "basic") {
@@ -686,6 +694,45 @@ SCENE CONTENT — extract from the bio/resume provided:
 5. "cta" scene: title = "Let's Connect", text = a warm invitation to follow or reach out, subtitle = LinkedIn/email or "Connect on LinkedIn"
 
 ${baseInterface}${jobBlock}`;
+  }
+
+  if (purpose === "course_lesson") {
+    // #1412 — pedagogy-specific scene shapes: learning-objective intro →
+    // concept → worked-example → knowledge-check → summary. Matches the
+    // mock storyboard scaffold in `course_lesson` of `scenesByPurpose`
+    // above, so the editor renders the LLM output identically whether
+    // we short-circuited or called the model.
+    return `You are an instructional designer producing micro-learning lessons. Produce a JSON VideoScript for a ${targetDuration}-second course lesson video.
+
+RULES:
+- Exactly 5 scenes in order: intro → concept → worked-example → knowledge-check → summary
+- Scene durations must sum to exactly ${targetDuration}s. Divide sensibly (e.g. for 180s: 25/40/55/30/30)
+- motion style: ${motion}
+- Tone: instructive, concrete, scoped to ONE objective. No marketing hype, no CTAs (this is training, not promo).
+- Return ONLY valid JSON. No markdown fences, no explanation.
+
+SCENE CONTENT — distilled from the lesson brief the user wrote below:
+1. "intro" scene:
+   - title: a short lesson title (max 8 words)
+   - subtitle: "Learning Objectives"
+   - text: 1–2 sentences in "By the end of this lesson, you will be able to…" form. State exactly ONE primary objective.
+2. "concept" scene:
+   - title: "Core Concept" (or the concept's name)
+   - items: 3–4 bullets defining the concept (definition · when it applies · failure mode · contrast with a related concept)
+3. "worked-example" scene:
+   - title: "Worked Example"
+   - text: a concrete scenario in 2–4 sentences narrated as a step-by-step solution path. Show the work; do NOT just state the answer.
+4. "knowledge-check" scene:
+   - title: "Knowledge Check"
+   - items: 3 short check-yourself prompts the learner can answer in their head (one recall, one application, one transfer)
+5. "summary" scene:
+   - title: "Summary"
+   - text: 1–2 sentence recap restating the objective, what they should now be able to do, and one suggested next step.
+
+${lessonInterface}
+
+Lesson Brief:
+`;
   }
 
   // Default: resume
@@ -879,6 +926,7 @@ studioRoutes.post("/storyboard", async (c) => {
       : purpose === "job_ad" ? "Create a compelling job advertisement video"
       : purpose === "company_promo" ? "Create an engaging company promotional video"
       : purpose === "recruiter_brand" ? "Create a recruiter personal brand video"
+      : purpose === "course_lesson" ? "Create a short course lesson teaching one concept end-to-end"
       : "Create a product launch video";
 
     try {

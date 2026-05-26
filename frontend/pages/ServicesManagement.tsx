@@ -283,7 +283,7 @@ export default function ServicesManagement() {
   if (!isAuthenticated || !user) {
     return (
       <AppShell>
-        <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="px-4 py-16">
               {/* Hero */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -424,7 +424,7 @@ export default function ServicesManagement() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
+      <main className="p-4 md:p-8 w-full">
 
           <ServicesNav />
 

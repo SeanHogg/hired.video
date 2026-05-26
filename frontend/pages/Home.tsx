@@ -146,7 +146,7 @@ function HomeMarketingPage() {
   return (
     <AppShell>
       <main>
-        <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="px-4 py-16">
             {/* Hero */}
             <div className="text-center mb-16">
               <div className="inline-flex items-center space-x-2 mb-6">
@@ -333,7 +333,7 @@ function HomeMarketingPage() {
           />
 
           {/* Final CTA */}
-          <div className="max-w-4xl mx-auto px-4 py-16">
+          <div className="px-4 py-16">
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
               <h3 className="text-3xl font-bold mb-4">
                 {t("marketing.home.ctaTitle")}
@@ -504,7 +504,7 @@ export default function Home() {
     <AppShell bgClassName="bg-muted/30">
         <div className="pb-20">
           {/* ── Feed section ── */}
-          <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="px-4 py-6">
             <div className="mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <MessageSquare className="h-6 w-6 text-primary" />

@@ -167,7 +167,7 @@ export default function JobDetail() {
     return (
       <AppShell bgClassName="bg-background">
 <div className="p-6">
-            <div className="max-w-4xl mx-auto">
+            <div>
               <Card>
                 <CardHeader>
                   <h1 className="text-2xl font-bold">{t("status.loadingJob")}</h1>
@@ -187,7 +187,7 @@ export default function JobDetail() {
     return (
       <AppShell bgClassName="bg-background">
 <div className="p-6">
-            <div className="max-w-4xl mx-auto text-center">
+            <div className="text-center">
               <h1 className="text-2xl font-bold mb-4">{t("headings.jobNotFound")}</h1>
               <p className="text-muted-foreground mb-6">
                 {t("messages.jobNotFoundDesc")}
@@ -253,7 +253,7 @@ export default function JobDetail() {
           {!isAuthenticated && (
             <AuthOverlay contentType="job" title={job?.data.title} />
           )}
-          <div className="max-w-6xl mx-auto p-4 md:p-6">
+          <div className="p-4 md:p-6">
             {/* Hub-level tab strip — keeps the Jobs / Saved / Applications
                 / Alerts / My Postings / Candidates context visible. */}
             {isAuthenticated && <EntityHubTabStrip entity="job" />}

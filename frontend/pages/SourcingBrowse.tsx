@@ -108,7 +108,7 @@ export default function SourcingBrowse() {
   return (
     <AppShell bgClassName="bg-background">
       <div className="p-6">
-          <div className="max-w-5xl mx-auto">
+          <div>
             <div className="mb-6">
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <Briefcase className="w-7 h-7 text-primary" />

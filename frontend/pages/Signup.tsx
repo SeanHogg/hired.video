@@ -210,7 +210,7 @@ export default function Signup() {
   return (
     <AppShell>
       <div className="flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
+          <div className="w-full md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
             <RegisterGate>
             <Card>

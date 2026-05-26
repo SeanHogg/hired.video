@@ -49,7 +49,7 @@ export default function Index() {
             <div className="h-[400px] w-full max-w-[800px] rounded-full bg-primary/5 blur-3xl" />
           </div>
 
-          <div className="relative max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-10 items-center">
+          <div className="relative grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-10 items-center">
             <div className="lg:col-span-3 min-w-0 text-center lg:text-left">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
                 {t("marketing.index.heroTitle1")} <span className="text-primary">{t("marketing.index.heroTitle2")}</span>
@@ -113,14 +113,14 @@ export default function Index() {
 
         {/* Resume Templates Section */}
         <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
-          <div className="max-w-7xl mx-auto">
+          <div>
             <TemplateGallery />
           </div>
         </section>
 
         {/* Job Posting Templates Section */}
         <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
-          <div className="max-w-7xl mx-auto">
+          <div>
             <JobTemplateGallery />
           </div>
         </section>
@@ -128,7 +128,7 @@ export default function Index() {
         {/* Public Video Resumes Section */}
         {publicVideos.length > 0 && (
           <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
-            <div className="max-w-7xl mx-auto">
+            <div>
               <div className="flex items-center gap-2 mb-6">
                 <Play className="w-5 h-5 text-primary" />
                 <h2 className="text-lg sm:text-xl font-semibold text-foreground">

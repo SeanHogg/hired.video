@@ -135,7 +135,7 @@ export default function ServiceInquiries() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="px-4 pb-4 md:px-8 md:pb-8 max-w-4xl mx-auto w-full">
+      <main className="px-4 pb-4 md:px-8 md:pb-8 w-full">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <Link to="/services">

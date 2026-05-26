@@ -99,7 +99,7 @@ export default function Contact() {
 <div>
           {/* Hero Section */}
           <section className="bg-gradient-to-br from-primary/5 via-background to-secondary/5 py-20">
-            <div className="max-w-6xl mx-auto px-6">
+            <div className="px-6">
               <div className="text-center max-w-3xl mx-auto">
                 <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                   Get in Touch
@@ -115,7 +115,7 @@ export default function Contact() {
 
           {/* Contact Information */}
           <section className="py-16">
-            <div className="max-w-6xl mx-auto px-6">
+            <div className="px-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                 {contactInfo.map((info, index) => (
                   <Card
@@ -162,7 +162,7 @@ export default function Contact() {
 
           {/* Contact Form Section */}
           <section id="contact-form" className="py-16 bg-muted/30">
-            <div className="max-w-4xl mx-auto px-6">
+            <div className="px-6">
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-4">Send Us a Message</h2>
                 <p className="text-lg text-muted-foreground">

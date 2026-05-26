@@ -57,7 +57,7 @@ type PostMode = "text" | "video" | "photo" | "article";
 function FeedMarketingPage() {
   return (
     <AppShell>
-      <div className="max-w-6xl mx-auto px-4 py-16">
+      <div className="px-4 py-16">
             <div className="text-center mb-16">
               <div className="inline-flex items-center space-x-2 mb-6">
                 <div className="relative">
@@ -406,7 +406,7 @@ export default function Feed() {
         <div className="pb-20">
           {/* Search bar — full width strip */}
           <div className="bg-background border-b sticky top-16 z-10">
-            <div className="max-w-6xl mx-auto px-4 py-2">
+            <div className="px-4 py-2">
               <form onSubmit={handleSearch} className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -420,7 +420,7 @@ export default function Feed() {
           </div>
 
           {/* 3-column layout */}
-          <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="px-4 py-6">
             <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
 
               {/* LEFT — Profile card */}

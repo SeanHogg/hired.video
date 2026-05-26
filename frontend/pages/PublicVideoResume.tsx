@@ -118,7 +118,7 @@ export default function PublicVideoResume() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <main className="px-4 py-10 space-y-8">
         {/* Owner info */}
         <div className="flex items-center gap-4">
           {ready.ownerAvatar ? (

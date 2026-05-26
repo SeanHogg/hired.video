@@ -34,6 +34,8 @@ const indeedConnector = defaultVendor({
   category: "job-board",
   description:
     "Indeed Resume mirrors most job-board fields — paste the rendered blocks straight in.",
+  // profile.indeed.com is the modern editor. The extension's parser now
+  // matches this host AND the legacy /resumes/* URL — fixes gap #1414.
   editProfileUrl: "https://profile.indeed.com/",
   supportsExtensionExtract: true,
   supportsExtensionWrite: false,
@@ -47,7 +49,7 @@ const glassdoorConnector = defaultVendor({
   description:
     "Sync your work history and skills to your Glassdoor profile.",
   editProfileUrl: "https://www.glassdoor.com/member/profile/index.htm",
-  supportsExtensionExtract: false,
+  supportsExtensionExtract: true,
   supportsExtensionWrite: false,
 });
 
@@ -59,7 +61,7 @@ const ziprecruiterConnector = defaultVendor({
   description:
     "Push your master resume into your ZipRecruiter profile and resume builder.",
   editProfileUrl: "https://www.ziprecruiter.com/profile",
-  supportsExtensionExtract: false,
+  supportsExtensionExtract: true,
   supportsExtensionWrite: false,
 });
 
@@ -70,7 +72,10 @@ const wellfoundConnector = defaultVendor({
   category: "startup",
   description:
     "Wellfound (formerly AngelList Talent) — keep your startup-jobs profile aligned with your master.",
-  editProfileUrl: "https://wellfound.com/jobs",
+  // /profile is Wellfound's stable redirect to the signed-in user's
+  // profile editor. The previous `/jobs` link pointed at the candidate
+  // jobs board, which has nothing to do with syncing. Fixes gap #1415.
+  editProfileUrl: "https://wellfound.com/profile",
   supportsExtensionExtract: false,
   supportsExtensionWrite: false,
 });
@@ -95,7 +100,7 @@ const monsterConnector = defaultVendor({
   description:
     "Update your Monster profile from your hired.video master.",
   editProfileUrl: "https://www.monster.com/profile",
-  supportsExtensionExtract: false,
+  supportsExtensionExtract: true,
   supportsExtensionWrite: false,
 });
 

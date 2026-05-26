@@ -50,7 +50,7 @@ export default function AudienceLandingPage(): JSX.Element {
       <div>
         {/* Hero */}
         <section className="px-4 py-20 text-center sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-          <div className="mx-auto max-w-4xl">
+          <div>
             <Badge variant="outline" className="mb-4">
               For {audience.label.toLowerCase()}
             </Badge>
@@ -63,7 +63,7 @@ export default function AudienceLandingPage(): JSX.Element {
         {/* Kind coverage strip — only renders when multiple kinds are present */}
         {kindsCovered.length > 1 && (
           <section className="border-y bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <span className="text-sm text-muted-foreground">You can build:</span>
               {kindsCovered.map((kind) => (
                 <Badge key={kind} variant="secondary" className="text-sm">
@@ -76,7 +76,7 @@ export default function AudienceLandingPage(): JSX.Element {
 
         {/* Templates grid — grouped by mediaKind */}
         <section className="px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl space-y-12">
+          <div className="space-y-12">
             {kindsCovered.map((kind) => {
               const inKind = templates.filter((t) => t.mediaKind === kind);
               return (
@@ -100,7 +100,7 @@ export default function AudienceLandingPage(): JSX.Element {
 
         {/* Final CTA */}
         <section className="bg-gradient-to-br from-brand-purple/5 to-brand-blue/5 px-4 py-16 text-center sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
+          <div>
             <h2 className="mb-4 text-3xl font-bold">Make something great</h2>
             <p className="mb-6 text-lg text-muted-foreground">
               {templates.length} template{templates.length === 1 ? "" : "s"} built for {audience.label.toLowerCase()}. Pick one,

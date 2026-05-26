@@ -268,7 +268,6 @@ export default function SentimentAnalysis() {
           "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
       }}
       breadcrumbLabel="Sentiment Analysis"
-      containerClassName="max-w-6xl mx-auto space-y-8"
     >
             {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -547,7 +546,7 @@ export default function SentimentAnalysis() {
             </div>
 
             {/* SEO Content Section */}
-            <div className="max-w-4xl mx-auto space-y-12 mt-16">
+            <div className="space-y-12 mt-16">
               {/* What is Resume Sentiment Analysis */}
               <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">

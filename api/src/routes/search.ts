@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
@@ -10,6 +10,7 @@ import { servicesProcessor } from "../domains/services-processing/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
 import type { ContentLocationKind, LocationFilter } from "../../../shared/content-locations.js";
+import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents } = schema;
 
@@ -350,6 +351,9 @@ searchRoutes.get("/public", async (c) => {
   const peopleVisibilityClause = and(
     eq(userProfiles.profileVisibility, "public"),
     eq(users.emailVerified, true),
+    // Exclude workforce members + platform staff from candidate search.
+    // Same SSoT used by /api/users/public (#1407, DRY rule).
+    notInArray(users.role, NON_CANDIDATE_ROLES as unknown as string[]),
   );
   const peopleWhereParts: any[] = [peopleVisibilityClause];
   if (search) {

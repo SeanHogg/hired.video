@@ -384,7 +384,7 @@ function Section({ section }: { section: SectionDef }) {
   const Icon = section.icon;
   return (
     <section id={section.id} className="py-12 px-4 sm:px-6 lg:px-8 scroll-mt-24">
-      <div className="max-w-6xl mx-auto">
+      <div>
         <div className="flex items-center gap-3 mb-2">
           <Icon className="h-6 w-6 text-primary" />
           <h2 className="text-2xl md:text-3xl font-bold">{section.title}</h2>
@@ -418,7 +418,7 @@ export default function Security() {
 <div>
           {/* Hero */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-            <div className="max-w-5xl mx-auto text-center">
+            <div className="text-center">
               <div className="inline-flex items-center gap-2 mb-6">
                 <Shield className="h-12 w-12 text-primary" />
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
@@ -465,7 +465,7 @@ export default function Security() {
 
           {/* Standards strip */}
           <section className="py-12 px-4 sm:px-6 lg:px-8 border-y">
-            <div className="max-w-6xl mx-auto">
+            <div>
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-6 text-center">
                 Standards & frameworks we align to
               </h2>
@@ -483,7 +483,7 @@ export default function Security() {
 
           {/* Quick nav */}
           <section className="py-8 px-4 sm:px-6 lg:px-8 border-b">
-            <div className="max-w-6xl mx-auto flex flex-wrap gap-2 justify-center">
+            <div className="flex flex-wrap gap-2 justify-center">
               {SECTIONS.map((s) => (
                 <a
                   key={s.id}
@@ -502,7 +502,7 @@ export default function Security() {
 
           {/* Disclosure */}
           <section className="py-16 px-4 sm:px-6 lg:px-8 bg-muted/30 border-t">
-            <div className="max-w-4xl mx-auto">
+            <div>
               <div className="flex items-center gap-3 mb-4">
                 <AlertTriangle className="h-6 w-6 text-primary" />
                 <h2 className="text-2xl font-bold">Coordinated disclosure</h2>

@@ -20,6 +20,7 @@ import { templateRoutes, attributeRoutes } from "./scorecards/templates.js";
 import { kitRoutes, stageRoutes } from "./scorecards/kits.js";
 import { submissionRoutes, debriefRoutes } from "./scorecards/submissions.js";
 import { decisionRoutes } from "./scorecards/decisions.js";
+import { competencyRoutes } from "./scorecards/competencies.js";
 
 const buildService = () => new ScorecardsService(defaultScorecardsServiceDeps());
 
@@ -32,5 +33,6 @@ scorecardRoutes.route("/stages", stageRoutes(buildService));
 scorecardRoutes.route("/submissions", submissionRoutes(buildService));
 scorecardRoutes.route("/debrief", debriefRoutes(buildService));
 scorecardRoutes.route("/decisions", decisionRoutes(buildService));
+scorecardRoutes.route("/competencies", competencyRoutes(buildService));
 
 export default scorecardRoutes;

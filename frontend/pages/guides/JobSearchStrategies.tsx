@@ -79,7 +79,7 @@ export default function JobSearchStrategies() {
   return (
     <AppShell bgClassName="bg-background">
 <div className="p-6">
-          <div className="max-w-4xl mx-auto space-y-8">
+          <div className="space-y-8">
             {/* Back link */}
             <Link
               to="/help"

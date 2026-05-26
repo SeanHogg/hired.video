@@ -2,16 +2,16 @@
 // Matches the JSON schema the LLM returns from POST /api/studio/storyboard.
 
 import type { StudioPurpose } from "@shared/studio-purposes";
+// #1430 — re-export the canonical SceneType from shared so any new scene
+// type added there flows into the frontend TS types automatically.
+import type { SceneType } from "@shared/scene-types";
+export type { SceneType };
 
 export type VideoResolution = "720p" | "1080p" | "4k";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3";
 export type MotionStyle = "minimal" | "moderate" | "cinematic";
 export type TransitionStyle = "cut" | "fade" | "slide" | "cinematic-fade";
 export type BackgroundStyle = "gradient" | "dark-tech-grid" | "particles" | "solid";
-export type SceneType =
-  | "intro" | "achievement" | "skills" | "closing"
-  | "job-details" | "company-culture" | "cta" | "testimonial"
-  | "product-feature" | "brand-story" | "requirements" | "benefits";
 export type ImagePosition =
   | "full"
   | "half-left" | "half-right"

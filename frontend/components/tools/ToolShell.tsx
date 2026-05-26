@@ -55,9 +55,6 @@ interface Props {
   /** Soft-gate overlay shown when auth is required. Omit for tools that
    *  don't need a soft gate (e.g. fully public tools). */
   authOverlay?: AuthOverlayConfig;
-  /** Inner container classes — controls width + spacing. Defaults to
-   *  the gold-standard `max-w-6xl mx-auto space-y-6`. */
-  containerClassName?: string;
   /** Override the breadcrumb tail label. Defaults to `header.title` when
    *  it's a string, else "Tool". */
   breadcrumbLabel?: string;
@@ -68,7 +65,6 @@ export function ToolShell({
   toolId,
   header,
   authOverlay,
-  containerClassName = "max-w-6xl mx-auto space-y-6",
   breadcrumbLabel,
   children,
 }: Props) {
@@ -102,7 +98,7 @@ export function ToolShell({
             message={authOverlay!.message}
           />
         )}
-        <div className={containerClassName}>
+        <div className="w-full space-y-6">
           <ToolPageHeader
             toolId={toolId}
             icon={header.icon}

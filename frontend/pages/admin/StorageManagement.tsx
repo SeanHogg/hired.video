@@ -115,7 +115,7 @@ export default function StorageManagement() {
   }, [orphans, toast]);
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">

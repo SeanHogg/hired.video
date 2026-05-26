@@ -479,7 +479,6 @@ export default function Career360() {
         description: t("tools.career360.subtitle"),
         tier: "free",
       }}
-      containerClassName="max-w-7xl mx-auto"
     >
           {loading ? (
             <Card className="mt-4">

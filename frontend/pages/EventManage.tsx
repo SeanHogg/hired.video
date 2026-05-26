@@ -96,7 +96,7 @@ export default function EventManage() {
   if (loading || !event || !analytics) {
     return (
       <AppShell bgClassName="bg-background">
-        <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <main className="px-4 sm:px-6 lg:px-8 py-10">
           <div className="h-8 bg-muted rounded w-3/4 mb-3 animate-pulse" />
           <div className="h-4 bg-muted rounded w-1/2 mb-6 animate-pulse" />
           <div className="grid grid-cols-3 gap-4">
@@ -139,7 +139,7 @@ export default function EventManage() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Title bar */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
           <div>

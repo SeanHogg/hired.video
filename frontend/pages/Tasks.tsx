@@ -217,7 +217,7 @@ export default function Tasks() {
   // the unauth marketing block AND the authed branches consume it.
   const SurfaceTabsStrip = (
     <div className="border-b">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 flex gap-1 -mb-px">
+      <div className="px-4 md:px-6 flex gap-1 -mb-px">
         {availableSurfaces.map((key) => {
           const active = currentSurface === key;
           const label =
@@ -755,7 +755,7 @@ export default function Tasks() {
       <AppShell bgClassName="bg-background">
         {SurfaceTabsStrip}
         <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-12">
+          <div className="space-y-12">
             <EventDiscoveryPanel />
             <MarketingFAQ items={EVENTS_FAQ} schemaId="events" />
           </div>
@@ -771,7 +771,7 @@ export default function Tasks() {
       <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         {SurfaceTabsStrip}
         <div>
-          <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="px-4 py-16">
               {/* Hero */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -1187,7 +1187,7 @@ export default function Tasks() {
       <AppShell bgClassName="bg-background">
         {SurfaceTabsStrip}
         <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="space-y-6">
             <MyEventsAndCoffee viewerUserId={user.id} />
           </div>
         </div>
@@ -1203,7 +1203,7 @@ export default function Tasks() {
       <AppShell bgClassName="bg-background">
         {SurfaceTabsStrip}
         <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="space-y-6">
             <TimesheetTab />
           </div>
         </div>
@@ -1215,7 +1215,7 @@ export default function Tasks() {
     <AppShell bgClassName="bg-background">
       {SurfaceTabsStrip}
       <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="space-y-6">
             <PageHeader
               tabs={taskTabs}
               activeTabKey={currentView}

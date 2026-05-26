@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import { STUDIO_PURPOSES, type StudioPurpose } from "@shared/studio-purposes";
+import { SCENE_TYPES } from "@shared/scene-types";
 import { MEDIA_KINDS, type MediaKind } from "@shared/media-kinds";
 import type { VideoScript } from "../../types/video-script";
 
@@ -113,7 +114,7 @@ export const SceneScriptSchema = z.object({
   id: z.string(),
   start: z.number(),
   duration: z.number(),
-  type: z.enum(["intro", "achievement", "skills", "closing", "job-details", "company-culture", "cta", "testimonial", "product-feature", "brand-story", "requirements", "benefits"]),
+  type: z.enum(SCENE_TYPES),
   title: z.string().optional(),
   subtitle: z.string().optional(),
   text: z.union([z.string(), z.array(z.string())]).optional(),
@@ -182,7 +183,7 @@ export const VideoScriptSchema = z.object({
 
 export const StoryboardSceneSchema = z.object({
   duration: z.number(),
-  type: z.enum(["intro", "achievement", "skills", "closing", "job-details", "company-culture", "cta", "testimonial", "product-feature", "brand-story", "requirements", "benefits"]),
+  type: z.enum(SCENE_TYPES),
   title: z.string().optional(),
   subtitle: z.string().optional(),
   text: z.string().optional(),

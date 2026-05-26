@@ -826,7 +826,7 @@ export default function People() {
     return (
       <AppShell bgClassName="bg-background">
         <div className="p-4 md:p-6">
-            <div className="max-w-7xl mx-auto">
+            <div>
               <PageHeader
                 tabs={peopleTabs}
                 activeTabKey={activeTab}
@@ -1637,7 +1637,7 @@ export default function People() {
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <div>
-          <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">
               <div className="inline-flex items-center space-x-2 mb-6">

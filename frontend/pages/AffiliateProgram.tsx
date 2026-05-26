@@ -63,7 +63,7 @@ export default function AffiliateProgram() {
     <AppShell bgClassName="bg-background">
 <main>
           {/* Hero */}
-          <section className="max-w-6xl mx-auto px-6 py-10">
+          <section className="px-6 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
               <div className="space-y-6">
                 <h1 className="text-4xl font-bold tracking-tight">Partner with hired.video</h1>
@@ -190,7 +190,7 @@ export default function AffiliateProgram() {
           </section>
 
           {/* Earnings & Payouts */}
-          <section className="max-w-6xl mx-auto px-6 py-6">
+          <section className="px-6 py-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader>
@@ -223,7 +223,7 @@ export default function AffiliateProgram() {
           </section>
 
           {/* Value propositions */}
-          <section className="max-w-6xl mx-auto px-6 py-6">
+          <section className="px-6 py-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader>
@@ -253,7 +253,7 @@ export default function AffiliateProgram() {
           </section>
 
           {/* Social proof */}
-          <section className="max-w-6xl mx-auto px-6 py-6">
+          <section className="px-6 py-6">
             <Card>
               <CardHeader>
                 <CardTitle>What affiliates say</CardTitle>
@@ -316,7 +316,7 @@ export default function AffiliateProgram() {
           />
 
           {/* Final CTA */}
-          <section className="max-w-6xl mx-auto px-6 py-10">
+          <section className="px-6 py-10">
             <div className="flex flex-col items-center text-center space-y-4">
               <h2 className="text-2xl font-semibold">
                 {isAuthenticated ? "Ready to share your link?" : "Ready to start earning?"}

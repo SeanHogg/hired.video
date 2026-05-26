@@ -22,7 +22,20 @@ const {
   timesheetTouchpoints,
   userCompanyRoleAssociations,
   users,
+  companySubscriptions,
+  billingEvents,
+  invoices,
+  invoiceLineItems,
+  payoutLedgerEntries,
+  placements,
+  placementDocuments,
 } = schema;
+
+/** Universal seat price per `[[project_pricing_seats]]` — $9.95/mo.
+ *  The 4900¢ default on companySubscriptions.pricePerSeatCents is stale
+ *  (still 49 $) and tracked under that memory; workforce rows always
+ *  stamp the correct 995¢ at create time. */
+const WORKFORCE_SEAT_PRICE_CENTS = 995;
 
 // ---------------------------------------------------------------------------
 // Tenant resolution
@@ -45,6 +58,100 @@ export async function resolveEmployeeCompanyId(
     ))
     .limit(1);
   return assoc?.companyId ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Seat billing (#1409) — workforce seat reconciliation
+//
+// Each active employee in an employer's workspace is one $9.95/mo seat.
+// `recalculateWorkforceSeats` is the single SSoT for seat-count → billing
+// reconciliation; both invite-accept and employee-deactivate route through it
+// so the company_subscriptions.seat_count stays in sync with the live UCRA
+// table. Provider-side sync (calling Helcim to update the subscription
+// charge amount) is deferred — see sub-gap noted in #1409.
+// ---------------------------------------------------------------------------
+
+export interface RecalculateSeatsResult {
+  companyId: string;
+  previousSeatCount: number;
+  newSeatCount: number;
+  pricePerSeatCents: number;
+  totalMonthlyCents: number;
+  delta: number;
+}
+
+export async function recalculateWorkforceSeats(
+  companyId: string,
+  db = getDb(),
+): Promise<RecalculateSeatsResult> {
+  // 1. Count active employees in the workspace — the canonical seat count.
+  const activeEmployees = await db
+    .select({ userId: userCompanyRoleAssociations.userId })
+    .from(userCompanyRoleAssociations)
+    .where(and(
+      eq(userCompanyRoleAssociations.companyId, companyId),
+      eq(userCompanyRoleAssociations.role, "employee"),
+      eq(userCompanyRoleAssociations.isActive, true),
+    ));
+  const newSeatCount = activeEmployees.length;
+
+  // 2. Upsert the companySubscriptions row. Workforce billing rides on the
+  //    same per-company subscription as other team features — if the row
+  //    doesn't exist (employer never bought anything else), create one
+  //    stamped with the workforce seat price.
+  const [existing] = await db.select().from(companySubscriptions)
+    .where(eq(companySubscriptions.companyId, companyId))
+    .limit(1);
+
+  let previousSeatCount = 0;
+  let row;
+  const now = new Date();
+  if (existing) {
+    previousSeatCount = existing.seatCount;
+    [row] = await db.update(companySubscriptions).set({
+      seatCount: newSeatCount,
+      // Don't clobber a custom price the employer negotiated; only stamp
+      // the workforce default when there's nothing set yet.
+      pricePerSeatCents: existing.pricePerSeatCents > 0
+        ? existing.pricePerSeatCents
+        : WORKFORCE_SEAT_PRICE_CENTS,
+      updatedAt: now,
+    } as any).where(eq(companySubscriptions.id, existing.id)).returning();
+  } else {
+    [row] = await db.insert(companySubscriptions).values({
+      companyId,
+      planTier: "workforce",
+      seatCount: newSeatCount,
+      pricePerSeatCents: WORKFORCE_SEAT_PRICE_CENTS,
+      status: "active",
+      billingInterval: "monthly",
+    } as any).returning();
+  }
+
+  // 3. Audit trail. The Helcim sync job consumes this stream to push the
+  //    new charge amount to the provider on the next billing cycle.
+  const delta = newSeatCount - previousSeatCount;
+  await db.insert(billingEvents).values({
+    eventType: "workforce_seats_recalculated",
+    payload: {
+      companyId,
+      previousSeatCount,
+      newSeatCount,
+      pricePerSeatCents: row!.pricePerSeatCents,
+      totalMonthlyCents: newSeatCount * row!.pricePerSeatCents,
+      delta,
+      at: now.toISOString(),
+    },
+  } as any);
+
+  return {
+    companyId,
+    previousSeatCount,
+    newSeatCount,
+    pricePerSeatCents: row!.pricePerSeatCents,
+    totalMonthlyCents: newSeatCount * row!.pricePerSeatCents,
+    delta,
+  };
 }
 
 /** Resolve the companies an employer can manage. An employer ↔ company
@@ -295,7 +402,227 @@ export async function approveTimesheet(
     type: "approved",
     performedByUserId: approverId,
   } as any);
+
+  // Phase 3 derivation (#1420). Fan out to invoice + payout. Each
+  // sub-function is idempotent (PayoutLedgerService.recordAccrual is
+  // idempotent by (sourceKind, sourceId); deriveWorkforceInvoicing
+  // checks for an existing invoice tied to this timesheet's snapshot)
+  // so re-running approve in a reject → re-submit → re-approve cycle
+  // doesn't double-charge.
+  const derivation = await deriveWorkforceBillingAndPayout(updated!, approverId, db);
+  if (derivation.touchpointType) {
+    await db.insert(timesheetTouchpoints).values({
+      timesheetId,
+      type: derivation.touchpointType,
+      payload: derivation.payload,
+      performedByUserId: approverId,
+    } as any);
+  }
+
   return updated;
+}
+
+/** Phase 3 derivation — timesheet → invoice line item + payout-ledger
+ *  accrual via the linked placement's bill/pay rates. Skips both if no
+ *  active placement matches, or if the placement is missing rate fields.
+ *  Returns the derivation summary for audit + UI consumption.
+ *
+ *  Money rails policy (#1349): we generate the invoice + payout LOCALLY
+ *  and emit a billingEvents row. Outbound provider push (QBO / Xero /
+ *  Gusto / Helcim) happens via `services/sync/connectors/*` adapters
+ *  that consume the billingEvents stream. */
+async function deriveWorkforceBillingAndPayout(
+  ts: typeof timesheets.$inferSelect,
+  performedByUserId: string,
+  db = getDb(),
+): Promise<{
+  touchpointType: string | null;
+  payload: Record<string, unknown>;
+  invoiceId?: string;
+  payoutEntryId?: string;
+}> {
+  // Locate the active placement that ties this employee to a client.
+  // `placements.candidateId` is the placed worker; we ignore status='ended'
+  // / cancelled rows. Multiple active placements for the same candidate
+  // (rare — one employee on parallel engagements) pick the most recent.
+  const [placement] = await db.select().from(placements)
+    .where(and(
+      eq(placements.candidateId, ts.userId),
+      sql`${placements.status} NOT IN ('cancelled', 'ended', 'terminated')`,
+    ))
+    .orderBy(desc(placements.createdAt))
+    .limit(1);
+
+  if (!placement) {
+    return {
+      touchpointType: "derivation_skipped",
+      payload: { reason: "no_active_placement_for_candidate" },
+    };
+  }
+
+  const billRate = Number(placement.billRateHourly ?? 0);
+  const payRate = Number(placement.payRateHourly ?? 0);
+  const totalHours = Number(ts.totalHours ?? 0);
+  const billableHours = Number(ts.totalBillableHours ?? 0);
+
+  if (billRate <= 0 && payRate <= 0) {
+    return {
+      touchpointType: "derivation_skipped",
+      payload: {
+        reason: "placement_missing_rates",
+        placementId: placement.id,
+        placementKind: placement.placementKind,
+      },
+    };
+  }
+
+  let invoiceId: string | undefined;
+  let payoutEntryId: string | undefined;
+
+  // --- Invoice line item -----------------------------------------------------
+  if (billRate > 0 && billableHours > 0) {
+    // Invoice ownership: tied to the agency-side recruiter who owns the
+    // placement. Note (sub-gap): the invoices schema today targets a
+    // user; real B2B billing wants a recipient *company* — tracked in
+    // the gap register's #1420 follow-up notes.
+    const invoiceTotal = (billableHours * billRate).toFixed(2);
+    const currency = placement.currency ?? "USD";
+    const description =
+      `Workforce time — ${placement.candidateName || "Employee"} · ` +
+      `week of ${ts.periodStart} · ${billableHours.toFixed(2)}h @ ${currency} ${billRate.toFixed(2)}/h`;
+
+    // Idempotency: if there's already an invoiceLineItems row whose
+    // description matches this week+placement, skip. The cleaner shape
+    // is a (timesheetId, placementId) unique constraint on a future
+    // table — noted as a sub-gap. For now, description match is enough
+    // to prevent the double-trigger from a reject→re-approve cycle.
+    const [existingLine] = await db.select({ id: invoiceLineItems.id, invoiceId: invoiceLineItems.invoiceId })
+      .from(invoiceLineItems)
+      .where(eq(invoiceLineItems.description, description))
+      .limit(1);
+
+    if (existingLine) {
+      invoiceId = existingLine.invoiceId;
+    } else {
+      const [inv] = await db.insert(invoices).values({
+        userId: placement.recruiterId,
+        status: "draft",
+        total: invoiceTotal,
+        currency,
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      } as any).returning({ id: invoices.id });
+      invoiceId = inv!.id;
+      await db.insert(invoiceLineItems).values({
+        invoiceId,
+        description,
+        quantity: Math.round(billableHours),
+        unitPrice: billRate.toFixed(2),
+        amount: invoiceTotal,
+      } as any);
+    }
+  }
+
+  // --- Payout ledger accrual -------------------------------------------------
+  if (payRate > 0 && totalHours > 0) {
+    // Defer to PayoutLedgerService which already implements the
+    // (sourceKind, sourceId) idempotency contract. Import dynamically
+    // to avoid a circular service graph.
+    const payoutCents = Math.round(totalHours * payRate * 100);
+    if (payoutCents > 0) {
+      const { PayoutLedgerService } = await import("../payout/PayoutLedgerService.js");
+      const ledger = new PayoutLedgerService();
+      const accrual = await ledger.recordAccrual({
+        userId: ts.userId,
+        amountCents: payoutCents,
+        currency: placement.currency ?? "USD",
+        sourceKind: "timesheet",
+        sourceId: ts.id,
+        note: `Workforce hours — week of ${ts.periodStart}`,
+      });
+      payoutEntryId = accrual.entryId;
+    }
+  }
+
+  // Outbound push to the configured accounting connector. Default is
+  // Helcim (we already use it for payments); employers can override via
+  // company-side integration config in a future pass. Connector failures
+  // are NON-fatal — the local invoice + payout rows are the SSoT; the
+  // connector retry queue (see #1349 sub-gap) is responsible for
+  // backing off + replaying.
+  const providerName = (typeof process !== "undefined" && process.env?.WORKFORCE_BILLING_PROVIDER) || "helcim";
+  let connectorResult: { invoice?: unknown; payout?: unknown } = {};
+  try {
+    const { getAccountingConnector } = await import("./connectors/index.js");
+    const connector = getAccountingConnector(providerName);
+    if (invoiceId) {
+      connectorResult.invoice = await connector.pushInvoice({
+        invoiceId,
+        recruiterId: placement.recruiterId,
+        recipientCompanyId: placement.companyId ?? null,
+        currency: placement.currency ?? "USD",
+        total: (billableHours * billRate).toFixed(2),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        lineItems: [{
+          description: `Workforce time — week of ${ts.periodStart}`,
+          quantity: Math.round(billableHours),
+          unitPrice: billRate.toFixed(2),
+          amount: (billableHours * billRate).toFixed(2),
+        }],
+      });
+    }
+    if (payoutEntryId) {
+      connectorResult.payout = await connector.pushPayout({
+        payoutEntryId,
+        contractorUserId: ts.userId,
+        amountCents: Math.round(totalHours * payRate * 100),
+        currency: placement.currency ?? "USD",
+        periodStart: String(ts.periodStart),
+        periodEnd: String(ts.periodEnd),
+        reference: `Timesheet ${ts.id} week of ${ts.periodStart}`,
+      });
+    }
+  } catch (e) {
+    // Connector errors get logged + audited but don't fail the approve.
+    connectorResult = { invoice: { ok: false, error: String((e as Error).message) } };
+  }
+
+  // Audit trail. The reconciliation job re-reads this stream to retry
+  // any connector pushes that errored above.
+  await db.insert(billingEvents).values({
+    userId: ts.userId,
+    eventType: "workforce_timesheet_derived",
+    payload: {
+      timesheetId: ts.id,
+      placementId: placement.id,
+      placementKind: placement.placementKind,
+      companyId: ts.companyId,
+      invoiceId: invoiceId ?? null,
+      payoutEntryId: payoutEntryId ?? null,
+      billableHours,
+      totalHours,
+      billRateHourly: billRate,
+      payRateHourly: payRate,
+      currency: placement.currency ?? "USD",
+      approvedBy: performedByUserId,
+      approvedAt: new Date().toISOString(),
+      provider: providerName,
+      connectorResult,
+    },
+  } as any);
+
+  return {
+    touchpointType: "billing_derived",
+    payload: {
+      placementId: placement.id,
+      invoiceId: invoiceId ?? null,
+      payoutEntryId: payoutEntryId ?? null,
+      billableHours,
+      totalHours,
+      grossMarginCents: Math.round((billableHours * billRate - totalHours * payRate) * 100),
+    },
+    invoiceId,
+    payoutEntryId,
+  };
 }
 
 export async function rejectTimesheet(
@@ -363,6 +690,193 @@ export async function getCompanyApprovalQueue(
       sql`${timesheets.companyId} = ANY(${employerCompanies}::uuid[])`,
     ))
     .orderBy(desc(timesheets.submittedAt));
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 read models (#1422 desk margin + #1421 doc-vault list)
+// ---------------------------------------------------------------------------
+
+export interface DeskMarginRow {
+  placementId: string;
+  candidateId: string;
+  candidateName: string;
+  recruiterId: string | null;
+  recruiterName: string | null;
+  placementKind: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  billRateHourly: number;
+  payRateHourly: number;
+  currency: string;
+  billableHoursYTD: number;
+  totalHoursYTD: number;
+  revenueCents: number;
+  payoutCents: number;
+  grossMarginCents: number;
+  approvedTimesheetCount: number;
+}
+
+/** Per-placement desk margin rollup for an employer's workforce. Sources
+ *  from approved timesheets only (via billing_events 'workforce_timesheet_derived')
+ *  so amounts always match what was invoiced.
+ *
+ *  Period: year-to-date by default; date-range filter can come later.
+ *  No new schema — pure read model over existing tables. (#1422) */
+export async function getDeskMargin(
+  employerId: string,
+  db = getDb(),
+): Promise<DeskMarginRow[]> {
+  const employerCompanies = await resolveEmployerCompanyIds(employerId, db);
+  if (employerCompanies.length === 0) return [];
+
+  // All placements with at least one timesheet derivation from approved
+  // timesheets where ts.companyId belongs to the employer. We aggregate
+  // in-memory because billing_events payload is JSONB; one query, simple
+  // bookkeeping in JS keeps the SQL portable across providers.
+  const events = await db.select({
+    payload: billingEvents.payload,
+    createdAt: billingEvents.createdAt,
+  })
+    .from(billingEvents)
+    .where(and(
+      eq(billingEvents.eventType, "workforce_timesheet_derived"),
+      sql`(${billingEvents.payload}->>'companyId')::uuid = ANY(${employerCompanies}::uuid[])`,
+    ));
+
+  if (events.length === 0) return [];
+
+  const placementIds = new Set<string>();
+  type Agg = {
+    billableHours: number; totalHours: number;
+    revenueCents: number; payoutCents: number; tsCount: number;
+  };
+  const aggByPlacement = new Map<string, Agg>();
+
+  for (const e of events) {
+    const p = (e.payload ?? {}) as Record<string, unknown>;
+    const placementId = String(p.placementId ?? "");
+    if (!placementId) continue;
+    placementIds.add(placementId);
+
+    const billableHours = Number(p.billableHours ?? 0);
+    const totalHours = Number(p.totalHours ?? 0);
+    const billRate = Number(p.billRateHourly ?? 0);
+    const payRate = Number(p.payRateHourly ?? 0);
+    const revenueCents = Math.round(billableHours * billRate * 100);
+    const payoutCents = Math.round(totalHours * payRate * 100);
+
+    const current = aggByPlacement.get(placementId) ?? {
+      billableHours: 0, totalHours: 0, revenueCents: 0, payoutCents: 0, tsCount: 0,
+    };
+    current.billableHours += billableHours;
+    current.totalHours += totalHours;
+    current.revenueCents += revenueCents;
+    current.payoutCents += payoutCents;
+    current.tsCount += 1;
+    aggByPlacement.set(placementId, current);
+  }
+
+  if (placementIds.size === 0) return [];
+
+  // Hydrate the placement rows in one query.
+  const placementRows = await db.select().from(placements)
+    .where(sql`${placements.id} = ANY(${Array.from(placementIds)}::uuid[])`);
+
+  // Recruiter name lookup.
+  const recruiterIds = Array.from(new Set(placementRows.map((p) => p.recruiterId).filter(Boolean)));
+  const recruiterRows = recruiterIds.length > 0
+    ? await db.select({ id: users.id, name: users.name }).from(users)
+        .where(sql`${users.id} = ANY(${recruiterIds}::uuid[])`)
+    : [];
+  const recruiterNameById = new Map(recruiterRows.map((r) => [r.id, r.name]));
+
+  return placementRows.map((p) => {
+    const agg = aggByPlacement.get(p.id)!;
+    return {
+      placementId: p.id,
+      candidateId: p.candidateId,
+      candidateName: p.candidateName || "Unknown",
+      recruiterId: p.recruiterId ?? null,
+      recruiterName: p.recruiterId ? (recruiterNameById.get(p.recruiterId) ?? null) : null,
+      placementKind: p.placementKind ?? null,
+      startDate: p.startDate ? new Date(p.startDate as any).toISOString() : null,
+      endDate: p.endDate ? new Date(p.endDate as any).toISOString() : null,
+      billRateHourly: Number(p.billRateHourly ?? 0),
+      payRateHourly: Number(p.payRateHourly ?? 0),
+      currency: p.currency ?? "USD",
+      billableHoursYTD: Number(agg.billableHours.toFixed(2)),
+      totalHoursYTD: Number(agg.totalHours.toFixed(2)),
+      revenueCents: agg.revenueCents,
+      payoutCents: agg.payoutCents,
+      grossMarginCents: agg.revenueCents - agg.payoutCents,
+      approvedTimesheetCount: agg.tsCount,
+    };
+  }).sort((a, b) => b.grossMarginCents - a.grossMarginCents);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 doc vault (#1421) — CRUD shell, e-sign integration deferred
+// ---------------------------------------------------------------------------
+
+export interface CreatePlacementDocumentInput {
+  placementId?: string | null;
+  companyId?: string | null;
+  userId?: string | null;
+  kind: string;
+  filePath?: string | null;
+  providerName?: string | null;
+  providerRef?: string | null;
+  signedAt?: Date | null;
+  expiresAt?: Date | null;
+}
+
+export async function createPlacementDocument(
+  inviterUserId: string,
+  input: CreatePlacementDocumentInput,
+  db = getDb(),
+) {
+  // Authority: caller must be employer of `companyId` (if scoped) or
+  // recruiter on `placementId`. Tightened gate per #1349 DRY — no
+  // prop-drilled "can manage docs"; the service checks workspace context
+  // every call.
+  if (input.companyId) {
+    const employerCompanies = await resolveEmployerCompanyIds(inviterUserId, db);
+    if (!employerCompanies.includes(input.companyId)) {
+      throw new ForbiddenError("Not an employer in this workspace");
+    }
+  } else if (input.placementId) {
+    const [p] = await db.select().from(placements)
+      .where(eq(placements.id, input.placementId)).limit(1);
+    if (!p || p.recruiterId !== inviterUserId) {
+      throw new ForbiddenError("Not the recruiter on this placement");
+    }
+  } else {
+    throw new ForbiddenError("Either companyId or placementId is required");
+  }
+  const [row] = await db.insert(placementDocuments).values({
+    placementId: input.placementId ?? null,
+    companyId: input.companyId ?? null,
+    userId: input.userId ?? null,
+    kind: input.kind,
+    filePath: input.filePath ?? null,
+    providerName: input.providerName ?? null,
+    providerRef: input.providerRef ?? null,
+    signedAt: input.signedAt ?? null,
+    expiresAt: input.expiresAt ?? null,
+    status: input.signedAt ? "signed" : "pending",
+  } as any).returning();
+  return row;
+}
+
+export async function listCompanyPlacementDocuments(
+  employerId: string,
+  db = getDb(),
+) {
+  const employerCompanies = await resolveEmployerCompanyIds(employerId, db);
+  if (employerCompanies.length === 0) return [];
+  return await db.select().from(placementDocuments)
+    .where(sql`${placementDocuments.companyId} = ANY(${employerCompanies}::uuid[])`)
+    .orderBy(desc(placementDocuments.createdAt));
 }
 
 /** Roster for the employer's Workforce settings tab — list of active

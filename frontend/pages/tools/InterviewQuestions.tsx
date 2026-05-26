@@ -276,7 +276,6 @@ export default function InterviewQuestions() {
         message:
           "Sign in to generate skill-tailored interview questions — we'll keep your inputs.",
       }}
-      containerClassName="max-w-5xl mx-auto"
     >
       <div className="space-y-6 mt-4">
         <Card>

@@ -833,7 +833,7 @@ export default function MyInterviewAssignments() {
 
   return (
     <AppShell>
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="px-4 py-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
           <h1 className="text-2xl font-bold">
             {isCompareRoute ? "Compare interviews" : "Interview assignments"}

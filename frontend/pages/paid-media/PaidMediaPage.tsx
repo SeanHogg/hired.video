@@ -52,7 +52,7 @@ export default function PaidMediaPage({ forceWorkspace, title }: PaidMediaPagePr
   const [tab, setTab] = useState<"connections" | "campaigns" | "creatives" | "pixels" | "reporting">("connections");
 
   return (
-    <div className="container mx-auto max-w-6xl py-8 px-4">
+    <div className="py-8 px-4">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold">{title ?? "Paid Media"}</h1>
         <p className="text-sm text-muted-foreground mt-1">

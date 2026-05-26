@@ -200,7 +200,6 @@ export default function JobResumeMatch() {
         message: t("messages.signInToScoreMatch"),
       }}
       breadcrumbLabel={t("tools.jobResumeMatch.title")}
-      containerClassName="max-w-4xl mx-auto space-y-8"
     >
             {/* Progress Steps */}
             <Card>

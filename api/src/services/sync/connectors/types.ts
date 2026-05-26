@@ -54,6 +54,12 @@ export interface ExportBlock {
   /** Platform constraint (LinkedIn headline = 220, About = 2600, etc.).
    *  Card surfaces a red counter when text length exceeds it. */
   charLimit?: number;
+  /** Per-block destination override. When set, the block's card opens
+   *  this URL instead of the connector-level `editProfileUrl` — needed
+   *  when a single connector's blocks belong to multiple destinations
+   *  (e.g. GitHub Bio → /settings/profile; GitHub README → the special
+   *  `<user>/<user>` repo, not settings). */
+  openTargetUrl?: string;
 }
 
 export interface VendorConnector {

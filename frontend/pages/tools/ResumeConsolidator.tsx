@@ -295,7 +295,6 @@ export default function ResumeConsolidator() {
         message:
           "Sign in to merge your resumes — we'll keep the source and target you've picked and pick up where you left off.",
       }}
-      containerClassName="max-w-4xl mx-auto space-y-8"
     >
             {step === "select" && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

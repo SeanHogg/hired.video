@@ -156,7 +156,7 @@ export default function Login() {
   return (
     <AppShell>
       <div className="flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
+          <div className="w-full md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
             {/* #320 — geo gate: sanctioned regions get a hard-block notice
                 (no email capture); waitlist regions still render the form

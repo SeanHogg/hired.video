@@ -147,7 +147,7 @@ export default function BlogIndex() {
   return (
     <AppShell bgClassName="bg-background">
 <div className="p-6">
-          <div className="max-w-6xl mx-auto space-y-8">
+          <div className="space-y-8">
             {/* Header */}
             <div className="text-center">
               <h1 className="text-4xl md:text-5xl font-bold mb-4">

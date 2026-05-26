@@ -36,7 +36,7 @@ export default function TermsOfService() {
   return (
     <AppShell bgClassName="bg-background">
       <div className="p-6">
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="space-y-8">
             {/* Header */}
             <div className="text-center">
               <div className="inline-flex items-center space-x-2 mb-4">

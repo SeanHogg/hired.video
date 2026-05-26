@@ -163,7 +163,7 @@ export default function EmbeddedResume() {
           embedded mode (no gradient hero, no platform chrome). Template is
           picked from resume.content.meta.embeddedTemplate with fallback to the
           resume's regular default, then DEFAULT_DESCRIPTOR. */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="px-4 py-8">
         {resume ? (
           <DeclarativeResumeRenderer
             resume={resume}
@@ -185,7 +185,7 @@ export default function EmbeddedResume() {
 
       {/* Footer */}
       <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="px-4 py-6">
           <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
             <span>Powered by</span>
             <a

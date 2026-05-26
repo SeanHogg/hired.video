@@ -95,7 +95,7 @@ export default function Competitors() {
       <main>
         {/* Hero */}
         <section className="bg-gradient-to-br from-brand-purple/5 via-background to-brand-blue/5 py-16 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-6xl mx-auto text-center">
+          <div className="text-center">
             <Badge className="mb-4" variant="outline">
               <Trophy className="h-4 w-4 mr-1" /> Comparison
             </Badge>
@@ -143,7 +143,7 @@ export default function Competitors() {
 
         {/* FAQ */}
         <section className="py-16 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
+          <div>
             <MarketingFAQ
               schemaId="competitors"
               heading="Frequently asked questions"
@@ -155,7 +155,7 @@ export default function Competitors() {
 
         {/* CTA */}
         <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple to-brand-blue text-white">
-          <div className="max-w-4xl mx-auto text-center">
+          <div className="text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Ready to see Hired.Video for yourself?
             </h2>

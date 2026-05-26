@@ -33,6 +33,11 @@ import {
   getEmployeeTimesheets,
   getCompanyApprovalQueue,
   getCompanyRoster,
+  getDeskMargin,
+  createPlacementDocument,
+  listCompanyPlacementDocuments,
+  recalculateWorkforceSeats,
+  resolveEmployerCompanyIds,
 } from "../services/workforce/index.js";
 
 export const workforceRoutes = new Hono<AppEnv>();
@@ -140,4 +145,69 @@ workforceRoutes.get("/roster", async (c) => {
   if (!userId) return unauthorized(c);
   const roster = await getCompanyRoster(userId);
   return c.json(success({ roster }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — desk margin reporting (#1422)
+// ---------------------------------------------------------------------------
+
+workforceRoutes.get("/desk-margin", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const rows = await getDeskMargin(userId);
+  return c.json(success({ rows }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 4 — placement documents (#1421)
+// ---------------------------------------------------------------------------
+
+workforceRoutes.get("/documents", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const docs = await listCompanyPlacementDocuments(userId);
+  return c.json(success({ documents: docs }), 200);
+});
+
+workforceRoutes.post("/documents", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const body = await c.req.json().catch(() => ({}));
+  if (!body.kind || typeof body.kind !== "string") {
+    return c.json(error("BAD_REQUEST", "kind is required"), 400);
+  }
+  const doc = await createPlacementDocument(userId, {
+    placementId: body.placementId ?? null,
+    companyId: body.companyId ?? null,
+    userId: body.userId ?? null,
+    kind: body.kind,
+    filePath: body.filePath ?? null,
+    providerName: body.providerName ?? null,
+    providerRef: body.providerRef ?? null,
+    signedAt: body.signedAt ? new Date(body.signedAt) : null,
+    expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+  });
+  return c.json(success(doc), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Seat reconciliation hook (#1409)
+//
+// Manual trigger for admins / employers to re-sync seat count. Normally
+// runs automatically on accept-invitation + remove-account-user; this
+// endpoint exists for the recover-from-drift case.
+// ---------------------------------------------------------------------------
+
+workforceRoutes.post("/reconcile-seats", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const employerCompanies = await resolveEmployerCompanyIds(userId);
+  if (employerCompanies.length === 0) {
+    return c.json(error("FORBIDDEN", "Not an employer in any workspace"), 403);
+  }
+  const results = [];
+  for (const companyId of employerCompanies) {
+    results.push(await recalculateWorkforceSeats(companyId));
+  }
+  return c.json(success({ results }), 200);
 });

@@ -101,12 +101,23 @@ export const githubConnector: VendorConnector = {
         text: bio,
         format: "plain",
         charLimit: GITHUB_BIO_LIMIT,
+        // Bio lives in /settings/profile. Same as the connector-level
+        // editProfileUrl, but pinned here so the card opens the right
+        // destination when openTargetUrl is set on a sibling block too.
+        openTargetUrl: "https://github.com/settings/profile",
       });
     }
     blocks.push({
       section: "Profile README",
       text: renderReadmeMarkdown(content),
       format: "markdown",
+      // The Profile README lives in a special `<username>/<username>` repo,
+      // NOT in /settings/profile. We don't know the user's handle here, so
+      // we send them to github.com/new pre-filled to create that repo (the
+      // template field guides them when their username is logged in). Fixes
+      // gap #1416 — previously the card sent them to settings, which is
+      // the wrong destination for the README block.
+      openTargetUrl: "https://github.com/new?template_name=README&template_owner=github",
     });
     return blocks;
   },

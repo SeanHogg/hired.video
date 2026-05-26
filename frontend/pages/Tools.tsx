@@ -196,7 +196,7 @@ export default function Tools() {
   if (!isAuthenticated || !user) {
     return (
       <AppShell>
-        <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -515,7 +515,7 @@ export default function Tools() {
   return (
     <AppShell bgClassName="bg-background">
       <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div>
             <PageHeader
               tabs={[
                 { key: "tools", label: "Tools", icon: Wrench, to: "/tools" },

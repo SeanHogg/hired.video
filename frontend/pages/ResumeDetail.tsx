@@ -496,13 +496,13 @@ export default function ResumeDetail() {
               Sourced context visible as the user navigates into a single
               resume. Falls back to "no highlight" on direct loads. */}
           {isAuthenticated && (
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+            <div className="px-4 sm:px-6 pt-4">
               <EntityHubTabStrip entity="resume" />
             </div>
           )}
 
           <div className="bg-muted/30 border-b">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Resume status flags + scores live in a gated side
                     panel — see ResumeStatsSheet. Job seekers viewing
@@ -691,7 +691,7 @@ export default function ResumeDetail() {
           </div>
 
           {loading && (
-            <div className="max-w-6xl mx-auto px-6 py-12">
+            <div className="px-6 py-12">
               <div className="animate-pulse space-y-4">
                 <div className="h-8 bg-muted rounded w-1/3" />
                 <div className="h-48 bg-muted rounded" />
@@ -701,7 +701,7 @@ export default function ResumeDetail() {
           )}
 
           {!loading && !resume && isPrivate && (
-            <div className="max-w-xl mx-auto px-6 py-16 text-center">
+            <div className="px-6 py-16 text-center">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-8 h-8 text-muted-foreground" />
               </div>
@@ -719,7 +719,7 @@ export default function ResumeDetail() {
           )}
 
           {!loading && !resume && !isPrivate && (
-            <div className="max-w-6xl mx-auto px-6 py-12 text-center">
+            <div className="px-6 py-12 text-center">
               <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
               <p className="text-muted-foreground mb-6">Could not load resume <code>{id}</code>.</p>
               <Button onClick={() => navigate("/resumes")}><ArrowLeft className="w-4 h-4 mr-2" />Back to Resumes</Button>
@@ -738,7 +738,7 @@ export default function ResumeDetail() {
                     navigate(`/resumes/edit/${resume.id}?section=${encodeURIComponent(key)}`)
                   }
                 />
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
+                <div className="px-4 sm:px-6 pb-8">
                   <SkillNetwork
                     resumeData={resume.content}
                     resumeId={resume.id}

@@ -42,6 +42,12 @@ const SCENE_IMAGE_BASE: Record<SceneType, string> = {
   "brand-story": "Storytelling visual, personal journey, warm tones, cinematic narrative feel",
   requirements: "Checklist visualization, organized requirements, structured layout, professional clarity",
   benefits: "Uplifting benefit icons, positive growth, bright optimistic palette, rewarding atmosphere",
+  // Course-lesson pedagogy types (#160 / #1412) — paired with the shared
+  // SceneType union via shared/scene-types.ts so this Record stays exhaustive.
+  concept: "Clean educational diagram, labelled concept boxes, minimalist instructional design, soft pastel palette",
+  "worked-example": "Step-by-step problem walkthrough on whiteboard, numbered solution path, instructor perspective",
+  "knowledge-check": "Quiz card layout, prompt question and answer slots, soft highlight on the active question",
+  summary: "Crisp lesson recap layout, key takeaways list, gentle gradient backdrop, calm finish tone",
 };
 
 const TYPE_COLOURS: Record<SceneType, string> = {
@@ -57,6 +63,13 @@ const TYPE_COLOURS: Record<SceneType, string> = {
   "brand-story":      "bg-rose-500/20 text-rose-300",
   requirements:       "bg-slate-500/20 text-slate-300",
   benefits:           "bg-lime-500/20 text-lime-300",
+  // Course-lesson pedagogy types — same colour family per role:
+  // sky for intro-ish concepts, fuchsia for hands-on worked-example,
+  // yellow for the check (eye-catching), green for the recap close.
+  concept:            "bg-sky-500/20 text-sky-300",
+  "worked-example":   "bg-fuchsia-500/20 text-fuchsia-300",
+  "knowledge-check":  "bg-yellow-500/20 text-yellow-300",
+  summary:            "bg-green-500/20 text-green-300",
 };
 
 function SceneCard({

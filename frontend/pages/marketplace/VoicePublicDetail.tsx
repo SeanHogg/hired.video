@@ -225,7 +225,7 @@ export default function VoicePublicDetail() {
       badges={badges}
       actions={actions}
       preview={
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        <div className="px-4 sm:px-6 py-8 space-y-6">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
               <span className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

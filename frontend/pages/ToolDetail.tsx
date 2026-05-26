@@ -31,7 +31,7 @@ export default function ToolDetail() {
   const Icon = tool.icon;
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8 space-y-8">
+    <div className="px-4 py-8 space-y-8">
       <Link
         to="/tools"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
