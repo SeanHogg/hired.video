@@ -9,6 +9,19 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>();
 const WINDOW_MS = 60_000;
+// Cap the map to prevent unbounded growth on long-lived Workers isolates under
+// sustained traffic from many unique IPs (gap #1339). When over the cap we do
+// a single linear sweep of expired entries. This is amortized O(1) — the sweep
+// fires at most once per `MAX_ENTRIES` insertions.
+const MAX_ENTRIES = 10_000;
+
+/** Drop expired entries from any rate-limit Map. Called lazily when the Map
+ *  grows past MAX_ENTRIES so we don't pay for a sweep on every request. */
+function sweepExpired(map: Map<string, RateLimitEntry>, now: number): void {
+  for (const [k, v] of map) {
+    if (now > v.resetAt) map.delete(k);
+  }
+}
 // Per-IP cap for anonymous traffic — kept tight because anon endpoints
 // (signup gate, public listings, etc.) are abuse-prone and a shared NAT
 // of real users shouldn't be hitting these in bulk.
@@ -72,6 +85,7 @@ export function createIpRateLimiter(opts: IpRateLimiterOptions): MiddlewareHandl
     const now = Date.now();
     const entry = bucket.get(key);
     if (!entry || now > entry.resetAt) {
+      if (bucket.size >= MAX_ENTRIES) sweepExpired(bucket, now);
       bucket.set(key, { count: 1, resetAt: now + opts.windowMs });
       return next();
     }
@@ -129,6 +143,7 @@ export const rateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
   const entry = store.get(key);
 
   if (!entry || now > entry.resetAt) {
+    if (store.size >= MAX_ENTRIES) sweepExpired(store, now);
     store.set(key, { count: 1, resetAt: now + WINDOW_MS });
     return next();
   }

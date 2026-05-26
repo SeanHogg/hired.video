@@ -1134,7 +1134,63 @@ const ProfileExtractionResponseSchema = z.object({
 		year: z.string().optional().default(""),
 	})).optional().default([]),
 	summary: z.string().optional().default(""),
+	// Loxo-Boost-parity contact + social enrichment. The LLM is asked to
+	// surface anything the page text reveals; downstream the populated
+	// `email` lands on `talent_pool_candidates.candidate_email` so the
+	// candidate row is immediately reachable from the CRM.
+	contactInfo: z.object({
+		email: z.string().optional().default(""),
+		phone: z.string().optional().default(""),
+		linkedin: z.string().optional().default(""),
+		github: z.string().optional().default(""),
+		twitter: z.string().optional().default(""),
+		website: z.string().optional().default(""),
+	}).optional().default({}),
 });
+
+/**
+ * Pull contact info + social URLs straight out of the raw page HTML.
+ * Used as a deterministic backstop behind the LLM extraction so we never
+ * miss a `mailto:`/`tel:` link or a visible LinkedIn / GitHub / X URL.
+ *
+ * Mirrors the contact fields surfaced by Loxo Boost so the same data flows
+ * into the recruiter's CRM the moment a profile is captured.
+ */
+function harvestContactsFromHtml(html: string): {
+	email: string;
+	phone: string;
+	linkedin: string;
+	github: string;
+	twitter: string;
+	website: string;
+} {
+	const mailto = /mailto:([^"'>\s?]+)/i.exec(html);
+	const tel = /tel:([+0-9 ()-]{6,})/i.exec(html);
+	const linkedin = /https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(?:in|pub)\/[a-zA-Z0-9-_%]+/i.exec(html);
+	const github = /https?:\/\/github\.com\/[a-zA-Z0-9-]+(?!\/)/i.exec(html);
+	const twitter = /https?:\/\/(?:twitter|x)\.com\/[a-zA-Z0-9_]+/i.exec(html);
+
+	// "website": prefer an explicit href= that isn't a social/recruiting host.
+	let website = "";
+	const hrefMatches = html.matchAll(/href=["']?(https?:\/\/[^\s"'>]+)/gi);
+	for (const m of hrefMatches) {
+		const url = m[1] ?? "";
+		const lc = url.toLowerCase();
+		if (!url || lc.length > 200) continue;
+		if (/linkedin\.com|github\.com|twitter\.com|x\.com|facebook\.com|instagram\.com|youtube\.com|indeed\.com|glassdoor\.com|mailto:|tel:/.test(lc)) continue;
+		website = url;
+		break;
+	}
+
+	return {
+		email: mailto?.[1]?.trim() ?? "",
+		phone: tel?.[1]?.trim() ?? "",
+		linkedin: linkedin?.[0] ?? "",
+		github: github?.[0] ?? "",
+		twitter: twitter?.[0] ?? "",
+		website,
+	};
+}
 
 function stripHtmlForProfile(html: string): string {
 	return html
@@ -1146,21 +1202,28 @@ function stripHtmlForProfile(html: string): string {
 		.slice(0, 10000);
 }
 
-recruiterRoutes.post("/extract-profile", async (c) => {
-	const user = c.get("user");
-	const body = await c.req.json().catch(() => null);
-	const parsed = ExtractProfileSchema.safeParse(body);
-	if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-
-	const { html, sourceUrl, force } = parsed.data;
+/**
+ * Run the full LLM + contact-harvest + dedup + persist pipeline for a
+ * single profile HTML chunk. Shared by `POST /extract-profile` (single)
+ * and `POST /extract-profiles/batch` (bulk capture, gap #1358) so both
+ * endpoints route through identical extraction logic.
+ *
+ * Returns either a `{ profile, talentPoolCandidate, duplicate }` envelope
+ * or an `{ error }` shape when the LLM call fails. Never throws on
+ * extraction failure — the caller decides how to surface it.
+ */
+async function extractProfileFromHtml(
+	c: any,
+	opts: { html: string; sourceUrl: string; force?: boolean; recruiterId: string },
+): Promise<
+	| { ok: true; profile: any; talentPoolCandidate: any; duplicate: boolean }
+	| { ok: false; code: string; message: string }
+> {
+	const { html, sourceUrl, force, recruiterId } = opts;
 	const db = getDb();
-	const recruiterId = user.sub;
-
-	// Normalize URL for dedup
 	const normalizedUrl = normalizeJobUrl(sourceUrl) ?? sourceUrl;
 	const plainText = stripHtmlForProfile(html);
 
-	// Extract structured data via LLM
 	let extracted: z.infer<typeof ProfileExtractionResponseSchema>;
 
 	if (hasAnyLLMProviderKey(c.env as any)) {
@@ -1172,11 +1235,11 @@ recruiterRoutes.post("/extract-profile", async (c) => {
 					systemPrompt: `You are a professional recruiter extracting candidate information from a web page.
 Extract the candidate's profile details and return valid JSON only.
 If a field is not found, use an empty string or empty array.`,
-					userMessage: `Extract the candidate profile from this page content:
+					userMessage: `Extract the candidate profile from this page content. Surface any visible contact info or social URLs verbatim — personal email, phone number, and the LinkedIn / GitHub / X (Twitter) / personal-website URLs the page reveals. Use empty strings for anything you cannot find. Never invent contact details.
 
 ${plainText}
 
-Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...", "skills": ["..."], "experience": [{"title": "...", "company": "...", "duration": "...", "description": "..."}], "education": [{"degree": "...", "institution": "...", "year": "..."}], "summary": "..." }`,
+Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...", "skills": ["..."], "experience": [{"title": "...", "company": "...", "duration": "...", "description": "..."}], "education": [{"degree": "...", "institution": "...", "year": "..."}], "summary": "...", "contactInfo": { "email": "...", "phone": "...", "linkedin": "...", "github": "...", "twitter": "...", "website": "..." } }`,
 					responseFormat: "json_object",
 					useCase: "company_brief",
 				},
@@ -1184,18 +1247,28 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 			);
 			extracted = data;
 		} catch {
-			return c.json(error("AI_ERROR", "Failed to extract profile. Please try again."), 500);
+			return { ok: false, code: "AI_ERROR", message: "Failed to extract profile." };
 		}
 	} else {
-		// Basic heuristic extraction when no AI available
 		extracted = {
 			name: "Unknown Candidate",
 			title: "", company: "", location: "",
 			skills: [], experience: [], education: [], summary: "",
+			contactInfo: {},
 		};
 	}
 
-	// Compute content hash for dedup
+	const harvested = harvestContactsFromHtml(html);
+	const contactInfo = {
+		email: extracted.contactInfo?.email || harvested.email,
+		phone: extracted.contactInfo?.phone || harvested.phone,
+		linkedin: extracted.contactInfo?.linkedin || harvested.linkedin,
+		github: extracted.contactInfo?.github || harvested.github,
+		twitter: extracted.contactInfo?.twitter || harvested.twitter,
+		website: extracted.contactInfo?.website || harvested.website,
+	};
+	extracted.contactInfo = contactInfo;
+
 	const hashInput = [extracted.name, extracted.title]
 		.map((s) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, ""))
 		.join("|");
@@ -1205,7 +1278,6 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 		.map((b) => b.toString(16).padStart(2, "0"))
 		.join("");
 
-	// Check for existing extraction (dedup)
 	if (!force) {
 		const [existing] = await db
 			.select()
@@ -1219,23 +1291,20 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 			.limit(1);
 
 		if (existing) {
-			return c.json(success({
-				profile: existing,
-				talentPoolCandidate: existing.talentPoolCandidateId
-					? await db.select().from(schema.talentPoolCandidates)
-							.where(eq(schema.talentPoolCandidates.id, existing.talentPoolCandidateId))
-							.limit(1).then((r) => r[0] ?? null)
-					: null,
-				duplicate: true,
-			}), 200);
+			const tp = existing.talentPoolCandidateId
+				? await db.select().from(schema.talentPoolCandidates)
+						.where(eq(schema.talentPoolCandidates.id, existing.talentPoolCandidateId))
+						.limit(1).then((r) => r[0] ?? null)
+				: null;
+			return { ok: true, profile: existing, talentPoolCandidate: tp, duplicate: true };
 		}
 	}
 
-	// Create talent pool candidate entry
 	const [candidate] = await db.insert(schema.talentPoolCandidates).values({
 		recruiterId,
 		candidateId: recruiterId, // Self-ref until real user ID is known
 		candidateName: extracted.name,
+		candidateEmail: contactInfo.email || undefined,
 		candidateTitle: extracted.title,
 		currentCompany: extracted.company || undefined,
 		currentTitle: extracted.title || undefined,
@@ -1245,7 +1314,6 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 		notes: extracted.summary || undefined,
 	} as any).returning();
 
-	// Create extracted profile record
 	const [profile] = await db.insert(schema.extractedProfiles).values({
 		recruiterId,
 		talentPoolCandidateId: candidate.id,
@@ -1256,7 +1324,6 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 		extractionMethod: "extension",
 	} as any).returning();
 
-	// Enqueue background scoring against recruiter's active jobs
 	try {
 		await db.insert(schema.queueJobToProcess).values({
 			type: "recruiter_score_jobs",
@@ -1265,11 +1332,80 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 		} as any);
 	} catch { /* non-critical */ }
 
-	return c.json(success({
+	return {
+		ok: true,
 		profile,
 		talentPoolCandidate: rowToTalentPoolEntry(candidate),
 		duplicate: false,
-	}), 201);
+	};
+}
+
+recruiterRoutes.post("/extract-profile", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => null);
+	const parsed = ExtractProfileSchema.safeParse(body);
+	if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+
+	const result = await extractProfileFromHtml(c, {
+		html: parsed.data.html,
+		sourceUrl: parsed.data.sourceUrl,
+		force: parsed.data.force,
+		recruiterId: user.sub,
+	});
+	if (!result.ok) return c.json(error(result.code, result.message), 500);
+	return c.json(
+		success({
+			profile: result.profile,
+			talentPoolCandidate: result.talentPoolCandidate,
+			duplicate: result.duplicate,
+		}),
+		result.duplicate ? 200 : 201,
+	);
+});
+
+// POST /extract-profiles/batch — bulk-source up to 25 profile cards from
+// a single list-view page in one request. Each card is processed through
+// the same pipeline as the single endpoint; per-card failures don't
+// abort the batch. Gap #1358 (Loxo-Boost-parity bulk capture).
+const ExtractProfilesBatchSchema = z.object({
+	sourceUrl: z.string().min(1),
+	cards: z.array(z.string().min(50)).min(1).max(25),
+	force: z.boolean().optional(),
+});
+
+recruiterRoutes.post("/extract-profiles/batch", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => null);
+	const parsed = ExtractProfilesBatchSchema.safeParse(body);
+	if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+
+	const { sourceUrl, cards, force } = parsed.data;
+	const recruiterId = user.sub;
+
+	const items: Array<
+		| { ok: true; profile: any; talentPoolCandidate: any; duplicate: boolean }
+		| { ok: false; code: string; message: string }
+	> = [];
+
+	for (const html of cards) {
+		const result = await extractProfileFromHtml(c, { html, sourceUrl, force, recruiterId });
+		items.push(result);
+	}
+
+	const created = items.filter((r) => r.ok && !r.duplicate).length;
+	const duplicates = items.filter((r) => r.ok && r.duplicate).length;
+	const failed = items.filter((r) => !r.ok).length;
+
+	return c.json(
+		success({
+			total: items.length,
+			created,
+			duplicates,
+			failed,
+			items,
+		}),
+		201,
+	);
 });
 
 // ─── Match Scoring ───────────────────────────────────────────────────────────
@@ -1433,4 +1569,234 @@ recruiterRoutes.get("/pipeline", async (c) => {
 	}
 
 	return c.json(success({ stages }));
+});
+
+// ─── Recruiter Lists (gap #1360) ─────────────────────────────────────────
+// Recruiter-scoped collections of candidates distinct from a job's
+// pipeline. `kind` is 'list' or 'call_queue'. Mounted at /lists.
+
+const RecruiterListSchema = z.object({
+	name: z.string().min(1).max(255),
+	description: z.string().optional(),
+	kind: z.enum(["list", "call_queue"]).default("list"),
+});
+
+recruiterRoutes.post("/lists", async (c) => {
+	const user = c.get("user");
+	const parsed = RecruiterListSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid list", parsed.error.flatten()), 400);
+
+	const [row] = await getDb().insert(schema.recruiterLists).values({
+		recruiterId: user.sub,
+		name: parsed.data.name,
+		description: parsed.data.description,
+		kind: parsed.data.kind,
+	} as any).returning();
+	return c.json(success(row), 201);
+});
+
+recruiterRoutes.get("/lists", async (c) => {
+	const user = c.get("user");
+	const rows = await getDb()
+		.select()
+		.from(schema.recruiterLists)
+		.where(eq(schema.recruiterLists.recruiterId, user.sub))
+		.orderBy(desc(schema.recruiterLists.updatedAt));
+	return c.json(success(rows));
+});
+
+recruiterRoutes.delete("/lists/:id", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const [row] = await db
+		.select({ recruiterId: schema.recruiterLists.recruiterId })
+		.from(schema.recruiterLists)
+		.where(eq(schema.recruiterLists.id, c.req.param("id")))
+		.limit(1);
+	if (!row || row.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "List not found"), 404);
+	await db.delete(schema.recruiterLists).where(eq(schema.recruiterLists.id, c.req.param("id")));
+	return c.json(success({ deleted: true }));
+});
+
+recruiterRoutes.post("/lists/:id/members", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const body = await c.req.json().catch(() => ({}));
+	const candidateId = String(body?.talentPoolCandidateId ?? "");
+	if (!candidateId) return c.json(error("VALIDATION_ERROR", "talentPoolCandidateId required"), 400);
+
+	const [list] = await db
+		.select({ recruiterId: schema.recruiterLists.recruiterId })
+		.from(schema.recruiterLists)
+		.where(eq(schema.recruiterLists.id, c.req.param("id")))
+		.limit(1);
+	if (!list || list.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "List not found"), 404);
+
+	// Idempotent: ignore unique-constraint conflicts on (list_id, candidate_id).
+	try {
+		const [row] = await db.insert(schema.recruiterListMembers).values({
+			listId: c.req.param("id"),
+			talentPoolCandidateId: candidateId,
+		} as any).returning();
+		return c.json(success(row), 201);
+	} catch {
+		return c.json(success({ duplicate: true }), 200);
+	}
+});
+
+recruiterRoutes.get("/lists/:id/members", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const [list] = await db
+		.select({ recruiterId: schema.recruiterLists.recruiterId })
+		.from(schema.recruiterLists)
+		.where(eq(schema.recruiterLists.id, c.req.param("id")))
+		.limit(1);
+	if (!list || list.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "List not found"), 404);
+
+	const rows = await db
+		.select({
+			id: schema.recruiterListMembers.id,
+			talentPoolCandidateId: schema.recruiterListMembers.talentPoolCandidateId,
+			position: schema.recruiterListMembers.position,
+			addedAt: schema.recruiterListMembers.addedAt,
+			candidateName: schema.talentPoolCandidates.candidateName,
+			candidateTitle: schema.talentPoolCandidates.candidateTitle,
+			currentCompany: schema.talentPoolCandidates.currentCompany,
+			candidateEmail: schema.talentPoolCandidates.candidateEmail,
+		})
+		.from(schema.recruiterListMembers)
+		.leftJoin(
+			schema.talentPoolCandidates,
+			eq(schema.recruiterListMembers.talentPoolCandidateId, schema.talentPoolCandidates.id),
+		)
+		.where(eq(schema.recruiterListMembers.listId, c.req.param("id")))
+		.orderBy(schema.recruiterListMembers.position);
+	return c.json(success(rows));
+});
+
+recruiterRoutes.delete("/lists/:id/members/:memberId", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const [list] = await db
+		.select({ recruiterId: schema.recruiterLists.recruiterId })
+		.from(schema.recruiterLists)
+		.where(eq(schema.recruiterLists.id, c.req.param("id")))
+		.limit(1);
+	if (!list || list.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "List not found"), 404);
+
+	await db
+		.delete(schema.recruiterListMembers)
+		.where(eq(schema.recruiterListMembers.id, c.req.param("memberId")));
+	return c.json(success({ deleted: true }));
+});
+
+// ─── Recruiter Outreach Sequences (gap #1357) ────────────────────────────
+
+const OutreachStepSchema = z.object({
+	channel: z.enum(["email", "message", "sms"]),
+	delayDays: z.number().int().min(0).max(365),
+	subject: z.string().optional(),
+	body: z.string().min(1),
+});
+
+const OutreachSequenceSchema = z.object({
+	name: z.string().min(1).max(255),
+	description: z.string().optional(),
+	steps: z.array(OutreachStepSchema).min(1).max(10),
+	isActive: z.boolean().optional(),
+});
+
+recruiterRoutes.post("/sequences", async (c) => {
+	const user = c.get("user");
+	const parsed = OutreachSequenceSchema.safeParse(await c.req.json().catch(() => null));
+	if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid sequence", parsed.error.flatten()), 400);
+
+	const [row] = await getDb().insert(schema.recruiterOutreachSequences).values({
+		recruiterId: user.sub,
+		name: parsed.data.name,
+		description: parsed.data.description,
+		steps: parsed.data.steps,
+		isActive: parsed.data.isActive ?? true,
+	} as any).returning();
+	return c.json(success(row), 201);
+});
+
+recruiterRoutes.get("/sequences", async (c) => {
+	const user = c.get("user");
+	const rows = await getDb()
+		.select()
+		.from(schema.recruiterOutreachSequences)
+		.where(eq(schema.recruiterOutreachSequences.recruiterId, user.sub))
+		.orderBy(desc(schema.recruiterOutreachSequences.updatedAt));
+	return c.json(success(rows));
+});
+
+recruiterRoutes.delete("/sequences/:id", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const [row] = await db
+		.select({ recruiterId: schema.recruiterOutreachSequences.recruiterId })
+		.from(schema.recruiterOutreachSequences)
+		.where(eq(schema.recruiterOutreachSequences.id, c.req.param("id")))
+		.limit(1);
+	if (!row || row.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "Sequence not found"), 404);
+	await db
+		.delete(schema.recruiterOutreachSequences)
+		.where(eq(schema.recruiterOutreachSequences.id, c.req.param("id")));
+	return c.json(success({ deleted: true }));
+});
+
+// Enroll a candidate into a sequence. First step's `nextSendAt` is
+// computed from `delayDays` on step 0; subsequent steps are scheduled by
+// the worker that processes due enrollments (out of scope for this pass —
+// tracked as residual gap).
+recruiterRoutes.post("/sequences/:id/enroll", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const body = await c.req.json().catch(() => ({}));
+	const candidateId = String(body?.talentPoolCandidateId ?? "");
+	if (!candidateId) return c.json(error("VALIDATION_ERROR", "talentPoolCandidateId required"), 400);
+
+	const [seq] = await db
+		.select()
+		.from(schema.recruiterOutreachSequences)
+		.where(eq(schema.recruiterOutreachSequences.id, c.req.param("id")))
+		.limit(1);
+	if (!seq || seq.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "Sequence not found"), 404);
+
+	const firstStep = (seq.steps as any[])[0] ?? { delayDays: 0 };
+	const nextSendAt = new Date(Date.now() + (firstStep.delayDays ?? 0) * 86_400_000);
+
+	try {
+		const [row] = await db.insert(schema.recruiterOutreachEnrollments).values({
+			sequenceId: c.req.param("id"),
+			recruiterId: user.sub,
+			talentPoolCandidateId: candidateId,
+			status: "active",
+			currentStep: 0,
+			nextSendAt,
+		} as any).returning();
+		return c.json(success(row), 201);
+	} catch {
+		return c.json(success({ duplicate: true }), 200);
+	}
+});
+
+recruiterRoutes.get("/sequences/:id/enrollments", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const [seq] = await db
+		.select({ recruiterId: schema.recruiterOutreachSequences.recruiterId })
+		.from(schema.recruiterOutreachSequences)
+		.where(eq(schema.recruiterOutreachSequences.id, c.req.param("id")))
+		.limit(1);
+	if (!seq || seq.recruiterId !== user.sub) return c.json(error("NOT_FOUND", "Sequence not found"), 404);
+
+	const rows = await db
+		.select()
+		.from(schema.recruiterOutreachEnrollments)
+		.where(eq(schema.recruiterOutreachEnrollments.sequenceId, c.req.param("id")))
+		.orderBy(desc(schema.recruiterOutreachEnrollments.enrolledAt));
+	return c.json(success(rows));
 });

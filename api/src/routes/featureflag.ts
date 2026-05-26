@@ -20,18 +20,45 @@ const DEFAULT_FLAGS = [
   { key: "smart_notifications", name: "Smart Notification Ranking", description: TIER_COPY.proUserDescription("AI-ranked notification feed"), enabled: true, rolloutPercentage: 100 },
 ];
 
-async function ensureSeedFlags() {
+// Seed-once guard: flags are seeded the first time the table is read in this
+// isolate; subsequent reads are served from the in-memory cache (gap #1361).
+// Previously every request fired two SELECTs against Neon (~10–20ms each) for
+// a mostly-static table. Cache is per-isolate so admin flag flips take effect
+// when the isolate recycles (~30 min). Admin write endpoints should invalidate.
+let cachedFlags: typeof schema.featureFlags.$inferSelect[] | null = null;
+let cachedAt = 0;
+const FLAGS_TTL_MS = 60_000;
+
+export function invalidateFeatureFlagCache(): void {
+  cachedFlags = null;
+  cachedAt = 0;
+}
+
+async function loadFlags(): Promise<typeof schema.featureFlags.$inferSelect[]> {
+  if (cachedFlags && Date.now() - cachedAt < FLAGS_TTL_MS) return cachedFlags;
   const db = getDb();
+  let flags: typeof schema.featureFlags.$inferSelect[] = [];
   try {
-    const existing = await db.select({ key: schema.featureFlags.key }).from(schema.featureFlags);
-    const existingKeys = new Set(existing.map((f) => f.key));
+    flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
+    const existingKeys = new Set(flags.map((f) => f.key));
     const toInsert = DEFAULT_FLAGS.filter((f) => !existingKeys.has(f.key));
     if (toInsert.length) {
       await db.insert(schema.featureFlags).values(toInsert as any[]);
+      flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
     }
   } catch {
-    // Table may not exist yet (pre-migration) — fall back gracefully
+    // Table may not exist yet (pre-migration) — synthesise from defaults
+    flags = DEFAULT_FLAGS.map((f) => ({
+      ...f,
+      id: crypto.randomUUID(),
+      conditions: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
   }
+  cachedFlags = flags;
+  cachedAt = Date.now();
+  return flags;
 }
 
 // Evaluate whether a flag is active for a given user.
@@ -52,21 +79,7 @@ function isEnabledForUser(flag: { enabled: boolean; rolloutPercentage: number },
 // GET /featureflag — list all flags and per-user evaluation
 featureFlagRoutes.get("/", async (c) => {
   const userId = c.var.user?.sub ?? "anonymous";
-  await ensureSeedFlags();
-  const db = getDb();
-
-  let flags: typeof schema.featureFlags.$inferSelect[] = [];
-  try {
-    flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
-  } catch {
-    flags = DEFAULT_FLAGS.map((f) => ({
-      ...f,
-      id: crypto.randomUUID(),
-      conditions: {},
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
-  }
+  const flags = await loadFlags();
 
   const userFlags: Record<string, boolean> = {};
   for (const flag of flags) {
@@ -76,13 +89,14 @@ featureFlagRoutes.get("/", async (c) => {
   return c.json(ok({ flags, userFlags }), 200);
 });
 
-// GET /featureflag/:key — evaluate a single flag for the current user
+// GET /featureflag/:key — evaluate a single flag for the current user.
+// Uses the same in-memory cache as the list endpoint to avoid a per-request
+// DB round-trip on hot paths that gate UI features.
 featureFlagRoutes.get("/:key", async (c) => {
   const flagKey = c.req.param("key");
   const userId = c.var.user?.sub ?? "anonymous";
-  const db = getDb();
-
-  const [flag] = await db.select().from(schema.featureFlags).where(eq(schema.featureFlags.key, flagKey)).limit(1);
+  const flags = await loadFlags();
+  const flag = flags.find((f) => f.key === flagKey);
   if (!flag) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Flag not found" } }, 404);
 
   const enabled = isEnabledForUser(flag, userId, flag.key);
@@ -107,6 +121,9 @@ featureFlagRoutes.patch("/:key", async (c) => {
     .returning();
 
   if (!updated) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Flag not found" } }, 404);
+  // Invalidate the in-memory cache so admin toggles take effect on the next
+  // read instead of waiting for the 60s TTL to expire (gap #1361).
+  invalidateFeatureFlagCache();
   return c.json(ok(updated), 200);
 });
 

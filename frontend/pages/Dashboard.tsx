@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -29,16 +29,18 @@ import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
 import AdSlot from "@/components/ads/AdSlot";
 
-// Role-specific dashboard components
-import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
-import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
-import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import CreatorDashboard from "@/components/dashboard/CreatorDashboard";
+// Role-specific dashboard components — lazy-loaded so a user only downloads
+// the variant they actually see (gap #1341). Each is ~300–500 LOC; bundling
+// all five into the main chunk shipped ~50–100 KB extra to every user.
+const JobSeekerDashboard = lazy(() => import("@/components/dashboard/JobSeekerDashboard"));
+const RecruiterDashboard = lazy(() => import("@/components/dashboard/RecruiterDashboard"));
+const EmployerDashboard = lazy(() => import("@/components/dashboard/EmployerDashboard"));
+const AdminDashboard = lazy(() => import("@/components/dashboard/AdminDashboard"));
+const CreatorDashboard = lazy(() => import("@/components/dashboard/CreatorDashboard"));
+const ProductDashboard = lazy(() => import("@/pages/admin/ProductDashboard"));
 import TabStrip, { type TabStripItem } from "@/components/ui/tab-strip";
 import { BarChart3, Activity } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import ProductDashboard from "@/pages/admin/ProductDashboard";
 
 
 type DashboardTab = "activity" | "content";
@@ -186,11 +188,13 @@ export default function Dashboard() {
             />
           </div>
         )}
-        {activeTab === "content" && !rolePermissions.isSuperAdmin ? (
-          <CreatorDashboard />
-        ) : (
-          getDashboardComponent()
-        )}
+        <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading dashboard…</div>}>
+          {activeTab === "content" && !rolePermissions.isSuperAdmin ? (
+            <CreatorDashboard />
+          ) : (
+            getDashboardComponent()
+          )}
+        </Suspense>
       </DashboardWrapper>
     );
   };

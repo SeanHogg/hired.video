@@ -172,26 +172,31 @@ export default function Pricing() {
         "Unlock 1M monthly AI tokens, voice cloning, every Pro export format (4K video, PDF / CBZ comics, motion-comic MP4), and priority matching.",
       freeFeatures: [
         "1 published pitch — video, comic, game, or podcast (unlimited drafts)",
-        "ATS-friendly resume builder",
+        "ATS-friendly resume builder + AI scoring + Resume Roast viral share",
         "Chrome extension — job tracking & match scoring",
         "50K AI tokens / mo",
         "Career Home dashboard & community feed",
         "Unlimited networking — connections & followers",
-        "Apply to jobs with video / comic intros",
+        "Apply to jobs with video / comic intros + 1-click Auto-Apply (Premium-gated for bulk)",
         "AI Studio — 1080p video, PNG-strip comic export (with watermark)",
-        "AI interview practice (limited)",
-        "Public profile hosting (hired.video branded)",
+        "AI interview practice (limited) + AI Coach / Career360 gap analysis",
+        "Public profile + per-section visibility controls (10 gateable sections)",
+        "Gamification — points, streaks, badges (cashout requires Pro)",
+        "Map + globe discovery (jobs, events, people, articles)",
       ],
       proFeatures: [
         "Unlimited published projects across every format",
+        "1M AI tokens / mo + pay-as-you-go top-up packs ($3.99–$199.99)",
         "AI Studio — Brand Kits, 4K video, PDF / CBZ comic, motion-comic MP4, watermark-free",
-        "Voice cloning & full TTS voice marketplace",
-        "One-click publishing — YouTube, Webtoon, itch.io + LinkedIn post AI",
-        "AI Assistance available (all tools)",
-        "Resume Tailor — per-job variations",
-        "AI interview practice",
-        "Priority job matching & salary insights",
-        "Project & profile analytics (every format)",
+        "Voice cloning + earn 95/5 on voice marketplace sales",
+        "Stock media library (Unsplash + Pexels + Pixabay) with dedup",
+        "One-click publishing — YouTube, Webtoon, itch.io, LinkedIn post AI",
+        "Resume Tailor (per-job JSON-preserving variations) + ATS package generator",
+        "Unlimited AI interview practice + async interview recorder",
+        "Learning Pathways — SCORM 1.2, xAPI, HMAC-verified certificates",
+        "Priority job matching, salary insights, hiring-pipeline analytics",
+        "Project + profile analytics, per-second engagement heatmap, AI thumbnails, hook optimizer",
+        "Gift-card cashout (Tremendous) + AI-credit & premium-month redemption",
         inboxSyncFeature(),
       ],
       unitLabel: "per month",
@@ -204,25 +209,30 @@ export default function Pricing() {
       proDescription:
         "Scale your team with AI candidate matching, automation, and analytics.",
       freeFeatures: [
-        "Applicant Tracking System (ATS)",
-        "Unlimited job postings (Google for Jobs indexed)",
+        "Applicant Tracking System (ATS) + visual Kanban pipeline",
+        "Unlimited job postings (Google for Jobs structured-data indexed)",
         "Recruiter Chrome extension — profile & company extraction",
-        "Unlimited searchable talent pool",
-        "Visual Kanban hiring pipeline",
-        "Basic interview scheduling",
+        "Unlimited searchable talent pool + Boolean operators (AND/OR/NOT/quoted)",
+        "Basic interview scheduling (1-way calendar)",
         "Up to 2 team members",
         "50K AI tokens / mo",
+        "Map + globe discovery (geo-tagged talent feed)",
+        "Real-time chat with presence + typing indicators",
       ],
       proFeatures: [
         "Unlimited talent pool & candidate imports",
-        "AI candidate ↔ job match scoring",
-        "Smart outreach campaigns & follow-ups",
-        "AI message personalization",
-        "Bulk resume scoring & screening",
-        "Video resume screening & transcript search",
-        "Performance dashboards & team leaderboards",
-        "Unlimited seats & team collaboration",
-        "Exclusive job boards + bidding",
+        "AI candidate ↔ job match scoring + bulk resume scoring & screening",
+        "Smart outreach campaigns, follow-up sequences, AI message personalization",
+        "Two-way calendar sync (Google + Outlook) with interview-slot generator",
+        "Video resume screening + transcript search",
+        "Structured scorecards + interview kits (Greenhouse-style, embedded in candidate detail)",
+        "Validated AI hiring assessments — Big Five (IPIP), cognitive, SJT, EQ, DISC",
+        "Async interview recorder + reviewer (Frame.io-style time-coded comments)",
+        "Exclusive job boards + bidding marketplace (recruiter auction)",
+        "ATS connectors — Greenhouse, Lever, Workday (HMAC-verified webhooks)",
+        "Performance dashboards, time-to-hire benchmarks, audit log",
+        "Public API + OpenAPI 3.1 spec (SHA-256 hashed API keys)",
+        "Unlimited seats & team collaboration · gamification leaderboards + cashout",
         inboxSyncFeature(" per seat"),
       ],
       unitLabel: "per seat / month",
@@ -235,26 +245,30 @@ export default function Pricing() {
       proDescription:
         "All-in-one HR suite with engagement, onboarding, and advanced analytics.",
       freeFeatures: [
-        "ATS + unlimited job postings",
-        "Google for Jobs structured-data indexing",
+        "ATS + unlimited job postings (Google for Jobs structured-data indexed)",
         "Recruiting & Sales CRM",
         "Video resume screening",
         "Recruiter Chrome extension",
-        "1 admin user",
-        "Up to 2 employees",
+        "1 admin user · up to 2 employees",
         "50K AI tokens / mo",
+        "Employer-branded company profile + follow system",
       ],
       proFeatures: [
-        "Employee community (Engage / Inform / Inspire)",
-        "Hiring & Onboarding (offers, contracts)",
-        "Performance management",
-        "Company video promos via AI Studio",
-        "Brand kits & company-wide templates",
-        "Calendar & smart notifications",
+        "Unlimited users + multi-tenant org structure",
+        "Employee community (Engage / Inform / Inspire) + company-wide feed",
+        "Hiring & onboarding — offer letters via Dropbox Sign, onboarding checklists",
+        "Performance management — OKRs, review cycles, employee sign-off",
+        "Company video promos via AI Studio + Brand Kits + company-wide templates",
+        "In-video lead-capture forms (Wistia Turnstile equivalent) → unified inbox",
+        "Async interview tool — record once, share to many candidates",
+        "Learning Pathways — author SCORM 1.2 / xAPI / verifiable certificates for employees",
+        "Two-way calendar + smart notifications (priority-ranked)",
+        "ATS connectors (Greenhouse, Lever, Workday) + OpenAPI 3.1 public API",
         inboxSyncFeature(" per user"),
-        "Advanced analytics, time-to-hire, API access",
-        "GDPR data-residency & SOC 2 (on the roadmap)",
-        "Unlimited users",
+        "White-label tenant — subdomain, custom branding, dedicated portal",
+        "Advanced analytics — time-to-hire, DEI funnel, source mix, account audit log",
+        "GDPR / CCPA compliance + data-residency policy (SOC 2 on the roadmap)",
+        "Affiliate program for talent referrals (tiered 10–25% commission)",
       ],
       unitLabel: "per user / month",
       userCountLabel: "Users",
@@ -1905,9 +1919,11 @@ export default function Pricing() {
 
                       {/* Engagement, Learning & Discovery — modules that
                           competitors don't ship at all (gamification cashout,
-                          SCORM learning paths, geo-map discovery, per-section
+                          SCORM learning paths, built-in AI/RAG/must-have-skills
+                          content library, geo-map discovery, per-section
                           profile gating). These ride on the same Pro seat —
-                          no per-module upcharge. */}
+                          no per-module upcharge, no separately-licensed
+                          LinkedIn-Learning-style SKU. */}
                       <SectionRow label="Engagement, Learning & Discovery" />
                       <FeatureRow
                         icon={Trophy}
@@ -1920,6 +1936,12 @@ export default function Pricing() {
                         label="Gift-card cashout (Tremendous) + AI-credit / premium-month redemption"
                         free="Earn points only"
                         pro="Full cashout + redemption"
+                      />
+                      <FeatureRow
+                        icon={GraduationCap}
+                        label="Built-in Learning Content Library — AI, RAG, prompt engineering, must-have skills (LinkedIn Learning is ~$379/seat/yr, separately licensed)"
+                        free="Browse + enroll"
+                        pro="Browse + enroll + employer authoring"
                       />
                       <FeatureRow
                         icon={GraduationCap}

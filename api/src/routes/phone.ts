@@ -224,6 +224,74 @@ phoneRoutes.get("/calls", async (c) => {
   return c.json(ok({ calls, total: calls.length }));
 });
 
+// ─── Outbound calls (gap #1359 — Loxo-Boost-parity native VoIP) ──────────────
+//
+// The recruiter extension's "Call via hired.video" toggle hits this
+// endpoint so outbound calls flow through SignalWire and get a `callLogs`
+// row + (optional) recording — instead of dropping out to the OS dialer
+// with no activity-timeline footprint.
+
+const PlaceCallSchema = z.object({
+  phoneNumberId: z.string().uuid(),
+  to:            z.string().min(7),
+  record:        z.boolean().optional(),
+});
+
+phoneRoutes.post("/call", async (c) => {
+  const userId = uid(c);
+  const parsed = PlaceCallSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", parsed.error.message), 400);
+
+  const db = getDb();
+  const [num] = await db
+    .select()
+    .from(schema.businessPhoneNumbers)
+    .where(and(eq(schema.businessPhoneNumbers.id, parsed.data.phoneNumberId), eq(schema.businessPhoneNumbers.userId, userId)))
+    .limit(1);
+  if (!num) return c.json(fail("NOT_FOUND", "Phone number not found"), 404);
+
+  const webhookBase = (globalThis as any).__ENV?.WEBHOOK_BASE_URL
+    || process.env.WEBHOOK_BASE_URL
+    || (globalThis as any).__ENV?.FRONTEND_URL
+    || process.env.FRONTEND_URL
+    || "";
+  if (!webhookBase) return c.json(fail("CONFIG_ERROR", "WEBHOOK_BASE_URL not configured"), 500);
+
+  let result: { sid: string; status: string };
+  try {
+    result = await sw.placeCall({
+      from: num.phoneNumber,
+      to: parsed.data.to,
+      webhookBase,
+      record: parsed.data.record ?? true,
+    });
+  } catch (err: any) {
+    return c.json(fail("PROVIDER_ERROR", err?.message ?? "Call failed"), 502);
+  }
+
+  const [log] = await db.insert(schema.callLogs).values({
+    userId,
+    phoneNumberId: parsed.data.phoneNumberId,
+    direction:     "outbound",
+    callerNumber:  num.phoneNumber,
+    calledNumber:  parsed.data.to,
+    status:        result.status === "completed" ? "completed" : "ringing",
+    signalwireCallSid: result.sid,
+  } as any).returning();
+
+  return c.json(ok({ call: log, sid: result.sid, status: result.status }), 201);
+});
+
+// SignalWire fetches this when an outbound call is answered — we return
+// TwiML that bridges to the destination and (optionally) records.
+phoneRoutes.post("/webhook/outbound-call", async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const to = form?.get("To")?.toString() ?? "";
+  const callerId = form?.get("From")?.toString() ?? null;
+  const xml = sw.buildOutboundCallTwiML({ to, record: true, callerId });
+  return new Response(xml, { headers: { "Content-Type": "application/xml" } });
+});
+
 // ─── SMS ──────────────────────────────────────────────────────────────────────
 
 // GET /api/phone/sms

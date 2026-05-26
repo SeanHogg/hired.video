@@ -218,6 +218,88 @@ export async function rankTopIntroducers(
 }
 
 // ---------------------------------------------------------------------------
+// Warm-intro request — opens a DM with a mutual asking them to introduce
+// the viewer to the target. This is the action half of the warm-network
+// surface: the graph endpoints above tell the viewer WHO can introduce
+// them; this turns that into a real ask sitting in the mutual's inbox.
+//
+// The target is intentionally NOT added to the conversation — the mutual
+// is the gatekeeper and decides whether to forward, accept, or decline.
+// ---------------------------------------------------------------------------
+
+export interface WarmIntroResult {
+  conversationId: string;
+  messageId: string;
+}
+
+export type WarmIntroError =
+  | "self"
+  | "via_not_mutual"
+  | "target_missing"
+  | "via_missing";
+
+export async function requestWarmIntro(
+  viewerId: string,
+  viaUserId: string,
+  targetUserId: string,
+  message: string,
+): Promise<WarmIntroResult | { error: WarmIntroError }> {
+  if (viewerId === viaUserId || viewerId === targetUserId || viaUserId === targetUserId) {
+    return { error: "self" };
+  }
+
+  const db = getDb();
+  const usersTable = schema.users;
+  const rows = await db
+    .select({ id: usersTable.id, name: usersTable.name })
+    .from(usersTable)
+    .where(inArray(usersTable.id, [viaUserId, targetUserId]))
+    .catch(() => [] as { id: string; name: string | null }[]);
+
+  const viaRow = rows.find((r: any) => r.id === viaUserId);
+  const targetRow = rows.find((r: any) => r.id === targetUserId);
+  if (!viaRow) return { error: "via_missing" };
+  if (!targetRow) return { error: "target_missing" };
+
+  const [viewerPeers, targetPeers] = await Promise.all([
+    fetchAcceptedPeers(viewerId),
+    fetchAcceptedPeers(targetUserId),
+  ]);
+  if (!viewerPeers.has(viaUserId) || !targetPeers.has(viaUserId)) {
+    return { error: "via_not_mutual" };
+  }
+
+  const targetName = targetRow.name?.trim() || "a connection";
+  const subject = `Warm intro request: ${targetName}`.slice(0, 500);
+
+  const [convo] = await db
+    .insert(schema.conversations)
+    .values({ subject, type: "warm_intro" } as any)
+    .returning();
+
+  await Promise.all(
+    [viewerId, viaUserId].map((pId) =>
+      db
+        .insert(schema.conversationParticipants)
+        .values({ conversationId: convo.id, userId: pId, role: "member" } as any),
+    ),
+  );
+
+  const [msg] = await db
+    .insert(schema.messages)
+    .values({
+      conversationId: convo.id,
+      senderId: viewerId,
+      content: message,
+      contentType: "text",
+      metadata: { kind: "warm_intro_request", targetUserId },
+    } as any)
+    .returning();
+
+  return { conversationId: convo.id, messageId: msg.id };
+}
+
+// ---------------------------------------------------------------------------
 // Public exports for testing
 // ---------------------------------------------------------------------------
 

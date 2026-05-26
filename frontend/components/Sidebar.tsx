@@ -91,11 +91,13 @@ export default function Sidebar({
       return location.pathname === "/";
     }
 
-    // Special handling for tools - match /tools, /Tools, and /chrome-extension
+    // Special handling for tools — match /tools, /Tools, /learning (the
+    // SEO alias for the Learning Content Library tab), and /chrome-extension.
     if (item.href === "/tools") {
       return (
         location.pathname.startsWith("/tools") ||
         location.pathname.startsWith("/Tools") ||
+        location.pathname.startsWith("/learning") ||
         location.pathname.startsWith("/chrome-extension")
       );
     }

@@ -345,7 +345,14 @@ export const extractedProfiles = pgTable("extracted_profiles", {
     experience?: Array<{ title?: string; company?: string; duration?: string; description?: string }>;
     education?: Array<{ degree?: string; institution?: string; year?: string }>;
     summary?: string;
-    contactInfo?: { email?: string; phone?: string; linkedin?: string };
+    contactInfo?: {
+      email?: string;
+      phone?: string;
+      linkedin?: string;
+      github?: string;
+      twitter?: string;
+      website?: string;
+    };
   }>(),
   extractionMethod: varchar("extraction_method", { length: 50 }).default("extension").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -354,6 +361,76 @@ export const extractedProfiles = pgTable("extracted_profiles", {
 
 export type ExtractedProfile = typeof extractedProfiles.$inferSelect;
 export type NewExtractedProfile = typeof extractedProfiles.$inferInsert;
+
+// ─── Recruiter Lists (gap #1360) ─────────────────────────────────────────
+// Recruiter-scoped collections of candidates distinct from a job's
+// pipeline. `kind` discriminates ordinary lists from prioritised call
+// queues so the extension can render them in two separate sections.
+
+export const recruiterLists = pgTable("recruiter_lists", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  kind: varchar("kind", { length: 32 }).default("list").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RecruiterList = typeof recruiterLists.$inferSelect;
+export type NewRecruiterList = typeof recruiterLists.$inferInsert;
+
+export const recruiterListMembers = pgTable("recruiter_list_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  listId: uuid("list_id").notNull().references(() => recruiterLists.id, { onDelete: "cascade" }),
+  talentPoolCandidateId: uuid("talent_pool_candidate_id").notNull().references(() => talentPoolCandidates.id, { onDelete: "cascade" }),
+  position: integer("position").default(0).notNull(),
+  addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RecruiterListMember = typeof recruiterListMembers.$inferSelect;
+export type NewRecruiterListMember = typeof recruiterListMembers.$inferInsert;
+
+// ─── Recruiter Outreach Sequences (gap #1357) ────────────────────────────
+// Reusable, recruiter-authored outreach copy organised as ordered steps
+// (channel + delay + body). Candidates can be enrolled directly from the
+// Chrome extension without first running the sourcing agent — distinct
+// from `recruiterAgentFollowups`, which is agent-run-bound.
+
+export const recruiterOutreachSequences = pgTable("recruiter_outreach_sequences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  steps: jsonb("steps").default([]).notNull().$type<Array<{
+    channel: "email" | "message" | "sms";
+    delayDays: number;
+    subject?: string;
+    body: string;
+  }>>(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RecruiterOutreachSequence = typeof recruiterOutreachSequences.$inferSelect;
+export type NewRecruiterOutreachSequence = typeof recruiterOutreachSequences.$inferInsert;
+
+export const recruiterOutreachEnrollments = pgTable("recruiter_outreach_enrollments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sequenceId: uuid("sequence_id").notNull().references(() => recruiterOutreachSequences.id, { onDelete: "cascade" }),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  talentPoolCandidateId: uuid("talent_pool_candidate_id").notNull().references(() => talentPoolCandidates.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  currentStep: integer("current_step").default(0).notNull(),
+  nextSendAt: timestamp("next_send_at", { withTimezone: true }),
+  enrolledAt: timestamp("enrolled_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  metadata: jsonb("metadata").default({}).notNull(),
+});
+
+export type RecruiterOutreachEnrollment = typeof recruiterOutreachEnrollments.$inferSelect;
+export type NewRecruiterOutreachEnrollment = typeof recruiterOutreachEnrollments.$inferInsert;
 
 // ─── Recruiter Match Scores (cached job ↔ candidate compatibility scores) ────
 // Stores the result of scoring a talent-pool candidate against a job.

@@ -28,6 +28,19 @@ import {
   GraduationCap,
   MapPin,
   Eye,
+  Flame,
+  CalendarCheck,
+  MessageCircle,
+  Coins,
+  Inbox,
+  Coffee,
+  UserPlus,
+  PlaySquare,
+  KeyRound,
+  TrendingUp,
+  Layers,
+  Image as ImageIcon,
+  Headphones,
 } from "lucide-react";
 import { PRO_MONTHLY_PRICE } from "@shared/pricing";
 import { Badge } from "@/components/ui/badge";
@@ -147,6 +160,25 @@ export const FEATURE_ROWS: FeatureRow[] = [
     feature: "Chrome extension for sourcing/job capture",
     icon: Chrome,
     values: { hired: "yes", loxo: "yes", linkedin: "yes", greenhouse: "partial", bullhorn: "partial" },
+    note: "Hired.Video's recruiter extension captures profiles from any site, surfaces personal email + phone + LinkedIn/GitHub/X/website with click-to-call, click-to-email, and click-to-SMS, drops candidates directly onto an open job's pipeline, edits tags inline, and auto-logs every action to the candidate activity timeline — feature parity with Loxo Boost.",
+  },
+  {
+    feature: "Profile contact + social enrichment from capture (email, phone, LinkedIn, GitHub, X, website)",
+    icon: Chrome,
+    values: { hired: "yes", loxo: "yes", linkedin: "partial", greenhouse: "no", bullhorn: "partial" },
+    note: "Both Hired.Video and LOXO pull personal email + phone + social URLs straight off the captured page. LinkedIn keeps email/phone behind InMail and Sales Navigator unlocks. Greenhouse has no capture extension at all.",
+  },
+  {
+    feature: "Click-to-call / email / SMS from the extension",
+    icon: Chrome,
+    values: { hired: "yes", loxo: "yes", linkedin: "partial", greenhouse: "no", bullhorn: "partial" },
+    note: "Hired.Video uses OS-native tel:/mailto:/sms: handoff (zero VoIP licence cost) and auto-logs each outreach as an interaction. LOXO ships its own VoIP layer at a higher per-seat price.",
+  },
+  {
+    feature: "One-click submit to a job + auto-logged activity timeline from the extension",
+    icon: Chrome,
+    values: { hired: "yes", loxo: "yes", linkedin: "partial", greenhouse: "no", bullhorn: "partial" },
+    note: "Capture → tag → submit → log all happens in the side panel without leaving the sourcing page.",
   },
   {
     feature: "AI candidate ↔ job match scoring",
@@ -210,6 +242,24 @@ export const FEATURE_ROWS: FeatureRow[] = [
     note: "LinkedIn's 1B-profile graph is structurally uncloneable in the short term. Hired.Video ships the graph QUERY surface — `/api/graph/mutuals/:userId`, `/api/graph/path/:userId` (1st / 2nd degree), and `/api/graph/top-introducers` for warm-intro ranking — on top of the existing `user_connections` table. The recruiter workflow on the graph is parity; the underlying 1B-profile reach is the remaining structural gap.",
   },
   {
+    feature: "Direct messaging to any user (no paywall, no InMail credit cap)",
+    icon: Inbox,
+    values: { hired: "yes", loxo: "partial", linkedin: "partial", greenhouse: "partial", bullhorn: "partial" },
+    note: "LinkedIn restricts free users to 1st-degree DMs and meters InMail to non-connections (≈100–150/mo on Recruiter Corporate at ~$1,080/seat/mo). Hired.Video's `/api/messages/conversations` lets any authenticated user start a conversation with any other user — no credit cap, no per-message price. AI-personalized message body is a Pro upgrade, not a wall on reachability.",
+  },
+  {
+    feature: "Warm-intro request through a mutual connection",
+    icon: UserPlus,
+    values: { hired: "yes", loxo: "no", linkedin: "yes", greenhouse: "no", bullhorn: "no" },
+    note: "On `/people/:id`, the WarmIntroRequestButton fetches `/api/graph/mutuals/:userId`, lets the viewer pick a mutual, and POSTs `/api/graph/intro` — which spins up a private DM between viewer and mutual carrying the ask. Mutual decides whether to forward. Closes the LinkedIn 'Get introduced' workflow without paid InMail.",
+  },
+  {
+    feature: '"Grab a coffee" meetup invites — calendar event + shared task on accept',
+    icon: Coffee,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Gated on the recipient's `openToCoffee` profile section. On accept, CoffeeRequestService writes one `scheduled_events` row (type='coffee'), two `event_attendees`, and a shared task in one transaction. Coffee pins also surface on the `/map` page for the opted-in audience. No competitor ships a native coffee-meetup primitive — LinkedIn punts the scheduling to Calendly.",
+  },
+  {
     feature: "Enterprise sales motion (multi-tier seats, intent data, large-account contracts)",
     icon: Building2,
     values: { hired: "no", loxo: "partial", linkedin: "yes", greenhouse: "yes", bullhorn: "yes" },
@@ -234,6 +284,12 @@ export const FEATURE_ROWS: FeatureRow[] = [
     note: "Native SCORM 1.2 runtime, xAPI LRS, DAG learning paths, HMAC-signed verifiable certificates, gamification hooks, and employer-side authoring. LinkedIn Learning is content-only — no SCORM ingestion, no DAG paths, no employer-author surface.",
   },
   {
+    feature: "Built-in learning content library (AI / RAG / must-have skills)",
+    icon: GraduationCap,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Platform-seeded courses on AI fundamentals, Retrieval-Augmented Generation, and the AI-era must-have skills ship as part of every plan — including Free. LinkedIn Learning's content library is a separate ~$379/seat/yr SKU on top of Recruiter; Greenhouse, Bullhorn, and LOXO don't ship learning content at all. Surface lives at /tools?tab=learning (alias: /learning).",
+  },
+  {
     feature: "Map / geo-tagged discovery for jobs, events, people",
     icon: MapPin,
     values: { hired: "yes", loxo: "no", linkedin: "partial", greenhouse: "no", bullhorn: "no" },
@@ -244,6 +300,72 @@ export const FEATURE_ROWS: FeatureRow[] = [
     icon: Eye,
     values: { hired: "yes", loxo: "no", linkedin: "partial", greenhouse: "no", bullhorn: "no" },
     note: "Candidates gate each section of /people/[id] independently (resume, video pitch, work history, certs, etc.) with role-keyed defaults via a shared resolver. LinkedIn offers profile-wide privacy, not per-section.",
+  },
+  {
+    feature: "Resume Roast viral engine + LinkedIn share card",
+    icon: Flame,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "AI-generated playful roast + visible score + LinkedIn share intent + PNG card download. Drives top-of-funnel inbound on a surface no recruiting platform owns.",
+  },
+  {
+    feature: "Two-way calendar sync (Google + Outlook) with interview slot generation",
+    icon: CalendarCheck,
+    values: { hired: "yes", loxo: "partial", linkedin: "no", greenhouse: "partial", bullhorn: "partial" },
+    note: "Native OAuth on both providers with refresh-token rotation, interview-slot generator, book-interview flow, and reminder notifications — not a vendor integration.",
+  },
+  {
+    feature: "Inbox sync (Gmail/Outlook unified inbox + reply tracking)",
+    icon: Inbox,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "partial" },
+    note: "3 mailboxes included on Pro; +$5/mo each additional. Threaded inbox with reply tracking, candidate-link enrichment, and email rules per user.",
+  },
+  {
+    feature: "In-video lead-capture forms (Wistia Turnstile equivalent)",
+    icon: PlaySquare,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Pin a form to any playback timestamp; submissions mirror into marketing_leads so the unified inbox surfaces them. Same primitive doubles as in-lesson knowledge checks on courses.",
+  },
+  {
+    feature: "Frame.io-style time-coded review comments + tokenized share links",
+    icon: MessageCircle,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Threaded comments pinned to any frame, anonymous-external-reviewer share tokens, no separate Frame.io / Vimeo Pro license required.",
+  },
+  {
+    feature: "Token-metered AI (top-up packs $3.99–$199.99 in addition to monthly allowance)",
+    icon: Coins,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "1M tokens/mo on Pro plus pay-as-you-go top-ups (Bite/Standard/Power/Mega). No competitor exposes token-level metering at consumer prices.",
+  },
+  {
+    feature: "Public, programmable API + OpenAPI 3.1 spec",
+    icon: KeyRound,
+    values: { hired: "yes", loxo: "partial", linkedin: "yes", greenhouse: "yes", bullhorn: "yes" },
+    note: "SHA-256-hashed API keys with per-call scoping (Premium tier). Spec at /api/openapi.json + Swagger UI at /docs.",
+  },
+  {
+    feature: "Creator monetisation (95/5 split on voice clones + templates + future media)",
+    icon: TrendingUp,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Creator-uploaded voice clones, templates, and future media sold to other users with a 95/5 split + CC processing on buyer. No recruiting platform pays the creator at all.",
+  },
+  {
+    feature: "White-label tenants (subdomain + brand + dedicated portal)",
+    icon: Layers,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "partial" },
+    note: "University / bootcamp / staffing-firm tenant types with ROI calculator, custom branding, plan-tier control. Bullhorn enterprise contracts support white-label for staffing customers only.",
+  },
+  {
+    feature: "Stock media library (Unsplash + Pexels + Pixabay) with content-addressed dedup",
+    icon: ImageIcon,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Aggregated stock library inside the AI Studio. One R2 object per sha256(bytes) — same asset backs many users without duplication.",
+  },
+  {
+    feature: "Multi-format AI Studio (video + podcast + voice + animation + comic + game + CAD)",
+    icon: Headphones,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Studio splits on a `mediaKind` axis with kind-specific scene templates + render engines. Most competitors are video-only or audio-only.",
   },
 ];
 
@@ -263,12 +385,13 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     pricing:
       "Free (1 user). Basic at $169/user/mo. Professional and Enterprise are custom-quoted; AI sourcing and automated outreach sit on Professional and above.",
     whereTheyShine: [
-      "Massive sourcing database with personal-contact enrichment",
-      "Mature integrated ATS + CRM workflow",
-      "Loxo Boost Chrome extension for profile capture",
+      "Massive sourcing database (1.2B profiles) with deep personal-contact enrichment",
+      "Mature integrated ATS + CRM workflow at the high end",
+      "Bundled VoIP layer for outbound calls directly from the CRM",
     ],
     whereHiredWins: [
       "$9.95/seat/mo Pro vs. $169/user/mo Basic — and AI is on the Free tier",
+      "Recruiter Chrome extension matches Loxo Boost feature-for-feature — profile capture with personal email + phone + LinkedIn / GitHub / X / website auto-enrichment, click-to-call / email / SMS quick actions, one-click submit to a job, inline tag editor, and auto-logged activity timeline — at 1/17th the per-seat price",
       "Native AI video resumes, AI Studio editor, and voice cloning — LOXO has none of these",
       "Built-in consumer job board with Google-for-Jobs indexing, plus a candidate-facing app (interview practice, resume tailor, public profiles)",
       "Gamification with gift-card cashout, learning pathways with SCORM, and a map discovery surface — all absent from LOXO",
@@ -281,16 +404,19 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     pricing:
       "Recruiter Lite from $170/mo (~$1,680/yr) per seat. Recruiter Corporate is custom-quoted at roughly $835–$1,080 per seat per month based on third-party reporting. No free tier.",
     whereTheyShine: [
-      "Unmatched access to the LinkedIn professional graph",
-      "InMail and warm-network signal at scale",
-      "Brand-of-record for sourcing in many enterprises",
+      "Unmatched 1B-profile professional graph — the only structural moat",
+      "Sponsored InMail and brand-of-record sourcing at enterprise scale",
       "LinkedIn Learning content library (separately licensed)",
     ],
     whereHiredWins: [
       "About 1/100th the cost of Recruiter Corporate per seat",
+      "Free, uncapped direct messaging — no InMail credit limit, no per-message paywall to reach non-connections",
+      "\"Ask for an intro\" through a mutual is a built-in CTA on every profile (LinkedIn's same workflow is gated behind paid Recruiter)",
+      "\"Grab a coffee\" meetup invites with calendar event + shared accountability task on accept — LinkedIn has no native equivalent",
       "Native ATS, CRM, and async video interviews — Recruiter requires an external ATS",
       "Candidates get first-class tools too: AI video resumes, interview practice, and resume tailoring",
-      "SCORM 1.2 + xAPI + employer-authored learning paths (LinkedIn Learning is content-only)",
+      "Built-in learning content library (AI, RAG, must-have skills) bundled with every plan — LinkedIn Learning is a separately-licensed ~$379/seat/yr SKU on top of Recruiter",
+      "SCORM 1.2 + xAPI + employer-authored learning paths (LinkedIn Learning is content-only — no SCORM ingestion, no DAG paths, no employer-author surface)",
       "Per-section profile visibility, gift-card-cashout gamification, and a /map surface — none ship on LinkedIn",
     ],
   },
@@ -362,6 +488,77 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
       "Candidates get an AI studio, voice cloning, resume tools, gamification, and learning pathways — not just an interview portal",
     ],
   },
+  {
+    name: "Synthesia",
+    positioning:
+      "AI avatar training and explainer video platform. Best-known for high-quality presenter avatars and 140+ languages, marketed primarily to L&D teams and internal comms.",
+    pricing:
+      "Starter $30/mo · Creator $96/mo per seat · Enterprise custom. No creator rev-share — buyers pay seat licenses; instructional designers don't get a cut when a course is sold.",
+    whereTheyShine: [
+      "Best-in-class AI presenter avatars",
+      "140+ language dubbing with consistent voice",
+      "Mature L&D + internal-comms positioning",
+    ],
+    whereHiredWins: [
+      "Real voice cloning + voice marketplace (95/5 split to the creator) — Synthesia doesn't pay creators",
+      "Multi-format Studio: comics, games, podcasts, animation, CAD — not just talking-head videos",
+      "Native SCORM 1.2 + xAPI export + verifiable certificates — Synthesia exports MP4 only",
+      "Full hiring stack underneath the studio (ATS, CRM, job board, interview practice) at consumer prices",
+    ],
+  },
+  {
+    name: "HeyGen",
+    positioning:
+      "Consumer-friendly AI avatar studio competing with Synthesia. Strong on UI ergonomics + faster avatar iteration.",
+    pricing:
+      "Free (limited) · Creator $24/mo · Team $69/mo per seat. No creator rev-share.",
+    whereTheyShine: [
+      "Approachable consumer UI for AI avatar creation",
+      "Fast avatar style iteration + voice library",
+    ],
+    whereHiredWins: [
+      "Multi-format authoring (comics + games + podcasts + CAD) — not just AI avatars",
+      "Native ATS + CRM + interview tools + job board — full talent vertical",
+      "Creator marketplace with 95/5 split, gamification cashout, SCORM export — none of which HeyGen ships",
+    ],
+  },
+  {
+    name: "Articulate 360 (Storyline + Rise)",
+    positioning:
+      "Gold-standard L&D authoring tool — 20+ years of maturity, gigantic asset library, every L&D buyer knows it. Storyline is desktop-first; Rise is web.",
+    pricing:
+      "$1,099/seat/yr (Personal) · $1,749/seat/yr (Teams). No creator rev-share — buyers pay annual seat fees, course creators don't see any of the downstream course-sale revenue.",
+    whereTheyShine: [
+      "20+ year ecosystem with deep template + asset libraries",
+      "Familiar UX for the entire L&D persona",
+      "Strong screen-reader / accessibility tooling",
+    ],
+    whereHiredWins: [
+      "$9.95/mo Pro vs. $1,099/yr seat — 92% lower for individual authors",
+      "AI scripting + AI avatar + voice cloning + auto captions baked in (Articulate is mostly manual)",
+      "Web-native authoring (Articulate Storyline is still partly desktop)",
+      "95/5 creator rev-share when courses sell — Articulate keeps 100% of the seat fee",
+      "Same studio also produces AI video resumes, podcasts, comics, games — not just elearning",
+    ],
+  },
+  {
+    name: "Canva / CapCut",
+    positioning:
+      "Consumer-grade video + design editors. Canva covers static + light video; CapCut is a TikTok-style mobile-first video editor.",
+    pricing:
+      "Canva Free / Pro $14.99/mo · CapCut Free / Pro $9.99/mo. No creator rev-share.",
+    whereTheyShine: [
+      "Huge template libraries + mass consumer brand recognition",
+      "Mobile + web parity (especially CapCut)",
+      "Massive social-media template fit",
+    ],
+    whereHiredWins: [
+      "Studio outputs are linked into a hiring + career platform — videos become resumes / interview submissions / course lessons",
+      "AI generation from a single prompt (storyboard → scene graph → render) — Canva/CapCut are manual",
+      "Creator marketplace with 95/5 split + SCORM/xAPI export + ATS package generator — not present on Canva or CapCut",
+      "Voice cloning + voice marketplace + per-second engagement heatmap on every published video",
+    ],
+  },
 ];
 
 export function CellIcon({ value }: { value: Cell }) {
@@ -399,9 +596,9 @@ export function buildComparisonStructuredData() {
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Hired.Video vs. competitor recruiting platforms",
+    name: "Hired.Video vs. competitor recruiting + studio + L&D platforms",
     description:
-      "Side-by-side comparison of Hired.Video against LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue, and VidCruiter for AI video resumes, ATS, recruiting CRM, gamification, learning pathways, and pricing.",
+      "Side-by-side comparison of Hired.Video against LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue, VidCruiter, Synthesia, HeyGen, Articulate 360, Canva, and CapCut — covering AI video resumes, ATS, recruiting CRM, AI studio (video / comic / podcast / animation), voice cloning marketplace, SCORM 1.2 + xAPI learning paths, gamification, in-video lead capture, two-way calendar sync, and pricing.",
     itemListElement: VENDORS.map((v, i) => ({
       "@type": "ListItem",
       position: i + 1,

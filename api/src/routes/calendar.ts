@@ -40,6 +40,10 @@ calendarRoutes.get("/events", requirePro("Calendar Integration"), async (c) => {
 
   const from = c.req.query("from") ? new Date(c.req.query("from")!) : new Date();
   const to = c.req.query("to") ? new Date(c.req.query("to")!) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // Hard cap on rows returned: a user with thousands of synced events would
+  // otherwise OOM the Worker isolate (128 MB). 500 covers any reasonable
+  // 30-day window; callers needing more pass a tighter `from`/`to`. Gap #1337.
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "500", 10) || 500, 1000);
 
   const events = await db
     .select()
@@ -51,7 +55,8 @@ calendarRoutes.get("/events", requirePro("Calendar Integration"), async (c) => {
         lte(schema.scheduledEvents.startAt, to),
       ),
     )
-    .orderBy(schema.scheduledEvents.startAt);
+    .orderBy(schema.scheduledEvents.startAt)
+    .limit(limit);
 
   return c.json(success(events), 200);
 });

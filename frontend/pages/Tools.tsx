@@ -8,6 +8,7 @@ import {
   Play,
   TrendingUp,
   Heart,
+  GraduationCap,
 } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -21,6 +22,7 @@ import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { ToolCard } from "@/components/ToolCard";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
+import LearningPanel from "@/components/courses/LearningPanel";
 import {
   TOOLS_CATALOG,
   audienceForRole,
@@ -94,6 +96,10 @@ export default function Tools() {
     tierParam === "free" || tierParam === "pro" ? tierParam : "all";
   const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
   const categoryFilter = parseCategoryFilter(searchParams.get("category"));
+  // Sub-tab on /tools — "tools" (default AI-tool grid) or "learning"
+  // (built-in Learning Content Library; competes with LinkedIn Learning's
+  // separately-licensed library by being bundled into every plan).
+  const tabParam = searchParams.get("tab") === "learning" ? "learning" : "tools";
 
   const setCategoryFilter = (next: CategoryFilter) => {
     const params = new URLSearchParams(searchParams);
@@ -254,6 +260,15 @@ export default function Tools() {
                     <ToolCard key={tool.id} tool={tool} />
                   ))}
                 </div>
+              </div>
+
+              {/* Built-in Learning Content Library — competes with LinkedIn
+                  Learning's separately-licensed library by being bundled
+                  with every plan (including Free). Surfaced on the marketing
+                  page so signed-out visitors see the entitlement before
+                  they hit signup. */}
+              <div className="mb-12 sm:mb-16">
+                <LearningPanel limit={12} />
               </div>
 
           {/* How It Works */}
@@ -485,11 +500,18 @@ export default function Tools() {
       <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             <PageHeader
-              tabs={[{ key: "tools", label: "Tools", icon: Wrench, to: "/tools" }]}
-              activeTabKey="tools"
+              tabs={[
+                { key: "tools", label: "Tools", icon: Wrench, to: "/tools" },
+                { key: "learning", label: "Learning", icon: GraduationCap, to: "/tools?tab=learning" },
+              ]}
+              activeTabKey={tabParam}
               search={<HeaderSearch />}
             />
 
+            {tabParam === "learning" ? (
+              <LearningPanel />
+            ) : (
+              <>
             {/* Audience filter — chip row (#472). Counts are not shown
                 because the audience axis is mutually exclusive with the
                 viewer's effective role; the For-me default already
@@ -595,6 +617,8 @@ export default function Tools() {
                 </div>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
     </AppShell>

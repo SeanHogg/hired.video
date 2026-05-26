@@ -37,6 +37,7 @@ import VisitorActionsSection, {
   type ConnectionState,
 } from "@/components/profile/sections/VisitorActionsSection";
 import { GrabCoffeeButton } from "@/components/events/GrabCoffeeButton";
+import { WarmIntroRequestButton } from "@/components/graph/WarmIntroRequestButton";
 import EmployerCompaniesTab from "@/components/company/EmployerCompaniesTab";
 import ConnectionRequestDialog from "@/components/profile/dialogs/ConnectionRequestDialog";
 import EditAboutDialog from "@/components/profile/dialogs/EditAboutDialog";
@@ -572,6 +573,11 @@ function PeopleDetailContent() {
                 onSubmitToJob={handleSubmitToJob}
               />
               <GrabCoffeeButton
+                targetUserId={profile.id ?? ""}
+                targetName={[profile.firstName, profile.lastName].filter(Boolean).join(" ") || null}
+                isSelf={isOwner}
+              />
+              <WarmIntroRequestButton
                 targetUserId={profile.id ?? ""}
                 targetName={[profile.firstName, profile.lastName].filter(Boolean).join(" ") || null}
                 isSelf={isOwner}

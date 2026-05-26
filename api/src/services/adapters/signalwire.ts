@@ -111,6 +111,68 @@ export async function releaseNumber(sid: string): Promise<void> {
   }
 }
 
+/**
+ * Place an outbound call. Returns the call SID + initial status. The
+ * `Url` parameter tells SignalWire which TwiML to fetch once the call
+ * connects — we point it at our own `/api/phone/webhook/call` so the
+ * existing inbound TwiML builder handles the bridge / record / VM flow.
+ *
+ * Used by the recruiter extension's "Call via hired.video" toggle so
+ * outbound calls flow through the platform instead of the OS dialer.
+ * Gap #1359 (Loxo-Boost-parity native VoIP).
+ */
+export async function placeCall(opts: {
+  from: string;
+  to:   string;
+  webhookBase: string;
+  record?: boolean;
+}): Promise<{ sid: string; status: string }> {
+  if (!isConfigured()) {
+    return { sid: `STUB_CALL_${Date.now()}`, status: "queued" };
+  }
+  const body = new URLSearchParams({
+    From: opts.from,
+    To:   opts.to,
+    Url:  `${opts.webhookBase}/api/phone/webhook/outbound-call`,
+    StatusCallback: `${opts.webhookBase}/api/phone/webhook/call-status`,
+    StatusCallbackEvent: "initiated ringing answered completed",
+    StatusCallbackMethod: "POST",
+  });
+  if (opts.record) {
+    body.set("Record", "true");
+    body.set("RecordingStatusCallback", `${opts.webhookBase}/api/phone/webhook/recording`);
+  }
+  const res = await fetch(apiUrl("/Calls.json"), {
+    method:  "POST",
+    headers: { Authorization: basicAuth(), "Content-Type": "application/x-www-form-urlencoded" },
+    body:    body.toString(),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`SignalWire call failed: ${res.status} — ${err}`);
+  }
+  const json = await res.json() as any;
+  return { sid: json.sid, status: json.status ?? "queued" };
+}
+
+/**
+ * Build TwiML returned to SignalWire when an outbound call connects.
+ * Bridges the recruiter's caller ID to the destination and (optionally)
+ * records the leg for the activity timeline.
+ */
+export function buildOutboundCallTwiML(opts: {
+  to: string;
+  record: boolean;
+  callerId: string | null;
+}): string {
+  const recordAttrs = opts.record ? ` record="record-from-answer" recordingStatusCallback="/api/phone/webhook/recording"` : "";
+  const callerIdAttr = opts.callerId ? ` callerId="${escapeXml(opts.callerId)}"` : "";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial timeout="30"${callerIdAttr}${recordAttrs}>${escapeXml(opts.to)}</Dial>
+</Response>`;
+}
+
 /** Send an outbound SMS. Returns the message SID. */
 export async function sendSms(opts: {
   from: string;

@@ -769,6 +769,10 @@ const App = () => (
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/checkout/success" element={<CheckoutSuccess />} />
                       <Route path="/tools" element={<Tools />} />
+                      {/* /learning is the SEO-friendly alias for the
+                          built-in Learning Content Library tab on /tools.
+                          Same page, learning tab pre-selected. */}
+                      <Route path="/learning" element={<Navigate to="/tools?tab=learning" replace />} />
                       <Route path="/chat" element={<AICoach />} />
                       <Route path="/ai-coach" element={<AICoach />} />
                       {/* Legacy PascalCase tool routes — redirect to the

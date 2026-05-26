@@ -84,6 +84,15 @@ export const courseService = {
     return res.data ?? [];
   },
 
+  async listPublished(limit = 50): Promise<PublicCourseCard[]> {
+    const res = await apiClient.get<PublicCourseCard[]>(
+      `/api/courses/public?limit=${limit}`,
+      undefined,
+      { suppressErrorEvent: true },
+    );
+    return res.data ?? [];
+  },
+
   async getMine(id: string): Promise<Course> {
     const res = await apiClient.get<Course>(`/api/courses/${id}`);
     return res.data;

@@ -19,6 +19,7 @@ import {
   findMutualConnections,
   findShortestPath,
   rankTopIntroducers,
+  requestWarmIntro,
 } from "../services/graph/professionalGraph.js";
 
 export const graphRoutes = new Hono<AppEnv>();
@@ -58,4 +59,32 @@ graphRoutes.post("/top-introducers", async (c) => {
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
   const result = await rankTopIntroducers(me, parsed.data.candidateIds, parsed.data.limit ?? 10);
   return c.json(success(result), 200);
+});
+
+// ─── POST /intro — request a warm intro through a mutual ────────────────
+const WarmIntroSchema = z.object({
+  viaUserId: z.string().uuid(),
+  targetUserId: z.string().uuid(),
+  message: z.string().min(1).max(2000),
+});
+
+graphRoutes.post("/intro", async (c) => {
+  const me = userId(c);
+  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = WarmIntroSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
+  const result = await requestWarmIntro(
+    me,
+    parsed.data.viaUserId,
+    parsed.data.targetUserId,
+    parsed.data.message,
+  );
+  if ("error" in result) {
+    if (result.error === "self") return c.json(error("BAD_REQUEST", "Cannot request an intro with yourself"), 400);
+    if (result.error === "via_not_mutual")
+      return c.json(error("FORBIDDEN", "That person isn't a mutual connection between you two"), 403);
+    return c.json(error("NOT_FOUND", "User not found"), 404);
+  }
+  return c.json(success(result), 201);
 });
