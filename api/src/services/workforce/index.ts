@@ -128,9 +128,29 @@ export async function recalculateWorkforceSeats(
     } as any).returning();
   }
 
-  // 3. Audit trail. The Helcim sync job consumes this stream to push the
-  //    new charge amount to the provider on the next billing cycle.
+  // 3. Audit trail + outbound provider sync. Pushing the new charge
+  //    amount to Helcim recurring billing closes #1437 — the local row
+  //    is canonical, but the provider needs to see the new amount on the
+  //    next billing cycle. Stripe customer IDs vs Helcim subscription IDs
+  //    both live on the legacy `stripeSubscriptionId` column today.
   const delta = newSeatCount - previousSeatCount;
+  const totalMonthlyCents = newSeatCount * row!.pricePerSeatCents;
+
+  let providerSync: { ok: boolean; providerRef?: string; error?: string } = { ok: true };
+  if (delta !== 0) {
+    try {
+      const { HelcimWorkforceConnector } = await import("./connectors/helcim-billing.js");
+      const connector = new HelcimWorkforceConnector();
+      providerSync = await connector.syncRecurringAmount({
+        helcimSubscriptionId: row!.stripeSubscriptionId ?? null,
+        totalMonthlyAmountCents: totalMonthlyCents,
+        currency: "USD",
+      });
+    } catch (e) {
+      providerSync = { ok: false, error: String((e as Error).message) };
+    }
+  }
+
   await db.insert(billingEvents).values({
     eventType: "workforce_seats_recalculated",
     payload: {
@@ -138,8 +158,9 @@ export async function recalculateWorkforceSeats(
       previousSeatCount,
       newSeatCount,
       pricePerSeatCents: row!.pricePerSeatCents,
-      totalMonthlyCents: newSeatCount * row!.pricePerSeatCents,
+      totalMonthlyCents,
       delta,
+      providerSync,
       at: now.toISOString(),
     },
   } as any);
@@ -149,7 +170,7 @@ export async function recalculateWorkforceSeats(
     previousSeatCount,
     newSeatCount,
     pricePerSeatCents: row!.pricePerSeatCents,
-    totalMonthlyCents: newSeatCount * row!.pricePerSeatCents,
+    totalMonthlyCents,
     delta,
   };
 }
