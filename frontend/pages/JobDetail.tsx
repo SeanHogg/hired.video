@@ -45,6 +45,8 @@ import { useUgcSeo } from "@/lib/seo-ugc";
 import { SAMPLE_JOB } from "@/lib/sample-job";
 import { DEFAULT_JOB_DESCRIPTOR, getJobTemplateById } from "@/types/job-template";
 import { mapApiJobToUI, type UIJob } from "@/lib/jobs/api-job-mapper";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromJobDescription } from "@/lib/audio/narrator-text";
 
 export default function JobDetail() {
   const { t } = useTranslation();
@@ -382,6 +384,29 @@ export default function JobDetail() {
             <div className="mb-4">
               <TimeToHireCard jobId={job.id} />
             </div>
+
+            {/* Listen-to-this-job player — narrates title, description,
+                and every bullet list a job posting carries. */}
+            <TextNarrator
+              text={textFromJobDescription({
+                title: job.data.title,
+                company: job.data.company?.name,
+                description: job.data.description,
+                responsibilities: job.data.responsibilities,
+                requirements: job.data.requirements?.map((r) =>
+                  [r.skill, r.level, r.required ? "(required)" : null]
+                    .filter(Boolean)
+                    .join(" "),
+                ),
+                qualifications: job.data.qualifications,
+                benefits: job.data.benefits?.map((b) =>
+                  [b.type, b.description].filter(Boolean).join(": "),
+                ),
+              })}
+              preferenceKey={`job.${job.id}`}
+              compact
+              className="mb-4"
+            />
 
             <DeclarativeJobRenderer
               job={{

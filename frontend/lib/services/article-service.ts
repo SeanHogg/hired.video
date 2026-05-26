@@ -27,6 +27,9 @@ export interface Article {
   slug: string;
   title: string;
   bodyMd: string;
+  // Tiptap (ProseMirror) JSON doc kept in lockstep with bodyMd. Nullable
+  // for legacy rows authored before the WYSIWYG editor was wired through.
+  bodyJson: unknown | null;
   summary: string | null;
   coverImageUrl: string | null;
   category: string | null;
@@ -76,6 +79,7 @@ export interface PublicArticleCard {
 export interface CreateArticleInput {
   title: string;
   bodyMd?: string;
+  bodyJson?: unknown;
   summary?: string;
   coverImageUrl?: string;
   category?: string;

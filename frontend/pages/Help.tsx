@@ -38,6 +38,8 @@ import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useAuth } from "@/lib/auth";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
 import { useContactPanel } from "@/components/ContactPanel";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromFAQ } from "@/lib/audio/narrator-text";
 
 export default function Help() {  const location = useLocation();
   useSEO(location.pathname);
@@ -209,6 +211,17 @@ export default function Help() {  const location = useLocation();
                     hired.video
                   </p>
                 </div>
+
+                {/* Listen to every visible Q&A. Self-gates: returns
+                    null when no FAQs match the active search. */}
+                <TextNarrator
+                  text={textFromFAQ(
+                    filteredFaqs.flatMap((c) => c.questions),
+                  )}
+                  preferenceKey={`help.faq${searchQuery ? `.${searchQuery}` : ""}`}
+                  compact
+                  className="max-w-3xl mx-auto"
+                />
 
                 {filteredFaqs.length > 0 ? (
                   <div className="space-y-8">

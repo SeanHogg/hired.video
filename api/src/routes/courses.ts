@@ -194,6 +194,9 @@ export const CreateLessonSchema = z.object({
   scormPkgId: UuidLikeSchema.optional(),
   externalUrl: z.string().url().optional(),
   bodyMd: z.string().optional(),
+  // Tiptap JSON kept in lockstep with bodyMd when the creator authors
+  // text_md lessons through the WYSIWYG editor (#1569).
+  bodyJson: z.unknown().optional(),
   estimatedMinutes: z.number().int().min(0).max(100_000).optional(),
   isRequired: z.boolean().optional(),
   knowledgeCheckFormId: UuidLikeSchema.optional(),
@@ -932,6 +935,7 @@ courseRoutes.post("/:id/lessons", async (c) => {
     scormPkgId: parsed.data.scormPkgId ?? null,
     externalUrl: parsed.data.externalUrl ?? null,
     bodyMd: parsed.data.bodyMd ?? null,
+    bodyJson: (parsed.data.bodyJson ?? null) as any,
     estimatedMinutes: parsed.data.estimatedMinutes ?? null,
     isRequired: parsed.data.isRequired ?? true,
     knowledgeCheckFormId: parsed.data.knowledgeCheckFormId ?? null,
@@ -960,7 +964,7 @@ courseRoutes.patch("/lessons/:lessonId", async (c) => {
   for (const k of [
     "title", "summary", "moduleId", "sourceType", "studioProjectId",
     "scormManifestUrl", "scormEntryUrl", "scormVersion", "scormPkgId", "externalUrl",
-    "bodyMd", "estimatedMinutes", "isRequired", "knowledgeCheckFormId", "sortOrder",
+    "bodyMd", "bodyJson", "estimatedMinutes", "isRequired", "knowledgeCheckFormId", "sortOrder",
   ] as const) {
     if (k in parsed.data) (patch as any)[k] = (parsed.data as any)[k];
   }

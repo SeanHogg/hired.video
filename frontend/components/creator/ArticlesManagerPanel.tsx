@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import ArticleEditor from "@/components/articles/ArticleEditor";
 import {
   Select,
   SelectContent,
@@ -74,6 +74,10 @@ export default function ArticlesManagerPanel() {
 
   const [title, setTitle] = useState("");
   const [bodyMd, setBodyMd] = useState("");
+  // Tiptap JSON kept in lockstep with bodyMd via ArticleEditor's onChange.
+  // Null on a fresh draft + on legacy rows that pre-date WYSIWYG wiring.
+  const [bodyJson, setBodyJson] = useState<unknown | null>(null);
+  const [wordCount, setWordCount] = useState(0);
   const [kind, setKind] = useState<ArticleKind>("article");
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
@@ -113,6 +117,8 @@ export default function ArticlesManagerPanel() {
     setEditing(null);
     setTitle("");
     setBodyMd("");
+    setBodyJson(null);
+    setWordCount(0);
     setKind("article");
     setCategory("");
     setTagsInput("");
@@ -127,6 +133,8 @@ export default function ArticlesManagerPanel() {
     setEditing(a);
     setTitle(a.title);
     setBodyMd(a.bodyMd);
+    setBodyJson(a.bodyJson ?? null);
+    setWordCount(a.bodyMd.trim().split(/\s+/).filter(Boolean).length);
     setKind(a.kind);
     setCategory(a.category ?? "");
     setTagsInput((a.tags ?? []).join(", "));
@@ -176,6 +184,7 @@ export default function ArticlesManagerPanel() {
   const buildInput = () => ({
     title: title.trim(),
     bodyMd,
+    bodyJson: bodyJson ?? undefined,
     kind,
     category: category.trim() || undefined,
     tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
@@ -500,18 +509,26 @@ export default function ArticlesManagerPanel() {
             />
           </div>
           <div>
-            <Label htmlFor="body">Body (Markdown)</Label>
-            <Textarea
-              id="body"
-              value={bodyMd}
-              onChange={(e) => setBodyMd(e.target.value)}
-              rows={18}
-              placeholder="Write your piece in Markdown. Headings, lists, code blocks, and links all supported."
-              className="font-mono text-sm"
-              disabled={locked}
+            <Label htmlFor="body">Body</Label>
+            {/* Keyed by editing.id so the editor remounts with the right
+                content when the creator switches between drafts. Tiptap's
+                useEditor reads `content` only on mount; without the key,
+                editing a second article would leave the first one's text
+                in place. */}
+            <ArticleEditor
+              key={editing?.id ?? "new"}
+              initialJson={bodyJson ?? undefined}
+              initialMarkdown={bodyMd}
+              placeholder="Write your piece. Headings, lists, code blocks, and links all supported."
+              readOnly={locked}
+              onChange={({ json, markdown, wordCount: wc }) => {
+                setBodyJson(json);
+                setBodyMd(markdown);
+                setWordCount(wc);
+              }}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Approx {Math.max(1, Math.ceil(bodyMd.trim().split(/\s+/).filter(Boolean).length / 225))} min read
+              Approx {Math.max(1, Math.ceil(wordCount / 225))} min read
             </p>
           </div>
 

@@ -573,7 +573,6 @@ function LessonBody({
             <TextNarrator
               text={lesson.bodyMd}
               preferenceKey="learn.lesson-narration"
-              className="border rounded-md p-2 bg-muted/40"
             />
           ) : null}
           <div className="prose prose-sm dark:prose-invert max-w-none">

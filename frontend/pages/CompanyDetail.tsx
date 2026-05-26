@@ -47,6 +47,8 @@ import { Progress } from "@/components/ui/progress";
 
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromCompanyAbout } from "@/lib/audio/narrator-text";
 import { ReviewsSection } from "@/components/reviews/ReviewsSection";
 import { ReviewRatingBadge } from "@/components/reviews/ReviewRatingBadge";
 import { useAuth } from "@/lib/auth";
@@ -560,6 +562,21 @@ export default function CompanyDetail() {
                     <CardTitle>About {company.data.name}</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {/* Listen to the company overview — description +
+                        mission + vision, all in one read. Self-gates on
+                        empty content. */}
+                    <TextNarrator
+                      text={textFromCompanyAbout({
+                        name: company.data.name,
+                        description: company.data.description,
+                        mission: company.data.mission,
+                        vision: company.data.vision,
+                      })}
+                      preferenceKey={`company.${company.id}`}
+                      compact
+                      className="mb-4"
+                    />
+
                     {company.data.description ? (
                       <p className="whitespace-pre-line text-sm leading-relaxed">
                         {company.data.description}

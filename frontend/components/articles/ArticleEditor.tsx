@@ -1,22 +1,29 @@
 "use client";
 
 /**
- * ArticleEditor — gap #170. Tiptap (ProseMirror) wrapper used by the
- * /articles/edit/:id page. The editor produces TWO outputs in lockstep:
+ * ArticleEditor — gap #170 / #1569. Tiptap (ProseMirror) wrapper used by
+ * every markdown-authoring surface (articles, FAQs, guides, text_md
+ * course lessons). The editor produces TWO outputs in lockstep:
  *
  *   - `bodyJson`  — Tiptap document (ProseMirror JSON). Source of truth.
  *   - `bodyMd`    — Markdown derived from the same doc. Kept so the
  *                   moderation classifier (#175) + the static blog
- *                   compatibility layer + ATS exports all keep working.
+ *                   compatibility layer + ATS exports + ReactMarkdown
+ *                   renderers all keep working.
  *
  * Tiptap's `getHTML()` is intentionally NOT serialised — the article
  * renderer rebuilds HTML from the JSON each time so a future schema
  * migration can normalise legacy nodes without re-parsing strings.
  *
- * The editor calls `onAutosave` ~3 seconds after the last keystroke,
- * mirroring the studio + resume autosave pattern. The parent owns the
- * actual snapshot create call so it can debounce / pause when the page
- * is in a "publishing" state.
+ * Callers:
+ *   - [[ArticlesManagerPanel]] — /services/creator/articles
+ *   - [[CourseContentEditor]]  — /services/creator/courses lesson body
+ *
+ * The editor calls `onAutosave` ~3 seconds after the last keystroke
+ * (when provided), mirroring the studio + resume autosave pattern. The
+ * parent owns the actual snapshot create call so it can debounce /
+ * pause when the page is in a "publishing" state. Consumers that don't
+ * need autosave just provide `onChange` and ignore the timer.
  */
 
 import { useEffect, useRef } from "react";

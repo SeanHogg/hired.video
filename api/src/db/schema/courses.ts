@@ -154,6 +154,10 @@ export const courseLessons = pgTable(
     scormPkgId: uuid("scorm_pkg_id"),
     externalUrl: text("external_url"),
     bodyMd: text("body_md"),
+    // Tiptap (ProseMirror) JSON kept in lockstep with body_md when the
+    // creator authors text_md lessons through the WYSIWYG editor. See
+    // #1569 / migration 0139.
+    bodyJson: jsonb("body_json"),
     estimatedMinutes: integer("estimated_minutes"),
     isRequired: boolean("is_required").default(true).notNull(),
     knowledgeCheckFormId: uuid("knowledge_check_form_id"),

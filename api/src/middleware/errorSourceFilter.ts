@@ -3,16 +3,21 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
 /**
- * Strips `error._source` from JSON error responses for non-SuperAdmin
- * viewers. The `fail()` and `apiError()` helpers always attach a
- * `{ file, line, column, function }` pointer to the response so a
- * SuperAdmin debugging a customer report can paste the JSON envelope and
- * jump straight to the line that produced it. Regular users never see
- * that field — same envelope, source info elided.
+ * Strips SuperAdmin-only diagnostic fields from JSON error responses for
+ * regular viewers. Two fields are gated today:
+ *   - `_source` — `{ file, line, column, function }` pointer attached by
+ *     `fail()`, `apiError()`, and the global error handler so a SuperAdmin
+ *     debugging a customer report can paste the JSON envelope and jump
+ *     straight to the line that produced it.
+ *   - `_pg` — Postgres diagnostic fields (code, detail, constraint, …)
+ *     extracted from driver errors so DB-layer 500s expose *why* PG
+ *     rejected the query, not just the SQL we attempted.
  *
  * Runs on `/api/*` after the route handler. Only touches JSON 4xx/5xx
  * bodies; everything else passes through untouched.
  */
+const SUPERADMIN_ONLY_ERROR_FIELDS = ["_source", "_pg"] as const;
+
 export const errorSourceFilterMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 
@@ -34,10 +39,17 @@ export const errorSourceFilterMiddleware: MiddlewareHandler<AppEnv> = async (c, 
   }
 
   if (!payload || typeof payload !== "object") return;
-  const err = (payload as { error?: { _source?: unknown } }).error;
-  if (!err || typeof err !== "object" || !("_source" in err)) return;
+  const err = (payload as { error?: Record<string, unknown> }).error;
+  if (!err || typeof err !== "object") return;
 
-  delete (err as Record<string, unknown>)._source;
+  let mutated = false;
+  for (const field of SUPERADMIN_ONLY_ERROR_FIELDS) {
+    if (field in err) {
+      delete err[field];
+      mutated = true;
+    }
+  }
+  if (!mutated) return;
 
   c.res = new Response(JSON.stringify(payload), {
     status: c.res.status,

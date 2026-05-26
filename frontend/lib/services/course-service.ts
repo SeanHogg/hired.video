@@ -84,6 +84,10 @@ export interface CourseLesson {
   scormPkgId: string | null;
   externalUrl: string | null;
   bodyMd: string | null;
+  // Tiptap JSON kept in lockstep with bodyMd for text_md lessons authored
+  // through the WYSIWYG editor (#1569). Null on legacy rows + non-text_md
+  // sources.
+  bodyJson: unknown | null;
   estimatedMinutes: number | null;
   isRequired: boolean;
   knowledgeCheckFormId: string | null;
@@ -116,6 +120,7 @@ export interface CreateLessonInput {
   scormPkgId?: string | null;
   externalUrl?: string | null;
   bodyMd?: string | null;
+  bodyJson?: unknown;
   estimatedMinutes?: number;
   isRequired?: boolean;
   sortOrder?: number;

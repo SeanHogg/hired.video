@@ -53,7 +53,7 @@ const JOB_SEEKER_VARIANT: BannerVariant = {
   title: "Earn on hired.video",
   subtitle: "You can make money here while you job search. Pick a path:",
   tiles: [
-    { to: "/studio?tab=voice-clones", Icon: Mic, title: "License your voice", desc: "Record once, earn 95% on every sale" },
+    { to: "/services/creator/voice-clones", Icon: Mic, title: "License your voice", desc: "Record once, earn 95% on every sale" },
     { to: "/services", Icon: Briefcase, title: "Offer services", desc: "Resume reviews, coaching, video editing" },
     { to: "/services?wizard=open", Icon: Sparkles, title: "Become a Creator", desc: "Make promo videos for paying clients" },
   ],

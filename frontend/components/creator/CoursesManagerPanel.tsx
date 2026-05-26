@@ -13,6 +13,7 @@ import { courseService, type Course, type CreateCourseInput } from "@/lib/servic
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import MediaPicker from "@/components/shared/MediaPicker";
 import CourseContentEditor from "@/components/creator/CourseContentEditor";
+import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 
 type Mode = "list" | "edit";
 
@@ -286,7 +287,16 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
           </div>
         )
       ) : (
-        <Card><CardContent className="p-6 space-y-4">
+        <Card>
+          <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-2 -mb-1">
+            <Badge variant="outline" className="text-[10px]">Step 1</Badge>
+            <h3 className="font-semibold text-sm">Course details</h3>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Title, summary, pricing — the metadata shown on the course card.
+            You'll add modules and lessons in <strong>Step 2</strong> below.
+          </p>
           <div>
             <Label htmlFor="title">Title</Label>
             <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A clear, specific title" />
@@ -371,12 +381,28 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
         </CardContent></Card>
       )}
 
-      {/* Module + lesson authoring — only after the course has been saved at
-          least once (otherwise there's no course id to attach to). Closes
-          gap #785/#798: lessons can now be authored end-to-end without
+      {/* Step 2 — module + lesson authoring. Always rendered alongside
+          Step 1 in edit mode so the two-step flow is visible up front;
+          before the first save we render a placeholder with disabled
+          authoring CTAs so the user knows what comes next. Closes
+          gap #785/#798: lessons can be authored end-to-end without
           curling the API. */}
-      {mode === "edit" && editing ? (
-        <CourseContentEditor courseId={editing.id} />
+      {mode === "edit" ? (
+        editing ? (
+          <CourseContentEditor courseId={editing.id} />
+        ) : (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px]">Step 2</Badge>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-primary" /> Modules &amp; lessons
+                </h3>
+              </div>
+              <LessonAuthoringCTAs courseId={null} />
+            </CardContent>
+          </Card>
+        )
       ) : null}
     </div>
   );

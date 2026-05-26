@@ -66,14 +66,13 @@ export const CREATOR_PROGRAM_ICON: Record<CreatorProgram, ComponentType<{ classN
 //
 // `services` lands back on the offerings page with `#my-services` so the
 // list scrolls into view (the creator is already on the page when they
-// see the program card). `voice` deep-links into the studio editor's
-// Voice Clones sub-tab — there is no standalone manager yet
-// (Gap #786). `articles` and `courses` open their sub-tab inside the
-// Content Creator workspace (ArticlesManagerPanel / CoursesManagerPanel
-// — Gap #785 tracks the full course authoring surface).
+// see the program card). `voice`, `articles`, and `courses` open their
+// sub-tab inside the Content Creator workspace (VoiceCloneManager /
+// ArticlesManagerPanel / CoursesManagerPanel — Gap #785 tracks the full
+// course authoring surface).
 export const CREATOR_PROGRAM_HOME: Record<CreatorProgram, string> = {
   video: "/studio",
-  voice: "/studio?tab=voice-clones",
+  voice: "/services/creator/voice-clones",
   services: "/services/offerings#my-services",
   articles: "/services/creator/articles",
   courses: "/services/creator/courses",

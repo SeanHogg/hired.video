@@ -81,6 +81,10 @@ const KindSchema = z.enum(ARTICLE_KINDS);
 const CreateArticleSchema = z.object({
   title: z.string().min(1).max(255),
   bodyMd: z.string().default(""),
+  // Tiptap (ProseMirror) JSON doc kept in lockstep with bodyMd. Optional
+  // for legacy clients + ATS exports that only know the markdown shape.
+  // See [[ArticleEditor]] for the serializer that produces it.
+  bodyJson: z.unknown().optional(),
   summary: z.string().max(1000).optional(),
   coverImageUrl: z.string().url().optional(),
   category: z.string().max(100).optional(),
@@ -266,6 +270,7 @@ articleRoutes.post("/", async (c) => {
     slug,
     title: parsed.data.title,
     bodyMd: parsed.data.bodyMd ?? "",
+    bodyJson: (parsed.data.bodyJson ?? null) as any,
     summary: parsed.data.summary ?? null,
     coverImageUrl: parsed.data.coverImageUrl ?? null,
     category: parsed.data.category ?? null,
@@ -328,6 +333,7 @@ articleRoutes.patch("/:id", async (c) => {
     patch.bodyMd = parsed.data.bodyMd;
     patch.readMinutes = readMinutes(parsed.data.bodyMd);
   }
+  if (parsed.data.bodyJson !== undefined) patch.bodyJson = parsed.data.bodyJson;
   if (parsed.data.summary !== undefined) patch.summary = parsed.data.summary;
   if (parsed.data.coverImageUrl !== undefined) patch.coverImageUrl = parsed.data.coverImageUrl;
   if (parsed.data.category !== undefined) patch.category = parsed.data.category;

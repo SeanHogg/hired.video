@@ -12,6 +12,7 @@ import { AppShell } from "@/components/AppShell";
 import { articleService } from "@/lib/services/article-service";
 import { useArtifactViewTracking } from "@/hooks/use-artifact-view-tracking";
 import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
+import TextNarrator from "@/components/audio/TextNarrator";
 
 interface ArticleData {
   id: string;
@@ -128,6 +129,13 @@ export default function ArticleView() {
                 )}
               </div>
             </header>
+
+            <TextNarrator
+              text={`${article.title}. ${article.summary ?? ""}\n\n${article.bodyMd}`}
+              preferenceKey={`article.${article.id}`}
+              compact
+              className="mb-6"
+            />
 
             <div className="prose prose-neutral dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.bodyMd}</ReactMarkdown>

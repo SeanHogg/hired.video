@@ -23,6 +23,8 @@ import BlogStudioTemplateRow from "@/components/blog/BlogStudioTemplateRow";
 import { AppShell } from "@/components/AppShell";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromFAQ } from "@/lib/audio/narrator-text";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -66,6 +68,19 @@ export default function BlogPost() {
   const related = useMemo(() => {
     if (!post) return [];
     return BLOG_POSTS.filter((p) => p.slug !== post.slug && p.category === post.category).slice(0, 2);
+  }, [post]);
+
+  // Flatten the post into a single narratable string: lead, every
+  // section heading + body, then the FAQ. TextNarrator strips markdown
+  // before speaking, so the raw bodies are fine to pass through.
+  const narrationText = useMemo(() => {
+    if (!post) return "";
+    const sectionBlock = post.sections
+      .map((s) => `${s.heading}. ${s.body}`)
+      .join("\n\n");
+    return [post.description, sectionBlock, textFromFAQ(post.faq)]
+      .filter(Boolean)
+      .join("\n\n");
   }, [post]);
 
   if (!post) return <Navigate to="/blog" replace />;
@@ -113,9 +128,19 @@ export default function BlogPost() {
           </h1>
 
           {/* Lead */}
-          <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+          <p className="text-lg text-muted-foreground mb-4 leading-relaxed">
             {post.description}
           </p>
+
+          {/* Listen-to-this-article player. Self-gates: returns null when
+              Web Speech is unavailable or the body is empty. */}
+          <TextNarrator
+            text={narrationText}
+            preferenceKey={`blog.${post.slug}`}
+            compact
+            className="mb-8"
+          />
+
 
           {/* Inline person previews — for candidate-profile-focused articles. */}
           {post.previewPersonIds && post.previewPersonIds.length > 0 && (

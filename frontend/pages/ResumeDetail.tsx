@@ -51,6 +51,8 @@ import { useUgcSeo } from "@/lib/seo-ugc";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromResume } from "@/lib/audio/narrator-text";
 import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
 import {
@@ -729,6 +731,15 @@ export default function ResumeDetail() {
           {resume && (
             <div className="flex">
               <div className="flex-1 min-w-0">
+                {/* Listen-to-this-resume player — narrates basics
+                    summary + work + education + projects + skills. */}
+                <div className="px-4 sm:px-6 pt-4">
+                  <TextNarrator
+                    text={textFromResume(resume)}
+                    preferenceKey={`resume.${resume.id}`}
+                    compact
+                  />
+                </div>
                 <DeclarativeResumeRenderer
                   resume={resume}
                   descriptor={descriptor}

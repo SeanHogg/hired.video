@@ -16,6 +16,7 @@ import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCar
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
 import CoursesManagerPanel from "@/components/creator/CoursesManagerPanel";
 import ArticlesManagerPanel from "@/components/creator/ArticlesManagerPanel";
+import VoiceCloneManager from "@/components/studio/VoiceCloneManager";
 import OfferingsPanel, { type OfferingsPanelHandle } from "@/components/services/OfferingsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -40,9 +41,10 @@ export type CreatorWorkspaceTab =
   | "portfolio"
   | "account"
   | "courses"
-  | "articles";
+  | "articles"
+  | "voice-clones";
 
-const TAB_VALUES = ["offerings", "profile", "payouts", "portfolio", "account", "courses", "articles"] as const;
+const TAB_VALUES = ["offerings", "profile", "payouts", "portfolio", "account", "courses", "articles", "voice-clones"] as const;
 
 interface Props {
   onProfileChange?: (next: CreatorProfile | null) => void;
@@ -179,6 +181,7 @@ export default function CreatorWorkspace({
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             {profile?.coursesActive && <TabsTrigger value="courses">Courses</TabsTrigger>}
             {profile?.articlesActive && <TabsTrigger value="articles">Articles</TabsTrigger>}
+            {profile?.voiceActive && <TabsTrigger value="voice-clones">Voice Clones</TabsTrigger>}
             <TabsTrigger value="account">Account</TabsTrigger>
           </TabsList>
 
@@ -347,6 +350,17 @@ export default function CreatorWorkspace({
         {profile?.articlesActive && (
           <TabsContent value="articles">
             <ArticlesManagerPanel />
+          </TabsContent>
+        )}
+
+        {/* Voice Clones authoring — hosted at /services/creator/voice-clones.
+            Same VoiceCloneManager the studio editor's Voiceover panel
+            reuses, so the record/upload/marketplace-pricing surface is
+            DRY across both entry points. Tab gated on `voiceActive` to
+            match the courses/articles pattern. */}
+        {profile?.voiceActive && (
+          <TabsContent value="voice-clones">
+            <VoiceCloneManager />
           </TabsContent>
         )}
 

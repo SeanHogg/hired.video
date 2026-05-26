@@ -84,6 +84,8 @@ export class HelcimAchPayoutProvider implements PayoutProvider {
     // `paymentType: verify` tokenises the bank without billing. Helcim's
     // success postMessage delivers a `bankToken` the frontend forwards to
     // /complete; we store that as the recipient's provider_account_id.
+    // Helcim's ACH path requires `amount` even in verify mode (unlike the
+    // card verify path) — pass 0 so no funds move.
     const res = await helcimRequest<{ checkoutToken: string }>(
       this.config,
       "POST",
@@ -91,6 +93,7 @@ export class HelcimAchPayoutProvider implements PayoutProvider {
       {
         paymentType: "verify",
         paymentMethod: "ach",
+        amount: 0,
         currency: "USD",
         successUrl,
         cancelUrl,

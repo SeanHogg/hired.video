@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { SortableList, SortableDragHandle } from "@/components/resume-sections/SortableList";
 import { extractAndUploadScormZip, type ScormUploadProgress } from "@/lib/courses/scorm-upload";
-import { Link } from "react-router-dom";
+import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import ArticleEditor from "@/components/articles/ArticleEditor";
 import { useToast } from "@/hooks/use-toast";
 import {
   courseService,
@@ -90,6 +90,10 @@ interface LessonFormState {
   moduleId: string | null;
   sourceType: CourseLessonSourceType;
   bodyMd: string;
+  // Tiptap JSON kept in lockstep with bodyMd via ArticleEditor for
+  // text_md lessons. Null when authoring a fresh lesson or editing a
+  // legacy row that pre-dates the WYSIWYG editor.
+  bodyJson: unknown | null;
   studioProjectId: string;
   scormManifestUrl: string;
   scormEntryUrl: string;
@@ -109,6 +113,7 @@ function emptyLessonForm(moduleId: string | null): LessonFormState {
     moduleId,
     sourceType: "text_md",
     bodyMd: "",
+    bodyJson: null,
     studioProjectId: "",
     scormManifestUrl: "",
     scormEntryUrl: "",
@@ -127,6 +132,7 @@ function lessonToForm(l: CourseLesson): LessonFormState {
     moduleId: l.moduleId,
     sourceType: l.sourceType,
     bodyMd: l.bodyMd ?? "",
+    bodyJson: l.bodyJson ?? null,
     studioProjectId: l.studioProjectId ?? "",
     scormManifestUrl: l.scormManifestUrl ?? "",
     scormEntryUrl: l.scormEntryUrl ?? "",
@@ -286,9 +292,13 @@ export default function CourseContentEditor({ courseId }: Props) {
   };
 
   // ── Lesson handlers ──
-  const openCreateLesson = (moduleId: string | null) => {
+  const openCreateLesson = (
+    moduleId: string | null,
+    initialSourceType?: CourseLessonSourceType,
+  ) => {
     setEditingLessonId(null);
-    setLessonForm(emptyLessonForm(moduleId));
+    const base = emptyLessonForm(moduleId);
+    setLessonForm(initialSourceType ? { ...base, sourceType: initialSourceType } : base);
     setLessonDialogOpen(true);
   };
 
@@ -310,6 +320,7 @@ export default function CourseContentEditor({ courseId }: Props) {
       moduleId: lessonForm.moduleId,
       sourceType: lessonForm.sourceType,
       bodyMd: lessonForm.sourceType === "text_md" ? (lessonForm.bodyMd || null) : null,
+      bodyJson: lessonForm.sourceType === "text_md" ? (lessonForm.bodyJson ?? null) : null,
       studioProjectId: lessonForm.sourceType === "studio_video" ? (lessonForm.studioProjectId.trim() || null) : null,
       scormManifestUrl: lessonForm.sourceType === "scorm_package" ? (lessonForm.scormManifestUrl.trim() || null) : null,
       scormEntryUrl: lessonForm.sourceType === "scorm_package" ? (lessonForm.scormEntryUrl.trim() || null) : null,
@@ -366,23 +377,23 @@ export default function CourseContentEditor({ courseId }: Props) {
   return (
     <Card>
       <CardContent className="p-6 space-y-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-semibold flex items-center gap-2">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px]">Step 2</Badge>
+            <h3 className="font-semibold text-sm flex items-center gap-2">
               <GraduationCap className="h-4 w-4 text-primary" /> Modules &amp; lessons
             </h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-              Organise the course into modules; add lessons of any source type
-              (markdown, Studio video, SCORM 1.2 / 2004 package, or external URL).
-              The published course needs at least one lesson before the Publish
-              gate will let it go live.
-            </p>
           </div>
-          <Button asChild size="sm" variant="outline">
-            <Link to="/studio?contentTemplate=course-lesson-explainer">
-              <Video className="h-3.5 w-3.5 mr-1" /> Author a video lesson in Studio
-            </Link>
-          </Button>
+          <p className="text-xs text-muted-foreground max-w-xl">
+            Organise the course into modules; add lessons of any source type
+            (markdown, Studio video, SCORM 1.2 / 2004 package, or external URL).
+            The published course needs at least one lesson before the Publish
+            gate will let it go live.
+          </p>
+          <LessonAuthoringCTAs
+            courseId={courseId}
+            onPickSource={(sourceType) => openCreateLesson(null, sourceType)}
+          />
         </div>
 
         {/* Module list */}
@@ -542,13 +553,19 @@ export default function CourseContentEditor({ courseId }: Props) {
               {/* Source-type-specific fields — one switch, no parallel forms. */}
               {lessonForm.sourceType === "text_md" && (
                 <div>
-                  <Label htmlFor="l-md">Lesson body (Markdown)</Label>
-                  <Textarea
-                    id="l-md"
-                    rows={10}
-                    value={lessonForm.bodyMd}
-                    onChange={(e) => setLessonForm((f) => ({ ...f, bodyMd: e.target.value }))}
-                    placeholder="# Heading\n\nLesson content in Markdown. Headings, lists, code blocks all render in the learner UI."
+                  <Label>Lesson body</Label>
+                  {/* Keyed by lesson id so the editor remounts with the
+                      right content when the creator switches between
+                      lessons — Tiptap's useEditor reads `content` only on
+                      mount. */}
+                  <ArticleEditor
+                    key={editingLessonId ?? "new"}
+                    initialJson={lessonForm.bodyJson ?? undefined}
+                    initialMarkdown={lessonForm.bodyMd}
+                    placeholder="Lesson content. Headings, lists, code blocks, and links all render in the learner UI."
+                    onChange={({ json, markdown }) =>
+                      setLessonForm((f) => ({ ...f, bodyJson: json, bodyMd: markdown }))
+                    }
                   />
                 </div>
               )}

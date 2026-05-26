@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -139,13 +139,21 @@ aiRoutes.post("/chat", async (c) => {
 
   const db = getDb();
 
-  // Resolve or create a chat session
+  // Resolve or create a chat session. The ownership filter (`userId` AND
+  // `id`) is load-bearing: without it, any authenticated user could post
+  // a turn that persists into another user's session by guessing or
+  // observing the UUID — leaking content + corrupting their history. If
+  // the supplied session id is missing or belongs to someone else we
+  // silently fall through to creating a fresh session below.
   let sessionId = incomingSessionId;
   if (sessionId) {
     const [existing] = await db
       .select({ id: schema.aiChatSessions.id })
       .from(schema.aiChatSessions)
-      .where(eq(schema.aiChatSessions.id, sessionId))
+      .where(and(
+        eq(schema.aiChatSessions.id, sessionId),
+        eq(schema.aiChatSessions.userId, userId),
+      ))
       .limit(1);
     if (!existing) sessionId = null;
   }

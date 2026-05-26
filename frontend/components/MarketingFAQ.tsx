@@ -6,6 +6,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { HelpCircle } from "lucide-react";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { textFromFAQ } from "@/lib/audio/narrator-text";
 
 export interface MarketingFAQItem {
   question: string;
@@ -86,6 +88,16 @@ export default function MarketingFAQ({
             </p>
           )}
         </div>
+
+        {/* Audio modality — narrate every Q&A in order. Self-gates: the
+            narrator returns null when speechSynthesis isn't available
+            or the items list is empty. */}
+        <TextNarrator
+          text={textFromFAQ(items)}
+          preferenceKey={`faq.${schemaId}`}
+          compact
+          className="mb-6"
+        />
 
         <Accordion type="single" collapsible className="w-full">
           {items.map((item, index) => (
