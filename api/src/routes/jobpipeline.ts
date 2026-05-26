@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -41,7 +42,7 @@ const AddEntrySchema = z.object({
   candidateLinkedinUrl: z.string().url().optional().nullable(),
   candidateResumeUrl: z.string().url().optional().nullable(),
   candidateAvatarUrl: z.string().url().optional().nullable(),
-  candidateUserId: z.string().uuid().optional().nullable(),
+  candidateUserId: UuidLikeSchema.optional().nullable(),
   stage: STAGE_ENUM.default("applied"),
   addedFrom: z.enum(PIPELINE_ADDED_FROM).default("manual"),
   notes: z.string().max(4000).optional().nullable(),
@@ -56,7 +57,7 @@ const UpdateStageSchema = z.object({
 const UpdateEntrySchema = z.object({
   notes: z.string().max(4000).optional().nullable(),
   tags: z.array(z.string()).optional(),
-  ownerId: z.string().uuid().optional().nullable(),
+  ownerId: UuidLikeSchema.optional().nullable(),
 });
 
 const TouchpointSchema = z.object({

@@ -17,9 +17,7 @@ import {
   RatingInputSchema,
   StageInputSchema,
 } from "../schemas.js";
-
-// Fixed RFC4122 v4 UUID for fixture stability — `z.string().uuid()` enforces the v4 format.
-const UUID = "00000000-0000-4000-8000-000000000000";
+import { SYNTHETIC_V4_UUID as UUID } from "../../../../../shared/__tests__/uuid-fixtures.js";
 
 describe("AttributeInputSchema", () => {
   it("accepts minimal payload — name only, defaults the rest", () => {
@@ -88,6 +86,16 @@ describe("CreateTemplateSchema", () => {
       CreateTemplateSchema.safeParse({ ...valid, companyId: "not-a-uuid" }).success,
       false,
     );
+  });
+
+  // Regression for gap #1522: seed migrations cast `md5(slug)` to UUID,
+  // producing strings with non-RFC-4122 version/variant bits. The shared
+  // `UuidLikeSchema` must accept them — runtime lookup only cares about
+  // the 8-4-4-4-12 hex shape, not the bit fields.
+  it("accepts md5-seed-derived UUID for companyId (non-RFC variant)", () => {
+    const seedUuid = "c87f7656-673a-7756-d100-281032a50731"; // version=7, variant=d
+    const r = CreateTemplateSchema.safeParse({ ...valid, companyId: seedUuid });
+    assert.equal(r.success, true);
   });
 
   it("accepts a valid rating scale enum value", () => {

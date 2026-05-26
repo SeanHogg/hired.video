@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { eq, and, desc, count, sum, sql, inArray, ilike, or } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -961,7 +962,7 @@ recruiterRoutes.get("/agent/runs/:id", async (c) => {
 
 const IntakeSchema = z.object({
 	briefText: z.string().optional(),
-	jobId: z.string().uuid().optional(),
+	jobId: UuidLikeSchema.optional(),
 });
 
 recruiterRoutes.post("/agent/intake", async (c) => {
@@ -1011,8 +1012,8 @@ recruiterRoutes.post("/agent/intake", async (c) => {
 // the `recruiter-agent-followup` worker (workers/recruiter-agent-followup.ts).
 
 const ScheduleFollowupSchema = z.object({
-	runId: z.string().uuid(),
-	candidateId: z.string().uuid(),
+	runId: UuidLikeSchema,
+	candidateId: UuidLikeSchema,
 	followupKind: z.string().min(1).max(32).optional().default("first_followup"),
 	sequenceIndex: z.number().int().min(1).max(10).optional().default(1),
 	scheduledFor: z.string().datetime().optional(),

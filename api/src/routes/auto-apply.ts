@@ -4,7 +4,8 @@
 
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -19,8 +20,8 @@ function uid(c: any): string | null {
 }
 
 const StartAutoApplySchema = z.object({
-  jobIds: z.array(z.string().uuid()).min(1).max(20),
-  resumeId: z.string().uuid().optional(),
+  jobIds: z.array(UuidLikeSchema).min(1).max(20),
+  resumeId: UuidLikeSchema.optional(),
   // Optional custom instructions for the AI tailoring
   customInstructions: z.string().max(1000).optional(),
   // If true, actually submit to the platform; if false, only draft (dry run)

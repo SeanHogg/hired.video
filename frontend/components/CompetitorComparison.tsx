@@ -41,6 +41,13 @@ import {
   Layers,
   Image as ImageIcon,
   Headphones,
+  UserCircle,
+  Languages,
+  Accessibility,
+  Smartphone,
+  FileSpreadsheet,
+  Stamp,
+  Wallet,
 } from "lucide-react";
 import { PRO_MONTHLY_PRICE } from "@shared/pricing";
 import { Badge } from "@/components/ui/badge";
@@ -260,10 +267,34 @@ export const FEATURE_ROWS: FeatureRow[] = [
     note: "When the kit's coverage badge flags a competency with no questions, one click suggests 3 calibrated STAR-style questions tagged to that competency at the chosen level (L1–L7). Reuses the platform LLM stack — no third-party tool required.",
   },
   {
-    feature: "Staffing-agency back-office (timesheets, placement billing, VMS)",
+    feature: "Staffing-agency back-office (timesheets + placement billing + accounting connectors)",
     icon: Receipt,
-    values: { hired: "no", loxo: "partial", linkedin: "no", greenhouse: "no", bullhorn: "yes" },
-    note: "Bullhorn's domain — contractor timesheets, placement invoicing, and VMS connectors. Hired.Video supports agency-recruiter sourcing in My Services, but not staffing back-office accounting.",
+    values: { hired: "yes", loxo: "partial", linkedin: "no", greenhouse: "no", bullhorn: "yes" },
+    note: "Shipped end-to-end in the Workforce module (#1349). Punch in/out against tasks → weekly timesheet envelope with approval workflow → on approve, auto-derived invoice line items (against placement bill rate) + contractor payout-ledger accrual (against pay rate), idempotent on re-approve. Multi-tenant AR: invoice.recipientCompanyId isolates agency-to-client billing. Marketing surface at /for-agencies. The remaining structural gap vs Bullhorn is VMS / MSP portal connectors — logged as roadmap.",
+  },
+  {
+    feature: "Compliance doc vault (I-9, W-9, W-8BEN, COI, BG check, MSA, SOW, NDA, offer letter) with native + DocuSign e-signature",
+    icon: Stamp,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "partial", bullhorn: "yes" },
+    note: "placement_documents table (#1349 Phase 4) with R2 upload, native e-sign flow, DocuSign connector, expiry tracking, nightly cleanup. Either bound to a single placement or to a (company × user) for re-use across placements.",
+  },
+  {
+    feature: "Accounting + payroll + payments connectors (QuickBooks Online, Xero, Gusto, DocuSign, Helcim)",
+    icon: Plug,
+    values: { hired: "yes", loxo: "partial", linkedin: "no", greenhouse: "partial", bullhorn: "yes" },
+    note: "company_integrations table (#1441) holds AES-GCM-encrypted OAuth tokens per (company × provider). Workforce derivation pushes invoices / payouts outbound automatically. Connectors at services/workforce/connectors/{quickbooks,xero,gusto,esign-docusign,helcim-billing}.ts.",
+  },
+  {
+    feature: "Per-placement P&L / desk margin reporting (revenue · contractor pay · gross margin)",
+    icon: FileSpreadsheet,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "yes" },
+    note: "DeskMarginRow projection: YTD revenue, contractor pay, gross margin, approved-timesheet count per placement. Sorted by margin desc, with drill-through to the placement detail screen. Recruiter Pro tier.",
+  },
+  {
+    feature: "Recruiter commission ledger + split fanout (multi-recruiter sourcer/manager splits)",
+    icon: Wallet,
+    values: { hired: "yes", loxo: "partial", linkedin: "no", greenhouse: "no", bullhorn: "yes" },
+    note: "placements.commission{Percentage,Amount,Status,PaidDate} + placement_splits fan a single placement out to multiple recruiters; on timesheet approval, PayoutLedgerService.recordAccrual writes to the payout ledger. Recruiter Commissions dashboard at /recruiter/commissions.",
   },
   {
     feature: "Validated AI hiring assessments (predictive science)",
@@ -416,6 +447,30 @@ export const FEATURE_ROWS: FeatureRow[] = [
     note: "Studio splits on a `mediaKind` axis with kind-specific scene templates + render engines. Most competitors are video-only or audio-only.",
   },
   {
+    feature: "AI presenter avatars (talking-head — WebGPU client-side, no per-render fee)",
+    icon: UserCircle,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "AvatarWidget in canvas-v2: viseme-driven mouth shapes synced to TTS word boundaries via existing tts-engines `onBoundary` callback. 6 stock presenters bundled (gender / ethnicity variants); BYO portrait support via the same voice-clone-style upload flow. Synthesia charges $30–$96/seat/mo for the comparable surface; HeyGen $24–$69. We ship it client-side with no per-minute render cost.",
+  },
+  {
+    feature: "AI multi-language video dubbing in your own cloned voice",
+    icon: Languages,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Studio → Dub panel: Whisper transcribes source → OpenRouter LLM translates each caption cue → cloned-voice TTS (Kokoro / Piper / VibeVoice WebGPU stack) re-renders audio in the target language → muxed into a parallel audio track in the timeline. 20+ target languages. Synthesia bundles dubbing only on Creator / Enterprise; Rask AI charges $24–$89/mo standalone — we ship it inside Pro.",
+  },
+  {
+    feature: "WCAG 2.2 accessibility audit on Studio output (alt-text, contrast, captions, reading order)",
+    icon: Accessibility,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no", },
+    note: "StudioAccessibilityPanel runs against the live CanvasState — flags missing alt text on image widgets, low-contrast text overlays (4.5:1 AA / 7:1 AAA), missing caption tracks on video clips, and non-sequential reading order. Closes the Articulate 360 accessibility-tooling gap without the $1,099/seat/yr ticket.",
+  },
+  {
+    feature: "Installable mobile + offline experience (PWA — Add to Home Screen, offline shell)",
+    icon: Smartphone,
+    values: { hired: "yes", loxo: "no", linkedin: "partial", greenhouse: "no", bullhorn: "no" },
+    note: "Installable PWA via web app manifest + service-worker offline shell — users add hired.video to their iOS/Android home screen and run the recruiter pipeline + candidate dashboard from a standalone window. Closes the CapCut / Canva mobile-parity gap without paying for a separate native build.",
+  },
+  {
     feature: "Multilingual UI (English, Español, Français — Canada)",
     icon: Globe,
     values: { hired: "yes", loxo: "no", linkedin: "yes", greenhouse: "partial", bullhorn: "partial" },
@@ -505,9 +560,13 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     ],
     whereHiredWins: [
       "Predictable per-seat pricing with no implementation fee",
-      "Native video resume, interview, and outreach tooling — no per-module upcharge",
+      "**Back-office at parity, not a $20K+/yr upcharge** — punch-in/out → weekly timesheets → approval-derived invoicing → contractor payout ledger → compliance doc vault (I-9 / W-9 / W-8BEN / COI / MSA) with native + DocuSign e-sign → QuickBooks Online / Xero / Gusto / Helcim push, all inside the $9.95/seat plan",
+      "Per-placement P&L (revenue · contractor pay · gross margin · approved-timesheet count) with drill-through to placement detail — Bullhorn's same surface lives behind enterprise reporting add-ons",
+      "Multi-recruiter commission splits (sourcer / manager fanout) + payout ledger that accrues on every approved timesheet, with a Recruiter Commissions dashboard included",
+      "Native video resume, interview, AI Studio, and outreach tooling — no per-module upcharge",
       "Full agency-recruiter mode in My Services, including pitch decks and shareable candidate links",
       "Candidate-facing surface — gamification, learning paths, public profile, map discovery — that Bullhorn doesn't ship at all",
+      "Remaining honest gap: Bullhorn's deeper VMS / MSP connector marketplace (logged as roadmap)",
     ],
   },
   {
@@ -554,10 +613,13 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
       "Mature L&D + internal-comms positioning",
     ],
     whereHiredWins: [
+      "**AI presenter avatars shipped client-side** — viseme-driven mouth shapes synced to TTS word boundaries via WebGPU. No per-render fee, no $30–$96/seat ticket.",
+      "**Multi-language dubbing in your own cloned voice** — Whisper transcript → LLM-translated cues → cloned-voice TTS re-renders → mux into a parallel audio track. 20+ target languages, inside Pro at $9.95/mo.",
       "Real voice cloning + voice marketplace (95/5 split to the creator) — Synthesia doesn't pay creators",
       "Multi-format Studio: comics, games, podcasts, animation, CAD — not just talking-head videos",
       "Native SCORM 1.2 + xAPI export + verifiable certificates — Synthesia exports MP4 only",
       "Full hiring stack underneath the studio (ATS, CRM, job board, interview practice) at consumer prices",
+      "Honest residual gap: Synthesia's photo-realistic avatar fidelity (140+ language brand-voice library, studio-grade lip-sync) is still ahead — our avatars are stylized 2D presenters today; photorealistic ML-rig avatars are on roadmap.",
     ],
   },
   {
@@ -571,6 +633,7 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
       "Fast avatar style iteration + voice library",
     ],
     whereHiredWins: [
+      "**Client-side AI avatar + dubbing** — runs in the browser on WebGPU, no per-minute render bill and no model-cost exposure as your usage scales",
       "Multi-format authoring (comics + games + podcasts + CAD) — not just AI avatars",
       "Native ATS + CRM + interview tools + job board — full talent vertical",
       "Creator marketplace with 95/5 split, gamification cashout, SCORM export — none of which HeyGen ships",
@@ -589,10 +652,12 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     ],
     whereHiredWins: [
       "$9.95/mo Pro vs. $1,099/yr seat — 92% lower for individual authors",
-      "AI scripting + AI avatar + voice cloning + auto captions baked in (Articulate is mostly manual)",
+      "AI scripting + **AI presenter avatars (WebGPU client-side)** + voice cloning + **20+ language dubbing** + auto captions baked in (Articulate is mostly manual)",
+      "**WCAG 2.2 audit panel** on Studio output — flags missing alt text, low-contrast overlays, missing caption tracks, non-sequential reading order in-editor before publish. Closes the Articulate accessibility-tooling gap inline.",
       "Web-native authoring (Articulate Storyline is still partly desktop)",
       "95/5 creator rev-share when courses sell — Articulate keeps 100% of the seat fee",
       "Same studio also produces AI video resumes, podcasts, comics, games — not just elearning",
+      "Honest residual gap: Articulate's 20+ years of asset / template library breadth is still wider — our Studio template library is ~20 templates today, growing per gap #1167 (mass template seeding).",
     ],
   },
   {
@@ -609,8 +674,10 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     whereHiredWins: [
       "Studio outputs are linked into a hiring + career platform — videos become resumes / interview submissions / course lessons",
       "AI generation from a single prompt (storyboard → scene graph → render) — Canva/CapCut are manual",
+      "**Installable PWA** — Add to Home Screen on iOS / Android, offline shell, standalone-window run mode. Closes the CapCut mobile-parity gap without paying for a separate native build.",
       "Creator marketplace with 95/5 split + SCORM/xAPI export + ATS package generator — not present on Canva or CapCut",
       "Voice cloning + voice marketplace + per-second engagement heatmap on every published video",
+      "Honest residual gap: Canva's social-template library breadth + CapCut's native-mobile editing fidelity are still ahead — our Studio is web-PWA, not Capacitor/native, and our template count is order-of-magnitude smaller.",
     ],
   },
 ];

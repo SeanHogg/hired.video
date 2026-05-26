@@ -22,6 +22,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
@@ -100,7 +101,7 @@ const ImportSchema = z.object({
   sourceUrl: z.string().min(1),
   /** Master (or any owned) resume to merge INTO. Frontend defaults to
    *  the user's master via the resume list page. */
-  targetResumeId: z.string().uuid(),
+  targetResumeId: UuidLikeSchema,
 });
 
 vendorSyncRoutes.post("/:connectorId/import", async (c) => {
@@ -168,9 +169,9 @@ vendorSyncRoutes.post("/:connectorId/import", async (c) => {
 // ---------------------------------------------------------------------------
 
 const ExecuteSchema = z.object({
-  syncRunId: z.string().uuid(),
+  syncRunId: UuidLikeSchema,
   sourceContent: z.record(z.string(), z.unknown()),
-  targetResumeId: z.string().uuid(),
+  targetResumeId: UuidLikeSchema,
   decisions: z.array(z.object({
     sectionType: z.string(),
     sourceIndex: z.number(),
@@ -275,7 +276,7 @@ vendorSyncRoutes.post("/:connectorId/execute", async (c) => {
 // ---------------------------------------------------------------------------
 
 const BlocksSchema = z.object({
-  resumeId: z.string().uuid(),
+  resumeId: UuidLikeSchema,
 });
 
 vendorSyncRoutes.post("/:connectorId/blocks", async (c) => {
@@ -310,7 +311,7 @@ vendorSyncRoutes.post("/:connectorId/blocks", async (c) => {
 
 const ManualRunSchema = z.object({
   connectorId: z.string().min(1),
-  sourceResumeId: z.string().uuid(),
+  sourceResumeId: UuidLikeSchema,
   notes: z.string().max(500).optional(),
 });
 

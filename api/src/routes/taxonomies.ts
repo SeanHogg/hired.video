@@ -12,6 +12,7 @@
 import { Hono } from "hono";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -73,9 +74,9 @@ taxonomyRoutes.post("/tags", async (c) => {
 
 // Assign / unassign tag → entity.
 const AssignSchema = z.object({
-  tagId: z.string().uuid(),
+  tagId: UuidLikeSchema,
   axis: z.enum(TAG_AXES),
-  entityId: z.string().uuid(),
+  entityId: UuidLikeSchema,
 });
 
 taxonomyRoutes.post("/tags/assign", async (c) => {

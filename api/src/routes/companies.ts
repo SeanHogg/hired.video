@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -508,7 +509,7 @@ companyRoutes.delete("/:id/locations/:locationId", async (c) => {
 // ─── Company Team Members ─────────────────────────────────────────────────
 
 const TeamMemberSchema = z.object({
-  userId: z.string().uuid().optional().nullable(),
+  userId: UuidLikeSchema.optional().nullable(),
   name: z.string().min(1).max(255),
   title: z.string().max(255).optional().nullable(),
   bio: z.string().max(2000).optional().nullable(),

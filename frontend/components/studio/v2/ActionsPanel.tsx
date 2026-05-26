@@ -17,6 +17,7 @@
  */
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import {
+  Accessibility,
   Camera,
   Captions,
   Mic,
@@ -75,6 +76,9 @@ const HookOptimizerDialog = lazy(
   () => import("@/components/studio/HookOptimizerDialog"),
 );
 const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
+const StudioAccessibilityPanel = lazy(
+  () => import("@/components/studio/StudioAccessibilityPanel"),
+);
 const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
 const AudioMixerV2 = lazy(() => import("./AudioMixerV2"));
 // Chapters / Thumbnails / Forms / Review Comments — the shared
@@ -95,6 +99,7 @@ type ActionId =
   | "ai-headshot"
   | "original-music"
   | "captions"
+  | "accessibility"
   | "ai-rewrite"
   | "ai-hook";
 
@@ -237,6 +242,11 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           label="Captions"
           icon={Captions}
           onClick={() => setOpenAction("captions")}
+        />
+        <LeftPanelTile
+          label="Accessibility (WCAG 2.2)"
+          icon={Accessibility}
+          onClick={() => setOpenAction("accessibility")}
         />
         {/* Chapters / Thumbnails / Forms / Reviews — shared cluster
             (#675). Self-gates on projectId so an unsaved draft hides
@@ -402,6 +412,10 @@ function ActionSheet({
               />
             )}
 
+            {openAction === "accessibility" && (
+              <StudioAccessibilityPanel state={state} />
+            )}
+
             {openAction === "ai-rewrite" && (
               <ScriptRewriterDialog
                 projectId={persistedProjectId}
@@ -515,6 +529,7 @@ function titleFor(id: ActionId | null): string {
     case "ai-headshot": return "AI Headshot";
     case "original-music": return "Original Music";
     case "captions": return "Captions";
+    case "accessibility": return "Accessibility (WCAG 2.2)";
     case "ai-rewrite": return "AI Rewrite";
     case "ai-hook": return "Hook Optimizer";
     default: return "";
@@ -543,6 +558,8 @@ function descriptionFor(id: ActionId | null): string {
       return "Compose original music — step sequencer OR live piano. The result replaces the current music track.";
     case "captions":
       return "Author captions for the composition.";
+    case "accessibility":
+      return "Audit this composition against WCAG 2.2 — alt text, contrast, captions, reading order — before you publish.";
     case "ai-rewrite":
       return "Rewrite the selected text widget with AI.";
     case "ai-hook":

@@ -19,7 +19,8 @@
 
 import { Hono } from "hono";
 import { and, eq, desc, sql, inArray } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -149,7 +150,7 @@ studioFeaturesRoutes.post("/captions/generate", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    projectId: z.string().uuid(),
+    projectId: UuidLikeSchema,
     wordTimestamps: z.array(z.object({
       word: z.string(),
       start: z.number(),
@@ -334,8 +335,8 @@ studioFeaturesRoutes.post("/linkedin/publish", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    linkedinAccountId: z.string().uuid(),
-    projectId: z.string().uuid(),
+    linkedinAccountId: UuidLikeSchema,
+    projectId: UuidLikeSchema,
     text: z.string().min(1).max(3000),
     visibility: z.enum(["PUBLIC", "CONNECTIONS"]).default("PUBLIC"),
   }).safeParse(body);
@@ -391,7 +392,7 @@ studioFeaturesRoutes.post("/linkedin/post", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    linkedinAccountId: z.string().uuid(),
+    linkedinAccountId: UuidLikeSchema,
     videoUrn: z.string(),
     text: z.string().min(1).max(3000),
     visibility: z.enum(["PUBLIC", "CONNECTIONS"]).default("PUBLIC"),
@@ -438,7 +439,7 @@ studioFeaturesRoutes.post("/linkedin/post", async (c) => {
 // aiCall. Returns a static heuristic if no LLM key is configured. Closes
 // roadmap entry #203 ("AI LinkedIn post generation").
 const LinkedInGenerateSchema = z.object({
-  projectId: z.string().uuid(),
+  projectId: UuidLikeSchema,
   tone: z.enum(["professional", "casual", "bold", "story"]).default("professional"),
 });
 
@@ -638,8 +639,8 @@ studioFeaturesRoutes.post("/coaching/analyze", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    recordingId: z.string().uuid(),
-    projectId: z.string().uuid().optional(),
+    recordingId: UuidLikeSchema,
+    projectId: UuidLikeSchema.optional(),
     words: z.array(z.object({
       word: z.string(),
       start: z.number(),
@@ -748,7 +749,7 @@ studioFeaturesRoutes.post("/ats/generate", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    projectId: z.string().uuid(),
+    projectId: UuidLikeSchema,
     candidateName: z.string().min(1).max(200),
     headline: z.string().max(200).optional(),
     linkedinUrl: z.string().optional(),
@@ -911,7 +912,7 @@ studioFeaturesRoutes.post("/interview/session", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    questionId: z.string().uuid(),
+    questionId: UuidLikeSchema,
     resumeText: z.string().optional(),
   }).safeParse(body);
 
@@ -959,8 +960,8 @@ studioFeaturesRoutes.patch("/interview/session/:id", async (c) => {
   const sessionId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    recordingId: z.string().uuid().optional(),
-    coachingId: z.string().uuid().optional(),
+    recordingId: UuidLikeSchema.optional(),
+    coachingId: UuidLikeSchema.optional(),
     answer: z.string().optional(),
     isPublic: z.boolean().optional(),
   }).safeParse(body);
@@ -1031,8 +1032,8 @@ studioFeaturesRoutes.post("/skills-demo", async (c) => {
     title: z.string().min(1).max(200),
     description: z.string().max(2000).optional(),
     projectUrl: z.string().optional(),
-    recordingId: z.string().uuid().optional(),
-    projectId: z.string().uuid().optional(),
+    recordingId: UuidLikeSchema.optional(),
+    projectId: UuidLikeSchema.optional(),
   }).safeParse(body);
 
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request"), 400);
@@ -1638,7 +1639,7 @@ studioFeaturesRoutes.delete("/voice-clones/:id", async (c) => {
 //     frontend can drive the flow without a webhook round-trip in development.
 const VoiceCloneCartCheckoutSchema = z.object({
   items: z.array(z.object({
-    voiceCloneId: z.string().uuid(),
+    voiceCloneId: UuidLikeSchema,
     expectedPriceCents: z.number().int().min(0),
   })).min(1).max(50),
   /** Provider charge reference (Stripe payment_intent ID, etc.).
@@ -1746,8 +1747,8 @@ studioFeaturesRoutes.post("/async-interview", async (c) => {
     title: z.string().min(1).max(200),
     instructions: z.string().max(2000).optional(),
     candidateEmail: z.string().email().optional(),
-    candidateId: z.string().uuid().optional(),
-    jobId: z.string().uuid().optional(),
+    candidateId: UuidLikeSchema.optional(),
+    jobId: UuidLikeSchema.optional(),
     questions: z.array(z.object({
       id: z.string(),
       text: z.string().min(1),
@@ -1813,7 +1814,7 @@ studioFeaturesRoutes.post("/async-interview/:id/respond", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
     questionId: z.string(),
-    recordingId: z.string().uuid().optional(),
+    recordingId: UuidLikeSchema.optional(),
     videoUrl: z.string().optional(),
     transcription: z.string().optional(),
     durationMs: z.number().optional(),
@@ -1900,7 +1901,7 @@ studioFeaturesRoutes.get("/async-interview/:id/responses", async (c) => {
 studioFeaturesRoutes.post("/analytics/track", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    projectId: z.string().uuid(),
+    projectId: UuidLikeSchema,
     viewerId: z.string().optional(),
     viewerEmail: z.string().email().optional(),
     secondsWatched: z.array(z.number()),     // array of 0|1 per second
@@ -3105,7 +3106,7 @@ studioFeaturesRoutes.post("/projects/:projectId/comments", async (c) => {
   const parsed = z.object({
     body: z.string().min(1).max(2000),
     timestampSec: z.number().min(0).nullable().optional(),
-    parentId: z.string().uuid().nullable().optional(),
+    parentId: UuidLikeSchema.nullable().optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
 
@@ -3132,7 +3133,7 @@ studioFeaturesRoutes.post("/review/:shareToken/comments", async (c) => {
     authorEmail: z.string().email().optional(),
     body: z.string().min(1).max(2000),
     timestampSec: z.number().min(0).nullable().optional(),
-    parentId: z.string().uuid().nullable().optional(),
+    parentId: UuidLikeSchema.nullable().optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
 
@@ -3324,7 +3325,7 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
   const parsed = z.object({
     storyboard: z.unknown(),
     /** Optional: explicit projectId to pull retention data from */
-    projectId: z.string().uuid().optional(),
+    projectId: UuidLikeSchema.optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
 
@@ -3411,7 +3412,7 @@ studioFeaturesRoutes.patch("/projects/:projectId/thumbnail", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
   const body = await c.req.json().catch(() => null);
-  const parsed = z.object({ thumbnailId: z.string().uuid() }).safeParse(body);
+  const parsed = z.object({ thumbnailId: UuidLikeSchema }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
 
   const db = getDb();

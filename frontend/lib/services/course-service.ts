@@ -297,6 +297,12 @@ export const courseService = {
     return res.data;
   },
 
+  // 409 CERTIFICATE_ISSUED if a cert exists — backend refuses, since the cert
+  // FK cascades on enrollment delete.
+  async unenroll(courseId: string): Promise<void> {
+    await apiClient.delete(`/api/courses/${courseId}/enroll`);
+  },
+
   async listMyEnrollments(): Promise<EnrollmentRow[]> {
     const res = await apiClient.get<EnrollmentRow[]>(`/api/courses/me/enrollments`);
     return res.data ?? [];

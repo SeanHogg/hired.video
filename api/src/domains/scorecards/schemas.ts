@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 
+import { UuidLikeSchema } from "../../../../shared/validation.js";
 export const RatingScaleEnum = z.enum(["1-4", "1-5", "thumbs", "yes-no"]);
 export type RatingScale = z.infer<typeof RatingScaleEnum>;
 
@@ -60,7 +61,7 @@ export const CompetencyLevelInputSchema = z.object({
 export type CompetencyLevelInput = z.infer<typeof CompetencyLevelInputSchema>;
 
 export const CreateCompetencySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   taxonomy: CompetencyTaxonomyEnum.default("other"),
@@ -86,7 +87,7 @@ export const AttributeInputSchema = z.object({
   anchors: z.record(z.string(), z.string()).optional(),
   // Migration 0132 / gap #1382. Optional link to a competency in the
   // reusable rubric library. Free-form attributes (null) remain valid.
-  competencyId: z.string().uuid().nullable().optional(),
+  competencyId: UuidLikeSchema.nullable().optional(),
 });
 // `z.input` (not `z.infer`) so callers can omit fields that have a default —
 // e.g. `weight`, `displayOrder` here. After `safeParse` the parsed `data`
@@ -94,13 +95,13 @@ export const AttributeInputSchema = z.object({
 export type AttributeInput = z.input<typeof AttributeInputSchema>;
 
 export const CreateTemplateSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   ratingScale: RatingScaleEnum.default("1-4"),
   roleFamily: z.string().max(100).optional(),
   /** Migration 0134 / gap #1384. Optional cert gate. */
-  requiredCertificationCourseId: z.string().uuid().nullable().optional(),
+  requiredCertificationCourseId: UuidLikeSchema.nullable().optional(),
   attributes: z.array(AttributeInputSchema).min(1).max(20),
 });
 export type CreateTemplateInput = z.input<typeof CreateTemplateSchema>;
@@ -110,7 +111,7 @@ export const UpdateTemplateSchema = z.object({
   description: z.string().nullable().optional(),
   ratingScale: RatingScaleEnum.optional(),
   roleFamily: z.string().max(100).nullable().optional(),
-  requiredCertificationCourseId: z.string().uuid().nullable().optional(),
+  requiredCertificationCourseId: UuidLikeSchema.nullable().optional(),
   isArchived: z.boolean().optional(),
 });
 export type UpdateTemplateInput = z.infer<typeof UpdateTemplateSchema>;
@@ -126,20 +127,20 @@ export const StageInputSchema = z.object({
   displayOrder: z.number().int().min(0).default(0),
   durationMinutes: z.number().int().min(5).max(480).default(60),
   suggestedQuestions: z.array(z.string()).optional(),
-  scorecardTemplateId: z.string().uuid().optional(),
+  scorecardTemplateId: UuidLikeSchema.optional(),
 });
 export type StageInput = z.input<typeof StageInputSchema>;
 
 export const CreateKitSchema = z.object({
-  companyId: z.string().uuid(),
-  jobId: z.string().uuid().optional(),
+  companyId: UuidLikeSchema,
+  jobId: UuidLikeSchema.optional(),
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   // Migration 0132 / gap #1380. Default 'off' — opt-in policy.
   blindReviewMode: BlindReviewModeEnum.default("off"),
   // Migration 0132 / gap #1383. Optional escalation recipient for SLA
   // breaches.
-  escalateToUserId: z.string().uuid().nullable().optional(),
+  escalateToUserId: UuidLikeSchema.nullable().optional(),
   stages: z.array(StageInputSchema).min(1).max(15),
 });
 export type CreateKitInput = z.input<typeof CreateKitSchema>;
@@ -147,9 +148,9 @@ export type CreateKitInput = z.input<typeof CreateKitSchema>;
 export const UpdateKitSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().nullable().optional(),
-  jobId: z.string().uuid().nullable().optional(),
+  jobId: UuidLikeSchema.nullable().optional(),
   blindReviewMode: BlindReviewModeEnum.optional(),
-  escalateToUserId: z.string().uuid().nullable().optional(),
+  escalateToUserId: UuidLikeSchema.nullable().optional(),
   isArchived: z.boolean().optional(),
 });
 export type UpdateKitInput = z.infer<typeof UpdateKitSchema>;
@@ -157,18 +158,18 @@ export type UpdateKitInput = z.infer<typeof UpdateKitSchema>;
 // ─── Submissions ─────────────────────────────────────────────────────────────
 
 export const RatingInputSchema = z.object({
-  attributeId: z.string().uuid(),
+  attributeId: UuidLikeSchema,
   rating: z.number().int().min(0).max(10).nullable(),
   notes: z.string().max(2000).optional(),
 });
 export type RatingInput = z.infer<typeof RatingInputSchema>;
 
 export const CreateSubmissionSchema = z.object({
-  templateId: z.string().uuid(),
+  templateId: UuidLikeSchema,
   applicationId: z.string().min(1),
-  interviewId: z.string().uuid().optional(),
-  kitStageId: z.string().uuid().optional(),
-  candidateUserId: z.string().uuid().optional(),
+  interviewId: UuidLikeSchema.optional(),
+  kitStageId: UuidLikeSchema.optional(),
+  candidateUserId: UuidLikeSchema.optional(),
   ratings: z.array(RatingInputSchema).optional(),
   overallRecommendation: RecommendationEnum.optional(),
   summary: z.string().max(5000).optional(),
@@ -195,10 +196,10 @@ export type UpdateSubmissionInput = z.infer<typeof UpdateSubmissionSchema>;
 // ─── Decisions ───────────────────────────────────────────────────────────────
 
 export const CreateDecisionSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   applicationId: z.string().min(1),
-  jobId: z.string().uuid().optional(),
-  candidateUserId: z.string().uuid().optional(),
+  jobId: UuidLikeSchema.optional(),
+  candidateUserId: UuidLikeSchema.optional(),
   decision: DecisionEnum,
   reason: z.string().max(2000).optional(),
 });

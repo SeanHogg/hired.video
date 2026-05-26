@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, avg, count, desc, eq, gte, lt, sql } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -344,7 +345,7 @@ import { hashClientIp } from "./resumes.js";
 
 const beaconSchema = z.object({
   artifactKind: z.enum(ARTIFACT_KINDS as unknown as [ArtifactKind, ...ArtifactKind[]]),
-  artifactId: z.string().uuid(),
+  artifactId: UuidLikeSchema,
   engagement: z.array(z.number()).optional(),
   totalEngagementSec: z.number().int().nonnegative().optional(),
   percentConsumed: z.number().min(0).max(1).optional(),

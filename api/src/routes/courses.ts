@@ -32,6 +32,7 @@
  *
  *   Learner
  *     POST   /api/courses/:id/enroll            — enrol current user (free courses only for now)
+ *     DELETE /api/courses/:id/enroll            — unenrol current user (blocked once cert issued)
  *     GET    /api/courses/me/enrollments        — my enrolments
  *     PATCH  /api/courses/enrollments/:enrollmentId/progress  — update lesson progress
  */
@@ -48,6 +49,7 @@ import {
 } from "../db/schema/courses.js";
 import { SCORM_COMPLETION_STATUSES, XAPI_VERBS } from "../db/schema/learning.js";
 import { slugify } from "../../../shared/slugify.js";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import { isUuid } from "../../../shared/value-types.js";
 import { USER_ROLES, pickScoringRole } from "../../../shared/user-roles.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
@@ -55,6 +57,7 @@ import { LearningPathService } from "../services/learning/learning-path-service.
 import { CertificateService } from "../services/learning/certificate-service.js";
 import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
 import { getJwtSecret } from "../utils/jwt.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 
 const {
   courses,
@@ -122,6 +125,29 @@ async function ownsCourse(db: ReturnType<typeof getDb>, userId: string, courseId
   return row != null;
 }
 
+/** Single seam: caller may mutate this course because they own it OR
+ *  they're a SuperAdmin. Used by every PATCH / POST / DELETE handler in
+ *  this file + course-authoring.ts. Per the DRY rule, every owner check
+ *  routes through here — never compute it inline at the call site, and
+ *  never prop-drill a `canEdit` boolean. Impersonation tokens that have
+ *  already swapped `sub` to the target user pass via ownsCourse(); raw
+ *  SuperAdmin tokens (no impersonation) pass via isSuperAdmin. */
+async function canEditCourse(
+  db: ReturnType<typeof getDb>,
+  c: any,
+  courseId: string,
+): Promise<boolean> {
+  const userId = uid(c);
+  if (!userId) return false;
+  if (await ownsCourse(db, userId, courseId)) return true;
+  if (!isSuperAdmin(c.var.user)) return false;
+  const [row] = await db.select({ id: courses.id })
+    .from(courses)
+    .where(eq(courses.id, courseId))
+    .limit(1);
+  return row != null;
+}
+
 // ---------------------------------------------------------------------------
 // Validators
 // ---------------------------------------------------------------------------
@@ -153,10 +179,10 @@ const CreateModuleSchema = z.object({
 
 const UpdateModuleSchema = CreateModuleSchema.partial();
 
-const CreateLessonSchema = z.object({
+export const CreateLessonSchema = z.object({
   title: z.string().min(1).max(255),
   summary: z.string().optional(),
-  moduleId: z.string().uuid().optional(),
+  moduleId: UuidLikeSchema.optional(),
   sourceType: z.enum(COURSE_LESSON_SOURCE_TYPES),
   studioProjectId: z.string().optional(),
   scormManifestUrl: z.string().url().optional(),
@@ -164,19 +190,19 @@ const CreateLessonSchema = z.object({
   scormVersion: z.enum(SCORM_VERSIONS).optional(),
   // #1440 — uuid of the R2 prefix that wraps every file in a SCORM
   // package. Recorded on insert so the DELETE handler can bulk-clean.
-  scormPkgId: z.string().uuid().optional(),
+  scormPkgId: UuidLikeSchema.optional(),
   externalUrl: z.string().url().optional(),
   bodyMd: z.string().optional(),
   estimatedMinutes: z.number().int().min(0).max(100_000).optional(),
   isRequired: z.boolean().optional(),
-  knowledgeCheckFormId: z.string().uuid().optional(),
+  knowledgeCheckFormId: UuidLikeSchema.optional(),
   sortOrder: z.number().int().min(0).optional(),
 });
 
 const UpdateLessonSchema = CreateLessonSchema.partial();
 
-const ProgressUpdateSchema = z.object({
-  lessonId: z.string().uuid(),
+export const ProgressUpdateSchema = z.object({
+  lessonId: UuidLikeSchema,
   status: z.enum(["not_started", "in_progress", "passed", "failed"]),
   scoreRaw: z.number().optional(),
   scoreMax: z.number().optional(),
@@ -615,9 +641,14 @@ courseRoutes.get("/:id", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  const [row] = await db.select().from(courses)
-    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
-    .limit(1);
+  // Owner or SuperAdmin can fetch any-status course (drafts included).
+  // For SA we skip the userId filter so platform-owned courses are
+  // editable from /services/creator/courses after impersonation OR
+  // from the inline editor that the /learn page exposes (#1521).
+  const ownerFilter = isSuperAdmin(c.var.user)
+    ? eq(courses.id, c.req.param("id"))
+    : and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId));
+  const [row] = await db.select().from(courses).where(ownerFilter).limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Course not found"), 404);
   const modules = await db.select().from(courseModules)
     .where(eq(courseModules.courseId, row.id))
@@ -636,7 +667,7 @@ courseRoutes.patch("/:id", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const db = getDb();
-  if (!(await ownsCourse(db, userId, c.req.param("id")))) {
+  if (!(await canEditCourse(db, c, c.req.param("id")))) {
     return c.json(error("NOT_FOUND", "Course not found"), 404);
   }
   const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -663,9 +694,11 @@ courseRoutes.post("/:id/publish", async (c) => {
     return c.json(error("AUTHORING_NOT_ELIGIBLE", "Re-enable the Courses Creator Program at /services to publish (or hold the employer role)."), 403);
   }
 
-  const [existing] = await db.select().from(courses)
-    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
-    .limit(1);
+  const courseId = c.req.param("id");
+  if (!(await canEditCourse(db, c, courseId))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
+  const [existing] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
   if (!existing) return c.json(error("NOT_FOUND", "Course not found"), 404);
 
   const lessonCount = await db.select({ n: sql<number>`count(*)::int` }).from(courseLessons)
@@ -703,9 +736,13 @@ courseRoutes.post("/:id/unpublish", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  const courseId = c.req.param("id");
+  if (!(await canEditCourse(db, c, courseId))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
   const [updated] = await db.update(courses)
     .set({ status: "draft", publishedAt: null, updatedAt: new Date() } as any)
-    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
+    .where(eq(courses.id, courseId))
     .returning();
   if (!updated) return c.json(error("NOT_FOUND", "Course not found"), 404);
   return c.json(success(updated), 200);
@@ -715,8 +752,12 @@ courseRoutes.delete("/:id", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  const courseId = c.req.param("id");
+  if (!(await canEditCourse(db, c, courseId))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
   const [deleted] = await db.delete(courses)
-    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
+    .where(eq(courses.id, courseId))
     .returning({ id: courses.id });
   if (!deleted) return c.json(error("NOT_FOUND", "Course not found"), 404);
   return c.json(success({ deleted: deleted.id }), 200);
@@ -730,11 +771,13 @@ courseRoutes.post("/:id/clone", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  const [original] = await db
-    .select()
-    .from(courses)
-    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
-    .limit(1);
+  // SuperAdmin can clone any course (e.g. fork a platform-seeded course
+  // into a tweaked variant); the clone is created under the caller's
+  // userId regardless of who owned the original.
+  const originalFilter = isSuperAdmin(c.var.user)
+    ? eq(courses.id, c.req.param("id"))
+    : and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId));
+  const [original] = await db.select().from(courses).where(originalFilter).limit(1);
   if (!original) return c.json(error("NOT_FOUND", "Course not found"), 404);
 
   // Slug is `unique(userId, slug)` so we only have to dodge collisions
@@ -805,7 +848,7 @@ courseRoutes.post("/:id/modules", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const db = getDb();
-  if (!(await ownsCourse(db, userId, c.req.param("id")))) {
+  if (!(await canEditCourse(db, c, c.req.param("id")))) {
     return c.json(error("NOT_FOUND", "Course not found"), 404);
   }
   const [created] = await db.insert(courseModules).values({
@@ -825,14 +868,13 @@ courseRoutes.patch("/modules/:moduleId", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const db = getDb();
-  // Authorise via the parent course
+  // Authorise via the parent course — owner OR SuperAdmin
   const [existing] = await db
-    .select({ courseId: courseModules.courseId, ownerId: courses.userId })
+    .select({ courseId: courseModules.courseId })
     .from(courseModules)
-    .innerJoin(courses, eq(courses.id, courseModules.courseId))
     .where(eq(courseModules.id, c.req.param("moduleId")))
     .limit(1);
-  if (!existing || existing.ownerId !== userId) {
+  if (!existing || !(await canEditCourse(db, c, existing.courseId))) {
     return c.json(error("NOT_FOUND", "Module not found"), 404);
   }
   const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -850,12 +892,11 @@ courseRoutes.delete("/modules/:moduleId", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
   const [existing] = await db
-    .select({ ownerId: courses.userId })
+    .select({ courseId: courseModules.courseId })
     .from(courseModules)
-    .innerJoin(courses, eq(courses.id, courseModules.courseId))
     .where(eq(courseModules.id, c.req.param("moduleId")))
     .limit(1);
-  if (!existing || existing.ownerId !== userId) {
+  if (!existing || !(await canEditCourse(db, c, existing.courseId))) {
     return c.json(error("NOT_FOUND", "Module not found"), 404);
   }
   await db.delete(courseModules).where(eq(courseModules.id, c.req.param("moduleId")));
@@ -874,7 +915,7 @@ courseRoutes.post("/:id/lessons", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const db = getDb();
-  if (!(await ownsCourse(db, userId, c.req.param("id")))) {
+  if (!(await canEditCourse(db, c, c.req.param("id")))) {
     return c.json(error("NOT_FOUND", "Course not found"), 404);
   }
   const [created] = await db.insert(courseLessons).values({
@@ -907,12 +948,11 @@ courseRoutes.patch("/lessons/:lessonId", async (c) => {
   }
   const db = getDb();
   const [existing] = await db
-    .select({ ownerId: courses.userId })
+    .select({ courseId: courseLessons.courseId })
     .from(courseLessons)
-    .innerJoin(courses, eq(courses.id, courseLessons.courseId))
     .where(eq(courseLessons.id, c.req.param("lessonId")))
     .limit(1);
-  if (!existing || existing.ownerId !== userId) {
+  if (!existing || !(await canEditCourse(db, c, existing.courseId))) {
     return c.json(error("NOT_FOUND", "Lesson not found"), 404);
   }
   const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -940,6 +980,7 @@ courseRoutes.delete("/lessons/:lessonId", async (c) => {
   const [existing] = await db
     .select({
       ownerId: courses.userId,
+      courseId: courseLessons.courseId,
       sourceType: courseLessons.sourceType,
       scormPkgId: courseLessons.scormPkgId,
     })
@@ -947,19 +988,21 @@ courseRoutes.delete("/lessons/:lessonId", async (c) => {
     .innerJoin(courses, eq(courses.id, courseLessons.courseId))
     .where(eq(courseLessons.id, c.req.param("lessonId")))
     .limit(1);
-  if (!existing || existing.ownerId !== userId) {
+  if (!existing || !(await canEditCourse(db, c, existing.courseId))) {
     return c.json(error("NOT_FOUND", "Lesson not found"), 404);
   }
   await db.delete(courseLessons).where(eq(courseLessons.id, c.req.param("lessonId")));
 
   // #1440 — bulk-delete the SCORM package's R2 prefix. Best-effort;
   // failures don't block the lesson delete (DB row is gone, R2 just
-  // ends up with orphans the next pass would clean).
+  // ends up with orphans the next pass would clean). R2 prefix is
+  // keyed on the lesson's owner, not the caller — important when
+  // SuperAdmin deletes a platform-authored lesson.
   if (existing.sourceType === "scorm_package" && existing.scormPkgId) {
     try {
       const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
       if (bucket) {
-        const prefix = `uploads/${userId}/scorm/${existing.scormPkgId}/`;
+        const prefix = `uploads/${existing.ownerId}/scorm/${existing.scormPkgId}/`;
         const listed = await bucket.list({ prefix, limit: 1000 });
         if (listed.objects.length > 0) {
           await bucket.delete(listed.objects.map((o) => o.key));
@@ -1038,6 +1081,47 @@ courseRoutes.post("/:id/enroll", async (c) => {
     .catch(() => undefined);
 
   return c.json(success(created), 201);
+});
+
+// Unenrol — drops the enrollment row (and cascades progress + SCORM CMI state
+// + xAPI rows via FK). Refuses once a certificate has been issued because
+// cert verification cascades on enrollment delete; revoking a real-world
+// credential by accident is not recoverable.
+courseRoutes.delete("/:id/enroll", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [existing] = await db.select().from(courseEnrollments)
+    .where(and(
+      eq(courseEnrollments.userId, userId),
+      eq(courseEnrollments.courseId, c.req.param("id")),
+    ))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "You are not enrolled in this course"), 404);
+
+  const [cert] = await db.select({ id: courseCertificates.id }).from(courseCertificates)
+    .where(eq(courseCertificates.enrollmentId, existing.id))
+    .limit(1);
+  if (cert) {
+    return c.json(
+      error(
+        "CERTIFICATE_ISSUED",
+        "You can't unenroll — a certificate has already been issued for this course. Contact support if you need this removed.",
+      ),
+      409,
+    );
+  }
+
+  await db.delete(courseEnrollments).where(eq(courseEnrollments.id, existing.id));
+
+  // Decrement aggregate (best-effort, clamped at 0).
+  await db.update(courses)
+    .set({ enrollmentCount: sql`GREATEST(${courses.enrollmentCount} - 1, 0)` } as any)
+    .where(eq(courses.id, existing.courseId))
+    .catch(() => undefined);
+
+  return c.json(success({ unenrolled: true }), 200);
 });
 
 courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
@@ -1201,8 +1285,8 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
 // Prerequisites (DAG edges)
 // ---------------------------------------------------------------------------
 
-const PrerequisiteSchema = z.object({
-  prerequisiteCourseId: z.string().uuid(),
+export const PrerequisiteSchema = z.object({
+  prerequisiteCourseId: UuidLikeSchema,
 });
 
 courseRoutes.get("/:id/prerequisites", async (c) => {
@@ -1231,7 +1315,7 @@ courseRoutes.post("/:id/prerequisites", async (c) => {
   }
   const db = getDb();
   const courseId = c.req.param("id");
-  if (!(await ownsCourse(db, userId, courseId))) {
+  if (!(await canEditCourse(db, c, courseId))) {
     return c.json(error("NOT_FOUND", "Course not found"), 404);
   }
   // Validate the prereq exists (any visibility — author may chain to a
@@ -1254,7 +1338,7 @@ courseRoutes.delete("/:id/prerequisites/:prereqId", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
   const courseId = c.req.param("id");
-  if (!(await ownsCourse(db, userId, courseId))) {
+  if (!(await canEditCourse(db, c, courseId))) {
     return c.json(error("NOT_FOUND", "Course not found"), 404);
   }
   const service = new LearningPathService(db);
@@ -1302,10 +1386,10 @@ courseRoutes.get("/me/certificates", async (c) => {
 // SCORM CMI persistence (#161) — runtime calls this from the lesson player
 // ---------------------------------------------------------------------------
 
-const ScormCommitSchema = z.object({
-  lessonId: z.string().uuid(),
+export const ScormCommitSchema = z.object({
+  lessonId: UuidLikeSchema,
   scormVersion: z.enum(SCORM_VERSIONS),
-  cmi: z.record(z.unknown()),
+  cmi: z.record(z.string(), z.unknown()),
   completionStatus: z.enum(SCORM_COMPLETION_STATUSES).optional(),
   scoreRaw: z.number().optional(),
   scoreMin: z.number().optional(),
@@ -1408,10 +1492,10 @@ courseRoutes.get("/scorm/:enrollmentId/:lessonId", async (c) => {
 // table; external-LRS mirroring lands later for enterprise customers.
 // ---------------------------------------------------------------------------
 
-const XapiStatementSchema = z.object({
-  enrollmentId: z.string().uuid().optional(),
-  lessonId: z.string().uuid().optional(),
-  courseId: z.string().uuid().optional(),
+export const XapiStatementSchema = z.object({
+  enrollmentId: UuidLikeSchema.optional(),
+  lessonId: UuidLikeSchema.optional(),
+  courseId: UuidLikeSchema.optional(),
   verb: z.object({
     id: z.string().min(1).max(255),
     display: z.string().max(80).optional(),
@@ -1426,7 +1510,7 @@ const XapiStatementSchema = z.object({
     completion: z.boolean().optional(),
     duration: z.string().optional(),
   }).optional(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
   timestamp: z.string().optional(),
 });
 

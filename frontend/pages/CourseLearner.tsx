@@ -39,6 +39,7 @@ import {
   Loader2,
   Lock,
   Package,
+  Pencil,
   Video,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -53,6 +54,8 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import ScormPlayer from "@/components/courses/ScormPlayer";
+import TextNarrator from "@/components/audio/TextNarrator";
+import { useCoursePermissions } from "@/hooks/use-course-permissions";
 import {
   courseService,
   type CourseLearnerContent,
@@ -86,6 +89,12 @@ export default function CourseLearner() {
   const [notFound, setNotFound] = useState(false);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
+
+  // #1521 — owner / SuperAdmin gets the edit pencil. Hook is called
+  // unconditionally with `data?.course` so it stays above the
+  // conditional renders below (rules-of-hooks). Returns canEdit=false
+  // until the course payload arrives.
+  const { canEdit } = useCoursePermissions(data?.course);
 
   // Fetch the enrollment + course + module + lesson tree on mount. The
   // endpoint 404s when the requester doesn't own the enrollment, so a
@@ -322,27 +331,48 @@ export default function CourseLearner() {
                         <p className="text-sm text-muted-foreground truncate">{activeLesson.summary}</p>
                       )}
                     </div>
-                    {/* SCORM lessons mark complete on their own Commit event;
-                        every other type gets the explicit Mark Complete button. */}
-                    {activeLesson.sourceType !== "scorm_package" && (
-                      <Button
-                        size="sm"
-                        onClick={markComplete}
-                        disabled={
-                          markingComplete ||
-                          enrollment.progress?.[activeLesson.id]?.status === "passed"
-                        }
-                      >
-                        {markingComplete ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                        ) : (
-                          <CheckCircle2 className="h-4 w-4 mr-1" />
-                        )}
-                        {enrollment.progress?.[activeLesson.id]?.status === "passed"
-                          ? "Completed"
-                          : "Mark complete"}
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* #1521 — owner / SuperAdmin edits via the
+                          existing CourseContentEditor surface. Deep
+                          link includes the lesson id so the editor
+                          can scroll-to/focus it. */}
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(
+                              `/services/creator/courses?courseId=${course.id}&lessonId=${activeLesson.id}`,
+                            )
+                          }
+                          title="Edit this lesson"
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      )}
+                      {/* SCORM lessons mark complete on their own Commit event;
+                          every other type gets the explicit Mark Complete button. */}
+                      {activeLesson.sourceType !== "scorm_package" && (
+                        <Button
+                          size="sm"
+                          onClick={markComplete}
+                          disabled={
+                            markingComplete ||
+                            enrollment.progress?.[activeLesson.id]?.status === "passed"
+                          }
+                        >
+                          {markingComplete ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                          )}
+                          {enrollment.progress?.[activeLesson.id]?.status === "passed"
+                            ? "Completed"
+                            : "Mark complete"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <LessonBody
                     lesson={activeLesson}
@@ -420,12 +450,24 @@ function LessonBody({
   switch (lesson.sourceType) {
     case "text_md":
       return (
-        <div className="p-6 prose prose-sm dark:prose-invert max-w-none">
+        <div className="p-6 space-y-4">
+          {/* Audio modality (#1519). Self-gates: returns null when
+              Web Speech is unavailable or the lesson has no body, so
+              we don't need a canPlay branch here. */}
           {lesson.bodyMd ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{lesson.bodyMd}</ReactMarkdown>
-          ) : (
-            <p className="text-muted-foreground italic">This lesson has no content yet.</p>
-          )}
+            <TextNarrator
+              text={lesson.bodyMd}
+              preferenceKey="learn.lesson-narration"
+              className="border rounded-md p-2 bg-muted/40"
+            />
+          ) : null}
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            {lesson.bodyMd ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{lesson.bodyMd}</ReactMarkdown>
+            ) : (
+              <p className="text-muted-foreground italic">This lesson has no content yet.</p>
+            )}
+          </div>
         </div>
       );
 

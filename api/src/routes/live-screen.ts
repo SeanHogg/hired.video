@@ -20,6 +20,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -42,7 +43,7 @@ function recruiterId(c: any): string {
 
 const CreateSessionSchema = z.object({
   title: z.string().min(1).max(255),
-  jobId: z.string().uuid().optional().nullable(),
+  jobId: UuidLikeSchema.optional().nullable(),
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
   slotMinutes: z.number().int().min(3).max(60).optional().default(8),
@@ -137,7 +138,7 @@ const ScheduleCandidatesSchema = z.object({
   candidates: z
     .array(
       z.object({
-        candidateId: z.string().uuid().nullable(),
+        candidateId: UuidLikeSchema.nullable(),
         candidateName: z.string().min(1).max(255),
         candidateEmail: z.string().email().optional().nullable(),
       }),

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -28,12 +29,12 @@ const ExtractRequestSchema = z
     /** Saved-resume path. Server loads the resume (owner-checked), ships
      *  its `ResumeContent` JSON straight to the LLM, and uses its section
      *  items as evidence-binding context. */
-    resumeId: z.string().uuid().optional(),
+    resumeId: UuidLikeSchema.optional(),
     /** Saved-job path. Server loads the job, projects it to `ParsedJob`,
      *  and ships the JSON to the LLM so it can reason over the
      *  responsibilities/requirements arrays directly instead of a flat
      *  text blob. */
-    jobId: z.string().uuid().optional(),
+    jobId: UuidLikeSchema.optional(),
   })
   .refine(
     (v) => Boolean(v.content) || Boolean(v.resumeId) || Boolean(v.jobId),

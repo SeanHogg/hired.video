@@ -92,13 +92,17 @@ export default function Sidebar({
     }
 
     // Special handling for tools — match /tools, /Tools, /learning (the
-    // SEO alias for the Learning Content Library tab), and /chrome-extension.
+    // SEO alias for the Learning Content Library tab), /chrome-extension,
+    // and the course-detail / learner surfaces (/courses/* + /learn/*) so
+    // the nav stays anchored while a learner is inside a course.
     if (item.href === "/tools") {
       return (
         location.pathname.startsWith("/tools") ||
         location.pathname.startsWith("/Tools") ||
         location.pathname.startsWith("/learning") ||
-        location.pathname.startsWith("/chrome-extension")
+        location.pathname.startsWith("/chrome-extension") ||
+        location.pathname.startsWith("/courses") ||
+        location.pathname.startsWith("/learn")
       );
     }
 

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { z } from "zod";
+import { UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import type { Variables, AppEnv } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
 import {
@@ -14,7 +15,7 @@ import {
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const StartSchema = z.object({
-  targetUserId: z.string().uuid("targetUserId must be a valid UUID"),
+  targetUserId: z.string().regex(UUID_LIKE_REGEX, "targetUserId must be a valid UUID"),
   reason: z.string().min(1, "reason is required and must be non-empty").max(500),
   enableDebugger: z.boolean().optional().default(false),
 });

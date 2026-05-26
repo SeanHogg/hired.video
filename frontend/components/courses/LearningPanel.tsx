@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import CourseMarketplaceCard, {
   type CourseMarketplaceItem,
 } from "@/components/CourseMarketplaceCard";
+import { UnenrollButton } from "@/components/courses/UnenrollButton";
 import {
   courseService,
   type EnrollmentRow,
@@ -60,6 +61,8 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
 
   // Authed users see a "Continue learning" rail across the top with every
   // course they've enrolled in. Self-fetches; unauth viewers skip.
+  // `enrollmentsToken` bumps after an unenroll so the rail refreshes.
+  const [enrollmentsToken, setEnrollmentsToken] = useState(0);
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
@@ -72,7 +75,8 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, enrollmentsToken]);
+  const refreshEnrollments = () => setEnrollmentsToken((t) => t + 1);
 
   return (
     <div>
@@ -113,7 +117,10 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
           has at least one enrollment. Shared component decides its own
           visibility (returns null when empty) per the DRY rule. */}
       {enrollments.length > 0 && (
-        <ContinueLearningRail enrollments={enrollments} />
+        <ContinueLearningRail
+          enrollments={enrollments}
+          onEnrollmentChange={refreshEnrollments}
+        />
       )}
 
       {loading ? (
@@ -164,7 +171,13 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
  *  100/0 bar for passed/in-progress; a future iteration can compute the
  *  real percentage if we add `progressPct` to the listMyEnrollments
  *  response). */
-function ContinueLearningRail({ enrollments }: { enrollments: EnrollmentRow[] }) {
+function ContinueLearningRail({
+  enrollments,
+  onEnrollmentChange,
+}: {
+  enrollments: EnrollmentRow[];
+  onEnrollmentChange: () => void;
+}) {
   const incomplete = enrollments.filter((r) => !r.enrollment.passed);
   const completed = enrollments.filter((r) => r.enrollment.passed);
   return (
@@ -174,17 +187,31 @@ function ContinueLearningRail({ enrollments }: { enrollments: EnrollmentRow[] })
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {incomplete.map((r) => (
-          <EnrollmentCard key={r.enrollment.id} row={r} />
+          <EnrollmentCard
+            key={r.enrollment.id}
+            row={r}
+            onUnenrolled={onEnrollmentChange}
+          />
         ))}
         {completed.map((r) => (
-          <EnrollmentCard key={r.enrollment.id} row={r} />
+          <EnrollmentCard
+            key={r.enrollment.id}
+            row={r}
+            onUnenrolled={onEnrollmentChange}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function EnrollmentCard({ row }: { row: EnrollmentRow }) {
+function EnrollmentCard({
+  row,
+  onUnenrolled,
+}: {
+  row: EnrollmentRow;
+  onUnenrolled: () => void;
+}) {
   const { enrollment, course, totalLessons, passedLessons } = row;
   const passed = enrollment.passed;
   // #1462 — exact percentage now that listMyEnrollments annotates totals.
@@ -211,12 +238,22 @@ function EnrollmentCard({ row }: { row: EnrollmentRow }) {
               : "Not started"}
         </div>
         <Progress value={passed ? 100 : pct} className="h-1.5" />
-        <Link to={`/learn/${enrollment.id}`}>
-          <Button size="sm" variant={passed ? "outline" : "default"} className="w-full">
-            <Play className="h-3.5 w-3.5 mr-1" />
-            {passed ? "Review" : hasStarted ? "Continue" : "Start"}
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to={`/learn/${enrollment.id}`} className="flex-1">
+            <Button size="sm" variant={passed ? "outline" : "default"} className="w-full">
+              <Play className="h-3.5 w-3.5 mr-1" />
+              {passed ? "Review" : hasStarted ? "Continue" : "Start"}
+            </Button>
+          </Link>
+          {/* Self-gates on passed — returns null for completed/cert-issued rows
+              so the Review CTA stretches the full width via flex-1 above. */}
+          <UnenrollButton
+            courseId={course.id}
+            courseTitle={course.title}
+            isPassed={passed}
+            onUnenrolled={onUnenrolled}
+          />
+        </div>
       </CardContent>
     </Card>
   );

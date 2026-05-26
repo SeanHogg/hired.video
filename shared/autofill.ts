@@ -4,7 +4,8 @@
  */
 
 import { z } from "zod";
-
+
+import { UuidLikeSchema } from "./validation.js";
 // ============================================================================
 // REQUEST SCHEMAS — single source of truth for the autofill write endpoints.
 // ============================================================================
@@ -13,9 +14,9 @@ export const SaveSubmissionSchema = z.object({
   fields: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
   answers: z.record(z.string(), z.unknown()),
   sourceUrl: z.string().url().optional().nullable(),
-  jobId: z.string().uuid().optional().nullable(),
-  savedJobId: z.string().uuid().optional().nullable(),
-  resumeId: z.string().uuid().optional().nullable(),
+  jobId: UuidLikeSchema.optional().nullable(),
+  savedJobId: UuidLikeSchema.optional().nullable(),
+  resumeId: UuidLikeSchema.optional().nullable(),
   atsProvider: z.string().max(50).optional().nullable(),
   jobDescription: z.string().max(50000).optional().nullable(),
   status: z.enum(["draft", "submitted", "reviewed"]).optional(),

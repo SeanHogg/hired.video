@@ -6,13 +6,18 @@ import { USER_ROLES } from "@shared/user-roles";
 /** SSoT for points eligibility. job_seeker / recruiter / employer all
  *  have catalog entries since the Phase-5 widen. Consumers (widget +
  *  page + any future surface) check this — never re-implement the role
- *  test. */
-export function isPointsEligible(user: { role?: string | null } | null | undefined): boolean {
+ *  test. The role-string overload exists so callers that work with an
+ *  effective role (impersonation > preview > real role) can gate
+ *  without re-deriving a `user` shape. */
+export function isPointsEligibleRole(role: string | null | undefined): boolean {
   return (
-    user?.role === USER_ROLES.JOB_SEEKER ||
-    user?.role === USER_ROLES.RECRUITER ||
-    user?.role === USER_ROLES.EMPLOYER
+    role === USER_ROLES.JOB_SEEKER ||
+    role === USER_ROLES.RECRUITER ||
+    role === USER_ROLES.EMPLOYER
   );
+}
+export function isPointsEligible(user: { role?: string | null } | null | undefined): boolean {
+  return isPointsEligibleRole(user?.role);
 }
 
 /**

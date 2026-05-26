@@ -8,7 +8,8 @@
  */
 
 import { z } from "zod";
-
+
+import { UuidLikeSchema } from "./validation.js";
 // Structured headquarters address — promoted from varchar to jsonb in
 // migration 0074 (#294). Free-text legacy values were rewritten to
 // `{ address }` so reads stay backwards-compatible.
@@ -83,7 +84,7 @@ export const CompanyLocationSchema = z.object({
 export type CompanyLocationInput = z.infer<typeof CompanyLocationSchema>;
 
 export const CompanyTeamMemberSchema = z.object({
-  userId: z.string().uuid().optional().nullable(),
+  userId: UuidLikeSchema.optional().nullable(),
   name: z.string().min(1).max(255),
   title: z.string().max(255).optional().nullable(),
   bio: z.string().max(2000).optional().nullable(),

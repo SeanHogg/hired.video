@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2, Plus, GraduationCap, Eye, EyeOff, Trash2, Lock, DollarSign } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ interface Props {
 export default function CoursesManagerPanel({ profile: profileProp, onEnrollClick }: Props = {}) {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [courses, setCourses] = useState<Course[]>([]);
   const [creator, setCreator] = useState<CreatorProfile | null>(profileProp ?? null);
   const [loading, setLoading] = useState(true);
@@ -89,6 +91,35 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setPriceDollars(c.priceCents ? (c.priceCents / 100).toFixed(2) : "");
     setMode("edit");
   };
+
+  // #1521 — deep-link from /learn/:enrollmentId's "Edit" button.
+  // Loads the course by id (works for SuperAdmin too — the backend
+  // /api/courses/:id now honors SA), drops the user into edit mode,
+  // and scrubs the query param so a browser back-then-forward
+  // doesn't re-trigger the auto-open.
+  useEffect(() => {
+    const deepLinkId = searchParams.get("courseId");
+    if (!deepLinkId || !isAuthenticated) return;
+    let cancelled = false;
+    courseService.getMine(deepLinkId)
+      .then((c) => {
+        if (cancelled) return;
+        beginEdit(c);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (cancelled) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete("courseId");
+        // lessonId is consumed by CourseContentEditor (scroll-to);
+        // leave it in place for that hop, then it's stale.
+        setSearchParams(next, { replace: true });
+      });
+    return () => { cancelled = true; };
+    // searchParams change triggers re-evaluation; intentional that
+    // setters aren't in deps (would loop).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, searchParams.get("courseId")]);
 
   const buildInput = (): CreateCourseInput => ({
     title: title.trim(),

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, like, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -98,9 +98,25 @@ marketingRoutes.get("/leads", async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  const leads = await db
-    .select()
-    .from(schema.marketingLeads)
+  // Optional ?source=contact_panel — when present matches `source LIKE
+  // 'contact_panel:%'` so the SuperAdmin Contact Inquiries page can ask for
+  // just the in-app inquiry submissions without dragging in landing-page
+  // lead-magnet capture. ?status filters by triage state.
+  const url = new URL(c.req.url);
+  const sourcePrefix = url.searchParams.get("source");
+  const status = url.searchParams.get("status");
+  const conditions: SQL[] = [];
+  if (sourcePrefix) {
+    conditions.push(like(schema.marketingLeads.source, `${sourcePrefix}%`));
+  }
+  if (status) {
+    conditions.push(eq(schema.marketingLeads.status, status));
+  }
+  const baseQuery = db.select().from(schema.marketingLeads);
+  const filtered = conditions.length > 0
+    ? baseQuery.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+    : baseQuery;
+  const leads = await filtered
     .orderBy(desc(schema.marketingLeads.createdAt))
     .limit(200);
   return c.json(success(leads), 200);
@@ -196,9 +212,12 @@ marketingRoutes.post("/contact", async (c) => {
     } as any)
     .returning();
 
-  // Notify every super_admin so an inquiry surfaces in the bell dropdown the
-  // next time they hit the app. Best-effort: a notification failure must not
-  // swallow the inquiry itself.
+  // Notify every super_admin so the inquiry surfaces in the existing
+  // unified inbox (/outreach Inbox tab + CommunicationHub bell — both
+  // hydrate from /api/inbox which reads `notifications`). Best-effort: a
+  // notification failure must not swallow the inquiry itself. The body
+  // is packed into `message` so the inbox row preview shows the full
+  // submission inline without needing a second surface.
   try {
     const admins = await db
       .select({ id: schema.users.id })
@@ -210,12 +229,29 @@ marketingRoutes.post("/contact", async (c) => {
         ),
       );
     if (admins.length > 0) {
+      // Compose a single message string that carries every actionable
+      // field: who, where to reach them, what they asked. Cap at 1900
+      // chars so it fits comfortably under the typical notifications.message
+      // text-column rendering budget without truncation in the inbox row.
+      const contactLine = [
+        `From: ${data.name} <${data.email}>`,
+        data.company ? `Company: ${data.company}` : null,
+        data.phone ? `Phone: ${data.phone}` : null,
+        data.page ? `Page: ${data.page}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const composed = `${contactLine}\nSubject: ${data.subject}\n\n${data.message}`;
+      const message = composed.length > 1900
+        ? composed.slice(0, 1900) + "…"
+        : composed;
+
       await db.insert(schema.notifications).values(
         admins.map((a) => ({
           userId: a.id,
           type: "contact_inquiry",
-          title: `New ${INQUIRY_LABEL[data.inquiryType]}`,
-          message: `${data.name}${data.company ? ` (${data.company})` : ""}: ${data.subject}`,
+          title: `New ${INQUIRY_LABEL[data.inquiryType]} — ${data.subject}`,
+          message,
           data: {
             leadId: lead?.id ?? null,
             email: data.email,

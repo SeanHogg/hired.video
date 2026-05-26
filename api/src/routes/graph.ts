@@ -13,6 +13,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import {
@@ -49,7 +50,7 @@ graphRoutes.get("/path/:userId", async (c) => {
 });
 
 const IntroducersSchema = z.object({
-  candidateIds: z.array(z.string().uuid()).min(1).max(200),
+  candidateIds: z.array(UuidLikeSchema).min(1).max(200),
   limit: z.number().int().min(1).max(50).optional(),
 });
 
@@ -65,8 +66,8 @@ graphRoutes.post("/top-introducers", async (c) => {
 
 // ─── POST /intro — request a warm intro through a mutual ────────────────
 const WarmIntroSchema = z.object({
-  viaUserId: z.string().uuid(),
-  targetUserId: z.string().uuid(),
+  viaUserId: UuidLikeSchema,
+  targetUserId: UuidLikeSchema,
   message: z.string().min(1).max(2000),
 });
 

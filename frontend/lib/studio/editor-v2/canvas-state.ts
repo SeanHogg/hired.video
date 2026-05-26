@@ -44,7 +44,13 @@ export type WidgetKind =
   // project is a comic so the palette doesn't bloat for the video flow.
   | "speech-bubble"
   | "caption-box"
-  | "sfx-burst";
+  | "sfx-burst"
+  // AI presenter avatar — viseme-driven 2D talking head painted client-side
+  // via the lib/studio/avatar painter. Animated in preview via the active
+  // TTS engine's `onBoundary` callback; baked into the exported MP4 at
+  // render time from the same painter + the caption-cue timeline. Closes
+  // the Synthesia / HeyGen avatar gap (#1557).
+  | "avatar";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -78,6 +84,12 @@ export interface ImageWidgetParams {
    *  path resolves either to a stable sourceId before persistence. */
   source: { kind: "sourceId"; id: string } | { kind: "url"; url: string };
   fit: "cover" | "contain" | "stretch";
+  /** Alternative text for screen readers — WCAG 2.2 SC 1.1.1
+   *  (Non-text Content). Read by the StudioAccessibilityPanel audit;
+   *  read by the published-page renderer to populate `<img alt>` on
+   *  the public viewer. Optional for back-compat with pre-#1556 widgets;
+   *  the audit flags any image whose alt is empty / missing. */
+  altText?: string;
 }
 
 export interface VideoWidgetParams {
@@ -331,6 +343,39 @@ export interface SfxBurstWidgetParams {
   shape: "star" | "jagged" | "circle-jagged" | "lightning";
 }
 
+/** AI presenter avatar — 2D talking head with viseme-driven mouth
+ *  shapes. `presenterId` picks from the STOCK_PRESENTERS library in
+ *  `lib/studio/avatar/presenters.ts`. `script` is what the avatar should
+ *  say; the inspector pipes it through the chosen TTS engine to drive
+ *  mouth motion in preview, and the render pass paints visemes against
+ *  the caption-cue timeline so the exported MP4 lip-syncs to the same
+ *  audio that plays in the timeline (cloned-voice voiceovers ride this
+ *  same lane). */
+export interface AvatarWidgetParams {
+  /** Presenter preset id — one of STOCK_PRESENTERS, or a future
+   *  user-uploaded BYO portrait id (BYO uploads tracked in the gap
+   *  register). */
+  presenterId: string;
+  /** Free-text script the avatar speaks. Drives both the audio (via
+   *  TTS) and the viseme estimation (via `estimateVisemesForText`). */
+  script: string;
+  /** TTS engine id (see `frontend/lib/services/tts-engines.ts`). Defaults
+   *  to "web-speech" when unset so the avatar speaks immediately even
+   *  before a WebGPU engine has been picked. */
+  engine?: import("../../services/tts-engines").TtsEngineId;
+  /** Voice id within the engine's catalogue. The Voice Cloning library
+   *  surfaces user-cloned voices through this same id space, so an
+   *  avatar can speak in the user's cloned voice without a separate
+   *  field. */
+  voiceId?: string;
+  /** Speaking rate (1 = natural). Threaded into the TTS engine. */
+  speed?: number;
+  /** Outfit-accent colour override — lets a brand designer match the
+   *  avatar's accent to a campaign palette without forking the stock
+   *  preset. `null` / undefined means use the preset's default. */
+  accentColor?: string | null;
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -344,7 +389,8 @@ export type WidgetParams =
   | { kind: "linked-content"; data: LinkedContentWidgetParams }
   | { kind: "speech-bubble"; data: SpeechBubbleWidgetParams }
   | { kind: "caption-box"; data: CaptionBoxWidgetParams }
-  | { kind: "sfx-burst"; data: SfxBurstWidgetParams };
+  | { kind: "sfx-burst"; data: SfxBurstWidgetParams }
+  | { kind: "avatar"; data: AvatarWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /

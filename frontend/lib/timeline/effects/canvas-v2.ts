@@ -24,6 +24,12 @@ import { ANIMATE_EFFECT_KINDS, applyAnimateEffectsToCtx } from "./animate";
 import { drawChart } from "@/lib/studio/chart-canvas";
 import { resolveCtaFontSizes } from "@/lib/studio/editor-v2/canvas-state";
 import {
+  estimateVisemesForText,
+  getPresenter,
+  type Viseme,
+} from "@/lib/studio/avatar/presenters";
+import { paintPresenter } from "@/lib/studio/avatar/paint";
+import {
   getLinkedContentMeta,
   isLinkedContentKind,
   resolveLinkedContentCtaTypography,

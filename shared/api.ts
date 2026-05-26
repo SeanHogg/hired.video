@@ -4,7 +4,8 @@
  * and/or small pure JS functions that can be used on both client and server
  */
 
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "./validation.js";
 import { USER_ROLES } from "./user-roles.js";
 
 // ============================================================================
@@ -103,7 +104,7 @@ export const LoginRequestSchema = z.object({
 
 export const LoginResponseSchema = z.object({
   user: z.object({
-    id: z.string().uuid(),
+    id: UuidLikeSchema,
     email: z.string().email(),
     name: z.string(),
     // Accept any backend role string; client maps/normalizes later
@@ -155,7 +156,7 @@ export type EmailVerificationChallenge = z.infer<typeof EmailVerificationChallen
  * User Profile Endpoints
  */
 export const UserProfileResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: UuidLikeSchema,
   slug: z.string(),
   data: z.object({
     firstName: z.string(),
@@ -191,7 +192,7 @@ export const UpdateUserProfileRequestSchema = z.object({
 export const ResumeListResponseSchema = z.object({
   resumes: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: UuidLikeSchema,
       slug: z.string(),
       name: z.string(),
       privacy: z.enum(["public", "private", "unlisted"]),
@@ -210,7 +211,7 @@ export const ResumeListResponseSchema = z.object({
 export const CreateResumeRequestSchema = z.object({
   name: z.string().min(1),
   privacy: z.enum(["public", "private", "unlisted"]).default("private"),
-  templateId: z.string().uuid().optional(),
+  templateId: UuidLikeSchema.optional(),
 });
 
 /**
@@ -219,7 +220,7 @@ export const CreateResumeRequestSchema = z.object({
 export const JobListResponseSchema = z.object({
   jobs: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: UuidLikeSchema,
       slug: z.string(),
       data: z.object({
         title: z.string(),

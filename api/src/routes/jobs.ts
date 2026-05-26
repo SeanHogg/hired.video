@@ -13,7 +13,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
-import { OptionalUrlSchema } from "../../../shared/validation.js";
+import { OptionalUrlSchema, UuidLikeSchema } from "../../../shared/validation.js";
 import { JOB_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import {
@@ -383,7 +383,7 @@ jobRoutes.put("/:id/screening", async (c) => {
 
   const body = await c.req.json().catch(() => null);
   const schemaIn = z.object({
-    questionSetId: z.string().uuid().nullable(),
+    questionSetId: UuidLikeSchema.nullable(),
     screeningRequired: z.enum(["none", "optional", "required"]),
   });
   const parsed = schemaIn.safeParse(body);

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, asc } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -23,10 +24,10 @@ const CreateSequenceSchema = z.object({
 });
 
 const EnrollSchema = z.object({
-  sequenceId: z.string().uuid(),
+  sequenceId: UuidLikeSchema,
   recipientEmail: z.string().email(),
   recipientName: z.string().optional(),
-  recipientUserId: z.string().uuid().optional(),
+  recipientUserId: UuidLikeSchema.optional(),
   context: z.record(z.string(), z.string()).optional(),
 });
 
@@ -239,11 +240,11 @@ followUpRoutes.patch("/enrollments/:id/:action", requirePro("Automated Follow-up
 // ---------------------------------------------------------------------------
 const TriggerSchema = z.object({
   trigger: z.string().min(1).max(100), // e.g. "signup", "job_match", "trial_expiring"
-  sequenceId: z.string().uuid().optional(),
+  sequenceId: UuidLikeSchema.optional(),
   sequenceName: z.string().optional(), // fallback: match by sequence name
   recipientEmail: z.string().email(),
   recipientName: z.string().optional(),
-  recipientUserId: z.string().uuid().optional(),
+  recipientUserId: UuidLikeSchema.optional(),
   context: z.record(z.string(), z.string()).optional(),
 });
 

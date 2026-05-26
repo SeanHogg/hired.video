@@ -15,6 +15,32 @@ import { z } from "zod";
 export const UuidSchema = z.string().uuid("Invalid UUID format");
 
 /**
+ * Permissive UUID-format regex — 8-4-4-4-12 hex, no version/variant
+ * constraint. Exported so route handlers that want a custom error
+ * message can do `z.string().regex(UUID_LIKE_REGEX, "<my msg>")`
+ * without re-inventing the pattern.
+ */
+export const UUID_LIKE_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
+ * Permissive UUID-format schema for DB-row IDs.
+ *
+ * Why this exists alongside `UuidSchema`: seed migrations
+ * (`0113_so_you_want_to_become_articles.sql`,
+ * `0131_seed_platform_learning_library.sql`) generate deterministic IDs
+ * via `md5(slug)::uuid` so re-applying the migration yields stable IDs
+ * that downstream tables can reference. MD5 hashes don't carry RFC 4122
+ * version/variant bits, so Zod 4's strict `.uuid()` rejects them — the
+ * variant slot must be `[89abAB]`, but md5-derived UUIDs land on any
+ * nibble. Use `UuidLikeSchema` anywhere a route validates an ID that
+ * arrived from a DB row (lessonId, courseId, etc.) — the bit pattern
+ * has no functional meaning for the lookup; only the shape matters.
+ * Reserve strict `UuidSchema` for IDs you generate fresh in app code.
+ */
+export const UuidLikeSchema = z.string().regex(UUID_LIKE_REGEX, "Invalid UUID format");
+
+/**
  * Email Schema
  */
 export const EmailSchema = z.string().email("Invalid email format");

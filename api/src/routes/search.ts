@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, ilike, inArray, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -596,8 +597,8 @@ const RecruiterSearchSchema = z.object({
   // Structured geo filter — viewer-side. Same shape as LocationFilter in
   // shared/content-locations.ts but spelled inline for the request body.
   countryId: z.number().int().positive().optional(),
-  stateId: z.string().uuid().optional(),
-  cityId: z.string().uuid().optional(),
+  stateId: UuidLikeSchema.optional(),
+  cityId: UuidLikeSchema.optional(),
   radiusKm: z.number().int().positive().max(20000).optional(),
   experienceLevel: z.enum(["entry", "mid", "senior", "lead", "executive"]).optional(),
   role: z.string().max(100).optional(),

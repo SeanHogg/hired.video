@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { Variables, AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
@@ -67,7 +68,7 @@ toolUsageRoutes.get("/daily", async (c) => {
 // ─── GET /by-user?userId=… ──────────────────────────────────────────────────
 // Per-tool run counts + latest run for a single user. Used by the user
 // detail page in SA so support can see what a user has actually been using.
-const ByUserQuery = z.object({ userId: z.string().uuid() });
+const ByUserQuery = z.object({ userId: UuidLikeSchema });
 toolUsageRoutes.get("/by-user", async (c) => {
   const parsed = ByUserQuery.safeParse(c.req.query());
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
@@ -94,7 +95,7 @@ toolUsageRoutes.get("/by-user", async (c) => {
 // scoped /api/tool-runs endpoints so the existing ToolHistoryPanel can
 // render admin views without a second code path.
 const RunsByUserQuery = z.object({
-  userId: z.string().uuid(),
+  userId: UuidLikeSchema,
   toolId: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });

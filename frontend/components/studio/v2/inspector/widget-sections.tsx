@@ -495,6 +495,15 @@ const IMAGE_CONTENT_SECTION: WidgetInspectorSection = {
             onChange={(fit) => set({ fit })}
           />
         </Field>
+        <Field label="Alt text (for screen readers)">
+          <input
+            type="text"
+            value={data.altText ?? ""}
+            placeholder="What does this image convey? (1 short sentence)"
+            onChange={(e) => set({ altText: e.target.value })}
+            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+          />
+        </Field>
       </div>
     );
   },

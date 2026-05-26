@@ -16,6 +16,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import { getDb, schema } from "../db/index.js";
 import { success, error } from "../types/index.js";
 import type { AppEnv } from "../types/index.js";
@@ -23,6 +24,7 @@ import { generateCourse, CourseGenInputSchema } from "../services/courses/course
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import { connectorFor } from "../services/lms/index.js";
 import { LMS_PROVIDERS } from "../db/schema/courses.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 
 const { lmsConnectors, lmsCoursePublishes, courses } = schema;
 
@@ -90,7 +92,7 @@ courseAuthoringRoutes.post("/lms/connectors/:id/revoke", async (c) => {
 });
 
 const PublishToLmsSchema = z.object({
-  connectorId: z.string().uuid(),
+  connectorId: UuidLikeSchema,
   scormPackageUrl: z.string().url(),
 });
 
@@ -102,9 +104,12 @@ courseAuthoringRoutes.post("/:id/publish-to-lms", async (c) => {
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.message), 400);
   const db = getDb();
 
-  const [course] = await db.select().from(courses)
-    .where(and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId)))
-    .limit(1);
+  // Owner OR SuperAdmin can publish-to-LMS. SA case is unusual but
+  // legitimate — e.g. seeded platform courses pushed to a partner LMS.
+  const courseFilter = isSuperAdmin(c.var.user)
+    ? eq(courses.id, c.req.param("id"))
+    : and(eq(courses.id, c.req.param("id")), eq(courses.userId, userId));
+  const [course] = await db.select().from(courses).where(courseFilter).limit(1);
   if (!course) return c.json(error("NOT_FOUND", "Course not found"), 404);
 
   const [conn] = await db.select().from(lmsConnectors)

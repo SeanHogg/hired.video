@@ -30,7 +30,7 @@ import { slugify, SLUG_PATTERN, isValidSlug } from "../../../shared/slugify.js";
 import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
 import type { Timeline } from "../../../shared/timeline.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
-import { OptionalUrlSchema } from "../../../shared/validation.js";
+import { OptionalUrlSchema, UuidLikeSchema } from "../../../shared/validation.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns, resumeInformation } = schema;
 
@@ -45,8 +45,8 @@ const studioPurposeSchema = z.enum(STUDIO_PURPOSES);
 const WorkspaceFieldSchema = z
   .union([
     z.object({ kind: z.literal("personal") }),
-    z.object({ kind: z.literal("company"), companyId: z.string().uuid() }),
-    z.object({ kind: z.literal("delegated"), subjectUserId: z.string().uuid() }),
+    z.object({ kind: z.literal("company"), companyId: UuidLikeSchema }),
+    z.object({ kind: z.literal("delegated"), subjectUserId: UuidLikeSchema }),
   ])
   .optional()
   .nullable();
@@ -168,7 +168,7 @@ const StoryboardSchema = z.object({
 const GenerateStoryboardSchema = z.object({
   resumeText: z.string().min(10),
   targetDuration: z.number().min(10).max(120).default(28),
-  resumeId: z.string().uuid().optional(),
+  resumeId: UuidLikeSchema.optional(),
   prompt: z.string().max(500).optional(),
   jobDescription: z.string().max(4000).optional(),
   // No `model` or `temperature` fields on purpose — both are server-owned
@@ -180,18 +180,18 @@ const GenerateStoryboardSchema = z.object({
   // Advertising: set purpose to unlock ad-specific scene types + prompts
   purpose: studioPurposeSchema.default("resume"),
   // Brand kit to inject into generated script
-  brandKitId: z.string().uuid().optional(),
+  brandKitId: UuidLikeSchema.optional(),
   // CTA for ad use cases
   ctaUrl: z.string().url().optional(),
   ctaText: z.string().max(100).optional(),
 });
 
 const PublishVideoSchema = z.object({
-  projectId: z.string().uuid(),
+  projectId: UuidLikeSchema,
   title: z.string().min(1),
   description: z.string().default(""),
   privacyStatus: z.enum(["public", "private", "unlisted"]).default("unlisted"),
-  resumeId: z.string().uuid().optional(),
+  resumeId: UuidLikeSchema.optional(),
 });
 
 function ok<T>(data: T) {
@@ -1000,7 +1000,7 @@ const GenerateComicSchema = z.object({
    *  available (resume > profile + services > prompt alone). The
    *  client can pin a specific resume by id; otherwise the user's
    *  master resume is loaded. */
-  resumeId: z.string().uuid().optional(),
+  resumeId: UuidLikeSchema.optional(),
   /** When true (#939 hybrid AI character portrait) the route also
    *  generates ONE genre-styled portrait of the protagonist via
    *  Workers AI SDXL-Lightning + threads the resulting CDN URL into
@@ -1447,7 +1447,7 @@ studioRoutes.post("/save-draft", async (c) => {
     name:           z.string().min(1).max(200).default("My Video Resume"),
     resumeText:     z.string().default(""),
     script:         z.any().optional(),
-    projectId:      z.string().uuid().optional(),
+    projectId:      UuidLikeSchema.optional(),
     prompt:         z.string().max(2000).optional(),
     jobDescription: z.string().max(4000).optional(),
     purpose:        studioPurposeSchema.optional(),
@@ -3801,7 +3801,7 @@ const CampaignSchema = z.object({
   utmSource:   z.string().max(100).optional(),
   utmMedium:   z.string().max(100).optional(),
   utmCampaign: z.string().max(100).optional(),
-  projectIds:  z.array(z.string().uuid()).default([]),
+  projectIds:  z.array(UuidLikeSchema).default([]),
 });
 
 studioRoutes.get("/campaigns", async (c) => {

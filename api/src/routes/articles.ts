@@ -22,6 +22,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -770,10 +771,10 @@ articleRoutes.post("/:id/classify", async (c) => {
 // ===========================================================================
 
 const OptInSchema = z.object({
-  legalDocsAccepted: z.array(z.string().uuid()).default([]),
+  legalDocsAccepted: z.array(UuidLikeSchema).default([]),
   /** Optional explicit Pro subscription id; default behaviour pulls it
    *  from the user's active sub at opt-in time. */
-  proSubscriptionId: z.string().uuid().optional(),
+  proSubscriptionId: UuidLikeSchema.optional(),
 });
 
 articleRoutes.post("/partner-program/opt-in", async (c) => {

@@ -74,17 +74,24 @@ export default defineConfig(({ mode }) => {
         // Inject the SW registration script automatically
         injectRegister: "auto",
         manifest: {
-          name: "hired.video — AI Career & Talent Network",
+          name: "hired.video — AI Video Resumes, Hiring & Studio",
           short_name: "hired.video",
           description:
-            "AI-powered career copilot: match resumes, prep for interviews, track jobs, and connect with top talent.",
+            "All-in-one video-first hiring platform: AI video resumes, ATS, sourcing CRM, AI Studio with WebGPU presenter avatars + multi-language dubbing, agency back-office (timesheets / placements / invoicing), learning pathways, and gamification — installable on iOS and Android.",
           theme_color: "#7c3aed",
-          background_color: "#ffffff",
+          background_color: "#0a0a0a",
           display: "standalone",
-          start_url: "/",
+          // window-controls-overlay opts the standalone window into the
+          // titlebar-overlay UI on Chromium desktop; falls back to standalone
+          // on browsers / OSes that don't support it.
+          display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
+          start_url: "/?source=pwa",
           scope: "/",
-          orientation: "portrait-primary",
-          categories: ["business", "productivity"],
+          // `any` instead of `portrait-primary` so the recruiter pipeline and
+          // Studio editor (both heavily-tabular) can rotate to landscape on
+          // tablets without forcing a redraw.
+          orientation: "any",
+          categories: ["business", "productivity", "education", "social"],
           icons: [
             {
               src: "pwa-64x64.png",
@@ -113,18 +120,40 @@ export default defineConfig(({ mode }) => {
               name: "My Resumes",
               short_name: "Resumes",
               description: "View and manage your resumes",
-              url: "/resumes",
+              url: "/resumes?source=pwa_shortcut",
               icons: [{ src: "/pwa-192x192.png", sizes: "192x192" }],
             },
             {
               name: "Job Tracker",
               short_name: "Jobs",
               description: "Track your job applications",
-              url: "/jobs",
+              url: "/jobs?source=pwa_shortcut",
+              icons: [{ src: "/pwa-192x192.png", sizes: "192x192" }],
+            },
+            {
+              name: "AI Studio",
+              short_name: "Studio",
+              description: "Open the AI Studio editor",
+              url: "/studio?source=pwa_shortcut",
+              icons: [{ src: "/pwa-192x192.png", sizes: "192x192" }],
+            },
+            {
+              name: "Recruiter Pipeline",
+              short_name: "Pipeline",
+              description: "Kanban hiring pipeline",
+              url: "/hiring-manager?source=pwa_shortcut",
               icons: [{ src: "/pwa-192x192.png", sizes: "192x192" }],
             },
           ],
-          screenshots: [],
+          screenshots: [
+            {
+              src: "/og-image.svg",
+              sizes: "1200x630",
+              type: "image/svg+xml",
+              form_factor: "wide",
+              label: "hired.video — all-in-one video-first hiring",
+            },
+          ],
         },
         workbox: {
           // Default precache file-size limit is 2 MiB; the main app chunk

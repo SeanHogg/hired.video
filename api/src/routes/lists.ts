@@ -16,6 +16,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -133,7 +134,7 @@ async function loadListIfVisible(
 const CreateListSchema = z.object({
   title: z.string().min(1).max(255),
   isPrivate: z.boolean().default(true),
-  companyId: z.string().uuid().nullable().optional(),
+  companyId: UuidLikeSchema.nullable().optional(),
 });
 
 const UpdateListSchema = z.object({
@@ -143,7 +144,7 @@ const UpdateListSchema = z.object({
 
 const AddItemSchema = z.object({
   entityType: z.enum(LIST_ITEM_ENTITY_TYPES),
-  entityId: z.string().uuid(),
+  entityId: UuidLikeSchema,
   notes: z.string().max(2000).optional(),
 });
 

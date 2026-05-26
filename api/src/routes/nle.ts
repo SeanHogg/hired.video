@@ -18,6 +18,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
@@ -103,8 +104,8 @@ function fail(code: string, message: string, details?: unknown) {
 const WorkspaceFieldSchema = z
   .union([
     z.object({ kind: z.literal("personal") }),
-    z.object({ kind: z.literal("company"), companyId: z.string().uuid() }),
-    z.object({ kind: z.literal("delegated"), subjectUserId: z.string().uuid() }),
+    z.object({ kind: z.literal("company"), companyId: UuidLikeSchema }),
+    z.object({ kind: z.literal("delegated"), subjectUserId: UuidLikeSchema }),
   ])
   .optional()
   .nullable();

@@ -30,6 +30,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { hasAnyLLMProviderKey, createLLMClient } from "../services/adapters/llm-client.js";
@@ -84,8 +85,8 @@ function randomToken(byteLength = 24): string {
 
 const GenerateRequestSchema = z
   .object({
-    resumeId: z.string().uuid().optional(),
-    jobId: z.string().uuid().optional(),
+    resumeId: UuidLikeSchema.optional(),
+    jobId: UuidLikeSchema.optional(),
     content: z.string().min(20).max(20_000).optional(),
     sourceType: z.enum(["job", "resume"]).optional(),
     targetRole: z.string().max(120).optional(),
@@ -113,15 +114,15 @@ const AssignRequestSchema = z.object({
   title: z.string().min(1).max(200).default("Interview Questions"),
   instructions: z.string().max(2000).optional(),
   questions: z.array(QuestionInputSchema).min(1).max(10),
-  jobId: z.string().uuid().optional(),
-  sourceResumeId: z.string().uuid().optional(),
+  jobId: UuidLikeSchema.optional(),
+  sourceResumeId: UuidLikeSchema.optional(),
   sourceContext: z.enum(["tool", "ai-coach", "career-360", "pipeline", "job-screening"]).default("tool"),
   targetRole: z.string().max(120).optional(),
   extractedSkills: z.array(z.any()).optional(),
   /** Provenance: the reusable library set this assignment was created from
    *  (if any). The library is decoupled from the live row — once assigned,
    *  per-candidate edits don't bleed back to the library. */
-  questionSetId: z.string().uuid().optional(),
+  questionSetId: UuidLikeSchema.optional(),
   /** How long the magic link is valid (hours). */
   linkExpiryHours: z.number().int().min(1).max(720).default(168), // 7 days default
   /** How long the candidate has to submit responses once they open the link (hours). */
@@ -149,7 +150,7 @@ const RespondRequestSchema = z.object({
   questionId: z.string(),
   responseMode: z.enum(["text", "video"]),
   textAnswer: z.string().max(20_000).optional(),
-  recordingId: z.string().uuid().optional(),
+  recordingId: UuidLikeSchema.optional(),
   videoUrl: z.string().optional(),
   durationMs: z.number().optional(),
   transcription: z.string().optional(),

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -16,8 +17,8 @@ const CreateCycleSchema = z.object({
 });
 
 const CreateReviewSchema = z.object({
-  cycleId: z.string().uuid(),
-  revieweeUserId: z.string().uuid(),
+  cycleId: UuidLikeSchema,
+  revieweeUserId: UuidLikeSchema,
   overallRating: z.number().min(1).max(5).optional(),
   strengths: z.string().optional(),
   areasForImprovement: z.string().optional(),
@@ -31,7 +32,7 @@ const CreateGoalSchema = z.object({
   description: z.string().optional(),
   category: z.enum(["professional", "personal", "team"]).default("professional"),
   targetDate: z.string().datetime().optional(),
-  cycleId: z.string().uuid().optional(),
+  cycleId: UuidLikeSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------

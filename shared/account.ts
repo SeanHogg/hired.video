@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { USER_ROLES } from "./user-roles.js";
-import { EmailSchema, NonEmptyStringSchema } from "./validation.js";
+import { EmailSchema, NonEmptyStringSchema, UuidLikeSchema } from "./validation.js";
 
 // SSoT for invite lifecycle. Numeric values are wire-stable — the frontend
 // table renders against them directly (badge label / colour / icon lookup).
@@ -41,7 +41,7 @@ export type AccountUser = z.infer<typeof AccountUserSchema>;
 
 // AccountOption DTO
 export const AccountOptionSchema = z.object({
-  id: z.string().uuid(),
+  id: UuidLikeSchema,
   name: NonEmptyStringSchema,
   role: z.nativeEnum(USER_ROLES),
   logoUrl: z.string().url().optional(),
@@ -59,7 +59,7 @@ export const InviteUserRequestSchema = z.object({
   // row scoping the new member to that workspace. Optional for the legacy
   // top-level role invites (recruiter / employer) that don't bind to a
   // specific company.
-  companyId: z.string().uuid().optional(),
+  companyId: UuidLikeSchema.optional(),
 });
 export type InviteUserRequest = z.infer<typeof InviteUserRequestSchema>;
 

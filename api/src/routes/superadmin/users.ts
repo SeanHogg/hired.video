@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema, UUID_LIKE_REGEX } from "../../../../shared/validation.js";
 import { desc, eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
@@ -43,7 +44,7 @@ const UserSearchSchema = z.object({
 // select what's on the page, and this guards the endpoint if the body is
 // crafted manually.
 const BulkUserActionSchema = z.object({
-  userIds: z.array(z.string().uuid()).min(1).max(100),
+  userIds: z.array(UuidLikeSchema).min(1).max(100),
 });
 
 const AssignRoleSchema = z.object({
@@ -55,7 +56,7 @@ const SetStatusSchema = z.object({
 });
 
 const AssignModuleSchema = z.object({
-  moduleId: z.string().uuid("moduleId must be a valid UUID"),
+  moduleId: z.string().regex(UUID_LIKE_REGEX, "moduleId must be a valid UUID"),
 });
 
 const GrantTokensSchema = z.object({

@@ -26,6 +26,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
@@ -81,7 +82,7 @@ const CreateSchema = z.object({
   proctoringOn: z.boolean().default(true),
   /** When set, the set is owned by this company (shared library). Caller
    *  MUST be an active member of the company. Omit for a personal set. */
-  companyId: z.string().uuid().optional(),
+  companyId: UuidLikeSchema.optional(),
 });
 
 const UpdateSchema = CreateSchema.partial().omit({ companyId: true }).extend({

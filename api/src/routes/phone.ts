@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -232,7 +233,7 @@ phoneRoutes.get("/calls", async (c) => {
 // with no activity-timeline footprint.
 
 const PlaceCallSchema = z.object({
-  phoneNumberId: z.string().uuid(),
+  phoneNumberId: UuidLikeSchema,
   to:            z.string().min(7),
   record:        z.boolean().optional(),
 });
@@ -327,7 +328,7 @@ phoneRoutes.get("/sms", async (c) => {
 });
 
 const SendSmsSchema = z.object({
-  phoneNumberId: z.string().uuid(),
+  phoneNumberId: UuidLikeSchema,
   to:            z.string().min(10),
   body:          z.string().min(1).max(1600),
 });

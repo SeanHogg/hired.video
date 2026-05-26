@@ -10,17 +10,18 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
 import type { ScorecardsService } from "../../domains/scorecards/scorecardsService.js";
 
 const AssignSubmissionSchema = z.object({
-  templateId: z.string().uuid(),
+  templateId: UuidLikeSchema,
   applicationId: z.string().min(1),
-  evaluatorUserId: z.string().uuid(),
-  kitStageId: z.string().uuid().optional(),
-  candidateUserId: z.string().uuid().optional(),
+  evaluatorUserId: UuidLikeSchema,
+  kitStageId: UuidLikeSchema.optional(),
+  candidateUserId: UuidLikeSchema.optional(),
   dueAt: z
     .union([z.string().datetime(), z.date()])
     .transform((v) => (typeof v === "string" ? new Date(v) : v)),

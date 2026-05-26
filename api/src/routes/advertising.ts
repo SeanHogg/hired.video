@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import { eq, and, desc, inArray, sum, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -27,7 +28,7 @@ function costPerClick(spentCents: number, clicks: number): number | null {
 // ─── Job Boosts (gap #106) ────────────────────────────────────────────────────
 
 const CreateBoostSchema = z.object({
-  jobId:         z.string().uuid(),
+  jobId:         UuidLikeSchema,
   placementType: z.enum(["search_top", "discovery_feed", "both"]),
   pricingModel:  z.enum(["cpm", "cpc"]),
   budgetCents:   z.number().int().min(1000), // minimum $10
@@ -143,7 +144,7 @@ advertisingRoutes.delete("/boosts/:id", async (c) => {
 // ─── Company Boosts (gap #107) ────────────────────────────────────────────────
 
 const CreateCompanyBoostSchema = z.object({
-  companyId:     z.string().uuid(),
+  companyId:     UuidLikeSchema,
   placementType: z.enum(["directory_featured", "dashboard_spotlight", "discovery_feed", "all"]),
   pricingModel:  z.enum(["flat", "cpm"]),
   budgetCents:   z.number().int().min(1000), // minimum $10

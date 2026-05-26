@@ -23,6 +23,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -98,7 +99,7 @@ async function resolveSubjectOwner(
 
 const CreateBoostSchema = z.object({
   subjectType: z.enum(BOOSTABLE_SUBJECT_TYPES),
-  subjectId: z.string().uuid(),
+  subjectId: UuidLikeSchema,
   budgetCents: z.number().int().min(100).max(1_000_000),
   durationDays: z.number().int().min(1).max(90),
   placementType: z.string().max(32).default("feed_top"),

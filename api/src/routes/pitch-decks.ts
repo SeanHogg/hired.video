@@ -12,7 +12,8 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -40,28 +41,28 @@ function generateShareToken(): string {
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const CreateDeckSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  jobId: z.string().uuid().optional(),
-  whitelabelTenantId: z.string().uuid().optional(),
-  redactionProfileId: z.string().uuid().optional(),
+  jobId: UuidLikeSchema.optional(),
+  whitelabelTenantId: UuidLikeSchema.optional(),
+  redactionProfileId: UuidLikeSchema.optional(),
   status: z.enum(["draft", "sent", "archived"]).optional(),
 });
 
 const UpdateDeckSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().nullable().optional(),
-  jobId: z.string().uuid().nullable().optional(),
-  whitelabelTenantId: z.string().uuid().nullable().optional(),
-  redactionProfileId: z.string().uuid().nullable().optional(),
+  jobId: UuidLikeSchema.nullable().optional(),
+  whitelabelTenantId: UuidLikeSchema.nullable().optional(),
+  redactionProfileId: UuidLikeSchema.nullable().optional(),
   status: z.enum(["draft", "sent", "archived"]).optional(),
 });
 
 const AddSlideSchema = z.object({
-  candidateResumeId: z.string().uuid(),
+  candidateResumeId: UuidLikeSchema,
   displayOrder: z.number().int().min(0).optional(),
-  redactionProfileId: z.string().uuid().optional(),
+  redactionProfileId: UuidLikeSchema.optional(),
   fitSummary: z.string().optional(),
   matchScore: z.number().int().min(0).max(100).optional(),
   recruiterNotes: z.string().optional(),
@@ -69,7 +70,7 @@ const AddSlideSchema = z.object({
 
 const UpdateSlideSchema = z.object({
   displayOrder: z.number().int().min(0).optional(),
-  redactionProfileId: z.string().uuid().nullable().optional(),
+  redactionProfileId: UuidLikeSchema.nullable().optional(),
   fitSummary: z.string().nullable().optional(),
   matchScore: z.number().int().min(0).max(100).nullable().optional(),
   recruiterNotes: z.string().nullable().optional(),

@@ -68,6 +68,12 @@ function iconForItem(item: HubItem) {
       return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
     case "job_application":
       return <Briefcase className="h-4 w-4 text-blue-500" />;
+    case "contact_inquiry":
+      // Inbound visitor inquiry from the shared ContactPanel — landed via
+      // POST /api/marketing/contact and notified every super_admin. Render
+      // with a distinct purple chat-bubble so triage row stands out vs the
+      // generic blue info notification.
+      return <MessageCircle className="h-4 w-4 text-brand-purple" />;
     default:
       return <Info className="h-4 w-4 text-blue-500" />;
   }

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -18,7 +19,7 @@ const CreateEventSchema = z.object({
   meetingUrl: z.string().url().optional(),
   type: z.enum(["interview", "meeting", "review", "other"]).default("interview"),
   relatedEntityType: z.enum(["job", "application", "candidate"]).optional(),
-  relatedEntityId: z.string().uuid().optional(),
+  relatedEntityId: UuidLikeSchema.optional(),
   attendees: z.array(z.object({ email: z.string().email(), name: z.string().optional(), status: z.string().optional() })).default([]),
   reminderMinutes: z.array(z.number().int().min(0)).default([30, 1440]),
 });

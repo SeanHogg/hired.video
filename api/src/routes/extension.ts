@@ -21,6 +21,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
@@ -47,7 +48,7 @@ const EventSchema = z.object({
 });
 
 export const BatchSchema = z.object({
-  sessionId: z.string().uuid(),
+  sessionId: UuidLikeSchema,
   extension: z.enum(["jobseeker", "recruiter"]),
   version: z.string().max(32).optional(),
   events: z.array(EventSchema).min(1).max(200),

@@ -5,7 +5,8 @@
 
 import { Hono } from "hono";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -51,9 +52,9 @@ const GenerateAnswersSchema = z.object({
     selector: z.string().optional(),
     category: z.string().optional(),
   })).min(1).max(100),
-  jobId: z.string().uuid().optional(),
+  jobId: UuidLikeSchema.optional(),
   jobDescription: z.string().max(10000).optional(),
-  resumeId: z.string().uuid().optional(),
+  resumeId: UuidLikeSchema.optional(),
   customInstructions: z.string().max(1000).optional(),
 });
 
@@ -70,9 +71,9 @@ const SaveSubmissionSchema = z.object({
   })),
   answers: z.record(z.string(), z.string()),
   sourceUrl: z.string().max(2000).optional(),
-  jobId: z.string().uuid().optional(),
-  savedJobId: z.string().uuid().optional(),
-  resumeId: z.string().uuid().optional(),
+  jobId: UuidLikeSchema.optional(),
+  savedJobId: UuidLikeSchema.optional(),
+  resumeId: UuidLikeSchema.optional(),
   atsProvider: z.string().max(50).optional(),
   jobDescription: z.string().max(10000).optional(),
   status: z.enum(["draft", "submitted", "reviewed"]).optional(),

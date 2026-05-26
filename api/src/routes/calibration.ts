@@ -4,6 +4,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { mapServiceError, requireUser } from "./helpers/routerHelpers.js";
@@ -15,8 +16,8 @@ import {
 import type { Context } from "hono";
 
 const CreateSessionSchema = z.object({
-  companyId: z.string().uuid(),
-  templateId: z.string().uuid(),
+  companyId: UuidLikeSchema,
+  templateId: UuidLikeSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   candidateApplicationIds: z.array(z.string().min(1)).min(1).max(20),
@@ -24,7 +25,7 @@ const CreateSessionSchema = z.object({
 
 const SubmitCalibrationSchema = z.object({
   applicationId: z.string().min(1),
-  ratings: z.record(z.string().uuid(), z.number().int().min(0).max(10).nullable()),
+  ratings: z.record(UuidLikeSchema, z.number().int().min(0).max(10).nullable()),
   overallRecommendation: z
     .enum(["strong_yes", "yes", "no", "strong_no"])
     .optional(),

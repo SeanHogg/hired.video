@@ -15,6 +15,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -28,7 +29,7 @@ export const adminArticleRoutes = new Hono<AppEnv>();
 adminArticleRoutes.use("*", superAdminMiddleware);
 
 const IdsSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(100),
+  ids: z.array(UuidLikeSchema).min(1).max(100),
 });
 
 const RejectSchema = IdsSchema.extend({

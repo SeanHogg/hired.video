@@ -26,6 +26,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
+import { UnenrollButton } from "@/components/courses/UnenrollButton";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { buildShareAction } from "@/lib/card-share-action";
@@ -266,6 +267,14 @@ export default function CoursePublicDetail() {
       <span className="font-semibold tabular-nums">
         {formatPrice(course.priceCents)}
       </span>
+      {enrollment && (
+        <UnenrollButton
+          courseId={course.id}
+          courseTitle={course.title}
+          isPassed={enrollment.passed}
+          onUnenrolled={() => setEnrollment(null)}
+        />
+      )}
       <Button
         size="sm"
         onClick={handleEnroll}

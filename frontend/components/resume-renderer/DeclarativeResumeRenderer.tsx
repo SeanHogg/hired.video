@@ -30,6 +30,7 @@ import {
   type ThemeStyles,
 } from "@/lib/resume-template-themes";
 import ItemSkillBadges from "@/components/ItemSkillBadges";
+import ItemMediaStrip from "@/components/ItemMediaStrip";
 import type { Resume } from "@/types/resume";
 import type {
   CardStyle,
@@ -721,6 +722,12 @@ function renderSectionBody(
       const items = data.work ?? [];
       if (items.length === 0) return null;
       const sorted = sortByDate(items, section.sortBy ?? "date_desc");
+      const itemFooter = (id: string | undefined) => (
+        <>
+          <ItemSkillBadges itemId={id} content={data} />
+          {section.showMedia && <ItemMediaStrip itemId={id} metaData={data.metaData} variant="tiles" />}
+        </>
+      );
       if (layout === "timeline") {
         return (
           <div className={density.entry}>
@@ -736,7 +743,7 @@ function renderSectionBody(
                 icon={Building}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
-                footer={<ItemSkillBadges itemId={w.id} content={data} />}
+                footer={itemFooter(w.id)}
               />
             ))}
           </div>
@@ -754,7 +761,7 @@ function renderSectionBody(
               description={w.summary}
               highlights={section.showHighlights ? w.highlights : undefined}
               theme={theme}
-              footer={<ItemSkillBadges itemId={w.id} content={data} />}
+              footer={itemFooter(w.id)}
             />
           ))}
         </div>
@@ -764,6 +771,12 @@ function renderSectionBody(
       const items = data.education ?? [];
       if (items.length === 0) return null;
       const sorted = sortByDate(items, section.sortBy ?? "date_desc");
+      const itemFooter = (id: string | undefined) => (
+        <>
+          <ItemSkillBadges itemId={id} content={data} />
+          {section.showMedia && <ItemMediaStrip itemId={id} metaData={data.metaData} variant="tiles" />}
+        </>
+      );
       if (layout === "timeline") {
         return (
           <div className={density.entry}>
@@ -778,7 +791,7 @@ function renderSectionBody(
                 icon={GraduationCap}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
-                footer={<ItemSkillBadges itemId={e.id} content={data} />}
+                footer={itemFooter(e.id)}
               />
             ))}
           </div>
@@ -795,7 +808,7 @@ function renderSectionBody(
               endDate={e.endDate}
               description={e.score ? `GPA: ${e.score}` : undefined}
               theme={theme}
-              footer={<ItemSkillBadges itemId={e.id} content={data} />}
+              footer={itemFooter(e.id)}
             />
           ))}
         </div>
@@ -805,6 +818,12 @@ function renderSectionBody(
       const items = data.volunteer ?? [];
       if (items.length === 0) return null;
       const sorted = sortByDate(items, section.sortBy ?? "date_desc");
+      const itemFooter = (id: string | undefined) => (
+        <>
+          <ItemSkillBadges itemId={id} content={data} />
+          {section.showMedia && <ItemMediaStrip itemId={id} metaData={data.metaData} variant="tiles" />}
+        </>
+      );
       if (layout === "timeline") {
         return (
           <div className={density.entry}>
@@ -820,7 +839,7 @@ function renderSectionBody(
                 icon={Heart}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
-                footer={<ItemSkillBadges itemId={v.id} content={data} />}
+                footer={itemFooter(v.id)}
               />
             ))}
           </div>
@@ -838,7 +857,7 @@ function renderSectionBody(
               description={v.summary}
               highlights={section.showHighlights ? v.highlights ?? undefined : undefined}
               theme={theme}
-              footer={<ItemSkillBadges itemId={v.id} content={data} />}
+              footer={itemFooter(v.id)}
             />
           ))}
         </div>
@@ -938,6 +957,7 @@ function renderSectionBody(
                 </div>
               )}
               <ItemSkillBadges itemId={p.id} content={data} />
+              {section.showMedia && <ItemMediaStrip itemId={p.id} metaData={data.metaData} variant="tiles" />}
             </div>
           ))}
         </div>

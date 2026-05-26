@@ -25,6 +25,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -1023,7 +1024,7 @@ reviewRoutes.get("/:reviewId/comments", async (c) => {
 
 const CommentBodySchema = z.object({
   body: z.string().trim().min(1).max(4000),
-  parentId: z.string().uuid().nullish(),
+  parentId: UuidLikeSchema.nullish(),
 });
 
 reviewRoutes.post("/:reviewId/comments", async (c) => {

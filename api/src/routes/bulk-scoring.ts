@@ -11,6 +11,7 @@
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -18,8 +19,8 @@ import { getDb, schema } from "../db/index.js";
 export const bulkScoringRoutes = new Hono<AppEnv>();
 
 const BulkScoreSchema = z.object({
-  resumeIds: z.array(z.string().uuid()).min(1).max(200),
-  jobId: z.string().uuid(),
+  resumeIds: z.array(UuidLikeSchema).min(1).max(200),
+  jobId: UuidLikeSchema,
   /** Optional weight overrides — defaults sum to 100 to keep the score
    *  capped at 0–100. The frontend doesn't expose these yet; they exist
    *  so a future Strategy / config-driven scorer can swap in cleanly. */

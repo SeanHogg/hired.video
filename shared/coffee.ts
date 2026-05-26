@@ -18,7 +18,8 @@
  * map "Open to coffee" pins).
  */
 import { z } from "zod";
-
+
+import { UuidLikeSchema } from "./validation.js";
 export const COFFEE_STATUSES = [
   "pending",
   "accepted",
@@ -32,7 +33,7 @@ export const COFFEE_FORMATS = ["in_person", "remote"] as const;
 export type CoffeeFormat = (typeof COFFEE_FORMATS)[number];
 
 export const CreateCoffeeRequestSchema = z.object({
-  recipientUserId: z.string().uuid(),
+  recipientUserId: UuidLikeSchema,
   message: z.string().max(2000).optional(),
   proposedAt: z.string().datetime().optional(),
   proposedLocation: z.string().max(500).optional(),

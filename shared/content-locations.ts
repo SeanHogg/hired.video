@@ -10,7 +10,8 @@
  * See migration 0108_content_locations.sql for storage layout.
  */
 import { z } from "zod";
-
+
+import { UuidLikeSchema } from "./validation.js";
 /**
  * Every content type that supports geo targeting. Adding a new kind here
  * is the ONLY place required to onboard a new entity — search wiring is
@@ -46,8 +47,8 @@ export type ContentLocationRole = (typeof CONTENT_LOCATION_ROLES)[number];
 export const ContentLocationInputSchema = z.object({
   role: z.enum(CONTENT_LOCATION_ROLES).default("origin"),
   countryId: z.number().int().positive().nullable().optional(),
-  stateId: z.string().uuid().nullable().optional(),
-  cityId: z.string().uuid().nullable().optional(),
+  stateId: UuidLikeSchema.nullable().optional(),
+  cityId: UuidLikeSchema.nullable().optional(),
   postalCode: z.string().max(20).nullable().optional(),
   latitude: z.number().gte(-90).lte(90).nullable().optional(),
   longitude: z.number().gte(-180).lte(180).nullable().optional(),
@@ -89,8 +90,8 @@ export type ContentLocationSet = z.infer<typeof ContentLocationSetSchema>;
  */
 export const LocationFilterSchema = z.object({
   countryId: z.number().int().positive().nullable().optional(),
-  stateId: z.string().uuid().nullable().optional(),
-  cityId: z.string().uuid().nullable().optional(),
+  stateId: UuidLikeSchema.nullable().optional(),
+  cityId: UuidLikeSchema.nullable().optional(),
   latitude: z.number().gte(-90).lte(90).nullable().optional(),
   longitude: z.number().gte(-180).lte(180).nullable().optional(),
   radiusKm: z.number().int().positive().max(20000).nullable().optional(),

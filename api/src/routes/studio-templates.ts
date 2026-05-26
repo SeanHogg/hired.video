@@ -26,6 +26,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import {
@@ -84,7 +85,7 @@ const TEMPLATE_KINDS = ["resume", "job", "studio"] as const;
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
 const PublishSchema = z.object({
-  sourceProjectId: z.string().uuid(),
+  sourceProjectId: UuidLikeSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(4000).nullable().optional(),
   thumbnailUrl: z.string().url().nullable().optional(),

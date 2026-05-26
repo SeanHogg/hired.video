@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, count } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -15,7 +16,7 @@ export const hiringOnboardingRoutes = new Hono<AppEnv>();
 const CreateOfferSchema = z.object({
   candidateName: z.string().min(1).max(255),
   candidateEmail: z.string().email(),
-  candidateUserId: z.string().uuid().optional(),
+  candidateUserId: UuidLikeSchema.optional(),
   jobTitle: z.string().min(1).max(255),
   companyName: z.string().min(1).max(255),
   salary: z.number().positive().optional(),
@@ -180,8 +181,8 @@ hiringOnboardingRoutes.delete("/offers/:id", requirePro("Hiring & Onboarding"), 
 
 const CreateChecklistSchema = z.object({
   candidateName: z.string().min(1),
-  candidateUserId: z.string().uuid().optional(),
-  offerLetterId: z.string().uuid().optional(),
+  candidateUserId: UuidLikeSchema.optional(),
+  offerLetterId: UuidLikeSchema.optional(),
   jobTitle: z.string().optional(),
   startDate: z.string().datetime().optional(),
   tasks: z.array(z.object({

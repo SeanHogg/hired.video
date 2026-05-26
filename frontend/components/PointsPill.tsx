@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Coins, Flame, Lock, Trophy } from "lucide-react";
+import { Coins, Flame, Lock, ShieldCheck, Trophy } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -8,10 +8,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/auth";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { cn } from "@/lib/utils";
+import { USER_ROLES } from "@shared/user-roles";
 import {
   pointsService,
-  isPointsEligible,
+  isPointsEligibleRole,
   type PointsSummary,
   type ShowcaseBadge,
 } from "@/lib/services/points-service";
@@ -19,9 +21,11 @@ import { BadgeIcon } from "@/components/badges/BadgeIcon";
 
 /**
  * Sidebar pill mirroring AITokenPill's idiom — balance + streak summary,
- * link-through to `/points`. Self-gates on role via
- * `isPointsEligible(user)` (SSoT in points-service); returns null for
- * non-eligible roles so the sidebar stays unchanged for them.
+ * link-through to `/points`. Gates on the effective role from
+ * `useEffectiveRole()` (impersonation > persona preview > real role) so
+ * SuperAdmin previewing as a scoring role sees the surface the previewed
+ * role would see. Raw SuperAdmin (no preview) renders an admin-flavored
+ * shortcut to `/admin/points`. Other non-scoring roles render null.
  *
  * `collapsed` mirrors AITokenPill: icon-only with a hover tooltip when
  * the sidebar is collapsed; full balance + streak row when expanded.
@@ -45,7 +49,10 @@ function fmt(n: number): string {
 
 export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
   const { user, isAuthenticated } = useAuth();
-  const enabled = isPointsEligible(user);
+  const effectiveRole = useEffectiveRole();
+  const enabled = isPointsEligibleRole(effectiveRole);
+  const isRawSuperAdmin =
+    isAuthenticated && !enabled && user?.role === USER_ROLES.SUPER_ADMIN;
 
   const { data, isLoading } = useQuery<PointsSummary>({
     queryKey: ["points", "me"],
@@ -123,6 +130,67 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
           <span className="flex items-center gap-1">
             <Flame className="h-3 w-3" />
             <span>Streaks</span>
+          </span>
+        </div>
+      </Link>
+    );
+  }
+
+  // Raw SuperAdmin (no scoring-role preview / impersonation) — surface a
+  // shortcut to /admin/points so SA can reach the gamification review
+  // queues without flipping a preview. Self-contained: no SA branching
+  // leaks into the regular pill below.
+  if (isRawSuperAdmin) {
+    if (collapsed) {
+      return (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to="/admin/points"
+                onClick={onNavigate}
+                className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
+                aria-label="Points admin"
+              >
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+              <div className="space-y-1 text-xs">
+                <div className="font-medium">Points admin</div>
+                <div className="text-muted-foreground">
+                  Review fraud queue, redemptions, and per-user balances.
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    return (
+      <Link
+        to="/admin/points"
+        onClick={onNavigate}
+        className="block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
+        aria-label="Points admin"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <span>Points admin</span>
+          </div>
+          <span className="text-[11px] font-semibold text-primary">
+            Open →
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Trophy className="h-3 w-3" />
+            <span>Fraud · redemptions</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Flame className="h-3 w-3" />
+            <span>Balances</span>
           </span>
         </div>
       </Link>

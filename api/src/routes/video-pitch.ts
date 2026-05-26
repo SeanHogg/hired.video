@@ -9,6 +9,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
@@ -31,7 +32,7 @@ function fail(code: string, message: string, details?: unknown) {
 }
 
 const ScriptRequest = z.object({
-  resumeId: z.string().uuid().optional(),
+  resumeId: UuidLikeSchema.optional(),
   length: z.union([z.literal(30), z.literal(60), z.literal(90)]),
   tone: z.enum(["casual", "professional", "enthusiastic"]),
 });

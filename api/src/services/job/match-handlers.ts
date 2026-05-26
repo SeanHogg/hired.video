@@ -21,7 +21,8 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../../shared/validation.js";
 import { schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
@@ -55,8 +56,8 @@ export interface MatchDeps {
 export const MatchInputSchema = z
   .object({
     jobHtml: z.string().optional(),
-    jobId: z.string().uuid().optional(),
-    resumeId: z.string().uuid().optional(),
+    jobId: UuidLikeSchema.optional(),
+    resumeId: UuidLikeSchema.optional(),
   })
   .refine((v) => !!(v.jobHtml || v.jobId), {
     message: "Either jobHtml or jobId is required",
@@ -68,13 +69,13 @@ export const MatchByContentSchema = z.object({
 });
 
 export const MatchByIdSchema = z.object({
-  jobId: z.string().uuid(),
-  resumeId: z.string().uuid(),
+  jobId: UuidLikeSchema,
+  resumeId: UuidLikeSchema,
 });
 
 export const MatchInsightsSchema = z.object({
   jobHtml: z.string().min(1),
-  resumeId: z.string().uuid().optional(),
+  resumeId: UuidLikeSchema.optional(),
 });
 
 /** LLMs sometimes return recommendations as string[] instead of string. */

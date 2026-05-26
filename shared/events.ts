@@ -9,7 +9,8 @@
  *
  * See migration 0122_events_coffee_shared_tasks.sql for storage layout.
  */
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "./validation.js";
 import { ContentLocationSetSchema } from "./content-locations.js";
 
 // ─── Enums ─────────────────────────────────────────────────────────────
@@ -95,7 +96,7 @@ export const CreateEventSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$/i, "slug must be 3-80 chars, alphanumerics + hyphens, no leading/trailing hyphen")
     .optional(),
 
-  coHostUserIds: z.array(z.string().uuid()).max(10).default([]),
+  coHostUserIds: z.array(UuidLikeSchema).max(10).default([]),
   publish: z.boolean().default(false),
 });
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
@@ -131,12 +132,12 @@ export const EventSearchFilterSchema = z.object({
   toDate: z.string().datetime().optional(),
   // Location filter reuses the existing geo plumbing.
   countryId: z.number().int().positive().optional(),
-  stateId: z.string().uuid().optional(),
-  cityId: z.string().uuid().optional(),
+  stateId: UuidLikeSchema.optional(),
+  cityId: UuidLikeSchema.optional(),
   latitude: z.number().gte(-90).lte(90).optional(),
   longitude: z.number().gte(-180).lte(180).optional(),
   radiusKm: z.number().int().positive().max(20_000).optional(),
-  hostUserId: z.string().uuid().optional(),
+  hostUserId: UuidLikeSchema.optional(),
   matchmakingOnly: z.boolean().optional(),
   // 'upcoming' | 'past' | 'all'  — defaults to upcoming.
   scope: z.enum(["upcoming", "past", "all"]).default("upcoming"),

@@ -9,7 +9,8 @@
  */
 import { Hono } from "hono";
 import { aliasedTable, desc, eq } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -37,7 +38,7 @@ function uid(c: any): string | null {
 
 const CreateReportSchema = z.object({
   entityType: z.enum(REPORT_ENTITY_TYPES),
-  entityId: z.string().uuid(),
+  entityId: UuidLikeSchema,
   reason: z.enum(REPORT_REASONS),
   notes: z.string().max(2000).optional(),
 });

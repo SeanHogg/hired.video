@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MetaBadge } from "./MetaBadge";
+import ItemMediaStrip from "./ItemMediaStrip";
 import HighlightsList from "./HighlightsList";
 import {
   Select,
@@ -470,17 +470,14 @@ export default function ResumeViewer({
             )}
 
             {/* Basics Metadata */}
-            {resume.content.metaData && resumeData.basics.id && (
-              <section data-section-id={resumeData.basics.id}>
-                <div className="flex flex-wrap gap-2">
-                  {resume.content.metaData
-                    .filter((m) => m.referenceId === resumeData.basics.id)
-                    .map((m) => (
-                      <MetaBadge key={m.id} meta={m} />
-                    ))}
-                </div>
-              </section>
-            )}
+            <section data-section-id={resumeData.basics.id}>
+              <ItemMediaStrip
+                itemId={resumeData.basics.id}
+                metaData={resume.content.metaData}
+                variant="pills"
+                className="mt-0"
+              />
+            </section>
 
             {/* Work Experience */}
             {resumeData.work.length > 0 && (
@@ -535,16 +532,11 @@ export default function ResumeViewer({
                         </div>
                         <p className="text-primary font-medium">{work.name}</p>
 
-	                    {/* Metadata for Work item */}
-	                    {resume.content.metaData && work.id && (
-	                      <div className="mt-2 flex flex-wrap gap-2">
-	                        {resume.content.metaData
-	                          .filter(m => m.referenceId === work.id)
-	                          .map((m) => (
-	                            <MetaBadge key={m.id} meta={m} />
-	                          ))}
-	                      </div>
-	                    )}
+	                    <ItemMediaStrip
+	                      itemId={work.id}
+	                      metaData={resume.content.metaData}
+	                      variant="pills"
+	                    />
 
                         {work.summary && (
                           <p className="text-muted-foreground">
@@ -585,16 +577,11 @@ export default function ResumeViewer({
                             {getDateText(edu.startDate, edu.endDate)}
                           </div>
                         )}
-                        {/* Metadata for Education item */}
-                        {resume.content.metaData && edu.id && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {resume.content.metaData
-                              .filter((m) => m.referenceId === edu.id)
-                              .map((m) => (
-                                <MetaBadge key={m.id} meta={m} />
-                              ))}
-                          </div>
-                        )}
+                        <ItemMediaStrip
+                          itemId={edu.id}
+                          metaData={resume.content.metaData}
+                          variant="pills"
+                        />
 
                       </div>
                     </div>
@@ -632,16 +619,11 @@ export default function ResumeViewer({
 
                           <HighlightsList highlights={volunteer.highlights} />
 
-                          {/* Metadata for Volunteer item */}
-                          {resume.content.metaData && volunteer.id && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {resume.content.metaData
-                                .filter((m) => m.referenceId === volunteer.id)
-                                .map((m) => (
-                                  <MetaBadge key={m.id} meta={m} />
-                                ))}
-                            </div>
-                          )}
+                          <ItemMediaStrip
+                            itemId={volunteer.id}
+                            metaData={resume.content.metaData}
+                            variant="pills"
+                          />
                         </div>
                       ))}
                   </div>
@@ -672,15 +654,12 @@ export default function ResumeViewer({
                           ))}
                         </div>
                       )}
-                      {resume.content.metaData && skill.id && (
-                        <div className="flex flex-wrap gap-2">
-                          {resume.content.metaData
-                            .filter((m) => m.referenceId === skill.id)
-                            .map((m) => (
-                              <MetaBadge key={m.id} meta={m} />
-                            ))}
-                        </div>
-                      )}
+                      <ItemMediaStrip
+                        itemId={skill.id}
+                        metaData={resume.content.metaData}
+                        variant="pills"
+                        className="mt-0"
+                      />
                     </div>
                   ))}
                 </div>
@@ -719,15 +698,11 @@ export default function ResumeViewer({
                           highlights={project.highlights}
                           className="list-disc list-inside text-sm mb-3 space-y-1"
                         />
-                        {resume.content.metaData && project.id && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {resume.content.metaData
-                              .filter((m) => m.referenceId === project.id)
-                              .map((m) => (
-                                <MetaBadge key={m.id} meta={m} />
-                              ))}
-                          </div>
-                        )}
+                        <ItemMediaStrip
+                          itemId={project.id}
+                          metaData={resume.content.metaData}
+                          variant="pills"
+                        />
                       </div>
                     ))}
                   </div>

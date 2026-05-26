@@ -40,6 +40,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { slugify } from "../../../shared/slugify.js";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
 
@@ -108,8 +109,8 @@ const UpdatePathSchema = CreatePathSchema.partial().extend({
   slug: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
 });
 
-const AttachCourseSchema = z.object({
-  courseId: z.string().uuid(),
+export const AttachCourseSchema = z.object({
+  courseId: UuidLikeSchema,
   displayOrder: z.number().int().min(0).optional(),
   isRequired: z.boolean().optional(),
 });

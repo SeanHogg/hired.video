@@ -59,6 +59,14 @@ export interface SectionBlock {
   layout: SectionLayout;
   columns?: 1 | 2 | 3 | 4;
   showHighlights?: boolean;
+  // Opt-in for surfacing per-item media attachments (production stills,
+  // demo reels, YouTube clips, hyperlinks) on the rendered resume. Reads
+  // from `content.metaData` filtered by item id. Default off — only the
+  // media-led templates (Actor — Headshot Hero, Director — Filmography
+  // Serif, etc.) flip it on so credit / filmography cards show stills
+  // alongside the text. The data path already exists for every item kind;
+  // this flag controls visibility.
+  showMedia?: boolean;
   sortBy?: SortOrder;
 }
 
@@ -401,7 +409,7 @@ export const ACTOR_HEADSHOT_HERO: ResumeTemplateDescriptor = {
     showVideo: true,
   },
   sections: [
-    { key: "projects", enabled: true, title: "Credits", icon: "folder-open", layout: "list", showHighlights: true, sortBy: "date_desc" },
+    { key: "projects", enabled: true, title: "Credits", icon: "folder-open", layout: "list", showHighlights: true, showMedia: true, sortBy: "date_desc" },
     { key: "skills", enabled: true, title: "Special Skills", icon: "star", layout: "grid", columns: 3 },
     { key: "languages", enabled: true, title: "Languages & Dialects", icon: "languages", layout: "grid", columns: 3 },
     { key: "education", enabled: true, title: "Training", icon: "graduation-cap", layout: "list", sortBy: "date_desc" },
@@ -438,7 +446,7 @@ export const DIRECTOR_FILMOGRAPHY_SERIF: ResumeTemplateDescriptor = printPreset(
     showVideo: false,
   },
   sections: [
-    { key: "projects", enabled: true, title: "Filmography", icon: "folder-open", layout: "list", showHighlights: true, sortBy: "date_desc" },
+    { key: "projects", enabled: true, title: "Filmography", icon: "folder-open", layout: "list", showHighlights: true, showMedia: true, sortBy: "date_desc" },
     { key: "awards", enabled: true, title: "Festivals & Awards", icon: "trophy", layout: "list" },
     { key: "publications", enabled: true, title: "Press & Coverage", icon: "book-open", layout: "list" },
     { key: "work", enabled: true, title: "Work History", icon: "building", layout: "list", showHighlights: true, sortBy: "date_desc" },

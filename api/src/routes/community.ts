@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -22,7 +23,7 @@ const VALID_CHANNELS = ["engage", "inform", "inspire", "general"] as const;
 type Channel = (typeof VALID_CHANNELS)[number];
 
 const CreatePostSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   channel: z.enum(VALID_CHANNELS).default("general"),
   content: z.string().min(1).max(10000),
   media: z.array(z.object({ url: z.string().url(), type: z.string() })).default([]),

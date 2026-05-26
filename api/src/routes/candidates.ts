@@ -16,7 +16,8 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { z } from "zod";
+import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -46,11 +47,11 @@ function generateShareToken(): string {
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const CreateCandidateResumeSchema = z.object({
-  companyId: z.string().uuid(),
-  talentPoolCandidateId: z.string().uuid().optional(),
-  linkedUserId: z.string().uuid().optional(),
-  mergedFromUserResumeId: z.string().uuid().optional(),
-  parentId: z.string().uuid().optional(),
+  companyId: UuidLikeSchema,
+  talentPoolCandidateId: UuidLikeSchema.optional(),
+  linkedUserId: UuidLikeSchema.optional(),
+  mergedFromUserResumeId: UuidLikeSchema.optional(),
+  parentId: UuidLikeSchema.optional(),
   label: z.string().max(255).optional(),
   content: z.record(z.string(), z.unknown()).default({}),
   recruiterNotes: z.string().optional(),
@@ -66,7 +67,7 @@ const UpdateCandidateResumeSchema = z.object({
 });
 
 const CreateRedactionProfileSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   isDefault: z.boolean().optional(),
@@ -88,10 +89,10 @@ const UpdateRedactionProfileSchema = CreateRedactionProfileSchema.omit({
 }).partial();
 
 const CreateShareSchema = z.object({
-  companyId: z.string().uuid(),
-  candidateResumeId: z.string().uuid(),
-  redactionProfileId: z.string().uuid().optional(),
-  whitelabelTenantId: z.string().uuid().optional(),
+  companyId: UuidLikeSchema,
+  candidateResumeId: UuidLikeSchema,
+  redactionProfileId: UuidLikeSchema.optional(),
+  whitelabelTenantId: UuidLikeSchema.optional(),
   name: z.string().max(255).optional(),
   recipientEmail: z.string().email().optional(),
   expiresAt: z.string().datetime().optional(),
@@ -309,7 +310,7 @@ const BulkCsvRowSchema = z.object({
   skills: z.array(z.string()).optional().nullable(),
 });
 const BulkCsvSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: UuidLikeSchema,
   rows: z.array(BulkCsvRowSchema).min(1).max(500),
 });
 

@@ -12,6 +12,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -205,7 +206,7 @@ const CampaignCreateSchema = z.object({
   startAt:           z.string().datetime().nullable().optional(),
   endAt:             z.string().datetime().nullable().optional(),
   subjectType:       z.string().nullable().optional(),
-  subjectId:         z.string().uuid().nullable().optional(),
+  subjectId:         UuidLikeSchema.nullable().optional(),
   notes:             z.string().nullable().optional(),
   metadata:          z.record(z.string(), z.unknown()).optional(),
 });
@@ -288,7 +289,7 @@ paidMediaRoutes.delete("/ad-sets/:id", async (c) => withinErrorHandling(c, async
 const AdCreateSchema = z.object({
   name:           z.string().min(1).max(255),
   status:         z.string().optional(),
-  creativeId:     z.string().uuid().nullable().optional(),
+  creativeId:     UuidLikeSchema.nullable().optional(),
   destinationUrl: z.string().url(),
   utmSource:      z.string().nullable().optional(),
   utmMedium:      z.string().nullable().optional(),
@@ -327,7 +328,7 @@ const CreativeCreateSchema = z.object({
   ctaText:           z.string().optional(),
   assetUrl:          z.string().url().nullable().optional(),
   assetThumbnailUrl: z.string().url().nullable().optional(),
-  studioProjectId:   z.string().uuid().nullable().optional(),
+  studioProjectId:   UuidLikeSchema.nullable().optional(),
   assets:            z.array(z.record(z.string(), z.unknown())).optional(),
   metadata:          z.record(z.string(), z.unknown()).optional(),
 });
@@ -352,7 +353,7 @@ paidMediaRoutes.delete("/creatives/:id", async (c) => withinErrorHandling(c, asy
 }));
 
 // ─── Sync ─────────────────────────────────────────────────────────────────
-const SyncCampaignSchema = z.object({ accountId: z.string().uuid() });
+const SyncCampaignSchema = z.object({ accountId: UuidLikeSchema });
 
 paidMediaRoutes.post("/campaigns/:id/sync", async (c) => withinErrorHandling(c, async () => {
   const { accountId } = SyncCampaignSchema.parse(await c.req.json());
@@ -378,7 +379,7 @@ paidMediaRoutes.post("/ads/:id/sync", async (c) => withinErrorHandling(c, async 
 
 // ─── Reporting ────────────────────────────────────────────────────────────
 const PullInsightsSchema = z.object({
-  accountId:    z.string().uuid(),
+  accountId:    UuidLikeSchema,
   resourceKind: z.enum(["campaign", "ad_set", "ad"]),
   externalIds:  z.array(z.string()).optional(),
   since:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -501,7 +502,7 @@ paidMediaRoutes.get("/pixels/public", async (c) => withinErrorHandling(c, async 
 // ─── Conversions ──────────────────────────────────────────────────────────
 const ConversionSchema = z.object({
   workspaceUserId:    z.string(),
-  workspaceCompanyId: z.string().uuid().nullable().optional(),
+  workspaceCompanyId: UuidLikeSchema.nullable().optional(),
   eventName:          z.string().min(1).max(64),
   eventTime:          z.string().datetime().optional(),
   valueCents:         z.number().int().nullable().optional(),

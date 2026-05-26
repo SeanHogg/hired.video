@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, count, desc, eq, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -1758,8 +1759,8 @@ resumeRoutes.get("/:id/diff", async (c) => {
 // ---------------------------------------------------------------------------
 
 const MergeAnalyzeSchema = z.object({
-  sourceResumeId: z.string().uuid(),
-  targetResumeId: z.string().uuid(),
+  sourceResumeId: UuidLikeSchema,
+  targetResumeId: UuidLikeSchema,
   useAI: z.boolean().optional().default(true),
 });
 
@@ -1791,9 +1792,9 @@ resumeRoutes.post("/merge/analyze", async (c) => {
 
 const MergeExecuteSchema = z.object({
   // Source is either an existing resume ID or inline parsed content (file-based merges)
-  sourceResumeId: z.string().uuid().optional(),
+  sourceResumeId: UuidLikeSchema.optional(),
   sourceContent: z.record(z.string(), z.unknown()).optional(),
-  targetResumeId: z.string().uuid(),
+  targetResumeId: UuidLikeSchema,
   decisions: z.array(z.object({
     sectionType: z.string(),
     sourceIndex: z.number(),
@@ -1924,7 +1925,7 @@ const MergeFromFileSchema = z.object({
   // still needs AI parsing). Providing `parsedContent` skips the AI step.
   text: z.string().optional(),
   parsedContent: z.record(z.string(), z.unknown()).optional(),
-  targetResumeId: z.string().uuid(),
+  targetResumeId: UuidLikeSchema,
   useAI: z.boolean().optional().default(true),
 }).refine((d) => (d.text && d.text.length > 0) || d.parsedContent, {
   message: "Either text or parsedContent must be provided",

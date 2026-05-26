@@ -5,6 +5,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../../shared/validation.js";
 import type { AppEnv } from "../../types/index.js";
 import { success, error } from "../../types/index.js";
 import { mapServiceError, requireUser } from "../helpers/routerHelpers.js";
@@ -13,7 +14,7 @@ import { generateQuestionsForCompetency } from "../../services/interview/questio
 
 const StageQuestionSchema = z.object({
   prompt: z.string().min(1).max(2000),
-  competencyId: z.string().uuid().nullable().optional(),
+  competencyId: UuidLikeSchema.nullable().optional(),
   difficulty: z.string().max(8).nullable().optional(),
   expectedAnswer: z
     .enum(["star", "technical", "coding", "portfolio", "open"])
@@ -21,7 +22,7 @@ const StageQuestionSchema = z.object({
 });
 
 const AiGenerateSchema = z.object({
-  competencyId: z.string().uuid(),
+  competencyId: UuidLikeSchema,
   level: z.string().max(8).optional(),
   count: z.number().int().min(1).max(6).optional(),
   targetRole: z.string().max(200).optional(),
@@ -37,7 +38,7 @@ const TakeHomeSchema = z.object({
 
 const InviteSchema = z.object({
   applicationId: z.string().min(1),
-  candidateUserId: z.string().uuid().optional(),
+  candidateUserId: UuidLikeSchema.optional(),
 });
 
 const DeliverySchema = z
@@ -53,8 +54,8 @@ const DeliverySchema = z
   );
 
 const StartReviewSchema = z.object({
-  takeHomeSubmissionId: z.string().uuid(),
-  templateId: z.string().uuid(),
+  takeHomeSubmissionId: UuidLikeSchema,
+  templateId: UuidLikeSchema,
 });
 
 export function stageQuestionRoutes(

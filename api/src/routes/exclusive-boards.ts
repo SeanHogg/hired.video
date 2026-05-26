@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -9,8 +10,8 @@ import { requirePro } from "../middleware/tierEnforcement.js";
 export const exclusiveBoardRoutes = new Hono<AppEnv>();
 
 const PlaceBidSchema = z.object({
-  boardId: z.string().uuid(),
-  jobId: z.string().uuid().optional(),
+  boardId: UuidLikeSchema,
+  jobId: UuidLikeSchema.optional(),
   bidAmount: z.number().positive(),
   durationDays: z.number().int().min(7).max(90).default(30),
   message: z.string().max(1000).optional(),
