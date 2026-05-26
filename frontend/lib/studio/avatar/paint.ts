@@ -21,7 +21,12 @@ export interface PaintRect {
 }
 
 export function paintPresenter(
-  ctx: CanvasRenderingContext2D,
+  // Accept both browser + worker contexts so the painter can be reused
+  // by the timeline frame renderer (ffmpeg.wasm exports run off the
+  // main-thread 2D canvas, but the editor preview path uses the
+  // OffscreenCanvas variant). Only basic 2D methods are used below —
+  // both contexts implement them with identical semantics.
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   presenter: PresenterDefinition,
   viseme: Viseme,
   rect: PaintRect,
@@ -120,7 +125,7 @@ export function paintPresenter(
 }
 
 function paintHair(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   presenter: PresenterDefinition,
   head: { cx: number; cy: number; rx: number; ry: number },
 ): void {

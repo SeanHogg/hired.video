@@ -62,6 +62,11 @@ function widgetToText(widget: Widget): string {
       // same way it acts on any other widget's text. SFX bursts are
       // short ("POW!") but still count as authored content.
       return p.data.text.trim();
+    case "avatar":
+      // The presenter's script IS its authored content — the AI
+      // rewriter, captions extractor, and dubbing pipeline all consume
+      // it the same way they consume a `text` widget's body.
+      return p.data.script.trim();
     case "image":
     case "video":
     case "shape-rect":

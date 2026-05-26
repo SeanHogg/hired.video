@@ -287,6 +287,10 @@ function widgetToElement(widget: Widget): SceneElement | null {
       // and the comic kind never compiles down to V1. Dropping is
       // correct here; the V2 timeline-emit path carries them.
       return null;
+    case "avatar":
+      // AI presenter avatar (#1557) is V2-native — V1 has no equivalent.
+      // The V2 timeline-emit path renders it via canvas-v2:avatar.
+      return null;
     case "shape-rect":
     case "shape-circle":
     case "divider":

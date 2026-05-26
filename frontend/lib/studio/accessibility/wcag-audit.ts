@@ -283,10 +283,12 @@ function resolveBackgroundColor(scene: Scene, widget: Widget): string {
     return widget.containerStyle.backgroundColor;
   }
   // Text + speech-bubble + chips + cta carry their own bg field that
-  // overrides the scene fill — read it when present.
-  const data = (widget.params as { data: Record<string, unknown> }).data ?? {};
+  // overrides the scene fill — read it when present. Cast via `unknown`
+  // because `widget.params.data` is a discriminated union and the
+  // individual `*WidgetParams` shapes don't carry an index signature.
+  const data = (widget.params.data ?? {}) as unknown as Record<string, unknown>;
   for (const key of ["bgColor", "background", "chipColor"]) {
-    const value = (data as Record<string, unknown>)[key];
+    const value = data[key];
     if (typeof value === "string" && value.trim().length > 0) return value;
   }
   return scene.backgroundColor;
