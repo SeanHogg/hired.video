@@ -199,22 +199,26 @@ export default function Tools() {
         <div className="px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
-                <div className="inline-flex items-center space-x-2 mb-6">
+                <div className="inline-flex items-center space-x-3 mb-6">
                   <div className="relative">
                     <Wrench className="h-12 w-12 text-primary" />
                     <Brain className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    AI-Powered Tools
+                    AI Tools + Learning
                   </span>
+                  <GraduationCap className="h-12 w-12 text-brand-purple" />
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Supercharge Your Career with Smart Tools
+                  Smart Tools and Built-in Courses to Supercharge Your Career
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Access cutting-edge AI tools designed to optimize your resume,
-                  practice interviews, calculate salary expectations, and
-                  accelerate your career growth.
+                  Free AI career tools — resume scoring, ATS optimization,
+                  salary benchmarks, interview practice — paired with a
+                  built-in learning library covering AI, RAG, prompt
+                  engineering, and the must-have skills for the AI era. SCORM
+                  1.2 + xAPI tracked with HMAC-signed certificates. No
+                  separate license required.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -259,19 +263,24 @@ export default function Tools() {
                 </div>
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
-                    24/7
+                    SCORM
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Tool availability
+                    1.2 + xAPI learning library included
                   </p>
                 </div>
               </div>
 
               {/* Unified Tools Grid */}
               <div className="mb-12 sm:mb-16">
-                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
+                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
                   AI-Powered Career Tools
                 </h2>
+                <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-2xl mx-auto">
+                  Free, single-purpose tools you can use without an account.
+                  Need structured learning instead? Scroll past the grid for
+                  the built-in course library.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {TOOLS_CATALOG.map((tool) => (
                     <ToolCard key={tool.id} tool={tool} />
@@ -483,11 +492,12 @@ export default function Tools() {
           {/* Final CTA */}
           <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
             <h3 className="text-2xl font-bold mb-4">
-              Ready to Enhance Your Career?
+              Tools to fix it. Courses to learn it.
             </h3>
             <p className="text-muted-foreground mb-6">
-              Access our AI-powered tools and take your career to the next
-              level. More tools coming soon!
+              Sharpen your resume in seconds with our AI tools, then go deeper
+              with built-in courses on AI, RAG, and the must-have skills
+              employers are hiring for now — all on one platform.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/signup">
@@ -499,9 +509,10 @@ export default function Tools() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link to="/tools/sentiment-analysis">
+              <Link to="/courses/e064d488-0b47-bcc7-d0c8-572f9c61cb3c/ai-era-must-have-skills">
                 <Button size="lg" variant="outline">
-                  Try Sentiment Analysis
+                  <GraduationCap className="mr-2 h-5 w-5" />
+                  Browse AI-Era Skills Course
                 </Button>
               </Link>
             </div>
