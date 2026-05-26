@@ -84,6 +84,7 @@ import { AppShell } from "@/components/AppShell";
 import type { UserRole } from "@/lib/auth";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
+import { useContactPanel } from "@/components/ContactPanel";
 
 export default function Pricing() {
   const location = useLocation();
@@ -129,6 +130,7 @@ export default function Pricing() {
   useBreadcrumbs([{ name: "Pricing", url: "/pricing" }]);
   const { isAuthenticated, user } = useAuth();
   const { addItem, openCart } = useCart();
+  const { openContactPanel } = useContactPanel();
 
   // Pricing state
   const [isAnnual, setIsAnnual] = useState(false);
@@ -2238,7 +2240,10 @@ export default function Pricing() {
               />
             </div>
 
-            {/* FAQ & Support Section */}
+            {/* FAQ & Support Section — every CTA opens the shared
+                <ContactPanel> slide-out so inquiries land in
+                marketing_leads + notify every super_admin. DRY anchor:
+                no per-card form duplication. */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               <Card className="text-center p-6 hover:shadow-lg transition-shadow">
                 <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary" />
@@ -2248,7 +2253,19 @@ export default function Pricing() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Our team is here to help you choose the right plan
                 </p>
-                <Button variant="outline">Talk to us</Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    openContactPanel({
+                      inquiryType: "sales",
+                      title: "Talk to our team",
+                      description:
+                        "Tell us what you're solving for and we'll help you choose the right plan.",
+                    })
+                  }
+                >
+                  Talk to us
+                </Button>
               </Card>
 
               <Card className="text-center p-6 hover:shadow-lg transition-shadow">
@@ -2257,7 +2274,17 @@ export default function Pricing() {
                 <p className="text-sm text-muted-foreground mb-4">
                   See hired.video in action with a personalized demo
                 </p>
-                <Button variant="outline">Request a demo</Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    openContactPanel({
+                      inquiryType: "demo",
+                      subjectLocked: true,
+                    })
+                  }
+                >
+                  Request a demo
+                </Button>
               </Card>
 
               <Card className="text-center p-6 hover:shadow-lg transition-shadow border-green-200">
@@ -2271,6 +2298,14 @@ export default function Pricing() {
                 <Button
                   variant="outline"
                   className="border-green-200 text-green-700 hover:bg-green-50"
+                  onClick={() =>
+                    openContactPanel({
+                      inquiryType: "nonprofit_discount",
+                      subjectLocked: true,
+                      prefillMessage:
+                        "Hi — we're a start-up / non-profit interested in reduced pricing. Here's a bit about us: ",
+                    })
+                  }
                 >
                   Contact us for reduced pricing
                 </Button>

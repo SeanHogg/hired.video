@@ -37,12 +37,14 @@ import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
 import { useAuth } from "@/lib/auth";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
+import { useContactPanel } from "@/components/ContactPanel";
 
 export default function Help() {  const location = useLocation();
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Help & Support", url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
   const { openAIChat } = useAI();
+  const { openContactPanel } = useContactPanel();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") ?? "";
 
@@ -75,11 +77,17 @@ export default function Help() {  const location = useLocation();
     return () => { document.getElementById(scriptId)?.remove(); };
   }, [faqSchema]);
 
+  // Every contact route on the Help page now flows through one mechanism.
+  // Email + the generic support entry open the shared <ContactPanel> so the
+  // inquiry lands in marketing_leads + notifies super_admins (no more
+  // mailto: silently dropping into the visitor's mail client, which fails
+  // on Chromebook / mobile-web where no mail client is registered). Live
+  // Chat still opens the AI assistant; phone keeps the tel: deeplink.
   const contactOptions = [
     {
       icon: MessageCircle,
       title: "Live Chat",
-      description: "Chat with our support team",
+      description: "Chat with our AI assistant",
       action: "Start Chat",
       available: "Mon-Fri, 9AM-6PM PST",
       onClick: () => openAIChat(),
@@ -87,10 +95,16 @@ export default function Help() {  const location = useLocation();
     {
       icon: Mail,
       title: "Email Support",
-      description: "Send us an email",
-      action: "Send Email",
-      available: "help@hired.video",
-      href: "mailto:help@hired.video",
+      description: "Send our team a message",
+      action: "Send Message",
+      available: "Typical response within 24h",
+      onClick: () =>
+        openContactPanel({
+          inquiryType: "support",
+          title: "Contact support",
+          description:
+            "Send our team a message and we'll get back to you within 24 hours.",
+        }),
     },
     {
       icon: Phone,

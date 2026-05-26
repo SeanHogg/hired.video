@@ -28,6 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
+import { useContactPanel } from "@/components/ContactPanel";
 import PeopleCard from "@/components/PeopleCard";
 import { AppShell } from "@/components/AppShell";
 import { userService } from "@/lib/services/user-service";
@@ -40,6 +41,7 @@ export default function About() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("labels.aboutUs"), url: "/about" }]);
   const { isAuthenticated } = useAuth();
+  const { openContactPanel } = useContactPanel();
 
   const values = [
     {
@@ -139,7 +141,12 @@ export default function About() {
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Button size="lg" variant="outline" className="text-lg px-8">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-8"
+                  onClick={() => openContactPanel()}
+                >
                   <MessageCircle className="mr-2 h-5 w-5" />
                   {t("labels.contactUs")}
                 </Button>
