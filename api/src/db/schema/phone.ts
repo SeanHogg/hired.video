@@ -1,4 +1,5 @@
-import { pgTable, text, varchar, boolean, integer, timestamp, uuid, pgEnum, jsonb, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, integer, timestamp, uuid, pgEnum, jsonb, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const phoneDirectionEnum = pgEnum("phone_direction", ["inbound", "outbound"]);
 export const callStatusEnum = pgEnum("call_status", ["answered", "missed", "voicemail", "busy", "failed"]);
@@ -43,6 +44,12 @@ export const callLogs = pgTable("call_logs", {
   index("cl_user_idx").on(t.userId),
   index("cl_number_idx").on(t.phoneNumberId),
   index("cl_created_idx").on(t.createdAt),
+  index("idx_call_logs_user_created").on(t.userId, t.createdAt.desc()),
+  // SignalWire webhook idempotency — re-delivered events for the same
+  // call_sid must not double-log.
+  uniqueIndex("uq_call_logs_signalwire_sid")
+    .on(t.signalwireCallSid)
+    .where(sql`${t.signalwireCallSid} IS NOT NULL`),
 ]);
 
 // SMS messages (inbound + outbound)
@@ -61,6 +68,10 @@ export const smsMessages = pgTable("sms_messages", {
   index("sms_user_idx").on(t.userId),
   index("sms_number_idx").on(t.phoneNumberId),
   index("sms_created_idx").on(t.createdAt),
+  index("idx_sms_messages_user_created").on(t.userId, t.createdAt.desc()),
+  uniqueIndex("uq_sms_messages_signalwire_sid")
+    .on(t.signalwireSmsSid)
+    .where(sql`${t.signalwireSmsSid} IS NOT NULL`),
 ]);
 
 // Per-user prepaid balance for phone usage overage

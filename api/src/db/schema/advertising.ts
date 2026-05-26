@@ -40,6 +40,9 @@ export const boosts = pgTable("boosts", {
   updatedAt:             timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   index("idx_boosts_subject").on(t.subjectType, t.subjectId),
+  // Subject + recency — renderer orders by created_at to break ties when
+  // multiple boosts overlap on the same subject.
+  index("idx_boosts_subject_created").on(t.subjectType, t.subjectId, t.createdAt.desc()),
   index("idx_boosts_user").on(t.userId),
 ]);
 

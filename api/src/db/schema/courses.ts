@@ -18,6 +18,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
 export const COURSE_STATUSES = ["draft", "in_review", "published", "unlisted", "flagged"] as const;
@@ -249,6 +250,12 @@ export const courseCertificates = pgTable(
   (t) => [
     index("idx_course_certificates_user").on(t.userId, t.issuedAt),
     index("idx_course_certificates_course").on(t.courseId, t.issuedAt),
+    // At most one active (non-revoked) cert per enrollment. Revoked
+    // certs leave revoked_at populated so a re-grant can insert a new
+    // active row without colliding.
+    uniqueIndex("uq_course_certificates_active_enrollment")
+      .on(t.enrollmentId)
+      .where(sql`${t.revokedAt} IS NULL`),
   ],
 );
 

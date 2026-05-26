@@ -138,20 +138,30 @@ export type PointsActivityCounters = typeof pointsActivityCounters.$inferSelect;
  * Streak state. One row per user. `lastActivityDate` is the user's local
  * day (engine resolves user TZ before comparing).
  */
-export const pointsStreaks = pgTable("points_streaks", {
-  userId: uuid("user_id")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  currentStreak: integer("current_streak").default(0).notNull(),
-  longestStreak: integer("longest_streak").default(0).notNull(),
-  lastActivityDate: date("last_activity_date"),
-  lastBonusAt: timestamp("last_bonus_at", { withTimezone: true }),
-  /** Highest milestone (7, 14, 30, …) paid out in the *current* streak;
-   *  resets when the streak resets. Lets the engine award once per
-   *  milestone without re-paying on every subsequent day. */
-  lastBonusMilestone: integer("last_bonus_milestone").default(0).notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const pointsStreaks = pgTable(
+  "points_streaks",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    currentStreak: integer("current_streak").default(0).notNull(),
+    longestStreak: integer("longest_streak").default(0).notNull(),
+    lastActivityDate: date("last_activity_date"),
+    lastBonusAt: timestamp("last_bonus_at", { withTimezone: true }),
+    /** Highest milestone (7, 14, 30, …) paid out in the *current* streak;
+     *  resets when the streak resets. Lets the engine award once per
+     *  milestone without re-paying on every subsequent day. */
+    lastBonusMilestone: integer("last_bonus_milestone").default(0).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    // Nightly streak-reset sweep walks rows where last_activity_date <
+    // today-1. Without this it scanned every user with a streak row.
+    lastActivityIdx: index("idx_points_streaks_last_activity")
+      .on(t.lastActivityDate)
+      .where(sql`${t.lastActivityDate} IS NOT NULL`),
+  }),
+);
 
 export type PointsStreaks = typeof pointsStreaks.$inferSelect;
 
@@ -303,7 +313,11 @@ export const pointRedemptions = pgTable(
   (t) => ({
     userCreatedIdx: index("point_redemptions_user_created_idx").on(t.userId, t.createdAt),
     statusIdx: index("point_redemptions_status_idx").on(t.status),
-    vendorOrderIdx: index("point_redemptions_vendor_order_idx").on(t.vendorOrderId),
+    // Tremendous order-id idempotency. Partial-unique so AI-credit /
+    // premium-month redemptions (vendor_order_id NULL) aren't disturbed.
+    vendorOrderUniq: uniqueIndex("uq_point_redemptions_vendor_order")
+      .on(t.vendorOrderId)
+      .where(sql`${t.vendorOrderId} IS NOT NULL`),
   }),
 );
 

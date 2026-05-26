@@ -8,6 +8,7 @@ import {
   jsonb,
   integer,
   numeric,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
@@ -401,13 +402,21 @@ export const recruiterLists = pgTable("recruiter_lists", {
 export type RecruiterList = typeof recruiterLists.$inferSelect;
 export type NewRecruiterList = typeof recruiterLists.$inferInsert;
 
-export const recruiterListMembers = pgTable("recruiter_list_members", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  listId: uuid("list_id").notNull().references(() => recruiterLists.id, { onDelete: "cascade" }),
-  talentPoolCandidateId: uuid("talent_pool_candidate_id").notNull().references(() => talentPoolCandidates.id, { onDelete: "cascade" }),
-  position: integer("position").default(0).notNull(),
-  addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const recruiterListMembers = pgTable(
+  "recruiter_list_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    listId: uuid("list_id").notNull().references(() => recruiterLists.id, { onDelete: "cascade" }),
+    talentPoolCandidateId: uuid("talent_pool_candidate_id").notNull().references(() => talentPoolCandidates.id, { onDelete: "cascade" }),
+    position: integer("position").default(0).notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    // One row per candidate per list. Position can change but membership
+    // uniqueness is at the (list, candidate) pair.
+    uniqueIndex("uq_recruiter_list_members_pair").on(t.listId, t.talentPoolCandidateId),
+  ],
+);
 
 export type RecruiterListMember = typeof recruiterListMembers.$inferSelect;
 export type NewRecruiterListMember = typeof recruiterListMembers.$inferInsert;

@@ -8,7 +8,9 @@ import {
   integer,
   jsonb,
   doublePrecision,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -362,16 +364,26 @@ export const systemSettings = pgTable("system_settings", {
 export type SystemSetting = typeof systemSettings.$inferSelect;
 export type NewSystemSetting = typeof systemSettings.$inferInsert;
 
-export const userConnections = pgTable("user_connections", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  fromUserId: uuid("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  toUserId: uuid("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  status: varchar("status", { length: 50 }).default("Pending").notNull(), // Pending | Accepted | Rejected
-  requestMessage: text("request_message"),
-  responseMessage: text("response_message"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const userConnections = pgTable(
+  "user_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromUserId: uuid("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    toUserId: uuid("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 50 }).default("Pending").notNull(), // Pending | Accepted | Rejected
+    requestMessage: text("request_message"),
+    responseMessage: text("response_message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    // At most one OPEN (Pending | Accepted) request per (from, to) pair.
+    // Rejected rows excluded so a re-request is legal after a prior reject.
+    uniqueIndex("uq_user_connections_open_pair")
+      .on(t.fromUserId, t.toUserId)
+      .where(sql`${t.status} IN ('Pending', 'Accepted')`),
+  ],
+);
 
 export type UserConnection = typeof userConnections.$inferSelect;
 export type NewUserConnection = typeof userConnections.$inferInsert;

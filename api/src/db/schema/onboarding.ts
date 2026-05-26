@@ -48,6 +48,9 @@ export const onboardingChecklists = pgTable("onboarding_checklists", {
   jobTitle: varchar("job_title", { length: 255 }),
   startDate: timestamp("start_date", { withTimezone: true }),
   status: varchar("status", { length: 50 }).default("pending").notNull(), // pending | in_progress | completed
+  // Stored as numeric; default expressed as the string '0' because that's
+  // what Drizzle's numeric() builder accepts (Postgres casts it on insert).
+  // A CHECK 0..100 lives in migration 0142.
   completionPercentage: numeric("completion_percentage").default("0"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

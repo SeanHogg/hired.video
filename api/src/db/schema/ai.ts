@@ -8,6 +8,7 @@ import {
   jsonb,
   integer,
   numeric,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { toolRuns } from "./tool-runs.js";
@@ -27,15 +28,22 @@ export const aiChatSessions = pgTable("ai_chat_sessions", {
 export type AiChatSession = typeof aiChatSessions.$inferSelect;
 export type NewAiChatSession = typeof aiChatSessions.$inferInsert;
 
-export const aiChatMessages = pgTable("ai_chat_messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: uuid("session_id").notNull().references(() => aiChatSessions.id, { onDelete: "cascade" }),
-  role: varchar("role", { length: 20 }).notNull(),
-  content: text("content").notNull(),
-  tokensUsed: integer("tokens_used"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const aiChatMessages = pgTable(
+  "ai_chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id").notNull().references(() => aiChatSessions.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 20 }).notNull(),
+    content: text("content").notNull(),
+    tokensUsed: integer("tokens_used"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    // Session render is a paged read by (session_id, created_at).
+    index("idx_ai_chat_messages_session_created").on(t.sessionId, t.createdAt),
+  ],
+);
 
 export type AiChatMessage = typeof aiChatMessages.$inferSelect;
 export type NewAiChatMessage = typeof aiChatMessages.$inferInsert;
