@@ -177,6 +177,7 @@ export default function Pricing() {
         "1 published pitch — video, comic, game, or podcast (unlimited drafts)",
         "ATS-friendly resume builder + AI scoring + Resume Roast viral share",
         "Chrome extension — job tracking & match scoring",
+        "Profile Sync — one master resume to LinkedIn / Indeed / Glassdoor / ZipRecruiter / Monster / Wellfound / Dice / GitHub (extension auto-fills Headline + Summary on 7)",
         "50K AI tokens / mo",
         "Career Home dashboard & community feed",
         "Unlimited networking — connections, followers, warm intros through mutuals, coffee meetups & free DMs to any user (no InMail credits)",

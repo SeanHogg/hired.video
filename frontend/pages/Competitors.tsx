@@ -51,6 +51,12 @@ const FAQS = [
       "Three pieces close the InMail gap. (1) Direct messages on Hired.Video are free and uncapped — `/api/messages/conversations` lets any authenticated user open a conversation with any other user, with no credit cap and no \"must be connected first\" wall. (2) \"Ask for an intro\" is a one-click CTA on every profile: it reads `/api/graph/mutuals/:userId`, lets you pick a mutual, and DMs them your ask — the same workflow LinkedIn gates behind paid Recruiter. (3) \"Grab a coffee\" is a primitive LinkedIn doesn't ship at all — on accept it writes a calendar event plus a shared task that both users see in their Tasks tab until the meetup happens. The remaining LinkedIn advantage is the 1B-profile graph scale itself; the workflow on top of the graph is at parity.",
   },
   {
+    question:
+      "Doesn't LinkedIn lock you in by being the canonical profile? How does Hired.Video address that?",
+    answer:
+      "Profile Sync (`/tools/vendor-sync`) flips the lock-in. One master resume on Hired.Video renders into paste-ready blocks for 9 destinations — LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, Wellfound, Dice, GitHub, and your personal site. The Chrome extension extracts edits made on 8 of those back into your master, and auto-fills Headline + Summary onto 7 vendor profile editors with a password-manager UX (you open the edit modal, click Auto-fill, review the value, save). LinkedIn keeps your profile data; Hired.Video keeps your career data. Free tier — no upcharge.",
+  },
+  {
     question: "How accurate is this comparison?",
     answer:
       "Pricing and feature claims are sourced from vendor-published pricing pages and recent third-party reporting (Pin, Capterra, G2, Vendr, Juicebox, augtal) as of April 2026. Vendors change pricing frequently and most enterprise plans are custom-quoted — verify the latest numbers directly with each vendor before purchase.",

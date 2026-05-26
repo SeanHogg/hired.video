@@ -191,6 +191,12 @@ export const FEATURE_ROWS: FeatureRow[] = [
     values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
   },
   {
+    feature: "One-master-resume sync to LinkedIn / Indeed / Glassdoor / ZipRecruiter / Monster / Wellfound / Dice / GitHub",
+    icon: Chrome,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Hired.Video's Chrome extension extracts profile edits back into your master resume on 8 vendors and auto-fills Headline + Summary on 7 (password-manager UX — you open the edit modal, click Auto-fill, review, save). LinkedIn locks profile data in by design; the other platforms have no equivalent.",
+  },
+  {
     feature: "AI interview practice for candidates",
     icon: Bot,
     values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
