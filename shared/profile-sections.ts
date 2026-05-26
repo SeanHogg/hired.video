@@ -82,11 +82,33 @@ const HIRING_SIDE_DEFAULTS: ProfileSections = {
   openToCoffee: false,
 };
 
+// Workforce members (#1349 #1407 #1436) — invite-only employees of an
+// employer. They CAN engage socially + post content on the platform
+// (adoption play), but are NOT on the job market: candidate-discovery
+// surfaces should never feature them. The public profile-section
+// defaults err private — visitors only see what an employee explicitly
+// opts in via the Settings → Profile sections panel.
+const WORKFORCE_DEFAULTS: ProfileSections = {
+  videoResume: false,
+  masterResume: false,
+  skillNetwork: false,
+  skills: false,
+  about: true,                 // light social baseline so the profile isn't empty
+  contact: false,
+  social: true,
+  opportunityPreferences: false,
+  additionalInfo: false,
+  profileVideos: true,         // creator/social posts surface here
+  openToCoffee: false,
+};
+
 export function getDefaultProfileSections(role: string | null | undefined): ProfileSections {
   switch (role) {
     case USER_ROLES.RECRUITER:
     case USER_ROLES.EMPLOYER:
       return { ...HIRING_SIDE_DEFAULTS };
+    case USER_ROLES.EMPLOYEE:
+      return { ...WORKFORCE_DEFAULTS };
     case USER_ROLES.JOB_SEEKER:
     case USER_ROLES.ADMIN:
     case USER_ROLES.SUPER_ADMIN:

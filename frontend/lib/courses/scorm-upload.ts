@@ -67,7 +67,7 @@ export interface ScormUploadProgress {
  *  editions stamp `2004 1st/2nd/3rd/4th Edition` etc. The mapping is
  *  best-effort — when no clear version match is found we default to 1.2,
  *  which scorm-again handles widely. */
-function classifyVersion(raw: string): ScormVersion {
+export function classifyVersion(raw: string): ScormVersion {
   const v = raw.toLowerCase();
   if (v.includes("1.2") || v.includes("cam 1.2")) return "1.2";
   if (v.includes("4th")) return "2004_4";
@@ -96,7 +96,7 @@ async function uploadOne(pkgId: string, path: string, blob: Blob, contentType: s
 /** Guess a content type from filename extension. The SCORM player needs
  *  HTML / JS / CSS / image MIME-types correct or the iframe fails to
  *  execute embedded scripts. */
-function contentTypeFor(name: string): string {
+export function contentTypeFor(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   switch (ext) {
     case "html":
@@ -125,7 +125,7 @@ function contentTypeFor(name: string): string {
 }
 
 /** Extract SCORM version + entry resource href from imsmanifest.xml. */
-function parseManifest(xml: string): { version: ScormVersion; entryHref: string | null } {
+export function parseManifest(xml: string): { version: ScormVersion; entryHref: string | null } {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   const parseError = doc.getElementsByTagName("parsererror")[0];
   if (parseError) throw new Error("imsmanifest.xml is not valid XML.");

@@ -230,9 +230,18 @@ export default function CourseLearner() {
             </div>
             <Progress value={progressPct} className="w-48" />
             {enrollment.passed && (
-              <div className="mt-2 flex items-center justify-end gap-1 text-sm text-emerald-600">
-                <Award className="h-4 w-4" />
-                <span>Course passed</span>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <span className="flex items-center gap-1 text-sm text-emerald-600">
+                  <Award className="h-4 w-4" />
+                  Course passed
+                </span>
+                {data.certificate && (
+                  <Button asChild size="sm" variant="outline">
+                    <a href={`/verify/${data.certificate.certNumber}`} target="_blank" rel="noreferrer">
+                      View certificate
+                    </a>
+                  </Button>
+                )}
               </div>
             )}
           </div>

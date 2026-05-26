@@ -151,16 +151,31 @@ export interface CourseEnrollment {
   passed: boolean;
 }
 
+export interface CourseCertificateSummary {
+  certNumber: string;
+  issuedAt: string;
+  expiresAt: string | null;
+}
+
 export interface CourseLearnerContent {
   enrollment: CourseEnrollment;
   course: Course;
   modules: CourseModule[];
   lessons: CourseLesson[];
+  /** Public-safe certificate summary when one has been issued for this
+   *  enrollment. Drives the "View certificate" CTA — the cert number is
+   *  the only thing the verify URL needs. */
+  certificate: CourseCertificateSummary | null;
 }
 
 export interface EnrollmentRow {
   enrollment: CourseEnrollment;
   course: Course;
+  /** Annotated by the listMyEnrollments handler (#1462). Lets cards
+   *  render an accurate "N of M lessons" progress bar without a
+   *  per-row round-trip. */
+  totalLessons: number;
+  passedLessons: number;
 }
 
 export interface PublicCourseCard {

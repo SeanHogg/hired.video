@@ -481,31 +481,30 @@ async function deriveWorkforceBillingAndPayout(
 
   // --- Invoice line item -----------------------------------------------------
   if (billRate > 0 && billableHours > 0) {
-    // Invoice ownership: tied to the agency-side recruiter who owns the
-    // placement. Note (sub-gap): the invoices schema today targets a
-    // user; real B2B billing wants a recipient *company* — tracked in
-    // the gap register's #1420 follow-up notes.
     const invoiceTotal = (billableHours * billRate).toFixed(2);
     const currency = placement.currency ?? "USD";
     const description =
       `Workforce time — ${placement.candidateName || "Employee"} · ` +
       `week of ${ts.periodStart} · ${billableHours.toFixed(2)}h @ ${currency} ${billRate.toFixed(2)}/h`;
 
-    // Idempotency: if there's already an invoiceLineItems row whose
-    // description matches this week+placement, skip. The cleaner shape
-    // is a (timesheetId, placementId) unique constraint on a future
-    // table — noted as a sub-gap. For now, description match is enough
-    // to prevent the double-trigger from a reject→re-approve cycle.
-    const [existingLine] = await db.select({ id: invoiceLineItems.id, invoiceId: invoiceLineItems.invoiceId })
-      .from(invoiceLineItems)
-      .where(eq(invoiceLineItems.description, description))
+    // Idempotency: invoices.sourceTimesheetId is unique (#1439) so a
+    // reject → re-approve cycle locates the existing invoice instead of
+    // creating a second one for the same week.
+    const [existing] = await db.select({ id: invoices.id })
+      .from(invoices)
+      .where(eq(invoices.sourceTimesheetId, ts.id))
       .limit(1);
 
-    if (existingLine) {
-      invoiceId = existingLine.invoiceId;
+    if (existing) {
+      invoiceId = existing.id;
     } else {
       const [inv] = await db.insert(invoices).values({
         userId: placement.recruiterId,
+        // recipientCompanyId is the *client* being billed — the agency
+        // (workforce.companyId on the timesheet) does the billing; the
+        // CLIENT pays. placement.companyId is canonical for the client.
+        recipientCompanyId: placement.companyId,
+        sourceTimesheetId: ts.id,
         status: "draft",
         total: invoiceTotal,
         currency,

@@ -185,11 +185,12 @@ function ContinueLearningRail({ enrollments }: { enrollments: EnrollmentRow[] })
 }
 
 function EnrollmentCard({ row }: { row: EnrollmentRow }) {
-  const { enrollment, course } = row;
+  const { enrollment, course, totalLessons, passedLessons } = row;
   const passed = enrollment.passed;
-  const passedLessons = Object.values(enrollment.progress ?? {}).filter((p) => p?.status === "passed").length;
-  // We don't know the total lesson count here; fall back to passed/in-progress signal.
-  const inProgress = Object.values(enrollment.progress ?? {}).filter((p) => p?.status === "in_progress").length;
+  // #1462 — exact percentage now that listMyEnrollments annotates totals.
+  const pct = totalLessons > 0 ? Math.round((passedLessons / totalLessons) * 100) : 0;
+  const hasStarted = passedLessons > 0
+    || Object.values(enrollment.progress ?? {}).some((p) => p?.status === "in_progress");
   return (
     <Card className="hover:border-primary/40 transition-colors">
       <CardContent className="p-4 space-y-3">
@@ -204,16 +205,16 @@ function EnrollmentCard({ row }: { row: EnrollmentRow }) {
         </div>
         <div className="text-xs text-muted-foreground">
           {passed
-            ? "Completed"
-            : passedLessons + inProgress > 0
-              ? `${passedLessons} passed · ${inProgress} in progress`
+            ? `Completed · ${passedLessons} of ${totalLessons} lessons`
+            : totalLessons > 0
+              ? `${passedLessons} of ${totalLessons} lessons · ${pct}%`
               : "Not started"}
         </div>
-        <Progress value={passed ? 100 : passedLessons + inProgress > 0 ? 25 : 0} className="h-1.5" />
+        <Progress value={passed ? 100 : pct} className="h-1.5" />
         <Link to={`/learn/${enrollment.id}`}>
           <Button size="sm" variant={passed ? "outline" : "default"} className="w-full">
             <Play className="h-3.5 w-3.5 mr-1" />
-            {passed ? "Review" : passedLessons + inProgress > 0 ? "Continue" : "Start"}
+            {passed ? "Review" : hasStarted ? "Continue" : "Start"}
           </Button>
         </Link>
       </CardContent>

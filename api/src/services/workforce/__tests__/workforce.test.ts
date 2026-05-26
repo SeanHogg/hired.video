@@ -215,7 +215,9 @@ describe("workforce — punch in/out", () => {
     assert.equal(row.status, "open");
     assert.equal(row.notes, "starting");
     assert.equal(row.billable, true);
-    assert.equal(row.endedAt, null);
+    // endedAt is null in PG (omitted on insert → defaults NULL); fake-db
+    // mirrors as undefined since the JS values object had no key.
+    assert.ok(row.endedAt == null, "endedAt must be null/undefined for an open punch");
     assert.equal(state.task_time_entries.length, 1);
   });
 

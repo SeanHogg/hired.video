@@ -158,6 +158,7 @@ const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplat
 const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
 const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
 const CourseLearner = lazy(() => import("./pages/CourseLearner"));
+const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
 // viewer became the default at /resumes/:id. Old links redirect in-place.
@@ -930,6 +931,12 @@ const App = () => (
                           self-gates on the requester owning the
                           enrollment row (API 404s otherwise). */}
                       <Route path="/learn/:enrollmentId" element={<CourseLearner />} />
+                      {/* Public certificate verification surface — shared
+                          via LinkedIn, recruiter emails, etc. The page
+                          self-fetches /api/verify/:certNumber and renders
+                          either the printable cert or the not-verified
+                          state. */}
+                      <Route path="/verify/:certNumber" element={<CertificateVerify />} />
                       <Route path="/account" element={<Navigate to="/settings" replace />} />
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />

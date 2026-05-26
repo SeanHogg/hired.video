@@ -24,16 +24,7 @@ import {
   graphService,
   type WarmIntroSummary,
 } from "@/lib/services/graph-service";
-
-function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]!.toUpperCase())
-    .join("");
-}
+import { initials } from "@/lib/utils/initials";
 
 export function WarmIntrosTab() {
   const [incoming, setIncoming] = useState<WarmIntroSummary[]>([]);

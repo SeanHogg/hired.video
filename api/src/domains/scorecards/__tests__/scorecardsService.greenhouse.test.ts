@@ -174,6 +174,9 @@ class FakeRepo implements Partial<IScorecardsRepository> {
   async findQuestionsForStage(kitStageId: string) {
     return this.stageQuestions.filter((q) => q.kitStageId === kitStageId);
   }
+  async findStageQuestionById(id: string) {
+    return this.stageQuestions.find((q) => q.id === id) ?? null;
+  }
   async insertStageQuestion(input: NewStageQuestion): Promise<StageQuestionRow> {
     const row = {
       id: uid(),
@@ -644,6 +647,28 @@ describe("ScorecardsService #1390 stage questions + coverage", () => {
     const lead = coverage.find((c) => c.competencyId === leadComp.id);
     assert.equal(tech?.hasQuestions, true);
     assert.equal(lead?.hasQuestions, false);
+  });
+
+  it("deleteStageQuestion rejects when caller doesn't have access to the kit's company", async () => {
+    const { service, repo } = buildService();
+    const { stage, techComp } = seedKitWithCoveredAndUncoveredCompetency(repo);
+    const q = await service.addStageQuestion("u1", stage.id, {
+      prompt: "Q",
+      competencyId: techComp.id,
+    });
+    // Build a second service whose caller can't access company-1.
+    const lockedService = new ScorecardsService({
+      repo: repo as unknown as IScorecardsRepository,
+      canAccessCompany: async () => false,
+      getCompanyIdsForUser: async () => [],
+      now: () => new Date(),
+    });
+    await assert.rejects(
+      () => lockedService.deleteStageQuestion("u-stranger", q.id),
+      (err: unknown) => err instanceof ServiceError && err.code === "FORBIDDEN",
+    );
+    // Question still exists.
+    assert.equal(repo.stageQuestions.length, 1);
   });
 
   it("getKitCoverage returns empty when no stage templates reference a competency", async () => {

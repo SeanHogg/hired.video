@@ -336,6 +336,7 @@ export interface IScorecardsRepository {
 
   // Stage questions (#1390)
   findQuestionsForStage(kitStageId: string): Promise<StageQuestionRow[]>;
+  findStageQuestionById(id: string): Promise<StageQuestionRow | null>;
   insertStageQuestion(input: NewStageQuestion): Promise<StageQuestionRow>;
   deleteStageQuestion(id: string): Promise<void>;
 
@@ -791,6 +792,15 @@ export class ScorecardsRepository implements IScorecardsRepository {
       .from(interviewStageQuestions)
       .where(eq(interviewStageQuestions.kitStageId, kitStageId))
       .orderBy(asc(interviewStageQuestions.displayOrder))) as StageQuestionRow[];
+  }
+
+  async findStageQuestionById(id: string): Promise<StageQuestionRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(interviewStageQuestions)
+      .where(eq(interviewStageQuestions.id, id))
+      .limit(1);
+    return (row as StageQuestionRow) ?? null;
   }
 
   async insertStageQuestion(input: NewStageQuestion): Promise<StageQuestionRow> {

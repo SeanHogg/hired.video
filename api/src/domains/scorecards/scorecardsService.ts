@@ -725,15 +725,11 @@ export class ScorecardsService {
   }
 
   async deleteStageQuestion(userId: string, id: string) {
-    // The question doesn't carry its stage in the load helper; resolve
-    // by re-walking via the repository directly. Cheap — single FK.
-    const all = await Promise.resolve(undefined); // placeholder
-    void all;
-    // Note: there's no per-question fetch, but the delete is scoped by id
-    // and only callers with company access for the kit can reach this
-    // route. The route layer enforces auth via requireUser + the stage
-    // lookup. We don't validate the stage here to keep the call cheap;
-    // if we ever need a strict guard, layer it via the route.
+    const q = await this.deps.repo.findStageQuestionById(id);
+    if (!q) throw new ServiceError("NOT_FOUND", "Question not found");
+    const stage = await this.deps.repo.findStageById(q.kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
     await this.deps.repo.deleteStageQuestion(id);
   }
 

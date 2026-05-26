@@ -28,6 +28,7 @@ import { getDb, schema } from "../db/index.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { scanContent } from "../services/moderation/contentScan.js";
 import { slugify } from "../../../shared/slugify.js";
+import { ARTICLE_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { ARTICLE_KINDS } from "../db/schema/articles.js";
 
@@ -111,7 +112,11 @@ articleRoutes.get("/public", async (c) => {
     const visible = await filterVisibleCreators(rows.map((r) => r.author.id));
     const items = rows.filter((r) => visible.has(r.author.id)).map(toPublicCard);
     withCacheHeaders(c, { scope: "public", maxAge: 60, sMaxAge: 300, swr: 600 });
-    return c.json(success(items), 200);
+    // `?fields=` projection (gap #1370 / #1446) — list view rarely needs
+    // the full article body or tags blob; trimming here saves the heavy
+    // markdown payload on every grid render.
+    const fields = parseFields(c.req.query("fields"), ARTICLE_LIST_FIELDS);
+    return c.json(success(projectRows(items as Array<Record<string, unknown>>, fields)), 200);
   } catch {
     return c.json(success([] as unknown[]), 200);
   }
@@ -141,7 +146,8 @@ articleRoutes.get("/public/by-user/:userId", async (c) => {
       ))
       .orderBy(desc(articles.publishedAt))
       .limit(limit);
-    return c.json(success(rows.map(toPublicCard)), 200);
+    const fields = parseFields(c.req.query("fields"), ARTICLE_LIST_FIELDS);
+    return c.json(success(projectRows(rows.map(toPublicCard) as Array<Record<string, unknown>>, fields)), 200);
   } catch {
     return c.json(success([] as unknown[]), 200);
   }

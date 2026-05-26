@@ -80,6 +80,15 @@ export const invoices = pgTable("invoices", {
   paidAt: timestamp("paid_at", { withTimezone: true }),
   dueDate: timestamp("due_date", { withTimezone: true }),
   invoicePdfUrl: text("invoice_pdf_url"),
+  // #1439 — multi-tenant AR. When an agency invoices its client (workforce
+  // back-office), the invoice recipient is the client *company*, not a user.
+  // Nullable so SaaS subscription invoices (user-as-buyer) keep their
+  // existing semantics unchanged.
+  recipientCompanyId: uuid("recipient_company_id"),
+  // Workforce derivation links the invoice back to the source timesheet
+  // so the reject → unapprove → re-approve cycle can locate the existing
+  // invoice instead of double-billing.
+  sourceTimesheetId: uuid("source_timesheet_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -532,7 +532,31 @@ courseRoutes.get("/me/enrollments", async (c) => {
     .innerJoin(courses, eq(courseEnrollments.courseId, courses.id))
     .where(eq(courseEnrollments.userId, userId))
     .orderBy(desc(courseEnrollments.enrolledAt));
-  return c.json(success(rows), 200);
+
+  // #1462 — annotate each row with totalLessons + passedLessons so the
+  // LearningPanel's Continue-learning rail can render an accurate
+  // progress bar without a per-row round-trip. Computed in one batch
+  // query keyed by courseId so the cost stays O(1) regardless of the
+  // number of enrollments.
+  const courseIds = Array.from(new Set(rows.map((r) => r.course.id)));
+  let totalsByCourse = new Map<string, number>();
+  if (courseIds.length > 0) {
+    const counts = await db
+      .select({ courseId: courseLessons.courseId, n: sql<number>`count(*)::int` })
+      .from(courseLessons)
+      .where(inArray(courseLessons.courseId, courseIds))
+      .groupBy(courseLessons.courseId);
+    totalsByCourse = new Map(counts.map((c) => [c.courseId, Number(c.n) || 0]));
+  }
+
+  const annotated = rows.map((r) => {
+    const total = totalsByCourse.get(r.course.id) ?? 0;
+    const progress = (r.enrollment.progress ?? {}) as Record<string, { status?: string }>;
+    const passed = Object.values(progress).filter((p) => p?.status === "passed").length;
+    return { ...r, totalLessons: total, passedLessons: passed };
+  });
+
+  return c.json(success(annotated), 200);
 });
 
 // Learner-side full content fetch — the only path a non-owner can get
@@ -1446,4 +1470,21 @@ courseRoutes.post("/xapi/statements", async (c) => {
 
   // If this xAPI statement is a passed/completed verb against a known
   // lesson, mirror it into PATCH-progress so the gamification + cert
-  // pipeline fires once. We don't double-
+  // pipeline fires once. We don't double-fire — the dedup-uniq on the
+  // lesson-completed action collapses repeats.
+  const isCompletion = parsed.data.verb.id === XAPI_VERBS.PASSED.id
+    || parsed.data.verb.id === XAPI_VERBS.COMPLETED.id;
+  if (isCompletion && parsed.data.enrollmentId && parsed.data.lessonId) {
+    await withGamification(c, "xapi-completed", (game, role, uid2) =>
+      game.onLessonCompleted({
+        userId: uid2,
+        role,
+        courseId: parsed.data.courseId ?? "",
+        lessonId: parsed.data.lessonId!,
+        enrollmentId: parsed.data.enrollmentId!,
+      }),
+    );
+  }
+
+  return c.json(success({ id: created!.id }), 201);
+});

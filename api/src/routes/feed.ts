@@ -7,6 +7,7 @@ import { buildRepos } from "../repositories/index.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
+import { FEED_POST_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
@@ -244,9 +245,14 @@ feedRoutes.get("/posts", async (c) => {
   const total = totalRow[0]?.count ?? 0;
   const dtos = await fetchPostDtos(postRows, currentUserId, db);
 
+  // `?fields=` projection (gap #1370 / #1446). Feed-card view rarely needs
+  // the full post body or media metadata blob.
+  const fields = parseFields(c.req.query("fields"), FEED_POST_LIST_FIELDS);
+  const posts = projectRows(dtos as Array<Record<string, unknown>>, fields);
+
   return c.json(
     success({
-      posts: dtos,
+      posts,
       totalCount: total,
       pageNumber,
       pageSize,

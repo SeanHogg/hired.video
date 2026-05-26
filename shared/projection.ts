@@ -126,3 +126,66 @@ export const RESUME_LIST_FIELDS = [
   "sentimentScore",
   "viewCount",
 ] as const;
+
+export const ARTICLE_LIST_FIELDS = [
+  "id",
+  "title",
+  "slug",
+  "summary",
+  "coverImageUrl",
+  "authorId",
+  "authorName",
+  "authorAvatarUrl",
+  "publishedAt",
+  "readingMinutes",
+  "viewCount",
+  "tags",
+  "category",
+] as const;
+
+export const FEED_POST_LIST_FIELDS = [
+  "id",
+  "authorId",
+  "authorName",
+  "authorAvatarUrl",
+  "kind",
+  "title",
+  "preview",
+  "mediaUrl",
+  "thumbnailUrl",
+  "createdAt",
+  "likeCount",
+  "commentCount",
+  "isLikedByMe",
+  "tags",
+] as const;
+
+export const TALENT_POOL_LIST_FIELDS = [
+  "id",
+  "candidateUserId",
+  "candidateName",
+  "candidateAvatarUrl",
+  "candidateHeadline",
+  "stage",
+  "score",
+  "tags",
+  "addedAt",
+  "lastInteractionAt",
+] as const;
+
+// Map of every domain → its allow-list, indexed by short key. Lets a
+// caller-side helper avoid hand-importing the right constant; pass
+// `kind: "jobs" | "users" | …` and parse against the matching set.
+// Single source of truth so the frontend `useListQuery` hook (gap #1444)
+// stays in sync with the backend without an extra hard-coded copy.
+export const LIST_FIELDS_BY_KIND = {
+  jobs: JOB_LIST_FIELDS,
+  users: USER_LIST_FIELDS,
+  companies: COMPANY_LIST_FIELDS,
+  resumes: RESUME_LIST_FIELDS,
+  articles: ARTICLE_LIST_FIELDS,
+  feedPosts: FEED_POST_LIST_FIELDS,
+  talentPool: TALENT_POOL_LIST_FIELDS,
+} as const;
+
+export type ListFieldsKind = keyof typeof LIST_FIELDS_BY_KIND;

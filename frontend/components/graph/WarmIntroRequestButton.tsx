@@ -31,22 +31,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { graphService, type PersonRef } from "@/lib/services/graph-service";
+import { initials } from "@/lib/utils/initials";
 
 interface WarmIntroRequestButtonProps {
   targetUserId: string;
   targetName?: string | null;
   /** Don't render for yourself. */
   isSelf?: boolean;
-}
-
-function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]!.toUpperCase())
-    .join("");
 }
 
 export function WarmIntroRequestButton({
