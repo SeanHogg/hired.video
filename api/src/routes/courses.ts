@@ -166,10 +166,20 @@ const CreateCourseSchema = z.object({
   priceVisible: z.boolean().optional(),
   issuesCertificate: z.boolean().optional(),
   passingScorePct: z.number().int().min(0).max(100).optional(),
+  /** #1501 — studio_template marketplace row supplying the SCORM player
+   *  chrome tokens + course-card branding. */
+  themeId: UuidLikeSchema.nullable().optional(),
+  /** #1501 — Override map merged over the themeId base. Whitelisted
+   *  string keys + values to prevent payload-bomb / XSS via CSS vars. */
+  themeTokens: z.record(z.string().max(64), z.string().max(256)).nullable().optional(),
 });
 
 const UpdateCourseSchema = CreateCourseSchema.partial().extend({
   slug: z.string().regex(/^[a-z0-9-]+$/).max(80).optional(),
+  /** #1502 — assignee for the in_review queue. Author sets this when
+   *  flipping status to in_review; the reviewer's queue page filters
+   *  on `assigned_reviewer_id = me`. */
+  assignedReviewerId: UuidLikeSchema.nullable().optional(),
 });
 
 const CreateModuleSchema = z.object({
@@ -542,6 +552,21 @@ courseRoutes.post("/", async (c) => {
   return c.json(success(created), 201);
 });
 
+/** #1502 — Reviewer queue: courses with status='in_review' assigned to
+ *  the calling user. SuperAdmin sees the entire queue. Registered BEFORE
+ *  `/:id` so the static path isn't shadowed by the UUID matcher. */
+courseRoutes.get("/review-queue", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const isSA = isSuperAdmin(c.var.user);
+  const whereClause = isSA
+    ? eq(courses.status, "in_review")
+    : and(eq(courses.status, "in_review"), eq(courses.assignedReviewerId, userId));
+  const rows = await db.select().from(courses).where(whereClause).orderBy(desc(courses.updatedAt));
+  return c.json(success(rows), 200);
+});
+
 courseRoutes.get("/me", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -678,7 +703,8 @@ courseRoutes.patch("/:id", async (c) => {
   for (const k of [
     "title", "summary", "description", "coverImageUrl", "category", "tags",
     "difficulty", "estimatedMinutes", "priceCents", "priceVisible",
-    "issuesCertificate", "passingScorePct", "slug",
+    "issuesCertificate", "passingScorePct", "slug", "assignedReviewerId",
+    "themeId", "themeTokens",
   ] as const) {
     if (k in parsed.data) (patch as any)[k] = (parsed.data as any)[k];
   }
@@ -751,6 +777,42 @@ courseRoutes.post("/:id/unpublish", async (c) => {
   if (!updated) return c.json(error("NOT_FOUND", "Course not found"), 404);
   return c.json(success(updated), 200);
 });
+
+/** #1502 — Submit-for-review endpoint. Flips the course to `in_review`
+ *  and (optionally) records the assigned reviewer. Reuses canEditCourse
+ *  so SuperAdmin + owner both reach it; the reviewer doesn't need to
+ *  own the course. */
+const SubmitForReviewSchema = z.object({
+  assignedReviewerId: UuidLikeSchema.nullable().optional(),
+});
+courseRoutes.post("/:id/submit-for-review", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const courseId = c.req.param("id");
+  if (!(await canEditCourse(db, c, courseId))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
+  const parsed = SubmitForReviewSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const patch: Record<string, unknown> = {
+    status: "in_review",
+    updatedAt: new Date(),
+  };
+  if ("assignedReviewerId" in parsed.data) {
+    patch.assignedReviewerId = parsed.data.assignedReviewerId ?? null;
+  }
+  const [updated] = await db.update(courses).set(patch as any)
+    .where(eq(courses.id, courseId))
+    .returning();
+  if (!updated) return c.json(error("NOT_FOUND", "Course not found"), 404);
+  return c.json(success(updated), 200);
+});
+
+/** #1502 — Reviewer queue: courses with status='in_review' assigned to
+ *  the calling user. SuperAdmin sees the entire queue. */
 
 courseRoutes.delete("/:id", async (c) => {
   const userId = uid(c);

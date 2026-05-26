@@ -41,11 +41,40 @@ export class CertificateService {
   /** Issue (or return the existing) certificate for a passed enrollment.
    *  Idempotent — re-issue returns the existing row. Returns null when
    *  the enrollment isn't passed, the course doesn't issue certificates,
-   *  or the enrollment isn't found. */
+   *  or the enrollment isn't found. Caller-bound: only the owner of the
+   *  enrollment can hit this path. */
   async issueForEnrollment(
     userId: string,
     enrollmentId: string,
   ): Promise<{ certificate: typeof courseCertificates.$inferSelect; newlyIssued: boolean } | null> {
+    return this._issueFor(enrollmentId, userId);
+  }
+
+  /** Admin / system backfill (#1567). Re-issues certs for enrollments
+   *  that the migration-0137 backfill flipped to `passed=true` after the
+   *  fact — those rows can't reach the JWT signer from SQL, so this
+   *  method walks them per-enrollment server-side. Idempotent via the
+   *  existing `_issueFor` body. NEVER expose to non-admin callers; the
+   *  admin route at [admin-courses-certs.ts](../../routes/admin-courses-certs.ts)
+   *  is the only callsite. */
+  async issueForEnrollmentAsAdmin(
+    enrollmentId: string,
+  ): Promise<{ certificate: typeof courseCertificates.$inferSelect; newlyIssued: boolean } | null> {
+    return this._issueFor(enrollmentId);
+  }
+
+  // Shared body — fetch the enrollment + course + user, optionally
+  // filtered to the calling user, then run the issuance logic. Single
+  // seam means /enrollments/:id/certificate (user) and the admin
+  // backfill always sign over the same canonical payload.
+  private async _issueFor(
+    enrollmentId: string,
+    userId?: string,
+  ): Promise<{ certificate: typeof courseCertificates.$inferSelect; newlyIssued: boolean } | null> {
+    const whereClause = userId
+      ? and(eq(courseEnrollments.id, enrollmentId), eq(courseEnrollments.userId, userId))
+      : eq(courseEnrollments.id, enrollmentId);
+
     const [row] = await this.db
       .select({
         enrollment: courseEnrollments,
@@ -55,10 +84,7 @@ export class CertificateService {
       .from(courseEnrollments)
       .innerJoin(courses, eq(courseEnrollments.courseId, courses.id))
       .innerJoin(users, eq(courseEnrollments.userId, users.id))
-      .where(and(
-        eq(courseEnrollments.id, enrollmentId),
-        eq(courseEnrollments.userId, userId),
-      ))
+      .where(whereClause)
       .limit(1);
     if (!row) return null;
     if (!row.enrollment.passed) return null;
@@ -137,7 +163,7 @@ export class CertificateService {
   // ── crypto helpers ────────────────────────────────────────────────
 
   private async sign(payload: SignedPayload): Promise<string> {
-    const canonical = canonicalJson(payload);
+    const canonical = canonicalJson(payload as unknown as Record<string, unknown>);
     const b64 = base64UrlEncode(canonical);
     const sig = await this.hmac(b64);
     return `${b64}.${sig}`;

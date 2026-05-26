@@ -38,8 +38,8 @@ import { mediaKindToArtifactKind } from "@/components/analytics/types";
 import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 import { campaignShareUrlFor } from "@/lib/campaigns/bake-utm";
 
-const EngagementToolset = lazy(
-  () => import("@/components/studio/shared/EngagementToolset"),
+const EngagementResultsPanel = lazy(
+  () => import("@/components/studio/shared/EngagementResultsPanel"),
 );
 
 interface Props {
@@ -423,18 +423,16 @@ export default function ProjectDetailsSheet({
             fallback={
               <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading engagement tools…
+                Loading viewer engagement…
               </div>
             }
           >
-            <EngagementToolset
-              projectId={project.id}
-              videoUrl={project.videoUrl ?? null}
-              className="grid gap-2"
-            />
+            <EngagementResultsPanel projectId={project.id} />
           </Suspense>
           <p className="mt-4 text-xs text-muted-foreground">
-            Chapters, thumbnails, in-video lead forms, and reviewer comments.
+            What viewers did — form submissions, reviewer threads, plus the
+            chapters and thumbnails currently exposed to them. Author these
+            in the editor's Actions panel.
           </p>
         </>
       ),

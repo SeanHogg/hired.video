@@ -20,6 +20,7 @@ import {
   type PointsBadge,
   type PointsSummary,
 } from "@/lib/services/points-service";
+import { BADGE_REFRESH_EVENT } from "@/lib/badges/refresh";
 import { BadgeIcon } from "./BadgeIcon";
 
 const STORAGE_KEY_PREFIX = "hv.badge-earn-snapshot:";
@@ -58,13 +59,23 @@ export function BadgeUnlockToaster() {
   const userId = user?.id ?? null;
   const seenRef = useRef<EarnSnapshot | null>(null);
 
-  const { data } = useQuery<PointsSummary>({
+  const { data, refetch } = useQuery<PointsSummary>({
     queryKey: ["points", "me"],
     queryFn: () => pointsService.getMe(),
     enabled: eligible && !!userId,
     refetchInterval: POLL_MS,
     refetchOnWindowFocus: true,
   });
+
+  // #1568 — listen for the cross-surface "I just earned something"
+  // event so badge toasts surface within the same render cycle as the
+  // completion dialog instead of lagging up to 60s on the poll tick.
+  useEffect(() => {
+    if (!eligible || !userId) return;
+    const handler = () => { void refetch(); };
+    window.addEventListener(BADGE_REFRESH_EVENT, handler);
+    return () => window.removeEventListener(BADGE_REFRESH_EVENT, handler);
+  }, [eligible, userId, refetch]);
 
   useEffect(() => {
     if (!userId || !data) return;

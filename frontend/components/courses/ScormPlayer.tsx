@@ -42,6 +42,32 @@ interface ScormPlayerProps {
   courseId?: string;
   onCompleted?: () => void;
   className?: string;
+  /** #1501 — themeTokens from the parent course's merged
+   *  themeId-base + themeTokens-override map. Whitelisted to CSS custom
+   *  properties applied to the chrome around the iframe; the SCO itself
+   *  (loaded from R2) is untouched. Pass undefined for default chrome. */
+  themeTokens?: Record<string, string>;
+}
+
+/** #1501 — whitelist mapping from course theme-token keys to the CSS
+ *  custom properties exposed on the player chrome. Only these keys are
+ *  honored, so an author's themeTokens JSON can't poke at arbitrary
+ *  styles via spread. */
+const CHROME_TOKEN_MAP: Record<string, string> = {
+  backgroundColor: "--scorm-chrome-bg",
+  textColor: "--scorm-chrome-text",
+  accentColor: "--scorm-chrome-accent",
+  borderColor: "--scorm-chrome-border",
+};
+
+function tokensToStyle(tokens: Record<string, string> | undefined): React.CSSProperties | undefined {
+  if (!tokens) return undefined;
+  const style: Record<string, string> = {};
+  for (const [key, cssVar] of Object.entries(CHROME_TOKEN_MAP)) {
+    const v = tokens[key];
+    if (v) style[cssVar] = v;
+  }
+  return style as React.CSSProperties;
 }
 
 interface ScormAgainRuntime {
@@ -60,6 +86,7 @@ export default function ScormPlayer({
   courseId,
   onCompleted,
   className,
+  themeTokens,
 }: ScormPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -165,10 +192,16 @@ export default function ScormPlayer({
     };
   }, [enrollmentId, lessonId, scormVersion, scormEntryUrl, courseId, onCompleted]);
 
+  const chromeStyle = tokensToStyle(themeTokens);
+
   if (error) {
     return (
-      <div className={className}>
-        <div className="p-4 rounded border border-red-200 bg-red-50 text-sm text-red-900">
+      <div className={className} style={chromeStyle}>
+        <div
+          role="alert"
+          className="p-4 rounded border border-red-200 bg-red-50 text-sm text-red-900"
+          style={{ borderColor: "var(--scorm-chrome-border, undefined)" }}
+        >
           SCORM runtime failed to load: {error}
         </div>
       </div>
@@ -176,16 +209,29 @@ export default function ScormPlayer({
   }
 
   return (
-    <div className={className}>
+    <div
+      className={className}
+      style={{
+        ...chromeStyle,
+        backgroundColor: "var(--scorm-chrome-bg, undefined)",
+        color: "var(--scorm-chrome-text, undefined)",
+      }}
+    >
       {!loaded && (
-        <div className="p-4 text-sm text-muted-foreground">Loading SCORM runtime…</div>
+        // #1503 — polite live region so AT learners hear the load
+        // transition instead of silently staring at an empty iframe.
+        <div role="status" aria-live="polite" className="p-4 text-sm text-muted-foreground">
+          Loading SCORM runtime…
+        </div>
       )}
       <iframe
         ref={iframeRef}
         src={scormEntryUrl}
-        title="SCORM lesson"
+        title="SCORM lesson content"
+        aria-label="Interactive SCORM lesson — controls live inside the lesson frame"
         className="w-full h-full min-h-[600px] border-0"
         allow="autoplay; fullscreen; camera; microphone"
+        style={{ borderColor: "var(--scorm-chrome-accent, undefined)" }}
       />
     </div>
   );

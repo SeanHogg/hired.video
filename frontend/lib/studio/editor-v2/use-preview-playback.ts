@@ -42,6 +42,11 @@ export interface PreviewPlayback {
   muted: boolean;
   setMuted: (muted: boolean) => void;
   toggleMute: () => void;
+  /** User-driven output gain in 0..1 layered on top of the project's
+   *  baked `audioMix.masterGain`. Lets the player chrome expose a
+   *  volume slider without mutating the saved project state. */
+  volume: number;
+  setVolume: (volume: number) => void;
 }
 
 export interface UsePreviewPlaybackOptions {
@@ -59,6 +64,7 @@ export function usePreviewPlayback(
   const [playhead, setPlayhead] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [muted, setMuted] = useState(Boolean(options?.initialMuted));
+  const [volume, setVolumeState] = useState(1);
   const playheadRef = useRef(0);
   const lastTickRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -78,11 +84,15 @@ export function usePreviewPlayback(
   // Replaces the prior `<audio>`-element-per-music-source code path
   // that couldn't schedule voiceovers and had no audioMix coupling.
   const audioClips = useMemo(() => canvasStateToAudioClips(state), [state]);
-  const masterVolume = state.audioMix?.masterGain ?? DEFAULT_AUDIO_MIX.masterGain;
+  const projectMasterGain =
+    state.audioMix?.masterGain ?? DEFAULT_AUDIO_MIX.masterGain;
+  // User-driven `volume` layered on top of the project's saved master
+  // gain so the slider lives entirely in player chrome (no project
+  // mutation) and the saved mix survives a session.
   useMusicScheduler({
     playing: isPlaying,
     clips: audioClips,
-    masterVolume: muted ? 0 : masterVolume,
+    masterVolume: muted ? 0 : projectMasterGain * volume,
     playheadRef,
   });
 
@@ -151,6 +161,15 @@ export function usePreviewPlayback(
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
+  // Unmute the moment the user drags the volume up — matches YouTube +
+  // OS-volume convention. Clamp to 0..1 so consumers can pass slider
+  // values directly without pre-clamping.
+  const setVolume = useCallback((next: number) => {
+    const clamped = Math.max(0, Math.min(1, next));
+    setVolumeState(clamped);
+    if (clamped > 0) setMuted(false);
+  }, []);
+
   // Derive the active scene + intra-scene elapsed time from the playhead.
   const { activeSceneIdAtPlayhead, activeSceneElapsed } = useMemo(() => {
     let cursor = 0;
@@ -185,5 +204,7 @@ export function usePreviewPlayback(
     muted,
     setMuted,
     toggleMute,
+    volume,
+    setVolume,
   };
 }

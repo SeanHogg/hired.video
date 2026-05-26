@@ -54,6 +54,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { signalBadgeRefresh } from "@/lib/badges/refresh";
 import ScormPlayer from "@/components/courses/ScormPlayer";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { useCoursePermissions } from "@/hooks/use-course-permissions";
@@ -216,14 +217,17 @@ export default function CourseLearner() {
       const flippedToPassed = !wasPassed && nextEnrollment.passed;
       if (flippedToPassed) {
         // Re-fetch to pick up the newly-issued certificate row + any
-        // other server-side side effects (badge fan-out happens async
-        // and surfaces via BadgeUnlockToaster's poll, not via this call).
+        // other server-side side effects (badge fan-out happens async).
         const refreshed = await courseService.getLearnerContent(data.enrollment.id);
         setData(refreshed);
         setCompletionOpen(true);
       } else {
         setData((d) => (d ? { ...d, enrollment: nextEnrollment } : d));
       }
+      // #1568 — kick BadgeUnlockToaster off the 60s poll so the badge
+      // celebration toast surfaces in the same render cycle as the
+      // completion dialog. Cheap signal; no-op when nothing's unlocked.
+      signalBadgeRefresh();
     } catch (e: unknown) {
       toast({
         title: "Couldn't save progress",
@@ -314,7 +318,7 @@ export default function CourseLearner() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[20rem_1fr] gap-4">
           {/* Curriculum rail */}
-          <div className="space-y-4">
+          <nav aria-label="Course curriculum" className="space-y-4">
             <Card>
               <CardContent className="p-3 space-y-3">
                 {modules
@@ -369,7 +373,7 @@ export default function CourseLearner() {
             <Button variant="outline" className="w-full" onClick={() => navigate(`/courses/${course.userId}/${course.slug}`)}>
               ← Back to course page
             </Button>
-          </div>
+          </nav>
 
           {/* Active lesson */}
           <div className="min-w-0">
@@ -529,6 +533,8 @@ function LessonRailItem({
       <button
         type="button"
         onClick={onSelect}
+        aria-current={active ? "true" : undefined}
+        aria-label={`${lesson.title}${passed ? " (completed)" : ""}${lesson.isRequired ? "" : " (optional)"}`}
         className={cn(
           "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-muted/60 transition-colors",
           active && "bg-primary/10 text-primary",
@@ -573,6 +579,7 @@ function LessonBody({
             <TextNarrator
               text={lesson.bodyMd}
               preferenceKey="learn.lesson-narration"
+              variant="inline"
             />
           ) : null}
           <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -603,6 +610,7 @@ function LessonBody({
           courseId={courseId}
           onCompleted={onScormCompleted}
           className="h-[70vh]"
+          themeTokens={data?.course.themeTokens ?? undefined}
         />
       );
 

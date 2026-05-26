@@ -19,7 +19,7 @@
 
 import { Hono } from "hono";
 import { and, eq, desc, sql, inArray } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables, AppEnv } from "../types/index.js";
@@ -2793,6 +2793,28 @@ studioFeaturesRoutes.get("/videos/:videoId/forms/public", async (c) => {
   return c.json(ok({ forms }));
 });
 
+// #1505 — Knowledge-check fields shared across create + update. Defining
+// them once keeps the two Zod schemas in DRY lockstep (only the
+// .optional() / .partial() shape differs at the boundary).
+const KnowledgeCheckFields = {
+  formType: z.enum(["lead_capture", "knowledge_check"]).optional(),
+  answerKey: z
+    .record(
+      z.string(),
+      z.object({
+        correctAnswer: z.string(),
+        points: z.number().int().min(1).max(100).default(1),
+        rationale: z.string().max(500).optional(),
+      }),
+    )
+    .nullable()
+    .optional(),
+  passingScorePct: z.number().int().min(0).max(100).nullable().optional(),
+  maxAttempts: z.number().int().min(1).max(20).nullable().optional(),
+  remediationJumpToSceneId: z.string().nullable().optional(),
+  courseLessonId: UuidLikeSchema.nullable().optional(),
+} as const;
+
 // POST /api/studio/projects/:projectId/forms — create
 studioFeaturesRoutes.post("/projects/:projectId/forms", async (c) => {
   const user = c.var.user;
@@ -2812,6 +2834,7 @@ studioFeaturesRoutes.post("/projects/:projectId/forms", async (c) => {
     requireToContinue: z.boolean().default(true),
     redirectUrl: z.string().url().nullable().optional(),
     submitButtonText: z.string().max(40).optional(),
+    ...KnowledgeCheckFields,
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
 
@@ -2826,6 +2849,12 @@ studioFeaturesRoutes.post("/projects/:projectId/forms", async (c) => {
     requireToContinue: parsed.data.requireToContinue,
     redirectUrl: parsed.data.redirectUrl ?? null,
     submitButtonText: parsed.data.submitButtonText ?? "Continue",
+    formType: parsed.data.formType ?? "lead_capture",
+    answerKey: parsed.data.answerKey ?? null,
+    passingScorePct: parsed.data.passingScorePct ?? null,
+    maxAttempts: parsed.data.maxAttempts ?? null,
+    remediationJumpToSceneId: parsed.data.remediationJumpToSceneId ?? null,
+    courseLessonId: parsed.data.courseLessonId ?? null,
   } as any).returning();
 
   return c.json(ok(form), 201);
@@ -2844,6 +2873,7 @@ studioFeaturesRoutes.patch("/forms/:id", async (c) => {
     isActive: z.boolean().optional(),
     redirectUrl: z.string().url().nullable().optional(),
     submitButtonText: z.string().max(40).optional(),
+    ...KnowledgeCheckFields,
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
 

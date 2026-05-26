@@ -3,9 +3,10 @@
  *
  * Single reusable seam for every text-rich surface (lessons, articles,
  * blog posts, FAQs, job descriptions, company About blocks, resume
- * narratives). Themed to match the black player chrome the rest of the
- * app uses — see PlaybackControls.tsx — so the audio bar reads as the
- * same playback control no matter what surface mounts it.
+ * narratives). Visually presents as a small pill button in the host
+ * page chrome; clicking expands the black audio-player bar (matching
+ * PlaybackControls.tsx) inside a popover so the page stays compact and
+ * the listen-to-this-text affordance is opt-in.
  *
  * Voice selection prefers anything the viewer has purchased or cloned
  * themselves (vibevoice engine, licensed-voices library). Falls back to
@@ -21,10 +22,7 @@ import {
   Loader2,
   Pause,
   Play,
-  Settings2,
   SkipBack,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,11 +40,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import VolumeControl from "@/components/audio/VolumeControl";
 import {
   estimateWordTimestamps,
   getBrowserVoices,
 } from "@/lib/services/browser-tts";
 import {
+  setEngineVolume,
   speakWithEngine,
   stopEngine,
   type TtsEngineId,
@@ -65,9 +65,12 @@ type Props = {
   /** Optional preference key — when set, voice + rate persist in localStorage
    *  under this key so a learner's choice survives across lessons / pages. */
   preferenceKey?: string;
-  /** Compact mode collapses to just play / scrub / time and tucks the voice
-   *  + speed pickers into a popover. Default false (full bar). */
-  compact?: boolean;
+  /** Display mode. `pill` (default) = small toolbar-sized button that pops
+   *  open the black player. `inline` = render the black player directly,
+   *  for surfaces dedicated to consumption (course lesson body). */
+  variant?: "pill" | "inline";
+  /** Optional label override for the pill. Defaults to "Listen". */
+  label?: string;
 };
 
 type NarratorVoice = {
@@ -148,11 +151,7 @@ function mapLicensedToNarrator(v: LicensedVoice): NarratorVoice {
     id: v.id,
     name: v.isOwner ? `${v.name} (your voice)` : v.name,
     engine: "vibevoice",
-    group: v.isOwner
-      ? "owner"
-      : v.licenseSource === "purchase"
-        ? "purchased"
-        : "purchased",
+    group: v.isOwner ? "owner" : "purchased",
   };
 }
 
@@ -169,7 +168,8 @@ export function TextNarrator({
   text,
   className,
   preferenceKey,
-  compact = false,
+  variant = "pill",
+  label = "Listen",
 }: Props) {
   // Self-gate: SSR + unsupported browsers render nothing.
   const supported =
@@ -193,6 +193,13 @@ export function TextNarrator({
       ),
   );
   const [muted, setMuted] = useState<boolean>(false);
+  const [volume, setVolume] = useState<number>(
+    () =>
+      loadPref<number>(
+        preferenceKey ? `${preferenceKey}.volume` : undefined,
+        1,
+      ),
+  );
   const [status, setStatus] = useState<
     "idle" | "loading" | "playing" | "paused"
   >("idle");
@@ -218,9 +225,7 @@ export function TextNarrator({
     let cancelled = false;
 
     const load = async () => {
-      const browser = await getBrowserVoices().catch(
-        () => [] as TTSVoice[],
-      );
+      const browser = await getBrowserVoices().catch(() => [] as TTSVoice[]);
       const browserVoices: NarratorVoice[] = browser.map(mapBrowserToNarrator);
 
       let licensedVoices: NarratorVoice[] = [];
@@ -238,8 +243,7 @@ export function TextNarrator({
       // pick is no longer available — e.g. they bought a voice and now
       // it's their owned default, but the saved pref still points at an
       // expired browser voice). Owned voices always win the seed.
-      const savedStillValid =
-        voiceId && all.some((v) => v.id === voiceId);
+      const savedStillValid = voiceId && all.some((v) => v.id === voiceId);
       if (!savedStillValid) {
         const seeded = resolveDefaultVoiceId(all);
         if (seeded) setVoiceId(seeded);
@@ -255,8 +259,7 @@ export function TextNarrator({
   }, [supported, isAuthenticated]);
 
   // Stop any in-progress narration when the text changes or the
-  // component unmounts. Prevents the previous utterance from continuing
-  // into a different lesson / page.
+  // component unmounts.
   useEffect(() => {
     return () => {
       cancelRef.current?.();
@@ -272,18 +275,18 @@ export function TextNarrator({
   const startSpeaking = useCallback(
     (fromWordIdx: number) => {
       if (!supported || !spoken || !currentVoice) return;
-      // Build the substring from fromWordIdx so seek-mid-playback resumes
-      // at the chosen word rather than replaying from zero.
       const fromIdx = Math.max(0, Math.min(fromWordIdx, words.length - 1));
       const remainder = words.slice(fromIdx).join(" ");
       if (!remainder) return;
 
       setStatus("loading");
       setActiveWordIdx(fromIdx);
+      const effectiveVolume = muted ? 0 : volume;
       void speakWithEngine(currentVoice.engine, {
         text: remainder,
         voiceId: currentVoice.id,
         speed: rate,
+        volume: effectiveVolume,
         onBoundary: (relativeIdx) => {
           setActiveWordIdx(fromIdx + relativeIdx);
           setStatus("playing");
@@ -306,7 +309,7 @@ export function TextNarrator({
           setActiveWordIdx(null);
         });
     },
-    [supported, spoken, currentVoice, rate, words],
+    [supported, spoken, currentVoice, rate, words, muted, volume],
   );
 
   const onPlay = useCallback(() => {
@@ -316,8 +319,8 @@ export function TextNarrator({
   const onPause = useCallback(() => {
     if (!supported) return;
     // Web Speech supports native pause/resume; WebGPU engines render the
-    // full utterance to PCM and play through Web Audio, which has no
-    // pause primitive — stop instead so the UI matches reality.
+    // full utterance to PCM so there's nothing to "pause" — stop and let
+    // resume restart from the active word.
     if (currentVoice?.engine === "web-speech") {
       window.speechSynthesis.pause();
       setStatus("paused");
@@ -334,7 +337,6 @@ export function TextNarrator({
       window.speechSynthesis.resume();
       setStatus("playing");
     } else {
-      // WebGPU engines: restart from the word we paused on.
       startSpeaking(activeWordIdx ?? 0);
     }
   }, [supported, currentVoice, activeWordIdx, startSpeaking]);
@@ -348,7 +350,6 @@ export function TextNarrator({
 
   const onSeek = useCallback(
     (nextSec: number) => {
-      // Map seconds → word index via the pre-estimated timestamps.
       const targetMs = nextSec * 1000;
       let idx = 0;
       for (let i = 0; i < timestamps.length; i++) {
@@ -369,16 +370,28 @@ export function TextNarrator({
 
   const onToggleMute = useCallback(() => {
     if (!supported) return;
-    // Web Speech utterance volume can't be changed after .speak() so the
-    // simplest cross-engine mute is "stop the audio while muted." A real
-    // gain-node mute would mean owning the AudioContext here; not worth
-    // the rewrite for what is fundamentally an audio-out toggle.
     setMuted((m) => {
       const next = !m;
-      if (next && (status === "playing" || status === "loading")) onStop();
+      // Live-apply to any in-flight WebGPU playback so the mute
+      // toggle is instant. Web Speech ignores live volume changes,
+      // so a mid-utterance unmute on the browser engine waits for
+      // the next utterance — acceptable given Web Speech's API limits.
+      setEngineVolume(next ? 0 : volume);
       return next;
     });
-  }, [supported, status, onStop]);
+  }, [supported, volume]);
+
+  const onChangeVolume = useCallback(
+    (next: number) => {
+      setVolume(next);
+      savePref(preferenceKey ? `${preferenceKey}.volume` : undefined, next);
+      // Unmute the moment the user drags the volume up — matches the
+      // YouTube / system-volume convention.
+      if (next > 0 && muted) setMuted(false);
+      setEngineVolume(muted && next === 0 ? 0 : next);
+    },
+    [preferenceKey, muted],
+  );
 
   const onChangeVoice = useCallback(
     (id: string) => {
@@ -407,22 +420,90 @@ export function TextNarrator({
     activeWordIdx != null && timestamps[activeWordIdx]
       ? timestamps[activeWordIdx]!.start / 1000
       : 0;
-
-  // Group voices for the picker.
   const grouped = {
     owner: voices.filter((v) => v.group === "owner"),
     purchased: voices.filter((v) => v.group === "purchased"),
     browser: voices.filter((v) => v.group === "browser"),
   };
+  const isPlaying = status === "playing";
+  const isLoading = status === "loading";
+  const playPauseHandler = isPlaying
+    ? onPause
+    : status === "paused"
+      ? onResume
+      : onPlay;
 
-  const settingsPanel = (
-    <div className="space-y-4 p-1">
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">
+  // The black audio bar — same chrome as PlaybackControls.tsx. Used as
+  // the inline mode and as the popover body in pill mode.
+  const blackBar = (
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-xl bg-black/90 px-3 py-2 text-white backdrop-blur-sm",
+      )}
+      role="region"
+      aria-label="Listen to this content"
+    >
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onSeek(0)}
+        aria-label="Back to start"
+        disabled={!currentVoice}
+        className="h-8 w-8 shrink-0 rounded-full p-0 text-white hover:bg-white/10 disabled:opacity-40"
+      >
+        <SkipBack className="h-4 w-4" />
+      </Button>
+
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={playPauseHandler}
+        aria-label={isPlaying ? "Pause" : "Play"}
+        disabled={!currentVoice || isLoading}
+        className="h-9 w-9 shrink-0 rounded-full p-0"
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : isPlaying ? (
+          <Pause className="h-4 w-4" />
+        ) : (
+          <Play className="h-4 w-4" />
+        )}
+      </Button>
+
+      <input
+        type="range"
+        min={0}
+        max={Math.max(0.1, durationSec)}
+        step={0.1}
+        value={Math.min(playheadSec, durationSec)}
+        onChange={(e) => onSeek(Number(e.target.value))}
+        className="h-1 min-w-0 flex-1 cursor-pointer accent-brand-purple"
+        aria-label="Playhead"
+      />
+
+      <span className="shrink-0 text-[11px] tabular-nums opacity-80">
+        {formatTime(playheadSec)} / {formatTime(durationSec)}
+      </span>
+
+      <VolumeControl
+        volume={volume}
+        onVolumeChange={onChangeVolume}
+        muted={muted}
+        onToggleMute={onToggleMute}
+        tone="dark"
+      />
+    </div>
+  );
+
+  const settingsPane = (
+    <div className="space-y-3 px-1 pb-1 pt-2">
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-muted-foreground">
           Voice
         </label>
         <Select value={voiceId ?? undefined} onValueChange={onChangeVoice}>
-          <SelectTrigger className="h-9 w-full text-xs">
+          <SelectTrigger className="h-8 w-full text-xs">
             <SelectValue placeholder="Pick a voice" />
           </SelectTrigger>
           <SelectContent>
@@ -461,12 +542,12 @@ export function TextNarrator({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-[11px] font-medium text-muted-foreground">
             Speed
           </label>
-          <span className="text-xs tabular-nums text-muted-foreground">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
             {rate.toFixed(2)}×
           </span>
         </div>
@@ -482,179 +563,55 @@ export function TextNarrator({
     </div>
   );
 
-  const isPlaying = status === "playing";
-  const isLoading = status === "loading";
+  if (variant === "inline") {
+    // Bar above the body, with the voice/speed picker sitting under it.
+    return (
+      <div className={cn("flex flex-col gap-1", className)}>
+        {blackBar}
+        <details className="text-xs text-muted-foreground self-end">
+          <summary className="cursor-pointer select-none px-1">
+            Voice &amp; speed
+          </summary>
+          <div className="w-72 rounded-md border bg-popover p-2 shadow-md">
+            {settingsPane}
+          </div>
+        </details>
+      </div>
+    );
+  }
 
-  const playPauseHandler = isPlaying
-    ? onPause
-    : status === "paused"
-      ? onResume
-      : onPlay;
-
+  // Pill: a small toolbar-sized button that opens the player in a
+  // popover. Optional by definition — nothing plays until the viewer
+  // clicks the pill. While playing, the pill shows a pulse + Pause icon
+  // so the host page surfaces the play state without expanding.
   return (
-    <div
-      className={cn(
-        "flex items-center gap-3 rounded-xl bg-black/80 px-4 py-3 text-white backdrop-blur-sm",
-        className,
-      )}
-      role="region"
-      aria-label="Listen to this content"
-    >
-      <Headphones
-        className="h-4 w-4 shrink-0 opacity-70 hidden sm:block"
-        aria-hidden
-      />
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onSeek(0)}
-        aria-label="Back to start"
-        disabled={!currentVoice}
-        className="h-10 w-10 shrink-0 rounded-full p-0 text-white hover:bg-white/10 disabled:opacity-40"
-      >
-        <SkipBack className="h-4 w-4" />
-      </Button>
-
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={playPauseHandler}
-        aria-label={isPlaying ? "Pause" : "Play"}
-        disabled={!currentVoice || isLoading}
-        className="h-12 w-12 shrink-0 rounded-full p-0"
-      >
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
-        ) : isPlaying ? (
-          <Pause className="h-5 w-5" />
-        ) : (
-          <Play className="h-5 w-5" />
-        )}
-      </Button>
-
-      <input
-        type="range"
-        min={0}
-        max={Math.max(0.1, durationSec)}
-        step={0.1}
-        value={Math.min(playheadSec, durationSec)}
-        onChange={(e) => onSeek(Number(e.target.value))}
-        className="h-1 min-w-0 flex-1 cursor-pointer accent-brand-purple"
-        aria-label="Playhead"
-      />
-
-      <span className="shrink-0 min-w-[7rem] text-center text-xs tabular-nums opacity-80">
-        {formatTime(playheadSec)} / {formatTime(durationSec)}
-      </span>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onToggleMute}
-        aria-label={muted ? "Unmute" : "Mute"}
-        aria-pressed={muted}
-        className="h-10 w-10 shrink-0 rounded-full p-0 text-white hover:bg-white/10"
-      >
-        {muted ? (
-          <VolumeX className="h-4 w-4" />
-        ) : (
-          <Volume2 className="h-4 w-4" />
-        )}
-      </Button>
-
-      {compact ? (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Narration settings"
-              className="h-10 w-10 shrink-0 rounded-full p-0 text-white hover:bg-white/10"
-            >
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-72">
-            {settingsPanel}
-          </PopoverContent>
-        </Popover>
-      ) : (
-        <div className="hidden lg:flex items-center gap-2 shrink-0">
-          <Select value={voiceId ?? undefined} onValueChange={onChangeVoice}>
-            <SelectTrigger className="h-9 w-[200px] border-white/20 bg-white/5 text-xs text-white">
-              <SelectValue placeholder="Pick a voice" />
-            </SelectTrigger>
-            <SelectContent>
-              {grouped.owner.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="text-xs">Your voices</SelectLabel>
-                  {grouped.owner.map((v) => (
-                    <SelectItem key={v.id} value={v.id} className="text-xs">
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-              {grouped.purchased.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="text-xs">
-                    Purchased &amp; licensed
-                  </SelectLabel>
-                  {grouped.purchased.map((v) => (
-                    <SelectItem key={v.id} value={v.id} className="text-xs">
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-              {grouped.browser.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="text-xs">Browser voices</SelectLabel>
-                  {grouped.browser.map((v) => (
-                    <SelectItem key={v.id} value={v.id} className="text-xs">
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-            </SelectContent>
-          </Select>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Narration speed"
-                className="h-10 w-14 shrink-0 rounded-full p-0 text-xs text-white hover:bg-white/10 tabular-nums"
-              >
-                {rate.toFixed(2)}×
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Speed
-                  </span>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {rate.toFixed(2)}×
-                  </span>
-                </div>
-                <Slider
-                  value={[rate]}
-                  min={0.7}
-                  max={1.8}
-                  step={0.05}
-                  onValueChange={onChangeRate}
-                  aria-label="Narration speed"
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      )}
-    </div>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={isPlaying ? "Open audio player (playing)" : label}
+          className={cn(
+            "h-7 px-2 gap-1.5 text-xs",
+            isPlaying && "border-brand-purple text-brand-purple",
+            className,
+          )}
+        >
+          {isPlaying ? (
+            <Pause className="h-3.5 w-3.5" />
+          ) : isLoading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Headphones className="h-3.5 w-3.5" />
+          )}
+          <span className="hidden sm:inline">{label}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[22rem] p-2">
+        {blackBar}
+        {settingsPane}
+      </PopoverContent>
+    </Popover>
   );
 }
 

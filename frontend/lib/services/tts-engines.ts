@@ -304,6 +304,11 @@ export interface EngineSpeakOptions {
   text: string;
   voiceId: string;
   speed?: number;
+  /** Output gain in 0..1. Defaults to 1. Live-mutable via
+   *  `setEngineVolume()` for the WebGPU engines (they route through a
+   *  GainNode); web-speech reads it once at `.speak()` time and live
+   *  changes only take effect on the next utterance. */
+  volume?: number;
   /**
    * Fired with the index of the word currently being spoken (0-based).
    * Web Speech provides this natively; WebGPU engines emulate it from the
@@ -318,12 +323,34 @@ export interface EngineSpeakOptions {
 let activeWebAudioCtx: AudioContext | null = null;
 let activeWebAudioSource: AudioBufferSourceNode | null = null;
 let activeBoundaryTimer: ReturnType<typeof setInterval> | null = null;
+// Shared GainNode for the WebGPU engines' Web Audio playback chain.
+// Owned at module scope so callers can live-change the volume via
+// `setEngineVolume()` without re-rendering the PCM buffer.
+let activeGainNode: GainNode | null = null;
+let currentEngineVolume = 1;
+
+/** Live-change the output gain for any active or future PCM playback
+ *  (Kokoro / Piper / VibeVoice). Web Speech can't be live-volumed mid-
+ *  utterance — its value is captured at `.speak()` time — so the
+ *  TextNarrator passes the current volume through to `speakWithEngine`
+ *  on every speak as a fallback. */
+export function setEngineVolume(volume: number): void {
+  const clamped = Math.max(0, Math.min(1, volume));
+  currentEngineVolume = clamped;
+  if (activeGainNode) {
+    activeGainNode.gain.value = clamped;
+  }
+}
 
 function clearWebAudio() {
   if (activeWebAudioSource) {
     try { activeWebAudioSource.stop(); } catch {}
     activeWebAudioSource.disconnect();
     activeWebAudioSource = null;
+  }
+  if (activeGainNode) {
+    try { activeGainNode.disconnect(); } catch {}
+    activeGainNode = null;
   }
   if (activeBoundaryTimer) {
     clearInterval(activeBoundaryTimer);
@@ -337,6 +364,7 @@ function playPcm(
   sampleRate: number,
   text: string,
   speed: number,
+  volume: number,
   onBoundary?: (wordIndex: number) => void,
   onEnd?: () => void,
   onError?: (msg: string) => void,
@@ -351,7 +379,14 @@ function playPcm(
     buf.getChannelData(0).set(pcm);
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(ctx.destination);
+    // Insert a GainNode so live volume changes work without re-decoding
+    // the PCM buffer. The module-scope `setEngineVolume()` mutates this
+    // node's `.gain.value` directly during playback.
+    const gain = ctx.createGain();
+    gain.gain.value = Math.max(0, Math.min(1, volume));
+    currentEngineVolume = gain.gain.value;
+    src.connect(gain).connect(ctx.destination);
+    activeGainNode = gain;
     src.onended = () => {
       if (activeBoundaryTimer) {
         clearInterval(activeBoundaryTimer);
@@ -402,11 +437,14 @@ export async function speakWithEngine(
   engine: TtsEngineId,
   opts: EngineSpeakOptions,
 ): Promise<() => void> {
+  const volume = opts.volume ?? 1;
+
   if (engine === "web-speech") {
     return webSpeak({
       text: opts.text,
       voiceId: opts.voiceId || undefined,
       rate: opts.speed ?? 1,
+      volume,
       onBoundary: opts.onBoundary,
       onEnd: opts.onEnd,
       onError: opts.onError,
@@ -418,12 +456,12 @@ export async function speakWithEngine(
     if (engine === "kokoro") {
       const tts = await loadKokoro();
       const out = await tts.generate(opts.text, { voice: opts.voiceId, speed: opts.speed });
-      return playPcm(out.audio, out.sampling_rate, opts.text, opts.speed ?? 1, opts.onBoundary, opts.onEnd, opts.onError);
+      return playPcm(out.audio, out.sampling_rate, opts.text, opts.speed ?? 1, volume, opts.onBoundary, opts.onEnd, opts.onError);
     }
     if (engine === "piper") {
       const tts = await loadPiper();
       const out = await tts.predict(opts.text, { voiceId: opts.voiceId, speed: opts.speed });
-      return playPcm(out.audio, out.sampleRate, opts.text, opts.speed ?? 1, opts.onBoundary, opts.onEnd, opts.onError);
+      return playPcm(out.audio, out.sampleRate, opts.text, opts.speed ?? 1, volume, opts.onBoundary, opts.onEnd, opts.onError);
     }
     if (engine === "vibevoice") {
       // The voiceId for VibeVoice is a studioVoiceClones.id. We fetch the
@@ -444,7 +482,7 @@ export async function speakWithEngine(
         referenceAudio,
         speed: opts.speed,
       });
-      return playPcm(out.audio, out.sampleRate, opts.text, opts.speed ?? 1, opts.onBoundary, opts.onEnd, opts.onError);
+      return playPcm(out.audio, out.sampleRate, opts.text, opts.speed ?? 1, volume, opts.onBoundary, opts.onEnd, opts.onError);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : `Engine ${engine} failed to synthesize`;
@@ -454,6 +492,7 @@ export async function speakWithEngine(
     return webSpeak({
       text: opts.text,
       rate: opts.speed ?? 1,
+      volume,
       onBoundary: opts.onBoundary,
       onEnd: opts.onEnd,
       onError: opts.onError,

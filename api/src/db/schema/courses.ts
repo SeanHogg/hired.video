@@ -97,6 +97,14 @@ export const courses = pgTable(
      *  studio (logo, colors, fonts). */
     themeTokens: jsonb("theme_tokens"),
 
+    /** #1502 — Named reviewer for the in_review workflow. Set when the
+     *  author submits the course for review; the reviewer's queue page
+     *  filters on this column. ON DELETE SET NULL so reviewer churn
+     *  doesn't lose the course's history. */
+    assignedReviewerId: uuid("assigned_reviewer_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -104,6 +112,7 @@ export const courses = pgTable(
     index("idx_courses_user").on(t.userId, t.createdAt),
     index("idx_courses_status_published").on(t.status, t.publishedAt),
     index("idx_courses_theme_id").on(t.themeId),
+    index("idx_courses_assigned_reviewer").on(t.assignedReviewerId),
     uniqueIndex("uq_courses_user_slug").on(t.userId, t.slug),
   ],
 );

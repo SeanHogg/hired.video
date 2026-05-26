@@ -130,12 +130,13 @@ export default function ArticleView() {
               </div>
             </header>
 
-            <TextNarrator
-              text={`${article.title}. ${article.summary ?? ""}\n\n${article.bodyMd}`}
-              preferenceKey={`article.${article.id}`}
-              compact
-              className="mb-6"
-            />
+            <div className="mb-6">
+              <TextNarrator
+                text={`${article.title}. ${article.summary ?? ""}\n\n${article.bodyMd}`}
+                preferenceKey={`article.${article.id}`}
+                label="Listen to this article"
+              />
+            </div>
 
             <div className="prose prose-neutral dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.bodyMd}</ReactMarkdown>

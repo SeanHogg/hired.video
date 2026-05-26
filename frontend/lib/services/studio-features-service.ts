@@ -910,6 +910,18 @@ export interface VideoFormField {
   options?: string[];
 }
 
+export type VideoFormType = "lead_capture" | "knowledge_check";
+
+/** #1505 — per-field answer entry on a knowledge-check form. Keyed by
+ *  the field's `key` in the parent `VideoForm.fields[]`. */
+export interface VideoFormAnswerEntry {
+  correctAnswer: string;
+  points: number;
+  rationale?: string;
+}
+
+export type VideoFormAnswerKey = Record<string, VideoFormAnswerEntry>;
+
 export interface VideoForm {
   id: string;
   projectId: string;
@@ -921,6 +933,13 @@ export interface VideoForm {
   redirectUrl: string | null;
   submitButtonText: string;
   isActive: boolean;
+  /** #1505 — discriminator. Null on legacy rows (treated as lead_capture). */
+  formType?: VideoFormType;
+  answerKey?: VideoFormAnswerKey | null;
+  passingScorePct?: number | null;
+  maxAttempts?: number | null;
+  remediationJumpToSceneId?: string | null;
+  courseLessonId?: string | null;
 }
 
 export async function listVideoForms(projectId: string): Promise<VideoForm[]> {

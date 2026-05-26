@@ -92,12 +92,13 @@ export default function MarketingFAQ({
         {/* Audio modality — narrate every Q&A in order. Self-gates: the
             narrator returns null when speechSynthesis isn't available
             or the items list is empty. */}
-        <TextNarrator
-          text={textFromFAQ(items)}
-          preferenceKey={`faq.${schemaId}`}
-          compact
-          className="mb-6"
-        />
+        <div className="flex justify-center mb-6">
+          <TextNarrator
+            text={textFromFAQ(items)}
+            preferenceKey={`faq.${schemaId}`}
+            label="Listen to FAQs"
+          />
+        </div>
 
         <Accordion type="single" collapsible className="w-full">
           {items.map((item, index) => (

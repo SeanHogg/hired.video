@@ -526,6 +526,17 @@ export default function ResumeDetail() {
                     <Edit className="w-4 h-4" />
                   </Button>
                 )}
+                {/* Listen-to-this-resume pill — slots inline with the
+                    toolbar buttons. Self-gates: returns null when Web
+                    Speech is unavailable or the resume has no
+                    narratable content. */}
+                {resume && (
+                  <TextNarrator
+                    text={textFromResume(resume)}
+                    preferenceKey={`resume.${resume.id}`}
+                    label="Listen"
+                  />
+                )}
                 {resume?.userId && !isSample && (
                   <Button
                     variant="outline"
@@ -731,15 +742,6 @@ export default function ResumeDetail() {
           {resume && (
             <div className="flex">
               <div className="flex-1 min-w-0">
-                {/* Listen-to-this-resume player — narrates basics
-                    summary + work + education + projects + skills. */}
-                <div className="px-4 sm:px-6 pt-4">
-                  <TextNarrator
-                    text={textFromResume(resume)}
-                    preferenceKey={`resume.${resume.id}`}
-                    compact
-                  />
-                </div>
                 <DeclarativeResumeRenderer
                   resume={resume}
                   descriptor={descriptor}

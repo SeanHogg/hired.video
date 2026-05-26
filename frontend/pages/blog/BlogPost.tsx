@@ -132,14 +132,15 @@ export default function BlogPost() {
             {post.description}
           </p>
 
-          {/* Listen-to-this-article player. Self-gates: returns null when
+          {/* Listen-to-this-article pill. Self-gates: returns null when
               Web Speech is unavailable or the body is empty. */}
-          <TextNarrator
-            text={narrationText}
-            preferenceKey={`blog.${post.slug}`}
-            compact
-            className="mb-8"
-          />
+          <div className="mb-8">
+            <TextNarrator
+              text={narrationText}
+              preferenceKey={`blog.${post.slug}`}
+              label="Listen to this article"
+            />
+          </div>
 
 
           {/* Inline person previews — for candidate-profile-focused articles. */}

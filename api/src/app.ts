@@ -69,6 +69,7 @@ import { locationRoutes } from "./routes/locations.js";
 import { adminRoutes } from "./routes/admin.js";
 import { adminR2Routes } from "./routes/admin-r2.js";
 import { adminWorkerRoutes } from "./routes/admin-workers.js";
+import { adminCourseRoutes } from "./routes/admin-courses.js";
 import { superadminRoutes } from "./routes/superadmin/index.js";
 import { paymentRoutes } from "./routes/payment.js";
 import { payoutRoutes } from "./routes/payouts.js";
@@ -587,6 +588,7 @@ export function createApp() {
   app.route("/api/admin/impersonate", superadminRoutes);
   app.route("/api/admin/r2", adminR2Routes);
   app.route("/api/admin/workers", adminWorkerRoutes);
+  app.route("/api/admin/courses", adminCourseRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);

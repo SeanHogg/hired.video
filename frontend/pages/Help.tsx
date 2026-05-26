@@ -214,14 +214,15 @@ export default function Help() {  const location = useLocation();
 
                 {/* Listen to every visible Q&A. Self-gates: returns
                     null when no FAQs match the active search. */}
-                <TextNarrator
-                  text={textFromFAQ(
-                    filteredFaqs.flatMap((c) => c.questions),
-                  )}
-                  preferenceKey={`help.faq${searchQuery ? `.${searchQuery}` : ""}`}
-                  compact
-                  className="max-w-3xl mx-auto"
-                />
+                <div className="flex justify-center">
+                  <TextNarrator
+                    text={textFromFAQ(
+                      filteredFaqs.flatMap((c) => c.questions),
+                    )}
+                    preferenceKey={`help.faq${searchQuery ? `.${searchQuery}` : ""}`}
+                    label="Listen to FAQs"
+                  />
+                </div>
 
                 {filteredFaqs.length > 0 ? (
                   <div className="space-y-8">

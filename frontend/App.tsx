@@ -162,6 +162,7 @@ const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplat
 const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
 const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
 const CourseLearner = lazy(() => import("./pages/CourseLearner"));
+const CourseReviewQueue = lazy(() => import("./pages/CourseReviewQueue"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
@@ -940,6 +941,10 @@ const App = () => (
                           self-gates on the requester owning the
                           enrollment row (API 404s otherwise). */}
                       <Route path="/learn/:enrollmentId" element={<CourseLearner />} />
+                      {/* #1502 — Reviewer inbox. Lists every course
+                          status='in_review' assigned to the calling
+                          user; SuperAdmin sees the full queue. */}
+                      <Route path="/courses/review-queue" element={<CourseReviewQueue />} />
                       {/* Public certificate verification surface — shared
                           via LinkedIn, recruiter emails, etc. The page
                           self-fetches /api/verify/:certNumber and renders

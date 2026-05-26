@@ -102,6 +102,8 @@ export interface SpeakOptions {
   text: string;
   voiceId?: string;
   rate?: number;
+  /** Output gain in 0..1. Defaults to 1 (full volume). */
+  volume?: number;
   onBoundary?: (wordIndex: number) => void;
   onEnd?: () => void;
   onError?: (error: string) => void;
@@ -123,6 +125,9 @@ export function speak(opts: SpeakOptions): () => void {
   }
 
   utterance.rate = opts.rate ?? 1;
+  if (typeof opts.volume === "number") {
+    utterance.volume = Math.max(0, Math.min(1, opts.volume));
+  }
 
   // Track word boundaries for highlighting
   if (opts.onBoundary) {

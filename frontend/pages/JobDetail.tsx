@@ -385,28 +385,29 @@ export default function JobDetail() {
               <TimeToHireCard jobId={job.id} />
             </div>
 
-            {/* Listen-to-this-job player — narrates title, description,
+            {/* Listen-to-this-job pill — narrates title, description,
                 and every bullet list a job posting carries. */}
-            <TextNarrator
-              text={textFromJobDescription({
-                title: job.data.title,
-                company: job.data.company?.name,
-                description: job.data.description,
-                responsibilities: job.data.responsibilities,
-                requirements: job.data.requirements?.map((r) =>
-                  [r.skill, r.level, r.required ? "(required)" : null]
-                    .filter(Boolean)
-                    .join(" "),
-                ),
-                qualifications: job.data.qualifications,
-                benefits: job.data.benefits?.map((b) =>
-                  [b.type, b.description].filter(Boolean).join(": "),
-                ),
-              })}
-              preferenceKey={`job.${job.id}`}
-              compact
-              className="mb-4"
-            />
+            <div className="mb-4">
+              <TextNarrator
+                text={textFromJobDescription({
+                  title: job.data.title,
+                  company: job.data.company?.name,
+                  description: job.data.description,
+                  responsibilities: job.data.responsibilities,
+                  requirements: job.data.requirements?.map((r) =>
+                    [r.skill, r.level, r.required ? "(required)" : null]
+                      .filter(Boolean)
+                      .join(" "),
+                  ),
+                  qualifications: job.data.qualifications,
+                  benefits: job.data.benefits?.map((b) =>
+                    [b.type, b.description].filter(Boolean).join(": "),
+                  ),
+                })}
+                preferenceKey={`job.${job.id}`}
+                label="Listen to this job"
+              />
+            </div>
 
             <DeclarativeJobRenderer
               job={{

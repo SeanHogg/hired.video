@@ -565,17 +565,18 @@ export default function CompanyDetail() {
                     {/* Listen to the company overview — description +
                         mission + vision, all in one read. Self-gates on
                         empty content. */}
-                    <TextNarrator
-                      text={textFromCompanyAbout({
-                        name: company.data.name,
-                        description: company.data.description,
-                        mission: company.data.mission,
-                        vision: company.data.vision,
-                      })}
-                      preferenceKey={`company.${company.id}`}
-                      compact
-                      className="mb-4"
-                    />
+                    <div className="mb-4">
+                      <TextNarrator
+                        text={textFromCompanyAbout({
+                          name: company.data.name,
+                          description: company.data.description,
+                          mission: company.data.mission,
+                          vision: company.data.vision,
+                        })}
+                        preferenceKey={`company.${company.id}`}
+                        label="Listen to overview"
+                      />
+                    </div>
 
                     {company.data.description ? (
                       <p className="whitespace-pre-line text-sm leading-relaxed">

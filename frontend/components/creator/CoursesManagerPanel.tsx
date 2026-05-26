@@ -14,6 +14,8 @@ import { creatorService, type CreatorProfile } from "@/lib/services/creator-serv
 import MediaPicker from "@/components/shared/MediaPicker";
 import CourseContentEditor from "@/components/creator/CourseContentEditor";
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
+import { studioTemplatesService, type StudioTemplate } from "@/lib/services/studio-templates-service";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Mode = "list" | "edit";
 
@@ -48,6 +50,15 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
   const [priceDollars, setPriceDollars] = useState("");
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  // #1502 — optional reviewer-uuid input. Blank = open queue (any
+  // SuperAdmin in the review pool can claim).
+  const [reviewerUserId, setReviewerUserId] = useState("");
+  // #1501 — theme picker. `null` = platform default; otherwise the
+  // user's owned studio_template row supplies the SCORM-player chrome
+  // tokens. Loaded once on mount via studioTemplatesService.
+  const [themeId, setThemeId] = useState<string | null>(null);
+  const [availableThemes, setAvailableThemes] = useState<StudioTemplate[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated) { setLoading(false); return; }
@@ -59,11 +70,16 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     Promise.all([
       courseService.listMine().catch(() => [] as Course[]),
       profileFetch,
+      // #1501 — themes are populated from the user's owned studio
+      // templates. Anonymous failure is fine; the picker just renders
+      // only the platform-default option.
+      studioTemplatesService.listMine().catch(() => [] as StudioTemplate[]),
     ])
-      .then(([list, c]) => {
+      .then(([list, c, themes]) => {
         if (cancelled) return;
         setCourses(list);
         setCreator(c);
+        setAvailableThemes(themes);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -78,6 +94,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setTagsInput("");
     setCoverImageUrl("");
     setPriceDollars("");
+    setThemeId(null);
+    setReviewerUserId("");
     setMode("edit");
   };
 
@@ -90,6 +108,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     setTagsInput((c.tags ?? []).join(", "));
     setCoverImageUrl(c.coverImageUrl ?? "");
     setPriceDollars(c.priceCents ? (c.priceCents / 100).toFixed(2) : "");
+    setThemeId(c.themeId ?? null);
+    setReviewerUserId(c.assignedReviewerId ?? "");
     setMode("edit");
   };
 
@@ -130,6 +150,7 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
     tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
     coverImageUrl: coverImageUrl.trim() || undefined,
     priceCents: priceDollars ? Math.round(parseFloat(priceDollars) * 100) : undefined,
+    themeId: themeId,
   });
 
   const save = async () => {
@@ -175,6 +196,32 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
       toast({ title: "Publish failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const submitForReview = async () => {
+    if (!editing) {
+      toast({ title: "Save the draft first", variant: "destructive" });
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const updated = await courseService.submitForReview(
+        editing.id,
+        reviewerUserId.trim() || null,
+      );
+      setCourses((cur) => cur.map((c) => (c.id === updated.id ? updated : c)));
+      setEditing(updated);
+      toast({
+        title: "Submitted for review",
+        description: reviewerUserId.trim()
+          ? "Assigned reviewer will see it in their queue at /courses/review-queue."
+          : "Open for any SuperAdmin reviewer to claim from /courses/review-queue.",
+      });
+    } catch (e: unknown) {
+      toast({ title: "Submit failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -335,6 +382,30 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
             <Label htmlFor="summary">Summary</Label>
             <Input id="summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One-line pitch shown on the course card" />
           </div>
+          {/* #1501 — Theme picker. Pulls from the author's owned studio
+              templates; the platform default is always available. */}
+          <div className="space-y-1">
+            <Label htmlFor="theme">Theme (optional)</Label>
+            <Select
+              value={themeId ?? "__none__"}
+              onValueChange={(v) => setThemeId(v === "__none__" ? null : v)}
+            >
+              <SelectTrigger id="theme">
+                <SelectValue placeholder="Platform default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Platform default</SelectItem>
+                {availableThemes.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Themes from your studio template marketplace listings; supplies
+              the SCORM player chrome's background, text, accent, and border
+              colors.
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label htmlFor="cat">Category</Label>
@@ -363,6 +434,21 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
             />
           </div>
 
+          {/* #1502 — Optional named reviewer for in-review workflow.
+              Blank = open queue for any SuperAdmin. We accept a raw
+              UUID for now; richer user-picker is tracked as #1571. */}
+          {editing && (
+            <div className="space-y-1 pt-2 border-t">
+              <Label htmlFor="reviewer-id" className="text-xs">Reviewer (optional)</Label>
+              <Input
+                id="reviewer-id"
+                value={reviewerUserId}
+                onChange={(e) => setReviewerUserId(e.target.value)}
+                placeholder="User UUID — leave blank to send to any SuperAdmin"
+                className="text-xs"
+              />
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2 pt-2 border-t">
             <div className="text-xs text-muted-foreground">
               {editing ? `Status: ${editing.status}` : "Unsaved draft"}
@@ -372,6 +458,16 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                 Save draft
               </Button>
+              {editing && editing.status !== "published" && editing.status !== "in_review" && (
+                <Button
+                  variant="outline"
+                  onClick={() => void submitForReview()}
+                  disabled={submittingReview}
+                >
+                  {submittingReview ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  Submit for review
+                </Button>
+              )}
               <Button onClick={publish} disabled={publishing || !editing}>
                 {publishing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
                 Publish

@@ -1,15 +1,15 @@
 /**
- * EngagementToolset — the four engagement dialogs (Chapters,
- * Thumbnails, in-video Forms, Review Comments) bundled as one
- * drop-in cluster. Each child renders its own trigger button + dialog
- * and self-gates on its own preconditions, so the toolset itself just
+ * EngagementToolset — the four engagement authoring dialogs (Chapters,
+ * Thumbnails, in-video Forms, Review Comments) bundled as one drop-in
+ * cluster. Each child renders its own trigger button + dialog and
+ * self-gates on its own preconditions, so the toolset itself just
  * needs primitive props and a saved project.
  *
- * Why this exists: the V2 editor's ActionsPanel and the Details side
- * panel both want this exact same four-button cluster. Defining the
- * cluster once here keeps both surfaces in sync — adding a fifth
- * engagement tool (in-video CTAs, NPS prompts, etc.) lands once and
- * shows up everywhere automatically (DRY rule).
+ * Editor-only host: this is mounted from the V2 editor's ActionsPanel,
+ * where the host has canvas state to bind authored assets back to. The
+ * Globe + Details drawer renders viewer *results* via
+ * EngagementResultsPanel instead — authoring there would orphan the
+ * artifact (no scene to anchor it to).
  *
  * Self-gates: returns `null` when there's no persisted projectId — the
  * dialogs all need a server-side row to write against.
@@ -32,10 +32,8 @@ const ReviewCommentsDialog = lazy(
 
 interface Props {
   projectId: string | null;
-  /** Compiled scene boundaries — pass them when the host has canvas
-   *  state (editor). Omitted hosts (the Details panel summoned from
-   *  the landing page) get manual chapter authoring instead of the
-   *  auto-seed flow. */
+  /** Compiled scene boundaries — used to auto-seed chapters from the
+   *  storyboard the first time the Chapters dialog opens. */
   sceneBoundaries?: SceneBoundary[];
   /** Rendered video URL — drives the Thumbnails dialog's frame
    *  extraction. The dialog self-gates to a disabled state until a
@@ -48,9 +46,6 @@ interface Props {
   /** Current preview playhead. Lets a new review comment anchor to
    *  the user's current scrub position. Defaults to 0 (general). */
   currentTimeSec?: number;
-  /** Optional layout knob — the editor lays the 4 triggers out in a
-   *  grid of two columns; the Details panel stacks them. */
-  className?: string;
 }
 
 export default function EngagementToolset({
@@ -59,11 +54,10 @@ export default function EngagementToolset({
   videoUrl,
   durationSec,
   currentTimeSec,
-  className,
 }: Props) {
   if (!projectId) return null;
   return (
-    <div className={className}>
+    <>
       <Suspense fallback={null}>
         <ChapterEditor
           projectId={projectId}
@@ -80,6 +74,6 @@ export default function EngagementToolset({
           currentTimeSec={currentTimeSec}
         />
       </Suspense>
-    </div>
+    </>
   );
 }

@@ -22,6 +22,16 @@ export interface Course {
   platformFeeBps: number;
   issuesCertificate: boolean;
   passingScorePct: number | null;
+  /** #1502 — UUID of the user this course is assigned to for review.
+   *  null when in draft / not yet submitted. */
+  assignedReviewerId?: string | null;
+  /** #1501 — Pointer to a studio_template marketplace row supplying the
+   *  branding tokens for the SCORM player chrome + the public course
+   *  card. Null = platform default. */
+  themeId?: string | null;
+  /** #1501 — Inline override map for theme tokens (merges over the
+   *  themeId base). Shape mirrors the studio brand-kit JSON. */
+  themeTokens?: Record<string, string> | null;
   enrollmentCount: number;
   completionCount: number;
   averageRating: number | null;
@@ -43,10 +53,16 @@ export interface CreateCourseInput {
   priceVisible?: boolean;
   issuesCertificate?: boolean;
   passingScorePct?: number;
+  /** #1501 */
+  themeId?: string | null;
+  themeTokens?: Record<string, string> | null;
 }
 
 export interface UpdateCourseInput extends Partial<CreateCourseInput> {
   slug?: string;
+  /** #1502 — set when the author submits the course for review or
+   *  when SuperAdmin reassigns. Pass null to clear the assignment. */
+  assignedReviewerId?: string | null;
 }
 
 export type CourseLessonSourceType =
@@ -250,6 +266,17 @@ export const courseService = {
   async unpublish(id: string): Promise<Course> {
     const res = await apiClient.post<Course>(`/api/courses/${id}/unpublish`, {});
     return res.data;
+  },
+
+  // #1502 — review workflow.
+  async submitForReview(id: string, assignedReviewerId: string | null = null): Promise<Course> {
+    const res = await apiClient.post<Course>(`/api/courses/${id}/submit-for-review`, { assignedReviewerId });
+    return res.data;
+  },
+
+  async listReviewQueue(): Promise<Course[]> {
+    const res = await apiClient.get<Course[]>("/api/courses/review-queue");
+    return res.data ?? [];
   },
 
   async remove(id: string): Promise<void> {
