@@ -48,6 +48,7 @@ const ExportBlockSchema = z.object({
   format: z.enum(["plain", "markdown"]).optional(),
   charLimit: z.number().optional(),
   openTargetUrl: z.string().optional(),
+  autofillSelector: z.string().optional(),
 });
 export type ExportBlock = z.infer<typeof ExportBlockSchema>;
 

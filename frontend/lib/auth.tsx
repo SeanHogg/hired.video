@@ -211,7 +211,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
             if (bootstrap?.verification) {
               setIsEmailVerified(bootstrap.verification.emailConfirmed);
               if (!bootstrap.verification.emailConfirmed) {
-                await maybeResendVerificationEmail();
+                await maybeResendVerificationEmail(bootstrap.verification.sentAt);
               }
             } else {
               const status = await authService.getVerificationStatus();

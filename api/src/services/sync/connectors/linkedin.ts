@@ -21,6 +21,16 @@ import { renderDefaultBlocks } from "./default-blocks.js";
 const LINKEDIN_HEADLINE_LIMIT = 220;
 const LINKEDIN_ABOUT_LIMIT = 2_600;
 
+// LinkedIn DOM selectors for the edit modals. The user must open the
+// modal (click the pencil icon) before clicking Auto-fill — this
+// connector NEVER opens modals or saves automatically. ARIA labels are
+// more durable than auto-generated ids; we still expect drift over
+// time, hence per-vendor maintenance is tracked in the gap register.
+const LINKEDIN_AUTOFILL: Record<string, string> = {
+  Headline: 'input[aria-label*="Headline" i], input[id*="single-line-text" i]',
+  About: 'textarea[aria-label*="About" i], textarea[aria-label*="Summary" i]',
+};
+
 export const linkedinConnector: VendorConnector = {
   id: "linkedin",
   label: "LinkedIn",
@@ -30,17 +40,28 @@ export const linkedinConnector: VendorConnector = {
     "Sync your master resume to your LinkedIn profile — keep headline, about, experience, and skills aligned.",
   editProfileUrl: "https://www.linkedin.com/in/me/edit/intro/",
   supportsExtensionExtract: true,
-  supportsExtensionWrite: false,
+  // Headline + About write-back via DOM autofill (one field at a time,
+  // user-initiated, requires the LinkedIn edit modal to be open). Other
+  // sections (Experience, Skills) still paste-only — see gap #1420.
+  supportsExtensionWrite: true,
 
   renderExportBlocks(content: ResumeContent): ExportBlock[] {
     const base = renderDefaultBlocks(content);
 
     const adjusted = base.map<ExportBlock>((block) => {
       if (block.section === "Headline") {
-        return { ...block, charLimit: LINKEDIN_HEADLINE_LIMIT };
+        return {
+          ...block,
+          charLimit: LINKEDIN_HEADLINE_LIMIT,
+          autofillSelector: LINKEDIN_AUTOFILL.Headline,
+        };
       }
       if (block.section === "About") {
-        return { ...block, charLimit: LINKEDIN_ABOUT_LIMIT };
+        return {
+          ...block,
+          charLimit: LINKEDIN_ABOUT_LIMIT,
+          autofillSelector: LINKEDIN_AUTOFILL.About,
+        };
       }
       // Drop the default flat Skills block — replaced below by per-skill
       // blocks so the user can paste each into LinkedIn's typeahead.

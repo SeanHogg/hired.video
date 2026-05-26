@@ -22,17 +22,21 @@ import { setInboxSeed } from "../inbox-seed";
 
 // `TokenBudget` + `InboxResponse` are interfaces, not Zod schemas — we
 // pass-through validate with `z.unknown()` so server-side schema changes
-// don't fail-closed the whole bootstrap. Consumers downstream are already
-// typed against the canonical interfaces and will reject on use if the
-// shape regresses.
+// don't fail-closed the whole bootstrap, then cast via `.transform` to the
+// canonical interface so consumers see a typed payload. Downstream code
+// will reject on use if the shape regresses.
 const BootstrapResponseSchema = z.object({
   verification: z
     .object({
       email: z.string(),
       emailConfirmed: z.boolean(),
+      sentAt: z.string().optional(),
     })
     .nullable(),
-  tokenBudget: z.unknown().nullable(),
+  tokenBudget: z
+    .unknown()
+    .nullable()
+    .transform((v) => v as TokenBudget | null),
   featureFlags: z.object({
     flags: z.array(FeatureFlagSchema),
     userFlags: z.record(z.string(), z.boolean()),
@@ -44,9 +48,7 @@ const BootstrapResponseSchema = z.object({
   serverTime: z.string(),
 });
 
-export type BootstrapPayload = z.infer<typeof BootstrapResponseSchema> & {
-  tokenBudget: TokenBudget | null;
-};
+export type BootstrapPayload = z.infer<typeof BootstrapResponseSchema>;
 
 /** Fetch the bootstrap aggregate. Caller is responsible for triggering this
  *  ONCE on AuthProvider mount; the per-slice services + hooks pull from the

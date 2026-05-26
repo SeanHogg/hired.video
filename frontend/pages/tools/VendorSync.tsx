@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Chrome, Loader2 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
@@ -47,12 +48,20 @@ type CategoryFilter = VendorCategory | "all";
 export default function VendorSync() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [connectors, setConnectors] = useState<VendorConnectorListItem[]>([]);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // The jobseeker Chrome extension's side panel deep-links here as
+  // `?autoSync=<connectorId>` when the user clicks "Sync to master" on
+  // its profile-detected banner. Auto-fire the same handler the cards
+  // call so the user doesn't have to scroll + click again.
+  const autoSyncConnectorId = searchParams.get("autoSync");
+  const autoSyncFiredRef = useRef(false);
 
   // Import-merge dialog state — populated when an extension push lands.
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
@@ -110,6 +119,38 @@ export default function VendorSync() {
     pendingConnectorRef.current = connectorId;
     send("vendor-sync:request-focused-html", { connectorId });
   }, [send]);
+
+  // Auto-fire the sync when the extension deep-links us with
+  // ?autoSync=<id>. Wait until both (a) connectors have loaded so we
+  // can validate the id and (b) a resume is selected so the import
+  // route accepts the request. Strip the param after firing so a
+  // refresh doesn't re-trigger.
+  useEffect(() => {
+    if (autoSyncFiredRef.current) return;
+    if (!autoSyncConnectorId) return;
+    if (loading) return;
+    if (!isAuthenticated) return;
+    if (!selectedResumeId) return;
+    const connector = connectors.find((c) => c.id === autoSyncConnectorId);
+    if (!connector) return;
+    if (!connector.supportsExtensionExtract) {
+      toast({
+        title: `${connector.label} doesn't support extension sync yet`,
+        description: "Use the paste-ready blocks instead.",
+        variant: "destructive",
+      });
+      autoSyncFiredRef.current = true;
+      return;
+    }
+    autoSyncFiredRef.current = true;
+    handleRequestExtensionSync(connector.id);
+    const next = new URLSearchParams(searchParams);
+    next.delete("autoSync");
+    setSearchParams(next, { replace: true });
+  }, [
+    autoSyncConnectorId, loading, isAuthenticated, selectedResumeId,
+    connectors, handleRequestExtensionSync, searchParams, setSearchParams, toast,
+  ]);
 
   // Bridge listener: handle the broadcast back. Calls the import API,
   // pops the merge dialog with the analysis. The whole flow doesn't

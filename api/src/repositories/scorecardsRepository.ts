@@ -81,6 +81,23 @@ export interface OverdueSubmission {
   escalatedAt: Date | null;
 }
 
+/** Per-interviewer SLA reliability metrics (migration 0132 / gap #1434). */
+export interface InterviewerReliability {
+  evaluatorUserId: string;
+  /** Submissions with both `dueAt` AND `submittedAt` — basis for lag math. */
+  totalWithSla: number;
+  /** Count of those submitted at or before their `dueAt`. */
+  onTimeCount: number;
+  /** Count of those submitted after their `dueAt`. */
+  lateCount: number;
+  /** Currently overdue drafts (status='draft', dueAt < now). */
+  overdueDraftCount: number;
+  /** Average lag in ms (submittedAt - dueAt); positive = late, negative = early. */
+  avgLagMs: number | null;
+  /** Total submissions in last 30 days regardless of SLA. */
+  last30dCount: number;
+}
+
 export interface NewScorecardTemplate {
   companyId: string;
   createdByUserId: string;
@@ -284,6 +301,11 @@ export interface IScorecardsRepository {
     now: Date;
     remindWithinMs: number;
   }): Promise<OverdueSubmission[]>;
+  /** Aggregate reliability per interviewer (#1434). */
+  findReliabilityForUser(
+    evaluatorUserId: string,
+    now: Date,
+  ): Promise<InterviewerReliability>;
 }
 
 export class ScorecardsRepository implements IScorecardsRepository {
@@ -721,5 +743,58 @@ export class ScorecardsRepository implements IScorecardsRepository {
         remindedAt: r.remindedAt,
         escalatedAt: r.escalatedAt,
       }));
+  }
+
+  async findReliabilityForUser(
+    evaluatorUserId: string,
+    now: Date,
+  ): Promise<InterviewerReliability> {
+    const rows = (await this.db
+      .select()
+      .from(scorecardSubmissions)
+      .where(
+        eq(scorecardSubmissions.evaluatorUserId, evaluatorUserId),
+      )) as ScorecardSubmissionRow[];
+
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    let totalWithSla = 0;
+    let onTimeCount = 0;
+    let lateCount = 0;
+    let overdueDraftCount = 0;
+    let last30dCount = 0;
+    let lagSumMs = 0;
+    let lagCount = 0;
+
+    for (const r of rows) {
+      const created = r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt);
+      if (created >= thirtyDaysAgo) last30dCount++;
+
+      if (r.status === "draft" && r.dueAt != null && r.dueAt < now) {
+        overdueDraftCount++;
+        continue;
+      }
+      if (r.status !== "submitted") continue;
+      if (r.dueAt == null || r.submittedAt == null) continue;
+
+      const due = r.dueAt instanceof Date ? r.dueAt : new Date(r.dueAt);
+      const submitted =
+        r.submittedAt instanceof Date ? r.submittedAt : new Date(r.submittedAt);
+      const lag = submitted.getTime() - due.getTime();
+      totalWithSla++;
+      lagSumMs += lag;
+      lagCount++;
+      if (lag <= 0) onTimeCount++;
+      else lateCount++;
+    }
+
+    return {
+      evaluatorUserId,
+      totalWithSla,
+      onTimeCount,
+      lateCount,
+      overdueDraftCount,
+      avgLagMs: lagCount > 0 ? Math.round(lagSumMs / lagCount) : null,
+      last30dCount,
+    };
   }
 }

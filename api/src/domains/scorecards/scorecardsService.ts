@@ -23,6 +23,7 @@ import {
   type HiringDecisionRow,
   type CompetencyRow,
   type CompetencyLevelRow,
+  type InterviewerReliability,
   type UpdateAttributePatch,
   type UpdateStagePatch,
 } from "../../repositories/scorecardsRepository.js";
@@ -674,6 +675,82 @@ export class ScorecardsService {
           )
         : [];
     return { ...comp, levels };
+  }
+
+  // ─── Reliability (#1434) ──────────────────────────────────────────────────
+
+  /**
+   * Caller may read their OWN reliability without extra checks (every
+   * interviewer can see their own stats). To read someone else's stats,
+   * the caller must share at least one company scope with the target —
+   * we already trust company-scope as the visibility boundary for the
+   * rest of the scorecards aggregate.
+   */
+  async getReliability(
+    userId: string,
+    targetUserId: string,
+    now: Date = this.now(),
+  ): Promise<InterviewerReliability> {
+    if (userId !== targetUserId) {
+      const callerScopes = await this.deps.getCompanyIdsForUser(userId);
+      const targetScopes = await this.deps.getCompanyIdsForUser(targetUserId);
+      const shared = callerScopes.some((c) => targetScopes.includes(c));
+      if (!shared) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "No shared workspace with this user",
+        );
+      }
+    }
+    return this.deps.repo.findReliabilityForUser(targetUserId, now);
+  }
+
+  // ─── Scorecard assignments (#1435) ────────────────────────────────────────
+
+  /**
+   * Recruiter-initiated assignment: pre-creates a draft submission keyed
+   * to (templateId, applicationId, evaluatorUserId) with the SLA `dueAt`.
+   * The evaluator's later `ScorecardSubmissionForm.ensureSubmission` then
+   * matches this draft by querying `listSubmissions({ applicationId })`
+   * and resuming it instead of creating a new row.
+   *
+   * Idempotent against (applicationId, evaluatorUserId, templateId): if a
+   * draft already exists, the dueAt is updated and the existing row is
+   * returned (no duplicate drafts).
+   */
+  async assignSubmission(
+    userId: string,
+    input: {
+      templateId: string;
+      applicationId: string;
+      evaluatorUserId: string;
+      kitStageId?: string;
+      candidateUserId?: string;
+      dueAt: Date;
+    },
+  ): Promise<ScorecardSubmissionRow> {
+    const tpl = await this.loadTemplate(userId, input.templateId);
+    const existing = await this.deps.repo.findSubmissionsForApplication(
+      input.applicationId,
+    );
+    const match = existing.find(
+      (s) =>
+        s.templateId === input.templateId &&
+        s.evaluatorUserId === input.evaluatorUserId &&
+        s.status === "draft",
+    );
+    if (match) {
+      return this.deps.repo.updateSubmission(match.id, { dueAt: input.dueAt });
+    }
+    return this.deps.repo.insertSubmission({
+      templateId: input.templateId,
+      applicationId: input.applicationId,
+      evaluatorUserId: input.evaluatorUserId,
+      kitStageId: input.kitStageId,
+      candidateUserId: input.candidateUserId,
+      status: "draft",
+      dueAt: input.dueAt,
+    });
   }
 
   async updateCompetency(

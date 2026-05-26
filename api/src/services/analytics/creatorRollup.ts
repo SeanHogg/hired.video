@@ -108,7 +108,10 @@ export async function buildCreatorRollup(userId: string): Promise<CreatorRollup>
     .from(schema.artifactViews)
     .where(eq(schema.artifactViews.ownerUserId, userId));
 
-  // Cross-artifact country histogram.
+  // Cross-artifact country histogram. Hard-cap at 250 distinct countries —
+  // there are 249 ISO-3166 codes so any creator will hit the practical ceiling
+  // long before the cap matters; the bound guards against malformed/spoofed
+  // codes inflating the result set (gap #1333).
   const countryRows = await db
     .select({
       country: schema.artifactViews.ipCountry,
@@ -117,18 +120,29 @@ export async function buildCreatorRollup(userId: string): Promise<CreatorRollup>
     .from(schema.artifactViews)
     .where(eq(schema.artifactViews.ownerUserId, userId))
     .groupBy(schema.artifactViews.ipCountry)
-    .orderBy(desc(count()));
+    .orderBy(desc(count()))
+    .limit(250);
   const countries = countryRows.map((r) => ({
     country: (r.country ?? "ZZ").toUpperCase(),
     views: Number(r.views ?? 0),
   }));
 
-  // Cross-artifact referrer rollup (hostname-collapsed in app code so
-  // SQL doesn't need to know about URL parsing).
+  // Cross-artifact referrer rollup (gap #1333). Previously fetched EVERY
+  // referrer row for the user — a creator with 1M+ views OOMed the Worker
+  // (128 MB limit). Now: GROUP BY in SQL + LIMIT 500 distinct referrer URLs,
+  // then hostname-collapse in app code (URL parsing isn't portable across
+  // Postgres versions). The 500-row cap bounds Worker memory; the JS
+  // aggregation collapses subdomain churn into ~10–50 final hostnames.
   const referrerRows = await db
-    .select({ referrer: schema.artifactViews.referrer })
+    .select({
+      referrer: schema.artifactViews.referrer,
+      views: count(),
+    })
     .from(schema.artifactViews)
-    .where(eq(schema.artifactViews.ownerUserId, userId));
+    .where(eq(schema.artifactViews.ownerUserId, userId))
+    .groupBy(schema.artifactViews.referrer)
+    .orderBy(desc(count()))
+    .limit(500);
   const referrerCounts = new Map<string, number>();
   for (const r of referrerRows) {
     const raw = r.referrer?.trim();
@@ -140,7 +154,7 @@ export async function buildCreatorRollup(userId: string): Promise<CreatorRollup>
         source = raw.slice(0, 100);
       }
     }
-    referrerCounts.set(source, (referrerCounts.get(source) ?? 0) + 1);
+    referrerCounts.set(source, (referrerCounts.get(source) ?? 0) + Number(r.views ?? 0));
   }
   const referrers = Array.from(referrerCounts.entries())
     .map(([source, c]) => ({ source, views: c }))

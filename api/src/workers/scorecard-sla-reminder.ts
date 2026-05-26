@@ -15,7 +15,9 @@
 
 import { ScorecardsRepository } from "../repositories/scorecardsRepository.js";
 import { NotificationsRepository } from "../repositories/notificationsRepository.js";
+import { UsersRepository } from "../repositories/usersRepository.js";
 import { getDb } from "../db/index.js";
+import { sendGenericEmail } from "../services/adapters/email.js";
 import type { WorkerDefinition, WorkerRunContext } from "./types.js";
 import {
   planScorecardReminderSweep,
@@ -31,6 +33,7 @@ async function run(ctx: WorkerRunContext): Promise<void> {
   const db = getDb();
   const repo = new ScorecardsRepository(db);
   const notifications = new NotificationsRepository(db);
+  const users = new UsersRepository(db);
   const now = new Date();
 
   const overdue = await repo.findOverdueDraftSubmissions({
@@ -40,23 +43,44 @@ async function run(ctx: WorkerRunContext): Promise<void> {
   ctx.recordScanned(overdue.length);
   if (overdue.length === 0) return;
 
-  // Dispatch via the existing notifications repository — same channel
-  // the recruiter coffee + connection flows use. Email is a separate
-  // follow-on (see #1383 README entry — would layer a SendPulse call
-  // alongside this insert, identical to the coffee-request pattern).
+  // Dispatch via the existing notifications repository (same channel as
+  // coffee + connection flows) AND, when the recipient has a usable
+  // email, via the SendPulse adapter. `sendGenericEmail` no-ops + logs
+  // when no provider is configured, so the worker stays safe in tests +
+  // dev environments without SendPulse creds.
   const dispatch: ReminderDispatcher = async (action) => {
     const remind = action.kind === "remind";
+    const title = remind
+      ? "Scorecard due soon"
+      : "Scorecard overdue — please submit";
+    const message = remind
+      ? "Your interview scorecard is due in the next 4 hours."
+      : "Your interview scorecard is more than 24 hours overdue and has been escalated.";
+
     await notifications.insertNotification({
       userId: action.recipientUserId,
       type: remind ? "scorecard_reminder" : "scorecard_overdue_escalation",
-      title: remind
-        ? "Scorecard due soon"
-        : "Scorecard overdue — please submit",
-      message: remind
-        ? "Your interview scorecard is due in the next 4 hours."
-        : "Your interview scorecard is more than 24 hours overdue and has been escalated.",
+      title,
+      message,
       data: { submissionId: action.submissionId } as any,
     } as any);
+
+    // Email is best-effort — failures don't block the notification or
+    // the row updates, and an absent provider just logs a warning.
+    try {
+      const user = await users.findById(action.recipientUserId).catch(() => null);
+      if (user?.email) {
+        await sendGenericEmail(
+          user.email,
+          title,
+          `<p>${message}</p>
+           <p>Submission ID: <code>${action.submissionId}</code></p>
+           <p>Open Hired.Video to complete it.</p>`,
+        );
+      }
+    } catch (err: any) {
+      ctx.recordFailure(action.submissionId, `email-dispatch: ${err?.message ?? err}`);
+    }
   };
 
   const plan = planScorecardReminderSweep({

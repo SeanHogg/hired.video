@@ -79,6 +79,10 @@ bootstrapRoutes.get("/", async (c) => {
       ? {
           email: verificationResult.value.email,
           emailConfirmed: !!verificationResult.value.emailVerified,
+          // Matches /api/auth/verification-status — current request time
+          // stands in for "last sent" (the route already does this; the
+          // real cooldown source is the client's localStorage timestamp).
+          sentAt: new Date().toISOString(),
         }
       : null;
 

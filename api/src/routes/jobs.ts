@@ -14,6 +14,7 @@ import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { OptionalUrlSchema } from "../../../shared/validation.js";
+import { JOB_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import {
   createScreeningInterviewFromApply,
@@ -112,9 +113,13 @@ async function publicJobsFromQuery(
 }
 
 // Public listing endpoint. Frontend legacy calls /api/Job with query params.
+// Supports `?fields=id,title,slug,...` projection (gap #1370) so list views
+// don't drag the full job body over the wire — descriptions + JSONB
+// blobs alone are usually 10× the size of the card-view fields.
 jobRoutes.get("/", async (c) => {
   const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
-  return c.json(success(data));
+  const fields = parseFields(c.req.query("fields"), JOB_LIST_FIELDS);
+  return c.json(success({ ...data, items: projectRows(data.items, fields) }));
 });
 
 /** POST /api/jobs or /api/job — create a new job */
@@ -156,10 +161,11 @@ jobRoutes.get("/saved", async (c) => {
   return c.json(success(items));
 });
 
-/** GET /api/jobs/public — explicit public listing */
+/** GET /api/jobs/public — explicit public listing. Supports `?fields=` per #1370. */
 jobRoutes.get("/public", async (c) => {
   const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
-  return c.json(success(data));
+  const fields = parseFields(c.req.query("fields"), JOB_LIST_FIELDS);
+  return c.json(success({ ...data, items: projectRows(data.items, fields) }));
 });
 
 /** POST /api/Job/:id/save — save/bookmark a job */

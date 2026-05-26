@@ -35,7 +35,7 @@ import {
   Search,
   Loader2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +70,14 @@ import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { MyEventsAndCoffee } from "@/components/events/MyEventsAndCoffee";
-import { EventDiscoveryPanel } from "@/components/events/EventDiscoveryPanel";
+// Lazy-loaded so `leaflet` + `react-leaflet` (~250 KB minified) only land
+// in the bundle for users who hit the Discover tab on /tasks (gap #1366).
+// `EventDiscoveryPanel` is a named export — `.then` re-shapes to default.
+const EventDiscoveryPanel = lazy(() =>
+  import("@/components/events/EventDiscoveryPanel").then((m) => ({
+    default: m.EventDiscoveryPanel,
+  })),
+);
 import { TimesheetTab } from "@/components/timesheet/TimesheetTab";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -756,7 +763,9 @@ export default function Tasks() {
         {SurfaceTabsStrip}
         <div className="p-4 md:p-6">
           <div className="space-y-12">
-            <EventDiscoveryPanel />
+            <Suspense fallback={<div className="py-12 text-center text-sm text-muted-foreground">Loading map…</div>}>
+              <EventDiscoveryPanel />
+            </Suspense>
             <MarketingFAQ items={EVENTS_FAQ} schemaId="events" />
           </div>
         </div>

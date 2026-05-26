@@ -60,6 +60,13 @@ export interface ExportBlock {
    *  (e.g. GitHub Bio → /settings/profile; GitHub README → the special
    *  `<user>/<user>` repo, not settings). */
   openTargetUrl?: string;
+  /** Raw CSS selector inside the vendor's profile-edit modal that this
+   *  block's text should be typed into. When set, the block surfaces
+   *  an "Auto-fill" button that asks the extension to write `text`
+   *  into the matching element on the vendor tab. Single-field at a
+   *  time, user-initiated — the user opens the edit modal first; we
+   *  never auto-open modals or auto-save. */
+  autofillSelector?: string;
 }
 
 export interface VendorConnector {

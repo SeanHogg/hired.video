@@ -16,6 +16,7 @@ import {
   type StoredProfileSections,
 } from "../../../shared/profile-sections.js";
 import { isUuid } from "../../../shared/value-types.js";
+import { USER_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import type { UserActorRow } from "../repositories/usersRepository.js";
 import { splitName, toUserActor } from "../services/user/userActor.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
@@ -417,7 +418,13 @@ userRoutes.get("/public", async (c) => {
     },
   }));
 
-  return c.json(success({ items, total: items.length, page, limit }));
+  // `?fields=id,name,avatarUrl,headline,...` projection (gap #1370) — the
+  // /people directory card view only needs a handful of fields; clipping the
+  // payload here saves the skills JSON + creator-program flags on every
+  // call. Detail endpoints still return the full row.
+  const fields = parseFields(c.req.query("fields"), USER_LIST_FIELDS);
+  const projected = projectRows(items as unknown as Array<Record<string, unknown>>, fields);
+  return c.json(success({ items: projected, total: items.length, page, limit }));
 });
 
 /** GET /api/users/me — frontend compatibility endpoint */
