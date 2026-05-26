@@ -28,7 +28,13 @@ import type {
   SpeechBubbleWidgetParams,
   CaptionBoxWidgetParams,
   SfxBurstWidgetParams,
+  AvatarWidgetParams,
 } from "@/lib/studio/editor-v2/canvas-state";
+import { STOCK_PRESENTERS } from "@/lib/studio/avatar/presenters";
+import { TTS_ENGINES, type TtsEngineId } from "@/lib/services/tts-engines";
+const AvatarPreview = lazy(
+  () => import("@/components/studio/avatar/AvatarPreview"),
+);
 import { DEFAULT_CHROMA_KEY } from "@/lib/studio/chroma-key";
 import {
   LINKED_CONTENT_REGISTRY,
@@ -1439,6 +1445,70 @@ const SFX_BURST_CONTENT_SECTION: WidgetInspectorSection = {
   },
 };
 
+const AVATAR_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "content",
+  title: "Presenter",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "avatar") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<AvatarWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "avatar", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Presenter">
+          <SelectField<string>
+            value={data.presenterId}
+            options={STOCK_PRESENTERS.map((p) => ({ value: p.id, label: p.label }))}
+            onChange={(presenterId) => set({ presenterId })}
+          />
+        </Field>
+        <Field label="Script (what the avatar says)">
+          <AutoSizeTextarea
+            value={data.script}
+            onChange={(script) => set({ script })}
+            placeholder="Type or paste the line you want the avatar to deliver…"
+          />
+        </Field>
+        <Field label="TTS engine">
+          <SelectField<TtsEngineId>
+            value={(data.engine ?? "web-speech") as TtsEngineId}
+            options={TTS_ENGINES.map((e) => ({ value: e.id, label: e.label }))}
+            onChange={(engine) => set({ engine })}
+          />
+        </Field>
+        <Field label="Voice id (optional)">
+          <input
+            type="text"
+            value={data.voiceId ?? ""}
+            placeholder="Engine voice id or cloned-voice id"
+            onChange={(e) => set({ voiceId: e.target.value })}
+            className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
+          />
+        </Field>
+        <Field label="Speed">
+          <NumberField
+            value={data.speed ?? 1}
+            min={0.5}
+            max={2}
+            step={0.05}
+            onChange={(speed) => set({ speed })}
+          />
+        </Field>
+        <Suspense fallback={null}>
+          <AvatarPreview
+            presenterId={data.presenterId}
+            script={data.script}
+            engine={(data.engine ?? "web-speech") as TtsEngineId}
+            voiceId={data.voiceId}
+            speed={data.speed ?? 1}
+          />
+        </Suspense>
+      </div>
+    );
+  },
+};
+
 export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   text: [LAYOUT_SECTION, textContentSection("text"), ...SHARED_TAIL],
   heading: [LAYOUT_SECTION, textContentSection("heading"), ...SHARED_TAIL],
@@ -1460,6 +1530,7 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   "speech-bubble": [LAYOUT_SECTION, SPEECH_BUBBLE_CONTENT_SECTION, ...SHARED_TAIL],
   "caption-box":   [LAYOUT_SECTION, CAPTION_BOX_CONTENT_SECTION, ...SHARED_TAIL],
   "sfx-burst":     [LAYOUT_SECTION, SFX_BURST_CONTENT_SECTION, ...SHARED_TAIL],
+  avatar:          [LAYOUT_SECTION, AVATAR_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -1482,4 +1553,5 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   "speech-bubble": "Speech bubble",
   "caption-box": "Caption box",
   "sfx-burst": "SFX burst",
+  avatar: "AI Presenter",
 };

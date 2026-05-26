@@ -608,6 +608,19 @@ function widgetToEffect(widget: Widget): ClipEffect {
           shape: p.data.shape,
         },
       };
+    case "avatar":
+      return {
+        kind: "canvas-v2:avatar",
+        params: {
+          ...rect,
+          presenterId: p.data.presenterId,
+          script: p.data.script,
+          engine: p.data.engine ?? "web-speech",
+          voiceId: p.data.voiceId ?? "",
+          speed: p.data.speed ?? 1,
+          accentColor: p.data.accentColor ?? null,
+        },
+      };
   }
 }
 
@@ -1104,6 +1117,25 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
               params.shape === "lightning"
                 ? params.shape
                 : "star",
+          },
+        },
+      };
+    case "canvas-v2:avatar":
+      return {
+        ...base,
+        kind: "avatar",
+        params: {
+          kind: "avatar",
+          data: {
+            presenterId: stringOr(params.presenterId, "presenter-amber"),
+            script: stringOr(params.script, ""),
+            engine: (stringOr(params.engine, "web-speech") as import("../../services/tts-engines").TtsEngineId),
+            voiceId: stringOr(params.voiceId, "") || undefined,
+            speed: numberOr(params.speed, 1),
+            accentColor:
+              typeof params.accentColor === "string" && params.accentColor.length > 0
+                ? params.accentColor
+                : null,
           },
         },
       };

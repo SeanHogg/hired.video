@@ -31,6 +31,7 @@ import {
   MessageCircle,
   Captions,
   Zap,
+  UserCircle,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind, VoiceoverClip } from "@/lib/studio/editor-v2/canvas-state";
@@ -46,7 +47,7 @@ export interface WidgetPaletteItem {
   kind: WidgetKind;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  group: "text" | "media" | "shape" | "layout" | "data" | "comic";
+  group: "text" | "media" | "shape" | "layout" | "data" | "comic" | "ai";
   /** When set, only show the tile when the active project's mediaKind
    *  is in this list. Keeps the comic-native primitives out of the
    *  Video palette so the surface doesn't bloat for the dominant flow.
@@ -64,6 +65,7 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "image", label: "Image", icon: ImageIcon, group: "media" },
   { kind: "video", label: "Video", icon: VideoIcon, group: "media" },
   { kind: "webcam", label: "Webcam", icon: Camera, group: "media" },
+  { kind: "avatar", label: "AI Presenter", icon: UserCircle, group: "ai" },
   { kind: "shape-rect", label: "Rectangle", icon: Square, group: "shape" },
   { kind: "shape-circle", label: "Circle", icon: Circle, group: "shape" },
   { kind: "divider", label: "Divider", icon: Minus, group: "layout" },
@@ -86,6 +88,7 @@ const GROUP_LABEL: Record<CatalogGroup, string> = {
   layout: "Layout",
   data: "Data",
   comic: "Comic",
+  ai: "AI",
 };
 
 export interface WidgetPaletteProps {
@@ -117,7 +120,7 @@ export interface WidgetPaletteProps {
 }
 
 const PRE_MEDIA_GROUPS: readonly CatalogGroup[] = ["text"];
-const POST_MEDIA_GROUPS: readonly CatalogGroup[] = ["shape", "comic", "layout", "data"];
+const POST_MEDIA_GROUPS: readonly CatalogGroup[] = ["ai", "shape", "comic", "layout", "data"];
 // Section ids used by the collapsible-state hook. "media" lives next to
 // the catalog groups so the user's open/closed preference for the Media
 // section persists across reloads alongside the others.

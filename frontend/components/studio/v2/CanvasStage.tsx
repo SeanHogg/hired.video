@@ -680,7 +680,54 @@ function WidgetBody({
       return <CaptionBoxBody data={p.data} />;
     case "sfx-burst":
       return <SfxBurstBody data={p.data} />;
+    case "avatar":
+      return <AvatarBody data={p.data} />;
   }
+}
+
+// ─── Avatar body ────────────────────────────────────────────────────────────
+// Static still painted by the same `paintPresenter` the render pipeline
+// uses, into an offscreen-canvas-style live <canvas>. Live mouth
+// animation runs inside the inspector preview (AvatarPreview.tsx); the
+// stage shows the rest pose so the editor surface stays calm.
+
+function AvatarBody({
+  data,
+}: {
+  data: import("@/lib/studio/editor-v2/canvas-state").AvatarWidgetParams;
+}) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let cancelled = false;
+    void Promise.all([
+      import("@/lib/studio/avatar/presenters"),
+      import("@/lib/studio/avatar/paint"),
+    ]).then(([{ getPresenter }, { paintPresenter }]) => {
+      if (cancelled) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      paintPresenter(
+        ctx,
+        getPresenter(data.presenterId),
+        "rest",
+        { x: 0, y: 0, w: canvas.width, h: canvas.height },
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data.presenterId]);
+  return (
+    <canvas
+      ref={ref}
+      width={400}
+      height={500}
+      style={{ width: "100%", height: "100%", display: "block" }}
+    />
+  );
 }
 
 // ─── Comic widget bodies ─────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ import {
 import {
   SEED_DERIVED_UUID,
   V4_UUID,
-} from "../../../../../shared/__tests__/uuid-fixtures.js";
+} from "../../../../shared/__tests__/uuid-fixtures.js";
 
 describe("ProgressUpdateSchema", () => {
   // Happy path

@@ -925,6 +925,25 @@ export function defaultWidget(kind: WidgetKind): Widget {
         visibleTo: null,
         motion: null,
       };
+    case "avatar":
+      return {
+        id,
+        kind,
+        position: { x: 0.6, y: 0.1, width: 0.35, height: 0.8, z: 5, rotation: 0 },
+        params: {
+          kind: "avatar",
+          data: {
+            presenterId: "presenter-amber",
+            script: "",
+            engine: "web-speech",
+            voiceId: "",
+            speed: 1,
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
   }
 }
 

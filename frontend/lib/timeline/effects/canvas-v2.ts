@@ -1681,3 +1681,72 @@ registerEffect({
     applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// canvas-v2:avatar — AI presenter avatar (#1557). Painted via the
+// programmatic painter in `lib/studio/avatar/paint.ts`. Visemes are
+// estimated from the script (one per word) and indexed against the
+// clip-local time so the mouth shape advances roughly in step with
+// a synchronously-rendered TTS audio track on the same scene.
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:avatar",
+  label: "AI presenter avatar",
+  category: "transform",
+  defaults: {
+    x: 0.6,
+    y: 0.1,
+    width: 0.35,
+    height: 0.8,
+    presenterId: "presenter-amber",
+    script: "",
+    speed: 1,
+  },
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
+    const { x, y, w, h } = rect;
+    const presenter = getPresenter(stringOr(effect.params.presenterId, ""));
+    const script = stringOr(effect.params.script, "");
+    const speed = numberOr(effect.params.speed, 1);
+
+    const viseme: Viseme = resolveVisemeFromTime(
+      script,
+      speed,
+      clipFrame,
+      clipDurationFrames,
+      fps,
+    );
+
+    ctx.save();
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
+    paintPresenter(ctx, presenter, viseme, { x, y, w, h });
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
+  },
+});
+
+/** Pick the active viseme for a given clip-local frame. The audio
+ *  rendering pass owes us a parallel TTS track of `script`; we estimate
+ *  ~3 words per second as the natural delivery rate, scaled by `speed`,
+ *  and index the viseme array against the elapsed seconds. Falls back to
+ *  the rest viseme when the script is empty or playback is past the
+ *  estimated speak duration. */
+function resolveVisemeFromTime(
+  script: string,
+  speed: number,
+  clipFrame: number,
+  clipDurationFrames: number,
+  fps: number,
+): Viseme {
+  if (!script || fps <= 0) return "rest";
+  const visemes = estimateVisemesForText(script);
+  if (visemes.length === 0) return "rest";
+
+  const elapsedSec = clipFrame / fps;
+  const wordsPerSec = 3 * Math.max(0.5, speed);
+  const wordIdx = Math.floor(elapsedSec * wordsPerSec);
+  if (wordIdx >= visemes.length) return "rest";
+  return visemes[wordIdx];
+}
