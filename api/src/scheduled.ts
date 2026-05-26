@@ -24,6 +24,11 @@ import { buildRepos } from "./repositories/index.js";
 import { EventReminderService } from "./services/event/EventReminderService.js";
 import { EventBlastService } from "./services/event/EventBlastService.js";
 import { buildApiDeps } from "./services/apiDeps.js";
+import {
+  closePartnerPoolForLastMonth,
+  dispatchDuePartnerPayouts,
+} from "./services/articles/partner-pool.js";
+import { TremendousClient } from "./services/tremendous/client.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -371,6 +376,83 @@ async function processMonthlyUsageClose(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Partner Program monthly close + Tremendous dispatch (gap #172 / #174)
+// ---------------------------------------------------------------------------
+//
+// Two paths:
+//   • Pool close: 1st of the month, 02:00 UTC window. Reads paid-sub
+//     revenue from invoices, calls closePartnerPoolForLastMonth().
+//   • Dispatch loop: every /5 tick. Sends Tremendous gift cards for
+//     payout rows whose 60-day hold has expired AND whose user balance
+//     is ≥ $50.
+
+async function processPartnerProgramPool(): Promise<void> {
+  const now = new Date();
+  const isFirstOfMonth = now.getUTCDate() === 1;
+  const isCloseWindow = now.getUTCHours() === 2 && now.getUTCMinutes() < 5;
+  if (!isFirstOfMonth || !isCloseWindow) return;
+  try {
+    const db = getDb();
+    // Subscriber revenue for the closing month — paid sub charges from
+    // billing.usageInvoices. Defaults to zero if the table is empty so
+    // we still write a $0 pool row for the period (audit trail).
+    const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodStart = new Date(Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth() - 1, 1));
+    let subscriberRevenueCents = 0;
+    try {
+      const [row] = await db
+        .select({
+          total: sql<number>`COALESCE(SUM(${schema.usageInvoices.totalCents}), 0)::int`,
+        })
+        .from(schema.usageInvoices)
+        .where(
+          and(
+            eq(schema.usageInvoices.status, "paid"),
+            sql`${schema.usageInvoices.periodStart} >= ${periodStart.toISOString().slice(0, 10)}`,
+            sql`${schema.usageInvoices.periodStart} <  ${periodEnd.toISOString().slice(0, 10)}`,
+          ),
+        );
+      subscriberRevenueCents = row?.total ?? 0;
+    } catch (e) {
+      console.warn("[scheduled] partner pool: revenue read failed, defaulting to 0:", e);
+    }
+    const result = await closePartnerPoolForLastMonth({
+      db,
+      now,
+      subscriberRevenueCents,
+    });
+    console.log("[scheduled] partner pool closed", result);
+  } catch (err) {
+    console.error("[scheduled] partner pool close failed:", err);
+  }
+}
+
+async function processPartnerProgramDispatch(): Promise<void> {
+  try {
+    const env = (globalThis as any).__ENV ?? {};
+    if (!env.TREMENDOUS_API_KEY || !env.TREMENDOUS_FUNDING_SOURCE_ID || !env.TREMENDOUS_CAMPAIGN_ID) {
+      return;
+    }
+    const tremendous = new TremendousClient({
+      apiKey: env.TREMENDOUS_API_KEY,
+      baseUrl: env.TREMENDOUS_BASE_URL,
+      fundingSourceId: env.TREMENDOUS_FUNDING_SOURCE_ID,
+      campaignId: env.TREMENDOUS_CAMPAIGN_ID,
+    });
+    const result = await dispatchDuePartnerPayouts({
+      db: getDb(),
+      tremendous,
+      now: new Date(),
+    });
+    if (result.dispatched > 0 || result.failed > 0) {
+      console.log("[scheduled] partner payouts dispatched", result);
+    }
+  } catch (err) {
+    console.error("[scheduled] partner payouts dispatch failed:", err);
+  }
+}
+
 export async function runScheduled(): Promise<void> {
   // Email sync intentionally absent — the cron sweep was removed in
   // gap #757. Connected mailboxes now sync exclusively via the PWA
@@ -386,5 +468,7 @@ export async function runScheduled(): Promise<void> {
     processMonthlyUsageClose(),
     processGamificationFraudSweep(),
     processEventReminders(),
+    processPartnerProgramPool(),
+    processPartnerProgramDispatch(),
   ]);
 }

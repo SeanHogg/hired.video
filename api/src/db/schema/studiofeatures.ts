@@ -674,12 +674,28 @@ export const studioVideoForms = pgTable(
     redirectUrl:     text("redirect_url"),                // optional CTA after submit
     submitButtonText: text("submit_button_text").notNull().default("Continue"),
     isActive:        boolean("is_active").notNull().default(true),
+    /** #201 — Discriminator. "lead_capture" keeps the original Wistia-
+     *  Turnstile behaviour; "knowledge_check" gates progression on a
+     *  scored answer and feeds cmi.score.raw back to SCORM (#161). */
+    formType:        text("form_type").notNull().default("lead_capture"),
+    /** Required when formType='knowledge_check'. Shape:
+     *  `{ [fieldKey]: { correctAnswer, points, rationale? } }` */
+    answerKey:       jsonb("answer_key"),
+    passingScorePct: integer("passing_score_pct"),
+    maxAttempts:     integer("max_attempts"),
+    /** When set, an incorrect attempt jumps the player back to the
+     *  named scene id for remediation before re-attempting. */
+    remediationJumpToSceneId: text("remediation_jump_to_scene_id"),
+    /** Linked course lesson — knowledge-check submissions report
+     *  cmi.score.raw on this lesson. Lead-capture forms leave null. */
+    courseLessonId:  uuid("course_lesson_id"),
     createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("idx_studio_video_forms_project").on(t.projectId),
     index("idx_studio_video_forms_user").on(t.userId),
+    index("idx_studio_video_forms_lesson").on(t.courseLessonId),
   ],
 );
 
@@ -696,6 +712,13 @@ export const studioVideoFormSubmissions = pgTable(
     timestampSec: real("timestamp_sec"),                  // playback position at submission
     referrer:    text("referrer"),
     ipCountry:   text("ip_country"),
+    /** #201 — Set only when the parent form is a knowledge_check. */
+    scoreRaw:    integer("score_raw"),
+    scoreMax:    integer("score_max"),
+    passed:      boolean("passed"),
+    /** Per-(viewer, lesson) attempt counter so remediation logic can
+     *  enforce maxAttempts cleanly. */
+    attemptNumber: integer("attempt_number").notNull().default(1),
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

@@ -779,7 +779,7 @@
   "faq.recruiters.gdprQ": "Is hired.video GDPR-compliant?",
   "faq.recruiters.importA": "Yes. Bulk-import candidates from a CSV, your existing ATS, or via our API. Existing tags and notes are preserved.",
   "faq.recruiters.importQ": "Can I import my existing candidate database?",
-  "faq.recruiters.linkedinA": "Yes. The extension captures candidate profiles from LinkedIn, Indeed, AngelList, and 20+ other boards. Profiles import into a job pipeline in one click.",
+  "faq.recruiters.linkedinA": "Yes — and far beyond profile capture. On LinkedIn, Indeed, GitHub, and AngelList the recruiter extension captures candidates one-at-a-time or in bulk from search-result pages (up to 25 per click), auto-enriches each profile with personal email + phone + LinkedIn / GitHub / X / website URLs, drops them onto a job pipeline / list / call queue / outreach sequence with one click, and supports click-to-call (recorded VoIP), click-to-SMS, and click-to-email with every action auto-logged to the candidate's activity timeline. Loxo-Boost parity at $9.95/seat/mo.",
   "faq.recruiters.linkedinQ": "Does the Chrome extension work on LinkedIn?",
   "faq.recruiters.matchingA": "Match scores combine skills, experience, location, and resume text against the job description. Recruiters routinely see 80–95% relevance on the top results, but you can always tune the weighting.",
   "faq.recruiters.matchingQ": "How accurate is AI matching?",

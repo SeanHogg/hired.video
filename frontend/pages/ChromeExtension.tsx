@@ -28,6 +28,11 @@ import {
   ListChecks,
   TrendingUp,
   Shield,
+  Phone,
+  Mail,
+  Send,
+  Wand2,
+  Bookmark,
 } from "lucide-react";
 import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 
@@ -40,6 +45,7 @@ const JOB_SITES = [
   "LinkedIn",
   "Indeed",
   "Glassdoor",
+  "GitHub",
   "ZipRecruiter",
   "Monster",
   "CareerBuilder",
@@ -139,23 +145,24 @@ export default function ChromeExtension() {
                       <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                         <Users className="h-3 w-3 mr-1" /> Recruiter & Employer
                       </Badge>
-                      <Badge variant="secondary">v1.0</Badge>
+                      <Badge variant="secondary">v1.7</Badge>
                     </div>
                     <CardTitle className="text-2xl">hired.video — Recruiter</CardTitle>
                     <CardDescription className="text-base">
-                      Source candidates from LinkedIn and Indeed, build a searchable talent pool, and move candidates
-                      through a visual hiring pipeline — all from the browser.
+                      Loxo-Boost-parity sourcing at $9.95/seat/mo. Capture candidates and companies from any site,
+                      auto-enrich personal email + phone + social URLs, drop them onto a job with one click, and
+                      reach out via click-to-call (recorded), SMS, email, or in-app message — every action auto-logged.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <ul className="space-y-2">
                       {[
-                        "Extract candidate profiles from LinkedIn & Indeed",
-                        "Extract company pages from LinkedIn & Glassdoor",
-                        "Searchable talent pool with tags and notes",
-                        "Kanban pipeline — Sourced → Contacted → Offer → Placed",
-                        "AI candidate ↔ job matching and scoring",
-                        "In-extension candidate messaging",
+                        "Profile capture from any site — auto-enriches personal email, phone, LinkedIn, GitHub, X, website",
+                        "Bulk capture from LinkedIn / Indeed / GitHub search-result pages (up to 25 cards per click)",
+                        "Click-to-call (recorded via SignalWire), click-to-SMS, click-to-email — auto-logged to the activity timeline",
+                        "Add to job pipeline, lists, call queues, or outreach sequences — one universal picker",
+                        "Inline tag editor + tracked-jobs tab (saves on web ↔ side panel sync)",
+                        "Interactive 🪄 Picker — job / profile / company modes with replayed saved selectors",
                       ].map((feat) => (
                         <li key={feat} className="flex items-start gap-2 text-sm">
                           <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
@@ -238,43 +245,74 @@ export default function ChromeExtension() {
                 <Badge className="mb-3 bg-purple-100 text-purple-800 hover:bg-purple-100">
                   <Users className="h-3 w-3 mr-1" /> Recruiter Extension
                 </Badge>
-                <h2 className="text-3xl font-bold">Source, Track, and Place Candidates Without Leaving the Browser</h2>
+                <h2 className="text-3xl font-bold">Source, Track, Reach Out, and Place Candidates Without Leaving the Browser</h2>
                 <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
-                  Five tabs in one side panel: Now (active page), Pipeline (kanban), Candidates (searchable pool),
-                  Companies, and Settings. Everything syncs to your hired.video recruiter workspace.
+                  Six tabs in one side panel: Now (active page), Pipeline (kanban), 🔖 Tracked jobs, Candidates
+                  (searchable pool), Companies, and Settings. Everything syncs to your hired.video recruiter
+                  workspace — and to your teammates if you're on a multi-seat plan.
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   {
                     icon: UserPlus,
-                    title: "Profile Extraction",
-                    desc: "Detects candidate profiles on LinkedIn and Indeed. Click Extract to parse name, title, company, and location into your talent pool.",
+                    title: "Profile Capture + Contact Enrichment",
+                    desc: "Detects candidate profiles on any site. The capture auto-enriches with personal email, phone, LinkedIn, GitHub, X, and personal-website URLs — LLM extraction plus a deterministic mailto:/tel:/social-URL harvester.",
+                  },
+                  {
+                    icon: ListChecks,
+                    title: "Bulk Capture from Search Results",
+                    desc: "On LinkedIn / Indeed / GitHub list pages a one-click \"Capture all\" sources up to 25 candidates per request — each runs through the same enrichment pipeline as the single capture.",
+                  },
+                  {
+                    icon: Phone,
+                    title: "Click-to-Call (recorded VoIP)",
+                    desc: "Flip the \"Call via hired.video\" toggle and tel: clicks route through SignalWire on your business number. Calls are recorded, attached to the candidate's interaction timeline, and counted against your minute budget.",
+                  },
+                  {
+                    icon: Mail,
+                    title: "Click-to-Email + Click-to-SMS",
+                    desc: "Contact-card buttons open the OS mail / SMS client and auto-log the outreach to the candidate's activity timeline so you don't have to remember to file a note.",
+                  },
+                  {
+                    icon: Target,
+                    title: "Universal Target Picker",
+                    desc: "One slide-out covers \"Add to job\" → submit to a pipeline, \"Add to list\" / \"Call queue\" → saved cohort, \"Enroll in sequence\" → recurring outreach. Create new lists / queues / sequences inline.",
+                  },
+                  {
+                    icon: Send,
+                    title: "Outreach Sequences",
+                    desc: "Reusable multi-step templates (email / message / SMS, per-step delay + body). Enroll a captured candidate in one click; due steps fire from the worker on schedule.",
+                  },
+                  {
+                    icon: Bookmark,
+                    title: "Tracked Jobs Tab",
+                    desc: "Saving a job on hired.video reflects instantly in the side panel. Score your talent pool against any tracked job from the row action.",
+                  },
+                  {
+                    icon: Wand2,
+                    title: "Interactive 🪄 Picker (3 modes)",
+                    desc: "When auto-detect doesn't fire, the picker overlays the page and walks you through clicking the job / profile / company fields. Saved selectors replay on every subsequent visit to that host.",
                   },
                   {
                     icon: Building2,
-                    title: "Company Extraction",
-                    desc: "Detects company pages on LinkedIn and Glassdoor. Pulls name, industry, size, location, and website into your company database.",
+                    title: "Company Extraction + LinkedIn Coverage",
+                    desc: "LinkedIn company pages, Glassdoor overviews, and any company-detail page yield structured records (name, industry, size, location, website) into your company database.",
                   },
                   {
                     icon: Search,
                     title: "Searchable Talent Pool",
-                    desc: "Every extracted candidate becomes searchable by name, title, company, or custom tags. Attach notes and match scores.",
+                    desc: "Every captured candidate is searchable by name, title, company, or custom tags. Tags can be edited inline from the candidate detail; AI-extracted skills seed them automatically.",
                   },
                   {
                     icon: LayoutGrid,
                     title: "Pipeline Kanban",
-                    desc: "Visualize candidates across six stages — Sourced, Contacted, Screening, Interview, Offer, Placed — with counts per column.",
-                  },
-                  {
-                    icon: Target,
-                    title: "Candidate ↔ Job Matching",
-                    desc: `Score candidates against your open jobs, or score open jobs against your talent pool. AI-powered, ${TIER_NAME.pro} tier.`,
+                    desc: "Sourced → Contacted → Screening → Interview → Offer → Placed, with counts per column and AI match scores rolled in. Drag to advance or use the candidate detail.",
                   },
                   {
                     icon: MessageSquare,
-                    title: "Candidate Messaging",
-                    desc: "Send outreach from the candidate detail pane. Messages are logged against the candidate's interaction history.",
+                    title: `AI Match Scoring + In-Panel Messaging (${TIER_NAME.pro})`,
+                    desc: "Score candidates against your open jobs or jobs against your pool. Compose with AI personalization, attach a shared job card, and the conversation lives in your hired.video inbox.",
                   },
                 ].map(({ icon: Icon, title, desc }) => (
                   <div key={title} className="bg-gray-50 p-6 rounded-lg border">
@@ -314,27 +352,37 @@ export default function ChromeExtension() {
               {
                 question: "Is the Chrome extension free?",
                 answer:
-                  `Yes. Both the Job Seeker and Recruiter extensions are free to install from the Chrome Web Store. The Job Seeker extension includes one-click job tracking, resume match scoring, and AI resume tailoring; the Recruiter extension includes profile and company extraction, talent pool search, and pipeline kanban. ${TIER_COPY.proFeaturesGatedNote()}`,
+                  `Yes. Both the Job Seeker and Recruiter extensions are free to install from the Chrome Web Store. The Job Seeker extension includes one-click job tracking, resume match scoring, and AI resume tailoring; the Recruiter extension includes profile + contact-enrichment capture, bulk sourcing, lists / call queues / outreach sequences, and the kanban pipeline. ${TIER_COPY.proFeaturesGatedNote()}`,
               },
               {
-                question: "Which job boards are supported?",
+                question: "How does the recruiter extension compare to Loxo Boost?",
                 answer:
-                  "The extensions auto-detect jobs, profiles, and companies on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, CareerBuilder, Dice, SimplyHired, Lever, Greenhouse, Workday, Wellfound, Built In, and generic fallbacks for most other sites. 16+ boards total.",
+                  "Feature parity at 1/17th the price. The hired.video recruiter extension captures candidate profiles from any site (LinkedIn, GitHub, Indeed, portfolio sites), auto-enriches with personal email + phone + LinkedIn / GitHub / X / website URLs, drops candidates straight onto a job pipeline, list, or call queue, enrolls them in multi-step outreach sequences, and supports click-to-call (recorded VoIP via SignalWire) — all auto-logged to the activity timeline. Loxo Basic is $169/user/mo; the hired.video Pro plan is $9.95/seat/mo.",
+              },
+              {
+                question: "How does the click-to-call work — do I need my own VoIP provider?",
+                answer:
+                  "No. The extension's \"Call via hired.video\" toggle routes phone clicks through SignalWire on a hired.video business number you provision in seconds from the settings panel. Calls are recorded, attached to the candidate's activity timeline with the SignalWire SID, and counted against your monthly minute budget (Pro includes 100 minutes). Turn the toggle off and tel: clicks fall back to the OS dialer with no recording.",
+              },
+              {
+                question: "Which sites are supported?",
+                answer:
+                  "The extensions auto-detect jobs, profiles, and companies on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, CareerBuilder, Dice, SimplyHired, Lever, Greenhouse, Workday, Wellfound, Built In, GitHub, and generic fallbacks for everything else. The interactive 🪄 picker (job / profile / company modes) handles sites the auto-detector doesn't recognise and replays your captured selectors on every subsequent visit.",
               },
               {
                 question: "Do I need a hired.video account to use the extension?",
                 answer:
-                  "Yes — the extension syncs your tracked jobs, scored resumes, and talent pool to your hired.video account. Create a free account at hired.video/signup if you don't already have one. Everything persists across devices.",
+                  "Yes — the extension syncs your tracked jobs, scored resumes, talent pool, lists, call queues, sequences, and call recordings to your hired.video account. Create a free account at hired.video/signup if you don't already have one. Everything persists across devices and team members.",
               },
               {
                 question: "How does the AI match score work?",
                 answer:
-                  "When you click Score on a job posting, the extension sends the job description to hired.video's AI, which compares it against your master resume — skills, experience level, keywords, and required qualifications. You get a score and a list of specific gaps to improve.",
+                  "When you click Score on a job posting, the extension sends the job description to hired.video's AI, which compares it against your master resume (job seeker side) or your talent pool (recruiter side) — skills, experience level, keywords, and required qualifications. You get a score and a list of specific gaps to improve.",
               },
               {
                 question: "Is my browsing data private?",
                 answer:
-                  "The extension only activates on job board and profile pages, and it only sends data to hired.video when you explicitly click Track, Score, or Extract. We don't track your general browsing, we don't share data with third parties, and we don't inject ads. Read the privacy policy for full details.",
+                  "The extension only activates on job-board / profile / company pages, and it only sends data to hired.video when you explicitly click Track, Score, Extract, Capture all, or invoke the picker. Telemetry has a one-click opt-out in Settings; \"picker_capture\" events strip the literal selector + value content before they ever leave the browser. We don't track general browsing, share data with third parties, or inject ads.",
               },
               {
                 question: "Does the extension work on Edge, Firefox, or Safari?",

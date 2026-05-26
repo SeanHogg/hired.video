@@ -131,6 +131,83 @@ const SPEC = {
     "/api/billing/company/{companyId}/seats": {
       patch: { tags: ["Billing", "Employer"], summary: "Update company seat count", parameters: [{ name: "companyId", in: "path", required: true, schema: { type: "string" } }], requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["seatCount"], properties: { seatCount: { type: "integer", minimum: 1 }, planTier: { type: "string", enum: ["starter", "team", "enterprise"] } } } } } }, responses: { "200": { description: "Updated seat subscription" } } },
     },
+    // ── Structured-Interview Scorecards (#1380 – #1390, #1477, #1478) ──────
+    "/api/scorecards/templates": {
+      get: { tags: ["Scorecards"], summary: "List scorecard templates", parameters: [{ name: "companyId", in: "query", schema: { type: "string" } }], responses: { "200": { description: "Templates" } } },
+      post: { tags: ["Scorecards"], summary: "Create a scorecard template", responses: { "201": { description: "Template created" } } },
+    },
+    "/api/scorecards/kits": {
+      get: { tags: ["Scorecards"], summary: "List interview kits", responses: { "200": { description: "Kits" } } },
+      post: { tags: ["Scorecards"], summary: "Create an interview kit (incl. blindReviewMode + stages)", responses: { "201": { description: "Kit created" } } },
+    },
+    "/api/scorecards/submissions": {
+      get: { tags: ["Scorecards"], summary: "List submissions for an application (blind-review filtered)", parameters: [{ name: "applicationId", in: "query", schema: { type: "string" } }], responses: { "200": { description: "Submissions" } } },
+      post: { tags: ["Scorecards"], summary: "Create a draft submission", responses: { "201": { description: "Submission created" } } },
+    },
+    "/api/scorecards/submissions/{id}/submit": {
+      post: { tags: ["Scorecards"], summary: "Finalise a submission (cert-gate enforced)", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Submitted" } } },
+    },
+    "/api/scorecards/debrief": {
+      get: { tags: ["Scorecards"], summary: "Per-application aggregate debrief", parameters: [{ name: "applicationId", in: "query", required: true, schema: { type: "string" } }], responses: { "200": { description: "Debrief aggregate" } } },
+    },
+    "/api/scorecards/decisions": {
+      get: { tags: ["Scorecards"], summary: "List hiring decisions", parameters: [{ name: "applicationId", in: "query", required: true, schema: { type: "string" } }], responses: { "200": { description: "Decisions" } } },
+      post: { tags: ["Scorecards"], summary: "Record a hiring decision", responses: { "201": { description: "Decision created" } } },
+    },
+    "/api/scorecards/competencies": {
+      get: { tags: ["Scorecards", "Competencies"], summary: "List competency library", responses: { "200": { description: "Competencies + leveled anchors" } } },
+      post: { tags: ["Scorecards", "Competencies"], summary: "Create a competency (with leveled rubric)", responses: { "201": { description: "Competency created" } } },
+    },
+    "/api/scorecards/reliability/{userId}": {
+      get: { tags: ["Scorecards"], summary: "Interviewer SLA reliability stats (on-time %, avg lag, overdue)", parameters: [{ name: "userId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Reliability aggregate" } } },
+    },
+    "/api/scorecards/assignments": {
+      post: { tags: ["Scorecards"], summary: "Recruiter assigns a scorecard with dueAt (idempotent)", responses: { "201": { description: "Draft submission pre-created with SLA" } } },
+    },
+    "/api/scorecards/bias-check": {
+      post: { tags: ["Scorecards", "AI"], summary: "Inline bias linter — LLM-flagged coded-language phrases in scorecard prose", responses: { "200": { description: "Flag list" } } },
+    },
+    "/api/scorecards/stage-questions/{stageId}": {
+      get: { tags: ["Scorecards"], summary: "List tagged stage questions", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Stage questions" } } },
+      post: { tags: ["Scorecards"], summary: "Add a tagged question (competencyId + difficulty)", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "201": { description: "Question added" } } },
+    },
+    "/api/scorecards/stage-questions/{stageId}/ai-generate": {
+      post: { tags: ["Scorecards", "AI"], summary: "AI-generate competency+level calibrated questions", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "201": { description: "Generated questions (persisted + tagged)" } } },
+    },
+    "/api/scorecards/coverage/{kitId}": {
+      get: { tags: ["Scorecards"], summary: "Per-competency coverage warning for a kit (rubric vs. question gaps)", parameters: [{ name: "kitId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Coverage rows" } } },
+    },
+    "/api/scorecards/take-home/{stageId}": {
+      get: { tags: ["Scorecards", "Take-Home"], summary: "Get take-home assignment for a stage", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Assignment" } } },
+      put: { tags: ["Scorecards", "Take-Home"], summary: "Upsert take-home prompt", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Assignment saved" } } },
+    },
+    "/api/scorecards/take-home/{stageId}/invites": {
+      post: { tags: ["Scorecards", "Take-Home"], summary: "Mint a candidate magic-link invite (idempotent per applicationId)", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "201": { description: "Invite minted" } } },
+    },
+    "/api/scorecards/take-home/{stageId}/submissions": {
+      get: { tags: ["Scorecards", "Take-Home"], summary: "List candidate submissions for review", parameters: [{ name: "stageId", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Submissions" } } },
+    },
+    "/api/scorecards/take-home/start-review": {
+      post: { tags: ["Scorecards", "Take-Home"], summary: "Lazy-create a scorecard submission bound to a take-home for review", responses: { "200": { description: "Scorecard submission id (idempotent)" } } },
+    },
+    "/api/public/take-home/invite/{token}": {
+      get: { tags: ["Take-Home", "Public"], security: [], summary: "Candidate-facing magic-link preview", parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Prompt + delivery format + expired/alreadySubmitted state" } } },
+      post: { tags: ["Take-Home", "Public"], security: [], summary: "Candidate submits delivery", parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Submission recorded (one-shot)" } } },
+    },
+    // ── Calibration sessions (#1381) ────────────────────────────────────────
+    "/api/calibration/sessions": {
+      get: { tags: ["Calibration"], summary: "List calibration sessions", responses: { "200": { description: "Sessions" } } },
+      post: { tags: ["Calibration"], summary: "Create a calibration session", responses: { "201": { description: "Session created" } } },
+    },
+    "/api/calibration/sessions/{id}": {
+      get: { tags: ["Calibration"], summary: "Get session with per-attribute deltas (after close)", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Session view + deltas" } } },
+    },
+    "/api/calibration/sessions/{id}/submissions": {
+      post: { tags: ["Calibration"], summary: "Evaluator submits a calibration scorecard (upsert)", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "201": { description: "Calibration submission saved" } } },
+    },
+    "/api/calibration/sessions/{id}/close": {
+      post: { tags: ["Calibration"], summary: "Organizer closes the session + reveals deltas", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Session closed" } } },
+    },
     // ── Assessments ─────────────────────────────────────────────────────────
     "/api/assessments": {
       get: { tags: ["Assessments"], summary: "Browse skill assessments", security: [], parameters: [{ name: "skill", in: "query", schema: { type: "string" } }], responses: { "200": { description: "Assessment list" } } },

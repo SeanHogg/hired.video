@@ -20,8 +20,19 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
-export const COURSE_STATUSES = ["draft", "published", "unlisted", "flagged"] as const;
+export const COURSE_STATUSES = ["draft", "in_review", "published", "unlisted", "flagged"] as const;
 export type CourseStatus = (typeof COURSE_STATUSES)[number];
+
+/** #200 — Per-provider LMS adapter id. Each connector adapter implements
+ *  the same publishCourse + checkPublishStatus + revokeCourse contract. */
+export const LMS_PROVIDERS = [
+  "cornerstone",
+  "workday_learning",
+  "docebo",
+  "talentlms",
+  "successfactors",
+] as const;
+export type LmsProvider = (typeof LMS_PROVIDERS)[number];
 
 export const COURSE_DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
 export type CourseDifficulty = (typeof COURSE_DIFFICULTIES)[number];
@@ -76,12 +87,23 @@ export const courses = pgTable(
     averageRating: real("average_rating"),
     ratingCount: integer("rating_count").default(0).notNull(),
 
+    /** #166 — Optional pointer to a studio_template row (template
+     *  marketplace) that supplies the course's branding tokens. The
+     *  same template kind used for video chrome powers course chrome —
+     *  no parallel "course-only" template system. */
+    themeId: uuid("theme_id"),
+    /** Inline override map for theme tokens. When set, merges over the
+     *  themeId base. Shape mirrors the existing brand-kit JSON used by
+     *  studio (logo, colors, fonts). */
+    themeTokens: jsonb("theme_tokens"),
+
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("idx_courses_user").on(t.userId, t.createdAt),
     index("idx_courses_status_published").on(t.status, t.publishedAt),
+    index("idx_courses_theme_id").on(t.themeId),
     uniqueIndex("uq_courses_user_slug").on(t.userId, t.slug),
   ],
 );
@@ -219,3 +241,60 @@ export const courseCertificates = pgTable(
 
 export type CourseCertificate = typeof courseCertificates.$inferSelect;
 export type NewCourseCertificate = typeof courseCertificates.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// #200 — LMS Connectors. Per-tenant OAuth tokens for course export to an
+// external LMS. Course-publish flow chooses a connector + queues a row
+// into lms_course_publishes, which the cron drains by calling the
+// provider adapter in api/src/services/lms/<provider>.ts.
+// ---------------------------------------------------------------------------
+export const lmsConnectors = pgTable(
+  "lms_connectors",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id"),
+    provider: varchar("provider", { length: 40 }).notNull(),
+    displayName: varchar("display_name", { length: 255 }),
+    baseUrl: text("base_url"),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    scope: text("scope"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    status: varchar("status", { length: 20 }).default("connected").notNull(),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_lms_connectors_user").on(t.userId),
+    index("idx_lms_connectors_provider").on(t.provider),
+  ],
+);
+
+export type LmsConnector = typeof lmsConnectors.$inferSelect;
+export type NewLmsConnector = typeof lmsConnectors.$inferInsert;
+
+export const lmsCoursePublishes = pgTable(
+  "lms_course_publishes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    connectorId: uuid("connector_id").notNull().references(() => lmsConnectors.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").notNull(),
+    externalId: text("external_id"),
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    lastError: text("last_error"),
+    pushedAt: timestamp("pushed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_lms_course_publishes_connector").on(t.connectorId),
+    index("idx_lms_course_publishes_course").on(t.courseId),
+  ],
+);
+
+export type LmsCoursePublish = typeof lmsCoursePublishes.$inferSelect;
+export type NewLmsCoursePublish = typeof lmsCoursePublishes.$inferInsert;

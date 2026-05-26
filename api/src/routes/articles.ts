@@ -32,7 +32,25 @@ import { ARTICLE_LIST_FIELDS, parseFields, projectRows } from "../../../shared/p
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { ARTICLE_KINDS } from "../db/schema/articles.js";
 
-const { articles, users, userProfiles, creatorProfiles } = schema;
+const {
+  articles,
+  articleVersions,
+  articleEngagement,
+  articleClaps,
+  articleShares,
+  partnerProgramOptIns,
+  partnerProgramBalances,
+  legalDocumentAcceptances,
+  users,
+  userProfiles,
+  creatorProfiles,
+} = schema;
+import { createLLMClient } from "../services/adapters/llm-client.js";
+import {
+  classifyArticle,
+  gateForSeverity,
+  toFindings,
+} from "../services/articles/moderation-classifier.js";
 
 export const articleRoutes = new Hono<AppEnv>();
 

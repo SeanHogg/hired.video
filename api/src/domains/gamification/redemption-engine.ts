@@ -99,7 +99,11 @@ export class RedemptionEngine {
     }
 
     const valueCents = deriveValueCents(sku);
-    const requiresKyc = await this.crossesKycThreshold(args.user.userId, valueCents);
+    // Campaign $ is platform-internal credit, not gift card / cash — IRS
+    // treats it as a service rebate, not 1099 income. Skip the W-9 gate.
+    const requiresKyc = sku.kind === "campaign_dollars"
+      ? false
+      : await this.crossesKycThreshold(args.user.userId, valueCents);
 
     // Insert the redemption row in pending state BEFORE debiting points;
     // gives us a row to refer to in the reverse path if anything fails.
@@ -146,6 +150,8 @@ export class RedemptionEngine {
           return { status: "fulfilled", redemption: await this.fulfillPremiumMonth(redemption, sku) };
         case "gift_card":
           return await this.fulfillGiftCard(redemption, sku, args.user);
+        case "campaign_dollars":
+          return { status: "fulfilled", redemption: await this.fulfillCampaignDollars(redemption, sku) };
       }
     } catch (e) {
       // Refund + mark redemption failed.
@@ -255,6 +261,31 @@ export class RedemptionEngine {
       row.valueCents,
       this.now().getUTCFullYear(),
     );
+    return this.deps.repos.points.updateRedemption(row.id, {
+      status: "fulfilled",
+      fulfilledAt: this.now(),
+    });
+  }
+
+  /** #169 — Campaign $ fulfillment. Grants `amountCents` into the user's
+   *  campaign_dollars_balance row + writes an audit transaction. The
+   *  boosts checkout flow (`api/src/routes/boosts.ts`) reads this
+   *  balance before charging Stripe. No YTD bump — Campaign $ is
+   *  platform-internal credit, not 1099 income. */
+  private async fulfillCampaignDollars(
+    row: PointRedemptionRow,
+    sku: RedemptionSku,
+  ): Promise<PointRedemptionRow> {
+    const amountCents = Number(sku.grant.amountCents ?? row.valueCents);
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      throw new Error(`campaign_dollars SKU ${sku.id} missing valid grant.amountCents`);
+    }
+    await this.deps.repos.points.grantCampaignDollars({
+      userId: row.userId,
+      amountCents,
+      redemptionId: row.id,
+      description: `Redeemed ${sku.label} for ${sku.pointsCost} pts`,
+    });
     return this.deps.repos.points.updateRedemption(row.id, {
       status: "fulfilled",
       fulfilledAt: this.now(),

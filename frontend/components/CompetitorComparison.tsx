@@ -212,6 +212,48 @@ export const FEATURE_ROWS: FeatureRow[] = [
     note: "Reusable scorecard templates with weighted rating attributes, multi-stage interview kits, per-evaluator submissions, aggregate debriefs, and final hiring-decision capture. Embedded into the candidate detail page.",
   },
   {
+    feature: "Calibration sessions (multi-evaluator bar-alignment)",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "yes", bullhorn: "no" },
+    note: "3-6 interviewers re-score past candidates blind; the system reveals per-attribute deltas vs. the real hire decision. Used quarterly to onboard new interviewers and keep the bar aligned. Greenhouse + Lever + Ashby ship this at enterprise tiers; hired.video includes it in the standard Recruiter Pro seat.",
+  },
+  {
+    feature: "Blind / anonymous interview review",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "yes", bullhorn: "no" },
+    note: "Kit-level policy hides candidate name + photo from the evaluator's scorecard view, and hides peer scorecards until the current evaluator submits. Both axes reduce halo-effect + groupthink bias.",
+  },
+  {
+    feature: "Inline bias linter on free-text scorecard feedback",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "LLM-powered linter runs while the evaluator types — flags coded language ('culture fit', 'abrasive', gendered descriptors, age-correlated terms) inline with severity + suggested rewrite. Greenhouse flags aggregate-rating disparity AFTER the loop; hired.video catches problematic language BEFORE submit.",
+  },
+  {
+    feature: "Take-home assignments (candidate magic-link delivery)",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "partial", bullhorn: "no" },
+    note: "Recruiter mints a per-candidate invite, candidate delivers via GitHub URL / shared doc / pasted code / link, reviewer scorecard is auto-bound to the take-home submission via the same rubric. Greenhouse's Assignment Stage requires a HackerRank / CodeSignal subscription; hired.video ships native.",
+  },
+  {
+    feature: "Cross-template competency framework + leveled rubrics",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "yes", bullhorn: "no" },
+    note: "Reusable competency primitives with L1–L7 anchors that scorecard attributes reference by ID. Two templates rating 'Technical Depth' now produce comparable cross-role analytics. Greenhouse charges enterprise pricing for this; hired.video includes it standard.",
+  },
+  {
+    feature: "Interviewer reliability tracking (SLA + on-time %)",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "Per-interviewer panel showing avg submission lag, on-time %, overdue draft count, and 30-day activity. Backed by hourly SLA-reminder worker that nudges (in-app + email) at 4h-before-due and escalates to the kit's hiring manager 24h-past-due.",
+  },
+  {
+    feature: "AI question generator calibrated to competency + level",
+    icon: ClipboardCheck,
+    values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
+    note: "When the kit's coverage badge flags a competency with no questions, one click suggests 3 calibrated STAR-style questions tagged to that competency at the chosen level (L1–L7). Reuses the platform LLM stack — no third-party tool required.",
+  },
+  {
     feature: "Staffing-agency back-office (timesheets, placement billing, VMS)",
     icon: Receipt,
     values: { hired: "no", loxo: "partial", linkedin: "no", greenhouse: "no", bullhorn: "yes" },
@@ -367,6 +409,12 @@ export const FEATURE_ROWS: FeatureRow[] = [
     values: { hired: "yes", loxo: "no", linkedin: "no", greenhouse: "no", bullhorn: "no" },
     note: "Studio splits on a `mediaKind` axis with kind-specific scene templates + render engines. Most competitors are video-only or audio-only.",
   },
+  {
+    feature: "Multilingual UI (English, Español, Français — Canada)",
+    icon: Globe,
+    values: { hired: "yes", loxo: "no", linkedin: "yes", greenhouse: "partial", bullhorn: "partial" },
+    note: "Hired.Video ships English + Spanish + Canadian French (Quebec Law 25 — fr-CA) so candidates in Mexico and Quebec enroll, build resumes, and apply in their native language. Locale switcher in the footer + header + signup honours visitor choice via a `?lang=` URL override and persists it onto `account_preferences.language` at signup. LinkedIn supports 24+ languages. Greenhouse and Bullhorn translate the candidate-facing careers site but keep the recruiter / admin tool mostly English.",
+  },
 ];
 
 export interface CompetitorDetail {
@@ -391,7 +439,7 @@ export const COMPETITOR_DETAILS: CompetitorDetail[] = [
     ],
     whereHiredWins: [
       "$9.95/seat/mo Pro vs. $169/user/mo Basic — and AI is on the Free tier",
-      "Recruiter Chrome extension matches Loxo Boost feature-for-feature — profile capture with personal email + phone + LinkedIn / GitHub / X / website auto-enrichment, click-to-call / email / SMS quick actions, one-click submit to a job, inline tag editor, and auto-logged activity timeline — at 1/17th the per-seat price",
+      "Recruiter Chrome extension matches Loxo Boost feature-for-feature — profile capture with personal email + phone + LinkedIn / GitHub / X / website auto-enrichment, bulk capture from search-result pages (up to 25 candidates per click), click-to-call (recorded VoIP via SignalWire) + click-to-SMS + click-to-email, one-click submit to a job / list / call queue / outreach sequence, inline tag editor, tracked-jobs tab, and an interactive 🪄 picker (job / profile / company modes) with learned-selector replay — all auto-logged to the activity timeline at 1/17th the per-seat price",
       "Native AI video resumes, AI Studio editor, and voice cloning — LOXO has none of these",
       "Built-in consumer job board with Google-for-Jobs indexing, plus a candidate-facing app (interview practice, resume tailor, public profiles)",
       "Gamification with gift-card cashout, learning pathways with SCORM, and a map discovery surface — all absent from LOXO",

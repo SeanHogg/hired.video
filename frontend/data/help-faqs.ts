@@ -150,4 +150,10 @@ export const HELP_GUIDES: HelpGuide[] = [
     description: "Step-by-step tutorials for every feature of hired.video",
     link: "/guides/tutorials",
   },
+  {
+    title: "Workforce & Timesheets (for agencies)",
+    description:
+      "Invite employees, capture time, approve timesheets, derive invoices, manage compliance docs, and track desk margin in hired.video's agency back-office.",
+    link: "/guides/workforce",
+  },
 ];

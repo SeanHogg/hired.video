@@ -59,6 +59,8 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Lazy load non-critical pages
 const PlacementDetail = lazy(() => import("./pages/recruiter/PlacementDetail"));
+const ForAgencies = lazy(() => import("./pages/ForAgencies"));
+const WorkforceGuide = lazy(() => import("./pages/guides/WorkforceGuide"));
 const BlogIndex = lazy(() => import("./pages/blog/BlogIndex"));
 const BlogPost = lazy(() => import("./pages/blog/BlogPost"));
 const PostAJob = lazy(() => import("./pages/PostAJob"));
@@ -642,6 +644,8 @@ const App = () => (
                         path="/for-recruiters"
                         element={<ForRecruiters />}
                       />
+                      <Route path="/for-agencies" element={<ForAgencies />} />
+                      <Route path="/guides/workforce" element={<WorkforceGuide />} />
                       <Route path="/about" element={<About />} />
                       <Route path="/careers" element={<Careers />} />
                       <Route path="/resumes" element={<Resumes />} />

@@ -40,6 +40,10 @@ import {
   Trophy,
   GraduationCap,
   MapPin,
+  Phone,
+  ListChecks,
+  Send,
+  Wand2,
 } from "lucide-react";
 import {
   PRO_MONTHLY_PRICE as PRO_MONTHLY_PRICE_DEFAULT,
@@ -117,7 +121,7 @@ export default function Pricing() {
       {
         name: "Pro",
         description:
-          "Full access to hired.video — 1M AI tokens/mo, 1080p + 4K video, PDF / CBZ comic export, voice cloning, brand kits, unlimited published projects.",
+          "Full access to hired.video — 1M AI tokens/mo, 1080p + 4K video, PDF / CBZ comic export, voice cloning, brand kits, unlimited published projects, plus the built-in Learning Content Library (SCORM 1.2 + xAPI + verifiable certificates — LinkedIn Learning is separately licensed at ~$379/seat/yr; ours is included).",
         monthlyPrice: basePrice,
         annualPrice: PRO_YEARLY_PRICE,
       },
@@ -176,7 +180,7 @@ export default function Pricing() {
         "Chrome extension — job tracking & match scoring",
         "50K AI tokens / mo",
         "Career Home dashboard & community feed",
-        "Unlimited networking — connections & followers",
+        "Unlimited networking — connections, followers, warm intros through mutuals, coffee meetups & free DMs to any user (no InMail credits)",
         "Apply to jobs with video / comic intros + 1-click Auto-Apply (Pro-gated for bulk)",
         "AI Studio — 1080p video, PNG-strip comic export (with watermark)",
         "AI interview practice (limited) + AI Coach / Career360 gap analysis",
@@ -211,7 +215,7 @@ export default function Pricing() {
       freeFeatures: [
         "Applicant Tracking System (ATS) + visual Kanban pipeline",
         "Unlimited job postings (Google for Jobs structured-data indexed)",
-        "Recruiter Chrome extension — profile & company extraction",
+        "Recruiter Chrome extension — Loxo-Boost-parity capture with personal email + phone + LinkedIn/GitHub/X/website enrichment, bulk capture from search-result pages, lists + call queues, outreach sequences, click-to-call (recorded VoIP), and the interactive 🪄 picker",
         "Unlimited searchable talent pool + Boolean operators (AND/OR/NOT/quoted)",
         "Basic interview scheduling (1-way calendar)",
         "Up to 2 team members",
@@ -225,7 +229,13 @@ export default function Pricing() {
         "Smart outreach campaigns, follow-up sequences, AI message personalization",
         "Two-way calendar sync (Google + Outlook) with interview-slot generator",
         "Video resume screening + transcript search",
-        "Structured scorecards + interview kits (Greenhouse-style, embedded in candidate detail)",
+        "Structured scorecards + interview kits + competency framework with leveled rubrics",
+        "Calibration sessions — re-score past candidates blind, see per-attribute deltas vs. real decisions",
+        "Blind / anonymous review mode — hide candidate identity + peer scorecards from evaluators until they submit",
+        "Bias linter — inline LLM flags coded-language ('culture fit', gendered descriptors) while scorecards are written",
+        "Take-home assignments — candidate magic-link delivery + reviewer scorecard binding",
+        "Scorecard SLAs + interviewer reliability tracking (on-time %, avg lag, overdue count)",
+        "AI question generator — calibrated to competency + level (closes rubric/question coverage gaps)",
         "Validated AI hiring assessments — Big Five (IPIP), cognitive, SJT, EQ, DISC",
         "Async interview recorder + reviewer (Frame.io-style time-coded comments)",
         "Exclusive job boards + bidding marketplace (recruiter auction)",
@@ -875,6 +885,114 @@ export default function Pricing() {
                           {persona === USER_ROLES.JOB_SEEKER
                             ? "—"
                             : "Unlimited"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          Personal email + phone + social URL enrichment on capture
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <ListChecks className="h-4 w-4 text-muted-foreground" />
+                          Bulk capture from LinkedIn / Indeed / GitHub search results (up to 25/click)
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          Click-to-call (recorded VoIP via SignalWire)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Requires phone number"}
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "100 min/mo included"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Lists + Call Queues (add from extension picker)
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Send className="h-4 w-4 text-muted-foreground" />
+                          Outreach sequence enrollment from extension
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Wand2 className="h-4 w-4 text-muted-foreground" />
+                          Interactive 🪄 picker (job / profile / company modes with replay)
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                       </tr>
                       <tr>

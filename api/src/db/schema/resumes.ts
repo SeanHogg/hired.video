@@ -96,6 +96,21 @@ export const resumeTemplates = pgTable("resume_templates", {
   // this flag when recommending a template for tech → AI-resilient
   // sector transitions.
   isPivotTemplate: boolean("is_pivot_template").notNull().default(false),
+  /** #158 — Marketplace fields. A creator-authored template defaults to
+   *  `private` and never lists publicly unless the owner explicitly
+   *  publishes it. The consent snapshot is required to flip
+   *  `visibility = 'public'`. The legacy `isPublic` flag stays for
+   *  platform-curated free templates; marketplace listings additionally
+   *  set `visibility = 'public'`. */
+  visibility: varchar("visibility", { length: 20 }).default("private").notNull(),
+  listingSlug: text("listing_slug"),
+  /** Snapshotted from PLATFORM_FEE_BPS_DEFAULT or the user's per-account
+   *  override at opt-in time. 500 = 5% platform fee, 95% to creator. */
+  platformFeeBps: integer("platform_fee_bps").default(500).notNull(),
+  priceCents: integer("price_cents").default(0).notNull(),
+  consentAgreedAt: timestamp("consent_agreed_at", { withTimezone: true }),
+  consentIp: text("consent_ip"),
+  consentUa: text("consent_ua"),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

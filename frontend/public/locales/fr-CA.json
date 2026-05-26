@@ -779,7 +779,7 @@
   "faq.recruiters.gdprQ": "Est hired.video GDPR-compliant?",
   "faq.recruiters.importA": "Oui. Importez des candidats en lot à partir d'un CSV, de votre ATS existant ou via notre API. Les étiquettes et les notes existantes sont préservées.",
   "faq.recruiters.importQ": "Puis-j’importer mon existing candidate ou candidat database?",
-  "faq.recruiters.linkedinA": "Oui. L’extension captures candidate ou candidat profils de LinkedIn, Indeed, AngelList, et 20+ other tableaux. Profils importer dans un offre d’emploi pipeline dans un cliquer.",
+  "faq.recruiters.linkedinA": "Oui — et bien au-delà de la simple capture de profil. Sur LinkedIn, Indeed, GitHub et AngelList, l’extension recruteur capture des candidats un à un ou en lot depuis les pages de résultats de recherche (jusqu’à 25 par clic), enrichit automatiquement chaque profil avec l’e-mail personnel + le téléphone + les URL LinkedIn / GitHub / X / site web, les ajoute à un pipeline d’emploi, à une liste, à une file d’appels ou à une séquence d’approche en un clic, et prend en charge le click-to-call (VoIP enregistré), le click-to-SMS et le click-to-email — chaque action étant automatiquement consignée dans la chronologie d’activité du candidat. Parité Loxo Boost à 9,95 $/poste/mois.",
   "faq.recruiters.linkedinQ": "Fait le Chrome extension travail sur LinkedIn?",
   "faq.recruiters.matchingA": "Correspondre scores combine compétences, expérience, emplacement, et CV texte against l’offre d’emploi description. Recruteurs et recruteuses routinely voir 80–95% relevance sur le principal résultats, mais vous peut toujours tune le weighting.",
   "faq.recruiters.matchingQ": "Quelle est la précision de l'appariement par IA?",

@@ -206,6 +206,51 @@ export const enrichmentTransactions = pgTable("enrichment_transactions", {
 ]);
 
 // ---------------------------------------------------------------------------
+// Campaign Dollars (#169) — ad/boost credit balance redeemable from
+// gamification points. Mirrors enrichment_credits + Tremendous flow but
+// terminates in an internal ledger that the boosts checkout consumes
+// before charging a card. Points → cents at a per-user snapshot rate.
+// ---------------------------------------------------------------------------
+export const campaignDollarsBalance = pgTable("campaign_dollars_balance", {
+  id:                   uuid("id").primaryKey().defaultRandom(),
+  userId:               uuid("user_id").notNull().unique(),
+  balanceCents:         integer("balance_cents").notNull().default(0),
+  lifetimeGrantedCents: integer("lifetime_granted_cents").notNull().default(0),
+  lifetimeSpentCents:   integer("lifetime_spent_cents").notNull().default(0),
+  /** Snapshotted on first opt-in. Falls back to platform default when
+   *  NULL. Insulates the user from later global rate adjustments. */
+  rateCentsPer1kPoints: integer("rate_cents_per_1k_points"),
+  createdAt:            timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:            timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type CampaignDollarsBalance = typeof campaignDollarsBalance.$inferSelect;
+export type NewCampaignDollarsBalance = typeof campaignDollarsBalance.$inferInsert;
+
+export const campaignDollarsTransactions = pgTable(
+  "campaign_dollars_transactions",
+  {
+    id:                  uuid("id").primaryKey().defaultRandom(),
+    userId:              uuid("user_id").notNull(),
+    /** "grant_redemption" | "boost_spend" | "ad_spend" | "refund" */
+    kind:                varchar("kind", { length: 32 }).notNull(),
+    /** Signed: positive = credit, negative = debit. */
+    amountCents:         integer("amount_cents").notNull(),
+    balanceAfterCents:   integer("balance_after_cents").notNull(),
+    referenceId:         text("reference_id"),
+    referenceType:       varchar("reference_type", { length: 40 }),
+    description:         text("description"),
+    createdAt:           timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_campaign_dollars_tx_user").on(t.userId, t.createdAt),
+  ],
+);
+
+export type CampaignDollarsTransaction = typeof campaignDollarsTransactions.$inferSelect;
+export type NewCampaignDollarsTransaction = typeof campaignDollarsTransactions.$inferInsert;
+
+// ---------------------------------------------------------------------------
 // Career Resilience Reports (gap #103)
 // ---------------------------------------------------------------------------
 export const careerResilienceReports = pgTable("career_resilience_reports", {

@@ -271,6 +271,19 @@ function HomeMarketingPage() {
                   <ToolCard key={tool.id} tool={tool} />
                 ))}
               </div>
+              {/* Built-in learning library teaser — keeps the home page
+                  surface lean (no new section) while still planting the
+                  flag against LinkedIn Learning's ~$379/seat/yr SKU.
+                  /learning redirects to /tools?tab=learning. */}
+              <div className="mt-10 text-center">
+                <Link
+                  to="/learning"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                >
+                  Plus: built-in Learning Library — AI, RAG, prompt engineering, must-have skills. No separate license.
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
 
             {/* Templates — pulled from the unified registry so creator-

@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  hreflang annotations on the marketing-funnel URLs below advertise the
+  Spanish and Canadian-French variants to search engines (gap #1467).
+  Each top-of-funnel URL emits `xhtml:link rel="alternate" hreflang="X"`
+  for en / es / fr-CA + x-default. Locale variants use the `?lang=X`
+  query string convention also honoured by the SPA i18n bootstrap.
+  Long-tail tool / SEO landing URLs further down are still English-only
+  pending a follow-up sitemap-localization pass.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
@@ -7,53 +17,99 @@
   <!-- ===== Homepage ===== -->
   <url>
     <loc>https://hired.video/</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/?lang=fr-CA" />
   </url>
 
   <!-- ===== Core Products ===== -->
   <url>
     <loc>https://hired.video/studio</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/studio" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/studio" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/studio?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/studio?lang=fr-CA" />
   </url>
 
   <url>
     <loc>https://hired.video/resumes</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/resumes" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/resumes" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/resumes?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/resumes?lang=fr-CA" />
   </url>
 
   <url>
     <loc>https://hired.video/jobs</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/jobs" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/jobs" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/jobs?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/jobs?lang=fr-CA" />
   </url>
 
   <url>
     <loc>https://hired.video/companies</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/companies" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/companies" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/companies?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/companies?lang=fr-CA" />
   </url>
 
   <url>
     <loc>https://hired.video/people</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/people" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/people" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/people?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/people?lang=fr-CA" />
+  </url>
+
+  <url>
+    <loc>https://hired.video/tasks</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://hired.video/vs-competitors</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/vs-competitors" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/vs-competitors" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/vs-competitors?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/vs-competitors?lang=fr-CA" />
   </url>
 
   <!-- ===== Lead-Gen & Engagement ===== -->
   <url>
     <loc>https://hired.video/for-recruiters</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/for-recruiters" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/for-recruiters" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/for-recruiters?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/for-recruiters?lang=fr-CA" />
   </url>
 
   <url>
@@ -72,9 +128,13 @@
 
   <url>
     <loc>https://hired.video/post-a-job</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/post-a-job" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/post-a-job" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/post-a-job?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/post-a-job?lang=fr-CA" />
   </url>
 
   <url>
@@ -93,17 +153,66 @@
 
   <url>
     <loc>https://hired.video/signup</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/signup" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/signup" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/signup?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/signup?lang=fr-CA" />
   </url>
 
-  <!-- ===== AI Tools (high-value SEO pages) ===== -->
+  <!-- ===== AI Tools + Learning (high-value SEO pages) ===== -->
   <url>
     <loc>https://hired.video/tools</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+  </url>
+
+  <!-- Learning Content Library hub (alias redirects to /tools?tab=learning).
+       Distinct sitemap entry so SEO crawlers index the L&D positioning
+       page without depending on a JS-rendered tab toggle. -->
+  <url>
+    <loc>https://hired.video/learning</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Seeded Learning Content Library — five platform-authored SCORM 1.2
+       courses (AI, RAG, prompt eng, must-have skills, Claude API).
+       Permanent public URLs; index for SEO so the LinkedIn-Learning
+       competitor copy has crawlable course pages to point at. -->
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/ai-fundamentals-for-job-seekers</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/retrieval-augmented-generation-rag</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/prompt-engineering-essentials</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/ai-era-must-have-skills</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hired.video/courses/hired-video-learning/building-with-the-claude-api</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
 
   <url>
@@ -156,6 +265,13 @@
   </url>
 
   <url>
+    <loc>https://hired.video/tools/vendor-sync</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
     <loc>https://hired.video/tools/pdf-to-json</loc>
     <lastmod>2026-04-17</lastmod>
     <changefreq>monthly</changefreq>
@@ -186,16 +302,24 @@
   <!-- ===== Marketing Pages ===== -->
   <url>
     <loc>https://hired.video/pricing</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/pricing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/pricing?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/pricing?lang=fr-CA" />
   </url>
 
   <url>
     <loc>https://hired.video/about</loc>
-    <lastmod>2026-04-17</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/about" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/about" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/about?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/about?lang=fr-CA" />
   </url>
 
   <url>

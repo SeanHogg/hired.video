@@ -438,7 +438,12 @@ export const USER_TASK_GATE_THRESHOLD = 100;
  * `ai_credits_*` rates derived from the token-pack cost basis
  * (≈ $3 / 1M tokens; 1000 pts ≈ $1 retail).
  */
-export type RedemptionKind = "ai_credits" | "premium_month" | "gift_card";
+/** #169 — `campaign_dollars` grants ad/boost spend credits into the
+ *  internal campaignDollarsBalance ledger. Distinct from gift_card
+ *  (cash equivalent — IRS taxable) because Campaign $ can only be spent
+ *  on platform inventory. The KYC threshold logic in redemption-engine
+ *  skips this kind for that reason. */
+export type RedemptionKind = "ai_credits" | "premium_month" | "gift_card" | "campaign_dollars";
 
 export interface RedemptionSku {
   id: string;
@@ -465,6 +470,14 @@ export const REDEMPTION_CATALOG: RedemptionSku[] = [
   { id: "gift_card_10", kind: "gift_card", label: "$10 gift card", pointsCost: 10_000, grant: { vendor: "tremendous", amountCents: 1_000 } },
   { id: "gift_card_25", kind: "gift_card", label: "$25 gift card", pointsCost: 25_000, grant: { vendor: "tremendous", amountCents: 2_500 } },
   { id: "gift_card_50", kind: "gift_card", label: "$50 gift card", pointsCost: 50_000, grant: { vendor: "tremendous", amountCents: 5_000 } },
+
+  // #169 — Campaign $ redemption store. Same value-per-point as gift
+  // cards (1000 pts ≈ $1) so the user isn't penalised for choosing
+  // platform credit over a Visa gift card.
+  { id: "campaign_dollars_5", kind: "campaign_dollars", label: "$5 Campaign credit", pointsCost: 5_000, grant: { amountCents: 500 } },
+  { id: "campaign_dollars_10", kind: "campaign_dollars", label: "$10 Campaign credit", pointsCost: 10_000, grant: { amountCents: 1_000 } },
+  { id: "campaign_dollars_25", kind: "campaign_dollars", label: "$25 Campaign credit", pointsCost: 25_000, grant: { amountCents: 2_500 } },
+  { id: "campaign_dollars_50", kind: "campaign_dollars", label: "$50 Campaign credit", pointsCost: 50_000, grant: { amountCents: 5_000 } },
 ];
 
 export function getRedemptionSku(id: string): RedemptionSku | null {

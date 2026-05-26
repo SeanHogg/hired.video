@@ -30,6 +30,8 @@ const {
   userBadges,
   pointRedemptions,
   userTaxStatus,
+  campaignDollarsBalance,
+  campaignDollarsTransactions,
 } = schema;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -666,6 +668,77 @@ export class PointsRepository implements IPointsRepository {
       })
       .returning();
     return row as UserTaxStatusRow;
+  }
+
+  /** #169 — Grant Campaign $ into the user's balance. Idempotent on the
+   *  redemption row: re-running the same `redemptionId` is a no-op. */
+  async grantCampaignDollars(args: {
+    userId: string;
+    amountCents: number;
+    redemptionId: string;
+    description: string;
+  }): Promise<void> {
+    // Dedup guard: if a transaction with this reference_id already exists
+    // we're processing a retry — skip both the balance bump and the
+    // transaction insert.
+    const existing = await this.db
+      .select({ id: campaignDollarsTransactions.id })
+      .from(campaignDollarsTransactions)
+      .where(
+        and(
+          eq(campaignDollarsTransactions.referenceId, args.redemptionId),
+          eq(campaignDollarsTransactions.referenceType, "redemption"),
+        ),
+      )
+      .limit(1);
+    if (existing.length > 0) return;
+
+    const [bumped] = await this.db
+      .insert(campaignDollarsBalance)
+      .values({
+        userId: args.userId,
+        balanceCents: args.amountCents,
+        lifetimeGrantedCents: args.amountCents,
+      })
+      .onConflictDoUpdate({
+        target: campaignDollarsBalance.userId,
+        set: {
+          balanceCents: sql`${campaignDollarsBalance.balanceCents} + ${args.amountCents}`,
+          lifetimeGrantedCents: sql`${campaignDollarsBalance.lifetimeGrantedCents} + ${args.amountCents}`,
+          updatedAt: this.now(),
+        },
+      })
+      .returning();
+
+    await this.db.insert(campaignDollarsTransactions).values({
+      userId: args.userId,
+      kind: "grant_redemption",
+      amountCents: args.amountCents,
+      balanceAfterCents: bumped.balanceCents,
+      referenceId: args.redemptionId,
+      referenceType: "redemption",
+      description: args.description,
+    });
+  }
+
+  /** Read current Campaign $ balance row. Used by /api/campaign-dollars
+   *  + by boost checkout. */
+  async findCampaignDollarsBalance(userId: string) {
+    const [row] = await this.db
+      .select()
+      .from(campaignDollarsBalance)
+      .where(eq(campaignDollarsBalance.userId, userId))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async listCampaignDollarsTransactions(userId: string, limit: number) {
+    return await this.db
+      .select()
+      .from(campaignDollarsTransactions)
+      .where(eq(campaignDollarsTransactions.userId, userId))
+      .orderBy(desc(campaignDollarsTransactions.createdAt))
+      .limit(limit);
   }
 
   async markW9Collected(

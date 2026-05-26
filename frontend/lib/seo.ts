@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { DEFAULT_LOCALE, PUBLIC_LOCALES, type Locale } from "@shared/i18n";
 
 export interface SEOData {
   title?: string;
@@ -18,6 +20,10 @@ export interface SEOData {
   robots?: string;
   author?: string;
   structuredData?: object;
+  /** BCP47 tag for the document body's primary language. Reflected onto
+   *  `<html lang>`. When omitted, the existing `<html lang>` attribute
+   *  is left alone — useSEO supplies the active i18n locale by default. */
+  htmlLang?: string;
 }
 
 /**
@@ -46,7 +52,7 @@ export const ORGANIZATION_SCHEMA = {
     "@type": "ContactPoint",
     contactType: "customer support",
     email: "info@hired.video",
-    availableLanguage: ["English"],
+    availableLanguage: ["English", "Spanish", "French"],
   },
 };
 
@@ -184,9 +190,9 @@ export const PAGE_SEO: Record<string, SEOData> = {
   "/chrome-extension": {
     title: "Chrome Extensions for Job Seekers & Recruiters — hired.video",
     description:
-      "Track jobs, score resumes, and source candidates on LinkedIn, Indeed, Glassdoor and 16+ job boards — without leaving the page. Free Chrome extension.",
+      "Two Chrome extensions, one platform. Job seekers track jobs + score resumes + AI-tailor variations. Recruiters get Loxo-Boost-parity sourcing: profile capture with email / phone / social URL enrichment, bulk capture from search results, click-to-call (recorded VoIP), lists + call queues, outreach sequences, and a tracked-jobs tab — all for $9.95/seat/mo vs. Loxo's $169/user/mo.",
     keywords:
-      "chrome extension, linkedin chrome extension, job tracker extension, resume scorer chrome, ATS chrome extension, sourcing tool",
+      "chrome extension, linkedin chrome extension, job tracker extension, resume scorer chrome, ATS chrome extension, sourcing tool, loxo alternative, loxo boost alternative, recruiter chrome extension, candidate sourcing extension, contact enrichment extension, click to call extension, recruiter VoIP, outreach sequences, talent pool extension, candidate capture",
   },
   "/affiliate-program": {
     title: "Affiliate Program: Earn 25% — hired.video",
@@ -201,9 +207,9 @@ export const PAGE_SEO: Record<string, SEOData> = {
   "/for-agencies": {
     title: "For Staffing Agencies: Bullhorn-class back-office at $9.95/seat — hired.video",
     description:
-      "Place candidates, capture time, approve timesheets, derive invoices, track desk margin. Helcim push live; QuickBooks / Xero / Gusto / DocuSign ready. $9.95 per active employee — one tenth of Bullhorn / Vincere.",
+      "Place candidates, capture time, approve timesheets, derive invoices, track desk margin — plus a built-in learning content library (AI, RAG, prompt engineering, must-have skills) so placed contractors can upskill on day one. Helcim push live; QuickBooks / Xero / Gusto / DocuSign ready. $9.95 per active employee — one tenth of Bullhorn / Vincere, and LinkedIn Learning is bundled-equivalent at no extra cost.",
     keywords:
-      "staffing agency software, bullhorn alternative, vincere alternative, recruiting back office, contractor timesheets, placement management, desk margin reporting, agency CRM",
+      "staffing agency software, bullhorn alternative, vincere alternative, recruiting back office, contractor timesheets, placement management, desk margin reporting, agency CRM, contractor upskilling, SCORM training for contractors, LinkedIn Learning alternative for agencies",
   },
   // Help-center guide for workforce operators (#1349). Step-by-step
   // walkthrough of invite → punch → submit → approve → invoice.
@@ -423,9 +429,9 @@ export const PAGE_SEO: Record<string, SEOData> = {
   "/pricing": {
     title: "Pricing: Plans for Job Seekers, Recruiters & Teams — hired.video",
     description:
-      "Start free, upgrade when you're ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — cancel anytime.",
+      "Start free, upgrade when you're ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — including the built-in Learning Content Library (AI, RAG, prompt engineering, must-have skills) bundled at no extra cost vs LinkedIn Learning's separately-licensed ~$379/seat/yr SKU. Cancel anytime.",
     keywords:
-      "hired.video pricing, video resume pricing, resume builder cost, recruiter plan, ats pricing, annual subscription",
+      "hired.video pricing, video resume pricing, resume builder cost, recruiter plan, ats pricing, annual subscription, built-in learning library pricing, LinkedIn Learning alternative pricing, SCORM courses included",
   },
   "/for-recruiters": {
     title:
@@ -537,32 +543,51 @@ export const PAGE_SEO: Record<string, SEOData> = {
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
-  "/people": {
-    title: "Professional Network — hired.video",
+  "/people/scorecards": {
+    title:
+      "Scorecards, Interview Kits, Calibration & Bias Linter — Structured Hiring on hired.video",
     description:
-      "Connect with professionals, recruiters, and industry leaders. Build your network and advance your career.",
+      "Run Greenhouse-grade structured interviews on hired.video: reusable scorecard templates, interview kits, calibration sessions, blind review, AI bias linter, take-home assignments, competency framework, interviewer reliability tracking, and AI question generation — all in one workspace.",
     keywords:
-      "professional networking, career connections, industry professionals, networking platform",
+      "structured interview, interview scorecard, scorecard template, interview kit, calibration session, blind interview review, hiring bias linter, take-home assignment, competency framework, interviewer reliability, AI interview questions, hiring panel, hire faster, Greenhouse alternative, Lever alternative, Ashby alternative",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: "Scorecards & Interview Kits — hired.video",
+      url: "https://hired.video/people/scorecards",
+      dateModified: "2026-05-26",
+      description:
+        "Structured-hiring scorecards, multi-evaluator debriefs, interview kits, calibration sessions, blind review, bias linter, take-home assignments, and AI question generation.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
+  },
+  "/people": {
+    title: "Professional Network — Warm Intros, Coffee Chats & Direct Messaging — hired.video",
+    description:
+      "Connect with professionals, recruiters, and industry leaders. Ask any mutual connection for a warm intro, grab coffee with someone open to it, and DM anyone — no InMail credits, no paywall. Build your network and advance your career.",
+    keywords:
+      "professional networking, warm introductions, ask for an intro, coffee chats, networking events, free direct messaging, LinkedIn InMail alternative, career connections, industry professionals, networking platform",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
       name: "Professional Network — hired.video",
       url: "https://hired.video/people",
-      dateModified: "2026-04-17",
-      description: "Connect with professionals, recruiters, and industry leaders on hired.video.",
+      dateModified: "2026-05-26",
+      description:
+        "Connect with professionals on hired.video — request warm intros through mutual connections, schedule coffee meetups, and message any user for free.",
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
   "/tasks": {
-    // `/tasks` hosts three surfaces — Tasks, My events & coffee, and
-    // Discover (events grid + map). Discover is the unauth default, so
+    // `/tasks` hosts four surfaces — Tasks, My events & coffee, Warm intros,
+    // and Discover (events grid + map). Discover is the unauth default, so
     // SEO has to read as a public event-discovery landing first, with
-    // task-management as a secondary signal.
-    title: "Career Events, Map & Task Hub — hired.video",
+    // task-management + networking commitments as secondary signals.
+    title: "Career Events, Coffee Meetups, Warm Intros & Task Hub — hired.video",
     description:
-      "Find networking events near you on the map, RSVP to meetups and workshops with AI-matched introductions, and organize your job search with built-in task management. Hosting events is free for everyone.",
+      "Find networking events near you on the map, RSVP to meetups and workshops, accept coffee invites, forward warm intros to your network, and organize your job search with built-in task management. Hosting events is free for everyone.",
     keywords:
-      "career events, networking events, events near me, career map, professional meetups, coffee chats, AI matchmaking, task management, job search organization, productivity tools",
+      "career events, networking events, events near me, warm introductions, get introduced, coffee chats, professional meetups, career map, AI matchmaking, task management, job search organization, productivity tools",
   },
   "/outreach": {
     title: "Professional Outreach — hired.video",
@@ -663,24 +688,55 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords: "tutorials, video guides, how-to, learn hired.video",
   },
   "/tools": {
-    title: "Free AI Career Tools: Resume Scorer, Optimizer, Value Prop — hired.video",
+    title: "Tools & Learning: AI Career Tools + Built-in SCORM Learning Library — hired.video",
     description:
-      "Free AI career tools from hired.video: resume scorer, ATS optimizer, salary calculator, job-resume match, sentiment analysis, and value proposition builder. No signup to try.",
+      "Free AI career tools from hired.video — resume scorer, ATS optimizer, salary calculator, interview practice, and a built-in learning content library (AI, RAG, prompt engineering, must-have skills) with SCORM 1.2 + xAPI + HMAC-signed verifiable certificates. No separate license required.",
     keywords:
-      "AI career tools, AI resume scorer, resume optimizer, ATS resume checker, salary calculator, job match, value proposition, free career tools, AI job search",
-    ogTitle: "Free AI Career Tools — hired.video",
+      "AI career tools, AI resume scorer, resume optimizer, ATS resume checker, salary calculator, job match, value proposition, free career tools, AI job search, built-in learning content library, SCORM 1.2 player, xAPI LRS, AI courses, RAG course, prompt engineering course, must-have AI skills",
+    ogTitle: "Tools & Learning — hired.video",
     ogDescription:
-      "Score, optimize, and tailor your resume with AI. Free to try — no signup needed to start.",
+      "Score and optimize your resume with AI, then upskill in the built-in learning library (AI, RAG, prompt engineering). Bundled — no separate license needed.",
     ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
-      name: "hired.video AI Career Tools",
+      name: "hired.video Tools & Learning",
       url: "https://hired.video/tools",
       description:
-        "A collection of free AI-powered career tools including resume scoring, ATS optimization, salary analysis, job-resume matching, and value proposition generation.",
+        "AI-powered career tools (resume scoring, ATS optimization, salary analysis, job-resume matching) plus a built-in learning content library covering AI fundamentals, Retrieval-Augmented Generation, prompt engineering, and the AI-era must-have skills.",
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
+  },
+  "/learning": {
+    title: "Built-in Learning Content Library — AI, RAG, Must-Have Skills (No Separate License) — hired.video",
+    description:
+      "Platform-seeded SCORM 1.2 courses on AI fundamentals, Retrieval-Augmented Generation, prompt engineering, AI-era must-have skills, and building with the Claude API. Bundled with every plan — LinkedIn Learning is a separate ~$379/seat/yr SKU; ours is included. HMAC-signed verifiable certificates issue on course pass.",
+    keywords:
+      "built-in learning library, SCORM 1.2 courses, xAPI LRS, AI fundamentals course, RAG course, prompt engineering course, must-have AI skills, Claude API course, LinkedIn Learning alternative, employer training authoring, verifiable certificate",
+    ogTitle: "Built-in Learning Content Library — hired.video",
+    ogDescription:
+      "SCORM-tracked AI, RAG, prompt-engineering and must-have-skills courses bundled with every plan. Verified certificates issue on course pass.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "hired.video Learning Content Library",
+      url: "https://hired.video/learning",
+      description:
+        "Platform-authored SCORM 1.2 courses on AI fundamentals, Retrieval-Augmented Generation, prompt engineering, the AI-era must-have skills, and building with the Claude API. Bundled with every plan — no separate license required.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
+  },
+  "/verify": {
+    title: "Verify Certificate — hired.video",
+    description:
+      "Verify a hired.video learning certificate. HMAC-signed, tamper-evident, course-pass-issued. Paste a cert number or open a share link to confirm authenticity.",
+    keywords:
+      "certificate verification, verify hired.video certificate, HMAC-signed certificate, course completion certificate, training certificate verification",
+    ogTitle: "Verify Certificate — hired.video",
+    ogDescription:
+      "HMAC-signed, course-pass-issued certificates — paste a cert number to verify.",
+    ogImage: "https://hired.video/og-image.svg",
   },
   "/tools/ai-resume-scorer": {
     title: "AI Resume Scorer: Free ATS Resume Grader — hired.video",
@@ -926,12 +982,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
   "/tools/vendor-sync": {
     title: "LinkedIn & Profile Sync: One Master Resume, Every Vendor — hired.video",
     description:
-      "Sync your hired.video master resume out to LinkedIn, Indeed, Glassdoor, GitHub, Wellfound and more. Pull updates back via the Chrome extension. Track which variant landed where.",
+      "Keep your LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, Wellfound, Dice, and GitHub profiles aligned with one master resume. Chrome extension extracts profile edits, merges them into your master, and auto-fills Headline + Summary back into supported vendor editors. Track which variant landed where.",
     keywords:
-      "linkedin profile sync, resume sync, profile updater, linkedin auto-update, profile copilot, indeed profile sync, glassdoor profile sync, github profile sync, wellfound sync",
-    ogTitle: "LinkedIn & Profile Sync — one master resume, many profile updates",
+      "linkedin profile sync, resume sync, profile updater, linkedin auto-fill, profile copilot, indeed profile sync, glassdoor profile sync, ziprecruiter sync, monster profile sync, github profile sync, wellfound sync, dice profile sync",
+    ogTitle: "LinkedIn & Profile Sync — one master resume, every job-board profile",
     ogDescription:
-      "Push your master resume to every job-board profile from one place. Chrome extension pulls vendor-side edits back into your master.",
+      "Render paste-ready blocks for 9 vendors; extract profile edits back via the Chrome extension on 8 of them; auto-fill Headline + Summary on LinkedIn / Indeed / Glassdoor / ZipRecruiter / Wellfound / Dice / Monster.",
     ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
@@ -1176,6 +1232,48 @@ export function updateMetaTags(seoData: SEOData): void {
     canonical.setAttribute("href", seoData.canonical);
   }
 
+  // Inject hreflang alternate links. Each supported locale gets its own
+  // <link rel="alternate" hreflang="X" href="...?lang=X"> plus one
+  // `x-default` pointing at the bare URL (which the cookie/detector
+  // resolves to the visitor's preferred locale). This is the signal
+  // Google Search uses to surface the right language version per user
+  // — without it, Mexican / Quebec Google never sees the localized
+  // catalogue and only indexes the en variant.
+  //
+  // We use ?lang= query strings instead of /es/* /fr-CA/* path prefixes
+  // because the SPA routes are flat and the i18n bootstrap already
+  // honours ?lang= (see frontend/lib/i18n/i18n.ts). Each locale variant
+  // is a separately-indexable URL with the same content surface.
+  if (seoData.canonical) {
+    // Wipe any prior hreflang links so navigating from /pricing to /jobs
+    // doesn't leak stale alternates.
+    document
+      .querySelectorAll('link[rel="alternate"][hreflang]')
+      .forEach((el) => el.remove());
+
+    const baseUrl = seoData.canonical.split("?")[0];
+    const addAlternate = (hreflang: string, href: string) => {
+      const link = document.createElement("link");
+      link.setAttribute("rel", "alternate");
+      link.setAttribute("hreflang", hreflang);
+      link.setAttribute("href", href);
+      document.head.appendChild(link);
+    };
+
+    addAlternate("x-default", baseUrl);
+    for (const loc of PUBLIC_LOCALES) {
+      const href = loc === DEFAULT_LOCALE ? baseUrl : `${baseUrl}?lang=${loc}`;
+      addAlternate(loc, href);
+    }
+  }
+
+  // Reflect the active UI locale on <html lang> so screen readers and
+  // crawlers know which language the body renders in. Falls back to the
+  // page's existing attribute if no locale was supplied.
+  if (seoData.htmlLang) {
+    document.documentElement.setAttribute("lang", seoData.htmlLang);
+  }
+
   // Add structured data
   if (seoData.structuredData) {
     // Remove existing structured data
@@ -1195,9 +1293,21 @@ export function updateMetaTags(seoData: SEOData): void {
 }
 
 /**
- * React hook for managing SEO
+ * React hook for managing SEO.
+ *
+ * Locale-aware: the active i18n locale is reflected onto `<html lang>`,
+ * baked into the canonical / og:url (`?lang=es` for non-default
+ * locales), and used to look up `seo.<path>.title` / `seo.<path>.description`
+ * catalogue keys that override the static English PAGE_SEO entries when
+ * present. hreflang alternates are emitted unconditionally — the
+ * non-English URL variants are always advertised to crawlers.
  */
 export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
+  const { i18n, t } = useTranslation();
+  const activeLocale = (PUBLIC_LOCALES as readonly string[]).includes(i18n.language)
+    ? (i18n.language as Locale)
+    : DEFAULT_LOCALE;
+
   useEffect(() => {
     // Canonicalize route path and normalize origin
     const canonicalPath = canonicalizePath(pathname);
@@ -1212,14 +1322,40 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
       ...customSEO,
     };
 
-    // Build canonical and og:url consistently
-    const url = `${CANONICAL_ORIGIN}${canonicalPath}`;
-
+    // Build canonical + og:url. Non-default locales get a `?lang=X`
+    // canonical so each language variant is a separately indexable URL.
+    const baseUrl = `${CANONICAL_ORIGIN}${canonicalPath}`;
+    const localizedUrl =
+      activeLocale === DEFAULT_LOCALE ? baseUrl : `${baseUrl}?lang=${activeLocale}`;
     if (!seoData.canonical) {
-      seoData.canonical = url;
+      seoData.canonical = localizedUrl;
     }
     if (!seoData.ogUrl) {
-      seoData.ogUrl = url;
+      seoData.ogUrl = localizedUrl;
+    }
+    if (!seoData.htmlLang) {
+      seoData.htmlLang = activeLocale;
+    }
+
+    // Locale-aware title + description overrides. When the catalogue
+    // carries `seo.<canonicalPath>.title` / `.description`, they win
+    // over the static English PAGE_SEO entry — so a Spanish or French
+    // visitor sees translated meta tags in the browser tab and in
+    // shared/social previews. Missing keys silently fall back to the
+    // English defaults (no flash of raw key — `defaultValue: ""`).
+    const titleKey = `seo.${canonicalPath}.title`;
+    const descKey = `seo.${canonicalPath}.description`;
+    const localizedTitle = t(titleKey, { defaultValue: "" });
+    const localizedDesc = t(descKey, { defaultValue: "" });
+    if (localizedTitle) {
+      seoData.title = localizedTitle;
+      seoData.ogTitle = seoData.ogTitle ?? localizedTitle;
+      seoData.twitterTitle = seoData.twitterTitle ?? localizedTitle;
+    }
+    if (localizedDesc) {
+      seoData.description = localizedDesc;
+      seoData.ogDescription = seoData.ogDescription ?? localizedDesc;
+      seoData.twitterDescription = seoData.twitterDescription ?? localizedDesc;
     }
 
     // Update meta tags
@@ -1232,7 +1368,7 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
         updateMetaTags(DEFAULT_SEO);
       }
     };
-  }, [pathname, customSEO]);
+  }, [pathname, customSEO, activeLocale, t]);
 }
 
 /**
