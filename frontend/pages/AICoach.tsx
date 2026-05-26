@@ -174,7 +174,7 @@ export default function AICoach() {
               ))}
 
             {/* Features Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               {coachingFeatures.map((feature, index) => {
                 const Icon = feature.icon;
                 return (
@@ -210,7 +210,7 @@ export default function AICoach() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {quickStartPrompts.map((prompt, index) => (
                     <Button
                       key={index}
@@ -235,7 +235,7 @@ export default function AICoach() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="text-center">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                       <span className="text-xl font-bold text-brand-blue">1</span>

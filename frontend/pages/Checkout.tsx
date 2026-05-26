@@ -235,7 +235,7 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
               </p>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Order Summary */}
               <div className="lg:order-2">
                 <Card className="sticky top-24">

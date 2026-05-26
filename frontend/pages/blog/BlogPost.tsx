@@ -277,7 +277,7 @@ export default function BlogPost() {
           {related.length > 0 && (
             <section className="mt-10 mb-6">
               <h2 className="text-2xl font-semibold mb-4">Related Guides</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {related.map((r) => (
                   <Link key={r.slug} to={`/blog/${r.slug}`} className="group">
                     <Card className="hover:shadow-md transition-shadow">

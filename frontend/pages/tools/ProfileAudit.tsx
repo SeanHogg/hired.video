@@ -217,7 +217,7 @@ export default function ProfileAudit() {
                   </TabsList>
 
                   <TabsContent value="card">
-                    <div className="grid lg:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <LabeledColumn label="Current" tone="neutral">
                         <PeopleCard person={currentCardPerson} />
                       </LabeledColumn>
@@ -228,7 +228,7 @@ export default function ProfileAudit() {
                   </TabsContent>
 
                   <TabsContent value="page">
-                    <div className="grid lg:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <ProfilePagePreview
                         data={currentPreview}
                         variantLabel="Current"
@@ -371,7 +371,7 @@ function checkIcon(status: ProfileAuditCheck["status"]) {
 function ScoreAndChecks({ score, checks, topFix, onOpenToWorkChanged }: ScoreAndChecksProps) {
   return (
     <Card>
-      <CardContent className="p-4 sm:p-6 grid md:grid-cols-3 gap-6 items-start">
+      <CardContent className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         <div className="text-center md:text-left">
           <p className="text-sm text-muted-foreground">Profile score</p>
           <p className={`text-5xl font-bold ${scoreColor(score)}`}>{score}<span className="text-xl text-muted-foreground">/100</span></p>
@@ -500,7 +500,7 @@ function RewriteRow({ label, before, after, rationale, accepted, onToggle }: Rew
           )}
         </Button>
       </div>
-      <div className="grid sm:grid-cols-2 gap-3 mb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
         <div className="bg-red-500/5 border border-red-500/20 p-2 rounded text-sm">
           <div className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">Before</div>
           <div className="whitespace-pre-wrap break-words">{before || <em className="text-muted-foreground">empty</em>}</div>

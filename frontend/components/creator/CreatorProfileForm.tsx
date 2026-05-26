@@ -100,7 +100,7 @@ export default function CreatorProfileForm({ onProfileChange }: Props = {}) {
       <CardContent className="p-5 space-y-4">
         <h2 className="font-semibold">Creator profile</h2>
         <p className="text-sm text-muted-foreground">These details surface on your public profile under the Services tab.</p>
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="cw-displayName">Display name</Label>
             <Input id="cw-displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />

@@ -1028,7 +1028,7 @@ function GapsTab({ skills }: { skills: Skill[] }) {
       )}
 
       {selectedJob && requiredSkills.length > 0 && (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="border-emerald-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-emerald-700">

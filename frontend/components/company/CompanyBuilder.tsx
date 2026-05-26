@@ -292,7 +292,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
               <CardDescription>Company name, logo, and general details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Company Name *</Label>
                   <Input
@@ -323,7 +323,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="size">Company Size *</Label>
                   <Select
@@ -452,7 +452,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
               <CardDescription>Email, phone, and social media</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -474,7 +474,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="linkedin">LinkedIn</Label>
                   <Input
@@ -518,7 +518,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
                 )}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="city">City *</Label>
                   <Input
@@ -548,7 +548,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="postalCode">Postal Code *</Label>
                   <Input
@@ -675,7 +675,7 @@ function BenefitsSection({
         <CardDescription>Employee benefits and perks</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
             { key: "healthInsurance", label: "Health Insurance" },
             { key: "dentalInsurance", label: "Dental Insurance" },

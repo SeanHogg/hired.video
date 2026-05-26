@@ -545,7 +545,7 @@ export default function SkillExtractor() {
           "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
       }}
     >
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left — input */}
               <div className="space-y-6">
                 <Card>

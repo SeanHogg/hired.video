@@ -271,7 +271,7 @@ export default function SentimentAnalysis() {
       containerClassName="max-w-6xl mx-auto space-y-8"
     >
             {/* Main Content */}
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left Column - Analysis Tool */}
               <div className="space-y-6">
                 <Card>
@@ -562,7 +562,7 @@ export default function SentimentAnalysis() {
                   </p>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6 mt-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                   <Card className="text-center">
                     <CardContent className="p-6">
                       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
@@ -613,7 +613,7 @@ export default function SentimentAnalysis() {
                 <h2 className="text-3xl font-bold text-center">
                   Why Resume Sentiment Matters
                 </h2>
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">
                       First Impressions Count
@@ -665,7 +665,7 @@ export default function SentimentAnalysis() {
                 <h2 className="text-3xl font-bold text-center">
                   How Our Sentiment Analysis Works
                 </h2>
-                <div className="grid md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <span className="text-2xl font-bold text-primary">1</span>
@@ -716,7 +716,7 @@ export default function SentimentAnalysis() {
                 <h2 className="text-3xl font-bold text-center">
                   Benefits of Resume Sentiment Analysis
                 </h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-green-600">

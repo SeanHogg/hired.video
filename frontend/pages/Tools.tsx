@@ -213,7 +213,7 @@ export default function Tools() {
               </div>
 
               {/* Stats Section */}
-              <div className="grid md:grid-cols-4 gap-6 mb-16">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">10+</div>
                   <p className="text-sm text-muted-foreground">
@@ -261,7 +261,7 @@ export default function Tools() {
             <h2 className="text-3xl font-bold text-center mb-12">
               How Our AI Tools Work
             </h2>
-            <div className="grid md:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FileText className="h-8 w-8 text-primary" />
@@ -317,7 +317,7 @@ export default function Tools() {
                 </p>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-pink-600 mb-2">
                     85%
@@ -363,7 +363,7 @@ export default function Tools() {
             <h2 className="text-3xl font-bold text-center mb-12">
               Tool Success Stories
             </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center mb-4">

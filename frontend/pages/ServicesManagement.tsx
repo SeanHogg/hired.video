@@ -361,7 +361,7 @@ export default function ServicesManagement() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   Built for Career Professionals
                 </h2>
-                <div className="grid md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card className="text-center">
                     <CardHeader>
                       <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />

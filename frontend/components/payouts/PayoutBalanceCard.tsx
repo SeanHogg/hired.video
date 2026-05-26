@@ -49,7 +49,7 @@ export default function PayoutBalanceCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Stat label="Available" cents={balance.availableCents} currency={balance.currency} primary />
           <Stat label="In flight" cents={balance.reservedCents} currency={balance.currency} icon={<Clock className="h-3.5 w-3.5" />} />
           <Stat label="Paid to date" cents={balance.paidCents} currency={balance.currency} icon={<CheckCircle2 className="h-3.5 w-3.5" />} />

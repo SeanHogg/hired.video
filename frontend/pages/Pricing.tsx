@@ -440,7 +440,7 @@ export default function Pricing() {
             </div>
 
             {/* Pricing Cards */}
-            <div className="grid md:grid-cols-2 gap-8 mb-16 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 max-w-4xl mx-auto">
               {/* Free Plan */}
               <Card className="relative border-2 border-border hover:border-primary/20 transition-colors">
                 <CardHeader className="text-center pb-8">
@@ -2099,7 +2099,7 @@ export default function Pricing() {
             </div>
 
             {/* FAQ & Support Section */}
-            <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               <Card className="text-center p-6 hover:shadow-lg transition-shadow">
                 <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary" />
                 <h3 className="font-semibold text-lg mb-2">

@@ -204,7 +204,7 @@ function NewTemplateForm({
             onChange={(e) => setName(e.target.value)}
           />
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Rating scale</Label>
             <Select value={ratingScale} onValueChange={(v) => setRatingScale(v as RatingScale)}>
@@ -366,7 +366,7 @@ function TemplateDetailEditor({
             <Label>Name</Label>
             <Input value={tpl.name} onChange={(e) => setTpl({ ...tpl, name: e.target.value })} />
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Rating scale</Label>
               <Select

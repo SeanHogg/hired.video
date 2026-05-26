@@ -219,7 +219,7 @@ export default function PayoutProfileForm() {
             <RadioGroup
               value={entityType}
               onValueChange={(v) => setEntityType(v as EntityType)}
-              className="grid sm:grid-cols-2 gap-3"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3"
             >
               <label className={`rounded-lg border p-3 cursor-pointer ${entityType === "individual" ? "border-primary bg-primary/5" : "border-border"}`}>
                 <div className="flex items-center gap-2">
@@ -239,7 +239,7 @@ export default function PayoutProfileForm() {
           </div>
 
           {/* Names */}
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="legalName">
                 {entityType === "business" ? "Authorized signer's legal name" : "Legal name"} *
@@ -265,7 +265,7 @@ export default function PayoutProfileForm() {
           </div>
 
           {/* Tax residency + ID */}
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label htmlFor="taxCountry">Tax residency *</Label>
               <Input
@@ -320,7 +320,7 @@ export default function PayoutProfileForm() {
           {/* Address */}
           <div className="space-y-3">
             <Label className="text-base">Address (used on the tax form and for 1099 mailing)</Label>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="addr1">Address line 1 *</Label>
                 <Input id="addr1" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} />

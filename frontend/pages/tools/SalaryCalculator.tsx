@@ -360,7 +360,7 @@ export default function SalaryCalculator() {
             </div>
 
             {/* Main Content */}
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left Column - Calculator Form */}
               <div className="space-y-6">
                 <Card>

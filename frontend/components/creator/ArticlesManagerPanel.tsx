@@ -389,7 +389,7 @@ export default function ArticlesManagerPanel() {
               This piece is in the review queue. Withdraw to make further edits.
             </div>
           )}
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="kind">Content type</Label>
               <Select value={kind} onValueChange={(v) => setKind(v as ArticleKind)} disabled={locked}>
@@ -438,7 +438,7 @@ export default function ArticlesManagerPanel() {
               />
             )}
           </div>
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="cat">Category</Label>
               <Input id="cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="career, hiring, AI…" disabled={locked} />
@@ -451,7 +451,7 @@ export default function ArticlesManagerPanel() {
           {/* Sector + audience taxonomy — drives sector landing pages
               and the For-Job-Seekers / For-Recruiters split. Both
               optional; leave blank for general career content. */}
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Sector</Label>
               <SectorPicker

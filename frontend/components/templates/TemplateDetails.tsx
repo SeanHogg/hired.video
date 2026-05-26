@@ -84,7 +84,7 @@ export default function TemplateDetails({ meta, compact = false }: Props) {
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_320px] gap-6 p-4 sm:p-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-4 sm:p-6">
       {previewBlock}
       <aside className="lg:border-l lg:pl-6">{infoBlock}</aside>
     </div>

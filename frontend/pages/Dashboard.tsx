@@ -255,7 +255,7 @@ export default function Dashboard() {
               </div>
 
               {/* Benefits Section */}
-              <div className="grid md:grid-cols-3 gap-8 mb-16">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <VideoIcon className="h-10 w-10 text-brand-purple mb-4" />

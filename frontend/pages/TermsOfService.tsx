@@ -520,7 +520,7 @@ export default function TermsOfService() {
                     <h4 className="font-medium mb-2 text-red-600">
                       As a user of the Services, you agree not to:
                     </h4>
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <ul className="list-disc list-inside text-muted-foreground space-y-1 text-sm">
                         <li>
                           Systematically retrieve data to create collections or
@@ -621,7 +621,7 @@ export default function TermsOfService() {
                       When you create or make available any Contributions, you
                       represent and warrant that:
                     </h4>
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <ul className="list-disc list-inside text-muted-foreground space-y-1 text-sm">
                         <li>
                           The creation, distribution, transmission, public
@@ -1954,7 +1954,7 @@ export default function TermsOfService() {
                     please contact us at:
                   </p>
 
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <h4 className="font-medium">Primary Contact</h4>
                       <div className="space-y-2">

@@ -793,7 +793,7 @@ export default function Tasks() {
               </div>
 
               {/* Stats */}
-              <div className="grid md:grid-cols-4 gap-6 mb-16">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
                 {[
                   { stat: t("labels.threshold10Plus"), label: t("labels.taskStatTaskTypesDesc") },
                   { stat: t("labels.taskStatThreeViews"), label: t("labels.taskStatThreeViewsDesc") },
@@ -812,7 +812,7 @@ export default function Tasks() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   {t("headings.everyCareerMoveOrganized")}
                 </h2>
-                <div className="grid md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                     <CardHeader>
                       <Calendar className="h-10 w-10 text-brand-purple mb-4" />
@@ -869,7 +869,7 @@ export default function Tasks() {
               {/* Task type showcase */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">{t("headings.builtForEveryStage")}</h2>
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-6 rounded-xl border border-border">
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                       <Briefcase className="h-5 w-5 text-brand-purple" />

@@ -166,7 +166,7 @@ export default function ArticlesIndex() {
         )}
 
         {!loading && !error && articles.length > 0 && (
-          <section className="pb-12 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <section className="pb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {articles.map((a) => (
               <ArticleCard key={a.id} article={a} />
             ))}

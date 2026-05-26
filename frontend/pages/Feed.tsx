@@ -84,7 +84,7 @@ function FeedMarketingPage() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               {[
                 { icon: Users, color: "text-brand-purple", title: "Share Career Milestones", desc: "Announce a new role, celebrate a promotion, or share a lesson learned." },
                 { icon: Globe, color: "text-brand-blue", title: "Hashtag-Powered Discovery", desc: "Tag posts with topics to reach the right professionals." },

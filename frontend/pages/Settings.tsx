@@ -533,7 +533,7 @@ function SettingsContent() {
                 </Link>
               </div>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader>
                   <CheckCircle className="h-8 w-8 text-emerald-600 mb-2" />
@@ -607,7 +607,7 @@ function SettingsContent() {
               </div>
 
               {/* Features Grid */}
-              <div className="grid md:grid-cols-3 gap-8 mb-16">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <User className="h-10 w-10 text-brand-purple mb-4" />
@@ -644,7 +644,7 @@ function SettingsContent() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   {t("headings.whyOurSettingsMatter")}
                 </h2>
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="flex items-start space-x-4">
                     <div className="bg-brand-purple/10 p-3 rounded-lg">
                       <Sliders className="h-6 w-6 text-brand-purple" />

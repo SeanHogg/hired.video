@@ -207,7 +207,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
 
   return (
     <>
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
       {/* Left: user-created services. Add Service / Lead Gen Settings
           buttons live in the tabs row in CreatorWorkspace (triggered via
           the imperative ref handle exposed below). */}

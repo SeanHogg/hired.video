@@ -293,7 +293,7 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
             <Label htmlFor="summary">Summary</Label>
             <Input id="summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One-line pitch shown on the course card" />
           </div>
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label htmlFor="cat">Category</Label>
               <Input id="cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="career, AI, leadership…" />

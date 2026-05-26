@@ -170,7 +170,7 @@ export default function ForRecruiters() {
             </div>
 
             {/* Stats */}
-            <div className="grid md:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
               {STATS.map((s) => (
                 <div key={s.stat} className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
@@ -186,7 +186,7 @@ export default function ForRecruiters() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 {t("marketing.recruiters.featuresTitle")}
               </h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {FEATURES.map(({ icon: Icon, title, description, bullets }) => (
                   <Card
                     key={title}
@@ -217,7 +217,7 @@ export default function ForRecruiters() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 {t("marketing.recruiters.workflowTitle")}
               </h2>
-              <div className="grid md:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                 {WORKFLOW.map(({ icon: Icon, step, desc }) => (
                   <div key={step} className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -235,7 +235,7 @@ export default function ForRecruiters() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 {t("marketing.recruiters.useCasesTitle")}
               </h2>
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   {
                     icon: Briefcase,
@@ -270,7 +270,7 @@ export default function ForRecruiters() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 {t("marketing.recruiters.testimonialsTitle")}
               </h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {TESTIMONIALS.map((t) => (
                   <Card key={t.name}>
                     <CardContent className="p-6">

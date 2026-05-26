@@ -54,7 +54,7 @@ export default function ProfileCoursesPanel({ userId, isOwner }: Props) {
   }
 
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {items.map((c) => (
         <CourseMarketplaceCard key={c.id} item={c as CourseMarketplaceItem} />
       ))}

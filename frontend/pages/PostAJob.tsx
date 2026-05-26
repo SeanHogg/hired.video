@@ -84,7 +84,7 @@ export default function PostAJob() {
             <div className="h-[400px] w-full max-w-[700px] rounded-full bg-primary/5 blur-3xl" />
           </div>
 
-          <div className="relative max-w-5xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div className="relative max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left — copy */}
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-6">
@@ -192,7 +192,7 @@ export default function PostAJob() {
         <section className="py-16 px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold text-center mb-10">{t("headings.howItWorksShort")}</h2>
-            <div className="grid sm:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
               {[
                 { step: "1", title: t("headings.postJobStep1Title"), body: t("messages.postJobStep1Body") },
                 { step: "2", title: t("headings.postJobStep2Title"), body: t("messages.postJobStep2Body") },

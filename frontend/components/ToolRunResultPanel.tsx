@@ -232,7 +232,7 @@ export function ToolRunResultPanel({ result, toolLabel, onCopyReport }: Props) {
             <CardTitle className="text-base">Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {result.extras!.map((e, i) => (
                 <div key={i} className="flex flex-col">
                   <dt className="text-xs uppercase tracking-wide text-muted-foreground">{e.label}</dt>

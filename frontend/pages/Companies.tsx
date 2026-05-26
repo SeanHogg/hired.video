@@ -539,7 +539,7 @@ export default function Companies() {
             </div>
 
             {/* Stats Section */}
-            <div className="grid md:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">1K+</div>
                 <p className="text-sm text-muted-foreground">
@@ -569,7 +569,7 @@ export default function Companies() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Featured Companies
               </h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {companies
                   .filter((company) => isValidCompanyName((company as any).name))
                   .slice(0, 3)
@@ -617,7 +617,7 @@ export default function Companies() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Why Companies Choose Us
               </h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Building2 className="h-10 w-10 text-brand-purple mb-4" />

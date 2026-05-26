@@ -253,7 +253,7 @@ export default function Help() {  const location = useLocation();
                   </p>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {resources.map((resource, index) => (
                     <Card
                       key={index}
@@ -317,7 +317,7 @@ export default function Help() {  const location = useLocation();
                   </p>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {contactOptions.map((option, index) => (
                     <Card key={index} className="text-center">
                       <CardHeader>

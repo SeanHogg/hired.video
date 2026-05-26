@@ -267,7 +267,7 @@ export default function ResumeTailor() {
       containerClassName="max-w-7xl mx-auto space-y-8"
     >
             {(
-              <div className="grid lg:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Input Section */}
                 <div className="space-y-6">
                   <Card>
@@ -511,7 +511,7 @@ export default function ResumeTailor() {
                                   <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
                                     {change.section}
                                   </div>
-                                  <div className="grid sm:grid-cols-2 gap-2 mb-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                                     <div className="bg-red-500/10 p-2 rounded">
                                       <div className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">
                                         Before

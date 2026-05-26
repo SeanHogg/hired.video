@@ -774,7 +774,7 @@ function Landing() {
         </div>
 
         {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
           {[
             { stat: "5–10 min", label: "Per practice session" },
             { stat: "5 types", label: "Behavioral, Technical, System Design, Product & more" },
@@ -793,7 +793,7 @@ function Landing() {
           <h2 className="text-3xl font-bold text-center mb-12">
             Everything You Need to Nail Your Interview
           </h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Zap className="h-10 w-10 text-brand-purple mb-4" />
@@ -853,7 +853,7 @@ function Landing() {
         {/* How it works */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
               { icon: Target, step: "1. Paste Job Description", desc: "Drop in any job posting and pick your interview type" },
               { icon: Sparkles, step: "2. AI Generates Questions", desc: "Get 5 tailored questions in seconds" },
@@ -874,7 +874,7 @@ function Landing() {
         {/* Testimonials */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">What Candidates Are Saying</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
                 quote: "I used to freeze up on behavioral questions. After 3 practice sessions I finally landed a FAANG offer. The AI feedback was brutally honest and incredibly helpful.",

@@ -247,7 +247,7 @@ export default function SystemSettings() {
                 <CardDescription>{t("messages.smtpDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>{t("labels.smtpHost")}</Label>
                     <Input value={settings[SETTING_KEYS.smtpHost]} onChange={(e) => update(SETTING_KEYS.smtpHost, e.target.value)} disabled={!canUpdate} />
@@ -257,7 +257,7 @@ export default function SystemSettings() {
                     <Input value={settings[SETTING_KEYS.smtpPort]} onChange={(e) => update(SETTING_KEYS.smtpPort, e.target.value)} disabled={!canUpdate} />
                   </div>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>{t("labels.fromName")}</Label>
                     <Input value={settings[SETTING_KEYS.fromName]} onChange={(e) => update(SETTING_KEYS.fromName, e.target.value)} disabled={!canUpdate} />
@@ -279,7 +279,7 @@ export default function SystemSettings() {
                 <CardDescription>{t("messages.sessionAccessControlsDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="grid gap-1.5">
                     <Label>{t("labels.sessionTtlHours")}</Label>
                     <Input value={settings[SETTING_KEYS.sessionTtlHours]} onChange={(e) => update(SETTING_KEYS.sessionTtlHours, e.target.value)} type="number" min="1" disabled={!canUpdate} />

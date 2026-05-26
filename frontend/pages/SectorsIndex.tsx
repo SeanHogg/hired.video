@@ -47,7 +47,7 @@ export default function SectorsIndex() {
             <h2 className="text-2xl font-semibold tracking-tight">
               {RESILIENCE_LABEL[tier]}
             </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {groups[tier].map((m) => (
                 <Link key={m.slug} to={`/sectors/${m.slug}`}>
                   <Card className="h-full hover:border-primary/50 transition-colors">

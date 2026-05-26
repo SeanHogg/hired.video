@@ -295,7 +295,7 @@ function Hero({
         <div
           className={
             descriptor.hero.layout === "split"
-              ? "grid md:grid-cols-[1fr_auto] gap-8 items-start"
+              ? "grid grid-cols-1 md:grid-cols-[1fr_auto] gap-8 items-start"
               : "space-y-6"
           }
         >
@@ -743,7 +743,7 @@ export default function DeclarativeJobRenderer({
         }
       >
         {descriptor.layout.columns === 2 ? (
-          <div className="grid md:grid-cols-[1fr_280px] print:grid-cols-[1fr_280px] gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] print:grid-cols-[1fr_280px] gap-10">
             <div className={density.section}>
               {mainBlocks.map((block) => renderSection({ ...renderArgs, block }))}
             </div>

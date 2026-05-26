@@ -89,7 +89,7 @@ export default function ResumeTemplatesGallery() {
           </section>
         )}
 
-        <section className="pb-12 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="pb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedThemes.map((theme, idx) => {
             const isRecommended =
               selectedSector !== null &&
@@ -143,7 +143,7 @@ export default function ResumeTemplatesGallery() {
             quick discovery without scanning the cards. */}
         <section className="pb-12 space-y-3">
           <h2 className="text-2xl font-semibold tracking-tight">By sector</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {allSectors().map((m) => {
               const rec = sectorTemplateRec(m.slug);
               return (

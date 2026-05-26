@@ -1707,7 +1707,7 @@ export default function People() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Meet Our Community
               </h2>
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {people.slice(0, 3).map((person) => {
                   const personMetadata = {
                     id: person.id || "",

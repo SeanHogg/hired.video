@@ -116,7 +116,7 @@ export default function Contact() {
           {/* Contact Information */}
           <section className="py-16">
             <div className="max-w-6xl mx-auto px-6">
-              <div className="grid md:grid-cols-3 gap-8 mb-16">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
                 {contactInfo.map((info, index) => (
                   <Card
                     key={index}

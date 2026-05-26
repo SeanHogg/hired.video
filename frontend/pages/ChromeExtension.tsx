@@ -92,7 +92,7 @@ export default function ChromeExtension() {
           {/* Two-plugin split */}
           <section className="py-16 px-6">
             <div className="max-w-6xl mx-auto">
-              <div className="grid md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Job Seeker card */}
                 <Card id="job-seeker" className="border-blue-200 hover:border-blue-400 transition-colors scroll-mt-20">
                   <CardHeader>
@@ -188,7 +188,7 @@ export default function ChromeExtension() {
                   from tracking it, scoring it against your resume, and generating a tailored variation.
                 </p>
               </div>
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   {
                     icon: Target,
@@ -244,7 +244,7 @@ export default function ChromeExtension() {
                   Companies, and Settings. Everything syncs to your hired.video recruiter workspace.
                 </p>
               </div>
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   {
                     icon: UserPlus,

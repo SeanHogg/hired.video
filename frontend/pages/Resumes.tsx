@@ -914,7 +914,7 @@ export default function Resumes() {
               </div>
 
               {/* Stats Section */}
-              <div className="grid md:grid-cols-4 gap-6 mb-16">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">3x</div>
                   <p className="text-sm text-muted-foreground">
@@ -952,7 +952,7 @@ export default function Resumes() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   Everything You Need to Succeed
                 </h2>
-                <div className="grid md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                     <CardHeader>
                       <Zap className="h-10 w-10 text-brand-purple mb-4" />
@@ -1041,7 +1041,7 @@ export default function Resumes() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   How It Works
                 </h2>
-                <div className="grid md:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Upload className="h-8 w-8 text-primary" />
@@ -1086,7 +1086,7 @@ export default function Resumes() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   Success Stories
                 </h2>
-                <div className="grid md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center mb-4">

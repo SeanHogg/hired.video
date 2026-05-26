@@ -186,7 +186,7 @@ function HomeMarketingPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid md:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
               {HOME_STATS.map((s) => (
                 <div key={s.stat} className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
@@ -210,7 +210,7 @@ function HomeMarketingPage() {
               <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
                 {t("marketing.home.featuresSubtitle")}
               </p>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {HOME_FEATURES.map(
                   ({ icon: Icon, title, description, bullets, border, iconColor }) => (
                     <Card
@@ -243,7 +243,7 @@ function HomeMarketingPage() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 {t("marketing.home.howItWorks")}
               </h2>
-              <div className="grid md:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                 {HOME_HOW_IT_WORKS.map(({ icon: Icon, step, desc }) => (
                   <div key={step} className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -296,7 +296,7 @@ function HomeMarketingPage() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 {t("marketing.home.testimonialsTitle")}
               </h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {HOME_TESTIMONIALS.map((t) => (
                   <Card key={t.name}>
                     <CardContent className="p-6">

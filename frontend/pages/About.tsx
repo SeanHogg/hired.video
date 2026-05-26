@@ -168,7 +168,7 @@ export default function About() {
           {/* Mission Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">
             <div className="max-w-6xl mx-auto">
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                 <div>
                   <h2 className="text-3xl md:text-4xl font-bold mb-6">
                     {t("marketing.about.missionTitle")}
@@ -218,7 +218,7 @@ export default function About() {
                   {t("marketing.about.valuesSubtitle")}
                 </p>
               </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {values.map((value, index) => (
                   <Card key={index} className="text-center">
                     <CardHeader>
@@ -249,7 +249,7 @@ export default function About() {
                   {t("marketing.about.teamSubtitle")}
                 </p>
               </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 {teamMembers.map((member) => (
                   <PeopleCard key={member.id} person={member} />
                 ))}
@@ -267,7 +267,7 @@ export default function About() {
                 {t("marketing.about.techSubtitle")}
               </p>
 
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <Card>
                   <CardHeader>
                     <Brain className="h-12 w-12 text-primary mx-auto mb-4" />

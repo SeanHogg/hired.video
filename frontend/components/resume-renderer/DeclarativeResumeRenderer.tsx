@@ -574,7 +574,7 @@ function Hero({
             user-facing contract: "if a public video is associated with
             this resume, show it in the header." */}
         {descriptor.hero.layout === "split" && videoSlot ? (
-          <div className="grid md:grid-cols-2 gap-8 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             {heroContent}
             <div>{videoSlot}</div>
           </div>
@@ -624,7 +624,7 @@ function TwoColumnBody(props: BodyProps) {
   const mainBlocks = enabled.filter((b) => !sidebarIds.has(blockId(b)));
 
   return (
-    <div className="grid md:grid-cols-[1fr_2fr] print:grid-cols-[1fr_2fr] gap-8">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] print:grid-cols-[1fr_2fr] gap-8">
       <aside className={props.density.section}>
         {sidebarBlocks.map((block) => (
           <BlockRenderer key={blockId(block)} block={block} {...props} />

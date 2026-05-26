@@ -147,7 +147,7 @@ export default function SectorLanding() {
         </section>
 
         {/* Example roles + licensure */}
-        <section className="max-w-6xl mx-auto px-6 py-8 grid md:grid-cols-2 gap-6">
+        <section className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Roles worth targeting</CardTitle>
@@ -197,7 +197,7 @@ export default function SectorLanding() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {jobs.map((job) => (
                   <SectorJobTile key={job.id} job={job} />
                 ))}
@@ -223,7 +223,7 @@ export default function SectorLanding() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {articles.map((a) => (
                 <ArticleCard key={a.id} article={a} />
               ))}

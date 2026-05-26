@@ -53,7 +53,7 @@ export default function ProfileArticlesPanel({ userId, isOwner }: Props) {
   }
 
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {items.map((a) => (
         <ArticleRow key={a.id} article={a} />
       ))}

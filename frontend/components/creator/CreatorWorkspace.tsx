@@ -250,7 +250,7 @@ export default function CreatorWorkspace({
 
               {showAddItem && (
                 <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
-                  <div className="grid md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="pf-title">Title</Label>
                       <Input id="pf-title" value={newItem.title} onChange={(e) => setNewItem({ ...newItem, title: e.target.value })} />
@@ -297,7 +297,7 @@ export default function CreatorWorkspace({
               ) : portfolio.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-2">No portfolio items yet. Add one to showcase your work to buyers.</p>
               ) : (
-                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {portfolio.map((item) => (
                     <div key={item.id} className="rounded-lg border overflow-hidden">
                       <div className="aspect-video bg-muted relative">

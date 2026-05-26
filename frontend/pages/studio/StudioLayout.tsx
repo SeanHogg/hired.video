@@ -153,7 +153,7 @@ function Landing() {
             which read as a single-format product. Headline now mirrors
             the "What you can make" grid below — DRY anchor for the
             multi-format identity is `listShippableKindPitches()`. */}
-        <div className="grid lg:grid-cols-5 gap-8 lg:gap-10 items-center mb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-10 items-center mb-16">
           <div className="lg:col-span-3 text-center lg:text-left">
             <div className="inline-flex items-center space-x-2 mb-6">
               <div className="relative">
@@ -210,7 +210,7 @@ function Landing() {
             studio's structural commitments (AI scaffold, in-browser
             render, free first project) which are true regardless of
             which kind a visitor cares about — no per-kind copy here. */}
-        <div className="grid md:grid-cols-4 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
           {[
             { stat: `${listShippableKindPitches().length}+`, label: "Creator formats in one studio" },
             { stat: "60s", label: "AI scaffolds your first scene" },
@@ -235,7 +235,7 @@ function Landing() {
           <h2 className="text-3xl font-bold text-center mb-12">
             Everything You Need to Stand Out
           </h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Zap className="h-10 w-10 text-brand-purple mb-4" />
@@ -298,7 +298,7 @@ function Landing() {
         {/* How it works */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
               { icon: Upload, step: "1. Paste Your Resume", desc: "Drop in your resume text or upload a PDF" },
               { icon: Sparkles, step: "2. AI Writes the Script", desc: "AI generates a script in the format you pick — scenes, panels, beats" },
@@ -331,7 +331,7 @@ function Landing() {
             One studio canvas, every output. Pick the format that fits the moment — the studio
             handles the AI scripting, the rendering, and the publish destinations for each.
           </p>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {listShippableKindPitches().map((pitch) => (
               <div
                 key={pitch.kind}
@@ -353,7 +353,7 @@ function Landing() {
         {/* Advertising extras */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">Built for Every Format — Resumes, Promos, Podcasts, Games &amp; More</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Users className="h-10 w-10 text-brand-purple mb-4" />

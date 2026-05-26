@@ -71,7 +71,7 @@ export default function ProfileVideoPanel({ userId, isOwner }: Props) {
           <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
             Media
           </h3>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {videos.map((v) => (
               <StudioVideoSurface
                 key={v.id}
@@ -90,7 +90,7 @@ export default function ProfileVideoPanel({ userId, isOwner }: Props) {
           <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
             Templates
           </h3>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {templates.map((tpl) => (
               <TemplateRow key={tpl.id} template={tpl} />
             ))}

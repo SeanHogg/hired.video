@@ -73,7 +73,7 @@ export default function PrivacyPolicy() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
                     <Lock className="h-5 w-5 text-green-600 mt-1" />
                     <div>
@@ -125,7 +125,7 @@ export default function PrivacyPolicy() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground">{t("legal.privacy.contact.intro")}</p>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <h4 className="font-medium">{t("legal.privacy.contact.company.title")}</h4>
                     <ul className="text-sm text-muted-foreground space-y-1">
@@ -181,7 +181,7 @@ export default function PrivacyPolicy() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">{t("legal.privacy.regulatory.intro")}</p>
-                <div className="grid md:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-muted-foreground">
                   <ul className="space-y-1">
                     <li>• Regulation (EU) 2016/679 (GDPR)</li>
                     <li>• California Privacy Rights Act 2023 (CPRA)</li>
@@ -825,7 +825,7 @@ export default function PrivacyPolicy() {
                 <CardContent>
                   <p className="text-muted-foreground mb-4">{t("legal.privacy.s14.intro")}</p>
 
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-3">
                       <h4 className="font-medium">{t("legal.privacy.s14.primary.title")}</h4>
                       <div className="space-y-2">

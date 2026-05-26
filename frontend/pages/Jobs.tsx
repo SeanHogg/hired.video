@@ -1425,7 +1425,7 @@ export default function Jobs() {
             </div>
 
             {/* Stats Section */}
-            <div className="grid md:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">50K+</div>
                 <p className="text-sm text-muted-foreground">
@@ -1455,7 +1455,7 @@ export default function Jobs() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Featured Opportunities
               </h2>
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {jobs.slice(0, 2).map((job) => {
                   const jobMetadata = {
                     id: job.id,
@@ -1501,7 +1501,7 @@ export default function Jobs() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Why Choose Our Job Platform
               </h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Target className="h-10 w-10 text-brand-purple mb-4" />
