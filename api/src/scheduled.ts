@@ -453,6 +453,27 @@ async function processPartnerProgramDispatch(): Promise<void> {
   }
 }
 
+/** Tick rotation — distributes the always-running sweeps across the /5
+ *  cron cadence so a single invocation doesn't blow the Cloudflare
+ *  Worker CPU budget. The old behaviour ran all nine sweeps every
+ *  tick (`Promise.allSettled([... 9 sweeps ...])`) and routinely
+ *  surfaced `Worker exceeded CPU time limit` in production tail
+ *  (2026-05-26, gap #1701). The date-gated sweeps (month close,
+ *  fraud sweep, partner pool) already self-gate inside their own
+ *  bodies and are always called — the rotation is for the heavy
+ *  always-on work (scraper, registered workers).
+ *
+ *  Cadence:
+ *   - every /5 tick:    followups, job queue, event reminders,
+ *                       partner-payout dispatch (each bounded by
+ *                       small per-call limits)
+ *   - every /15 tick:   registered workers dispatcher (each worker
+ *                       additionally gates itself via isWorkerDue)
+ *   - every /30 tick:   scrapeAllActiveSources (HTTP fan-out +
+ *                       RSS/JSON parsing — the heaviest sweep)
+ *   - every tick:       month close, fraud sweep, partner pool
+ *                       (date-window guards short-circuit cheaply)
+ */
 export async function runScheduled(): Promise<void> {
   // Email sync intentionally absent — the cron sweep was removed in
   // gap #757. Connected mailboxes now sync exclusively via the PWA
@@ -460,15 +481,19 @@ export async function runScheduled(): Promise<void> {
   // /api/inbox/external-emails/ingest). Service Worker `periodicSync`
   // is the planned mechanism for syncing while the tab is closed
   // (tracked as gap #758).
-  await Promise.allSettled([
+  const minute = new Date().getUTCMinutes();
+  const isQuarterTick = minute % 15 < 5;   // :00, :15, :30, :45
+  const isHalfTick    = minute % 30 < 5;   // :00, :30
+  const sweeps: Array<Promise<unknown>> = [
     processFollowUps(),
     processJobQueue(),
-    scrapeAllActiveSources(),
-    processRegisteredWorkers(),
+    processEventReminders(),
+    processPartnerProgramDispatch(),
     processMonthlyUsageClose(),
     processGamificationFraudSweep(),
-    processEventReminders(),
     processPartnerProgramPool(),
-    processPartnerProgramDispatch(),
-  ]);
+  ];
+  if (isQuarterTick) sweeps.push(processRegisteredWorkers());
+  if (isHalfTick)    sweeps.push(scrapeAllActiveSources());
+  await Promise.allSettled(sweeps);
 }

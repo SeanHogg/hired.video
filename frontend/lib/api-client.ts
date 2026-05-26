@@ -838,11 +838,29 @@ export class ApiClient {
           error: normalizedError.message,
         });
 
-        // Don't retry on certain error types
+        // Retry policy: only retry when the failure looks like a
+        // transient transport problem (fetch threw, DNS/TCP failure,
+        // timeout) — i.e. NetworkError with NO httpStatus in context.
+        // Any HTTP response the server actually emitted — incl. 5xx —
+        // is a signal that hammering further will amplify the fire.
+        // Production tail (2026-05-26) showed `/api/resumes/embedded/:id`
+        // returning 503 on Worker CPU exhaustion, and the original
+        // retry policy of "retry 3× with exponential backoff on
+        // everything except 4xx" multiplied each user retry by 4 and
+        // sustained the worker-CPU overload that originally triggered
+        // the failure.
+        const errorHttpStatus =
+          typeof (normalizedError.context as any)?.httpStatus === "number"
+            ? ((normalizedError.context as any).httpStatus as number)
+            : undefined;
+        const hasServerResponse =
+          errorHttpStatus !== undefined ||
+          /^HTTP \d{3}:/.test(normalizedError.message);
         if (
           normalizedError instanceof ValidationError ||
           normalizedError instanceof AuthenticationError ||
           normalizedError instanceof AuthorizationError ||
+          hasServerResponse ||
           attempt >= maxAttempts
         ) {
           const processedError =

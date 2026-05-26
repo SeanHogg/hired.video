@@ -96,30 +96,32 @@ function makeProjectSlug(name: string, projectId: string | undefined): string {
 }
 
 /** Ensure the given base slug is unique across `studio_projects` by
- *  appending `-2`, `-3`, … on collision. Scopes by the slug-as-text
- *  path (`storyboard->>'_slug'`) since the slug lives inside the
- *  storyboard JSONB blob — no dedicated column. `selfProjectId`
- *  excludes the project being saved so its own current slug doesn't
- *  count as a collision (e.g. re-saving without changing the name).
+ *  appending `-2`, `-3`, … on collision. Reads the dedicated
+ *  `studio_projects.slug` column (migration 0141) which carries a
+ *  partial unique index, so each candidate check is an O(log n) point
+ *  lookup instead of the sequential JSONB scan this used to be (gap
+ *  #661 — that scan blew the Cloudflare Worker CPU budget on every
+ *  save-draft once the table grew). `selfProjectId` excludes the
+ *  project being saved so its own current slug doesn't count as a
+ *  collision (e.g. re-saving without changing the name).
  *
- *  Race-condition note: there's no DB-level unique constraint on the
- *  JSON path, so two simultaneous saves of the same base name COULD
- *  end up with the same slug. The next save by either party re-runs
- *  this check and resolves the duplicate. A migration that lifts the
- *  slug into a generated unique column would close the race; tracked
- *  in the Consolidated Gap Register. */
+ *  Race-condition note: the DB unique index is now authoritative —
+ *  if two simultaneous saves race past this check with the same
+ *  base, the INSERT/UPDATE on the second one fails on the unique
+ *  constraint. Callers handle that by retrying with a fresh suffix;
+ *  here we just do the prospective check. */
 async function ensureUniqueProjectSlug(
   db: ReturnType<typeof getDb>,
   baseSlug: string,
   selfProjectId: string | undefined,
 ): Promise<string> {
+  // One prefix query against the indexed `slug` column instead of a
+  // per-candidate round trip. Postgres uses the partial unique btree
+  // index for `LIKE 'literal%'` against a text/varchar column.
   const rows = await db
-    .select({
-      id: studioProjects.id,
-      slug: sql<string | null>`${studioProjects.storyboard}->>'_slug'`,
-    })
+    .select({ id: studioProjects.id, slug: studioProjects.slug })
     .from(studioProjects)
-    .where(sql`${studioProjects.storyboard}->>'_slug' LIKE ${`${baseSlug}%`}`);
+    .where(sql`${studioProjects.slug} LIKE ${`${baseSlug}%`}`);
   const taken = new Set<string>();
   for (const r of rows) {
     if (r.id === selfProjectId) continue;
@@ -1260,7 +1262,10 @@ function toProjectDto(
   const savedPurpose = meta?._purpose as string | undefined;
   // SEO fields — surfaced via the editor "Details" drawer.
   const savedMetaDescription = meta?._metaDescription as string | undefined;
-  const savedSlug = meta?._slug as string | undefined;
+  // Prefer the dedicated `slug` column (migration 0141) which is the
+  // authoritative source post-#661. Fall back to the JSONB mirror for
+  // any row that hasn't been re-saved since the migration.
+  const savedSlug = project.slug ?? (meta?._slug as string | undefined);
   const savedKeywords = Array.isArray(meta?._keywords) ? (meta!._keywords as string[]) : undefined;
   const savedSocialCardImage = meta?._socialCardImage as string | undefined;
   // If the storyboard is a VideoScript (saved by save-draft), expose it as `script`
@@ -1534,15 +1539,19 @@ studioRoutes.post("/save-draft", async (c) => {
   // drawer. Each key is overwritten only when explicitly present in the
   // request payload — otherwise we carry forward the prior value.
   let priorMeta: Record<string, unknown> = {};
+  let priorSlug: string | null = null;
   if (projectId) {
     const [prior] = await db
-      .select({ storyboard: studioProjects.storyboard })
+      .select({ storyboard: studioProjects.storyboard, slug: studioProjects.slug })
       .from(studioProjects)
       .where(eq(studioProjects.id, projectId))
       .limit(1);
     if (prior?.storyboard && typeof prior.storyboard === "object") {
       priorMeta = prior.storyboard as Record<string, unknown>;
     }
+    // Prefer the indexed column; fall back to the JSONB mirror for
+    // pre-migration-0141 rows that haven't been re-saved yet.
+    priorSlug = prior?.slug ?? ((priorMeta._slug as string | undefined) ?? null);
   }
   // Auto-fill the slug on first save so the public /v/:slug URL is set
   // the moment the project lands in the database, and dedupe against
@@ -1557,9 +1566,9 @@ studioRoutes.post("/save-draft", async (c) => {
   const explicitSlug =
     slug !== undefined && slug !== null && slug !== ""
       ? slug
-      : (priorMeta._slug as string | undefined);
+      : (priorSlug ?? undefined);
   let resolvedSlug: string | null;
-  if (explicitSlug && slug !== undefined && slug !== priorMeta._slug) {
+  if (explicitSlug && slug !== undefined && slug !== priorSlug) {
     // User edited the slug field — uniquify against any other project.
     resolvedSlug = await ensureUniqueProjectSlug(db, explicitSlug, projectId);
   } else if (explicitSlug) {
@@ -1623,6 +1632,7 @@ studioRoutes.post("/save-draft", async (c) => {
       .update(studioProjects)
       .set({
         storyboard: storyboardValue as any,
+        slug: resolvedSlug,
         resumeText: resumeText || name,
         userId: user.sub, // record the editor for attribution
         ...resumeIdPatch,
@@ -1640,6 +1650,7 @@ studioRoutes.post("/save-draft", async (c) => {
         companyId: target.ownerCompanyId,
         resumeText: resumeText || name,
         storyboard: storyboardValue as any,
+        slug: resolvedSlug,
         status: "draft",
         ...resumeIdPatch,
         ...editorKindPatch,
@@ -3210,7 +3221,7 @@ studioRoutes.get("/videos/featured", async (c) => {
 // ─── GET /public/:videoId ──────────────────────────────────────────────────────
 // Returns public metadata for a single video. No auth required.
 // Accepts a UUID (videos.id), a YouTube-style ID (videos.youtubeVideoId),
-// or a vanity slug stored on the project (studioProjects.storyboard._slug).
+// or a vanity slug stored on the project (studioProjects.slug).
 studioRoutes.get("/public/:videoId", async (c) => {
   const { videoId } = c.req.param();
   const db = getDb();
@@ -3219,8 +3230,9 @@ studioRoutes.get("/public/:videoId", async (c) => {
   //   - videos.id (UUID)
   //   - videos.youtubeVideoId (string)
   //   - studioProjects.id (UUID — what the studio "Copy URL" button uses)
-  //   - studioProjects.storyboard._slug (kebab-case vanity slug — used
-  //     by the V2 save menu's share link)
+  //   - studioProjects.slug (kebab-case vanity slug — used by the
+  //     V2 save menu's share link; migration 0141 promoted this from
+  //     storyboard._slug to a real indexed column)
   //
   // Resolution order: try project-by-UUID first when the param looks
   // like one, then project-by-slug when it doesn't, then fall through
@@ -3326,16 +3338,16 @@ studioRoutes.get("/public/:videoId", async (c) => {
       projectInfo = toProjectInfo(proj);
     }
   } else if (isValidSlug(videoId)) {
-    // Looks like a kebab-case slug — match against `storyboard._slug`.
-    // The validator regex on save-draft enforces this exact shape, so
-    // anything matching it is a plausible slug; anything not is treated
-    // as a YouTube ID by the fall-through.
+    // Looks like a kebab-case slug — match against the indexed `slug`
+    // column (migration 0141). The validator regex on save-draft
+    // enforces this exact shape, so anything matching it is a plausible
+    // slug; anything not is treated as a YouTube ID by the fall-through.
     const [proj] = await db
       .select(projectSelect)
       .from(studioProjects)
       .innerJoin(users, eq(studioProjects.userId, users.id))
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .where(sql`${studioProjects.storyboard}->>'_slug' = ${videoId}`)
+      .where(eq(studioProjects.slug, videoId))
       .limit(1);
     if (proj) {
       if (proj.videoId) resolvedVideoId = proj.videoId;

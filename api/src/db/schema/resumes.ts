@@ -57,6 +57,11 @@ export const resumeInformation = pgTable("resume_information", {
 }, (table) => [
   index("resume_information_user_id_idx").on(table.userId),
   index("resume_information_parent_id_idx").on(table.parentId),
+  // Partial index for the slug-keyed `/api/resumes/:id` lookup path —
+  // see migration 0141 + gap #1588 (slug-keyed reads were sequentially
+  // scanning the table and contributing to the Worker CPU exhaustion
+  // that took down save-draft on 2026-05-26).
+  index("resume_information_slug_idx").on(table.slug),
 ]);
 
 export type ResumeInformation = typeof resumeInformation.$inferSelect;
@@ -216,6 +221,12 @@ export const studioProjects = pgTable("studio_projects", {
   // drawing extents + unit + grid). Null for non-cad projects.
   // Migration 0107 / #930.
   cadState: jsonb("cad_state"),
+  // Public-URL slug. Promoted from `storyboard._slug` to a real column
+  // in migration 0141 because the JSONB extraction made the per-save
+  // uniqueness check sequentially scan studio_projects and blow the
+  // Worker CPU budget (#661). The save-draft writer mirrors into both
+  // this column and the JSONB for backward read compatibility.
+  slug: varchar("slug", { length: 120 }),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   // Project-level visibility. After the Save/Publish split (#665) the
@@ -256,6 +267,9 @@ export const studioProjects = pgTable("studio_projects", {
   uniqueIndex("uq_studio_projects_profile_primary_per_user")
     .on(table.userId)
     .where(sql`${table.isProfilePrimary} = true`),
+  uniqueIndex("uq_studio_projects_slug")
+    .on(table.slug)
+    .where(sql`${table.slug} IS NOT NULL`),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;
