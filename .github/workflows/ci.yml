@@ -28,16 +28,19 @@ jobs:
         # #524 — wrap in a retry loop so a single npm registry ECONNRESET
         # doesn't fail the entire build. --prefer-offline + --no-audit
         # also drops the audit-RTT cost on every install.
-        run: for i in 1 2 3; do npm ci --prefer-offline --no-audit && break; sleep 5; done
+        # `npm install` (not `npm ci`) so a lockfile drift reconciles
+        # against package.json instead of silently failing inside the
+        # retry loop and leaving node_modules empty for typecheck.
+        run: for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done
 
       - name: Install shared dependencies
         # shared/ is a private workspace-style package that declares zod
         # as a dependency so both api/ and frontend/ can import its zod
         # schemas without the bundler failing at "Could not resolve zod".
-        run: cd shared && (for i in 1 2 3; do npm ci --omit=dev --prefer-offline --no-audit && break; sleep 5; done)
+        run: cd shared && (for i in 1 2 3; do npm install --omit=dev --prefer-offline --no-audit && break; sleep 5; done)
 
       - name: Install dependencies
-        run: cd frontend && (for i in 1 2 3; do npm ci --prefer-offline --no-audit && break; sleep 5; done)
+        run: cd frontend && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
 
       - name: Run type checking
         run: cd frontend && npm run typecheck
@@ -72,7 +75,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: cd frontend && (for i in 1 2 3; do npm ci --prefer-offline --no-audit && break; sleep 5; done)
+        run: cd frontend && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
 
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV
@@ -109,15 +112,15 @@ jobs:
         # shared/resume.ts's `import { z } from "zod"` via shared/node_modules,
         # which only exists after `npm ci` here.
         #
-        # The shared/ fallback uses parens to keep both `npm ci` and
-        # `npm install` running in the same already-cd'd directory —
+        # The shared/ fallback uses parens to keep both `npm install`
+        # invocations running in the same already-cd'd directory —
         # the previous `cd shared && X || cd shared && Y` form re-cd'd
         # into shared/shared/ on the failure path and silently left
         # api/node_modules unpopulated.
         run: |
           set -e
-          cd shared && (npm ci --omit=dev || npm install --omit=dev)
-          cd ../api && npm ci
+          cd shared && npm install --omit=dev
+          cd ../api && npm install
 
       - name: Validate DATABASE_URL secret
         run: |
@@ -132,15 +135,15 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run SQL migrations (fallback)
-        # Belt-and-suspenders npm ci — the upstream Install step normally
-        # populates api/node_modules, but `if: always()` means this step
-        # also runs when install partially failed. Re-running npm ci is a
-        # ~5s no-op when the cache is warm and recovers the @neondatabase
-        # /serverless import that this script needs.
+        # Belt-and-suspenders npm install — the upstream Install step
+        # normally populates api/node_modules, but `if: always()` means
+        # this step also runs when install partially failed. Re-running
+        # npm install is a ~5s no-op when the cache is warm and recovers
+        # the @neondatabase/serverless import that this script needs.
         if: always()
         run: |
           set -e
-          cd api && npm ci
+          cd api && npm install
           node scripts/run-sql-migrations.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
