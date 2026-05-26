@@ -55,6 +55,7 @@ import { USER_ROLES, pickScoringRole } from "../../../shared/user-roles.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
+import { evaluateCourseCompletion } from "../services/learning/course-completion.js";
 import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
 import { getJwtSecret } from "../utils/jwt.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
@@ -1187,7 +1188,15 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
   const [courseRow] = await db.select({ passingScorePct: courses.passingScorePct, issuesCertificate: courses.issuesCertificate }).from(courses)
     .where(eq(courses.id, enrollmentRow!.courseId)).limit(1);
 
+  // Passing-score gate: only enforced when (a) the course defines one
+  // AND (b) at least one lesson actually reported a score. If no lesson
+  // can score (text_md-only / studio_video-only courses with no quiz),
+  // the "complete all required lessons" signal IS the passing bar —
+  // there's nothing to evaluate against `passingScorePct`. Without this
+  // carve-out, every text_md course is uncompletable (the user reported
+  // exactly this: 4/4 lessons green, course still "in progress").
   const meetsPassingScore = courseRow?.passingScorePct == null
+    || scoreCount === 0
     || (finalScorePct ?? 0) >= courseRow.passingScorePct;
   const flipToPassed = !wasPassed && courseNowPassed && meetsPassingScore;
 

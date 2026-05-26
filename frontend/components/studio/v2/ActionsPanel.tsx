@@ -20,6 +20,7 @@ import {
   Accessibility,
   Camera,
   Captions,
+  Languages,
   Mic,
   Music,
   Sparkles,
@@ -79,6 +80,9 @@ const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
 const StudioAccessibilityPanel = lazy(
   () => import("@/components/studio/StudioAccessibilityPanel"),
 );
+const StudioDubbingPanel = lazy(
+  () => import("@/components/studio/dubbing/StudioDubbingPanel"),
+);
 const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
 const AudioMixerV2 = lazy(() => import("./AudioMixerV2"));
 // Chapters / Thumbnails / Forms / Review Comments — the shared
@@ -100,6 +104,7 @@ type ActionId =
   | "original-music"
   | "captions"
   | "accessibility"
+  | "dubbing"
   | "ai-rewrite"
   | "ai-hook";
 
@@ -247,6 +252,11 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           label="Accessibility (WCAG 2.2)"
           icon={Accessibility}
           onClick={() => setOpenAction("accessibility")}
+        />
+        <LeftPanelTile
+          label="Multi-language dubbing"
+          icon={Languages}
+          onClick={() => setOpenAction("dubbing")}
         />
         {/* Chapters / Thumbnails / Forms / Reviews — shared cluster
             (#675). Self-gates on projectId so an unsaved draft hides
@@ -416,6 +426,10 @@ function ActionSheet({
               <StudioAccessibilityPanel state={state} />
             )}
 
+            {openAction === "dubbing" && (
+              <StudioDubbingPanel state={state} onAddVoiceover={onAddVoiceover} />
+            )}
+
             {openAction === "ai-rewrite" && (
               <ScriptRewriterDialog
                 projectId={persistedProjectId}
@@ -530,6 +544,7 @@ function titleFor(id: ActionId | null): string {
     case "original-music": return "Original Music";
     case "captions": return "Captions";
     case "accessibility": return "Accessibility (WCAG 2.2)";
+    case "dubbing": return "Multi-language dubbing";
     case "ai-rewrite": return "AI Rewrite";
     case "ai-hook": return "Hook Optimizer";
     default: return "";
@@ -560,6 +575,8 @@ function descriptionFor(id: ActionId | null): string {
       return "Author captions for the composition.";
     case "accessibility":
       return "Audit this composition against WCAG 2.2 — alt text, contrast, captions, reading order — before you publish.";
+    case "dubbing":
+      return "Translate the project's captions into a target language and re-synthesize them as a dubbed audio track.";
     case "ai-rewrite":
       return "Rewrite the selected text widget with AI.";
     case "ai-hook":

@@ -45,17 +45,19 @@ jobs:
       - name: Run type checking
         run: cd frontend && npm run typecheck
 
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV
+
       - name: Build SPA
         run: cd frontend && npm run build
+        env:
+          VITE_BUILD_DATE: ${{ env.BUILD_DATE }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
         with:
           name: build-artifacts
-          path: |
-            frontend/dist/
-            frontend/package.json
-            frontend/package-lock.json
+          path: frontend/dist/
           retention-days: 7
 
   deploy-production:
@@ -65,31 +67,18 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-
-      - name: Install dependencies
-        run: cd frontend && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
-
-      - name: Set build date
-        run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV
-
-      - name: Build application
-        run: cd frontend && npm run build
-        env:
-          VITE_BUILD_DATE: ${{ env.BUILD_DATE }}
+          name: build-artifacts
+          path: dist
 
       - name: Deploy to Cloudflare Pages
-        run: cd frontend && npx wrangler pages deploy dist --project-name hired
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name hired
 
   deploy-api:
     name: Deploy API to Cloudflare Workers

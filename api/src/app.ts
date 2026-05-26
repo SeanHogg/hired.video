@@ -13,6 +13,7 @@ import { getDb, schema } from "./db/index.js";
 import { studioRoutes } from "./routes/studio.js";
 import { studioFeaturesRoutes } from "./routes/studio-features.js";
 import { studioTemplatesRoutes } from "./routes/studio-templates.js";
+import { studioDubbingRoutes } from "./routes/studio-dubbing.js";
 import { workspaceRoutes } from "./routes/workspaces.js";
 import { nleRoutes } from "./routes/nle.js";
 
@@ -591,6 +592,7 @@ export function createApp() {
   app.route("/api/studio", studioRoutes);
   app.route("/api/studio", studioFeaturesRoutes);
   app.route("/api/studio", studioTemplatesRoutes);
+  app.route("/api/studio", studioDubbingRoutes);
   app.route("/api/studio", linkedInPostRoutes);
   app.route("/api/nle", nleRoutes);
   app.route("/api", workspaceRoutes);

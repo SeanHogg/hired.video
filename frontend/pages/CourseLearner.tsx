@@ -27,7 +27,7 @@
  * redirect to the public course page; no per-prop `canView` boolean.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Award,
@@ -50,6 +50,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,7 @@ import {
   type CourseLessonSourceType,
   type LessonProgress,
 } from "@/lib/services/course-service";
+import { issueCertificate } from "@/lib/courses/courses-api";
 
 const SOURCE_ICON: Record<CourseLessonSourceType, typeof FileText> = {
   text_md: FileText,
@@ -85,6 +87,16 @@ export default function CourseLearner() {
   const { toast } = useToast();
 
   const [data, setData] = useState<CourseLearnerContent | null>(null);
+  // Celebration modal — fires once when the enrollment transitions
+  // false → true. Tracked in a ref so React StrictMode's double-effect
+  // doesn't double-show; the modal itself is dialog state.
+  const [completionOpen, setCompletionOpen] = useState(false);
+  // Backfill guard — when an enrollment was flipped to passed by the
+  // migration 0137 backfill, the cert wasn't issued at that time
+  // (SQL can't reach the JWT signer). On the next load we auto-issue
+  // once so the learner sees their cert. The ref prevents a retry
+  // storm if the issue call fails for an unrelated reason.
+  const backfillCertAttemptedRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
@@ -127,6 +139,30 @@ export default function CourseLearner() {
     };
   }, [enrollmentId]);
 
+  // Backfill cert issuance — see backfillCertAttemptedRef comment.
+  // Only runs when the course actually issues certs AND the enrollment
+  // is already passed but no cert row exists. Issuing is idempotent on
+  // the server (CertificateService.issueForEnrollment returns the
+  // existing cert if one already exists), so the worst case is a
+  // wasted round-trip.
+  useEffect(() => {
+    if (!data) return;
+    if (!data.enrollment.passed) return;
+    if (data.certificate) return;
+    if (!data.course.issuesCertificate) return;
+    const enrId = data.enrollment.id;
+    if (backfillCertAttemptedRef.current === enrId) return;
+    backfillCertAttemptedRef.current = enrId;
+    issueCertificate(enrId)
+      .then(async () => {
+        // Re-fetch to pick up the freshly-issued cert row + any badge
+        // fan-out the issue endpoint kicked off.
+        const refreshed = await courseService.getLearnerContent(enrId);
+        setData(refreshed);
+      })
+      .catch(() => undefined);
+  }, [data]);
+
   const lessonsByModule = useMemo(() => {
     const map = new Map<string | null, CourseLesson[]>();
     if (!data) return map;
@@ -160,41 +196,61 @@ export default function CourseLearner() {
       .catch(() => undefined);
   }, [data, activeLesson]);
 
-  const markComplete = useCallback(async () => {
-    if (!data || !activeLesson) return;
-    setMarkingComplete(true);
+  // Shared post-lesson-pass handler — every "this lesson is now passed"
+  // signal (markComplete button + SCORM Commit + any future knowledge-
+  // check submission) routes through here so the celebration + cert
+  // fetch logic lives in ONE place. No prop-drilled passed-flag fan-out.
+  //
+  // When the backend's response flips the enrollment to `passed`, we
+  // re-fetch the full learner content (cert is issued AFTER the PATCH
+  // returns, so the enrollment row alone won't carry it) and surface
+  // the completion dialog with the cert link.
+  const applyLessonPassed = useCallback(async (lessonId: string) => {
+    if (!data) return;
+    const wasPassed = data.enrollment.passed;
     try {
       const nextEnrollment = await courseService.patchLessonProgress(data.enrollment.id, {
-        lessonId: activeLesson.id,
+        lessonId,
         status: "passed",
       });
-      setData((d) => (d ? { ...d, enrollment: nextEnrollment } : d));
-      toast({ title: "Lesson complete" });
+      const flippedToPassed = !wasPassed && nextEnrollment.passed;
+      if (flippedToPassed) {
+        // Re-fetch to pick up the newly-issued certificate row + any
+        // other server-side side effects (badge fan-out happens async
+        // and surfaces via BadgeUnlockToaster's poll, not via this call).
+        const refreshed = await courseService.getLearnerContent(data.enrollment.id);
+        setData(refreshed);
+        setCompletionOpen(true);
+      } else {
+        setData((d) => (d ? { ...d, enrollment: nextEnrollment } : d));
+      }
     } catch (e: unknown) {
       toast({
         title: "Couldn't save progress",
         description: e instanceof Error ? e.message : "Try again",
         variant: "destructive",
       });
+    }
+  }, [data, toast]);
+
+  const markComplete = useCallback(async () => {
+    if (!data || !activeLesson) return;
+    setMarkingComplete(true);
+    try {
+      await applyLessonPassed(activeLesson.id);
+      toast({ title: "Lesson complete" });
     } finally {
       setMarkingComplete(false);
     }
-  }, [data, activeLesson, toast]);
+  }, [data, activeLesson, applyLessonPassed, toast]);
 
   // Called by <ScormPlayer> when the runtime fires Commit with passed/
-  // completed. Same write the markComplete button does, so the
-  // backend's cert + progress aggregation logic only has one branch to
-  // worry about.
+  // completed. Same path as markComplete so completion celebration fires
+  // for SCORM-driven passes too.
   const onScormCompleted = useCallback(() => {
-    if (!data || !activeLesson) return;
-    courseService
-      .patchLessonProgress(data.enrollment.id, {
-        lessonId: activeLesson.id,
-        status: "passed",
-      })
-      .then((nextEnrollment) => setData((d) => (d ? { ...d, enrollment: nextEnrollment } : d)))
-      .catch(() => undefined);
-  }, [data, activeLesson]);
+    if (!activeLesson) return;
+    void applyLessonPassed(activeLesson.id);
+  }, [activeLesson, applyLessonPassed]);
 
   if (!isAuthenticated) {
     return <Navigate to={`/login?returnTo=${encodeURIComponent(`/learn/${enrollmentId ?? ""}`)}`} replace />;
@@ -392,7 +448,66 @@ export default function CourseLearner() {
           </div>
         </div>
       </div>
+
+      {/* Course-completion celebration — fires once when the enrollment
+          flips false→true. Surfaces the cert, badge note, and the
+          natural "what's next" CTAs in one dialog. Self-gates on the
+          underlying boolean so the consumer can leave it mounted
+          unconditionally (DRY rule). */}
+      <CourseCompletionDialog
+        open={completionOpen}
+        onOpenChange={setCompletionOpen}
+        courseTitle={course.title}
+        certNumber={data.certificate?.certNumber ?? null}
+      />
     </AppShell>
+  );
+}
+
+function CourseCompletionDialog({
+  open,
+  onOpenChange,
+  courseTitle,
+  certNumber,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  courseTitle: string;
+  certNumber: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="mx-auto h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
+            <Award className="h-7 w-7 text-emerald-600" />
+          </div>
+          <DialogTitle className="text-center text-2xl">
+            Course complete!
+          </DialogTitle>
+          <DialogDescription className="text-center">
+            You finished <span className="font-medium text-foreground">{courseTitle}</span>.
+            Your progress is recorded and any earned badges will appear in the corner momentarily.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-center sm:flex-col sm:gap-2">
+          {certNumber && (
+            <Button asChild className="w-full sm:w-auto">
+              <a href={`/verify/${certNumber}`} target="_blank" rel="noreferrer">
+                <Award className="h-4 w-4 mr-2" />
+                View your certificate
+              </a>
+            </Button>
+          )}
+          <Button asChild variant="outline" className="w-full sm:w-auto">
+            <a href="/tools?tab=learning">Browse more courses</a>
+          </Button>
+          <Button variant="ghost" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+            Keep reviewing
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
