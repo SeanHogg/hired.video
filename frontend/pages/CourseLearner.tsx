@@ -438,6 +438,7 @@ export default function CourseLearner() {
                     lesson={activeLesson}
                     enrollmentId={enrollment.id}
                     courseId={course.id}
+                    themeTokens={course.themeTokens ?? undefined}
                     onScormCompleted={onScormCompleted}
                   />
                 </CardContent>
@@ -559,11 +560,13 @@ function LessonBody({
   lesson,
   enrollmentId,
   courseId,
+  themeTokens,
   onScormCompleted,
 }: {
   lesson: CourseLesson;
   enrollmentId: string;
   courseId: string;
+  themeTokens?: Record<string, string>;
   onScormCompleted: () => void;
 }) {
   // One switch on sourceType — every lesson kind self-renders without
@@ -610,7 +613,7 @@ function LessonBody({
           courseId={courseId}
           onCompleted={onScormCompleted}
           className="h-[70vh]"
-          themeTokens={data?.course.themeTokens ?? undefined}
+          themeTokens={themeTokens}
         />
       );
 

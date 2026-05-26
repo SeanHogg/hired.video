@@ -13,8 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { useSEO } from "@/hooks/useSEO";
-import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { courseService, type Course } from "@/lib/services/course-service";
 
 export default function CourseReviewQueue() {
@@ -24,8 +23,8 @@ export default function CourseReviewQueue() {
 
   useSEO("/courses/review-queue");
   useBreadcrumbs([
-    { label: "Courses", to: "/learning" },
-    { label: "Review queue" },
+    { name: "Courses", url: "/learning" },
+    { name: "Review queue", url: "/courses/review-queue" },
   ]);
 
   useEffect(() => {

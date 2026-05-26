@@ -1,5 +1,4 @@
 import { createApp } from "./app.js";
-import { seedSuperAdminAndCompany } from "./seed.js";
 import { runScheduled } from "./scheduled.js";
 // Real-time chat transport (gap #1230). Cloudflare needs the Durable
 // Object class to be re-exported from the worker module so the runtime
@@ -74,10 +73,6 @@ export default {
       return handleCdnRequest(request, env);
     }
 
-    // Seed runs after __ENV is set so getDb() can resolve the database URL from bindings.
-    void seedSuperAdminAndCompany().catch((err) => {
-      console.error("Failed to seed superadmin/company:", err);
-    });
     return app.fetch(request, env, ctx);
   },
 

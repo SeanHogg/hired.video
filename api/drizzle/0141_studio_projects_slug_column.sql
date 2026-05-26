@@ -24,6 +24,22 @@
 ALTER TABLE studio_projects
   ADD COLUMN IF NOT EXISTS slug varchar(120);
 
+-- Strip any inherited STORED/GENERATED expression on `slug` and any
+-- DEFAULT clause that references another column. Production was
+-- bootstrapped with `drizzle-kit push` and introspection materialised
+-- this column as `GENERATED ALWAYS AS (NULLIF(lower(storyboard->>'_slug'),
+-- '')) STORED` (also serialised in the 0129 backfill as a DEFAULT
+-- referencing `storyboard`, which Postgres rejects on UPDATE with
+-- `column "slug" can only be updated to DEFAULT`). The save-draft
+-- writer now owns slug mirroring explicitly, so the column must be a
+-- plain writable varchar. DROP EXPRESSION IF EXISTS is a no-op when
+-- the column was never generated (e.g. fresh local DBs), and DROP
+-- DEFAULT is idempotent in Postgres regardless of whether one was set.
+ALTER TABLE studio_projects
+  ALTER COLUMN slug DROP EXPRESSION IF EXISTS;
+ALTER TABLE studio_projects
+  ALTER COLUMN slug DROP DEFAULT;
+
 -- Backfill from the JSONB blob where the slug already exists. NULLIF
 -- guards against rows where the JSONB key is missing entirely (->>
 -- returns NULL on missing keys, but storing the JSON literal 'null'

@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 
-export type CourseStatus = "draft" | "published" | "unlisted" | "flagged";
+export type CourseStatus = "draft" | "in_review" | "published" | "unlisted" | "flagged";
 export type CourseDifficulty = "beginner" | "intermediate" | "advanced";
 
 export interface Course {

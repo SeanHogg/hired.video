@@ -727,6 +727,18 @@ export const PAGE_SEO: Record<string, SEOData> = {
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
+  "/courses/review-queue": {
+    title: "Course Review Queue — hired.video",
+    description:
+      "Reviewer inbox for course submissions. SuperAdmins and assigned reviewers see every course currently in_review, with deep-links into the threaded review surface.",
+    keywords:
+      "course review queue, course moderation, learning content review, in_review courses, reviewer inbox",
+    ogTitle: "Course Review Queue — hired.video",
+    ogDescription:
+      "Reviewer inbox for courses awaiting approval — open one to leave threaded comments or approve.",
+    ogImage: "https://hired.video/og-image.svg",
+    robots: "noindex, nofollow",
+  },
   "/verify": {
     title: "Verify Certificate — hired.video",
     description:

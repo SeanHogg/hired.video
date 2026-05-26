@@ -94,11 +94,17 @@ async function hashPassword(password: string): Promise<string> {
   return `${saltHex}:${hashHex}`;
 }
 
-let seeded = false;
-
+/**
+ * Idempotent seed: creates the superadmin user (if missing) and the two
+ * platform-shipped company profiles + sector articles. **Never** overwrites
+ * an existing user's password or role — the previous "refresh on every
+ * boot" branch silently reset whatever password was set through the app
+ * each time a Cloudflare isolate cold-started (gap #1593).
+ *
+ * Invoked from the daily window in scheduled.ts, not from the fetch path,
+ * so the SELECT-per-article-draft loop doesn't tax request latency.
+ */
 export async function seedSuperAdminAndCompany(): Promise<void> {
-  if (seeded) return;
-
   const email = process.env.SUPERADMIN_EMAIL ?? "seanhogg@gmail.com";
   const password = process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin123!";
   const name = process.env.SUPERADMIN_NAME ?? "Sean Hogg";
@@ -109,7 +115,7 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
     const db = getDb();
 
     const [existingUser] = await db
-      .select()
+      .select({ id: users.id })
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
@@ -135,13 +141,6 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
       console.log("[seed] Created super admin user", email);
     } else {
       userId = existingUser.id;
-      // Always refresh the seeded password and ensure the intended role
-      const passwordHash = await hashPassword(password);
-      await db
-        .update(users)
-        .set({ passwordHash, role, updatedAt: new Date() } as any)
-        .where(eq(users.id, userId));
-      console.log("[seed] Refreshed super admin password and role");
     }
 
     // Seed company profiles (not fake jobs) so the companies surface on
@@ -168,14 +167,12 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
       await ensureCompanyMembership(db, userId, hiredVideoCommunityId, "owner");
 
       // Phase 1: seed sector articles. Idempotent on (userId, slug) so
-      // re-running the boot seed does not duplicate. Platform-shipped
+      // the daily reconciliation does not duplicate. Platform-shipped
       // content lands as `published` (approvedBy=SA, approvedAt=now)
       // because it bypasses the creator-program enrollment gate that
       // user-authored articles run through.
       await seedSectorArticles(db, userId);
     }
-
-    seeded = true;
   } catch (err) {
     console.error("[seed] Failed to seed super admin / company:", err);
   }

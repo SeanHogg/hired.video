@@ -29,6 +29,7 @@ import {
   dispatchDuePartnerPayouts,
 } from "./services/articles/partner-pool.js";
 import { TremendousClient } from "./services/tremendous/client.js";
+import { seedSuperAdminAndCompany } from "./seed.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -453,6 +454,26 @@ async function processPartnerProgramDispatch(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// SuperAdmin + platform-company + sector-article seed (gap #1593)
+// ---------------------------------------------------------------------------
+// Runs once per day inside the 03:30 UTC /5 window. Previously called from
+// the fetch path on every request, which (because `executionModel` is
+// stateless) re-ran on every Cloudflare isolate cold-start — silently
+// resetting the superadmin password and costing a PBKDF2 hash + UPDATE on
+// each cold request. seedSuperAdminAndCompany is now idempotent and never
+// overwrites an existing user, so this is purely a "fill in anything
+// missing" daily reconciliation.
+async function processSeedSuperAdmin(): Promise<void> {
+  const now = new Date();
+  if (now.getUTCHours() !== 3 || now.getUTCMinutes() < 30 || now.getUTCMinutes() >= 35) return;
+  try {
+    await seedSuperAdminAndCompany();
+  } catch (err) {
+    console.error("[scheduled] superadmin seed failed:", err);
+  }
+}
+
 /** Tick rotation — distributes the always-running sweeps across the /5
  *  cron cadence so a single invocation doesn't blow the Cloudflare
  *  Worker CPU budget. The old behaviour ran all nine sweeps every
@@ -492,6 +513,7 @@ export async function runScheduled(): Promise<void> {
     processMonthlyUsageClose(),
     processGamificationFraudSweep(),
     processPartnerProgramPool(),
+    processSeedSuperAdmin(),
   ];
   if (isQuarterTick) sweeps.push(processRegisteredWorkers());
   if (isHalfTick)    sweeps.push(scrapeAllActiveSources());
