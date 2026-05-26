@@ -179,7 +179,9 @@ aiRoutes.post("/chat", async (c) => {
 
   // Tool follow-ups carry their own minimal context (the prior assistant
   // tool_call turn + tool results); plain user turns load history from
-  // the DB if the client didn't supply it.
+  // the DB if the client didn't supply it. Loaded BEFORE the user-turn
+  // persistence below so we don't replay the just-written turn back at
+  // the LLM as duplicated context.
   if (history.length === 0 && !isToolFollowup) {
     const prevMessages = await db
       .select({ role: schema.aiChatMessages.role, content: schema.aiChatMessages.content })
@@ -190,11 +192,41 @@ aiRoutes.post("/chat", async (c) => {
     history.push(...prevMessages.reverse());
   }
 
+  // Persistence is best-effort: a failure here (Cloudflare per-invocation
+  // subrequest cap, Neon transient, FK race) must NOT take down the
+  // chat — the user message is already in the request body, the
+  // assistant response is already generated, and the client cares about
+  // getting the answer back. We log + swallow so the route still
+  // returns 200. Once gap #1578's `_pg` surface confirms the failure
+  // class we can either wrap the two writes in a Neon transaction (FK
+  // race) or trim the dispatch chain (subrequest cap).
+  //
+  // We persist the user message BEFORE the LLM call so it lands while
+  // there's still subrequest budget — the LLM dispatch + token-ledger
+  // writes inside callMessages burn most of the per-invocation cap and
+  // were leaving the post-LLM message inserts to fail every time
+  // (see #1570 + #1578).
+  async function persistChatMessage(role: "user" | "assistant", content: string, tokensUsed: number) {
+    if (!content) return;
+    try {
+      await db.insert(schema.aiChatMessages).values({ sessionId, role, content, tokensUsed } as any);
+    } catch (persistErr) {
+      console.error("[ai/chat] persist message failed", { sessionId, role, tokensUsed, err: persistErr });
+    }
+  }
+
+  if (!isToolFollowup && userMessage) {
+    // `tokens_used` on the message row is denormalized + approximate;
+    // the authoritative LLM cost ledger is `ai_usage_records` (charged
+    // inside callMessages). Estimating from the message content keeps
+    // the per-row column meaningful without needing the LLM result.
+    await persistChatMessage("user", userMessage, estimateTokens(userMessage));
+  }
+
   let responseMessage = "";
   let responseToolCalls: ToolCall[] = [];
   let promptTokens = 0;
   let completionTokens = 0;
-  let model = "mock";
 
   if (hasAnyLLMProviderKey(c.env as any)) {
     try {
@@ -234,7 +266,6 @@ aiRoutes.post("/chat", async (c) => {
       responseToolCalls = result.toolCalls;
       promptTokens = result.usage.promptTokens;
       completionTokens = result.usage.completionTokens;
-      model = result.usage.model;
     } catch {
       const mock = generateMockResponse(userMessage || "");
       responseMessage = mock.message;
@@ -250,20 +281,10 @@ aiRoutes.post("/chat", async (c) => {
 
   const totalTokens = promptTokens + completionTokens;
 
-  // Persist user-visible turns: the user's message (when this isn't a
-  // tool follow-up) and any final prose from the assistant. Tool-call /
-  // tool-result intermediate turns are session-local and not replayed
-  // on history reload — keeps the chat log readable.
-  const rows: Array<{ sessionId: string; role: string; content: string; tokensUsed: number }> = [];
-  if (!isToolFollowup && userMessage) {
-    rows.push({ sessionId, role: "user", content: userMessage, tokensUsed: promptTokens });
-  }
-  if (responseMessage) {
-    rows.push({ sessionId, role: "assistant", content: responseMessage, tokensUsed: completionTokens });
-  }
-  if (rows.length > 0) {
-    await db.insert(schema.aiChatMessages).values(rows as any);
-  }
+  // Assistant prose persistence — best-effort via `persistChatMessage`.
+  // Tool-call / tool-result intermediate turns are session-local and not
+  // replayed on history reload, so we skip them here.
+  await persistChatMessage("assistant", responseMessage, completionTokens);
 
   // Token usage is charged automatically by `LLMClient.callMessages`
   // (with `sessionId` linked through the `LLMCallOpts`) — no second

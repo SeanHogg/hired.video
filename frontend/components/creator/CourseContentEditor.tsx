@@ -14,6 +14,14 @@ import {
 import { SortableList, SortableDragHandle } from "@/components/resume-sections/SortableList";
 import { extractAndUploadScormZip, type ScormUploadProgress } from "@/lib/courses/scorm-upload";
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
+import CourseGeneratorDialog, { type GeneratedCourse } from "@/components/creator/CourseGeneratorDialog";
+import { importPptx } from "@/lib/courses/pptx-import";
+import {
+  commitCourseSkeleton,
+  generatedCourseToSkeleton,
+  pptxSlidesToSkeleton,
+  uploadPptxThumbnails,
+} from "@/lib/courses/commit-course-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -168,6 +176,12 @@ export default function CourseContentEditor({ courseId }: Props) {
   // #1410 — client-side SCORM zip extract + per-file R2 upload progress.
   // Null when no upload is in flight.
   const [scormProgress, setScormProgress] = useState<ScormUploadProgress | null>(null);
+  // #1497 — AI generator dialog open state.
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [generatorCommitting, setGeneratorCommitting] = useState(false);
+  // #1498 — PPTX import progress. Same null-or-string indicator as
+  // scormProgress so the UI can render a single in-flight chip.
+  const [pptxBusy, setPptxBusy] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -362,6 +376,65 @@ export default function CourseContentEditor({ courseId }: Props) {
     }
   };
 
+  // ── Bulk-import handlers — #1497 + #1498. Both route through the
+  //    shared commitCourseSkeleton walker so module + lesson row creation
+  //    is identical regardless of source. ──
+  const commitSkeleton = async (
+    sourceLabel: string,
+    skeleton: Awaited<ReturnType<typeof generatedCourseToSkeleton>>,
+  ): Promise<void> => {
+    try {
+      const { modules: createdModules, lessons: createdLessons } = await commitCourseSkeleton(
+        courseId,
+        skeleton,
+        modules.length,
+      );
+      setModules((cur) => [...cur, ...createdModules]);
+      setLessons((cur) => [...cur, ...createdLessons]);
+      toast({
+        title: `${sourceLabel} imported`,
+        description: `${createdModules.length} module${createdModules.length === 1 ? "" : "s"}, ${createdLessons.length} lesson${createdLessons.length === 1 ? "" : "s"} added.`,
+      });
+    } catch (e: unknown) {
+      toast({
+        title: `${sourceLabel} import failed`,
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGenerated = async (course: GeneratedCourse) => {
+    setGeneratorCommitting(true);
+    try {
+      await commitSkeleton("AI course", generatedCourseToSkeleton(course));
+    } finally {
+      setGeneratorCommitting(false);
+    }
+  };
+
+  const handlePptxFile = async (file: File) => {
+    setPptxBusy(`Parsing ${file.name}…`);
+    try {
+      const { slides } = await importPptx(file);
+      if (slides.length === 0) {
+        toast({ title: "No slides found in deck", variant: "destructive" });
+        return;
+      }
+      setPptxBusy(`Uploading slide thumbnails (${slides.filter((s) => s.thumbnailUrl).length})…`);
+      const uploaded = await uploadPptxThumbnails(slides);
+      await commitSkeleton("PowerPoint deck", pptxSlidesToSkeleton(slides, uploaded));
+    } catch (e: unknown) {
+      toast({
+        title: "PPTX import failed",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setPptxBusy(null);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -393,7 +466,24 @@ export default function CourseContentEditor({ courseId }: Props) {
           <LessonAuthoringCTAs
             courseId={courseId}
             onPickSource={(sourceType) => openCreateLesson(null, sourceType)}
+            onGenerate={() => setGeneratorOpen(true)}
+            onImportPptx={() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = ".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation";
+              input.onchange = () => {
+                const file = input.files?.[0];
+                if (file) void handlePptxFile(file);
+              };
+              input.click();
+            }}
           />
+          {(generatorCommitting || pptxBusy) && (
+            <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {generatorCommitting ? "Committing AI-generated course…" : pptxBusy}
+            </div>
+          )}
         </div>
 
         {/* Module list */}
@@ -738,6 +828,14 @@ export default function CourseContentEditor({ courseId }: Props) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* #1497 — AI generator. The dialog stays decoupled from the
+            persistence walker; `handleGenerated` is what commits. */}
+        <CourseGeneratorDialog
+          open={generatorOpen}
+          onOpenChange={setGeneratorOpen}
+          onGenerated={(course) => void handleGenerated(course)}
+        />
       </CardContent>
     </Card>
   );

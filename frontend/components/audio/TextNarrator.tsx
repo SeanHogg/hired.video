@@ -54,6 +54,7 @@ import {
 import {
   getLicensedVoices,
   type LicensedVoice,
+  type TTSVoice,
 } from "@/lib/services/studio-features-service";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -155,6 +156,15 @@ function mapLicensedToNarrator(v: LicensedVoice): NarratorVoice {
   };
 }
 
+function mapBrowserToNarrator(v: TTSVoice): NarratorVoice {
+  return {
+    id: v.voice_id,
+    name: v.name,
+    engine: "web-speech",
+    group: "browser",
+  };
+}
+
 export function TextNarrator({
   text,
   className,
@@ -208,13 +218,10 @@ export function TextNarrator({
     let cancelled = false;
 
     const load = async () => {
-      const browser = await getBrowserVoices().catch(() => []);
-      const browserVoices: NarratorVoice[] = browser.map((v) => ({
-        id: v.voice_id,
-        name: v.name,
-        engine: "web-speech" as const,
-        group: "browser" as const,
-      }));
+      const browser = await getBrowserVoices().catch(
+        () => [] as TTSVoice[],
+      );
+      const browserVoices: NarratorVoice[] = browser.map(mapBrowserToNarrator);
 
       let licensedVoices: NarratorVoice[] = [];
       if (isAuthenticated) {
