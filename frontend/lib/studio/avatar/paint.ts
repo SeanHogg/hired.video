@@ -193,7 +193,7 @@ function paintHair(
 }
 
 function paintMouth(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   viseme: Viseme,
   m: { cx: number; cy: number; w: number; h: number; colors: { lips: string; stroke: string } },
 ): void {
