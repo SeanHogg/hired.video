@@ -453,6 +453,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
+      // Drop the cached inbox seed so the next signed-in user doesn't
+      // briefly see the previous user's hub before /api/bootstrap fires
+      // (gap #1368).
+      clearInboxSeed();
       setUser(null);
     }
   };

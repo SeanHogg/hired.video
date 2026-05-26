@@ -186,12 +186,23 @@ export async function extractAndUploadScormZip(
   }
 
   // Manifest's directory prefix (e.g. "Package/" when the zip wraps
-  // everything in one folder). Used to resolve the entry href relative
-  // to the manifest location AND to strip the prefix when computing
-  // upload paths (so each file's "logical" SCORM path is recorded
-  // without the folder noise).
+  // everything in one folder). Stripped from every upload path so the
+  // R2 layout starts at the manifest's directory — which means the
+  // entry HTML's relative refs like `<script src="loader.js">` resolve
+  // to the sibling key inside the same R2 prefix (`<pkg>/loader.js`).
+  // Without this strip, every file would carry the "Package/" prefix
+  // and the relative refs would still work between siblings, but the
+  // public R2 URL would be uglier and the manifest reference resolution
+  // below would need extra concatenation.
   const lastSlash = manifestEntry.name.lastIndexOf("/");
   const manifestPrefix = lastSlash >= 0 ? manifestEntry.name.slice(0, lastSlash + 1) : "";
+  const stripPrefix = (name: string) =>
+    manifestPrefix && name.startsWith(manifestPrefix) ? name.slice(manifestPrefix.length) : name;
+
+  // #1431 — mint one package id; every file lands under
+  // `uploads/<userId>/scorm/<pkgId>/<inZipPath>` so relative asset
+  // references in the entry HTML resolve to real R2 siblings.
+  const pkgId = crypto.randomUUID();
 
   let done = 0;
   const total = entries.length;
@@ -200,18 +211,28 @@ export async function extractAndUploadScormZip(
   for (const entry of entries) {
     const blob = await entry.async("blob");
     const contentType = contentTypeFor(entry.name);
-    const url = await uploadOne(entry.name, blob, contentType);
-    urlByPath.set(entry.name, url);
+    const relPath = stripPrefix(entry.name);
+    if (!relPath) {
+      // Skip an unexpected directory entry that slipped past the dir filter
+      // (some authoring tools emit zero-byte folder markers).
+      done += 1;
+      onProgress?.({ done, total, lastPath: entry.name });
+      continue;
+    }
+    const url = await uploadOne(pkgId, relPath, blob, contentType);
+    urlByPath.set(relPath, url);
     done += 1;
-    onProgress?.({ done, total, lastPath: entry.name });
+    onProgress?.({ done, total, lastPath: relPath });
   }
 
-  const manifestUrl = urlByPath.get(manifestEntry.name)!;
-  const entryAbsolutePath = manifestPrefix + entryHref;
-  const entryUrl = urlByPath.get(entryAbsolutePath) ?? urlByPath.get(entryHref);
+  const manifestUrl = urlByPath.get(stripPrefix(manifestEntry.name))!;
+  // entryHref in the manifest is relative to the manifest's directory,
+  // which after stripPrefix is the package root — so the key under R2
+  // is exactly entryHref.
+  const entryUrl = urlByPath.get(entryHref);
   if (!entryUrl) {
     throw new Error(`Entry resource "${entryHref}" was declared in the manifest but not found in the zip.`);
   }
 
-  return { manifestUrl, entryUrl, version, fileCount: total };
+  return { manifestUrl, entryUrl, version, fileCount: total, pkgId };
 }

@@ -58,6 +58,64 @@ export interface RosterRow {
   last7DaysHours: string;
 }
 
+export interface DeskMarginRow {
+  placementId: string;
+  candidateId: string;
+  candidateName: string;
+  recruiterId: string | null;
+  recruiterName: string | null;
+  placementKind: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  billRateHourly: number;
+  payRateHourly: number;
+  currency: string;
+  billableHoursYTD: number;
+  totalHoursYTD: number;
+  revenueCents: number;
+  payoutCents: number;
+  grossMarginCents: number;
+  approvedTimesheetCount: number;
+}
+
+export interface PlacementDocument {
+  id: string;
+  placementId: string | null;
+  companyId: string | null;
+  userId: string | null;
+  kind: string;
+  filePath: string | null;
+  providerName: string | null;
+  providerRef: string | null;
+  signedAt: string | null;
+  expiresAt: string | null;
+  status: "pending" | "signed" | "expired" | "revoked";
+  metadata: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDocumentInput {
+  placementId?: string | null;
+  companyId?: string | null;
+  userId?: string | null;
+  kind: string;
+  filePath?: string | null;
+  providerName?: string | null;
+  providerRef?: string | null;
+  signedAt?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface SeatReconcileResult {
+  companyId: string;
+  previousSeatCount: number;
+  newSeatCount: number;
+  pricePerSeatCents: number;
+  totalMonthlyCents: number;
+  delta: number;
+}
+
 async function unwrap<T>(p: Promise<{ data: T }>): Promise<T> {
   const r = await p;
   return r.data;
@@ -104,6 +162,29 @@ class WorkforceService {
 
   getRoster() {
     return unwrap(apiClient.get<{ roster: RosterRow[] }>("/api/workforce/roster"));
+  }
+
+  getDeskMargin() {
+    return unwrap(apiClient.get<{ rows: DeskMarginRow[] }>("/api/workforce/desk-margin"));
+  }
+
+  listDocuments() {
+    return unwrap(apiClient.get<{ documents: PlacementDocument[] }>("/api/workforce/documents"));
+  }
+
+  createDocument(input: CreateDocumentInput) {
+    return unwrap(apiClient.post<PlacementDocument>("/api/workforce/documents", input));
+  }
+
+  reconcileSeats() {
+    return unwrap(apiClient.post<{ results: SeatReconcileResult[] }>("/api/workforce/reconcile-seats", {}));
+  }
+
+  /** Deactivate an employee (off-board). Hits the existing account API
+   *  rather than a workforce-specific route — removeAccountUser handles
+   *  the UCRA flip + workforce seat reconciliation (#1406). */
+  deactivateEmployee(userId: string) {
+    return apiClient.delete<{ success: boolean }>(`/api/account/users/${userId}`);
   }
 }
 
