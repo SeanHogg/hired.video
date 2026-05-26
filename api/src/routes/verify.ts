@@ -22,7 +22,7 @@ export const verifyRoutes = new Hono<{ Variables: Variables } & AppEnv>();
 verifyRoutes.get("/:certNumber", async (c) => {
   const certService = new CertificateService(getDb(), getJwtSecret());
   const result = await certService.verify(c.req.param("certNumber"));
-  if (!result.valid) {
+  if (result.valid === false) {
     return c.json(success({ valid: false, reason: result.reason }), 200);
   }
   const { certificate, payload } = result;

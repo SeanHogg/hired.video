@@ -5,7 +5,8 @@
  * covered transitively by integration tests against the route.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import { strict as assert } from "node:assert";
 import { generateQuestionsForCompetency } from "../question-generator.js";
 
 const NO_KEY_ENV = {} as any;
@@ -16,7 +17,7 @@ describe("generateQuestionsForCompetency (mock fallback)", () => {
       competencyName: "Technical Depth",
       count: 4,
     });
-    expect(out).toHaveLength(4);
+    assert.equal(out.length, 4);
   });
 
   it("clamps count below 1 to 1 and above 6 to 6", async () => {
@@ -28,8 +29,8 @@ describe("generateQuestionsForCompetency (mock fallback)", () => {
       competencyName: "X",
       count: 999,
     });
-    expect(tooFew).toHaveLength(1);
-    expect(tooMany).toHaveLength(6);
+    assert.equal(tooFew.length, 1);
+    assert.equal(tooMany.length, 6);
   });
 
   it("echoes the competency name into each prompt + tags difficulty when level is provided", async () => {
@@ -39,8 +40,8 @@ describe("generateQuestionsForCompetency (mock fallback)", () => {
       count: 2,
     });
     for (const q of out) {
-      expect(q.prompt.toLowerCase()).toContain("leadership");
-      expect(q.difficulty).toBe("L4");
+      assert.ok(q.prompt.toLowerCase().includes("leadership"));
+      assert.equal(q.difficulty, "L4");
     }
   });
 
@@ -49,6 +50,6 @@ describe("generateQuestionsForCompetency (mock fallback)", () => {
       competencyName: "Communication",
       count: 1,
     });
-    expect(out[0].expectedAnswer).toBe("star");
+    assert.equal(out[0].expectedAnswer, "star");
   });
 });

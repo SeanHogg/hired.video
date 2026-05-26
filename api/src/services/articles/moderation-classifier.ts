@@ -61,6 +61,7 @@ export async function classifyArticle(args: {
   body: string;
 }): Promise<ClassifierResult> {
   const result = await args.llm.callJson<ClassifierResult>(
+    "article_moderation",
     {
       useCase: "article_moderation",
       systemPrompt: SYSTEM_PROMPT,

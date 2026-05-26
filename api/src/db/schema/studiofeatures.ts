@@ -27,6 +27,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { studioProjects } from "./resumes.js";
+import { users } from "./users.js";
 
 // ---------------------------------------------------------------------------
 // oauthConnectionColumns — shared lifecycle columns for any per-user OAuth
@@ -97,7 +98,7 @@ export const studioVoiceClones = pgTable(
   "studio_voice_clones",
   {
     id:              uuid("id").primaryKey().defaultRandom(),
-    userId:          text("user_id").notNull(),
+    userId:          uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     name:            text("name").notNull().default("My Voice"),
     description:     text("description"),
     /** Engine the sample is intended for at synthesis time. */
@@ -170,8 +171,8 @@ export const studioVoiceCloneLicenses = pgTable(
   "studio_voice_clone_licenses",
   {
     id:               uuid("id").primaryKey().defaultRandom(),
-    userId:           text("user_id").notNull(),
-    voiceCloneId:     uuid("voice_clone_id").notNull(),
+    userId:           uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    voiceCloneId:     uuid("voice_clone_id").notNull().references(() => studioVoiceClones.id, { onDelete: "cascade" }),
     source:           text("source").notNull(),     // 'owner' | 'free' | 'purchase'
     pricePaidCents:   integer("price_paid_cents").notNull().default(0),
     creatorCutCents:  integer("creator_cut_cents").notNull().default(0),
@@ -194,8 +195,8 @@ export const studioCaptions = pgTable(
   "studio_captions",
   {
     id:          uuid("id").primaryKey().defaultRandom(),
-    userId:      text("user_id").notNull(),
-    projectId:   text("project_id").notNull(),
+    userId:      uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId:   uuid("project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
     language:    text("language").notNull().default("en"),
     style:       text("style").notNull().default("standard"), // standard | bold-pop | word-by-word | lower-thirds
     cues:        jsonb("cues").notNull(),         // Array<{start, end, text, words?}>
@@ -213,7 +214,7 @@ export const linkedinAccounts = pgTable(
   "linkedin_accounts",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
-    userId:       text("user_id").notNull(),
+    userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     linkedinId:   text("linkedin_id").notNull(),  // LinkedIn member URN
     displayName:  text("display_name"),
     profileUrl:   text("profile_url"),
@@ -235,7 +236,7 @@ export const youtubeAccounts = pgTable(
   "youtube_accounts",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
-    userId:       text("user_id").notNull(),
+    userId:       uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     googleId:     text("google_id").notNull(),
     channelId:    text("channel_id"),
     channelTitle: text("channel_title"),

@@ -119,7 +119,7 @@ async function publicJobsFromQuery(
 jobRoutes.get("/", async (c) => {
   const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
   const fields = parseFields(c.req.query("fields"), JOB_LIST_FIELDS);
-  return c.json(success({ ...data, items: projectRows(data.items, fields) }));
+  return c.json(success({ ...data, items: projectRows(data.items as unknown as Array<Record<string, unknown>>, fields) }));
 });
 
 /** POST /api/jobs/:id/archive — soft-delete the job (#154). Owner only.
@@ -131,12 +131,12 @@ jobRoutes.post("/:id/archive", async (c) => {
   const id = c.req.param("id");
   const db = getDb();
   const [row] = await db
-    .select({ id: schema.jobItems.id, userId: schema.jobItems.userId })
+    .select({ id: schema.jobItems.id, postedByUserId: schema.jobItems.postedByUserId })
     .from(schema.jobItems)
     .where(eq(schema.jobItems.id, id))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Job not found"), 404);
-  if (row.userId !== userId) return c.json(error("FORBIDDEN", "Not your job"), 403);
+  if (row.postedByUserId !== userId) return c.json(error("FORBIDDEN", "Not your job"), 403);
   const [updated] = await db
     .update(schema.jobItems)
     .set({ archivedAt: new Date(), updatedAt: new Date() } as any)
@@ -151,12 +151,12 @@ jobRoutes.post("/:id/unarchive", async (c) => {
   const id = c.req.param("id");
   const db = getDb();
   const [row] = await db
-    .select({ id: schema.jobItems.id, userId: schema.jobItems.userId })
+    .select({ id: schema.jobItems.id, postedByUserId: schema.jobItems.postedByUserId })
     .from(schema.jobItems)
     .where(eq(schema.jobItems.id, id))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Job not found"), 404);
-  if (row.userId !== userId) return c.json(error("FORBIDDEN", "Not your job"), 403);
+  if (row.postedByUserId !== userId) return c.json(error("FORBIDDEN", "Not your job"), 403);
   const [updated] = await db
     .update(schema.jobItems)
     .set({ archivedAt: null, updatedAt: new Date() } as any)
@@ -208,7 +208,7 @@ jobRoutes.get("/saved", async (c) => {
 jobRoutes.get("/public", async (c) => {
   const data = await publicJobsFromQuery(c.req.query(), (c.env ?? {}) as Record<string, string | undefined>);
   const fields = parseFields(c.req.query("fields"), JOB_LIST_FIELDS);
-  return c.json(success({ ...data, items: projectRows(data.items, fields) }));
+  return c.json(success({ ...data, items: projectRows(data.items as unknown as Array<Record<string, unknown>>, fields) }));
 });
 
 /** POST /api/Job/:id/save — save/bookmark a job */

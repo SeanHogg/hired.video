@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import { strict as assert } from "node:assert";
 import {
   planScorecardReminderSweep,
   type ReminderPlanInput,
@@ -24,8 +25,8 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub()],
     });
-    expect(plan.reminders).toHaveLength(1);
-    expect(plan.escalations).toHaveLength(0);
+    assert.equal(plan.reminders.length, 1);
+    assert.equal(plan.escalations.length, 0);
   });
 
   it("does NOT emit a remind when one was already sent inside the cycle", () => {
@@ -35,7 +36,7 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub({ remindedAt: new Date("2026-05-25T09:00:00Z") })],
     });
-    expect(plan.reminders).toHaveLength(0);
+    assert.equal(plan.reminders.length, 0);
   });
 
   it("emits a remind when previous remind was BEFORE the current cycle started", () => {
@@ -48,7 +49,7 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub({ remindedAt: new Date("2026-05-25T06:00:00Z") })],
     });
-    expect(plan.reminders).toHaveLength(1);
+    assert.equal(plan.reminders.length, 1);
   });
 
   it("emits an escalation 24h past due with no prior escalation", () => {
@@ -58,7 +59,7 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub()],
     });
-    expect(plan.escalations).toHaveLength(1);
+    assert.equal(plan.escalations.length, 1);
   });
 
   it("does NOT escalate twice", () => {
@@ -68,7 +69,7 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub({ escalatedAt: new Date("2026-05-26T12:30:00Z") })],
     });
-    expect(plan.escalations).toHaveLength(0);
+    assert.equal(plan.escalations.length, 0);
   });
 
   it("emits BOTH a remind and an escalation in the same sweep when warranted", () => {
@@ -80,8 +81,8 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub()],
     });
-    expect(plan.reminders).toHaveLength(1);
-    expect(plan.escalations).toHaveLength(1);
+    assert.equal(plan.reminders.length, 1);
+    assert.equal(plan.escalations.length, 1);
   });
 
   it("is a no-op when now is before the reminder horizon", () => {
@@ -91,7 +92,7 @@ describe("planScorecardReminderSweep", () => {
       escalateAfterMs: 24 * HOUR,
       candidates: [sub()],
     });
-    expect(plan.reminders).toHaveLength(0);
-    expect(plan.escalations).toHaveLength(0);
+    assert.equal(plan.reminders.length, 0);
+    assert.equal(plan.escalations.length, 0);
   });
 });

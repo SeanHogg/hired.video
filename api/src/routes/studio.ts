@@ -1053,15 +1053,21 @@ studioRoutes.post("/generate-comic", async (c) => {
 
   const loadProfile = async (): Promise<string> => {
     const [row] = await db
-      .select()
-      .from(userProfiles)
-      .where(eq(userProfiles.userId, user.sub))
+      .select({
+        name: users.name,
+        headline: userProfiles.headline,
+        summary: userProfiles.summary,
+        location: userProfiles.location,
+      })
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(eq(users.id, user.sub))
       .limit(1);
     if (!row) return "";
     const lines: string[] = [];
-    if (row.firstName || row.lastName) lines.push(`Name: ${[row.firstName, row.lastName].filter(Boolean).join(" ")}`);
+    if (row.name)     lines.push(`Name: ${row.name}`);
     if (row.headline) lines.push(`Headline: ${row.headline}`);
-    if (row.bio)      lines.push(`Bio: ${row.bio}`);
+    if (row.summary)  lines.push(`Summary: ${row.summary}`);
     if (row.location) lines.push(`Location: ${row.location}`);
     return lines.join("\n");
   };
@@ -1141,7 +1147,7 @@ studioRoutes.post("/generate-comic", async (c) => {
           const portraitPrompt =
             `${genre.artDirection ?? "cinematic illustration"}, ` +
             `hero portrait of ${input.protagonistName || "a determined protagonist"}, ` +
-            `${genre.palette?.join(" ") ?? ""}, head-and-shoulders, ` +
+            `${Object.values(genre.palette ?? {}).join(" ")}, head-and-shoulders, ` +
             `clean background, dramatic lighting, comic-book panel style`;
           const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
             prompt: portraitPrompt.slice(0, 500),
@@ -1154,7 +1160,13 @@ studioRoutes.post("/generate-comic", async (c) => {
           const characterUrl = cdnUrl(key);
           spec.pages = spec.pages.map((p) => ({
             ...p,
-            assets: { ...(p.assets ?? {}), characterUrl },
+            assets: {
+              backgroundUrl: null,
+              propUrl: null,
+              sfxUrl: null,
+              ...(p.assets ?? {}),
+              characterUrl,
+            },
           }));
           await tokenLedger.charge({
             userId: user.sub,

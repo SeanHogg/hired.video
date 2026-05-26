@@ -167,8 +167,8 @@ locationRoutes.get("/search", async (c) => {
     .limit(6)) as Array<{
     cityId: string;
     cityName: string;
-    cityLat: string | null;
-    cityLng: string | null;
+    cityLat: number | null;
+    cityLng: number | null;
     stateId: string;
     stateName: string;
     stateCode: string | null;
@@ -184,8 +184,8 @@ locationRoutes.get("/search", async (c) => {
     stateId: r.stateId,
     cityId: r.cityId,
     postalCode: null as string | null,
-    latitude: r.cityLat ? Number(r.cityLat) : null,
-    longitude: r.cityLng ? Number(r.cityLng) : null,
+    latitude: r.cityLat,
+    longitude: r.cityLng,
   }));
 
   return c.json(success(hits), 200);

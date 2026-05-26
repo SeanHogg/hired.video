@@ -78,6 +78,8 @@ export type LLMUseCase =
   | "email_summary"
   | "email_digest"
   | "scorecard_bias_check"
+  | "article_moderation"
+  | "course_generation"
   | "default";
 
 /** A leaf inference profile — model + sampling, no further fallbacks. */
@@ -215,6 +217,8 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   match_insights: { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.4 },
   interview_questions: { model: "google/gemma-4-31b-it:free", temperature: 0.6 },
   interview_analyze: { model: "openai/gpt-oss-120b:free", temperature: 0.3 },
+  interview_answer_score: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
+  video_pitch_script: { model: "anthropic/claude-3-haiku", temperature: 0.7 },
   autofill: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.2 },
   skill_extract: { model: "qwen/qwen3-coder:free", temperature: 0.0 },
   linkedin_post: { model: "google/gemma-4-31b-it:free", temperature: 0.8 },
@@ -270,6 +274,8 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   email_digest: { model: "google/gemma-4-31b-it:free", temperature: 0.4, maxTokens: 600 },
   // Scorecard bias linter (#1385). Short input + strict JSON output; the
   // gemma 4 instruct family hits the sweet spot of cheap + structured.
+  article_moderation: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
+  course_generation: { model: "anthropic/claude-3-haiku", temperature: 0.5 },
   scorecard_bias_check: {
     model: "google/gemma-4-26b-a4b-it:free",
     temperature: 0.1,

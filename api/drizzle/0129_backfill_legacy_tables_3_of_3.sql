@@ -252,7 +252,18 @@ CREATE TABLE IF NOT EXISTS "studio_projects" (
   "kind" character varying(16) NOT NULL DEFAULT 'scene'::character varying,
   "timeline_spec" jsonb,
   "is_public" boolean NOT NULL DEFAULT false,
-  "slug" text DEFAULT NULLIF(lower((storyboard ->> '_slug'::text)), ''::text),
+  -- `slug` is a plain nullable column here. Production was introspected
+  -- from a `drizzle-kit push`-installed GENERATED column, which the
+  -- backfill generator originally serialised as
+  --   DEFAULT NULLIF(lower((storyboard ->> '_slug'::text)), ''::text)
+  -- — but Postgres rejects DEFAULTs that reference another column at
+  -- INSERT time, so a fresh-deploy DB without the pre-existing prod
+  -- table would have failed the first studio_projects INSERT. Migration
+  -- 0141 owns the slug column's final shape (writable varchar(120) +
+  -- partial unique index + explicit backfill from `storyboard._slug`),
+  -- and the save-draft writer mirrors into both `slug` and the JSONB
+  -- so the previous DEFAULT-derived value is no longer load-bearing.
+  "slug" text,
   "is_profile_primary" boolean NOT NULL DEFAULT false,
   "is_featured" boolean NOT NULL DEFAULT false,
   "media_kind" character varying(16) NOT NULL DEFAULT 'video'::character varying,

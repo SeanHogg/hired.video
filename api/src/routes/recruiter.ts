@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, desc, count, sum, sql, inArray, ilike, or } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -1151,7 +1151,7 @@ const ProfileExtractionResponseSchema = z.object({
 		github: z.string().optional().default(""),
 		twitter: z.string().optional().default(""),
 		website: z.string().optional().default(""),
-	}).optional().default({}),
+	}).optional().default({ email: "", phone: "", linkedin: "", github: "", twitter: "", website: "" }),
 });
 
 /**
@@ -1260,7 +1260,7 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 			name: "Unknown Candidate",
 			title: "", company: "", location: "",
 			skills: [], experience: [], education: [], summary: "",
-			contactInfo: {},
+			contactInfo: { email: "", phone: "", linkedin: "", github: "", twitter: "", website: "" },
 		};
 	}
 
@@ -1358,7 +1358,7 @@ recruiterRoutes.post("/extract-profile", async (c) => {
 		force: parsed.data.force,
 		recruiterId: user.sub,
 	});
-	if (!result.ok) return c.json(error(result.code, result.message), 500);
+	if (result.ok === false) return c.json(error(result.code, result.message), 500);
 	return c.json(
 		success({
 			profile: result.profile,

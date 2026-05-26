@@ -94,85 +94,92 @@ async function hashPassword(password: string): Promise<string> {
   return `${saltHex}:${hashHex}`;
 }
 
+/** Inputs that determine *what* the seed inserts. Separated from
+ *  `seedSuperAdminAndCompany` so the env-reading wrapper stays env-aware
+ *  while the core is unit-testable with explicit values + an injected db. */
+export interface SeedOpts {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+  companyName: string;
+}
+
+/** Default opts derived from `process.env` — the production caller. */
+function defaultSeedOpts(): SeedOpts {
+  return {
+    email: process.env.SUPERADMIN_EMAIL ?? "seanhogg@gmail.com",
+    password: process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin123!",
+    name: process.env.SUPERADMIN_NAME ?? "Sean Hogg",
+    role: process.env.SUPERADMIN_ROLE ?? USER_ROLES.SUPER_ADMIN,
+    companyName: process.env.SEED_COMPANY_NAME ?? "Fix Faster LLC",
+  };
+}
+
+/** Core seed routine: `db` injected so tests can substitute a fake db.
+ *  **Idempotent** and **never overwrites an existing user's credentials**
+ *  — the previous "refresh on every boot" branch silently reset whatever
+ *  password was set through the app each time a Cloudflare isolate
+ *  cold-started (gap #1593). */
+export async function runSeed(
+  db: ReturnType<typeof getDb>,
+  opts: SeedOpts,
+): Promise<void> {
+  const [existingUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, opts.email))
+    .limit(1);
+
+  let userId: string;
+
+  if (!existingUser) {
+    const passwordHash = await hashPassword(opts.password);
+    const [created] = await db
+      .insert(users)
+      .values({
+        email: opts.email,
+        name: opts.name,
+        passwordHash,
+        emailVerified: true,
+        role: opts.role,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      .returning();
+
+    userId = created?.id;
+    console.log("[seed] Created super admin user", opts.email);
+  } else {
+    userId = existingUser.id;
+  }
+
+  if (userId) {
+    const fixFasterId = await ensureCompanyProfile(
+      db,
+      userId,
+      opts.companyName,
+      `${opts.companyName} — seeded company profile.`,
+    );
+    const hiredVideoCommunityId = await ensureCompanyProfile(
+      db,
+      userId,
+      HIRED_VIDEO_SEED_COMPANY,
+      "Placeholder company for jobs tracked by hired.video community members through the Chrome extension. Tracked jobs that don't specify a company are attributed here. Also serves as the first-party owner of platform-shipped Studio templates.",
+    );
+    await ensureCompanyMembership(db, userId, fixFasterId, "owner");
+    await ensureCompanyMembership(db, userId, hiredVideoCommunityId, "owner");
+    await seedSectorArticles(db, userId);
+  }
+}
+
 /**
- * Idempotent seed: creates the superadmin user (if missing) and the two
- * platform-shipped company profiles + sector articles. **Never** overwrites
- * an existing user's password or role — the previous "refresh on every
- * boot" branch silently reset whatever password was set through the app
- * each time a Cloudflare isolate cold-started (gap #1593).
- *
- * Invoked from the daily window in scheduled.ts, not from the fetch path,
- * so the SELECT-per-article-draft loop doesn't tax request latency.
+ * Production wrapper: reads env, resolves real db, runs the core. Daily
+ * window in scheduled.ts is the only caller — see worker.ts comment.
  */
 export async function seedSuperAdminAndCompany(): Promise<void> {
-  const email = process.env.SUPERADMIN_EMAIL ?? "seanhogg@gmail.com";
-  const password = process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin123!";
-  const name = process.env.SUPERADMIN_NAME ?? "Sean Hogg";
-  const role = process.env.SUPERADMIN_ROLE ?? USER_ROLES.SUPER_ADMIN;
-  const companyName = process.env.SEED_COMPANY_NAME ?? "Fix Faster LLC";
-
   try {
-    const db = getDb();
-
-    const [existingUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-
-    let userId: string;
-
-    if (!existingUser) {
-      const passwordHash = await hashPassword(password);
-      const [created] = await db
-        .insert(users)
-        .values({
-          email,
-          name,
-          passwordHash,
-          emailVerified: true,
-          role,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as any)
-        .returning();
-
-      userId = created?.id;
-      console.log("[seed] Created super admin user", email);
-    } else {
-      userId = existingUser.id;
-    }
-
-    // Seed company profiles (not fake jobs) so the companies surface on
-    // the public board. Idempotent on name — if the profile already
-    // exists, nothing happens. No placeholder jobs are created.
-    if (userId) {
-      const fixFasterId = await ensureCompanyProfile(
-        db,
-        userId,
-        companyName,
-        `${companyName} — seeded company profile.`,
-      );
-      const hiredVideoCommunityId = await ensureCompanyProfile(
-        db,
-        userId,
-        HIRED_VIDEO_SEED_COMPANY,
-        "Placeholder company for jobs tracked by hired.video community members through the Chrome extension. Tracked jobs that don't specify a company are attributed here. Also serves as the first-party owner of platform-shipped Studio templates.",
-      );
-      // Make the superadmin a member of both seeded companies so they can
-      // act through those workspaces in Studio. companyProfiles.ownerId
-      // alone doesn't satisfy the assertCanWrite gate — we need an active
-      // userCompanyRoleAssociations row too.
-      await ensureCompanyMembership(db, userId, fixFasterId, "owner");
-      await ensureCompanyMembership(db, userId, hiredVideoCommunityId, "owner");
-
-      // Phase 1: seed sector articles. Idempotent on (userId, slug) so
-      // the daily reconciliation does not duplicate. Platform-shipped
-      // content lands as `published` (approvedBy=SA, approvedAt=now)
-      // because it bypasses the creator-program enrollment gate that
-      // user-authored articles run through.
-      await seedSectorArticles(db, userId);
-    }
+    await runSeed(getDb(), defaultSeedOpts());
   } catch (err) {
     console.error("[seed] Failed to seed super admin / company:", err);
   }

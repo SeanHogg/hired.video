@@ -18,7 +18,7 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
-const { users, userProfiles, userConnections } = schema;
+const { users, userProfiles, userConnections, accountPreferences } = schema;
 
 export type DbLike = any;
 
@@ -91,6 +91,11 @@ export interface IUsersRepository {
   setEmail(id: string, email: string, verified: boolean): Promise<void>;
   deleteById(id: string): Promise<boolean>;
   markLogin(id: string): Promise<void>;
+  /** IANA timezone for a user, read from `account_preferences.timezone`.
+   *  Returns null when the user has no preferences row yet (signup before
+   *  the preferences seed lands). Source of truth, not `users.*` — the
+   *  `users` table does NOT carry a timezone column. */
+  findTimezone(userId: string): Promise<string | null>;
   // ── profile ───────────────────────────────────────────────────────────
   findProfileByUserId(userId: string): Promise<UserProfileRow | null>;
   findProfilesByUserIds(userIds: string[]): Promise<UserProfileRow[]>;
@@ -131,6 +136,15 @@ export class UsersRepository implements IUsersRepository {
   async findManyByIds(ids: string[]): Promise<UserRow[]> {
     if (ids.length === 0) return [];
     return (await this.db.select().from(users).where(inArray(users.id, ids))) as UserRow[];
+  }
+
+  async findTimezone(userId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ tz: accountPreferences.timezone })
+      .from(accountPreferences)
+      .where(eq(accountPreferences.userId, userId))
+      .limit(1);
+    return (row?.tz as string | null | undefined) ?? null;
   }
 
   async findSuperAdminIds(): Promise<string[]> {

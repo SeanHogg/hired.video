@@ -7,6 +7,7 @@ import {
   timestamp,
   serial,
   char,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 
 export const countries = pgTable("countries", {
@@ -39,8 +40,8 @@ export const cities = pgTable("cities", {
   id: uuid("id").primaryKey().defaultRandom(),
   stateId: uuid("state_id").notNull().references(() => stateProvinces.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
-  latitude: varchar("latitude", { length: 20 }),
-  longitude: varchar("longitude", { length: 20 }),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -52,8 +53,8 @@ export const postalZipCodes = pgTable("postal_zip_codes", {
   id: uuid("id").primaryKey().defaultRandom(),
   cityId: uuid("city_id").references(() => cities.id, { onDelete: "set null" }),
   code: varchar("code", { length: 20 }).notNull(),
-  latitude: varchar("latitude", { length: 20 }),
-  longitude: varchar("longitude", { length: 20 }),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

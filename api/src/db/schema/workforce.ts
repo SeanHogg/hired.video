@@ -29,6 +29,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { tasks } from "./productivity.js";
 import { companyProfiles } from "./companies.js";
@@ -72,7 +73,7 @@ export const taskTimeEntries = pgTable("task_time_entries", {
   index("idx_time_entries_timesheet").on(t.timesheetId),
   // Find the open row for a user fast. WHERE-partial means the index
   // only stores rows that are actually punched-in (typically << 1% of total).
-  index("idx_time_entries_active").on(t.userId).where(/* sql */`ended_at IS NULL`),
+  index("idx_time_entries_active").on(t.userId).where(sql`ended_at IS NULL`),
 ]);
 
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
@@ -176,7 +177,7 @@ export const placementDocuments = pgTable("placement_documents", {
 }, (t) => [
   index("idx_placement_docs_placement").on(t.placementId),
   index("idx_placement_docs_company_user").on(t.companyId, t.userId),
-  index("idx_placement_docs_expiry").on(t.expiresAt).where(/* sql */`expires_at IS NOT NULL`),
+  index("idx_placement_docs_expiry").on(t.expiresAt).where(sql`expires_at IS NOT NULL`),
 ]);
 
 export type PlacementDocument = typeof placementDocuments.$inferSelect;

@@ -175,6 +175,20 @@ export interface IPointsRepository {
     args: { legalName: string; taxIdLast4: string; taxClassification: "personal" | "business" },
   ): Promise<UserTaxStatusRow>;
 
+  // ── campaign dollars (#169 — internal credit currency) ─────────────
+  /** Grant Campaign $ into the user's balance. Idempotent on
+   *  `redemptionId` — re-running the same id is a no-op. */
+  grantCampaignDollars(args: {
+    userId: string;
+    amountCents: number;
+    redemptionId: string;
+    description: string;
+  }): Promise<void>;
+  /** Current Campaign $ balance row (null if user never received any). */
+  findCampaignDollarsBalance(userId: string): Promise<unknown>;
+  /** Latest N Campaign $ transactions for the user, newest first. */
+  listCampaignDollarsTransactions(userId: string, limit: number): Promise<unknown[]>;
+
   // ── stats (superadmin) ──────────────────────────────────────────────
   globalStats(): Promise<{
     totalUsers: number;

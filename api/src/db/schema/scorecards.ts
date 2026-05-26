@@ -304,6 +304,8 @@ export const scorecardSubmissionRatings = pgTable(
     submissionAttrUnique: uniqueIndex(
       "scorecard_submission_ratings_submission_attribute_unique",
     ).on(t.submissionId, t.attributeId),
+    // Cross-submission "all ratings for attribute X" analytics rollup.
+    attributeIdx: index("idx_scorecard_submission_ratings_attribute").on(t.attributeId),
   }),
 );
 

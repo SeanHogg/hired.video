@@ -106,6 +106,7 @@ export async function generateCourse(args: {
   }
   const validated = CourseGenInputSchema.parse(args.input);
   const result = await args.llm.callJson<GeneratedCourse>(
+    "course_generation",
     {
       useCase: "course_generation",
       systemPrompt: buildSystemPrompt(validated),

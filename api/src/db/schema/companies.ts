@@ -213,6 +213,9 @@ export const companyViews = pgTable("company_views", {
 }, (table) => [
   index("company_views_company_id_idx").on(table.companyId),
   index("company_views_viewed_at_idx").on(table.viewedAt),
+  // Dashboard "recent views for company X" feed; the per-column indexes
+  // covered lookups but forced a sort step on read.
+  index("idx_company_views_company_viewed").on(table.companyId, table.viewedAt.desc()),
 ]);
 
 export type CompanyView = typeof companyViews.$inferSelect;

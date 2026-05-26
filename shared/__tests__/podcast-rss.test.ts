@@ -12,7 +12,7 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderPodcastRss, type PodcastFeedSpec, type PodcastEpisode } from "../podcast-rss";
+import { renderPodcastRss, type PodcastFeedSpec, type PodcastEpisode } from "../podcast-rss.js";
 
 function spec(): PodcastFeedSpec {
   return {

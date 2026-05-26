@@ -30,6 +30,7 @@ import {
 } from "./services/articles/partner-pool.js";
 import { TremendousClient } from "./services/tremendous/client.js";
 import { seedSuperAdminAndCompany } from "./seed.js";
+import { runRetentionSweep } from "./services/maintenance/retention-sweep.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -297,8 +298,7 @@ async function processRegisteredWorkers(): Promise<void> {
 // per day.
 
 async function processGamificationFraudSweep(): Promise<void> {
-  const now = new Date();
-  if (now.getUTCHours() !== 4 || now.getUTCMinutes() < 30) return;
+  if (!isFraudSweepWindow(new Date())) return;
   try {
     const db = getDb();
     const repos = buildRepos(db);
@@ -365,10 +365,7 @@ async function processEventReminders(): Promise<void> {
 }
 
 async function processMonthlyUsageClose(): Promise<void> {
-  const now = new Date();
-  const isFirstOfMonth = now.getUTCDate() === 1;
-  const isMorningWindow = now.getUTCHours() < 4;
-  if (!isFirstOfMonth || !isMorningWindow) return;
+  if (!isMonthlyCloseWindow(new Date())) return;
   try {
     const summary = await runMonthClose();
     console.log("[scheduled] month-close summary", summary);
@@ -390,9 +387,7 @@ async function processMonthlyUsageClose(): Promise<void> {
 
 async function processPartnerProgramPool(): Promise<void> {
   const now = new Date();
-  const isFirstOfMonth = now.getUTCDate() === 1;
-  const isCloseWindow = now.getUTCHours() === 2 && now.getUTCMinutes() < 5;
-  if (!isFirstOfMonth || !isCloseWindow) return;
+  if (!isPartnerPoolCloseWindow(now)) return;
   try {
     const db = getDb();
     // Subscriber revenue for the closing month — paid sub charges from
@@ -465,13 +460,87 @@ async function processPartnerProgramDispatch(): Promise<void> {
 // overwrites an existing user, so this is purely a "fill in anything
 // missing" daily reconciliation.
 async function processSeedSuperAdmin(): Promise<void> {
-  const now = new Date();
-  if (now.getUTCHours() !== 3 || now.getUTCMinutes() < 30 || now.getUTCMinutes() >= 35) return;
+  if (!isSeedSuperAdminWindow(new Date())) return;
   try {
     await seedSuperAdminAndCompany();
   } catch (err) {
     console.error("[scheduled] superadmin seed failed:", err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Retention sweep (gap #1602)
+// ---------------------------------------------------------------------------
+// Once-daily DELETE pass against the append-only / ephemeral tables
+// enumerated in `services/maintenance/retention-sweep.ts`. The 04:15
+// UTC /5 window aligns with the fraud sweep cadence (04:30) so both
+// land outside US-peak hours. Each table is bounded to maxRowsPerRun
+// per run so a single tick can't blow the CPU budget; remaining rows
+// drain over subsequent days. Idempotent — older-than-threshold is the
+// only predicate, so re-runs with no eligible rows are no-ops.
+async function processRetentionSweep(): Promise<void> {
+  if (!isRetentionSweepWindow(new Date())) return;
+  try {
+    const summaries = await runRetentionSweep();
+    const totalDeleted = summaries.reduce((sum, s) => sum + s.rowsDeleted, 0);
+    if (totalDeleted > 0) {
+      const breakdown = summaries
+        .filter((s) => s.rowsDeleted > 0 || s.errorMessage)
+        .map((s) => `${s.table}=${s.rowsDeleted}${s.cappedAtLimit ? "(capped)" : ""}${s.errorMessage ? `(ERR: ${s.errorMessage})` : ""}`)
+        .join(" ");
+      console.log(`[scheduled] retention sweep deleted ${totalDeleted} rows — ${breakdown}`);
+    }
+  } catch (err) {
+    console.error("[scheduled] retention sweep failed:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pure tick-rotation + window-guard predicates (gap #1617 — extracted from
+// inline code so they're unit-testable). The /5 cron tick calls these to
+// decide which sweeps fire on the current minute. Keeping these pure +
+// side-effect-free + exported is the only way to lock down the rotation
+// against accidental "fires every tick" regressions (which is what caused
+// gap #1589 — all nine sweeps fanned out per /5 tick and blew CPU).
+// ---------------------------------------------------------------------------
+
+/** True when the heavy registered-workers dispatcher should fire on the
+ *  current tick. /15 cadence: :00, :15, :30, :45 (with /5 jitter window). */
+export function isQuarterTick(d: Date): boolean {
+  return d.getUTCMinutes() % 15 < 5;
+}
+
+/** True when the heaviest sweep (scrapeAllActiveSources) should fire on
+ *  the current tick. /30 cadence: :00, :30 (with /5 jitter window). */
+export function isHalfTick(d: Date): boolean {
+  return d.getUTCMinutes() % 30 < 5;
+}
+
+/** True inside the daily 03:30–03:35 UTC window — the seed reconciliation
+ *  window (gap #1593). One /5 tick per day satisfies this. */
+export function isSeedSuperAdminWindow(d: Date): boolean {
+  return d.getUTCHours() === 3 && d.getUTCMinutes() >= 30 && d.getUTCMinutes() < 35;
+}
+
+/** True inside the daily 04:15–04:20 UTC window — the retention sweep
+ *  window (gap #1602). */
+export function isRetentionSweepWindow(d: Date): boolean {
+  return d.getUTCHours() === 4 && d.getUTCMinutes() >= 15 && d.getUTCMinutes() < 20;
+}
+
+/** True inside the daily 04:30–05:00 UTC window — the fraud sweep window. */
+export function isFraudSweepWindow(d: Date): boolean {
+  return d.getUTCHours() === 4 && d.getUTCMinutes() >= 30;
+}
+
+/** True inside the monthly close window: 1st of month, 00:00–04:00 UTC. */
+export function isMonthlyCloseWindow(d: Date): boolean {
+  return d.getUTCDate() === 1 && d.getUTCHours() < 4;
+}
+
+/** True inside the partner-pool close window: 1st of month, 02:00–02:05 UTC. */
+export function isPartnerPoolCloseWindow(d: Date): boolean {
+  return d.getUTCDate() === 1 && d.getUTCHours() === 2 && d.getUTCMinutes() < 5;
 }
 
 /** Tick rotation — distributes the always-running sweeps across the /5
@@ -502,9 +571,7 @@ export async function runScheduled(): Promise<void> {
   // /api/inbox/external-emails/ingest). Service Worker `periodicSync`
   // is the planned mechanism for syncing while the tab is closed
   // (tracked as gap #758).
-  const minute = new Date().getUTCMinutes();
-  const isQuarterTick = minute % 15 < 5;   // :00, :15, :30, :45
-  const isHalfTick    = minute % 30 < 5;   // :00, :30
+  const now = new Date();
   const sweeps: Array<Promise<unknown>> = [
     processFollowUps(),
     processJobQueue(),
@@ -514,8 +581,9 @@ export async function runScheduled(): Promise<void> {
     processGamificationFraudSweep(),
     processPartnerProgramPool(),
     processSeedSuperAdmin(),
+    processRetentionSweep(),
   ];
-  if (isQuarterTick) sweeps.push(processRegisteredWorkers());
-  if (isHalfTick)    sweeps.push(scrapeAllActiveSources());
+  if (isQuarterTick(now)) sweeps.push(processRegisteredWorkers());
+  if (isHalfTick(now))    sweeps.push(scrapeAllActiveSources());
   await Promise.allSettled(sweeps);
 }

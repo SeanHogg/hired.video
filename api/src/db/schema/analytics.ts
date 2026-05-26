@@ -10,6 +10,7 @@ import {
   real,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
 /**
@@ -58,6 +59,11 @@ export const artifactViews = pgTable(
     index("artifact_views_viewer_idx").on(t.viewerId),
     index("artifact_views_viewed_at_idx").on(t.viewedAt),
     index("artifact_views_kind_viewed_idx").on(t.artifactKind, t.viewedAt),
+    // Creator-stats surface — "my recent views, newest first". The
+    // per-column owner index covered lookups but forced a sort.
+    index("idx_artifact_views_owner_viewed")
+      .on(t.ownerUserId, t.viewedAt.desc())
+      .where(sql`${t.ownerUserId} IS NOT NULL`),
   ],
 );
 

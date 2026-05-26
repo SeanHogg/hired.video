@@ -64,7 +64,11 @@ export const legalDocumentAcceptances = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    documentId: uuid("document_id").notNull().references(() => legalDocuments.id, { onDelete: "restrict" }),
+    // SET NULL on doc delete — the denormalised snapshots below (kind,
+    // version, locale, accepted_at, ip, user_agent) make the acceptance
+    // row self-contained, so we can purge an old doc without losing the
+    // compliance evidence that the user accepted some version of it.
+    documentId: uuid("document_id").references(() => legalDocuments.id, { onDelete: "set null" }),
 
     // Denormalised snapshots so the acceptance record is self-contained even
     // if the source document is later edited or deleted.

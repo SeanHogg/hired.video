@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import { strict as assert } from "node:assert";
 import { computeCalibrationDeltas } from "../scoring.js";
 import type { CalibrationSubmissionRow } from "../../../repositories/calibrationRepository.js";
 
@@ -38,12 +39,12 @@ describe("computeCalibrationDeltas", () => {
     });
     const tech = result["app1"].find((r) => r.attributeId === "attr-tech")!;
     const comm = result["app1"].find((r) => r.attributeId === "attr-comm")!;
-    expect(tech.calibrationMean).toBe(4);
-    expect(tech.realMean).toBe(3);
-    expect(tech.delta).toBe(1);
-    expect(comm.calibrationMean).toBe(3.5);
-    expect(comm.realMean).toBe(3);
-    expect(comm.delta).toBe(0.5);
+    assert.equal(tech.calibrationMean, 4);
+    assert.equal(tech.realMean, 3);
+    assert.equal(tech.delta, 1);
+    assert.equal(comm.calibrationMean, 3.5);
+    assert.equal(comm.realMean, 3);
+    assert.equal(comm.delta, 0.5);
   });
 
   it("returns null delta when one side has no samples", () => {
@@ -52,8 +53,8 @@ describe("computeCalibrationDeltas", () => {
       calibrationSubmissions: [sub("app1", { "attr-tech": 4 })],
       realRatingsByApplication: { app1: [] },
     });
-    expect(result["app1"][0].realMean).toBeNull();
-    expect(result["app1"][0].delta).toBeNull();
+    assert.equal(result["app1"][0].realMean, null);
+    assert.equal(result["app1"][0].delta, null);
   });
 
   it("filters null ratings out of the mean", () => {
@@ -69,8 +70,8 @@ describe("computeCalibrationDeltas", () => {
       },
     });
     const row = result["app1"][0];
-    expect(row.calibrationMean).toBe(3);
-    expect(row.calibrationSamples).toBe(2);
+    assert.equal(row.calibrationMean, 3);
+    assert.equal(row.calibrationSamples, 2);
   });
 
   it("handles multiple candidates independently", () => {
@@ -85,7 +86,7 @@ describe("computeCalibrationDeltas", () => {
         app2: [{ attributeId: "attr-tech", rating: 4 }],
       },
     });
-    expect(result["app1"][0].delta).toBe(2);
-    expect(result["app2"][0].delta).toBe(-3);
+    assert.equal(result["app1"][0].delta, 2);
+    assert.equal(result["app2"][0].delta, -3);
   });
 });

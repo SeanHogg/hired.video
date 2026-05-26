@@ -165,7 +165,7 @@ describe("workforce — recalculateWorkforceSeats", () => {
     await recalculateWorkforceSeats(COMPANY_ID, db);
     assert.equal(state.billing_events.length, 1);
     assert.equal(state.billing_events[0].eventType, "workforce_seats_recalculated");
-    const payload = state.billing_events[0].payload;
+    const payload = state.billing_events[0].payload as Record<string, any>;
     assert.equal(payload.companyId, COMPANY_ID);
     assert.equal(payload.newSeatCount, 1);
     assert.equal(payload.previousSeatCount, 0);
@@ -418,9 +418,10 @@ describe("workforce — timesheet lifecycle", () => {
     // Audit trail.
     const derived = state.billing_events.find((e: any) => e.eventType === "workforce_timesheet_derived");
     assert.ok(derived, "billing_events must contain the derivation audit row");
-    assert.equal(derived!.payload.placementId, "placement-1");
-    assert.equal(derived!.payload.billableHours, 5);
-    assert.equal(derived!.payload.totalHours, 6);
+    const derivedPayload = derived!.payload as Record<string, any>;
+    assert.equal(derivedPayload.placementId, "placement-1");
+    assert.equal(derivedPayload.billableHours, 5);
+    assert.equal(derivedPayload.totalHours, 6);
     // Touchpoints include billing_derived.
     const tpTypes = state.timesheet_touchpoints.map((tp: any) => tp.type);
     assert.ok(tpTypes.includes("billing_derived"));
@@ -449,7 +450,7 @@ describe("workforce — timesheet lifecycle", () => {
     assert.equal(state.payout_ledger_entries.length, 0);
     const skipTp = state.timesheet_touchpoints.find((tp: any) => tp.type === "derivation_skipped");
     assert.ok(skipTp);
-    assert.equal(skipTp!.payload.reason, "placement_missing_rates");
+    assert.equal((skipTp!.payload as Record<string, any>).reason, "placement_missing_rates");
   });
 
   it("getEmployeeTimesheets returns the employee's own submissions", async () => {

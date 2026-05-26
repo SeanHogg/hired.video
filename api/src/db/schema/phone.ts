@@ -1,5 +1,6 @@
 import { pgTable, text, varchar, boolean, integer, timestamp, uuid, pgEnum, jsonb, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { users } from "./users.js";
 
 export const phoneDirectionEnum = pgEnum("phone_direction", ["inbound", "outbound"]);
 export const callStatusEnum = pgEnum("call_status", ["answered", "missed", "voicemail", "busy", "failed"]);
@@ -10,7 +11,7 @@ export const phoneBalanceTxTypeEnum = pgEnum("phone_balance_tx_type", ["purchase
 // Provisioned Business Phone numbers per user
 export const businessPhoneNumbers = pgTable("business_phone_numbers", {
   id:                   uuid("id").defaultRandom().primaryKey(),
-  userId:               text("user_id").notNull(),
+  userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   phoneNumber:          varchar("phone_number", { length: 20 }).notNull(),    // E.164
   friendlyName:         varchar("friendly_name", { length: 100 }),
   signalwirePhoneSid:   text("signalwire_phone_sid"),                         // SignalWire resource SID
@@ -29,7 +30,7 @@ export const businessPhoneNumbers = pgTable("business_phone_numbers", {
 // Call log — one row per call leg
 export const callLogs = pgTable("call_logs", {
   id:                   uuid("id").defaultRandom().primaryKey(),
-  userId:               text("user_id").notNull(),
+  userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   phoneNumberId:        uuid("phone_number_id").notNull(),
   direction:            phoneDirectionEnum("direction").notNull(),
   callerNumber:         varchar("caller_number", { length: 20 }).notNull(),
@@ -55,7 +56,7 @@ export const callLogs = pgTable("call_logs", {
 // SMS messages (inbound + outbound)
 export const smsMessages = pgTable("sms_messages", {
   id:                   uuid("id").defaultRandom().primaryKey(),
-  userId:               text("user_id").notNull(),
+  userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   phoneNumberId:        uuid("phone_number_id").notNull(),
   direction:            phoneDirectionEnum("direction").notNull(),
   fromNumber:           varchar("from_number", { length: 20 }).notNull(),
@@ -90,7 +91,7 @@ export const phoneBalances = pgTable("phone_balances", {
 // Transaction ledger for phone balance
 export const phoneBalanceTransactions = pgTable("phone_balance_transactions", {
   id:                   uuid("id").defaultRandom().primaryKey(),
-  userId:               text("user_id").notNull(),
+  userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type:                 phoneBalanceTxTypeEnum("type").notNull(),
   amountCents:          integer("amount_cents").notNull(),   // positive = credit, negative = debit
   balanceCentsAfter:    integer("balance_cents_after").notNull(),

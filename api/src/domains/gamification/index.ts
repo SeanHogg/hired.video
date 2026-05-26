@@ -45,8 +45,7 @@ export class GamificationService {
     this.engine = new PointsEngine(repos.points, {
       getUserTimezone: async (userId) => {
         try {
-          const u = await this.repos.users.findById(userId);
-          return u?.timezone ?? null;
+          return await this.repos.users.findTimezone(userId);
         } catch {
           return null;
         }

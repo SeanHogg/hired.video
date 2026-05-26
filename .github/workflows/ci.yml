@@ -42,8 +42,44 @@ jobs:
       - name: Install dependencies
         run: cd frontend && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
 
-      - name: Run type checking
+      - name: Install api dependencies
+        # api/ also needs its own deps to typecheck + run its 1944
+        # node:test suite. Same retry loop so a single ECONNRESET
+        # doesn't fail the build.
+        run: cd api && (for i in 1 2 3; do npm install --prefer-offline --no-audit && break; sleep 5; done)
+
+      - name: Run type checking (frontend)
         run: cd frontend && npm run typecheck
+
+      - name: Run type checking (api)
+        # Gates schema drift in the worker bundle (gap #1617). Was not
+        # previously checked in CI, which is how `userProfiles.firstName
+        # /lastName/bio` (#1591) and other drift landed on main unnoticed.
+        run: cd api && npm run typecheck
+
+      - name: Run api tests
+        # 1944 node:test cases via scripts/run-tests.mjs (gap #1617).
+        # Previous hand-glob in package.json missed `__tests__/` dirs in
+        # domains/, middleware/, repositories/, handlers/,
+        # services/{articles,interview,scorecards}/. The new discoverer
+        # walks the tree so adding a `__tests__/` dir is a no-op.
+        run: cd api && npm test
+
+      - name: Run frontend tests (advisory)
+        # 1166 vitest cases. 74 currently fail under network-mocking
+        # gaps + one real `nullToUndefined` regression (gap #1618).
+        # Kept advisory until #1595 closes so we don't block every PR on
+        # a known triage backlog — failures still surface on every run.
+        run: cd frontend && npm test
+        continue-on-error: true
+
+      - name: Run ESLint (api, advisory)
+        # 27 pre-existing errors (gap #1619) including a real
+        # `sql\`= ANY(${array})\`` ban that the worker pg driver can't
+        # bind. Kept advisory until #1596 closes — failures visible on
+        # every run so they can't grow unnoticed.
+        run: cd api && npm run lint
+        continue-on-error: true
 
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV

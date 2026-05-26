@@ -255,7 +255,9 @@ taskRoutes.post("/:id", async (c) => {
       const taskType = typeof metadata.taskType === "number"
         ? metadata.taskType
         : typeof existingMeta.taskType === "number" ? existingMeta.taskType : 0;
-      await awardTaskCompletion(userId, c.var.user.roles, updated.id, taskType);
+      await withGamification(c, "task-close", (game, role, uid) =>
+        game.onTaskClosed({ userId: uid, role, taskId: updated.id, taskType }),
+      );
     }
 
     return c.json(ok(toTaskDto(updated)), 200);

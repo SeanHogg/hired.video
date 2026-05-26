@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import { strict as assert } from "node:assert";
 import {
   filterSubmissionsForRequester,
   maskCandidateIdentity,
@@ -41,7 +42,7 @@ const sub = (overrides: Partial<ScorecardSubmissionRow> = {}): ScorecardSubmissi
 
 describe("blindReview", () => {
   describe("parseBlindReviewMode", () => {
-    it.each([
+    const cases: Array<[string | null | undefined, string]> = [
       ["off", "off"],
       ["anonymize_candidate", "anonymize_candidate"],
       ["hide_peer_scorecards", "hide_peer_scorecards"],
@@ -49,54 +50,57 @@ describe("blindReview", () => {
       [null, "off"],
       [undefined, "off"],
       ["nonsense", "off"],
-    ])("parses %s → %s", (input, expected) => {
-      expect(parseBlindReviewMode(input as string | null | undefined)).toBe(expected);
-    });
+    ];
+    for (const [input, expected] of cases) {
+      it(`parses ${String(input)} → ${expected}`, () => {
+        assert.equal(parseBlindReviewMode(input), expected);
+      });
+    }
   });
 
   describe("shouldAnonymizeCandidate", () => {
     it("returns true for anonymize_candidate + both, false otherwise", () => {
-      expect(shouldAnonymizeCandidate(kit("anonymize_candidate"))).toBe(true);
-      expect(shouldAnonymizeCandidate(kit("both"))).toBe(true);
-      expect(shouldAnonymizeCandidate(kit("hide_peer_scorecards"))).toBe(false);
-      expect(shouldAnonymizeCandidate(kit("off"))).toBe(false);
-      expect(shouldAnonymizeCandidate(null)).toBe(false);
+      assert.equal(shouldAnonymizeCandidate(kit("anonymize_candidate")), true);
+      assert.equal(shouldAnonymizeCandidate(kit("both")), true);
+      assert.equal(shouldAnonymizeCandidate(kit("hide_peer_scorecards")), false);
+      assert.equal(shouldAnonymizeCandidate(kit("off")), false);
+      assert.equal(shouldAnonymizeCandidate(null), false);
     });
   });
 
   describe("shouldHidePeerScorecards", () => {
     it("returns true for hide_peer_scorecards + both, false otherwise", () => {
-      expect(shouldHidePeerScorecards(kit("hide_peer_scorecards"))).toBe(true);
-      expect(shouldHidePeerScorecards(kit("both"))).toBe(true);
-      expect(shouldHidePeerScorecards(kit("anonymize_candidate"))).toBe(false);
-      expect(shouldHidePeerScorecards(kit("off"))).toBe(false);
-      expect(shouldHidePeerScorecards(null)).toBe(false);
+      assert.equal(shouldHidePeerScorecards(kit("hide_peer_scorecards")), true);
+      assert.equal(shouldHidePeerScorecards(kit("both")), true);
+      assert.equal(shouldHidePeerScorecards(kit("anonymize_candidate")), false);
+      assert.equal(shouldHidePeerScorecards(kit("off")), false);
+      assert.equal(shouldHidePeerScorecards(null), false);
     });
   });
 
   describe("maskCandidateIdentity", () => {
     it("strips candidateUserId + flags _anonymized when requester is evaluator + policy is on", () => {
       const masked = maskCandidateIdentity(sub(), kit("anonymize_candidate"), true);
-      expect(masked.candidateUserId).toBeNull();
-      expect(masked._anonymized).toBe(true);
+      assert.equal(masked.candidateUserId, null);
+      assert.equal(masked._anonymized, true);
     });
 
     it("returns row unchanged for HM (requesterIsEvaluator = false), no _anonymized flag", () => {
       const masked = maskCandidateIdentity(sub(), kit("anonymize_candidate"), false);
-      expect(masked.candidateUserId).toBe("candidate-1");
-      expect(masked._anonymized).toBeUndefined();
+      assert.equal(masked.candidateUserId, "candidate-1");
+      assert.equal(masked._anonymized, undefined);
     });
 
     it("returns row unchanged when policy is off", () => {
       const masked = maskCandidateIdentity(sub(), kit("off"), true);
-      expect(masked.candidateUserId).toBe("candidate-1");
-      expect(masked._anonymized).toBeUndefined();
+      assert.equal(masked.candidateUserId, "candidate-1");
+      assert.equal(masked._anonymized, undefined);
     });
 
     it("returns row unchanged when no governing kit", () => {
       const masked = maskCandidateIdentity(sub(), null, true);
-      expect(masked.candidateUserId).toBe("candidate-1");
-      expect(masked._anonymized).toBeUndefined();
+      assert.equal(masked.candidateUserId, "candidate-1");
+      assert.equal(masked._anonymized, undefined);
     });
   });
 
@@ -106,13 +110,13 @@ describe("blindReview", () => {
     const peer = sub({ id: "peer", evaluatorUserId: "other", status: "submitted" });
 
     it("returns everything when policy is off", () => {
-      expect(filterSubmissionsForRequester([own, peer], kit("off"), "me")).toHaveLength(2);
+      assert.equal(filterSubmissionsForRequester([own, peer], kit("off"), "me").length, 2);
     });
 
     it("hides peers when requester still has a draft", () => {
       const result = filterSubmissionsForRequester([own, peer], kit("hide_peer_scorecards"), "me");
-      expect(result).toHaveLength(1);
-      expect(result[0]?.id).toBe("own");
+      assert.equal(result.length, 1);
+      assert.equal(result[0]?.id, "own");
     });
 
     it("reveals peers once requester's own submission is submitted", () => {
@@ -121,18 +125,18 @@ describe("blindReview", () => {
         kit("hide_peer_scorecards"),
         "me",
       );
-      expect(result).toHaveLength(2);
+      assert.equal(result.length, 2);
     });
 
     it("hides peers when requester has no submission at all", () => {
       // Edge: a reviewer browsing before they've created their own card.
       const result = filterSubmissionsForRequester([peer], kit("both"), "me");
-      expect(result).toHaveLength(0);
+      assert.equal(result.length, 0);
     });
 
     it("treats null kit as policy=off", () => {
       const result = filterSubmissionsForRequester([own, peer], null, "me");
-      expect(result).toHaveLength(2);
+      assert.equal(result.length, 2);
     });
   });
 });

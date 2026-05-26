@@ -215,8 +215,8 @@ export class LocationService {
           .values({
             stateId,
             name: place.cityName,
-            latitude: place.latitude.toString(),
-            longitude: place.longitude.toString(),
+            latitude: place.latitude,
+            longitude: place.longitude,
           } as any)
           .returning({ id: cities.id })) as Array<{ id: string }>;
         cityId = inserted?.id ?? null;
@@ -256,8 +256,8 @@ export class LocationService {
       .limit(1)) as Array<{
       cityId: string;
       cityName: string;
-      cityLat: string | null;
-      cityLng: string | null;
+      cityLat: number | null;
+      cityLng: number | null;
       stateId: string;
       countryId: number;
     }>;
@@ -267,8 +267,8 @@ export class LocationService {
         countryId: r.countryId,
         stateId: r.stateId,
         cityId: r.cityId,
-        latitude: r.cityLat ? Number(r.cityLat) : null,
-        longitude: r.cityLng ? Number(r.cityLng) : null,
+        latitude: r.cityLat,
+        longitude: r.cityLng,
         label: r.cityName,
         postalCode: null,
       };

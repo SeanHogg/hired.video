@@ -73,7 +73,7 @@ export interface IResumeRepository {
   findByIdOrSlug(idOrSlug: string): Promise<ResumeRow | null>;
   findById(id: string): Promise<ResumeRow | null>;
   findByIdForOwner(id: string, ownerId: string): Promise<ResumeRow | null>;
-  findAllForOwner(ownerId: string): Promise<ResumeRow[]>;
+  findAllForOwner(ownerId: string, opts?: { includeArchived?: boolean }): Promise<ResumeRow[]>;
   findChildrenForOwner(parentId: string, ownerId: string): Promise<ResumeRow[]>;
   findBySlug(slug: string, excludeId?: string | null): Promise<ResumeRow | null>;
   findPublicPaginated(opts?: PaginationOptions): Promise<ResumeRow[]>;

@@ -9,6 +9,7 @@ import {
   integer,
   index,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
@@ -37,7 +38,10 @@ export const resumeInformation = pgTable("resume_information", {
   // Resume hierarchy & display fields
   isMaster: boolean("is_master").default(false).notNull(),
   isActive: boolean("is_active").default(false).notNull(),
-  parentId: uuid("parent_id"),  // self-referential: null = root / variation of parentId
+  // Self-referential: null = root / variation of parentId. ON DELETE
+  // SET NULL so deleting a parent resume promotes its variants to roots
+  // instead of cascade-deleting the variant tree.
+  parentId: uuid("parent_id").references((): AnyPgColumn => resumeInformation.id, { onDelete: "set null" }),
   slug: varchar("slug", { length: 255 }),  // per-user vanity URL segment
   privacyLevel: integer("privacy_level").default(10).notNull(),  // 0=public,1=recruiter,2=connections,10=private
   diffPercent: integer("diff_percent"),  // 0-100, percent difference vs parent; only populated on children
