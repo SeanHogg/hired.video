@@ -74,10 +74,10 @@ that maps cleanly onto the hired.video course schema:
 
 Scene types you may use are exactly: ${SCENE_TYPES.filter((t) => ["intro", "concept", "worked-example", "knowledge-check", "summary"].includes(t)).join(", ")}.
 Pedagogy expectations per lesson:
-  • Start with an `intro` (or `concept`) scene framing the learning objective.
-  • Follow with `concept` or `worked-example` body scenes.
+  • Start with an \`intro\` (or \`concept\`) scene framing the learning objective.
+  • Follow with \`concept\` or \`worked-example\` body scenes.
   ${input.includeKnowledgeChecks ? "• End with a `knowledge-check` scene; emit { question, options[] } with one correct answer." : ""}
-  • Close with a `summary` scene recapping takeaways.
+  • Close with a \`summary\` scene recapping takeaways.
 
 Difficulty for this course: ${input.difficulty}.
 Target ${input.moduleCount} modules, ${input.lessonsPerModule} lessons per module.
