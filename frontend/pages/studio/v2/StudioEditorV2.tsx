@@ -70,6 +70,7 @@ import {
   DEFAULT_AUDIO_MIX,
   emptyScene,
   makeLinkedContentWidget,
+  makeEngagementAssetWidget,
   totalDurationSeconds,
   updateMusicTiming,
   updateVoiceoverClip,
@@ -78,6 +79,7 @@ import {
   resolveLinkedContentColors,
   type LinkedContentKind,
 } from "@/lib/studio/editor-v2/linked-content";
+import type { EngagementAssetKind } from "@/lib/studio/editor-v2/engagement-assets";
 import {
   canvasStateToTimeline,
   resolveTimelineAudioSources,
@@ -1399,6 +1401,23 @@ export default function StudioEditorV2() {
     [placeWidget, state],
   );
 
+  const insertEngagementAsset = useCallback(
+    (
+      assetKind: EngagementAssetKind,
+      assetId: string,
+      atFraction?: { x: number; y: number },
+    ) => {
+      // Engagement assets adopt the same warm-card defaults as
+      // linked-content (defined inside the widget factory) — no per-
+      // theme stamping at insert time today since the per-kind body
+      // renders its own chrome from the bound artifact. Theme-aware
+      // stamping can layer in later via a `resolveEngagementAssetColors`
+      // helper that mirrors `resolveLinkedContentColors`.
+      placeWidget(makeEngagementAssetWidget({ assetKind, assetId }), atFraction);
+    },
+    [placeWidget],
+  );
+
   const updateWidgetPosition = useCallback(
     (widgetId: string, position: WidgetPosition) => {
       setState((prev) => ({
@@ -2509,6 +2528,7 @@ export default function StudioEditorV2() {
                       }}
                       onPatchAudioMix={patchAudioMix}
                       onPatchVoiceover={patchVoiceoverClip}
+                      onInsertEngagementAsset={insertEngagementAsset}
                     />
                   )}
                 </div>
@@ -2760,12 +2780,19 @@ export default function StudioEditorV2() {
                         : (entityKind, entityId, atFraction) =>
                             insertLinkedContent(entityKind, entityId, atFraction)
                     }
+                    onEngagementAssetDrop={
+                      playback.isPlaying
+                        ? undefined
+                        : (assetKind, assetId, atFraction) =>
+                            insertEngagementAsset(assetKind, assetId, atFraction)
+                    }
                     onScreenshotDrop={
                       playback.isPlaying
                         ? undefined
                         : (atFraction) => placeScreenshot(atFraction)
                     }
                     defaultFontId={state.fontFamily}
+                    projectId={persistedProjectId}
                   />
                   {aiChipNode}
                   </div>

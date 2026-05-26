@@ -108,7 +108,7 @@ function EmptyState({
         boxShadow: `0 0 0 1px ${withAlpha(colors.textColor, 0.25)}`,
       }}
     >
-      <Icon className="h-6 w-6" style={{ opacity: 0.7 }} />
+      <Icon className="h-6 w-6 opacity-70" />
       <div className="text-xs font-medium">{label}</div>
       <div className="text-[11px] leading-tight opacity-70">{message}</div>
     </div>

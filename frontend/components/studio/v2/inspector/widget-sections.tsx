@@ -1531,6 +1531,13 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   "caption-box":   [LAYOUT_SECTION, CAPTION_BOX_CONTENT_SECTION, ...SHARED_TAIL],
   "sfx-burst":     [LAYOUT_SECTION, SFX_BURST_CONTENT_SECTION, ...SHARED_TAIL],
   avatar:          [LAYOUT_SECTION, AVATAR_CONTENT_SECTION, ...SHARED_TAIL],
+  // Engagement assets (#1579) — bound to a per-project authored
+  // artifact (form / chapter / thumbnail / review) via the registry
+  // at lib/studio/editor-v2/engagement-assets.ts. Kind-specific
+  // content section (rebind to a different asset, theme overrides)
+  // is deferred to #1587; today the inspector exposes only layout +
+  // the shared tail so the widget is still resizeable / animatable.
+  "engagement-asset": [LAYOUT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -1554,4 +1561,5 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   "caption-box": "Caption box",
   "sfx-burst": "SFX burst",
   avatar: "AI Presenter",
+  "engagement-asset": "Engagement asset",
 };

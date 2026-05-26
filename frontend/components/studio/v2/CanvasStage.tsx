@@ -57,8 +57,13 @@ import {
   parseLinkedContentRef,
   type LinkedContentKind,
 } from "@/lib/studio/editor-v2/linked-content";
+import {
+  parseEngagementAssetRef,
+  type EngagementAssetKind,
+} from "@/lib/studio/editor-v2/engagement-assets";
 import CanvasDropOverlay from "./CanvasDropOverlay";
 import LinkedContentBody from "./LinkedContentBody";
+import EngagementAssetBody from "./EngagementAssetBody";
 import SafeZoneOverlay from "./SafeZoneOverlay";
 import SceneBackgroundEffect from "@/components/studio/shared/SceneBackgroundEffect";
 
@@ -116,6 +121,18 @@ export interface CanvasStageProps {
     entityId: string,
     atFraction: { x: number; y: number },
   ) => void;
+  /** Engagement-asset drag-drop → drop a card preview of a per-project
+   *  authored engagement artifact (form / chapter / thumbnail / review)
+   *  at the drop fraction. The body needs `projectId` to self-fetch. */
+  onEngagementAssetDrop?: (
+    assetKind: EngagementAssetKind,
+    assetId: string,
+    atFraction: { x: number; y: number },
+  ) => void;
+  /** Active project id — threaded down to engagement-asset widget
+   *  bodies so they can self-fetch their bound artifact. `null` for
+   *  unsaved compositions; the body renders an empty state. */
+  projectId?: string | null;
   /** Screenshot drag-drop → drop point is remembered, then the parent
    *  opens the display-media picker; the captured frame becomes an
    *  Image widget at `atFraction`. The drop carries no payload of its
@@ -142,8 +159,10 @@ export default function CanvasStage({
   onBackgroundDrop,
   onMediaDrop,
   onLinkedContentDrop,
+  onEngagementAssetDrop,
   onScreenshotDrop,
   defaultFontId,
+  projectId,
 }: CanvasStageProps) {
   const isPlayback = mode === "playback";
   const stageRef = useRef<HTMLDivElement>(null);
@@ -208,6 +227,11 @@ export default function CanvasStage({
       case "linked-content": {
         const ref = parseLinkedContentRef(payload.data);
         if (ref) onLinkedContentDrop?.(ref.kind, ref.id, f);
+        break;
+      }
+      case "engagement-asset": {
+        const ref = parseEngagementAssetRef(payload.data);
+        if (ref) onEngagementAssetDrop?.(ref.kind, ref.id, f);
         break;
       }
       case "screenshot":
@@ -305,6 +329,7 @@ export default function CanvasStage({
                 scene.durationSeconds,
                 isPlayback ? currentTimeSec : undefined,
               )}
+              projectId={projectId ?? null}
             />
           ))}
         {/* Safe-zone overlay — dashed bands marking destination-specific
@@ -347,6 +372,9 @@ interface WidgetViewProps {
    *  mode (authored start pose); playback callers pass the real
    *  playhead-derived time so animate-* effects run live. */
   animateInput: AnimateInput;
+  /** Active project id — only consumed by `engagement-asset` widget
+   *  bodies (project-scoped fetch). Other widget kinds ignore it. */
+  projectId: string | null;
 }
 
 function WidgetView({
@@ -357,6 +385,7 @@ function WidgetView({
   onSelect,
   onMove,
   animateInput,
+  projectId,
 }: WidgetViewProps) {
   const startRef = useRef<{
     pointerId: number;
@@ -494,6 +523,7 @@ function WidgetView({
           widget={widget}
           clipTimeSec={animateInput.clipTimeSec}
           isPlayback={!interactive}
+          projectId={projectId}
         />
       </div>
       {interactive && selected && (
@@ -542,6 +572,7 @@ function WidgetBody({
   widget,
   clipTimeSec,
   isPlayback,
+  projectId,
 }: {
   widget: Widget;
   /** Clip-local time — threaded down so video / webcam bodies can
@@ -551,6 +582,9 @@ function WidgetBody({
    *  on the WidgetView). Video / webcam bodies drive `play()` / `pause()`
    *  off this. */
   isPlayback: boolean;
+  /** Active project id — only consumed by the engagement-asset case
+   *  (project-scoped fetch). Other widget kinds ignore it. */
+  projectId: string | null;
 }) {
   const p = widget.params;
   switch (p.kind) {
@@ -674,6 +708,8 @@ function WidgetBody({
       return <CtaBody data={p.data} />;
     case "linked-content":
       return <LinkedContentBody data={p.data} />;
+    case "engagement-asset":
+      return <EngagementAssetBody data={p.data} projectId={projectId} />;
     case "speech-bubble":
       return <SpeechBubbleBody data={p.data} />;
     case "caption-box":

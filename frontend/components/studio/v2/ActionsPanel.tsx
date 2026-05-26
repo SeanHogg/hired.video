@@ -85,12 +85,18 @@ const StudioDubbingPanel = lazy(
 );
 const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
 const AudioMixerV2 = lazy(() => import("./AudioMixerV2"));
-// Chapters / Thumbnails / Forms / Review Comments — the shared
-// engagement dialog cluster (#675). Same component drops into the
-// editor's Engagement section and the Details side panel so the
-// two surfaces stay in sync without per-host re-wiring.
+// Chapters / Thumbnails / Forms / Review Comments — the authoring
+// dialog cluster (#675). Editor-only mount; the Details drawer renders
+// viewer results via `EngagementResultsPanel` instead.
 const EngagementToolset = lazy(
   () => import("@/components/studio/shared/EngagementToolset"),
+);
+// Project-scoped palette section listing the authored forms / chapters /
+// thumbnails / review threads as draggable canvas tiles (#1579). Surfaces
+// the assets created via EngagementToolset above so they can be bound
+// to scenes instead of orbiting unrendered on the server.
+const EngagementAssetPaletteSection = lazy(
+  () => import("./EngagementAssetPaletteSection"),
 );
 
 type RecordingMode = "webcam" | "screen" | "screen+webcam";
@@ -149,6 +155,15 @@ export interface ActionsPanelProps {
    *  ReviewCommentsDialog so a new review comment anchors to wherever
    *  the user is scrubbing in the preview (#654). */
   currentTimeSec?: number;
+  /** Click-to-insert handler for the engagement-asset palette tiles
+   *  (#1579). Drag uses the dataTransfer protocol via `writeDragPayload`
+   *  and ends up in the CanvasStage drop dispatcher; this callback
+   *  covers the click path. Caller appends a new `engagement-asset`
+   *  widget to the active scene bound to the picked asset id. */
+  onInsertEngagementAsset?: (
+    assetKind: import("@/lib/studio/editor-v2/engagement-assets").EngagementAssetKind,
+    assetId: string,
+  ) => void;
 }
 
 const SECTION_IDS = ["recording", "media", "ai", "engagement", "advisory"] as const;
@@ -258,11 +273,9 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           icon={Languages}
           onClick={() => setOpenAction("dubbing")}
         />
-        {/* Chapters / Thumbnails / Forms / Reviews — shared cluster
+        {/* Chapters / Thumbnails / Forms / Reviews — authoring cluster
             (#675). Self-gates on projectId so an unsaved draft hides
-            the whole row. The same toolset is mounted from the
-            Details side panel — adding a new engagement dialog lands
-            once and shows up everywhere. */}
+            the whole row. */}
         <Suspense fallback={null}>
           <EngagementToolset
             projectId={props.persistedProjectId}
@@ -280,6 +293,19 @@ export default function ActionsPanel(props: ActionsPanelProps) {
             currentTimeSec={props.currentTimeSec}
           />
         </Suspense>
+        {/* Draggable tiles for every authored engagement asset on this
+            project — closes the orphan-binding half of #1579 by giving
+            forms / chapters / thumbnails / reviews a canvas presence.
+            Self-gates on projectId (returns null until the draft is
+            saved); inner sections fetch their kind on first open. */}
+        {props.onInsertEngagementAsset && (
+          <Suspense fallback={null}>
+            <EngagementAssetPaletteSection
+              projectId={props.persistedProjectId}
+              onInsert={props.onInsertEngagementAsset}
+            />
+          </Suspense>
+        )}
         {/* V2-native audio mixer (#645) — self-gates: returns null when
             the state has no music + no voiceovers (no audio to mix).
             Operates directly on CanvasState.audioMix + voiceovers, no
