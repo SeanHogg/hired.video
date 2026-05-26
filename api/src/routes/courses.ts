@@ -1156,49 +1156,33 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
     },
   };
 
-  // Course completion check: every required lesson now passed.
+  // Course completion check — extracted to evaluateCourseCompletion so
+  // every callsite (this route, the path-completion fan-out, the future
+  // admin "mark passed" tool) shares one set of rules. See its docstring
+  // for the unscored-course carve-out (#course-pass-without-quiz bug).
   const allLessons = await db.select({
       id: courseLessons.id,
       isRequired: courseLessons.isRequired,
     })
     .from(courseLessons)
     .where(eq(courseLessons.courseId, existing.courseId));
-  const requiredIds = allLessons.filter((l) => l.isRequired).map((l) => l.id);
-  const passedRequired = requiredIds.filter((id) =>
-    (nextProgress as Record<string, { status?: string }>)[id]?.status === "passed",
-  );
-  const courseNowPassed = requiredIds.length > 0 && passedRequired.length === requiredIds.length;
 
-  // Compute aggregate final score (avg of scoreRaw/scoreMax * 100 for
-  // lessons that reported a score). Falls back to null when no lessons
-  // reported a score (Studio-video lessons without an assessment).
-  let scoreSum = 0;
-  let scoreCount = 0;
-  for (const l of allLessons) {
-    const lp = (nextProgress as Record<string, { scoreRaw?: number; scoreMax?: number }>)[l.id];
-    if (lp?.scoreRaw != null && lp?.scoreMax && lp.scoreMax > 0) {
-      scoreSum += (lp.scoreRaw / lp.scoreMax) * 100;
-      scoreCount += 1;
-    }
-  }
-  const finalScorePct = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
+  const [courseRow] = await db.select({
+      passingScorePct: courses.passingScorePct,
+      issuesCertificate: courses.issuesCertificate,
+    })
+    .from(courses)
+    .where(eq(courses.id, existing.courseId))
+    .limit(1);
 
-  const [enrollmentRow] = await db.select({ courseId: courseEnrollments.courseId }).from(courseEnrollments)
-    .where(eq(courseEnrollments.id, existing.id)).limit(1);
-  const [courseRow] = await db.select({ passingScorePct: courses.passingScorePct, issuesCertificate: courses.issuesCertificate }).from(courses)
-    .where(eq(courses.id, enrollmentRow!.courseId)).limit(1);
-
-  // Passing-score gate: only enforced when (a) the course defines one
-  // AND (b) at least one lesson actually reported a score. If no lesson
-  // can score (text_md-only / studio_video-only courses with no quiz),
-  // the "complete all required lessons" signal IS the passing bar —
-  // there's nothing to evaluate against `passingScorePct`. Without this
-  // carve-out, every text_md course is uncompletable (the user reported
-  // exactly this: 4/4 lessons green, course still "in progress").
-  const meetsPassingScore = courseRow?.passingScorePct == null
-    || scoreCount === 0
-    || (finalScorePct ?? 0) >= courseRow.passingScorePct;
-  const flipToPassed = !wasPassed && courseNowPassed && meetsPassingScore;
+  const completion = evaluateCourseCompletion({
+    wasPassed,
+    passingScorePct: courseRow?.passingScorePct ?? null,
+    lessons: allLessons,
+    progress: nextProgress as Record<string, { status?: string; scoreRaw?: number; scoreMax?: number }>,
+  });
+  const finalScorePct = completion.finalScorePct;
+  const flipToPassed = completion.shouldFlipToPassed;
 
   const [updated] = await db.update(courseEnrollments).set({
     progress: nextProgress,
