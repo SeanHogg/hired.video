@@ -50,8 +50,9 @@ import { scoreLoginRisk } from "./risk.js";
 import { detectCountry } from "./geo.js";
 import { checkEmailRateLimit } from "./emailRateLimit.js";
 import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
+import { isLocale, type Locale } from "../../../../shared/i18n.js";
 
-const { users, userProfiles, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, affiliateReferrals, loginEvents } = schema;
+const { users, userProfiles, accountPreferences, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, affiliateReferrals, loginEvents } = schema;
 
 // ---------------------------------------------------------------------------
 // recordLoginEvent — fire-and-forget insert into login_events. Awaited so
@@ -197,6 +198,14 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
 
   const { email, password, role, enableAffiliate } = parsed.data;
   const referralCodeInput = (parsed.data as { referralCode?: string }).referralCode?.trim() || null;
+  // Pre-auth UI locale forwarded from the signup form. Validated against
+  // the shared whitelist so non-PUBLIC values silently drop to null —
+  // matches the existing settings sanitizer posture (the visitor lands
+  // on the default "en" instead of getting a 400).
+  const requestedLocale = (parsed.data as { language?: string }).language?.trim() || null;
+  const localePref: Locale | null = requestedLocale && isLocale(requestedLocale) && requestedLocale !== "w"
+    ? requestedLocale
+    : null;
   const attribution = {
     utmSource:       (parsed.data as { utmSource?: string }).utmSource       || null,
     utmMedium:       (parsed.data as { utmMedium?: string }).utmMedium       || null,
@@ -361,6 +370,24 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       .onConflictDoNothing({ target: userProfiles.userId });
   } catch (err) {
     console.error("[register] Failed to seed profile section defaults:", err);
+  }
+  // Seed account_preferences.language with the visitor's pre-auth pick
+  // so LocaleSync resolves to their chosen locale on the very first
+  // authed render. Skipped when the form didn't forward a valid Locale
+  // (organic flows, OAuth, anything pre-#1408 client) — those keep the
+  // DB default "en" via the settings handler's fall-through.
+  if (localePref) {
+    try {
+      await deps.db
+        .insert(accountPreferences)
+        .values({ userId: user.id, language: localePref } as any)
+        .onConflictDoUpdate({
+          target: accountPreferences.userId,
+          set: { language: localePref },
+        });
+    } catch (err) {
+      console.error("[register] Failed to seed account preferences language:", err);
+    }
   }
   try {
     await deps.onboarding.seedTasks(user.id, user.role ?? "job_seeker");

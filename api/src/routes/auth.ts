@@ -216,6 +216,13 @@ export const RegisterSchema = z.object({
   // Any value (including empty string) is accepted at the schema layer;
   // the signup composer rejects when length > 0.
   website: z.string().optional(),
+  // Pre-auth UI locale the visitor selected before submitting. Seeded
+  // onto `account_preferences.language` so the first authed render in
+  // LocaleSync resolves to their pick instead of the DB default ("en").
+  // Validated downstream via `canPickLocale` so anything outside the
+  // PUBLIC_LOCALES whitelist is silently dropped (matches the existing
+  // settings sanitizer posture).
+  language: z.string().trim().max(16).optional(),
 }).refine(
   (d) => d.name || (d.firstName || d.lastName),
   { message: "name or firstName/lastName is required", path: ["name"] },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, Loader2, ArrowRight } from "lucide-react";
+import { GraduationCap, Loader2, ArrowRight, Plus, Video } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,7 +65,17 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
               separate license required.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link to="/services/creator/courses">
+              <Button variant="outline" size="sm">
+                <Plus className="mr-1 h-4 w-4" /> Author a course
+              </Button>
+            </Link>
+            <Link to="/studio?contentTemplate=course-lesson-explainer">
+              <Button variant="outline" size="sm">
+                <Video className="mr-1 h-4 w-4" /> Record a video lesson
+              </Button>
+            </Link>
             <Link to="/search?category=courses">
               <Button variant="outline" size="sm">
                 Browse marketplace <ArrowRight className="ml-1 h-4 w-4" />
@@ -82,15 +92,29 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <GraduationCap className="h-8 w-8 mx-auto mb-3 opacity-60" />
-          <p className="font-medium mb-1">No published courses yet</p>
-          <p className="text-sm">
-            Platform-seeded courses on AI, RAG, and must-have skills will
-            appear here once the seed migration runs. Employer-authored
-            internal training and creator-published courses surface alongside
-            them.
-          </p>
+        <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground space-y-4">
+          <GraduationCap className="h-8 w-8 mx-auto opacity-60" />
+          <div>
+            <p className="font-medium mb-1">No published courses yet</p>
+            <p className="text-sm max-w-xl mx-auto">
+              Platform-seeded courses on AI, RAG, and must-have skills will
+              appear here once the seed migration runs. Employer-authored
+              internal training and creator-published courses surface
+              alongside them.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <Link to="/services/creator/courses">
+              <Button>
+                <Plus className="mr-1 h-4 w-4" /> Author the first course
+              </Button>
+            </Link>
+            <Link to="/studio?contentTemplate=course-lesson-explainer">
+              <Button variant="outline">
+                <Video className="mr-1 h-4 w-4" /> Or record a lesson in Studio
+              </Button>
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

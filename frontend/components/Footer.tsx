@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Copyright from "./Copyright";
 import LegalLinks from "./LegalLinks";
+import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
 import { runtimeConfig } from "@/lib/runtime-config";
 
 export default function Footer() {
@@ -60,14 +61,17 @@ export default function Footer() {
         </div>
 
         {/* Bottom Section */}
-        <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row md:px-4 justify-between items-center">
+        <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row md:px-4 justify-between items-center gap-4">
           <div className="mb-4 md:mb-0">
             <Copyright />
             <p className="text-xs text-muted-foreground mt-1">
               {t("footer.build", { build: runtimeConfig.build })}
             </p>
           </div>
-          <LegalLinks />
+          <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
+            <LocaleSwitcher variant="labeled" align="end" />
+            <LegalLinks />
+          </div>
         </div>
       </div>
     </footer>

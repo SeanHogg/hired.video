@@ -114,4 +114,28 @@ export function applyLocale(locale: string | null | undefined): void {
   void i18n.changeLanguage(norm);
 }
 
+/** Shareable URL override — if the visitor lands with `?lang=fr-CA`
+ *  (e.g. a recruiter sends a French-Canadian candidate a direct link),
+ *  flip the active locale immediately so the page renders in the right
+ *  language on first paint. This runs ONCE at module init alongside the
+ *  i18next bootstrap, so it doesn't depend on React Router context.
+ *
+ *  The detector chain otherwise won't see the query param — its default
+ *  order (querystring → cookie → localStorage → navigator) is wired in
+ *  the library but the `lookupQuerystring` key is `lng`, not `lang`. We
+ *  honour both `?lang=` (human-friendly) and `?lng=` (i18next default)
+ *  here so docs that use either work. */
+if (typeof window !== "undefined") {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("lang") ?? params.get("lng");
+    const norm = normalizeLocale(requested);
+    if (norm) {
+      void i18n.changeLanguage(norm);
+    }
+  } catch {
+    // URL parsing failures shouldn't break i18n bootstrap.
+  }
+}
+
 export default i18n;

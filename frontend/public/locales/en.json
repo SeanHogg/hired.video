@@ -5576,5 +5576,13 @@
   "labels.failures": "Failures",
   "labels.samples": "Samples",
   "labels.truncated": "(truncated)",
-  "labels.triggeredBy": "Triggered by"
+  "labels.triggeredBy": "Triggered by",
+  "chrome.localeSwitcher.label": "Change language",
+  "chrome.localeSwitcher.title": "Choose a language",
+  "chrome.localeSuggest.aria": "Language suggestion",
+  "chrome.localeSuggest.message": "We noticed you may prefer {{suggested}}. Would you like to switch?",
+  "chrome.localeSuggest.switch": "Switch to {{suggested}}",
+  "chrome.localeSuggest.keep": "Keep {{active}}",
+  "chrome.localeSuggest.dismiss": "Dismiss",
+  "settings.appearance.languageOption.fr-CA": "French (Canada)"
 }

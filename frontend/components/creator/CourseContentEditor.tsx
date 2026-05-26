@@ -357,7 +357,7 @@ export default function CourseContentEditor({ courseId }: Props) {
             </p>
           </div>
           <Button asChild size="sm" variant="outline">
-            <Link to="/studio?template=course_lesson_explainer">
+            <Link to="/studio?contentTemplate=course-lesson-explainer">
               <Video className="h-3.5 w-3.5 mr-1" /> Author a video lesson in Studio
             </Link>
           </Button>

@@ -39,7 +39,7 @@ import { readAttribution } from "@/lib/attribution";
 
 export default function Signup() {
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -175,6 +175,11 @@ export default function Signup() {
         referralCode || undefined,
         undefined,
         captcha.token,
+        // Forward the active UI locale so the backend can seed
+        // account_preferences.language. The visitor's pick survives the
+        // signup → email-verify → first-render handshake instead of
+        // LocaleSync immediately overwriting it with the DB default.
+        i18n.language,
       );
       trackSignUp("email");
       // Carry any ?redirectTo=<tool-path> (or legacy ?redirect=) forward so

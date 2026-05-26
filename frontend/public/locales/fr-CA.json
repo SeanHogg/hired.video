@@ -402,5 +402,14 @@
   "privacy.regional.mxARCO.intro": "En vertu de la Loi fédérale du Mexique sur la protection des données personnelles détenues par des particuliers (LFPDPPP), vous avez le droit d'accéder, de rectifier, d'annuler et de vous opposer (ARCO) au traitement de vos données personnelles.",
 
   "privacy.regional.gdpr.title": "Vos droits en vertu du RGPD",
-  "privacy.regional.gdpr.intro": "Si vous êtes situé dans l'Espace économique européen ou au Royaume-Uni, le Règlement général sur la protection des données (RGPD) vous accorde les droits suivants à l'égard de vos données personnelles."
+  "privacy.regional.gdpr.intro": "Si vous êtes situé dans l'Espace économique européen ou au Royaume-Uni, le Règlement général sur la protection des données (RGPD) vous accorde les droits suivants à l'égard de vos données personnelles.",
+
+  "chrome.localeSwitcher.label": "Changer la langue",
+  "chrome.localeSwitcher.title": "Choisir une langue",
+  "chrome.localeSuggest.aria": "Suggestion de langue",
+  "chrome.localeSuggest.message": "Préférez-vous consulter hired.video en {{suggested}}?",
+  "chrome.localeSuggest.switch": "Passer en {{suggested}}",
+  "chrome.localeSuggest.keep": "Garder {{active}}",
+  "chrome.localeSuggest.dismiss": "Fermer",
+  "settings.appearance.languageOption.fr-CA": "Français (Canada)"
 }

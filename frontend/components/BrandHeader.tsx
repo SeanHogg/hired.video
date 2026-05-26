@@ -3,6 +3,7 @@ import { Video, Sparkles, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
 import { useAuth } from "@/lib/auth";
 
 /**
@@ -48,17 +49,20 @@ export function BrandHeader(): JSX.Element {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <BrandLogo />
-          {isAuthenticated && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">{t("actions.signOut")}</span>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <LocaleSwitcher variant="compact" />
+            {isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{t("actions.signOut")}</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </header>

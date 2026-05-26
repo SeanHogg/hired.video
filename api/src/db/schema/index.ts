@@ -65,3 +65,4 @@ export * from "./paidmedia.js";
 export * from "./gamification.js";
 export * from "./liveScreening.js";
 export * from "./compliance.js";
+export * from "./workforce.js";

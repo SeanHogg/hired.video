@@ -5547,5 +5547,13 @@
   "labels.failures": "Fallos",
   "labels.samples": "Muestras",
   "labels.truncated": "(truncado)",
-  "labels.triggeredBy": "Disparado por"
+  "labels.triggeredBy": "Disparado por",
+  "chrome.localeSwitcher.label": "Cambiar idioma",
+  "chrome.localeSwitcher.title": "Elige un idioma",
+  "chrome.localeSuggest.aria": "Sugerencia de idioma",
+  "chrome.localeSuggest.message": "¿Prefieres ver hired.video en {{suggested}}?",
+  "chrome.localeSuggest.switch": "Cambiar a {{suggested}}",
+  "chrome.localeSuggest.keep": "Seguir en {{active}}",
+  "chrome.localeSuggest.dismiss": "Descartar",
+  "settings.appearance.languageOption.fr-CA": "Francés (Canadá)"
 }

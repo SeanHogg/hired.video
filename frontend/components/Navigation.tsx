@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import HeaderSearch from "@/components/HeaderSearch";
 import ShoppingCart from "@/components/ShoppingCart";
 import CommunicationHub from "@/components/CommunicationHub";
+import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
@@ -253,6 +254,12 @@ export default function Navigation({
 
             {/* Shopping Cart - Visible on both mobile and desktop */}
             <ShoppingCart />
+
+            {/* Language switcher — same component used in BrandHeader +
+                Footer so a visitor can switch language from any chrome
+                surface. Hidden below md to keep the mobile top bar tight;
+                the Footer mount stays available on mobile. */}
+            <LocaleSwitcher variant="compact" className="hidden md:inline-flex" />
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
             {!isAuthenticated && <AuthButtons className="hidden md:flex" />}

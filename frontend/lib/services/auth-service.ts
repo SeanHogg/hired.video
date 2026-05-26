@@ -61,6 +61,10 @@ export const RegisterRequestSchema = z.object({
   // Cloudflare Turnstile token from the signup widget. The form must
   // populate this before submit when VITE_TURNSTILE_SITE_KEY is set.
   cfTurnstileToken: z.string().optional(),
+  // Pre-auth UI locale the visitor picked via LocaleSwitcher before
+  // submitting. Backend seeds this onto account_preferences so the very
+  // first authed render lands on their pick instead of the DB default.
+  language: z.string().max(16).optional(),
 });
 
 // Use the shared login response schema from @shared/api

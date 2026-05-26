@@ -3083,6 +3083,16 @@ export default function StudioEditorV2() {
           </div>
         </div>
       </div>
+      {/* Save as Course Lesson — see [AttachToCourseDialog](../../components/creator/AttachToCourseDialog.tsx)
+          and the SaveMenuV2 publish-handler wiring above. Self-fetches the
+          user's courses; renders a "Create a course" CTA when the list is
+          empty. */}
+      <AttachToCourseDialog
+        open={attachToCourseOpen}
+        onOpenChange={setAttachToCourseOpen}
+        studioProjectId={persistedProjectId}
+        defaultTitle={persistedProject?.title ?? undefined}
+      />
       {previewOpen && (
         <PreviewOverlay
           state={state}

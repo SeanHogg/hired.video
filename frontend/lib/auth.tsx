@@ -74,6 +74,7 @@ interface AuthContextType {
     referralCode?: string,
     enableAffiliate?: boolean,
     cfTurnstileToken?: string,
+    language?: string,
   ) => Promise<void>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
@@ -361,6 +362,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     referralCode?: string,
     enableAffiliate?: boolean,
     cfTurnstileToken?: string,
+    language?: string,
   ): Promise<void> => {
     setIsLoading(true);
     try {
@@ -395,6 +397,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         landingReferrer: captured.landingReferrer,
         enableAffiliate,
         cfTurnstileToken,
+        language,
       });
     } finally {
       setIsLoading(false);

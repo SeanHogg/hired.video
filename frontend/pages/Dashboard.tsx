@@ -109,9 +109,13 @@ export default function Dashboard() {
     // SuperAdmin (real or previewed) gets the Product Dashboard
     if (rolePermissions.isSuperAdmin) return <ProductDashboard />;
 
-    // Other role-based dashboards
+    // Other role-based dashboards. Employees ride the JobSeekerDashboard
+    // surface so they get the same social + content-posting feed
+    // (adoption play — #1349 design): we want workforce members engaged
+    // on the platform, not boxed into a time-tracking-only view. The
+    // workforce-specific surface (timesheet) lives at /tasks?surface=timesheet.
     if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;
-    if (rolePermissions.isJobSeeker)
+    if (rolePermissions.isJobSeeker || rolePermissions.isEmployee)
       return <JobSeekerDashboard {...commonProps} />;
     if (rolePermissions.isRecruiter)
       return <RecruiterDashboard {...commonProps} />;
