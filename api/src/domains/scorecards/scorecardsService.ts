@@ -24,9 +24,20 @@ import {
   type CompetencyRow,
   type CompetencyLevelRow,
   type InterviewerReliability,
+  type TakeHomeAssignmentRow,
+  type TakeHomeSubmissionRow,
   type UpdateAttributePatch,
   type UpdateStagePatch,
 } from "../../repositories/scorecardsRepository.js";
+
+/** 32-byte hex magic-link token. Mirrors the async-interview invite shape. */
+function randomInviteToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 import { getDb } from "../../db/index.js";
 import {
   resolveCompanyScope,
@@ -809,6 +820,177 @@ export class ScorecardsService {
       deliveryFormat: input.deliveryFormat,
       dueInHours: input.dueInHours,
     });
+  }
+
+  // ─── Take-home invite + candidate flow (#1438) ────────────────────────────
+
+  /**
+   * Recruiter mints a candidate invite for a take-home assignment. The
+   * candidate gets a magic-link URL `/take-home/:token` that resolves to
+   * the prompt + a delivery form. Idempotent over
+   * (assignmentId, applicationId) — re-inviting the same candidate
+   * returns the existing row rather than creating duplicates.
+   */
+  async createTakeHomeInvite(
+    userId: string,
+    kitStageId: string,
+    input: {
+      applicationId: string;
+      candidateUserId?: string;
+    },
+  ) {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    const assignment = await this.deps.repo.findTakeHomeForStage(kitStageId);
+    if (!assignment) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Configure the take-home prompt before inviting candidates",
+      );
+    }
+    // Idempotency over (assignment, application) — re-invite is cheap.
+    const existing = await this.deps.repo.findTakeHomeSubmissionsForAssignment(
+      assignment.id,
+    );
+    const match = existing.find((s) => s.applicationId === input.applicationId);
+    if (match) return match;
+
+    const token = randomInviteToken();
+    const expiresAt = new Date(
+      this.now().getTime() + assignment.dueInHours * 60 * 60 * 1000,
+    );
+    return this.deps.repo.insertTakeHomeSubmission({
+      assignmentId: assignment.id,
+      applicationId: input.applicationId,
+      candidateUserId: input.candidateUserId ?? null,
+      inviteToken: token,
+      tokenExpiresAt: expiresAt,
+    });
+  }
+
+  /** Public-by-token preview the candidate sees on /take-home/:token. */
+  async getTakeHomeByToken(token: string): Promise<{
+    submission: TakeHomeSubmissionRow;
+    assignment: TakeHomeAssignmentRow;
+    stage: { id: string; name: string };
+    /** True iff the token has expired AND no delivery is recorded yet. */
+    expired: boolean;
+    /** True iff the candidate has already submitted. */
+    alreadySubmitted: boolean;
+  }> {
+    const submission = await this.deps.repo.findTakeHomeSubmissionByToken(token);
+    if (!submission) {
+      throw new ServiceError("NOT_FOUND", "Invite not found");
+    }
+    const assignment = await this.deps.repo.findTakeHomeById(submission.assignmentId);
+    if (!assignment) throw new ServiceError("NOT_FOUND", "Assignment not found");
+    const stage = await this.deps.repo.findStageById(assignment.kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    const now = this.now();
+    const expired =
+      submission.tokenExpiresAt != null &&
+      submission.tokenExpiresAt < now &&
+      submission.submittedAt == null;
+    return {
+      submission,
+      assignment,
+      stage: { id: stage.id, name: stage.name },
+      expired,
+      alreadySubmitted: submission.submittedAt != null,
+    };
+  }
+
+  /** Candidate submits their delivery via the magic-link surface. */
+  async submitTakeHomeByToken(
+    token: string,
+    input: {
+      deliveryUrl?: string;
+      textResponse?: string;
+      fileRefs?: string[];
+    },
+  ): Promise<TakeHomeSubmissionRow> {
+    const submission = await this.deps.repo.findTakeHomeSubmissionByToken(token);
+    if (!submission) {
+      throw new ServiceError("NOT_FOUND", "Invite not found");
+    }
+    if (submission.submittedAt) {
+      throw new ServiceError("CONFLICT", "Already submitted");
+    }
+    if (
+      submission.tokenExpiresAt != null &&
+      submission.tokenExpiresAt < this.now()
+    ) {
+      throw new ServiceError("CONFLICT", "Invite has expired");
+    }
+    if (!input.deliveryUrl && !input.textResponse && (input.fileRefs?.length ?? 0) === 0) {
+      throw new ServiceError("VALIDATION_ERROR", "Provide a delivery");
+    }
+    return this.deps.repo.updateTakeHomeSubmission(submission.id, {
+      deliveryUrl: input.deliveryUrl ?? null,
+      textResponse: input.textResponse ?? null,
+      fileRefs: input.fileRefs ?? [],
+      submittedAt: this.now(),
+    });
+  }
+
+  /** Recruiter lists submissions for a take-home assignment. */
+  async listTakeHomeSubmissions(
+    userId: string,
+    kitStageId: string,
+  ): Promise<TakeHomeSubmissionRow[]> {
+    const stage = await this.deps.repo.findStageById(kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+    const assignment = await this.deps.repo.findTakeHomeForStage(kitStageId);
+    if (!assignment) return [];
+    return this.deps.repo.findTakeHomeSubmissionsForAssignment(assignment.id);
+  }
+
+  /**
+   * Bind a scorecard submission to a take-home submission for review.
+   * Lazy-creates a draft scorecard submission keyed to the same
+   * applicationId so the reviewer can immediately fill it without
+   * losing context. Idempotent — re-binding returns the existing link.
+   */
+  async startTakeHomeReview(
+    userId: string,
+    takeHomeSubmissionId: string,
+    templateId: string,
+  ): Promise<{
+    takeHomeSubmissionId: string;
+    scorecardSubmissionId: string;
+  }> {
+    const th = await this.deps.repo.findTakeHomeSubmissionById(takeHomeSubmissionId);
+    if (!th) throw new ServiceError("NOT_FOUND", "Take-home submission not found");
+    const assignment = await this.deps.repo.findTakeHomeById(th.assignmentId);
+    if (!assignment) throw new ServiceError("NOT_FOUND", "Assignment not found");
+    const stage = await this.deps.repo.findStageById(assignment.kitStageId);
+    if (!stage) throw new ServiceError("NOT_FOUND", "Stage not found");
+    await this.loadKit(userId, stage.kitId);
+
+    if (th.evaluatorScorecardSubmissionId) {
+      return {
+        takeHomeSubmissionId: th.id,
+        scorecardSubmissionId: th.evaluatorScorecardSubmissionId,
+      };
+    }
+    await this.loadTemplate(userId, templateId);
+    const scorecard = await this.deps.repo.insertSubmission({
+      templateId,
+      applicationId: th.applicationId,
+      evaluatorUserId: userId,
+      kitStageId: stage.id,
+      candidateUserId: th.candidateUserId ?? undefined,
+      status: "draft",
+    });
+    await this.deps.repo.updateTakeHomeSubmission(th.id, {
+      evaluatorScorecardSubmissionId: scorecard.id,
+    });
+    return {
+      takeHomeSubmissionId: th.id,
+      scorecardSubmissionId: scorecard.id,
+    };
   }
 
   // ─── Reliability (#1434) ──────────────────────────────────────────────────

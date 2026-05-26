@@ -58,6 +58,7 @@ import SignupSuccess from "./pages/SignupSuccess";
 import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Lazy load non-critical pages
+const PlacementDetail = lazy(() => import("./pages/recruiter/PlacementDetail"));
 const BlogIndex = lazy(() => import("./pages/blog/BlogIndex"));
 const BlogPost = lazy(() => import("./pages/blog/BlogPost"));
 const PostAJob = lazy(() => import("./pages/PostAJob"));
@@ -211,6 +212,7 @@ const StudioProjectRoute = lazy(() =>
 const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const ATSLandingPage = lazy(() => import("./pages/studio/ATSLandingPage"));
 const AsyncInterviewPage = lazy(() => import("./pages/studio/AsyncInterviewPage"));
+const TakeHomeDeliveryPage = lazy(() => import("./pages/TakeHomeDeliveryPage"));
 const ResumeRoast = lazy(() => import("./pages/ResumeRoast"));
 const PublicVideoResume = lazy(() => import("./pages/PublicVideoResume"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
@@ -614,6 +616,7 @@ const App = () => (
                       />
                       <Route path="/profile" element={<ProfileRedirect />} />
                       <Route path="/dashboard" element={<Home />} />
+                      <Route path="/recruiter/placements/:id" element={<PlacementDetail />} />
                       <Route path="/points" element={<PointsPage />} />
                       <Route path="/rewards" element={<RewardsPage />} />
                       <Route path="/home" element={<Navigate to="/dashboard" replace />} />
@@ -1037,6 +1040,9 @@ const App = () => (
 
                       {/* Async video interview — candidate view */}
                       <Route path="/interview/:token" element={<AsyncInterviewPage />} />
+
+                      {/* Take-home assignment — candidate delivery surface (#1438) */}
+                      <Route path="/take-home/:token" element={<TakeHomeDeliveryPage />} />
 
                       {/* Agency recruiting — unauthenticated reviewer views */}
                       <Route

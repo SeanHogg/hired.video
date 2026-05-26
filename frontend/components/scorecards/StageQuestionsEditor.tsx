@@ -4,7 +4,7 @@
 // the loop. Self-loads, self-manages.
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +40,7 @@ export function StageQuestionsEditor({ companyId, stageId }: Props) {
   const [questions, setQuestions] = useState<StageQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [competencyId, setCompetencyId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState("");
@@ -82,6 +83,21 @@ export function StageQuestionsEditor({ companyId, stageId }: Props) {
   async function remove(id: string) {
     await scorecardsService.deleteStageQuestion(id);
     await refresh();
+  }
+
+  async function aiGenerate() {
+    if (!competencyId) return;
+    setGenerating(true);
+    try {
+      await scorecardsService.aiGenerateStageQuestions(stageId, {
+        competencyId,
+        level: difficulty || undefined,
+        count: 3,
+      });
+      await refresh();
+    } finally {
+      setGenerating(false);
+    }
   }
 
   if (loading) return null;
@@ -146,6 +162,18 @@ export function StageQuestionsEditor({ companyId, stageId }: Props) {
           <Button size="sm" onClick={add} disabled={adding || !prompt.trim()}>
             <Plus className="mr-1 h-4 w-4" /> Add
           </Button>
+          {competencyId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={aiGenerate}
+              disabled={generating}
+              title="Generate 3 calibrated questions tagged to this competency"
+            >
+              <Sparkles className="mr-1 h-4 w-4" />
+              {generating ? "Generating…" : "Suggest with AI"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

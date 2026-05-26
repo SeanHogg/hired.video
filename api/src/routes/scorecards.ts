@@ -26,6 +26,7 @@ import { biasRoutes } from "./scorecards/bias.js";
 import {
   stageQuestionRoutes,
   takeHomeRoutes,
+  takeHomePublicRoutes as buildTakeHomePublicRoutes,
   coverageRoutes,
 } from "./scorecards/takehome.js";
 
@@ -47,5 +48,11 @@ scorecardRoutes.route("/bias-check", biasRoutes);
 scorecardRoutes.route("/stage-questions", stageQuestionRoutes(buildService));
 scorecardRoutes.route("/take-home", takeHomeRoutes(buildService));
 scorecardRoutes.route("/coverage", coverageRoutes(buildService));
+
+// Public-by-token candidate-facing take-home routes (#1438). Exported
+// separately so the app composition root can mount them outside the
+// auth-gated /api/scorecards prefix (mirrors the pipeline-public + ats
+// public pattern).
+export const takeHomePublicRoutes = buildTakeHomePublicRoutes(buildService);
 
 export default scorecardRoutes;

@@ -609,6 +609,47 @@ export class ResumeService {
     await apiClient.delete(`/api/resumes/${id}`);
   }
 
+  /** #154 — Archive (soft-delete). Hides from default list, preserves analytics. */
+  async archiveResume(id: string): Promise<void> {
+    await apiClient.post(`/api/resumes/${id}/archive`, {});
+  }
+
+  /** #154 — Unarchive. Restores into the default list. */
+  async unarchiveResume(id: string): Promise<void> {
+    await apiClient.post(`/api/resumes/${id}/unarchive`, {});
+  }
+
+  /** #155 — List version history snapshots (autosave + manual). */
+  async listVersions(id: string): Promise<Array<{
+    id: string;
+    versionNumber: number;
+    label: string | null;
+    isAutosave: boolean;
+    createdAt: string;
+  }>> {
+    const response = await apiClient.get<{ versions: Array<{
+      id: string;
+      versionNumber: number;
+      label: string | null;
+      isAutosave: boolean;
+      createdAt: string;
+    }> }>(`/api/resumes/${id}/versions`);
+    return response.data.versions;
+  }
+
+  /** #155 — Manual snapshot of the current content. */
+  async createVersion(
+    id: string,
+    opts: { label?: string; isAutosave?: boolean } = {},
+  ): Promise<void> {
+    await apiClient.post(`/api/resumes/${id}/versions`, opts);
+  }
+
+  /** #155 — Restore a prior version into the live resume content. */
+  async restoreVersion(id: string, versionId: string): Promise<void> {
+    await apiClient.post(`/api/resumes/${id}/versions/${versionId}/restore`, {});
+  }
+
   /**
    * Clone resume
    */
@@ -817,9 +858,9 @@ export class ResumeService {
    * - Returns normalized ResumeWithOwnership[]
    * - If withOwnership is empty, falls back to master groups (masters + variations)
    */
-  async getResumesForDisplay(): Promise<ResumeWithOwnership[]> {
+  async getResumesForDisplay(opts: { includeArchived?: boolean } = {}): Promise<ResumeWithOwnership[]> {
     const [owned, groups] = await Promise.all([
-      this.getResumesWithOwnership().catch(() => []),
+      this.getResumesWithOwnership(opts).catch(() => []),
       this.getMasterResumeGroups().catch(() => []),
     ]);
 
@@ -866,10 +907,11 @@ export class ResumeService {
   /**
    * Get resumes with ownership information
    */
-  async getResumesWithOwnership(): Promise<ResumeWithOwnership[]> {
+  async getResumesWithOwnership(opts: { includeArchived?: boolean } = {}): Promise<ResumeWithOwnership[]> {
     try {
+      const qs = opts.includeArchived ? "?includeArchived=1" : "";
       const response = await apiClient.get<ResumeWithOwnership[]>(
-        `/api/resumes/withownership`,
+        `/api/resumes/withownership${qs}`,
         z.array(ResumeWithOwnershipSchema),
       );
       return response.data;

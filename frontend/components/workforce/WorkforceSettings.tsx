@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Users, ClipboardCheck, CheckCircle2, XCircle, UserMinus, DollarSign, TrendingUp, Plug, Unplug } from "lucide-react";
+import { Loader2, Users, ClipboardCheck, CheckCircle2, XCircle, UserMinus, DollarSign, TrendingUp, Plug, Unplug, Printer, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,14 @@ function ApprovalQueueCard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => window.open(`/api/workforce/timesheets/${row.timesheet.id}/print`, "_blank", "noopener")}
+                      title="Print / Save as PDF"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -503,9 +512,16 @@ function DeskMarginCard() {
             </div>
             <div className="space-y-2">
               {rows.map((r) => (
-                <div key={r.placementId} className="border rounded-md p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+                <Link
+                  key={r.placementId}
+                  to={`/recruiter/placements/${r.placementId}`}
+                  className="border rounded-md p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm hover:bg-muted/50 transition-colors"
+                >
                   <div className="flex-1">
-                    <div className="font-medium">{r.candidateName}</div>
+                    <div className="font-medium flex items-center gap-1">
+                      {r.candidateName}
+                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {r.placementKind ?? "—"} · {r.recruiterName ?? "no recruiter"} ·{" "}
                       {r.approvedTimesheetCount} timesheet{r.approvedTimesheetCount === 1 ? "" : "s"}
@@ -523,7 +539,7 @@ function DeskMarginCard() {
                       <div className="text-xs text-muted-foreground">margin</div>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

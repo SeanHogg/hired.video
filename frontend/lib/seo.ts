@@ -195,6 +195,25 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // Bullhorn-class agency back-office (#1349). Pitches the workforce
+  // module — placements, timesheets, invoice + payout derivation, doc
+  // vault, desk margin reporting — to staffing-agency operators.
+  "/for-agencies": {
+    title: "For Staffing Agencies: Bullhorn-class back-office at $9.95/seat — hired.video",
+    description:
+      "Place candidates, capture time, approve timesheets, derive invoices, track desk margin. Helcim push live; QuickBooks / Xero / Gusto / DocuSign ready. $9.95 per active employee — one tenth of Bullhorn / Vincere.",
+    keywords:
+      "staffing agency software, bullhorn alternative, vincere alternative, recruiting back office, contractor timesheets, placement management, desk margin reporting, agency CRM",
+  },
+  // Help-center guide for workforce operators (#1349). Step-by-step
+  // walkthrough of invite → punch → submit → approve → invoice.
+  "/guides/workforce": {
+    title: "Workforce & Timesheet Guide — hired.video for Agencies",
+    description:
+      "How to invite employees, capture time, submit + approve weekly timesheets, generate invoices, manage compliance documents, and track desk margin in hired.video's agency back-office.",
+    keywords:
+      "timesheet guide, contractor time tracking how-to, agency invoice workflow, recruitment back office guide, placement management tutorial",
+  },
   // `/events` (discovery index) and `/map` were folded into `/tasks`
   // (see Tasks.tsx Discover surface). The legacy URLs `<Navigate>`
   // redirect to /tasks?surface=discover; SEO for the public discovery

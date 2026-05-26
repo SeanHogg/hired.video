@@ -172,3 +172,106 @@ ${skillSummary || "(no skills supplied — fall back to role-fit questions for t
   }
 }
 
+// ─── Competency-aware variant (#1439) ───────────────────────────────────────
+
+export interface GenerateForCompetencyArgs {
+  competencyName: string;
+  /** Optional level / anchor description for calibrated difficulty. */
+  level?: string;
+  /** Optional leveled-anchor text — gives the LLM "what L3 looks like". */
+  anchorText?: string;
+  /** 1–6 questions, defaults to 3. */
+  count?: number;
+  /** Optional role context for tone. */
+  targetRole?: string;
+}
+
+export interface GeneratedCompetencyQuestion {
+  prompt: string;
+  difficulty?: string;
+  expectedAnswer: "star" | "technical" | "coding" | "portfolio" | "open";
+}
+
+const CompetencyQuestionSchema = z.object({
+  prompt: z.string().min(8).max(2000),
+  difficulty: z.string().max(8).optional(),
+  expectedAnswer: z
+    .enum(["star", "technical", "coding", "portfolio", "open"])
+    .default("open"),
+});
+
+const CompetencyQuestionsResponseSchema = z.object({
+  questions: z.array(CompetencyQuestionSchema).min(1).max(6),
+});
+
+function buildMockCompetencyQuestions(
+  args: GenerateForCompetencyArgs,
+): GeneratedCompetencyQuestion[] {
+  const count = Math.min(Math.max(args.count ?? 3, 1), 6);
+  const level = args.level ? ` (${args.level})` : "";
+  return Array.from({ length: count }, (_, i) => ({
+    prompt:
+      i === 0
+        ? `Tell me about a time you demonstrated ${args.competencyName}${level} in a recent role. What was the situation and outcome?`
+        : i === 1
+          ? `What's the most challenging situation you've handled that tested your ${args.competencyName}${level}? Walk me through your approach.`
+          : `How would you coach a teammate on ${args.competencyName}${level}? What would you focus on first?`,
+    difficulty: args.level,
+    expectedAnswer: "star" as const,
+  }));
+}
+
+/**
+ * Generate interview questions calibrated against a competency + level.
+ * Falls back to a deterministic mock when no LLM provider is configured.
+ * Tagged outputs are tightly scoped to the competency the caller passed
+ * — the route layer attaches `competencyId` when persisting.
+ */
+export async function generateQuestionsForCompetency(
+  env: Env,
+  user: JwtPayload | undefined,
+  args: GenerateForCompetencyArgs,
+): Promise<GeneratedCompetencyQuestion[]> {
+  const count = Math.min(Math.max(args.count ?? 3, 1), 6);
+  if (!hasAnyLLMProviderKey(env)) {
+    return buildMockCompetencyQuestions({ ...args, count });
+  }
+  const role = args.targetRole?.trim() ?? "the target role";
+  const systemPrompt =
+`You are designing structured-interview questions that probe a specific competency. Return STRICT JSON.
+
+RULES:
+1. Produce EXACTLY ${count} questions targeting "${args.competencyName}".
+2. ${args.level ? `Calibrate difficulty to level "${args.level}".` : "Mix difficulty across the question set."}
+3. Each question MUST be answerable in 2-4 minutes by a candidate giving a STAR-structured answer.
+4. Prefer behavioral / situational phrasing; only use "technical" or "coding" expectedAnswer when the competency is unambiguously a hard-skill area.
+5. NO yes/no questions. NO leading questions.
+
+OUTPUT JSON SHAPE:
+{
+  "questions": [
+    { "prompt": "...", "difficulty": "${args.level ?? "L3"}", "expectedAnswer": "star" }
+  ]
+}`;
+  const userMessage =
+`Competency: ${args.competencyName}
+${args.level ? `Level: ${args.level}\n` : ""}${args.anchorText ? `What "${args.level ?? "this level"}" looks like:\n${args.anchorText}\n` : ""}Role context: ${role}
+Count: ${count}`;
+  try {
+    const llm = createLLMClient(env, user);
+    const { data } = await llm.callJson(
+      "interview_questions",
+      { useCase: "interview_questions", systemPrompt, userMessage },
+      CompetencyQuestionsResponseSchema,
+    );
+    return data.questions.slice(0, count).map((q) => ({
+      prompt: q.prompt,
+      difficulty: q.difficulty ?? args.level,
+      expectedAnswer: q.expectedAnswer ?? "open",
+    }));
+  } catch (err) {
+    console.error("[question-generator/competency] LLM error, using mock:", err);
+    return buildMockCompetencyQuestions({ ...args, count });
+  }
+}
+

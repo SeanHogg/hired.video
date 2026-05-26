@@ -38,7 +38,12 @@ import {
   listCompanyPlacementDocuments,
   recalculateWorkforceSeats,
   resolveEmployerCompanyIds,
+  attachDocumentFile,
+  markDocumentSigned,
+  getDocumentForCaller,
 } from "../services/workforce/index.js";
+import { renderInvoiceHtml, renderTimesheetHtml } from "../services/workforce/print-html.js";
+import { cdnUrl } from "../utils/cdn.js";
 import {
   listEmployerIntegrations,
   disconnectByEmployer,
@@ -193,6 +198,95 @@ workforceRoutes.post("/documents", async (c) => {
     expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
   });
   return c.json(success(doc), 200);
+});
+
+/**
+ * Upload the file payload for an existing placement document (#1442).
+ * The body is the raw file bytes; content-type comes from the request
+ * header. R2 binding (`VIDEO_BUCKET`) holds the actual blob; the row's
+ * `file_path` column stores the key for later retrieval.
+ *
+ * Key shape: `workforce/docs/{companyOrPlacementId}/{docId}/{filename}`.
+ * Filename is taken from the `x-filename` header so the original
+ * extension survives.
+ */
+workforceRoutes.post("/documents/:id/upload", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const documentId = c.req.param("id");
+  // Authority + existence check first — failed auth shouldn't read the
+  // request body (which could be many MB) into memory.
+  const doc = await getDocumentForCaller(userId, documentId);
+  const body = await c.req.arrayBuffer();
+  const MAX_DOC_BYTES = 25 * 1024 * 1024; // 25MB — workforce docs are small PDFs / scans
+  if (body.byteLength > MAX_DOC_BYTES) {
+    return c.json(error("PAYLOAD_TOO_LARGE", "Document exceeds 25 MB"), 413);
+  }
+  const contentType = c.req.header("content-type") || "application/octet-stream";
+  const filename = c.req.header("x-filename") || `${doc.kind}.bin`;
+  const scopeId = doc.companyId ?? doc.placementId ?? "orphan";
+  const key = `workforce/docs/${scopeId}/${documentId}/${filename}`;
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) {
+    return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+  }
+  await bucket.put(key, body, { httpMetadata: { contentType } });
+  const updated = await attachDocumentFile(userId, documentId, key, contentType);
+  return c.json(success({ ...updated, downloadUrl: cdnUrl(key) }), 200);
+});
+
+/**
+ * Mark a document signed (Native e-sign flow — manual confirmation by
+ * the employer). DocuSign's webhook hits a separate route (deferred to
+ * #1442 sub-work).
+ */
+workforceRoutes.post("/documents/:id/mark-signed", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const body = await c.req.json().catch(() => ({}));
+  const signedAt = body.signedAt ? new Date(body.signedAt) : null;
+  const row = await markDocumentSigned(userId, c.req.param("id"), signedAt);
+  return c.json(success(row), 200);
+});
+
+/**
+ * Get the doc + a download URL. The file_path stored on the row is the
+ * R2 key; cdnUrl translates it to a public CDN URL.
+ */
+workforceRoutes.get("/documents/:id/download", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const doc = await getDocumentForCaller(userId, c.req.param("id"));
+  if (!doc.filePath) {
+    return c.json(error("NOT_FOUND", "Document has no uploaded file"), 404);
+  }
+  return c.json(success({ ...doc, downloadUrl: cdnUrl(doc.filePath) }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Print views (#1440) — server returns A4-styled HTML that the browser
+// converts to PDF via the standard print dialog. Auto-fires window.print()
+// on load so the URL doubles as a one-click PDF export.
+// ---------------------------------------------------------------------------
+
+workforceRoutes.get("/invoices/:id/print", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const html = await renderInvoiceHtml(userId, c.req.param("id"));
+  return new Response(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+});
+
+workforceRoutes.get("/timesheets/:id/print", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const html = await renderTimesheetHtml(userId, c.req.param("id"));
+  return new Response(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 });
 
 // ---------------------------------------------------------------------------

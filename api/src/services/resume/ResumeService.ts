@@ -404,9 +404,11 @@ export async function handleListResumes(
 export async function handleListOwnedResumes(
   deps: ResumeDeps,
   ownerId: string,
-  opts: { includeOwnership?: boolean } = {},
+  opts: { includeOwnership?: boolean; includeArchived?: boolean } = {},
 ): Promise<HandlerResult> {
-  const rows = await deps.repo.findAllForOwner(ownerId);
+  const rows = await deps.repo.findAllForOwner(ownerId, {
+    includeArchived: opts.includeArchived ?? false,
+  });
   const extrasMap = await computeViewerExtrasBatch(deps.repo, rows, ownerId);
   const summaries = rows.map((r) => {
     const summary = rowToResumeSummary(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS);

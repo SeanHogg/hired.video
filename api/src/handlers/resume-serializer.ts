@@ -166,6 +166,7 @@ export function rowToResume(
     viewCount: extras.viewCount,
     isOwner: extras.isOwner,
     isWatched: extras.isWatched,
+    archivedAt: row.archivedAt ? new Date(row.archivedAt).toISOString() : null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   };
@@ -202,6 +203,7 @@ export function rowToResumeSummary(
     viewCount: extras.viewCount,
     isOwner: extras.isOwner,
     isWatched: extras.isWatched,
+    archivedAt: row.archivedAt ? new Date(row.archivedAt).toISOString() : null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     headline,

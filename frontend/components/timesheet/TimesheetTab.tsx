@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, Play, Square, Loader2, CalendarRange, Send, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, Play, Square, Loader2, CalendarRange, Send, CheckCircle2, XCircle, Printer } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import { Button } from "@/components/ui/button";
@@ -284,6 +284,14 @@ function EmployeeTimesheetSurface() {
                     <Badge variant={t.status === "approved" ? "default" : t.status === "rejected" ? "destructive" : "secondary"}>
                       {t.status}
                     </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => window.open(`/api/workforce/timesheets/${t.id}/print`, "_blank", "noopener")}
+                      title="Print / Save as PDF"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}

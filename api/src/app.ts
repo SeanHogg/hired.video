@@ -91,7 +91,7 @@ import { interviewRoutes } from "./routes/interview.js";
 import { interviewAssignmentRoutes } from "./routes/interview-assignments.js";
 import { interviewQuestionSetRoutes } from "./routes/interview-question-sets.js";
 import { videoPitchRoutes } from "./routes/video-pitch.js";
-import { scorecardRoutes } from "./routes/scorecards.js";
+import { scorecardRoutes, takeHomePublicRoutes } from "./routes/scorecards.js";
 import { calibrationRoutes } from "./routes/calibration.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
@@ -286,6 +286,7 @@ export function createApp() {
     "/api/whitelabel/roi-calculator",
     "/api/public/candidate-resume",
     "/api/public/pitch-deck",
+    "/api/public/take-home",
     // /map discovery pins (events + open-to-coffee people) — anonymous
     // visitors must see the pins so the public /map page works without
     // a session. Handler reads zero user-scoped data.
@@ -603,6 +604,7 @@ export function createApp() {
   app.route("/api/video-pitch", videoPitchRoutes);
   app.route("/api/scorecards", scorecardRoutes);
   app.route("/api/calibration", calibrationRoutes);
+  app.route("/api/public/take-home", takeHomePublicRoutes);
   app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);
   app.route("/api/apikeys", apiKeyRoutes);

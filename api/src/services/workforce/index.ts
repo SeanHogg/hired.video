@@ -903,6 +903,89 @@ export async function listCompanyPlacementDocuments(
     .orderBy(desc(placementDocuments.createdAt));
 }
 
+/** Authority gate shared between `attachDocumentFile` + `markDocumentSigned`
+ *  + the soon-to-land webhook handler. Returns the doc row when the caller
+ *  is allowed to mutate it (employer of the doc's company, or recruiter on
+ *  the doc's placement). */
+async function loadDocForCaller(
+  callerUserId: string,
+  documentId: string,
+  db = getDb(),
+) {
+  const [doc] = await db.select().from(placementDocuments)
+    .where(eq(placementDocuments.id, documentId)).limit(1);
+  if (!doc) throw new ForbiddenError("Document not found");
+  if (doc.companyId) {
+    const employerCompanies = await resolveEmployerCompanyIds(callerUserId, db);
+    if (employerCompanies.includes(doc.companyId)) return doc;
+  }
+  if (doc.placementId) {
+    const [p] = await db.select().from(placements)
+      .where(eq(placements.id, doc.placementId)).limit(1);
+    if (p && p.recruiterId === callerUserId) return doc;
+  }
+  throw new ForbiddenError("Not authorised to mutate this document");
+}
+
+/** Attach the R2 object key for an uploaded file. The actual blob lives
+ *  on R2 — this stamps the placement_documents row with the lookup key
+ *  + content type so the doc-vault UI can fetch + render. (#1442) */
+export async function attachDocumentFile(
+  callerUserId: string,
+  documentId: string,
+  fileKey: string,
+  contentType: string | null,
+  db = getDb(),
+) {
+  await loadDocForCaller(callerUserId, documentId, db);
+  const [row] = await db.update(placementDocuments).set({
+    filePath: fileKey,
+    metadata: sql`COALESCE(${placementDocuments.metadata}, '{}'::jsonb) || ${JSON.stringify({ contentType: contentType ?? "application/octet-stream" })}::jsonb`,
+    updatedAt: new Date(),
+  } as any).where(eq(placementDocuments.id, documentId)).returning();
+  return row;
+}
+
+/** Manually mark a document signed (Native e-sign flow). DocuSign's
+ *  webhook calls the same underlying update through a separate route. */
+export async function markDocumentSigned(
+  callerUserId: string,
+  documentId: string,
+  signedAt: Date | null = null,
+  db = getDb(),
+) {
+  await loadDocForCaller(callerUserId, documentId, db);
+  const [row] = await db.update(placementDocuments).set({
+    status: "signed",
+    signedAt: signedAt ?? new Date(),
+    updatedAt: new Date(),
+  } as any).where(eq(placementDocuments.id, documentId)).returning();
+  return row;
+}
+
+/** Nightly cron helper — flips signed-but-expired docs to status='expired'.
+ *  Idempotent so it can re-run safely. */
+export async function expireOverdueDocuments(db = getDb()) {
+  return await db.update(placementDocuments).set({
+    status: "expired",
+    updatedAt: new Date(),
+  } as any).where(and(
+    eq(placementDocuments.status, "signed"),
+    sql`${placementDocuments.expiresAt} IS NOT NULL`,
+    sql`${placementDocuments.expiresAt} <= NOW()`,
+  ));
+}
+
+/** Get a single document row — used by the upload route to read
+ *  the existing `metadata.contentType` before serving the file. */
+export async function getDocumentForCaller(
+  callerUserId: string,
+  documentId: string,
+  db = getDb(),
+) {
+  return await loadDocForCaller(callerUserId, documentId, db);
+}
+
 /** Roster for the employer's Workforce settings tab — list of active
  *  employees in companies the employer manages, with their last-7-days
  *  punch totals. */

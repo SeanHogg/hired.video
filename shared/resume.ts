@@ -438,6 +438,10 @@ export const ResumeSchema = z.object({
   isOwner: z.boolean(),
   isWatched: z.boolean(),
 
+  // Soft-delete flag (#154). Null = active; ISO timestamp = archived at
+  // that moment. List endpoints filter on null unless `includeArchived=1`.
+  archivedAt: z.string().nullable(),
+
   createdAt: z.string(),
   updatedAt: z.string(),
 });

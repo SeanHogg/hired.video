@@ -30,6 +30,7 @@ const {
   courseCertificates,
   interviewStageQuestions,
   takeHomeAssignments,
+  takeHomeSubmissions,
 } = schema;
 
 export type DbLike = any;
@@ -50,6 +51,23 @@ export type CompetencyRow = typeof competencies.$inferSelect;
 export type CompetencyLevelRow = typeof competencyLevels.$inferSelect;
 export type StageQuestionRow = typeof interviewStageQuestions.$inferSelect;
 export type TakeHomeAssignmentRow = typeof takeHomeAssignments.$inferSelect;
+export type TakeHomeSubmissionRow = typeof takeHomeSubmissions.$inferSelect;
+
+export interface NewTakeHomeSubmission {
+  assignmentId: string;
+  applicationId: string;
+  candidateUserId?: string | null;
+  inviteToken: string;
+  tokenExpiresAt: Date;
+}
+
+export interface UpdateTakeHomeSubmissionPatch {
+  deliveryUrl?: string | null;
+  fileRefs?: string[];
+  textResponse?: string | null;
+  submittedAt?: Date | null;
+  evaluatorScorecardSubmissionId?: string | null;
+}
 
 export interface NewStageQuestion {
   kitStageId: string;
@@ -340,11 +358,23 @@ export interface IScorecardsRepository {
   insertStageQuestion(input: NewStageQuestion): Promise<StageQuestionRow>;
   deleteStageQuestion(id: string): Promise<void>;
 
-  // Take-home assignments (#1386)
+  // Take-home assignments (#1386 + #1438)
   findTakeHomeForStage(kitStageId: string): Promise<TakeHomeAssignmentRow | null>;
+  findTakeHomeById(id: string): Promise<TakeHomeAssignmentRow | null>;
   upsertTakeHomeAssignment(
     input: NewTakeHomeAssignment,
   ): Promise<TakeHomeAssignmentRow>;
+  // Take-home submissions (#1438)
+  insertTakeHomeSubmission(input: NewTakeHomeSubmission): Promise<TakeHomeSubmissionRow>;
+  findTakeHomeSubmissionByToken(token: string): Promise<TakeHomeSubmissionRow | null>;
+  findTakeHomeSubmissionById(id: string): Promise<TakeHomeSubmissionRow | null>;
+  findTakeHomeSubmissionsForAssignment(
+    assignmentId: string,
+  ): Promise<TakeHomeSubmissionRow[]>;
+  updateTakeHomeSubmission(
+    id: string,
+    patch: UpdateTakeHomeSubmissionPatch,
+  ): Promise<TakeHomeSubmissionRow>;
 }
 
 export class ScorecardsRepository implements IScorecardsRepository {
@@ -852,6 +882,69 @@ export class ScorecardsRepository implements IScorecardsRepository {
       .values(input as any)
       .returning();
     return row as TakeHomeAssignmentRow;
+  }
+
+  async findTakeHomeById(id: string): Promise<TakeHomeAssignmentRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(takeHomeAssignments)
+      .where(eq(takeHomeAssignments.id, id))
+      .limit(1);
+    return (row as TakeHomeAssignmentRow) ?? null;
+  }
+
+  async insertTakeHomeSubmission(
+    input: NewTakeHomeSubmission,
+  ): Promise<TakeHomeSubmissionRow> {
+    const [row] = await this.db
+      .insert(takeHomeSubmissions)
+      .values(input as any)
+      .returning();
+    return row as TakeHomeSubmissionRow;
+  }
+
+  async findTakeHomeSubmissionByToken(
+    token: string,
+  ): Promise<TakeHomeSubmissionRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(takeHomeSubmissions)
+      .where(eq(takeHomeSubmissions.inviteToken, token))
+      .limit(1);
+    return (row as TakeHomeSubmissionRow) ?? null;
+  }
+
+  async findTakeHomeSubmissionById(
+    id: string,
+  ): Promise<TakeHomeSubmissionRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(takeHomeSubmissions)
+      .where(eq(takeHomeSubmissions.id, id))
+      .limit(1);
+    return (row as TakeHomeSubmissionRow) ?? null;
+  }
+
+  async findTakeHomeSubmissionsForAssignment(
+    assignmentId: string,
+  ): Promise<TakeHomeSubmissionRow[]> {
+    return (await this.db
+      .select()
+      .from(takeHomeSubmissions)
+      .where(eq(takeHomeSubmissions.assignmentId, assignmentId))
+      .orderBy(desc(takeHomeSubmissions.createdAt))) as TakeHomeSubmissionRow[];
+  }
+
+  async updateTakeHomeSubmission(
+    id: string,
+    patch: UpdateTakeHomeSubmissionPatch,
+  ): Promise<TakeHomeSubmissionRow> {
+    const [row] = await this.db
+      .update(takeHomeSubmissions)
+      .set(patch as any)
+      .where(eq(takeHomeSubmissions.id, id))
+      .returning();
+    return row as TakeHomeSubmissionRow;
   }
 
   async hasActiveCertification(

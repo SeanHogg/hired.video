@@ -159,11 +159,20 @@ export class ResumeRepository implements IResumeRepository {
    *  handlers — pagination belongs one layer up (these arrays are
    *  typically small enough that the caller projects into the shape it
    *  wants rather than querying twice). */
-  async findAllForOwner(ownerId: string): Promise<ResumeRow[]> {
+  async findAllForOwner(
+    ownerId: string,
+    opts: { includeArchived?: boolean } = {},
+  ): Promise<ResumeRow[]> {
+    const whereClause = opts.includeArchived
+      ? eq(resumeInformation.userId, ownerId)
+      : and(
+          eq(resumeInformation.userId, ownerId),
+          sql`${resumeInformation.archivedAt} IS NULL`,
+        );
     return (await this.db
       .select()
       .from(resumeInformation)
-      .where(eq(resumeInformation.userId, ownerId))
+      .where(whereClause)
       .orderBy(asc(resumeInformation.updatedAt))) as ResumeRow[];
   }
 

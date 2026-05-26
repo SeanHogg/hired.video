@@ -684,7 +684,9 @@ function failHeal(c: any, issues: Array<{ path: string; message: string }>) {
 export const listResumesHandler = async (c: any) => {
   const user = c.var.user;
   const repo = buildRepos(getDb()).resumes;
-  const rows = await repo.findAllForOwner(user.sub);
+  const includeArchived = c.req.query("includeArchived") === "1"
+    || c.req.query("includeArchived") === "true";
+  const rows = await repo.findAllForOwner(user.sub, { includeArchived });
   const extrasMap = await computeViewerExtrasBatch(repo, rows, user.sub);
   return c.json(
     ok(rows.map((r) => rowToResume(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS))),
@@ -814,10 +816,12 @@ resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
 });
 
 resumeRoutes.get("/withownership", async (c) => {
+  const includeArchived = c.req.query("includeArchived") === "1"
+    || c.req.query("includeArchived") === "true";
   const result = await handleListOwnedResumes(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
-    { includeOwnership: true },
+    { includeOwnership: true, includeArchived },
   );
   return c.json(result.body as any, result.status as any);
 });

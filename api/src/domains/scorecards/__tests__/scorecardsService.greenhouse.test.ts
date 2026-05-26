@@ -25,10 +25,12 @@ import type {
   CompetencyLevelRow,
   StageQuestionRow,
   TakeHomeAssignmentRow,
+  TakeHomeSubmissionRow,
   NewCompetency,
   NewCompetencyLevel,
   NewStageQuestion,
   NewTakeHomeAssignment,
+  NewTakeHomeSubmission,
   NewScorecardSubmission,
   ScorecardAttributeRow,
   InterviewerReliability,
@@ -47,6 +49,7 @@ class FakeRepo implements Partial<IScorecardsRepository> {
   competencyLevels: CompetencyLevelRow[] = [];
   stageQuestions: StageQuestionRow[] = [];
   takeHomes: TakeHomeAssignmentRow[] = [];
+  takeHomeSubmissions: TakeHomeSubmissionRow[] = [];
   certs: { userId: string; courseId: string; revokedAt: Date | null; expiresAt: Date | null }[] = [];
 
   async findTemplateById(id: string) {
@@ -224,6 +227,44 @@ class FakeRepo implements Partial<IScorecardsRepository> {
     } as unknown as TakeHomeAssignmentRow;
     this.takeHomes.push(row);
     return row;
+  }
+
+  // Take-home submissions (#1438)
+  async findTakeHomeById(id: string) {
+    return this.takeHomes.find((t) => t.id === id) ?? null;
+  }
+  async insertTakeHomeSubmission(input: NewTakeHomeSubmission) {
+    const row = {
+      id: uid(),
+      assignmentId: input.assignmentId,
+      applicationId: input.applicationId,
+      candidateUserId: input.candidateUserId ?? null,
+      deliveryUrl: null,
+      fileRefs: [],
+      textResponse: null,
+      inviteToken: input.inviteToken,
+      tokenExpiresAt: input.tokenExpiresAt,
+      submittedAt: null,
+      evaluatorScorecardSubmissionId: null,
+      createdAt: new Date(),
+    } as unknown as TakeHomeSubmissionRow;
+    this.takeHomeSubmissions.push(row);
+    return row;
+  }
+  async findTakeHomeSubmissionByToken(token: string) {
+    return this.takeHomeSubmissions.find((s) => s.inviteToken === token) ?? null;
+  }
+  async findTakeHomeSubmissionById(id: string) {
+    return this.takeHomeSubmissions.find((s) => s.id === id) ?? null;
+  }
+  async findTakeHomeSubmissionsForAssignment(assignmentId: string) {
+    return this.takeHomeSubmissions.filter((s) => s.assignmentId === assignmentId);
+  }
+  async updateTakeHomeSubmission(id: string, patch: Record<string, unknown>) {
+    const idx = this.takeHomeSubmissions.findIndex((s) => s.id === id);
+    const merged = { ...this.takeHomeSubmissions[idx], ...patch } as TakeHomeSubmissionRow;
+    this.takeHomeSubmissions[idx] = merged;
+    return merged;
   }
 
   // Cert gate
@@ -486,6 +527,167 @@ describe("ScorecardsService #1382 competencies", () => {
     const list = await service.listCompetencies("u1");
     assert.equal(list.length, 1);
     assert.equal(list[0].name, "Inside");
+  });
+});
+
+describe("ScorecardsService #1438 take-home invite + delivery flow", () => {
+  function seedTakeHomeStage(repo: FakeRepo) {
+    const kit = {
+      id: uid(),
+      companyId: "company-1",
+      jobId: null,
+      createdByUserId: "u1",
+      name: "K",
+      description: null,
+      blindReviewMode: "off",
+      escalateToUserId: null,
+      isArchived: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as InterviewKitRow;
+    const stage = {
+      id: uid(),
+      kitId: kit.id,
+      name: "Take-home",
+      description: null,
+      stageKind: "take_home",
+      displayOrder: 0,
+      durationMinutes: 60,
+      suggestedQuestions: null,
+      scorecardTemplateId: null,
+      createdAt: new Date(),
+    } as unknown as InterviewKitStageRow;
+    repo.kits.push(kit);
+    repo.stages.push(stage);
+    return { kit, stage };
+  }
+
+  it("createTakeHomeInvite rejects when no assignment configured for the stage", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await assert.rejects(
+      () =>
+        service.createTakeHomeInvite("u1", stage.id, {
+          applicationId: "app-1",
+        }),
+      (e: unknown) =>
+        e instanceof ServiceError && e.code === "VALIDATION_ERROR",
+    );
+  });
+
+  it("createTakeHomeInvite mints a token + future expiry", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await service.upsertTakeHome("u1", stage.id, {
+      prompt: "Build a thing",
+      dueInHours: 24,
+    });
+    const sub = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    assert.ok(sub.inviteToken);
+    assert.ok(sub.tokenExpiresAt);
+    assert.equal(sub.applicationId, "app-1");
+  });
+
+  it("createTakeHomeInvite is idempotent over (assignment, applicationId)", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await service.upsertTakeHome("u1", stage.id, { prompt: "P" });
+    const a = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    const b = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    assert.equal(a.id, b.id);
+    assert.equal(repo.takeHomeSubmissions.length, 1);
+  });
+
+  it("getTakeHomeByToken returns expired=true when token is past expiry + no delivery", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await service.upsertTakeHome("u1", stage.id, { prompt: "P", dueInHours: 1 });
+    const sub = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    // Force expiry into the past.
+    sub.tokenExpiresAt = new Date("2026-05-25T11:00:00Z");
+    const view = await service.getTakeHomeByToken(sub.inviteToken!);
+    assert.equal(view.expired, true);
+    assert.equal(view.alreadySubmitted, false);
+  });
+
+  it("submitTakeHomeByToken records the delivery + stamps submittedAt", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await service.upsertTakeHome("u1", stage.id, { prompt: "P" });
+    const sub = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    const submitted = await service.submitTakeHomeByToken(sub.inviteToken!, {
+      deliveryUrl: "https://github.com/user/repo",
+    });
+    assert.equal(submitted.deliveryUrl, "https://github.com/user/repo");
+    assert.ok(submitted.submittedAt);
+  });
+
+  it("submitTakeHomeByToken rejects CONFLICT on second submit", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await service.upsertTakeHome("u1", stage.id, { prompt: "P" });
+    const sub = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    await service.submitTakeHomeByToken(sub.inviteToken!, {
+      deliveryUrl: "https://example.com/1",
+    });
+    await assert.rejects(
+      () =>
+        service.submitTakeHomeByToken(sub.inviteToken!, {
+          deliveryUrl: "https://example.com/2",
+        }),
+      (e: unknown) => e instanceof ServiceError && e.code === "CONFLICT",
+    );
+  });
+
+  it("submitTakeHomeByToken requires at least one delivery payload", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    await service.upsertTakeHome("u1", stage.id, { prompt: "P" });
+    const sub = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    await assert.rejects(
+      () => service.submitTakeHomeByToken(sub.inviteToken!, {}),
+      (e: unknown) =>
+        e instanceof ServiceError && e.code === "VALIDATION_ERROR",
+    );
+  });
+
+  it("startTakeHomeReview lazy-creates a scorecard + links it back, idempotent", async () => {
+    const { service, repo } = buildService();
+    const { stage } = seedTakeHomeStage(repo);
+    const tpl = seedTemplate(repo);
+    await service.upsertTakeHome("u1", stage.id, { prompt: "P" });
+    const sub = await service.createTakeHomeInvite("u1", stage.id, {
+      applicationId: "app-1",
+    });
+    await service.submitTakeHomeByToken(sub.inviteToken!, {
+      deliveryUrl: "https://example.com",
+    });
+
+    const a = await service.startTakeHomeReview("u1", sub.id, tpl.id);
+    const b = await service.startTakeHomeReview("u1", sub.id, tpl.id);
+    assert.equal(a.scorecardSubmissionId, b.scorecardSubmissionId);
+    // Only one scorecard created across both calls.
+    assert.equal(repo.submissions.length, 1);
+    // Take-home submission carries the link.
+    const linked = repo.takeHomeSubmissions[0];
+    assert.equal(
+      linked.evaluatorScorecardSubmissionId,
+      a.scorecardSubmissionId,
+    );
   });
 });
 

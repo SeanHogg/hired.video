@@ -30,6 +30,7 @@ import {
 } from "@/lib/scorecards/blind-review";
 import { StageQuestionsEditor } from "./StageQuestionsEditor";
 import { TakeHomePromptEditor } from "./TakeHomePromptEditor";
+import { TakeHomeInviteManager } from "./TakeHomeInviteManager";
 import { KitCoverageBadge } from "./KitCoverageBadge";
 import type { StageKind } from "@/lib/services/scorecards-service";
 
@@ -527,6 +528,12 @@ function KitDetailEditor({
                 </Select>
               </div>
               <TakeHomePromptEditor stageId={s.id} stageKind={s.stageKind as StageKind} />
+              <TakeHomeInviteManager
+                stageId={s.id}
+                stageKind={s.stageKind as StageKind}
+                companyId={k.companyId}
+                defaultTemplateId={s.scorecardTemplateId}
+              />
               <StageQuestionsEditor companyId={k.companyId} stageId={s.id} />
             </div>
           ))}

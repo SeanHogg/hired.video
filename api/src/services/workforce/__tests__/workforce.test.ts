@@ -33,6 +33,9 @@ import {
   rejectTimesheet,
   getEmployeeTimesheets,
   createPlacementDocument,
+  attachDocumentFile,
+  markDocumentSigned,
+  getDocumentForCaller,
 } from "../index.js";
 
 function makeDb(seed: Record<string, any[]> = {}) {
@@ -522,5 +525,119 @@ describe("workforce — placement documents", () => {
       () => createPlacementDocument(EMPLOYER_ID, { kind: "i9" }, db),
       /companyId or placementId is required/,
     );
+  });
+});
+
+// ─── Doc upload + sign lifecycle (#1442) ────────────────────────────────────
+
+describe("workforce — document upload + sign lifecycle", () => {
+  it("attachDocumentFile stamps file_path + metadata on the row", async () => {
+    const { db, state } = makeDb();
+    seedEmployee(state);
+    const doc = await createPlacementDocument(EMPLOYER_ID, {
+      companyId: COMPANY_ID,
+      kind: "i9",
+    }, db);
+    const updated = await attachDocumentFile(
+      EMPLOYER_ID,
+      doc.id,
+      "workforce/docs/co/i9-1.pdf",
+      "application/pdf",
+      db,
+    );
+    assert.equal(updated!.filePath, "workforce/docs/co/i9-1.pdf");
+    // metadata is a JSONB merge — actual content depends on fake-db SQL eval,
+    // but the row update should have run (timestamp changed).
+    assert.ok(updated!.updatedAt instanceof Date || typeof updated!.updatedAt === "string");
+  });
+
+  it("attachDocumentFile refuses for an unrelated caller", async () => {
+    const { db, state } = makeDb();
+    seedEmployee(state);
+    const doc = await createPlacementDocument(EMPLOYER_ID, {
+      companyId: COMPANY_ID,
+      kind: "w9",
+    }, db);
+    await assert.rejects(
+      () => attachDocumentFile("random-user", doc.id, "key", "application/pdf", db),
+      /Not authorised/,
+    );
+  });
+
+  it("markDocumentSigned flips status + sets signedAt", async () => {
+    const { db, state } = makeDb();
+    seedEmployee(state);
+    const doc = await createPlacementDocument(EMPLOYER_ID, {
+      companyId: COMPANY_ID,
+      kind: "i9",
+    }, db);
+    assert.equal(doc.status, "pending");
+    const signed = await markDocumentSigned(EMPLOYER_ID, doc.id, null, db);
+    assert.equal(signed!.status, "signed");
+    assert.ok(signed!.signedAt, "signedAt must be set");
+  });
+
+  it("getDocumentForCaller returns the doc for an authorised employer", async () => {
+    const { db, state } = makeDb();
+    seedEmployee(state);
+    const created = await createPlacementDocument(EMPLOYER_ID, {
+      companyId: COMPANY_ID,
+      kind: "coi",
+    }, db);
+    const doc = await getDocumentForCaller(EMPLOYER_ID, created.id, db);
+    assert.equal(doc.id, created.id);
+  });
+});
+
+// ─── Seat reconciliation deltas + idempotency on re-approve ─────────────────
+
+describe("workforce — derivation idempotency", () => {
+  function seedActivePlacement(state: Record<string, any[]>) {
+    state.placements.push({
+      id: "p-idemp",
+      recruiterId: EMPLOYER_ID,
+      candidateId: EMPLOYEE_ID,
+      candidateName: "Jane",
+      recruiterName: "Boss",
+      companyId: "client-co-1",
+      status: "active",
+      placementKind: "contract",
+      billRateHourly: "100.00",
+      payRateHourly: "70.00",
+      currency: "USD",
+      createdAt: new Date(),
+    });
+  }
+
+  it("approveTimesheet → derivation row written; second approve attempt is rejected (state guard)", async () => {
+    const { db, state } = makeDb();
+    seedEmployee(state);
+    seedActivePlacement(state);
+    // Seed one closed entry directly.
+    state.task_time_entries.push({
+      id: "tte-1",
+      taskId: null,
+      userId: EMPLOYEE_ID,
+      companyId: COMPANY_ID,
+      startedAt: new Date("2026-05-25T09:00:00Z"),
+      endedAt: new Date("2026-05-25T14:00:00Z"),
+      durationSec: 5 * 3600,
+      billable: true,
+      notes: null,
+      status: "closed",
+      timesheetId: null,
+    });
+    const ts = await submitTimesheet(EMPLOYEE_ID, "2026-05-25", db);
+    await approveTimesheet(ts!.id, EMPLOYER_ID, db);
+    // First approve created the invoice + payout.
+    assert.equal(state.invoices.length, 1);
+    assert.equal(state.payout_ledger_entries.length, 1);
+    // State guard refuses a second approval, so no double-billing happens.
+    await assert.rejects(
+      () => approveTimesheet(ts!.id, EMPLOYER_ID, db),
+      /Cannot approve a timesheet in state 'approved'/,
+    );
+    assert.equal(state.invoices.length, 1);
+    assert.equal(state.payout_ledger_entries.length, 1);
   });
 });

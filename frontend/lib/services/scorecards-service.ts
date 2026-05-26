@@ -251,6 +251,31 @@ export interface TakeHomeAssignment {
   updatedAt: string;
 }
 
+/** Take-home candidate submission (#1438). */
+export interface TakeHomeSubmission {
+  id: string;
+  assignmentId: string;
+  applicationId: string;
+  candidateUserId: string | null;
+  deliveryUrl: string | null;
+  fileRefs: string[];
+  textResponse: string | null;
+  inviteToken: string | null;
+  tokenExpiresAt: string | null;
+  submittedAt: string | null;
+  evaluatorScorecardSubmissionId: string | null;
+  createdAt: string;
+}
+
+/** Public-by-token preview of a take-home assignment for the candidate. */
+export interface TakeHomeInviteView {
+  submission: TakeHomeSubmission;
+  assignment: TakeHomeAssignment;
+  stage: { id: string; name: string };
+  expired: boolean;
+  alreadySubmitted: boolean;
+}
+
 /** Kit coverage row (#1390). */
 export interface KitCoverageRow {
   competencyId: string;
@@ -466,6 +491,24 @@ export const scorecardsService = {
   async deleteStageQuestion(id: string): Promise<void> {
     await apiClient.delete(`/api/scorecards/stage-questions/items/${id}`);
   },
+  async aiGenerateStageQuestions(
+    stageId: string,
+    input: {
+      competencyId: string;
+      level?: string;
+      count?: number;
+      targetRole?: string;
+    },
+  ): Promise<{ questions: StageQuestion[] }> {
+    return (
+      (
+        await apiClient.post<{ questions: StageQuestion[] }>(
+          `/api/scorecards/stage-questions/${stageId}/ai-generate`,
+          input,
+        )
+      ).data ?? { questions: [] }
+    );
+  },
 
   async getTakeHome(stageId: string): Promise<TakeHomeAssignment | null> {
     return (
@@ -483,6 +526,62 @@ export const scorecardsService = {
     return (
       await apiClient.put<TakeHomeAssignment>(
         `/api/scorecards/take-home/${stageId}`,
+        input,
+      )
+    ).data!;
+  },
+
+  async listTakeHomeSubmissions(stageId: string): Promise<TakeHomeSubmission[]> {
+    return (
+      (
+        await apiClient.get<TakeHomeSubmission[]>(
+          `/api/scorecards/take-home/${stageId}/submissions`,
+        )
+      ).data ?? []
+    );
+  },
+  async createTakeHomeInvite(
+    stageId: string,
+    input: { applicationId: string; candidateUserId?: string },
+  ): Promise<TakeHomeSubmission> {
+    return (
+      await apiClient.post<TakeHomeSubmission>(
+        `/api/scorecards/take-home/${stageId}/invites`,
+        input,
+      )
+    ).data!;
+  },
+  async startTakeHomeReview(input: {
+    takeHomeSubmissionId: string;
+    templateId: string;
+  }): Promise<{ takeHomeSubmissionId: string; scorecardSubmissionId: string }> {
+    return (
+      await apiClient.post<{
+        takeHomeSubmissionId: string;
+        scorecardSubmissionId: string;
+      }>("/api/scorecards/take-home/start-review", input)
+    ).data!;
+  },
+
+  // Public-by-token take-home flow (#1438)
+  async getTakeHomeInvite(token: string): Promise<TakeHomeInviteView | null> {
+    return (
+      await apiClient.get<TakeHomeInviteView>(
+        `/api/public/take-home/invite/${encodeURIComponent(token)}`,
+      )
+    ).data ?? null;
+  },
+  async submitTakeHomeByToken(
+    token: string,
+    input: {
+      deliveryUrl?: string;
+      textResponse?: string;
+      fileRefs?: string[];
+    },
+  ): Promise<TakeHomeSubmission> {
+    return (
+      await apiClient.post<TakeHomeSubmission>(
+        `/api/public/take-home/invite/${encodeURIComponent(token)}`,
         input,
       )
     ).data!;

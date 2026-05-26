@@ -86,6 +86,12 @@ interface ResumeCardProps {
    *  page; most callers don't need to pass this. */
   onClone?: () => void;
   onDelete?: () => void;
+  /** #154 — Archive flag + handlers. Defaults to not-archived. */
+  isArchived?: boolean;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
+  /** #155 — Open version history dialog. */
+  onViewVersionHistory?: () => void;
   onTrack?: () => void;
   onContactOwner?: () => void;
   onViewToolHistory?: () => void;
@@ -139,6 +145,10 @@ export default function ResumeCard({
   onCopyToMaster,
   onClone,
   onDelete,
+  isArchived = false,
+  onArchive,
+  onUnarchive,
+  onViewVersionHistory,
   onTrack,
   onContactOwner,
   onViewToolHistory,
@@ -456,6 +466,10 @@ export default function ResumeCard({
             onCopyToMaster={onCopyToMaster}
             onClone={isOwner ? (onClone ?? handleCloneResume) : undefined}
             onDelete={onDelete}
+            isArchived={isArchived}
+            onArchive={onArchive}
+            onUnarchive={onUnarchive}
+            onViewVersionHistory={onViewVersionHistory}
             isTracked={ownership === "tracked"}
             onTrack={onTrack}
             onContactOwner={onContactOwner}

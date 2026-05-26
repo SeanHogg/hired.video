@@ -2,7 +2,7 @@ import {
   Eye, Edit, Film, Copy, Star, Trash2, MoreHorizontal,
   Download, Globe, Users, Lock, UserPlus, Mail,
   History, GitMerge, FileJson, FileType, Printer, FileText,
-  Pencil, BarChart3,
+  Pencil, BarChart3, Archive, ArchiveRestore,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +67,14 @@ interface ResumeActionsMenuProps {
    *  parent/variant); Clone produces an independent copy. */
   onClone?: () => void;
   onDelete?: () => void;
+  /** #154 — Archive / Unarchive. Soft-delete that preserves slug + analytics.
+   *  The menu shows "Archive Resume" when `isArchived` is falsy and
+   *  "Restore from Archive" when true. Owner only. */
+  isArchived?: boolean;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
+  /** #155 — Open version history dialog. Owner only. */
+  onViewVersionHistory?: () => void;
   /** For tracked (non-owned) resumes — shows Track/Untrack instead of owner actions */
   isTracked?: boolean;
   onTrack?: () => void;
@@ -108,6 +116,10 @@ export function ResumeActionsMenu({
   onCopyToMaster,
   onClone,
   onDelete,
+  isArchived = false,
+  onArchive,
+  onUnarchive,
+  onViewVersionHistory,
   onViewAnalytics,
   triggerClassName,
   isTracked = false,
@@ -119,7 +131,9 @@ export function ResumeActionsMenu({
 }: ResumeActionsMenuProps) {
   const showCopyToMaster = isOwner && !!onCopyToMaster && !!parentId;
   const showRunTool = isOwner && !!resumeId;
-  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onClone || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
+  const showArchive = isOwner && ((isArchived && !!onUnarchive) || (!isArchived && !!onArchive));
+  const showVersionHistory = isOwner && !!onViewVersionHistory;
+  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onClone || showArchive || showVersionHistory || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
   const hasPublicActions = onView || onShare || onCopyLink || onShowQR || onEmbed || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
@@ -311,6 +325,38 @@ export function ResumeActionsMenu({
           <DropdownMenuItem onClick={onContactOwner}>
             <Mail className="w-4 h-4 mr-2" />
             Contact Owner
+          </DropdownMenuItem>
+        )}
+
+        {/* #155 — Version History. Owner only. Opens the dialog
+            mounted by the parent page. Sits above Archive so the
+            destructive group stays at the bottom. */}
+        {showVersionHistory && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onViewVersionHistory}>
+              <History className="w-4 h-4 mr-2" />
+              Version History
+            </DropdownMenuItem>
+          </>
+        )}
+
+        {/* #154 — Archive / Unarchive. Owner only. Soft-delete that
+            preserves slug + analytics history. Label flips on
+            `isArchived`. */}
+        {showArchive && (
+          <DropdownMenuItem onClick={isArchived ? onUnarchive : onArchive}>
+            {isArchived ? (
+              <>
+                <ArchiveRestore className="w-4 h-4 mr-2" />
+                Restore from Archive
+              </>
+            ) : (
+              <>
+                <Archive className="w-4 h-4 mr-2" />
+                Archive Resume
+              </>
+            )}
           </DropdownMenuItem>
         )}
 
