@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { courseService, type Course, type CreateCourseInput } from "@/lib/services/course-service";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import MediaPicker from "@/components/shared/MediaPicker";
+import CourseContentEditor from "@/components/creator/CourseContentEditor";
 
 type Mode = "list" | "edit";
 
@@ -321,13 +322,6 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
             />
           </div>
 
-          <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-            Module &amp; lesson authoring (chapters, video lessons, SCORM, knowledge checks)
-            is not yet wired into this surface — tracked as Gap #785. The backend already
-            supports the full data model via <code>POST /api/courses/:id/modules</code> and
-            <code> /lessons</code>.
-          </div>
-
           <div className="flex items-center justify-between gap-2 pt-2 border-t">
             <div className="text-xs text-muted-foreground">
               {editing ? `Status: ${editing.status}` : "Unsaved draft"}
@@ -345,6 +339,14 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
           </div>
         </CardContent></Card>
       )}
+
+      {/* Module + lesson authoring — only after the course has been saved at
+          least once (otherwise there's no course id to attach to). Closes
+          gap #785/#798: lessons can now be authored end-to-end without
+          curling the API. */}
+      {mode === "edit" && editing ? (
+        <CourseContentEditor courseId={editing.id} />
+      ) : null}
     </div>
   );
 }

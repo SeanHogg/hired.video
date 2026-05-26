@@ -55,9 +55,62 @@ export const scorecardTemplates = pgTable(
 export type ScorecardTemplate = typeof scorecardTemplates.$inferSelect;
 export type NewScorecardTemplate = typeof scorecardTemplates.$inferInsert;
 
+// Cross-template competency framework (migration 0132 / gap #1382). A
+// `competency` is a reusable rubric primitive — multiple templates can rate
+// the same competency at different levels, which is what enables cross-role
+// analytics. Attributes optionally reference a competency; free-form
+// attributes (competency_id NULL) remain valid.
+export const competencies = pgTable(
+  "competencies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companyProfiles.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    // 'technical' | 'behavioral' | 'leadership' | 'execution' | 'other'
+    taxonomy: varchar("taxonomy", { length: 32 }).notNull().default("other"),
+    isArchived: boolean("is_archived").notNull().default(false),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    companyIdx: index("competencies_company_idx").on(t.companyId),
+  }),
+);
+
+export type Competency = typeof competencies.$inferSelect;
+export type NewCompetency = typeof competencies.$inferInsert;
+
+export const competencyLevels = pgTable(
+  "competency_levels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    competencyId: uuid("competency_id")
+      .notNull()
+      .references(() => competencies.id, { onDelete: "cascade" }),
+    level: integer("level").notNull(),
+    label: varchar("label", { length: 100 }).notNull(),
+    anchor: text("anchor").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    competencyIdx: index("competency_levels_competency_idx").on(t.competencyId),
+    levelUnique: uniqueIndex("competency_levels_unique").on(t.competencyId, t.level),
+  }),
+);
+
+export type CompetencyLevel = typeof competencyLevels.$inferSelect;
+export type NewCompetencyLevel = typeof competencyLevels.$inferInsert;
+
 // Rating attribute on a template — e.g. "Technical depth", "Communication",
 // "Leadership". Each carries an optional weight so debriefs can compute a
-// weighted overall.
+// weighted overall. Optionally references a competency (#1382) so
+// cross-template "Technical Depth" averages line up.
 export const scorecardAttributes = pgTable(
   "scorecard_attributes",
   {
@@ -65,6 +118,9 @@ export const scorecardAttributes = pgTable(
     templateId: uuid("template_id")
       .notNull()
       .references(() => scorecardTemplates.id, { onDelete: "cascade" }),
+    competencyId: uuid("competency_id").references(() => competencies.id, {
+      onDelete: "set null",
+    }),
     name: varchar("name", { length: 200 }).notNull(),
     description: text("description"),
     displayOrder: integer("display_order").notNull().default(0),
@@ -75,6 +131,7 @@ export const scorecardAttributes = pgTable(
   },
   (t) => ({
     templateIdx: index("scorecard_attributes_template_idx").on(t.templateId),
+    competencyIdx: index("scorecard_attributes_competency_idx").on(t.competencyId),
   }),
 );
 
@@ -98,6 +155,16 @@ export const interviewKits = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 200 }).notNull(),
     description: text("description"),
+    // Migration 0132 / gap #1380. 'off' | 'anonymize_candidate' |
+    // 'hide_peer_scorecards' | 'both'. Validated at the Zod layer.
+    blindReviewMode: varchar("blind_review_mode", { length: 32 })
+      .notNull()
+      .default("off"),
+    // Migration 0132 / gap #1383. User who receives the escalation email
+    // when an SLA-overdue scorecard still hasn't been submitted.
+    escalateToUserId: uuid("escalate_to_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     isArchived: boolean("is_archived").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -122,6 +189,10 @@ export const interviewKitStages = pgTable(
       .references(() => interviewKits.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 200 }).notNull(),
     description: text("description"),
+    // Migration 0132 / gap #1386. 'interview' (default) | 'async_video' |
+    // 'take_home' | 'assessment'. Drives which candidate-facing surface +
+    // reviewer UI a stage hands off to.
+    stageKind: varchar("stage_kind", { length: 32 }).notNull().default("interview"),
     displayOrder: integer("display_order").notNull().default(0),
     durationMinutes: integer("duration_minutes").default(60),
     // Suggested questions the interviewer can ask in this stage.
@@ -181,6 +252,13 @@ export const scorecardSubmissions = pgTable(
     // "draft" | "submitted"
     status: varchar("status", { length: 16 }).notNull().default("draft"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    // Migration 0132 / gap #1383. SLA timestamps. `dueAt` is the soft
+    // deadline the evaluator commits to; `remindedAt` is the last reminder
+    // nudge sent; `escalatedAt` is set when the kit's escalateToUserId is
+    // notified.
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -188,6 +266,7 @@ export const scorecardSubmissions = pgTable(
     applicationIdx: index("scorecard_submissions_application_idx").on(t.applicationId),
     evaluatorIdx: index("scorecard_submissions_evaluator_idx").on(t.evaluatorUserId),
     interviewIdx: index("scorecard_submissions_interview_idx").on(t.interviewId),
+    slaIdx: index("scorecard_submissions_sla_idx").on(t.dueAt),
     // One submission per (interview, evaluator) — rerunning replaces the row.
     interviewEvaluatorUnique: uniqueIndex(
       "scorecard_submissions_interview_evaluator_unique",

@@ -49,6 +49,81 @@ export interface UpdateCourseInput extends Partial<CreateCourseInput> {
   slug?: string;
 }
 
+export type CourseLessonSourceType =
+  | "studio_video"
+  | "scorm_package"
+  | "external_url"
+  | "text_md";
+
+export type ScormVersion = "1.2" | "2004_1" | "2004_2" | "2004_3" | "2004_4";
+
+export interface CourseModule {
+  id: string;
+  courseId: string;
+  title: string;
+  summary: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourseLesson {
+  id: string;
+  courseId: string;
+  moduleId: string | null;
+  title: string;
+  summary: string | null;
+  sourceType: CourseLessonSourceType;
+  studioProjectId: string | null;
+  scormManifestUrl: string | null;
+  scormEntryUrl: string | null;
+  scormVersion: ScormVersion | null;
+  externalUrl: string | null;
+  bodyMd: string | null;
+  estimatedMinutes: number | null;
+  isRequired: boolean;
+  knowledgeCheckFormId: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateModuleInput {
+  title: string;
+  summary?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateModuleInput {
+  title?: string;
+  summary?: string | null;
+  sortOrder?: number;
+}
+
+export interface CreateLessonInput {
+  title: string;
+  summary?: string;
+  moduleId?: string | null;
+  sourceType: CourseLessonSourceType;
+  studioProjectId?: string | null;
+  scormManifestUrl?: string | null;
+  scormEntryUrl?: string | null;
+  scormVersion?: ScormVersion | null;
+  externalUrl?: string | null;
+  bodyMd?: string | null;
+  estimatedMinutes?: number;
+  isRequired?: boolean;
+  sortOrder?: number;
+}
+
+export type UpdateLessonInput = Partial<CreateLessonInput>;
+
+export interface CourseDetailsResponse {
+  course: Course;
+  modules: CourseModule[];
+  lessons: CourseLesson[];
+}
+
 export interface PublicCourseCard {
   id: string;
   type: "course";
@@ -120,5 +195,44 @@ export const courseService = {
 
   async remove(id: string): Promise<void> {
     await apiClient.delete(`/api/courses/${id}`);
+  },
+
+  // ── Course content (modules + lessons) ──────────────────────────────
+  // GET /:id returns { course, modules, lessons } — same response shape
+  // the API has shipped since migration 0041 (#160). The authoring UI
+  // ([CoursesManagerPanel](../../components/creator/CoursesManagerPanel.tsx))
+  // consumes this to render the module → lesson tree.
+
+  async getDetails(id: string): Promise<CourseDetailsResponse> {
+    const res = await apiClient.get<CourseDetailsResponse>(`/api/courses/${id}`);
+    return res.data;
+  },
+
+  async addModule(courseId: string, input: CreateModuleInput): Promise<CourseModule> {
+    const res = await apiClient.post<CourseModule>(`/api/courses/${courseId}/modules`, input);
+    return res.data;
+  },
+
+  async updateModule(moduleId: string, input: UpdateModuleInput): Promise<CourseModule> {
+    const res = await apiClient.patch<CourseModule>(`/api/courses/modules/${moduleId}`, input);
+    return res.data;
+  },
+
+  async removeModule(moduleId: string): Promise<void> {
+    await apiClient.delete(`/api/courses/modules/${moduleId}`);
+  },
+
+  async addLesson(courseId: string, input: CreateLessonInput): Promise<CourseLesson> {
+    const res = await apiClient.post<CourseLesson>(`/api/courses/${courseId}/lessons`, input);
+    return res.data;
+  },
+
+  async updateLesson(lessonId: string, input: UpdateLessonInput): Promise<CourseLesson> {
+    const res = await apiClient.patch<CourseLesson>(`/api/courses/lessons/${lessonId}`, input);
+    return res.data;
+  },
+
+  async removeLesson(lessonId: string): Promise<void> {
+    await apiClient.delete(`/api/courses/lessons/${lessonId}`);
   },
 };

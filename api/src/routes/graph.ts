@@ -18,6 +18,8 @@ import { error, success } from "../types/index.js";
 import {
   findMutualConnections,
   findShortestPath,
+  forwardWarmIntro,
+  listWarmIntros,
   rankTopIntroducers,
   requestWarmIntro,
 } from "../services/graph/professionalGraph.js";
@@ -87,4 +89,37 @@ graphRoutes.post("/intro", async (c) => {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
   return c.json(success(result), 201);
+});
+
+// ─── GET /intros/incoming|outgoing — warm-intro inbox ──────────────────
+graphRoutes.get("/intros/incoming", async (c) => {
+  const me = userId(c);
+  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const result = await listWarmIntros(me, "incoming");
+  return c.json(success(result), 200);
+});
+
+graphRoutes.get("/intros/outgoing", async (c) => {
+  const me = userId(c);
+  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const result = await listWarmIntros(me, "outgoing");
+  return c.json(success(result), 200);
+});
+
+// ─── POST /intros/:conversationId/forward — mutual forwards the ask ───
+graphRoutes.post("/intros/:conversationId/forward", async (c) => {
+  const me = userId(c);
+  if (!me) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const conversationId = c.req.param("conversationId");
+  if (!conversationId) return c.json(error("VALIDATION_ERROR", "conversationId required"), 400);
+  const result = await forwardWarmIntro(me, conversationId);
+  if ("error" in result) {
+    if (result.error === "not_found") return c.json(error("NOT_FOUND", "Intro not found"), 404);
+    if (result.error === "not_via")
+      return c.json(error("FORBIDDEN", "Only the asked mutual can forward this intro"), 403);
+    if (result.error === "not_warm_intro")
+      return c.json(error("BAD_REQUEST", "Not a warm-intro conversation"), 400);
+    return c.json(error("BAD_REQUEST", "Cannot forward this intro"), 400);
+  }
+  return c.json(success(result), result.created ? 201 : 200);
 });

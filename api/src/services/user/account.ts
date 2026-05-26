@@ -37,7 +37,7 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
   };
 };
 
-const { users, userProfiles, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
+const { users, userProfiles, accountPreferences, accountInvitations, userCompanyRoleAssociations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
 
 /** Display name + email pattern stamped over the row when a user deletes
  *  their account. The email pattern preserves the unique-constraint while
@@ -214,6 +214,7 @@ export async function inviteAccountUser(request: InviteUserRequest, invitedByUse
       token,
       invitedBy: invitedByUserId,
       status: "pending",
+      companyId: request.companyId ?? null,
     } as any)
     .returning();
   return {
@@ -307,8 +308,10 @@ export async function acceptInvitation(invitationId: string,
     .where(eq(accountInvitations.id, invitationId));
 
   const [existing] = await db.select().from(users).where(eq(users.email, invite.email)).limit(1);
+  let acceptedUserId: string;
   if (existing) {
     await db.update(users).set({ role: invite.role as any, isActive: true } as any).where(eq(users.id, existing.id));
+    acceptedUserId = existing.id;
   } else {
     const passwordHash = ""; // no password set; user should reset
     const now = new Date();
@@ -318,7 +321,7 @@ export async function acceptInvitation(invitationId: string,
     // to surface every accepted invitee as "Unknown User" forever.
     const placeholderName =
       invite.email.split("@")[0]?.replace(/[._-]+/g, " ").trim() || invite.email;
-    await db.insert(users).values({
+    const [created] = await db.insert(users).values({
       email: invite.email,
       name: placeholderName,
       passwordHash,
@@ -328,7 +331,34 @@ export async function acceptInvitation(invitationId: string,
       mustChangePassword: true,
       createdAt: now,
       updatedAt: now,
-    } as any);
+    } as any).returning({ id: users.id });
+    acceptedUserId = created!.id;
+  }
+
+  // Workforce / company-bound invites: bind the accepted user to the
+  // inviting employer's workspace via userCompanyRoleAssociations. The
+  // existing-row branch (re-invite, role swap) upgrades the role rather
+  // than stacking a duplicate. Legacy invites without a companyId stay
+  // as plain top-level role assignments.
+  if (invite.companyId) {
+    const [existingAssoc] = await db.select().from(userCompanyRoleAssociations)
+      .where(and(
+        eq(userCompanyRoleAssociations.userId, acceptedUserId),
+        eq(userCompanyRoleAssociations.companyId, invite.companyId),
+      ))
+      .limit(1);
+    if (existingAssoc) {
+      await db.update(userCompanyRoleAssociations)
+        .set({ role: invite.role as string, isActive: true, updatedAt: new Date() } as any)
+        .where(eq(userCompanyRoleAssociations.id, existingAssoc.id));
+    } else {
+      await db.insert(userCompanyRoleAssociations).values({
+        userId: acceptedUserId,
+        companyId: invite.companyId,
+        role: invite.role as string,
+        isActive: true,
+      } as any);
+    }
   }
 
   return {

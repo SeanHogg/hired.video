@@ -54,6 +54,12 @@ export type AccountOption = z.infer<typeof AccountOptionSchema>;
 export const InviteUserRequestSchema = z.object({
   email: EmailSchema,
   role: z.nativeEnum(USER_ROLES),
+  // Workforce invites (role=employee) carry the inviting employer's
+  // companyId so accept-invitation creates a userCompanyRoleAssociations
+  // row scoping the new member to that workspace. Optional for the legacy
+  // top-level role invites (recruiter / employer) that don't bind to a
+  // specific company.
+  companyId: z.string().uuid().optional(),
 });
 export type InviteUserRequest = z.infer<typeof InviteUserRequestSchema>;
 
@@ -114,10 +120,14 @@ export function getAvailableRolesForInvite(userRoles: string | string[]): string
   const roles = Array.isArray(userRoles) ? userRoles : [userRoles];
   const lower = roles.map((r) => (r ?? "").toLowerCase());
   if (lower.includes("admin") || lower.includes("super_admin")) {
-    return ["recruiter", "employer"];
+    return ["recruiter", "employer", "employee"];
   }
   if (lower.includes("employer")) {
-    return ["recruiter", "employer"];
+    // Employers can invite recruiters + co-employers (existing) AND
+    // workforce members (employees) for timesheet / placement tracking.
+    // The accept-invitation handler binds employee invites to the
+    // inviter's company via userCompanyRoleAssociations.
+    return ["recruiter", "employer", "employee"];
   }
   if (lower.includes("recruiter")) {
     return ["recruiter"];

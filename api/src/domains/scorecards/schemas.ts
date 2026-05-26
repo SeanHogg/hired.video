@@ -18,6 +18,64 @@ export type Decision = z.infer<typeof DecisionEnum>;
 export const SubmissionStatusEnum = z.enum(["draft", "submitted"]);
 export type SubmissionStatus = z.infer<typeof SubmissionStatusEnum>;
 
+// Migration 0132 / gap #1380. Kit-level blind-review policy. Validated at
+// the Zod layer rather than a CHECK constraint so new modes can land
+// without a schema migration.
+export const BlindReviewModeEnum = z.enum([
+  "off",
+  "anonymize_candidate",
+  "hide_peer_scorecards",
+  "both",
+]);
+export type BlindReviewMode = z.infer<typeof BlindReviewModeEnum>;
+
+// Migration 0132 / gap #1386. Drives which candidate-facing surface +
+// reviewer UI a stage hands off to.
+export const StageKindEnum = z.enum([
+  "interview",
+  "async_video",
+  "take_home",
+  "assessment",
+]);
+export type StageKind = z.infer<typeof StageKindEnum>;
+
+// Migration 0132 / gap #1382. Coarse-grained classification — used to
+// drive filtering + cross-template analytics roll-ups.
+export const CompetencyTaxonomyEnum = z.enum([
+  "technical",
+  "behavioral",
+  "leadership",
+  "execution",
+  "other",
+]);
+export type CompetencyTaxonomy = z.infer<typeof CompetencyTaxonomyEnum>;
+
+// ─── Competency framework (#1382) ────────────────────────────────────────────
+
+export const CompetencyLevelInputSchema = z.object({
+  level: z.number().int().min(1).max(20),
+  label: z.string().min(1).max(100),
+  anchor: z.string().min(1).max(2000),
+});
+export type CompetencyLevelInput = z.infer<typeof CompetencyLevelInputSchema>;
+
+export const CreateCompetencySchema = z.object({
+  companyId: z.string().uuid(),
+  name: z.string().min(1).max(200),
+  description: z.string().optional(),
+  taxonomy: CompetencyTaxonomyEnum.default("other"),
+  levels: z.array(CompetencyLevelInputSchema).min(0).max(20).default([]),
+});
+export type CreateCompetencyInput = z.input<typeof CreateCompetencySchema>;
+
+export const UpdateCompetencySchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().nullable().optional(),
+  taxonomy: CompetencyTaxonomyEnum.optional(),
+  isArchived: z.boolean().optional(),
+});
+export type UpdateCompetencyInput = z.infer<typeof UpdateCompetencySchema>;
+
 // ─── Templates + attributes ──────────────────────────────────────────────────
 
 export const AttributeInputSchema = z.object({
@@ -26,6 +84,9 @@ export const AttributeInputSchema = z.object({
   displayOrder: z.number().int().min(0).default(0),
   weight: z.number().int().min(1).max(10).default(1),
   anchors: z.record(z.string(), z.string()).optional(),
+  // Migration 0132 / gap #1382. Optional link to a competency in the
+  // reusable rubric library. Free-form attributes (null) remain valid.
+  competencyId: z.string().uuid().nullable().optional(),
 });
 // `z.input` (not `z.infer`) so callers can omit fields that have a default —
 // e.g. `weight`, `displayOrder` here. After `safeParse` the parsed `data`
@@ -56,6 +117,9 @@ export type UpdateTemplateInput = z.infer<typeof UpdateTemplateSchema>;
 export const StageInputSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional(),
+  // Migration 0132 / gap #1386. Defaults to 'interview' to keep existing
+  // kit-create requests working unchanged.
+  stageKind: StageKindEnum.default("interview"),
   displayOrder: z.number().int().min(0).default(0),
   durationMinutes: z.number().int().min(5).max(480).default(60),
   suggestedQuestions: z.array(z.string()).optional(),
@@ -68,6 +132,11 @@ export const CreateKitSchema = z.object({
   jobId: z.string().uuid().optional(),
   name: z.string().min(1).max(200),
   description: z.string().optional(),
+  // Migration 0132 / gap #1380. Default 'off' — opt-in policy.
+  blindReviewMode: BlindReviewModeEnum.default("off"),
+  // Migration 0132 / gap #1383. Optional escalation recipient for SLA
+  // breaches.
+  escalateToUserId: z.string().uuid().nullable().optional(),
   stages: z.array(StageInputSchema).min(1).max(15),
 });
 export type CreateKitInput = z.input<typeof CreateKitSchema>;
@@ -76,6 +145,8 @@ export const UpdateKitSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().nullable().optional(),
   jobId: z.string().uuid().nullable().optional(),
+  blindReviewMode: BlindReviewModeEnum.optional(),
+  escalateToUserId: z.string().uuid().nullable().optional(),
   isArchived: z.boolean().optional(),
 });
 export type UpdateKitInput = z.infer<typeof UpdateKitSchema>;
@@ -100,6 +171,12 @@ export const CreateSubmissionSchema = z.object({
   summary: z.string().max(5000).optional(),
   strengths: z.string().max(5000).optional(),
   concerns: z.string().max(5000).optional(),
+  // Migration 0132 / gap #1383. Soft deadline; the reminder worker scans
+  // for drafts with dueAt approaching.
+  dueAt: z
+    .union([z.string().datetime(), z.date()])
+    .transform((v) => (typeof v === "string" ? new Date(v) : v))
+    .optional(),
 });
 export type CreateSubmissionInput = z.infer<typeof CreateSubmissionSchema>;
 

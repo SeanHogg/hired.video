@@ -115,6 +115,7 @@ import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
 import CadStage from "@/components/studio/cad/CadStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
+import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer, makeVectorLayer, makeTextLayer } from "@shared/image-state";
 import { spillLayersIfNeeded } from "@/lib/studio/drawing/layer-r2-spill";
 import {
@@ -1875,6 +1876,10 @@ export default function StudioEditorV2() {
     renderedBlobRef.current = null;
   }, [state]);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
+  // "Save as Course Lesson" — attaches the saved project to a course as
+  // sourceType: studio_video. Closes the Studio→Course authoring loop
+  // (parity with the Save menu's other publish destinations).
+  const [attachToCourseOpen, setAttachToCourseOpen] = useState(false);
 
   async function renderToBlob(): Promise<Blob | null> {
     if (state.scenes.length === 0) return null;
@@ -2327,6 +2332,9 @@ export default function StudioEditorV2() {
             currentMediaKind === "image" && !savingImageToLibrary && !!imageCanvas
               ? handleSaveImageToLibrary
               : undefined
+          }
+          onPublishAsCourseLesson={
+            persistedProjectId ? () => setAttachToCourseOpen(true) : undefined
           }
           usesTimelineChrome={usesTimelineChrome}
         />
@@ -3165,6 +3173,7 @@ function EditorHeader({
   onPublishToLinkedIn,
   onPublishToProfile,
   onSaveImageToLibrary,
+  onPublishAsCourseLesson,
   usesTimelineChrome,
 }: {
   title: string;
@@ -3188,6 +3197,9 @@ function EditorHeader({
    *  publish destination. Falls through unbound (the dropdown row
    *  self-disables) for non-image projects. */
   onSaveImageToLibrary?: () => void;
+  /** Opens the AttachToCourseDialog (Save as Course Lesson). Pass undefined
+   *  when no project id is persisted yet — the SaveMenu row self-disables. */
+  onPublishAsCourseLesson?: () => void;
   /** Drives whether the playback scrubber + Preview button render — the
    *  shared gate (#936) so non-Timeline kinds (game / image) don't see
    *  scene-shaped controls that don't apply to their runtime. */
@@ -3344,6 +3356,13 @@ function EditorHeader({
             // MediaPicker uses — closes the create→reuse loop.
             ...(onSaveImageToLibrary
               ? { "asset-library": onSaveImageToLibrary }
+              : {}),
+            // Course-lesson handoff (#160). When bound (project has been
+            // persisted at least once), the SaveMenu's "Save as Course
+            // Lesson" row opens AttachToCourseDialog. Unbound for drafts
+            // because `studio_video` lessons need a real project id.
+            ...(onPublishAsCourseLesson
+              ? { "course-lesson": onPublishAsCourseLesson }
               : {}),
           }}
         />

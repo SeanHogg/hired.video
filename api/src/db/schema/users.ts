@@ -337,6 +337,11 @@ export const accountInvitations = pgTable("account_invitations", {
   token: varchar("token", { length: 255 }).notNull().unique(),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+  // Optional company binding. Set for workforce / agency back-office invites
+  // (role=employee, recruiter joining a company, etc.) so the accept handler
+  // can create a userCompanyRoleAssociations row at the same time. Null for
+  // generic platform-role invites that don't bind to a specific company.
+  companyId: uuid("company_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),

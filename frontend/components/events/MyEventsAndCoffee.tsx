@@ -12,6 +12,7 @@
  */
 import { MyEventsTab } from "@/components/events/MyEventsTab";
 import { CoffeeTab } from "@/components/events/CoffeeTab";
+import { WarmIntrosTab } from "@/components/graph/WarmIntrosTab";
 
 export function MyEventsAndCoffee({ viewerUserId }: { viewerUserId: string }) {
   return (
@@ -21,6 +22,11 @@ export function MyEventsAndCoffee({ viewerUserId }: { viewerUserId: string }) {
       <section>
         <h2 className="text-lg font-semibold mb-3">Coffee invites</h2>
         <CoffeeTab viewerUserId={viewerUserId} />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-3">Warm intros</h2>
+        <WarmIntrosTab />
       </section>
     </div>
   );

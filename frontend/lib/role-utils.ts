@@ -23,6 +23,7 @@ export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.JOB_SEEKER]: "Job Seeker",
   [USER_ROLES.RECRUITER]: "recruiter",
   [USER_ROLES.EMPLOYER]: "employer",
+  [USER_ROLES.EMPLOYEE]: "Employee",
   [USER_ROLES.ADMIN]: "Administrator",
   [USER_ROLES.SUPER_ADMIN]: "Super Administrator",
   "Unassigned": "Unassigned", // Users without a role or profile
@@ -33,6 +34,7 @@ export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.JOB_SEEKER]: "Looking for job opportunities",
   [USER_ROLES.RECRUITER]: "Recruiting talent for companies",
   [USER_ROLES.EMPLOYER]: "Managing company and hiring",
+  [USER_ROLES.EMPLOYEE]: "Workforce member punching time against tasks for an employer",
   [USER_ROLES.ADMIN]: "System administration",
   [USER_ROLES.SUPER_ADMIN]: "Full system control and product management",
   "Unassigned": "Users without a role or profile assigned",
@@ -43,6 +45,7 @@ export const DASHBOARD_TYPES = {
   JOB_SEEKER: "jobseeker",
   RECRUITER: "recruiter",
   EMPLOYER: "employer",
+  EMPLOYEE: "employee",
   ADMIN: "admin",
   SUPER_ADMIN: "admin", // SuperAdmin uses admin dashboard
   DEFAULT: "default",
@@ -93,6 +96,8 @@ export function normalizeRole(
     case "employer":
     case "business": // Legacy role, maps to Employer
       return USER_ROLES.EMPLOYER;
+    case "employee":
+      return USER_ROLES.EMPLOYEE;
     case "affiliate": // Legacy — affiliate is now a service, not a role
       return USER_ROLES.EMPLOYER;
     case "admin":
@@ -191,12 +196,27 @@ export class RolePermissions {
     return this.role === USER_ROLES.EMPLOYER;
   }
 
+  get isEmployee(): boolean {
+    return this.role === USER_ROLES.EMPLOYEE;
+  }
+
   get isAdmin(): boolean {
     return this.role === USER_ROLES.ADMIN;
   }
 
   get isSuperAdmin(): boolean {
     return this.role === USER_ROLES.SUPER_ADMIN;
+  }
+
+  // Workforce back-office gates. Single source of truth so every
+  // <WorkforceSettings> / <TimesheetTab> consumer self-gates instead
+  // of relying on a prop-drilled boolean from a parent. (#1349, DRY rule.)
+  get canManageWorkforce(): boolean {
+    return this.isEmployer || this.isAdmin || this.isSuperAdmin;
+  }
+
+  get canPunchTime(): boolean {
+    return this.isEmployee;
   }
 
   // Permission checks
@@ -246,6 +266,7 @@ export class RolePermissions {
     if (this.isEmployer) return DASHBOARD_TYPES.EMPLOYER;
     if (this.isRecruiter) return DASHBOARD_TYPES.RECRUITER;
     if (this.isJobSeeker) return DASHBOARD_TYPES.JOB_SEEKER;
+    if (this.isEmployee) return DASHBOARD_TYPES.EMPLOYEE;
     return DASHBOARD_TYPES.DEFAULT;
   }
 }
@@ -273,6 +294,9 @@ export const roleUtils = {
     const normalized = normalizeRole(role);
     return normalized === USER_ROLES.EMPLOYER;
   },
+
+  isEmployee: (role: string | number | undefined | null): boolean =>
+    normalizeRole(role) === USER_ROLES.EMPLOYEE,
 
   isAdmin: (role: string | number | undefined | null): boolean =>
     normalizeRole(role) === USER_ROLES.ADMIN,

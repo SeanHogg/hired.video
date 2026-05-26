@@ -17,8 +17,10 @@
  * by feature work.
  */
 
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { buildRepos } from "../../repositories/index.js";
+import { emitNotification, resolveActor } from "../notifications/notificationService.js";
 
 const ACCEPTED = "Accepted";
 
@@ -296,7 +298,365 @@ export async function requestWarmIntro(
     } as any)
     .returning();
 
+  // Fire-and-forget inbox notification. Mirrors the connection-request
+  // pattern in routes/users.ts so the mutual sees the ask on their bell
+  // icon, not just on their next inbox refresh.
+  (async () => {
+    try {
+      const repos = buildRepos(db);
+      const { actor, actorName } = await resolveActor({ repos }, viewerId);
+      await emitNotification(
+        { repos },
+        {
+          recipientIds: [viaUserId],
+          type: "warm_intro_received",
+          actor,
+          title: `${actorName} asked you for a warm intro`,
+          message: `${actorName} would like an introduction to ${targetName}.`,
+          target: { id: convo.id, type: "conversation" },
+          extraData: { targetUserId, kind: "warm_intro_request" },
+        },
+      );
+    } catch (err) {
+      console.error("[warm-intro] notification insert failed:", err);
+    }
+  })();
+
   return { conversationId: convo.id, messageId: msg.id };
+}
+
+// ---------------------------------------------------------------------------
+// List warm-intro requests for a given viewer.
+//
+// `side` semantics:
+//   - "outgoing": viewer is the requester (sent the ask)
+//   - "incoming": viewer is the via (the mutual being asked)
+//
+// Source of truth is the FIRST message in each `type='warm_intro'`
+// conversation the viewer participates in:
+//   - metadata.kind          = "warm_intro_request"
+//   - metadata.targetUserId  = the person the requester wants to meet
+//   - senderId               = the requester
+// We classify by comparing senderId to viewer.
+//
+// Forwarded state is detected by the presence of a second message with
+// metadata.kind = "warm_intro_forwarded" in the same conversation
+// (written by forwardWarmIntro). This keeps state on the existing
+// messages table — no schema migration needed.
+// ---------------------------------------------------------------------------
+
+export interface WarmIntroSummary {
+  conversationId: string;
+  createdAt: string;
+  message: string;
+  status: "pending" | "forwarded" | "declined";
+  forwardedConversationId: string | null;
+  requester: PersonRef;
+  via: PersonRef;
+  target: PersonRef;
+}
+
+export type WarmIntroSide = "incoming" | "outgoing";
+
+async function fetchFirstAndForwardedMessages(
+  conversationIds: string[],
+): Promise<Map<string, { first: any; forwarded: any | null }>> {
+  if (conversationIds.length === 0) return new Map();
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(schema.messages)
+    .where(inArray(schema.messages.conversationId, conversationIds))
+    .orderBy(asc(schema.messages.createdAt))
+    .catch(() => [] as any[]);
+
+  const out = new Map<string, { first: any; forwarded: any | null }>();
+  for (const m of rows as any[]) {
+    const slot = out.get(m.conversationId) ?? { first: null, forwarded: null };
+    if (!slot.first) slot.first = m;
+    if (!slot.forwarded && m?.metadata?.kind === "warm_intro_forwarded") {
+      slot.forwarded = m;
+    }
+    out.set(m.conversationId, slot);
+  }
+  return out;
+}
+
+export async function listWarmIntros(
+  viewerId: string,
+  side: WarmIntroSide,
+): Promise<WarmIntroSummary[]> {
+  const db = getDb();
+
+  // Conversations of type='warm_intro' the viewer participates in.
+  const myConvoRows = await db
+    .select({ conversationId: schema.conversationParticipants.conversationId })
+    .from(schema.conversationParticipants)
+    .innerJoin(
+      schema.conversations,
+      eq(schema.conversationParticipants.conversationId, schema.conversations.id),
+    )
+    .where(
+      and(
+        eq(schema.conversationParticipants.userId, viewerId),
+        eq(schema.conversations.type, "warm_intro"),
+      ),
+    )
+    .catch(() => [] as { conversationId: string }[]);
+
+  const convoIds = myConvoRows.map((r: any) => r.conversationId);
+  if (convoIds.length === 0) return [];
+
+  const msgMap = await fetchFirstAndForwardedMessages(convoIds);
+
+  // Build raw rows, classifying by side and collecting people to hydrate.
+  type Raw = {
+    conversationId: string;
+    createdAt: Date;
+    messageContent: string;
+    senderId: string;
+    targetUserId: string;
+    forwarded: { id: string; metadata: any } | null;
+  };
+  const raw: Raw[] = [];
+  for (const id of convoIds) {
+    const pair = msgMap.get(id);
+    if (!pair?.first) continue;
+    const targetUserId = pair.first?.metadata?.targetUserId;
+    if (!targetUserId) continue;
+    const senderId = pair.first.senderId as string;
+    const isOutgoing = senderId === viewerId;
+    if (side === "outgoing" && !isOutgoing) continue;
+    if (side === "incoming" && isOutgoing) continue;
+    raw.push({
+      conversationId: id,
+      createdAt: pair.first.createdAt,
+      messageContent: pair.first.content,
+      senderId,
+      targetUserId,
+      forwarded: pair.forwarded
+        ? { id: pair.forwarded.id, metadata: pair.forwarded.metadata }
+        : null,
+    });
+  }
+  if (raw.length === 0) return [];
+
+  // For each conversation we need 3 people: requester (=senderId), via
+  // (= the OTHER participant), target (= metadata.targetUserId).
+  // First pull all participants for these conversations so we can find via.
+  const partRows = await db
+    .select({
+      conversationId: schema.conversationParticipants.conversationId,
+      userId: schema.conversationParticipants.userId,
+    })
+    .from(schema.conversationParticipants)
+    .where(inArray(schema.conversationParticipants.conversationId, convoIds))
+    .catch(() => [] as { conversationId: string; userId: string }[]);
+
+  const partsByConvo = new Map<string, string[]>();
+  for (const r of partRows as any[]) {
+    const arr = partsByConvo.get(r.conversationId) ?? [];
+    arr.push(r.userId);
+    partsByConvo.set(r.conversationId, arr);
+  }
+
+  const allIds = new Set<string>();
+  for (const r of raw) {
+    allIds.add(r.senderId);
+    allIds.add(r.targetUserId);
+    for (const p of partsByConvo.get(r.conversationId) ?? []) allIds.add(p);
+  }
+  const hydrated = await hydratePeople([...allIds]);
+  const blank = (id: string): PersonRef => ({
+    userId: id,
+    name: null,
+    avatarUrl: null,
+    headline: null,
+  });
+
+  return raw
+    .map((r): WarmIntroSummary | null => {
+      const parts = partsByConvo.get(r.conversationId) ?? [];
+      const viaId = parts.find((p) => p !== r.senderId);
+      if (!viaId) return null;
+      return {
+        conversationId: r.conversationId,
+        createdAt: r.createdAt.toISOString(),
+        message: r.messageContent,
+        status: r.forwarded ? "forwarded" : "pending",
+        forwardedConversationId: r.forwarded?.metadata?.toConversationId ?? null,
+        requester: hydrated.get(r.senderId) ?? blank(r.senderId),
+        via: hydrated.get(viaId) ?? blank(viaId),
+        target: hydrated.get(r.targetUserId) ?? blank(r.targetUserId),
+      };
+    })
+    .filter((r): r is WarmIntroSummary => r !== null)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+// ---------------------------------------------------------------------------
+// Forward a warm intro. Closes LinkedIn's "Get introduced" loop:
+//   1. Validates the caller is the `via` on a pending warm_intro convo.
+//   2. Creates a NEW 3-party conversation (via + requester + target).
+//   3. Seeds it with a system message ("Forwarded by {via}: {original}"),
+//      so the target lands in context without re-typing.
+//   4. Writes a `warm_intro_forwarded` marker message back into the
+//      original convo, pointing at the new conversation — that's what
+//      `listWarmIntros` reads to set status='forwarded'.
+//
+// Idempotent: if the convo is already forwarded, returns the existing
+// new-conversation id rather than minting a second one.
+// ---------------------------------------------------------------------------
+
+export type ForwardWarmIntroError =
+  | "not_found"
+  | "not_via"
+  | "not_warm_intro"
+  | "missing_first_message";
+
+export interface ForwardWarmIntroResult {
+  /** The new 3-party conversation that includes the target. */
+  forwardedConversationId: string;
+  /** Whether this call actually created the new conversation, or just
+   *  returned an existing forward (idempotent re-call). */
+  created: boolean;
+}
+
+export async function forwardWarmIntro(
+  viaUserId: string,
+  originalConversationId: string,
+): Promise<ForwardWarmIntroResult | { error: ForwardWarmIntroError }> {
+  const db = getDb();
+
+  // Convo + viewer-is-participant check rolled into one query.
+  const [convo] = await db
+    .select()
+    .from(schema.conversations)
+    .where(eq(schema.conversations.id, originalConversationId))
+    .limit(1);
+  if (!convo) return { error: "not_found" };
+  if (convo.type !== "warm_intro") return { error: "not_warm_intro" };
+
+  const parts = await db
+    .select({ userId: schema.conversationParticipants.userId })
+    .from(schema.conversationParticipants)
+    .where(eq(schema.conversationParticipants.conversationId, originalConversationId));
+  const partIds = parts.map((p: any) => p.userId);
+  if (!partIds.includes(viaUserId)) return { error: "not_via" };
+
+  // First message is the source of truth for requester + target.
+  const msgs = await db
+    .select()
+    .from(schema.messages)
+    .where(eq(schema.messages.conversationId, originalConversationId))
+    .orderBy(asc(schema.messages.createdAt));
+  const first: any = msgs[0];
+  if (!first || first?.metadata?.kind !== "warm_intro_request") {
+    return { error: "missing_first_message" };
+  }
+  const requesterId: string = first.senderId;
+  const targetUserId: string | undefined = first?.metadata?.targetUserId;
+  if (!targetUserId) return { error: "missing_first_message" };
+  if (requesterId === viaUserId) return { error: "not_via" };
+
+  // Idempotency: if a forwarded marker already exists, return it.
+  const existingForward: any = msgs.find(
+    (m: any) => m?.metadata?.kind === "warm_intro_forwarded",
+  );
+  if (existingForward?.metadata?.toConversationId) {
+    return {
+      forwardedConversationId: existingForward.metadata.toConversationId,
+      created: false,
+    };
+  }
+
+  // Hydrate names for the seeded message.
+  const namesRows = await db
+    .select({ id: schema.users.id, name: schema.users.name })
+    .from(schema.users)
+    .where(inArray(schema.users.id, [viaUserId, requesterId, targetUserId]));
+  const nameById = new Map<string, string>(
+    (namesRows as any[]).map((r) => [r.id, (r.name ?? "").trim() || "a connection"]),
+  );
+  const viaName = nameById.get(viaUserId) ?? "A connection";
+  const requesterName = nameById.get(requesterId) ?? "Someone";
+  const targetName = nameById.get(targetUserId) ?? "this person";
+
+  // 1. Create the new 3-party conversation.
+  const [newConvo] = await db
+    .insert(schema.conversations)
+    .values({
+      subject: `${viaName} introduced ${requesterName}`.slice(0, 500),
+      type: "direct",
+    } as any)
+    .returning();
+
+  await Promise.all(
+    [viaUserId, requesterId, targetUserId].map((pId) =>
+      db
+        .insert(schema.conversationParticipants)
+        .values({ conversationId: newConvo.id, userId: pId, role: "member" } as any),
+    ),
+  );
+
+  // 2. Seed with the original ask, attributed.
+  const introContent =
+    `Hi ${targetName} — wanted to introduce you to ${requesterName}.\n\n` +
+    `Their original note to me:\n` +
+    `"${(first.content ?? "").trim()}"\n\n` +
+    `I'll let you two take it from here.`;
+  await db
+    .insert(schema.messages)
+    .values({
+      conversationId: newConvo.id,
+      senderId: viaUserId,
+      content: introContent,
+      contentType: "text",
+      metadata: {
+        kind: "warm_intro_forward",
+        fromConversationId: originalConversationId,
+        requesterId,
+        targetUserId,
+      },
+    } as any);
+
+  // 3. Marker on the original convo. listWarmIntros reads this for status.
+  await db.insert(schema.messages).values({
+    conversationId: originalConversationId,
+    senderId: viaUserId,
+    content: `Forwarded the intro to ${targetName}.`,
+    contentType: "text",
+    metadata: {
+      kind: "warm_intro_forwarded",
+      toConversationId: newConvo.id,
+    },
+  } as any);
+
+  // 4. Notify both the requester (their ask was forwarded!) and the target.
+  (async () => {
+    try {
+      const repos = buildRepos(db);
+      const { actor } = await resolveActor({ repos }, viaUserId);
+      await emitNotification(
+        { repos },
+        {
+          recipientIds: [requesterId, targetUserId],
+          type: "warm_intro_forwarded",
+          actor,
+          title: `${viaName} introduced ${requesterName} to ${targetName}`,
+          target: { id: newConvo.id, type: "conversation" },
+          extraData: {
+            kind: "warm_intro_forward",
+            fromConversationId: originalConversationId,
+          },
+        },
+      );
+    } catch (err) {
+      console.error("[warm-intro] forward notification failed:", err);
+    }
+  })();
+
+  return { forwardedConversationId: newConvo.id, created: true };
 }
 
 // ---------------------------------------------------------------------------

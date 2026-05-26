@@ -36,6 +36,24 @@ export interface WarmIntroResult {
   messageId: string;
 }
 
+export type WarmIntroStatus = "pending" | "forwarded" | "declined";
+
+export interface WarmIntroSummary {
+  conversationId: string;
+  createdAt: string;
+  message: string;
+  status: WarmIntroStatus;
+  forwardedConversationId: string | null;
+  requester: PersonRef;
+  via: PersonRef;
+  target: PersonRef;
+}
+
+export interface ForwardWarmIntroResult {
+  forwardedConversationId: string;
+  created: boolean;
+}
+
 export const graphService = {
   async mutuals(targetUserId: string): Promise<MutualConnectionsResult> {
     const res = await apiClient.get<MutualConnectionsResult>(
@@ -57,6 +75,27 @@ export const graphService = {
     message: string;
   }): Promise<WarmIntroResult> {
     const res = await apiClient.post<WarmIntroResult>(`/api/graph/intro`, input);
+    return res.data;
+  },
+
+  /** Warm-intro requests where the viewer is the mutual being asked. */
+  async incomingIntros(): Promise<WarmIntroSummary[]> {
+    const res = await apiClient.get<WarmIntroSummary[]>(`/api/graph/intros/incoming`);
+    return res.data ?? [];
+  },
+
+  /** Warm-intro requests the viewer sent. */
+  async outgoingIntros(): Promise<WarmIntroSummary[]> {
+    const res = await apiClient.get<WarmIntroSummary[]>(`/api/graph/intros/outgoing`);
+    return res.data ?? [];
+  },
+
+  /** Mutual forwards the ask — creates the 3-party conversation. */
+  async forwardIntro(conversationId: string): Promise<ForwardWarmIntroResult> {
+    const res = await apiClient.post<ForwardWarmIntroResult>(
+      `/api/graph/intros/${conversationId}/forward`,
+      {},
+    );
     return res.data;
   },
 };

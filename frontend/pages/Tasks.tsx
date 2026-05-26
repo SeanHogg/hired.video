@@ -71,6 +71,7 @@ import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { MyEventsAndCoffee } from "@/components/events/MyEventsAndCoffee";
 import { EventDiscoveryPanel } from "@/components/events/EventDiscoveryPanel";
+import { TimesheetTab } from "@/components/timesheet/TimesheetTab";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useAuth, USER_ROLES } from "@/lib/auth";
@@ -163,26 +164,39 @@ export default function Tasks() {
   const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
 
   useSEO("/tasks");
-  useBreadcrumbs([{ name: "Tasks & Events", url: "/tasks" }]);
+  useBreadcrumbs([{ name: "Tasks, Events & Timesheet", url: "/tasks" }]);
 
   // View axis lives in the URL so the page-level breadcrumb tabs are
   // shareable + back-button friendly. `?tab=` controls the Tasks-view
   // axis (kanban/calendar/table); `?view=` is reserved for the Discover
   // sub-view (grid/map) so the two never collide.
   type TaskView = "calendar" | "table" | "kanban";
-  // Top-level surface tab — Tasks / My events & coffee / Discover.
+  // Top-level surface tab — Tasks / My events & coffee / Timesheet / Discover.
   // Discover is the unauthenticated default so /tasks doubles as the
   // public marketing landing for the (now-redirected) /events and /map.
-  type TaskSurface = "tasks" | "my-events" | "discover";
+  // Timesheet is workforce-only (employee + employer, #1349).
+  type TaskSurface = "tasks" | "my-events" | "timesheet" | "discover";
   const [searchParams, setSearchParams] = useSearchParams();
   const surfaceParam = searchParams.get("surface");
   const surfaceFromUrl: TaskSurface | null =
     surfaceParam === "my-events" ? "my-events" :
+    surfaceParam === "timesheet" ? "timesheet" :
     surfaceParam === "discover" ? "discover" :
     surfaceParam === "tasks" ? "tasks" :
     null;
   const defaultSurface: TaskSurface = isAuthenticated ? "tasks" : "discover";
   const currentSurface: TaskSurface = surfaceFromUrl ?? defaultSurface;
+  // Self-gate the Timesheet surface tab so the surface list is a single
+  // SSoT — no prop-drilled `canSeeTimesheet`; consumers inside Tasks.tsx
+  // read the same `availableSurfaces` array (DRY rule, #1349).
+  const role = (user?.role ?? "").toLowerCase();
+  const isWorkforceMember = role === USER_ROLES.EMPLOYEE
+    || role === USER_ROLES.EMPLOYER
+    || role === USER_ROLES.ADMIN
+    || role === USER_ROLES.SUPER_ADMIN;
+  const availableSurfaces: TaskSurface[] = isWorkforceMember
+    ? ["tasks", "my-events", "timesheet", "discover"]
+    : ["tasks", "my-events", "discover"];
   const viewParam = currentSurface === "tasks" ? (searchParams.get("tab") ?? searchParams.get("view")) : null;
   const currentView: TaskView =
     viewParam === "calendar" ? "calendar" :
@@ -204,11 +218,12 @@ export default function Tasks() {
   const SurfaceTabsStrip = (
     <div className="border-b">
       <div className="max-w-7xl mx-auto px-4 md:px-6 flex gap-1 -mb-px">
-        {(["tasks", "my-events", "discover"] as TaskSurface[]).map((key) => {
+        {availableSurfaces.map((key) => {
           const active = currentSurface === key;
           const label =
             key === "tasks" ? "Tasks" :
             key === "my-events" ? "My events & coffee" :
+            key === "timesheet" ? "Timesheet" :
             "Discover";
           return (
             <button
@@ -1174,6 +1189,22 @@ export default function Tasks() {
         <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             <MyEventsAndCoffee viewerUserId={user.id} />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Timesheet surface — workforce-only (employee + employer). The
+  // <TimesheetTab/> component self-gates; for non-workforce viewers it
+  // returns null and we fall through to the tasks surface below.
+  if (currentSurface === "timesheet" && isWorkforceMember) {
+    return (
+      <AppShell bgClassName="bg-background">
+        {SurfaceTabsStrip}
+        <div className="p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <TimesheetTab />
           </div>
         </div>
       </AppShell>

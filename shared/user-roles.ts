@@ -17,6 +17,7 @@ export const USER_ROLES = {
   JOB_SEEKER: "job_seeker",
   RECRUITER: "recruiter",
   EMPLOYER: "employer",
+  EMPLOYEE: "employee",
   ADMIN: "admin",
   SUPER_ADMIN: "super_admin",
 } as const;
@@ -24,7 +25,9 @@ export const USER_ROLES = {
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
 /** Roles that can earn gamification points. Admin / super_admin are
- *  intentionally excluded; affiliate isn't a role. */
+ *  intentionally excluded; affiliate isn't a role. Employee is also
+ *  excluded — they're invite-only workforce members, not earners on
+ *  the gamification surface (see project_employee_role memory + #1349). */
 export type ScoringRole = "job_seeker" | "recruiter" | "employer";
 
 /** Resolve the user's primary scoring role from the JWT `roles` array

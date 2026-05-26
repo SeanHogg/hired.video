@@ -25,6 +25,8 @@ const {
   scorecardSubmissions,
   scorecardSubmissionRatings,
   hiringDecisions,
+  competencies,
+  competencyLevels,
 } = schema;
 
 export type DbLike = any;
@@ -41,6 +43,43 @@ export type InterviewKitStageRow = typeof interviewKitStages.$inferSelect;
 export type ScorecardSubmissionRow = typeof scorecardSubmissions.$inferSelect;
 export type ScorecardSubmissionRatingRow = typeof scorecardSubmissionRatings.$inferSelect;
 export type HiringDecisionRow = typeof hiringDecisions.$inferSelect;
+export type CompetencyRow = typeof competencies.$inferSelect;
+export type CompetencyLevelRow = typeof competencyLevels.$inferSelect;
+
+export interface NewCompetency {
+  companyId: string;
+  createdByUserId: string;
+  name: string;
+  description?: string | null;
+  taxonomy?: string;
+  isArchived?: boolean;
+}
+
+export interface NewCompetencyLevel {
+  competencyId: string;
+  level: number;
+  label: string;
+  anchor: string;
+}
+
+export interface UpdateCompetencyPatch {
+  name?: string;
+  description?: string | null;
+  taxonomy?: string;
+  isArchived?: boolean;
+}
+
+export interface OverdueSubmission {
+  id: string;
+  templateId: string;
+  evaluatorUserId: string;
+  applicationId: string;
+  candidateUserId: string | null;
+  kitStageId: string | null;
+  dueAt: Date;
+  remindedAt: Date | null;
+  escalatedAt: Date | null;
+}
 
 export interface NewScorecardTemplate {
   companyId: string;
@@ -59,6 +98,8 @@ export interface NewScorecardAttribute {
   displayOrder?: number;
   weight?: number;
   anchors?: Record<string, string> | null;
+  /** Migration 0132 / gap #1382. Optional link to a reusable competency. */
+  competencyId?: string | null;
 }
 
 export interface NewInterviewKit {
@@ -68,6 +109,10 @@ export interface NewInterviewKit {
   jobId?: string | null;
   description?: string | null;
   isArchived?: boolean;
+  /** Migration 0132 / gap #1380. */
+  blindReviewMode?: string;
+  /** Migration 0132 / gap #1383. */
+  escalateToUserId?: string | null;
 }
 
 export interface NewInterviewKitStage {
@@ -78,6 +123,8 @@ export interface NewInterviewKitStage {
   durationMinutes?: number;
   suggestedQuestions?: string[];
   scorecardTemplateId?: string;
+  /** Migration 0132 / gap #1386. */
+  stageKind?: string;
 }
 
 export interface NewScorecardSubmission {
@@ -94,6 +141,8 @@ export interface NewScorecardSubmission {
   concerns?: string | null;
   status?: "draft" | "submitted";
   submittedAt?: Date | null;
+  /** Migration 0132 / gap #1383. Soft deadline for SLA tracking. */
+  dueAt?: Date | null;
 }
 
 export interface NewScorecardSubmissionRating {
@@ -128,6 +177,7 @@ export interface UpdateAttributePatch {
   displayOrder?: number;
   weight?: number;
   anchors?: Record<string, string> | null;
+  competencyId?: string | null;
 }
 
 export interface UpdateKitPatch {
@@ -135,6 +185,8 @@ export interface UpdateKitPatch {
   description?: string | null;
   jobId?: string | null;
   isArchived?: boolean;
+  blindReviewMode?: string;
+  escalateToUserId?: string | null;
 }
 
 export interface UpdateStagePatch {
@@ -144,6 +196,7 @@ export interface UpdateStagePatch {
   durationMinutes?: number;
   suggestedQuestions?: string[];
   scorecardTemplateId?: string | null;
+  stageKind?: string;
 }
 
 export interface UpdateSubmissionPatch {
@@ -154,6 +207,9 @@ export interface UpdateSubmissionPatch {
   concerns?: string | null;
   status?: "draft" | "submitted";
   submittedAt?: Date | null;
+  dueAt?: Date | null;
+  remindedAt?: Date | null;
+  escalatedAt?: Date | null;
 }
 
 export interface IScorecardsRepository {
@@ -209,6 +265,25 @@ export interface IScorecardsRepository {
     companyIds: readonly string[],
   ): Promise<HiringDecisionRow[]>;
   insertDecision(input: NewHiringDecision): Promise<HiringDecisionRow>;
+
+  // Competencies (migration 0132 / gap #1382)
+  findCompetencyById(id: string): Promise<CompetencyRow | null>;
+  findActiveCompetenciesForCompanies(
+    companyIds: readonly string[],
+  ): Promise<CompetencyRow[]>;
+  insertCompetency(input: NewCompetency): Promise<CompetencyRow>;
+  updateCompetency(id: string, patch: UpdateCompetencyPatch): Promise<CompetencyRow>;
+  findLevelsForCompetencies(
+    competencyIds: readonly string[],
+  ): Promise<CompetencyLevelRow[]>;
+  insertCompetencyLevels(rows: readonly NewCompetencyLevel[]): Promise<CompetencyLevelRow[]>;
+  deleteLevelsForCompetency(competencyId: string): Promise<void>;
+
+  // SLA scan (migration 0132 / gap #1383)
+  findOverdueDraftSubmissions(opts: {
+    now: Date;
+    remindWithinMs: number;
+  }): Promise<OverdueSubmission[]>;
 }
 
 export class ScorecardsRepository implements IScorecardsRepository {
@@ -543,5 +618,108 @@ export class ScorecardsRepository implements IScorecardsRepository {
   async insertDecision(input: NewHiringDecision): Promise<HiringDecisionRow> {
     const [row] = await this.db.insert(hiringDecisions).values(input as any).returning();
     return row as HiringDecisionRow;
+  }
+
+  // ─── Competencies (#1382) ─────────────────────────────────────────────────
+
+  async findCompetencyById(id: string): Promise<CompetencyRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(competencies)
+      .where(eq(competencies.id, id))
+      .limit(1);
+    return (row as CompetencyRow) ?? null;
+  }
+
+  async findActiveCompetenciesForCompanies(
+    companyIds: readonly string[],
+  ): Promise<CompetencyRow[]> {
+    if (companyIds.length === 0) return [];
+    return (await this.db
+      .select()
+      .from(competencies)
+      .where(
+        and(
+          inArray(competencies.companyId, companyIds as string[]),
+          eq(competencies.isArchived, false),
+        ),
+      )
+      .orderBy(asc(competencies.name))) as CompetencyRow[];
+  }
+
+  async insertCompetency(input: NewCompetency): Promise<CompetencyRow> {
+    const [row] = await this.db.insert(competencies).values(input as any).returning();
+    return row as CompetencyRow;
+  }
+
+  async updateCompetency(
+    id: string,
+    patch: UpdateCompetencyPatch,
+  ): Promise<CompetencyRow> {
+    const [row] = await this.db
+      .update(competencies)
+      .set({ ...patch, updatedAt: this.now() } as any)
+      .where(eq(competencies.id, id))
+      .returning();
+    return row as CompetencyRow;
+  }
+
+  async findLevelsForCompetencies(
+    competencyIds: readonly string[],
+  ): Promise<CompetencyLevelRow[]> {
+    if (competencyIds.length === 0) return [];
+    return (await this.db
+      .select()
+      .from(competencyLevels)
+      .where(inArray(competencyLevels.competencyId, competencyIds as string[]))
+      .orderBy(asc(competencyLevels.level))) as CompetencyLevelRow[];
+  }
+
+  async insertCompetencyLevels(
+    rows: readonly NewCompetencyLevel[],
+  ): Promise<CompetencyLevelRow[]> {
+    if (rows.length === 0) return [];
+    return (await this.db
+      .insert(competencyLevels)
+      .values(rows as any[])
+      .returning()) as CompetencyLevelRow[];
+  }
+
+  async deleteLevelsForCompetency(competencyId: string): Promise<void> {
+    await this.db
+      .delete(competencyLevels)
+      .where(eq(competencyLevels.competencyId, competencyId));
+  }
+
+  // ─── SLA scan (#1383) ─────────────────────────────────────────────────────
+
+  async findOverdueDraftSubmissions(opts: {
+    now: Date;
+    remindWithinMs: number;
+  }): Promise<OverdueSubmission[]> {
+    const horizon = new Date(opts.now.getTime() + opts.remindWithinMs);
+    const rows = (await this.db
+      .select()
+      .from(scorecardSubmissions)
+      .where(
+        and(
+          eq(scorecardSubmissions.status, "draft"),
+          // dueAt IS NOT NULL is implicit because dueAt < horizon excludes nulls
+          // in Drizzle's translation; we re-assert via the partial-index path.
+        ),
+      )) as ScorecardSubmissionRow[];
+    return rows
+      .filter((r) => r.dueAt != null && r.dueAt < horizon)
+      .map((r) => ({
+        id: r.id,
+        templateId: r.templateId,
+        evaluatorUserId: r.evaluatorUserId,
+        applicationId: r.applicationId,
+        candidateUserId: r.candidateUserId,
+        kitStageId: r.kitStageId,
+        dueAt: r.dueAt!,
+        remindedAt: r.remindedAt,
+        escalatedAt: r.escalatedAt,
+      }));
   }
 }

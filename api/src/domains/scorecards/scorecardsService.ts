@@ -36,6 +36,10 @@ import {
   type AggregateSnapshot,
   type AttributeAverage,
 } from "./scoring.js";
+import {
+  filterSubmissionsForRequester,
+  maskCandidateIdentity,
+} from "./blindReview.js";
 import type {
   CreateDecisionInput,
   CreateKitInput,
@@ -142,6 +146,21 @@ export class ScorecardsService {
     return kit;
   }
 
+  /**
+   * Resolve the kit that governs a submission's review policy. Submissions
+   * link to a kit indirectly via `kitStageId` (optional) — submissions
+   * created outside a kit return null and behave as "no blind-review
+   * policy" (legacy ad-hoc scorecards keep working unchanged).
+   */
+  private async resolveKitForSubmission(
+    sub: Pick<ScorecardSubmissionRow, "kitStageId">,
+  ): Promise<InterviewKitRow | null> {
+    if (!sub.kitStageId) return null;
+    const stage = await this.deps.repo.findStageById(sub.kitStageId);
+    if (!stage) return null;
+    return this.deps.repo.findKitById(stage.kitId);
+  }
+
   // ─── Templates ────────────────────────────────────────────────────────────
 
   async listTemplates(
@@ -182,6 +201,7 @@ export class ScorecardsService {
         displayOrder: a.displayOrder ?? i,
         weight: a.weight ?? 1,
         anchors: a.anchors as Record<string, string> | undefined,
+        competencyId: a.competencyId ?? null,
       })),
     );
     return { ...tpl, attributes };
@@ -209,6 +229,7 @@ export class ScorecardsService {
       displayOrder: input.displayOrder ?? 0,
       weight: input.weight ?? 1,
       anchors: input.anchors as Record<string, string> | undefined,
+      competencyId: input.competencyId ?? null,
     });
   }
 
@@ -226,6 +247,7 @@ export class ScorecardsService {
       displayOrder: patch.displayOrder,
       weight: patch.weight,
       anchors: patch.anchors,
+      competencyId: patch.competencyId,
     };
     return this.deps.repo.updateAttribute(id, repoPatch);
   }
@@ -267,6 +289,8 @@ export class ScorecardsService {
       createdByUserId: userId,
       name: input.name,
       description: input.description,
+      blindReviewMode: input.blindReviewMode ?? "off",
+      escalateToUserId: input.escalateToUserId ?? null,
     });
     const stages = await this.deps.repo.insertStages(
       input.stages.map((s, i) => ({
@@ -277,6 +301,7 @@ export class ScorecardsService {
         durationMinutes: s.durationMinutes ?? 60,
         suggestedQuestions: s.suggestedQuestions,
         scorecardTemplateId: s.scorecardTemplateId,
+        stageKind: s.stageKind ?? "interview",
       })),
     );
     return { ...kit, stages };
@@ -305,6 +330,7 @@ export class ScorecardsService {
       durationMinutes: input.durationMinutes ?? 60,
       suggestedQuestions: input.suggestedQuestions,
       scorecardTemplateId: input.scorecardTemplateId,
+      stageKind: input.stageKind ?? "interview",
     });
   }
 
@@ -323,6 +349,7 @@ export class ScorecardsService {
       durationMinutes: patch.durationMinutes,
       suggestedQuestions: patch.suggestedQuestions,
       scorecardTemplateId: patch.scorecardTemplateId,
+      stageKind: patch.stageKind,
     };
     return this.deps.repo.updateStage(id, repoPatch);
   }
@@ -371,7 +398,31 @@ export class ScorecardsService {
         visibleTemplateIds.add(t.id);
       }
     }
-    return subs.filter((s) => visibleTemplateIds.has(s.templateId));
+    const visible = subs.filter((s) => visibleTemplateIds.has(s.templateId));
+
+    // Blind-review peer-hiding (#1380). Group by governing kit because
+    // each kit defines its own policy; ungoverned submissions are
+    // unaffected. We deliberately do the kit lookup inside the loop
+    // (small N, cached by the repo) rather than join in SQL.
+    const grouped = new Map<string | "_none", ScorecardSubmissionRow[]>();
+    const kitCache = new Map<string, InterviewKitRow | null>();
+    for (const sub of visible) {
+      const kit = await this.resolveKitForSubmission(sub);
+      const key = kit?.id ?? "_none";
+      if (kit && !kitCache.has(kit.id)) kitCache.set(kit.id, kit);
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(sub);
+      grouped.set(key, bucket);
+    }
+    const out: ScorecardSubmissionRow[] = [];
+    for (const [key, bucket] of grouped) {
+      const kit = key === "_none" ? null : kitCache.get(key) ?? null;
+      const filtered = filterSubmissionsForRequester(bucket, kit, userId);
+      out.push(
+        ...filtered.map((s) => maskCandidateIdentity(s, kit, s.evaluatorUserId === userId)),
+      );
+    }
+    return out;
   }
 
   async getSubmission(userId: string, id: string): Promise<SubmissionWithRatings> {
@@ -379,7 +430,9 @@ export class ScorecardsService {
     if (!sub) throw new ServiceError("NOT_FOUND", "Submission not found");
     await this.loadTemplate(userId, sub.templateId);
     const ratings = await this.deps.repo.findRatingsForSubmission(sub.id);
-    return { ...sub, ratings };
+    const kit = await this.resolveKitForSubmission(sub);
+    const view = maskCandidateIdentity(sub, kit, sub.evaluatorUserId === userId);
+    return { ...view, ratings };
   }
 
   async createSubmission(
@@ -399,6 +452,7 @@ export class ScorecardsService {
       strengths: input.strengths,
       concerns: input.concerns,
       status: "draft",
+      dueAt: input.dueAt ?? null,
     });
     if (input.ratings && input.ratings.length > 0) {
       await this.deps.repo.insertRatings(

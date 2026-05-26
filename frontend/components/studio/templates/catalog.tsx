@@ -22,6 +22,7 @@ import {
   FilePlus2,
   Frame,
   Gamepad2,
+  GraduationCap,
   Headphones,
   Image as ImageIcon,
   Mic2,
@@ -72,6 +73,15 @@ export type ContentTemplate =
   | "company_promo"
   | "sizzle_reel"
   | "tool_promo"
+  // ─── Learning / e-learning lessons (#160) ─────────────────────────────
+  // Each maps to STUDIO_PURPOSES `course_lesson` so the storyboard
+  // generator branches into learning-objective + concept + worked-example
+  // + summary scene shapes (gen branch tracked as #162). On Save, the
+  // editor's StudioSaveMenuV2 surfaces "Save as Course Lesson" which
+  // attaches the project to a course as `sourceType: studio_video`.
+  | "course_lesson_explainer"
+  | "course_lesson_demo"
+  | "course_lesson_walkthrough"
   | "self_tape"
   | "monologue"
   | "showreel"
@@ -167,6 +177,7 @@ export type TemplateCategory =
   | "promote"
   | "showcase"
   | "hiring"
+  | "learning"
   | "quick"
   | "film"
   | "comic"
@@ -176,6 +187,11 @@ export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
   { id: "promote", label: "Promote Yourself" },
   { id: "showcase", label: "Showcase Work" },
   { id: "hiring", label: "Hiring" },
+  // Learning / e-learning bucket (#160). Course-lesson templates land
+  // here; selecting any of them seeds the storyboard generator with the
+  // `course_lesson` purpose so the LLM produces learning-objective +
+  // concept + worked-example scene shapes (gen branch tracked as #162).
+  { id: "learning", label: "Learning & Training" },
   // Paid-media bucket (#1041). Surfaces IAB display banners + social-
   // video ad specs + outdoor/CTV formats in one place. Templates here
   // are sized to the platform's official spec from
@@ -467,6 +483,61 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // the browser — there's no scenario where the user wouldn't
     // reach for screen capture next.
     defaultRecordingMode: "screen+webcam",
+  },
+  // ─── Learning & Training templates (#160) ──────────────────────────────────
+  // All three use `purpose: "course_lesson"` so the storyboard generator
+  // takes the lesson branch (learning-objective + concept + worked-example
+  // + summary scene shapes — gen branch tracked as #162). All three share
+  // BasicIntake (the user describes the lesson; the AI scaffolds the
+  // scenes) per `feedback_extract_on_duplication` — one intake form, three
+  // pedagogical framings. The Save menu's "Save as Course Lesson" row
+  // attaches the saved project to a course as `sourceType: studio_video`.
+  {
+    id: "course_lesson_explainer",
+    label: "Course Lesson — Explainer",
+    desc: "Teach one concept end-to-end. Opens with a learning objective, ends with a summary + knowledge check.",
+    icon: BookOpen,
+    importMode: "none",
+    purpose: "course_lesson",
+    category: "learning",
+    mediaKind: "video",
+    audiences: ["creator", "employer", "educator", "designer"],
+    defaultName: "Course Lesson — Explainer",
+    defaultPrompt: "Create a 3-minute explainer lesson on a single concept. Open with the learning objective in plain English, present the concept with one concrete example, then summarise the takeaway in three sentences.",
+    firstTabLabel: "Lesson",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "course_lesson_demo",
+    label: "Course Lesson — Demo",
+    desc: "Show, don't tell. Screen + webcam capture for a software walkthrough that becomes a lesson.",
+    icon: Monitor,
+    importMode: "none",
+    purpose: "course_lesson",
+    category: "learning",
+    mediaKind: "video",
+    audiences: ["creator", "developer", "employer", "educator"],
+    defaultName: "Course Lesson — Demo",
+    defaultPrompt: "Create a 5-minute demo lesson. State what the learner will be able to do by the end, walk through the steps in the actual tool, then recap the workflow.",
+    firstTabLabel: "Demo",
+    IntakeForm: BasicIntake,
+    // Auto-arm screen + webcam — demos are the whole point of this template.
+    defaultRecordingMode: "screen+webcam",
+  },
+  {
+    id: "course_lesson_walkthrough",
+    label: "Course Lesson — Worked Example",
+    desc: "Worked-example pedagogy: a problem, a solution path, the trade-offs, a generalised takeaway.",
+    icon: GraduationCap,
+    importMode: "none",
+    purpose: "course_lesson",
+    category: "learning",
+    mediaKind: "video",
+    audiences: ["creator", "employer", "educator", "developer", "designer"],
+    defaultName: "Course Lesson — Worked Example",
+    defaultPrompt: "Create a 5-7 minute worked-example lesson. State the problem, walk through one solution path narrating the decisions, name the trade-offs, then generalise the takeaway so the learner can apply the pattern.",
+    firstTabLabel: "Lesson",
+    IntakeForm: BasicIntake,
   },
   // ─── Film & Acting templates ───────────────────────────────────────────────
   // Director + Actor templates share the generic BasicIntake — the user
