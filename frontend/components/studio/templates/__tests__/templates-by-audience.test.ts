@@ -34,11 +34,15 @@ describe("templatesForAudience", () => {
     for (const g of games) expect(g.mediaKind).toBe("game");
   });
 
-  it("illustrator audience surfaces every comic + image template", () => {
+  it("illustrator audience surfaces every comic + drawing-image template", () => {
     const ids = templatesForAudience("illustrator").map((t) => t.id);
-    // Every comic_* and drawing_* template should be tagged illustrator.
+    // Every comic_* and drawing-style image template should be tagged
+    // illustrator. Ad-banner image templates (`ad_*`) intentionally
+    // target designer / marketer audiences, NOT illustrator — they're
+    // image-kind only because the runtime renders pixels, not because
+    // an illustrator's workflow produces them.
     const expectedFromCatalog = TEMPLATE_CATALOG.filter(
-      (t) => t.mediaKind === "comic" || t.mediaKind === "image",
+      (t) => t.mediaKind === "comic" || (t.mediaKind === "image" && !t.id.startsWith("ad_")),
     ).map((t) => t.id);
     expect(ids.sort()).toEqual(expectedFromCatalog.sort());
   });

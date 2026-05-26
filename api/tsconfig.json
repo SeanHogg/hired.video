@@ -11,7 +11,6 @@
     "types": ["@cloudflare/workers-types"],
     "noEmit": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
       "@shared/*": ["../shared/*"]
     }
