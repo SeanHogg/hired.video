@@ -48,9 +48,14 @@ export default function ProfileAudit() {
     currentRole?: boolean;
   }>({});
   const [isApplying, setIsApplying] = useState(false);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
   const { recordRun } = useToolRunRecorder(TOOL_ID);
 
   const handleRun = async () => {
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
     setError(null);
     setResult(null);
     setAccepted({});
@@ -161,7 +166,8 @@ export default function ProfileAudit() {
     [result, currentCardPerson],
   );
 
-  // Authenticated-but-not-Pro: render an upsell. Anonymous: AuthOverlay.
+  // Authenticated-but-not-Pro: render an upsell. Anonymous users see the
+  // run bar like everyone else; the overlay only fires when they click Run.
   // Self-gating (per the codebase rule) — the page decides what to show
   // based on its own dependencies, no `canAudit` prop drilling required.
   const showProUpsell = isAuthenticated && !subLoading && !isPro;
@@ -178,7 +184,7 @@ export default function ProfileAudit() {
         tier: "pro",
       }}
       authOverlay={{
-        show: !isAuthenticated,
+        show: showAuthOverlay,
         message:
           "Sign in to audit your candidate profile — we'll grade your headline, summary, and recruiter signals, then propose a rewrite.",
       }}

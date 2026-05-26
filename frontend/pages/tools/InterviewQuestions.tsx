@@ -52,6 +52,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import {
@@ -66,6 +67,18 @@ import {
 import { toast } from "sonner";
 
 type SourceMode = "resume" | "job" | "text" | "target-only";
+
+interface InterviewQuestionsDraft {
+  mode: SourceMode;
+  resumeId: string;
+  jobId: string;
+  pastedText: string;
+  pastedKind: "job" | "resume";
+  targetRole: string;
+  seniority: string;
+  style: QuestionStyle;
+  count: number;
+}
 
 export default function InterviewQuestions() {
   const { isAuthenticated, user } = useAuth();
@@ -105,6 +118,23 @@ export default function InterviewQuestions() {
   const [sourceDescription, setSourceDescription] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Snapshot every form field so an anon user who clicks Generate, signs
+  // in, and bounces back to the page lands on the same configuration.
+  const { restored, snapshot, clear } = usePendingToolInput<InterviewQuestionsDraft>();
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    setMode(restored.mode);
+    setResumeId(restored.resumeId);
+    setJobId(restored.jobId);
+    setPastedText(restored.pastedText);
+    setPastedKind(restored.pastedKind);
+    setTargetRole(restored.targetRole);
+    setSeniority(restored.seniority);
+    setStyle(restored.style);
+    setCount(restored.count);
+  }, [restored, isAuthenticated]);
 
   const isRecruiterOrEmployer =
     user?.role === USER_ROLES.RECRUITER ||
@@ -125,6 +155,39 @@ export default function InterviewQuestions() {
 
   async function handleGenerate() {
     setError(null);
+    // Validate inputs up-front so anon users get the same prompts they
+    // would post-login — no point bouncing them through signup just to
+    // discover they need to pick a resume.
+    try {
+      if (mode === "resume" && !resumeId) throw new Error("Pick a resume first");
+      if (mode === "job" && !jobId) throw new Error("Pick a job first");
+      if (mode === "text" && pastedText.trim().length < 20)
+        throw new Error("Paste at least 20 characters of job description or resume text");
+      if (mode === "target-only" && !targetRole.trim())
+        throw new Error("Enter a target role title to generate from");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid input";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!isAuthenticated) {
+      snapshot({
+        mode,
+        resumeId,
+        jobId,
+        pastedText,
+        pastedKind,
+        targetRole,
+        seniority,
+        style,
+        count,
+      });
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setGenerating(true);
     try {
       const payload: Parameters<typeof generateInterviewQuestions>[0] = {
@@ -135,19 +198,12 @@ export default function InterviewQuestions() {
         sourceContext,
       };
       if (mode === "resume") {
-        if (!resumeId) throw new Error("Pick a resume first");
         payload.resumeId = resumeId;
       } else if (mode === "job") {
-        if (!jobId) throw new Error("Pick a job first");
         payload.jobId = jobId;
       } else if (mode === "text") {
-        if (pastedText.trim().length < 20)
-          throw new Error("Paste at least 20 characters of job description or resume text");
         payload.content = pastedText.trim();
         payload.sourceType = pastedKind;
-      } else if (mode === "target-only") {
-        if (!targetRole.trim())
-          throw new Error("Enter a target role title to generate from");
       }
 
       const res = await generateInterviewQuestions(payload);
@@ -157,6 +213,8 @@ export default function InterviewQuestions() {
       setSourceDescription(res.sourceDescription);
       if (res.questions.length === 0) {
         setError("Couldn't generate any questions for that input. Try a different source.");
+      } else {
+        clear();
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not generate questions";
@@ -214,8 +272,9 @@ export default function InterviewQuestions() {
         tier: "free",
       }}
       authOverlay={{
-        show: !isAuthenticated,
-        message: "Sign in to generate skill-tailored interview questions.",
+        show: showAuthOverlay,
+        message:
+          "Sign in to generate skill-tailored interview questions — we'll keep your inputs.",
       }}
       containerClassName="max-w-5xl mx-auto"
     >
@@ -385,7 +444,7 @@ export default function InterviewQuestions() {
             </div>
           </CardContent>
           <CardContent className="pt-0">
-            <Button onClick={handleGenerate} disabled={generating || !isAuthenticated} className="gap-2">
+            <Button onClick={handleGenerate} disabled={generating} className="gap-2">
               {generating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

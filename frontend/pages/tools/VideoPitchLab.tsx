@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { resumeService } from "@/lib/services/resume-service";
 import {
   generatePitchScript,
@@ -55,6 +56,13 @@ import { toast } from "sonner";
 type Length = 30 | 60 | 90;
 type Tone = "casual" | "professional" | "enthusiastic";
 
+interface PitchDraft {
+  length: Length;
+  tone: Tone;
+  resumeId: string;
+  script: string;
+}
+
 export default function VideoPitchLab() {
   const { isAuthenticated } = useAuth();
   const [length, setLength] = useState<Length>(60);
@@ -64,6 +72,21 @@ export default function VideoPitchLab() {
   const [generating, setGenerating] = useState(false);
   const [step, setStep] = useState<"setup" | "record" | "review">("setup");
   const [recording, setRecording] = useState<{ url: string; durationSec: number } | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+  const [authMessage, setAuthMessage] = useState(
+    "Sign in to draft, record, and save your video pitch — we'll keep your script.",
+  );
+
+  const { restored, snapshot, clear } = usePendingToolInput<PitchDraft>();
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    setLength(restored.length);
+    setTone(restored.tone);
+    setResumeId(restored.resumeId);
+    setScript(restored.script);
+  }, [restored, isAuthenticated]);
+
+  const currentDraft = (): PitchDraft => ({ length, tone, resumeId, script });
   // Saved profile pitch URL (#1237). Hydrated from the API on mount so a
   // returning user sees "your current pitch" rather than starting fresh.
   const [savedPitchUrl, setSavedPitchUrl] = useState<string | null>(null);
@@ -90,6 +113,7 @@ export default function VideoPitchLab() {
     try {
       const next = await setPitchProfile(recording.url);
       setSavedPitchUrl(next.videoPitchUrl);
+      clear();
       toast.success("Saved as your profile pitch — recruiters will see it on your profile");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save");
@@ -105,6 +129,14 @@ export default function VideoPitchLab() {
   });
 
   async function handleGenerateScript() {
+    if (!isAuthenticated) {
+      snapshot(currentDraft());
+      setAuthMessage(
+        "Sign in to let AI draft your pitch script — we'll keep the length and tone you picked.",
+      );
+      setShowAuthOverlay(true);
+      return;
+    }
     setGenerating(true);
     try {
       const result = await generatePitchScript({
@@ -118,6 +150,18 @@ export default function VideoPitchLab() {
     } finally {
       setGenerating(false);
     }
+  }
+
+  function handleContinueToRecord() {
+    if (!isAuthenticated) {
+      snapshot(currentDraft());
+      setAuthMessage(
+        "Sign in to record your pitch — we'll keep your script ready to go.",
+      );
+      setShowAuthOverlay(true);
+      return;
+    }
+    setStep("record");
   }
 
   function handleCopyUrl() {
@@ -145,8 +189,8 @@ export default function VideoPitchLab() {
         tier: "free",
       }}
       authOverlay={{
-        show: !isAuthenticated,
-        message: "Sign in to draft, record, and save your video pitch.",
+        show: showAuthOverlay,
+        message: authMessage,
       }}
       containerClassName="max-w-4xl mx-auto"
     >
@@ -219,7 +263,7 @@ export default function VideoPitchLab() {
                 />
                 <div className="flex justify-end">
                   <Button
-                    onClick={() => setStep("record")}
+                    onClick={handleContinueToRecord}
                     disabled={script.trim().length < 20}
                     className="gap-1"
                   >

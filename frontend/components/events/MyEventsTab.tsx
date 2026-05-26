@@ -80,7 +80,7 @@ export function MyEventsTab() {
                 : "You don't have any events yet."}
           </p>
           <Button asChild>
-            <Link to="/events">Browse events</Link>
+            <Link to="/tasks?surface=discover">Browse events</Link>
           </Button>
         </div>
       ) : (

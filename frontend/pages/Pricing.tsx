@@ -37,6 +37,9 @@ import {
   Lock,
   Download,
   Mail,
+  Trophy,
+  GraduationCap,
+  MapPin,
 } from "lucide-react";
 import {
   PRO_MONTHLY_PRICE as PRO_MONTHLY_PRICE_DEFAULT,
@@ -54,6 +57,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs, generatePricingSchema } from "@/lib/seo";
 import MarketingFAQ from "@/components/MarketingFAQ";
+import CompetitorComparison from "@/components/CompetitorComparison";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1899,6 +1903,55 @@ export default function Pricing() {
                         </td>
                       </tr>
 
+                      {/* Engagement, Learning & Discovery — modules that
+                          competitors don't ship at all (gamification cashout,
+                          SCORM learning paths, geo-map discovery, per-section
+                          profile gating). These ride on the same Pro seat —
+                          no per-module upcharge. */}
+                      <SectionRow label="Engagement, Learning & Discovery" />
+                      <FeatureRow
+                        icon={Trophy}
+                        label="Gamification — points, streaks, badges"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Trophy}
+                        label="Gift-card cashout (Tremendous) + AI-credit / premium-month redemption"
+                        free="Earn points only"
+                        pro="Full cashout + redemption"
+                      />
+                      <FeatureRow
+                        icon={GraduationCap}
+                        label="Learning Paths — DAG-structured courses with prerequisites"
+                        free="Browse + enroll"
+                        pro="Authoring + assign to team"
+                      />
+                      <FeatureRow
+                        icon={GraduationCap}
+                        label="SCORM 1.2 player + xAPI LRS"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={GraduationCap}
+                        label="HMAC-signed verifiable certificates"
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={MapPin}
+                        label="Geo-tagged search + /map discovery (jobs, events, members)"
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Lock}
+                        label="Per-section profile visibility (10 gateable sections on /people/[id])"
+                        free
+                        pro
+                      />
+
                       {/* Support & Security */}
                       <tr className="bg-muted/20">
                         <td
@@ -2032,6 +2085,17 @@ export default function Pricing() {
                   </table>
                 </div>
               </Card>
+            </div>
+
+            {/* How Hired.Video compares to LOXO / LinkedIn / Greenhouse /
+                Bullhorn / HireVue / VidCruiter. Same component the dedicated
+                /vs-competitors page renders — single source of truth so the
+                two pages can't drift on vendor pricing or feature claims. */}
+            <div className="mb-16">
+              <CompetitorComparison
+                eyebrow="vs. the market"
+                showSectionHeader
+              />
             </div>
 
             {/* FAQ & Support Section */}

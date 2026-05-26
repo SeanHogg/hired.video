@@ -69,8 +69,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
-import { MyEventsTab } from "@/components/events/MyEventsTab";
-import { CoffeeTab } from "@/components/events/CoffeeTab";
+import { MyEventsAndCoffee } from "@/components/events/MyEventsAndCoffee";
+import { EventDiscoveryPanel } from "@/components/events/EventDiscoveryPanel";
+import MarketingFAQ from "@/components/MarketingFAQ";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
   Sheet,
@@ -131,22 +133,56 @@ const priorityColors = {
   high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
+// Events FAQ lifted from the deleted /events page. Lives on the Discover
+// surface so the marketing copy stays public (events are public per the
+// consolidation decision — see [project_gap_register]).
+const EVENTS_FAQ = [
+  {
+    question: "Who can host an event?",
+    answer:
+      "Any hired.video member can host. There's no upgrade — create unlimited free events, invite your network, and accept RSVPs.",
+  },
+  {
+    question: "Is hosting events free?",
+    answer:
+      "Yes. Public RSVPs, waitlists, capacity, co-hosts, attendee matchmaking, reminder cadence — all included. Paid ticketing is on the roadmap; we'll never gate the free hosting flow behind a subscription.",
+  },
+  {
+    question: "What kinds of events work best?",
+    answer:
+      "In-person meetups, online workshops, panels, career fairs, study groups, hackathons, demos, mixers, talks. Every event automatically gets the AI matchmaking layer so attendees see the people they should meet.",
+  },
+  {
+    question: "How does attendee matchmaking work?",
+    answer:
+      "Default-on. We use the skill graph + skill evidence from members' profiles to suggest who each attendee should meet, ranked 0-100 with a one-line reason. Hosts can disable it per event.",
+  },
+];
+
 export default function Tasks() {
   const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
 
+  useSEO("/tasks");
+  useBreadcrumbs([{ name: "Tasks & Events", url: "/tasks" }]);
+
   // View axis lives in the URL so the page-level breadcrumb tabs are
-  // shareable + back-button friendly. Default is Kanban (preserves the
-  // pre-2026-05-04 default). Legacy `?view=` is honored alongside `?tab=`.
+  // shareable + back-button friendly. `?tab=` controls the Tasks-view
+  // axis (kanban/calendar/table); `?view=` is reserved for the Discover
+  // sub-view (grid/map) so the two never collide.
   type TaskView = "calendar" | "table" | "kanban";
-  type TaskSurface = "tasks" | "events" | "coffee";
+  // Top-level surface tab — Tasks / My events & coffee / Discover.
+  // Discover is the unauthenticated default so /tasks doubles as the
+  // public marketing landing for the (now-redirected) /events and /map.
+  type TaskSurface = "tasks" | "my-events" | "discover";
   const [searchParams, setSearchParams] = useSearchParams();
-  // Top-level surface tab — Tasks / Events / Coffee — drives which inner
-  // panel renders. Default 'tasks' preserves the legacy /tasks URL.
   const surfaceParam = searchParams.get("surface");
-  const currentSurface: TaskSurface =
-    surfaceParam === "events" ? "events" :
-    surfaceParam === "coffee" ? "coffee" :
-    "tasks";
+  const surfaceFromUrl: TaskSurface | null =
+    surfaceParam === "my-events" ? "my-events" :
+    surfaceParam === "discover" ? "discover" :
+    surfaceParam === "tasks" ? "tasks" :
+    null;
+  const defaultSurface: TaskSurface = isAuthenticated ? "tasks" : "discover";
+  const currentSurface: TaskSurface = surfaceFromUrl ?? defaultSurface;
   const viewParam = currentSurface === "tasks" ? (searchParams.get("tab") ?? searchParams.get("view")) : null;
   const currentView: TaskView =
     viewParam === "calendar" ? "calendar" :
@@ -154,12 +190,45 @@ export default function Tasks() {
     "kanban";
   const switchSurface = (next: TaskSurface) => {
     const sp = new URLSearchParams(searchParams);
-    if (next === "tasks") sp.delete("surface");
+    if (next === defaultSurface) sp.delete("surface");
     else sp.set("surface", next);
     sp.delete("tab");
     sp.delete("view");
     setSearchParams(sp, { replace: false });
   };
+
+  // Top strip — rendered above every surface, both authed and unauthed,
+  // so the public Discover landing still exposes the route into the
+  // app. Defined here (not inside conditional branches) because both
+  // the unauth marketing block AND the authed branches consume it.
+  const SurfaceTabsStrip = (
+    <div className="border-b">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 flex gap-1 -mb-px">
+        {(["tasks", "my-events", "discover"] as TaskSurface[]).map((key) => {
+          const active = currentSurface === key;
+          const label =
+            key === "tasks" ? "Tasks" :
+            key === "my-events" ? "My events & coffee" :
+            "Discover";
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => switchSurface(key)}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                active
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const [calendarView, setCalendarView] = useState<"week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
@@ -662,10 +731,30 @@ export default function Tasks() {
     return grid;
   };
 
-  // If user is not authenticated, show marketing page
+  // Discover surface is fully public — render it before the auth gate
+  // so logged-out visitors land on the events grid + map + FAQ that
+  // /events and /map used to host. Placed AFTER all hooks (state,
+  // effects) above so React's hook-order invariant holds.
+  if (currentSurface === "discover") {
+    return (
+      <AppShell bgClassName="bg-background">
+        {SurfaceTabsStrip}
+        <div className="p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-12">
+            <EventDiscoveryPanel />
+            <MarketingFAQ items={EVENTS_FAQ} schemaId="events" />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // If user is not authenticated, show marketing page (with the surface
+  // tab strip so visitors can flip into the public Discover surface).
   if (!isAuthenticated || !user) {
     return (
       <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+        {SurfaceTabsStrip}
         <div>
           <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero */}
@@ -1075,58 +1164,16 @@ export default function Tasks() {
     { key: "kanban",   label: t("labels.kanbanView"),         icon: List,         to: "/tasks" },
   ];
 
-  // ─── Top-level surface tab strip ───────────────────────────────────────
-  // Renders above the page content, switching between Tasks (existing
-  // kanban/table/calendar UI), Events (hosting + attending), and Coffee
-  // (incoming + outgoing "Grab a coffee" requests). Per the user's
-  // [Tasks layout] decision, this is one URL with internal tabs, not
-  // separate pages.
-  const SurfaceTabsStrip = (
-    <div className="border-b">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 flex gap-1 -mb-px">
-        {(["tasks", "events", "coffee"] as TaskSurface[]).map((key) => {
-          const active = currentSurface === key;
-          const label = key === "tasks" ? "Tasks" : key === "events" ? "Events" : "Coffee";
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => switchSurface(key)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                active
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  // Non-tasks surfaces render their own component bodies — short-circuit
-  // before the heavy tasks-tab JSX.
-  if (currentSurface === "events") {
+  // My events + coffee surface — short-circuits before the heavy
+  // tasks-tab JSX. (The Discover surface is handled earlier, above the
+  // auth gate, since events are public.)
+  if (currentSurface === "my-events") {
     return (
       <AppShell bgClassName="bg-background">
         {SurfaceTabsStrip}
         <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            <MyEventsTab />
-          </div>
-        </div>
-      </AppShell>
-    );
-  }
-  if (currentSurface === "coffee") {
-    return (
-      <AppShell bgClassName="bg-background">
-        {SurfaceTabsStrip}
-        <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <CoffeeTab viewerUserId={user.id} />
+            <MyEventsAndCoffee viewerUserId={user.id} />
           </div>
         </div>
       </AppShell>

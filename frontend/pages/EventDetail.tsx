@@ -32,10 +32,10 @@ export default function EventDetail() {
   useBreadcrumbs(
     event
       ? [
-          { name: "Events", url: "/events" },
+          { name: "Events", url: "/tasks?surface=discover" },
           { name: event.title, url: `/events/${event.slug ?? event.id}` },
         ]
-      : [{ name: "Events", url: "/events" }],
+      : [{ name: "Events", url: "/tasks?surface=discover" }],
   );
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function EventDetail() {
             This event may have been removed or you don't have access.
           </p>
           <Button asChild>
-            <Link to="/events">Browse events</Link>
+            <Link to="/tasks?surface=discover">Browse events</Link>
           </Button>
         </main>
       </AppShell>

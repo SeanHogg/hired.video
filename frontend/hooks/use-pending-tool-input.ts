@@ -8,7 +8,7 @@ import { useLocation } from "react-router-dom";
  * Flow:
  *   1. User fills a tool's form while signed out.
  *   2. Tool calls `snapshot(state)` the moment it decides to show the
- *      overlay — the state is written to sessionStorage under a key
+ *      overlay — the state is written to localStorage under a key
  *      derived from the current pathname.
  *   3. AuthOverlay links to `/login?redirect=<pathname>`. After
  *      authentication, Login navigates back.
@@ -17,8 +17,9 @@ import { useLocation } from "react-router-dom";
  *   5. After successful API submission the tool calls `clear()` so the
  *      snapshot is not replayed on subsequent visits.
  *
- * sessionStorage (not localStorage) is intentional — the recovery window
- * is the current tab session, after which the snapshot expires naturally.
+ * localStorage (not sessionStorage) so the snapshot survives a magic-link
+ * or OAuth callback that lands in a new tab. The 1-hour TTL below keeps
+ * stale drafts from being replayed days later.
  */
 export interface UsePendingToolInputOptions {
   /**
@@ -50,19 +51,19 @@ export function usePendingToolInput<T>(options: UsePendingToolInputOptions = {})
     if (!autoRestore || hasRestoredRef.current) return;
     if (typeof window === "undefined") return;
     try {
-      const raw = window.sessionStorage.getItem(storageKey(ns));
+      const raw = window.localStorage.getItem(storageKey(ns));
       if (!raw) return;
       const parsed = JSON.parse(raw) as { value: T; savedAt: number };
       // Drop snapshots older than 1 hour — the user has clearly moved on.
       if (Date.now() - parsed.savedAt > 60 * 60 * 1000) {
-        window.sessionStorage.removeItem(storageKey(ns));
+        window.localStorage.removeItem(storageKey(ns));
         return;
       }
       setRestored(parsed.value);
       hasRestoredRef.current = true;
     } catch {
       // Malformed snapshot — discard silently.
-      try { window.sessionStorage.removeItem(storageKey(ns)); } catch { /* ignore */ }
+      try { window.localStorage.removeItem(storageKey(ns)); } catch { /* ignore */ }
     }
   }, [ns, autoRestore]);
 
@@ -70,7 +71,7 @@ export function usePendingToolInput<T>(options: UsePendingToolInputOptions = {})
     (value: T) => {
       if (typeof window === "undefined") return;
       try {
-        window.sessionStorage.setItem(
+        window.localStorage.setItem(
           storageKey(ns),
           JSON.stringify({ value, savedAt: Date.now() }),
         );
@@ -83,7 +84,7 @@ export function usePendingToolInput<T>(options: UsePendingToolInputOptions = {})
 
   const clear = useCallback(() => {
     if (typeof window === "undefined") return;
-    try { window.sessionStorage.removeItem(storageKey(ns)); } catch { /* ignore */ }
+    try { window.localStorage.removeItem(storageKey(ns)); } catch { /* ignore */ }
     setRestored(null);
     hasRestoredRef.current = false;
   }, [ns]);

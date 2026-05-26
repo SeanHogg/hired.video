@@ -53,6 +53,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import {
   archiveQuestionSet,
   createQuestionSet,
@@ -62,6 +63,17 @@ import {
 } from "@/lib/services/interview-question-sets-service";
 import type { GeneratedQuestion } from "@/lib/services/interview-assignments-service";
 import { toast } from "sonner";
+
+interface TemplateDraft {
+  title: string;
+  description: string;
+  targetRole: string;
+  style: "mixed" | "behavioral" | "technical";
+  prepTimeSec: number;
+  maxRetakes: number;
+  proctoringOn: boolean;
+  questions: GeneratedQuestion[];
+}
 
 export default function InterviewTemplates() {
   const { isAuthenticated, user } = useAuth();
@@ -80,6 +92,23 @@ export default function InterviewTemplates() {
 
   const [editing, setEditing] = useState<InterviewQuestionSet | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+  const [authMessage, setAuthMessage] = useState(
+    "Sign in as a recruiter or employer to save this template.",
+  );
+
+  // Preserve an in-progress draft across the anonymous → authenticated
+  // round-trip so users return to the same editor with everything they
+  // typed still in place.
+  const { restored, snapshot, clear } = usePendingToolInput<TemplateDraft>();
+  const [restoredDraft, setRestoredDraft] = useState<TemplateDraft | null>(null);
+
+  useEffect(() => {
+    if (!restored) return;
+    if (!isAuthenticated || !isRecruiterOrEmployer) return;
+    setRestoredDraft(restored);
+    setCreating(true);
+  }, [restored, isAuthenticated, isRecruiterOrEmployer]);
 
   const archiveMut = useMutation({
     mutationFn: (id: string) => archiveQuestionSet(id),
@@ -89,6 +118,16 @@ export default function InterviewTemplates() {
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Could not archive"),
   });
+
+  const handleUnauthSave = (draft: TemplateDraft) => {
+    snapshot(draft);
+    setAuthMessage(
+      !isAuthenticated
+        ? "Sign in to save this template — we'll keep everything you've entered."
+        : "Switch to a recruiter or employer account to save interview templates.",
+    );
+    setShowAuthOverlay(true);
+  };
 
   return (
     <ToolShell
@@ -102,8 +141,8 @@ export default function InterviewTemplates() {
         tier: "free",
       }}
       authOverlay={{
-        show: !isAuthenticated || !isRecruiterOrEmployer,
-        message: "Sign in as a recruiter or employer to build interview templates.",
+        show: showAuthOverlay,
+        message: authMessage,
       }}
       containerClassName="max-w-5xl mx-auto"
     >
@@ -201,11 +240,17 @@ export default function InterviewTemplates() {
         <TemplateEditorDialog
           open={true}
           initial={editing}
+          initialDraft={editing ? null : restoredDraft}
+          canSave={isAuthenticated && isRecruiterOrEmployer}
+          onUnauthSave={handleUnauthSave}
           onClose={() => {
             setEditing(null);
             setCreating(false);
+            setRestoredDraft(null);
           }}
           onSaved={() => {
+            clear();
+            setRestoredDraft(null);
             void qc.invalidateQueries({ queryKey: ["interview-question-sets"] });
           }}
         />
@@ -219,21 +264,37 @@ export default function InterviewTemplates() {
 interface EditorProps {
   open: boolean;
   initial: InterviewQuestionSet | null;
+  /** Snapshot restored from local storage after a login round-trip. Only
+   *  consulted when creating a new template (no `initial`). */
+  initialDraft?: TemplateDraft | null;
+  /** When false, `handleSave` skips the API call and routes to
+   *  `onUnauthSave` so the parent can snapshot + show the auth overlay. */
+  canSave: boolean;
+  onUnauthSave: (draft: TemplateDraft) => void;
   onClose: () => void;
   onSaved: () => void;
 }
 
-function TemplateEditorDialog({ open, initial, onClose, onSaved }: EditorProps) {
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
-  const [targetRole, setTargetRole] = useState(initial?.targetRole ?? "");
+function TemplateEditorDialog({
+  open,
+  initial,
+  initialDraft,
+  canSave,
+  onUnauthSave,
+  onClose,
+  onSaved,
+}: EditorProps) {
+  const seed = initial ?? initialDraft ?? null;
+  const [title, setTitle] = useState(seed?.title ?? "");
+  const [description, setDescription] = useState(seed?.description ?? "");
+  const [targetRole, setTargetRole] = useState(seed?.targetRole ?? "");
   const [style, setStyle] = useState<"mixed" | "behavioral" | "technical">(
-    (initial?.style as "mixed" | "behavioral" | "technical") ?? "mixed",
+    (seed?.style as "mixed" | "behavioral" | "technical") ?? "mixed",
   );
-  const [prepTimeSec, setPrepTimeSec] = useState(initial?.prepTimeSec ?? 10);
-  const [maxRetakes, setMaxRetakes] = useState(initial?.maxRetakes ?? 1);
-  const [proctoringOn, setProctoringOn] = useState(initial?.proctoringOn ?? true);
-  const [questions, setQuestions] = useState<GeneratedQuestion[]>(initial?.questions ?? []);
+  const [prepTimeSec, setPrepTimeSec] = useState(seed?.prepTimeSec ?? 10);
+  const [maxRetakes, setMaxRetakes] = useState(seed?.maxRetakes ?? 1);
+  const [proctoringOn, setProctoringOn] = useState(seed?.proctoringOn ?? true);
+  const [questions, setQuestions] = useState<GeneratedQuestion[]>(seed?.questions ?? []);
   const [draft, setDraft] = useState<{ text: string; maxDurationSec: number }>({
     text: "",
     maxDurationSec: 120,
@@ -277,17 +338,26 @@ function TemplateEditorDialog({ open, initial, onClose, onSaved }: EditorProps) 
       toast.error("Add at least one question");
       return;
     }
+    const draftPayload: TemplateDraft = {
+      title: title.trim(),
+      description: description.trim(),
+      targetRole: targetRole.trim(),
+      style,
+      questions,
+      prepTimeSec,
+      maxRetakes,
+      proctoringOn,
+    };
+    if (!canSave) {
+      onUnauthSave(draftPayload);
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        targetRole: targetRole.trim() || undefined,
-        style,
-        questions,
-        prepTimeSec,
-        maxRetakes,
-        proctoringOn,
+        ...draftPayload,
+        description: draftPayload.description || undefined,
+        targetRole: draftPayload.targetRole || undefined,
       };
       if (initial) {
         await updateQuestionSet(initial.id, payload);

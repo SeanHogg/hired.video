@@ -194,11 +194,6 @@ export default function VendorSync() {
         description:
           "Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back.",
       }}
-      authOverlay={{
-        show: !isAuthenticated,
-        message:
-          "Sign in to sync your master resume out to LinkedIn, Indeed, Glassdoor, GitHub and more — and pull profile updates back.",
-      }}
       containerClassName="max-w-7xl mx-auto space-y-6"
     >
         {/* Extension highlight */}

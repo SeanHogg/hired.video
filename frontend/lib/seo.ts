@@ -195,13 +195,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
-  "/events": {
-    title: "Career Networking Events — Meetups, Workshops, Coffee Chats | hired.video",
-    description:
-      "Find in-person and remote career events near you — meetups, workshops, panels, coffee chats. Free RSVP, AI-matched introductions to the people you should meet. Hosting is free for everyone.",
-    keywords:
-      "career events, networking events, professional meetups, career workshops, in person networking, coffee chats, career conferences",
-  },
+  // `/events` (discovery index) and `/map` were folded into `/tasks`
+  // (see Tasks.tsx Discover surface). The legacy URLs `<Navigate>`
+  // redirect to /tasks?surface=discover; SEO for the public discovery
+  // landing now lives on the `/tasks` entry below. Per-event surfaces
+  // (`/events/new`, `/events/:idOrSlug`, `/events/:idOrSlug/manage`)
+  // keep their own SEO since they're still independent routes.
   "/events/new": {
     title: "Host an Event — Free Networking Events | hired.video",
     description:
@@ -214,12 +213,6 @@ export const PAGE_SEO: Record<string, SEOData> = {
     description:
       "Event details, RSVP, and attendee list on hired.video — the career network with AI-matched introductions for every event.",
     keywords: "event, networking, RSVP, attendees, professional event",
-  },
-  "/map": {
-    title: "Map — Events & Coffee Near You | hired.video",
-    description:
-      "Discover career events and members open to coffee in your area on the interactive map.",
-    keywords: "career map, networking near me, coffee chats near me, events near me",
   },
   "/events/:idOrSlug/manage": {
     title: "Manage event — hired.video",
@@ -542,11 +535,15 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tasks": {
-    title: "Task Management — hired.video",
+    // `/tasks` hosts three surfaces — Tasks, My events & coffee, and
+    // Discover (events grid + map). Discover is the unauth default, so
+    // SEO has to read as a public event-discovery landing first, with
+    // task-management as a secondary signal.
+    title: "Career Events, Map & Task Hub — hired.video",
     description:
-      "Organize your job search and career development with powerful task management tools. Stay on top of applications and follow-ups.",
+      "Find networking events near you on the map, RSVP to meetups and workshops with AI-matched introductions, and organize your job search with built-in task management. Hosting events is free for everyone.",
     keywords:
-      "task management, job search organization, career planning, productivity tools",
+      "career events, networking events, events near me, career map, professional meetups, coffee chats, AI matchmaking, task management, job search organization, productivity tools",
   },
   "/outreach": {
     title: "Professional Outreach — hired.video",
@@ -1088,6 +1085,9 @@ export function canonicalizePath(pathname: string): string {
     "/resume-roast": "/tools/resume-roast",
     "/privacy": "/privacy-policy",
     "/terms": "/terms-of-service",
+    // Legacy discovery URLs consolidated into /tasks Discover surface.
+    "/events": "/tasks",
+    "/map": "/tasks",
   };
 
   if (aliasMap[p]) return aliasMap[p];

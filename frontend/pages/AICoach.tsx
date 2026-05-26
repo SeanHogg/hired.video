@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useAI } from "@/lib/ai-context";
 import { useSEO } from "@/lib/seo";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import AIChatPanel from "@/components/AIChatPanel";
@@ -18,26 +19,38 @@ export default function AICoach() {
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { openAIChat, openAIWithMessage, isAIChatOpen } = useAI();
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Snapshot the prompt the visitor clicked so it auto-sends after login.
+  const { restored, snapshot, clear } = usePendingToolInput<{ prompt: string }>();
 
   // SEO for AI Coach page
   useSEO(location.pathname);
 
-  // Auto-open AI chat when page loads; pre-fill from ?q= param if present
+  // Auto-open AI chat when page loads; pre-fill from ?q= param if present,
+  // or from a saved prompt the visitor picked before signing in.
   useEffect(() => {
-    if (isAuthenticated && !isAIChatOpen) {
-      const initialQuery = searchParams.get("q");
-      setTimeout(() => {
-        if (initialQuery) {
-          openAIWithMessage(initialQuery);
-        } else {
-          openAIChat();
-        }
-      }, 500);
-    }
+    if (!isAuthenticated || isAIChatOpen) return;
+    const initialQuery = restored?.prompt ?? searchParams.get("q");
+    setTimeout(() => {
+      if (initialQuery) {
+        openAIWithMessage(initialQuery);
+        if (restored?.prompt) clear();
+      } else {
+        openAIChat();
+      }
+    }, 500);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  const showAuthOverlay = !isAuthenticated;
+  const handlePromptClick = (prompt: string) => {
+    if (!isAuthenticated) {
+      snapshot({ prompt });
+      setShowAuthOverlay(true);
+      return;
+    }
+    openAIWithMessage(prompt);
+  };
 
   const profileAuditTool = getCatalogTool("profile-audit");
   const interviewQuestionsTool = getCatalogTool("interview-questions");
@@ -183,35 +196,35 @@ export default function AICoach() {
               })}
             </div>
 
-            {/* Quick Start Section */}
-            {isAuthenticated && (
-              <Card className="mb-8">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Quick Start Prompts
-                  </CardTitle>
-                  <CardDescription>
-                    Click any prompt below to start a conversation with your AI Coach
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {quickStartPrompts.map((prompt, index) => (
-                      <Button
-                        key={index}
-                        variant="outline"
-                        className="text-left justify-start h-auto p-4 whitespace-normal"
-                        onClick={() => openAIWithMessage(prompt)}
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm">{prompt}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Quick Start Section — visible to anon users so they can pick
+                a prompt before signing in; clicking gates and snapshots
+                the prompt so it auto-sends after authentication. */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Quick Start Prompts
+                </CardTitle>
+                <CardDescription>
+                  Click any prompt below to start a conversation with your AI Coach
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {quickStartPrompts.map((prompt, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="text-left justify-start h-auto p-4 whitespace-normal"
+                      onClick={() => handlePromptClick(prompt)}
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm">{prompt}</span>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* How It Works */}
             <Card>

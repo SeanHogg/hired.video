@@ -37,7 +37,7 @@ import type {
 export default function EventNew() {
   useSEO("/events/new");
   useBreadcrumbs([
-    { name: "Events", url: "/events" },
+    { name: "Events", url: "/tasks?surface=discover" },
     { name: "Host an event", url: "/events/new" },
   ]);
 

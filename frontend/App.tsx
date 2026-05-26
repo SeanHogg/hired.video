@@ -133,11 +133,13 @@ const SecuritySessions = lazy(() => import("./pages/SecuritySessions"));
 const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
-const EventsIndex = lazy(() => import("./pages/EventsIndex"));
+// `/events` (discovery index) and `/map` were consolidated into
+// `/tasks` (see Tasks.tsx Discover surface). Sub-pages stay on their
+// own URLs because they're per-event detail surfaces, not the
+// discovery list.
 const EventDetail = lazy(() => import("./pages/EventDetail"));
 const EventNew = lazy(() => import("./pages/EventNew"));
 const EventManage = lazy(() => import("./pages/EventManage"));
-const MapPage = lazy(() => import("./pages/MapPage"));
 const SectorsIndex = lazy(() => import("./pages/SectorsIndex"));
 const SectorLanding = lazy(() => import("./pages/SectorLanding"));
 const ResumeTemplatesGallery = lazy(() => import("./pages/ResumeTemplatesGallery"));
@@ -701,12 +703,15 @@ const App = () => (
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
                       <Route path="/affiliate/dashboard" element={<Navigate to="/services" replace />} />
 
-                      {/* Public events + coffee networking (gap #1240) */}
-                      <Route path="/events" element={<EventsIndex />} />
+                      {/* Public events + coffee networking (gap #1240).
+                          Discovery (`/events`) and map (`/map`) folded
+                          into `/tasks` Discover surface; the per-event
+                          surfaces below keep their own URLs. */}
+                      <Route path="/events" element={<Navigate to="/tasks?surface=discover" replace />} />
                       <Route path="/events/new" element={<EventNew />} />
                       <Route path="/events/:idOrSlug" element={<EventDetail />} />
                       <Route path="/events/:idOrSlug/manage" element={<EventManage />} />
-                      <Route path="/map" element={<MapPage />} />
+                      <Route path="/map" element={<Navigate to="/tasks?surface=discover&view=map" replace />} />
 
                       {/* AI-resilient sector surfaces — see shared/sectors.ts SSoT. */}
                       <Route path="/sectors" element={<SectorsIndex />} />

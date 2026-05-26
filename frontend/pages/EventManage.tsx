@@ -58,11 +58,11 @@ export default function EventManage() {
   useBreadcrumbs(
     event
       ? [
-          { name: "Events", url: "/events" },
+          { name: "Events", url: "/tasks?surface=discover" },
           { name: event.title, url: `/events/${event.slug ?? event.id}` },
           { name: "Manage", url: `/events/${event.slug ?? event.id}/manage` },
         ]
-      : [{ name: "Events", url: "/events" }],
+      : [{ name: "Events", url: "/tasks?surface=discover" }],
   );
 
   async function reload() {
@@ -82,7 +82,7 @@ export default function EventManage() {
       setAnalytics(stats);
       setAttendees(list.attendees ?? []);
     } catch {
-      navigate("/events");
+      navigate("/tasks?surface=discover");
     } finally {
       setLoading(false);
     }
