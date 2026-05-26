@@ -8,6 +8,7 @@ import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-
 import type { CompanyBenefits } from "../db/schema/companies.js";
 import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
 import { slugify } from "../../../shared/slugify.js";
+import { COMPANY_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
@@ -198,7 +199,11 @@ companyRoutes.get("/public", async (c) => {
   // of being created, which is fine — the company already advertised
   // itself via every other surface (their own profile URL, jobs feed).
   withCacheHeaders(c, { scope: "public", maxAge: 60, sMaxAge: 300, swr: 600 });
-  return c.json(success({ items: rows.map(rowToCompanyMeta), total, page, limit, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 }), 200);
+  // `?fields=` projection (gap #1370) — strips description / culture / values
+  // / mission JSONB blobs when the caller only needs the card-view fields.
+  const fields = parseFields(c.req.query("fields"), COMPANY_LIST_FIELDS);
+  const items = projectRows(rows.map(rowToCompanyMeta) as Array<Record<string, unknown>>, fields);
+  return c.json(success({ items, total, page, limit, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 }), 200);
 });
 
 // Trending companies (most followers)

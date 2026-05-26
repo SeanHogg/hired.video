@@ -58,14 +58,13 @@ export function WarmIntroRequestButton({
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [loadingMutuals, setLoadingMutuals] = useState(false);
   const [mutuals, setMutuals] = useState<PersonRef[] | null>(null);
   const [mutualCount, setMutualCount] = useState<number | null>(null);
   const [hideButton, setHideButton] = useState(false);
   const [selectedViaId, setSelectedViaId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<"created" | "deduped" | null>(null);
 
   // Probe for mutuals on mount. If there are none (or the call fails), we
   // self-hide rather than render a CTA that always errors. Unauthed
@@ -112,19 +111,18 @@ export function WarmIntroRequestButton({
     setError(null);
     setBusy(true);
     try {
-      await graphService.requestIntro({
+      const result = await graphService.requestIntro({
         viaUserId: selectedViaId,
         targetUserId,
         message: message.trim(),
       });
-      setSuccess(true);
-      setLoadingMutuals(false);
+      setSuccess(result.created ? "created" : "deduped");
       setTimeout(() => {
         setOpen(false);
-        setSuccess(false);
+        setSuccess(null);
         setMessage("");
         setSelectedViaId(null);
-      }, 1400);
+      }, 1800);
     } catch (err: any) {
       const msg = String(err?.message ?? err ?? "");
       if (msg.includes("403") || msg.toLowerCase().includes("mutual")) {
@@ -164,13 +162,15 @@ export function WarmIntroRequestButton({
 
         {success ? (
           <div className="py-6 text-center text-green-700">
-            Sent. We'll let you know when they reply.
+            {success === "deduped"
+              ? "You already have a pending request with this person — your earlier ask is still waiting on them."
+              : "Sent. We'll let you know when they reply."}
           </div>
         ) : (
           <div className="space-y-4">
             <div>
               <Label className="mb-2 block">Who should we ask?</Label>
-              {loadingMutuals && mutualList.length === 0 ? (
+              {mutuals === null ? (
                 <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Loading mutuals…

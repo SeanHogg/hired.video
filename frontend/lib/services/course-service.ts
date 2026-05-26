@@ -78,6 +78,10 @@ export interface CourseLesson {
   scormManifestUrl: string | null;
   scormEntryUrl: string | null;
   scormVersion: ScormVersion | null;
+  // #1440 — uuid of the R2 prefix under uploads/<userId>/scorm/<pkgId>/
+  // that wraps every file in the SCORM package. Drives prefix cleanup
+  // when the lesson is deleted. Only set for `scorm_package` lessons.
+  scormPkgId: string | null;
   externalUrl: string | null;
   bodyMd: string | null;
   estimatedMinutes: number | null;
@@ -109,6 +113,7 @@ export interface CreateLessonInput {
   scormManifestUrl?: string | null;
   scormEntryUrl?: string | null;
   scormVersion?: ScormVersion | null;
+  scormPkgId?: string | null;
   externalUrl?: string | null;
   bodyMd?: string | null;
   estimatedMinutes?: number;
@@ -122,6 +127,40 @@ export interface CourseDetailsResponse {
   course: Course;
   modules: CourseModule[];
   lessons: CourseLesson[];
+}
+
+export type LessonProgressStatus = "not_started" | "in_progress" | "passed" | "failed";
+
+export interface LessonProgress {
+  status: LessonProgressStatus;
+  scoreRaw?: number;
+  scoreMax?: number;
+  timeSpentSec?: number;
+  lastSeenAt?: string;
+}
+
+export interface CourseEnrollment {
+  id: string;
+  courseId: string;
+  userId: string;
+  enrolledAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  progress: Record<string, LessonProgress>;
+  finalScorePct: number | null;
+  passed: boolean;
+}
+
+export interface CourseLearnerContent {
+  enrollment: CourseEnrollment;
+  course: Course;
+  modules: CourseModule[];
+  lessons: CourseLesson[];
+}
+
+export interface EnrollmentRow {
+  enrollment: CourseEnrollment;
+  course: Course;
 }
 
 export interface PublicCourseCard {
@@ -234,5 +273,41 @@ export const courseService = {
 
   async removeLesson(lessonId: string): Promise<void> {
     await apiClient.delete(`/api/courses/lessons/${lessonId}`);
+  },
+
+  // ── Learner-side ────────────────────────────────────────────────────
+
+  async enroll(courseId: string): Promise<CourseEnrollment> {
+    const res = await apiClient.post<CourseEnrollment>(`/api/courses/${courseId}/enroll`, {});
+    return res.data;
+  },
+
+  async listMyEnrollments(): Promise<EnrollmentRow[]> {
+    const res = await apiClient.get<EnrollmentRow[]>(`/api/courses/me/enrollments`);
+    return res.data ?? [];
+  },
+
+  async getLearnerContent(enrollmentId: string): Promise<CourseLearnerContent> {
+    const res = await apiClient.get<CourseLearnerContent>(
+      `/api/courses/enrollments/${enrollmentId}/content`,
+    );
+    return res.data;
+  },
+
+  async patchLessonProgress(
+    enrollmentId: string,
+    body: {
+      lessonId: string;
+      status: LessonProgressStatus;
+      scoreRaw?: number;
+      scoreMax?: number;
+      timeSpentSec?: number;
+    },
+  ): Promise<CourseEnrollment> {
+    const res = await apiClient.patch<CourseEnrollment>(
+      `/api/courses/enrollments/${enrollmentId}/progress`,
+      body,
+    );
+    return res.data;
   },
 };

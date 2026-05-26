@@ -27,6 +27,9 @@ const {
   hiringDecisions,
   competencies,
   competencyLevels,
+  courseCertificates,
+  interviewStageQuestions,
+  takeHomeAssignments,
 } = schema;
 
 export type DbLike = any;
@@ -45,6 +48,24 @@ export type ScorecardSubmissionRatingRow = typeof scorecardSubmissionRatings.$in
 export type HiringDecisionRow = typeof hiringDecisions.$inferSelect;
 export type CompetencyRow = typeof competencies.$inferSelect;
 export type CompetencyLevelRow = typeof competencyLevels.$inferSelect;
+export type StageQuestionRow = typeof interviewStageQuestions.$inferSelect;
+export type TakeHomeAssignmentRow = typeof takeHomeAssignments.$inferSelect;
+
+export interface NewStageQuestion {
+  kitStageId: string;
+  competencyId?: string | null;
+  prompt: string;
+  difficulty?: string | null;
+  expectedAnswer?: string;
+  displayOrder?: number;
+}
+
+export interface NewTakeHomeAssignment {
+  kitStageId: string;
+  prompt: string;
+  deliveryFormat?: string;
+  dueInHours?: number;
+}
 
 export interface NewCompetency {
   companyId: string;
@@ -106,6 +127,8 @@ export interface NewScorecardTemplate {
   ratingScale?: string;
   roleFamily?: string | null;
   isArchived?: boolean;
+  /** Migration 0134 / gap #1384. */
+  requiredCertificationCourseId?: string | null;
 }
 
 export interface NewScorecardAttribute {
@@ -186,6 +209,7 @@ export interface UpdateTemplatePatch {
   ratingScale?: string;
   roleFamily?: string | null;
   isArchived?: boolean;
+  requiredCertificationCourseId?: string | null;
 }
 
 export interface UpdateAttributePatch {
@@ -306,6 +330,20 @@ export interface IScorecardsRepository {
     evaluatorUserId: string,
     now: Date,
   ): Promise<InterviewerReliability>;
+  /** Cert gate (#1384). True iff the user holds an active, non-revoked
+   *  certificate for the given course AND it has not expired. */
+  hasActiveCertification(userId: string, courseId: string, now: Date): Promise<boolean>;
+
+  // Stage questions (#1390)
+  findQuestionsForStage(kitStageId: string): Promise<StageQuestionRow[]>;
+  insertStageQuestion(input: NewStageQuestion): Promise<StageQuestionRow>;
+  deleteStageQuestion(id: string): Promise<void>;
+
+  // Take-home assignments (#1386)
+  findTakeHomeForStage(kitStageId: string): Promise<TakeHomeAssignmentRow | null>;
+  upsertTakeHomeAssignment(
+    input: NewTakeHomeAssignment,
+  ): Promise<TakeHomeAssignmentRow>;
 }
 
 export class ScorecardsRepository implements IScorecardsRepository {
@@ -743,6 +781,91 @@ export class ScorecardsRepository implements IScorecardsRepository {
         remindedAt: r.remindedAt,
         escalatedAt: r.escalatedAt,
       }));
+  }
+
+  // ─── Stage questions (#1390) ──────────────────────────────────────────────
+
+  async findQuestionsForStage(kitStageId: string): Promise<StageQuestionRow[]> {
+    return (await this.db
+      .select()
+      .from(interviewStageQuestions)
+      .where(eq(interviewStageQuestions.kitStageId, kitStageId))
+      .orderBy(asc(interviewStageQuestions.displayOrder))) as StageQuestionRow[];
+  }
+
+  async insertStageQuestion(input: NewStageQuestion): Promise<StageQuestionRow> {
+    const [row] = await this.db
+      .insert(interviewStageQuestions)
+      .values(input as any)
+      .returning();
+    return row as StageQuestionRow;
+  }
+
+  async deleteStageQuestion(id: string): Promise<void> {
+    await this.db
+      .delete(interviewStageQuestions)
+      .where(eq(interviewStageQuestions.id, id));
+  }
+
+  // ─── Take-home assignments (#1386) ────────────────────────────────────────
+
+  async findTakeHomeForStage(
+    kitStageId: string,
+  ): Promise<TakeHomeAssignmentRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(takeHomeAssignments)
+      .where(eq(takeHomeAssignments.kitStageId, kitStageId))
+      .limit(1);
+    return (row as TakeHomeAssignmentRow) ?? null;
+  }
+
+  async upsertTakeHomeAssignment(
+    input: NewTakeHomeAssignment,
+  ): Promise<TakeHomeAssignmentRow> {
+    const existing = await this.findTakeHomeForStage(input.kitStageId);
+    if (existing) {
+      const [row] = await this.db
+        .update(takeHomeAssignments)
+        .set({
+          prompt: input.prompt,
+          deliveryFormat: input.deliveryFormat ?? existing.deliveryFormat,
+          dueInHours: input.dueInHours ?? existing.dueInHours,
+          updatedAt: this.now(),
+        } as any)
+        .where(eq(takeHomeAssignments.id, existing.id))
+        .returning();
+      return row as TakeHomeAssignmentRow;
+    }
+    const [row] = await this.db
+      .insert(takeHomeAssignments)
+      .values(input as any)
+      .returning();
+    return row as TakeHomeAssignmentRow;
+  }
+
+  async hasActiveCertification(
+    userId: string,
+    courseId: string,
+    now: Date,
+  ): Promise<boolean> {
+    const rows = (await this.db
+      .select()
+      .from(courseCertificates)
+      .where(
+        and(
+          eq(courseCertificates.userId, userId),
+          eq(courseCertificates.courseId, courseId),
+        ),
+      )) as Array<{
+      revokedAt: Date | null;
+      expiresAt: Date | null;
+    }>;
+    return rows.some(
+      (r) =>
+        r.revokedAt == null &&
+        (r.expiresAt == null || new Date(r.expiresAt) > now),
+    );
   }
 
   async findReliabilityForUser(

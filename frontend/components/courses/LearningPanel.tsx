@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
-import { GraduationCap, Loader2, ArrowRight, Plus, Video } from "lucide-react";
+import { GraduationCap, Loader2, ArrowRight, Plus, Video, Play } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import CourseMarketplaceCard, {
   type CourseMarketplaceItem,
 } from "@/components/CourseMarketplaceCard";
-import { courseService, type PublicCourseCard } from "@/lib/services/course-service";
+import {
+  courseService,
+  type EnrollmentRow,
+  type PublicCourseCard,
+} from "@/lib/services/course-service";
+import { useAuth } from "@/lib/auth";
 
 interface LearningPanelProps {
   /** Cap on how many courses to fetch. Default 50 matches the legacy
@@ -28,8 +34,10 @@ interface LearningPanelProps {
  * fetch path is `GET /api/courses/public` (already DI-refactored).
  */
 export default function LearningPanel({ limit = 50, hideIntro = false }: LearningPanelProps = {}) {
+  const { isAuthenticated } = useAuth();
   const [items, setItems] = useState<PublicCourseCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +57,22 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
       cancelled = true;
     };
   }, [limit]);
+
+  // Authed users see a "Continue learning" rail across the top with every
+  // course they've enrolled in. Self-fetches; unauth viewers skip.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    courseService
+      .listMyEnrollments()
+      .then((rows) => {
+        if (!cancelled) setEnrollments(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   return (
     <div>
@@ -83,6 +107,13 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
             </Link>
           </div>
         </div>
+      )}
+
+      {/* "Continue learning" rail — only renders when the authed user
+          has at least one enrollment. Shared component decides its own
+          visibility (returns null when empty) per the DRY rule. */}
+      {enrollments.length > 0 && (
+        <ContinueLearningRail enrollments={enrollments} />
       )}
 
       {loading ? (
@@ -124,5 +155,68 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
         </div>
       )}
     </div>
+  );
+}
+
+/** Per-enrollment "Continue learning" card. The progress bar is derived
+ *  from `enrollment.passed` + the enrollment's `progress` JSONB (count
+ *  of passed lessons over total — we don't have total here, so we show a
+ *  100/0 bar for passed/in-progress; a future iteration can compute the
+ *  real percentage if we add `progressPct` to the listMyEnrollments
+ *  response). */
+function ContinueLearningRail({ enrollments }: { enrollments: EnrollmentRow[] }) {
+  const incomplete = enrollments.filter((r) => !r.enrollment.passed);
+  const completed = enrollments.filter((r) => r.enrollment.passed);
+  return (
+    <div className="mb-8 space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Continue learning
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {incomplete.map((r) => (
+          <EnrollmentCard key={r.enrollment.id} row={r} />
+        ))}
+        {completed.map((r) => (
+          <EnrollmentCard key={r.enrollment.id} row={r} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EnrollmentCard({ row }: { row: EnrollmentRow }) {
+  const { enrollment, course } = row;
+  const passed = enrollment.passed;
+  const passedLessons = Object.values(enrollment.progress ?? {}).filter((p) => p?.status === "passed").length;
+  // We don't know the total lesson count here; fall back to passed/in-progress signal.
+  const inProgress = Object.values(enrollment.progress ?? {}).filter((p) => p?.status === "in_progress").length;
+  return (
+    <Card className="hover:border-primary/40 transition-colors">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h4 className="font-semibold text-sm truncate">{course.title}</h4>
+            {course.summary && (
+              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{course.summary}</p>
+            )}
+          </div>
+          <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {passed
+            ? "Completed"
+            : passedLessons + inProgress > 0
+              ? `${passedLessons} passed · ${inProgress} in progress`
+              : "Not started"}
+        </div>
+        <Progress value={passed ? 100 : passedLessons + inProgress > 0 ? 25 : 0} className="h-1.5" />
+        <Link to={`/learn/${enrollment.id}`}>
+          <Button size="sm" variant={passed ? "outline" : "default"} className="w-full">
+            <Play className="h-3.5 w-3.5 mr-1" />
+            {passed ? "Review" : passedLessons + inProgress > 0 ? "Continue" : "Start"}
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
   );
 }

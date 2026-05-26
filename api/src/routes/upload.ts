@@ -234,7 +234,13 @@ uploadRoutes.post("/scorm-file", async (c) => {
 
   await bucket.put(key, bytes, { httpMetadata: { contentType: part.type || "application/octet-stream" } });
 
-  return c.json(ok({ url: cdnUrl(key), key }), 201);
+  // #1460 — SCORM iframe needs same-origin URLs so the SCO can call
+  // `window.parent.API`. Return the proxy URL that streams from R2 via
+  // the app origin, NOT cdnUrl() (which points at a separate hostname).
+  // The R2 key is preserved on the response for any future
+  // admin / cleanup tooling.
+  const url = `/api/courses/scorm-asset/${user.sub}/${pkgId}/${path}`;
+  return c.json(ok({ url, key }), 201);
 });
 
 /** POST /api/upload/video — multipart video upload used by resume/video flows */

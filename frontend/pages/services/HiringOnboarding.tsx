@@ -7,6 +7,7 @@
 // needs to upgrade — we surface that as a friendly upgrade prompt.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import {
   CheckCircle2,
   Circle,
@@ -49,16 +50,19 @@ import {
   type OnboardingChecklist,
 } from "@/lib/services/hiring-service";
 
+// Map status → badge variant + i18n key. The label itself flows through
+// useTranslation so each row reads in the active locale; only the
+// variant is static.
 const OFFER_STATUS_VARIANT: Record<
   OfferStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { labelKey: string; variant: "default" | "secondary" | "destructive" | "outline" }
 > = {
-  draft:    { label: "Draft",    variant: "secondary" },
-  sent:     { label: "Sent",     variant: "default" },
-  viewed:   { label: "Viewed",   variant: "default" },
-  accepted: { label: "Accepted", variant: "default" },
-  signed:   { label: "Signed",   variant: "default" },
-  declined: { label: "Declined", variant: "destructive" },
+  draft:    { labelKey: "hiring.status.draft",    variant: "secondary" },
+  sent:     { labelKey: "hiring.status.sent",     variant: "default" },
+  viewed:   { labelKey: "hiring.status.viewed",   variant: "default" },
+  accepted: { labelKey: "hiring.status.accepted", variant: "default" },
+  signed:   { labelKey: "hiring.status.signed",   variant: "default" },
+  declined: { labelKey: "hiring.status.declined", variant: "destructive" },
 };
 
 const EMPTY_OFFER: CreateOfferInput = {
@@ -109,6 +113,7 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function HiringOnboarding() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const peopleTabs = usePeopleTabs();
@@ -152,7 +157,7 @@ export default function HiringOnboarding() {
       // upgrade/forbidden hint so we don't depend on the exact wording.
       const msg = (e as Error)?.message ?? "";
       if (msg.includes("PRO_REQUIRED") || /upgrade|forbidden/i.test(msg)) setProGated(true);
-      else toast({ title: "Failed to load offers", variant: "destructive" });
+      else toast({ title: t("hiring.toast.loadOffersFailed"), variant: "destructive" });
     } finally {
       setLoadingOffers(false);
     }
@@ -166,7 +171,7 @@ export default function HiringOnboarding() {
     } catch (e) {
       const msg = (e as Error)?.message ?? "";
       if (/premium|upgrade|forbidden/i.test(msg)) setProGated(true);
-      else toast({ title: "Failed to load checklists", variant: "destructive" });
+      else toast({ title: t("hiring.toast.loadChecklistsFailed"), variant: "destructive" });
     } finally {
       setLoadingChecklists(false);
     }
@@ -181,11 +186,11 @@ export default function HiringOnboarding() {
 
   async function saveOffer() {
     if (!offerDraft.candidateName.trim() || !offerDraft.candidateEmail.trim() || !offerDraft.jobTitle.trim() || !offerDraft.companyName.trim()) {
-      toast({ title: "Candidate, email, job title, and company are required", variant: "destructive" });
+      toast({ title: t("hiring.toast.offerFieldsRequired"), variant: "destructive" });
       return;
     }
     if (!offerDraft.bodyHtml.trim()) {
-      toast({ title: "Offer body cannot be empty", variant: "destructive" });
+      toast({ title: t("hiring.toast.offerBodyEmpty"), variant: "destructive" });
       return;
     }
     try {
@@ -193,10 +198,10 @@ export default function HiringOnboarding() {
       const created = await hiringService.createOffer(offerDraft);
       setOffers((prev) => [created, ...prev]);
       setOfferDialogOpen(false);
-      toast({ title: "Offer letter created" });
+      toast({ title: t("hiring.toast.offerCreated") });
     } catch (e) {
       toast({
-        title: "Failed to create offer",
+        title: t("hiring.toast.offerCreateFailed"),
         description: (e as Error)?.message ?? undefined,
         variant: "destructive",
       });
@@ -210,10 +215,10 @@ export default function HiringOnboarding() {
       setBusyOfferId(id);
       const updated = await hiringService.sendOffer(id);
       setOffers((prev) => prev.map((o) => (o.id === id ? updated : o)));
-      toast({ title: "Offer sent" });
+      toast({ title: t("hiring.toast.offerSent") });
     } catch (e) {
       toast({
-        title: "Failed to send offer",
+        title: t("hiring.toast.offerSendFailed"),
         description: (e as Error)?.message ?? undefined,
         variant: "destructive",
       });
@@ -223,15 +228,15 @@ export default function HiringOnboarding() {
   }
 
   async function deleteOffer(id: string) {
-    if (!window.confirm("Delete this offer letter? This cannot be undone.")) return;
+    if (!window.confirm(t("hiring.confirm.deleteOffer"))) return;
     try {
       setBusyOfferId(id);
       await hiringService.deleteOffer(id);
       setOffers((prev) => prev.filter((o) => o.id !== id));
-      toast({ title: "Offer deleted" });
+      toast({ title: t("hiring.toast.offerDeleted") });
     } catch (e) {
       toast({
-        title: "Failed to delete offer",
+        title: t("hiring.toast.offerDeleteFailed"),
         description: (e as Error)?.message ?? undefined,
         variant: "destructive",
       });
@@ -276,11 +281,11 @@ export default function HiringOnboarding() {
       }));
 
     if (!checklistDraft.candidateName.trim()) {
-      toast({ title: "Candidate name is required", variant: "destructive" });
+      toast({ title: t("hiring.toast.checklistCandidateRequired"), variant: "destructive" });
       return;
     }
     if (tasks.length === 0) {
-      toast({ title: "Add at least one task", variant: "destructive" });
+      toast({ title: t("hiring.toast.checklistTaskRequired"), variant: "destructive" });
       return;
     }
 
@@ -296,10 +301,10 @@ export default function HiringOnboarding() {
       const created = await hiringService.createChecklist(payload);
       setChecklists((prev) => [created, ...prev]);
       setChecklistDialogOpen(false);
-      toast({ title: "Checklist created" });
+      toast({ title: t("hiring.toast.checklistCreated") });
     } catch (e) {
       toast({
-        title: "Failed to create checklist",
+        title: t("hiring.toast.checklistCreateFailed"),
         description: (e as Error)?.message ?? undefined,
         variant: "destructive",
       });
@@ -328,7 +333,7 @@ export default function HiringOnboarding() {
       );
     } catch (e) {
       toast({
-        title: "Failed to update task",
+        title: t("hiring.toast.taskUpdateFailed"),
         description: (e as Error)?.message ?? undefined,
         variant: "destructive",
       });
@@ -357,9 +362,9 @@ export default function HiringOnboarding() {
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Hiring &amp; Onboarding</h1>
+                <h1 className="text-2xl md:text-3xl font-bold">{t("hiring.pageTitle")}</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Send offer letters and run new-hire onboarding checklists. {TIER_COPY.proFeatureLabel()}.
+                  {t("hiring.pageSubtitle")} {TIER_COPY.proFeatureLabel()}.
                 </p>
               </div>
             </div>
@@ -368,34 +373,33 @@ export default function HiringOnboarding() {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-3">
                   <FileSignature className="h-10 w-10 text-muted-foreground" />
-                  <h3 className="text-lg font-medium">{TIER_COPY.featureIsProOnly("Hiring & Onboarding")}</h3>
+                  <h3 className="text-lg font-medium">{TIER_COPY.featureIsProOnly(t("hiring.pageTitle"))}</h3>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Upgrade to send offer letters with e-signature and run onboarding
-                    checklists for new hires.
+                    {t("hiring.upgradePrompt")}
                   </p>
                   <Button asChild className="mt-2">
-                    <a href="/pricing">View pricing</a>
+                    <a href="/pricing">{t("hiring.viewPricing")}</a>
                   </Button>
                 </CardContent>
               </Card>
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <StatCard label="Drafts"  value={offerStats.draft}   icon={FileSignature} />
-                  <StatCard label="Pending" value={offerStats.pending} icon={Send} />
-                  <StatCard label="Signed"  value={offerStats.signed}  icon={CheckCircle2} />
-                  <StatCard label="Active checklists" value={activeChecklists} icon={ClipboardList} />
+                  <StatCard label={t("hiring.stat.drafts")}            value={offerStats.draft}   icon={FileSignature} />
+                  <StatCard label={t("hiring.stat.pending")}           value={offerStats.pending} icon={Send} />
+                  <StatCard label={t("hiring.stat.signed")}            value={offerStats.signed}  icon={CheckCircle2} />
+                  <StatCard label={t("hiring.stat.activeChecklists")}  value={activeChecklists}   icon={ClipboardList} />
                 </div>
 
                 <Tabs defaultValue="offers">
                   <TabsList className="mb-4">
                     <TabsTrigger value="offers" className="flex items-center gap-2">
                       <FileSignature className="h-4 w-4" />
-                      Offer letters
+                      {t("hiring.tab.offers")}
                     </TabsTrigger>
                     <TabsTrigger value="checklists" className="flex items-center gap-2">
                       <ClipboardCheck className="h-4 w-4" />
-                      Onboarding
+                      {t("hiring.tab.checklists")}
                     </TabsTrigger>
                   </TabsList>
 
@@ -404,7 +408,7 @@ export default function HiringOnboarding() {
                     <div className="flex justify-end">
                       <Button onClick={openOfferCreate}>
                         <Plus className="h-4 w-4 mr-1" />
-                        New offer letter
+                        {t("hiring.offers.new")}
                       </Button>
                     </div>
 
@@ -416,9 +420,9 @@ export default function HiringOnboarding() {
                       <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-2">
                           <FileSignature className="h-10 w-10 text-muted-foreground" />
-                          <h3 className="text-lg font-medium">No offer letters yet</h3>
+                          <h3 className="text-lg font-medium">{t("hiring.offers.emptyTitle")}</h3>
                           <p className="text-sm text-muted-foreground">
-                            Draft an offer to send to a candidate.
+                            {t("hiring.offers.emptyBody")}
                           </p>
                         </CardContent>
                       </Card>
@@ -433,7 +437,7 @@ export default function HiringOnboarding() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold truncate">{offer.candidateName}</span>
-                                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                                    <Badge variant={cfg.variant}>{t(cfg.labelKey)}</Badge>
                                   </div>
                                   <p className="text-sm text-muted-foreground mt-0.5 truncate">
                                     {offer.jobTitle} · {offer.companyName}
@@ -445,11 +449,11 @@ export default function HiringOnboarding() {
                                         {offer.currency} {Number(offer.salary).toLocaleString()}
                                       </span>
                                     )}
-                                    {offer.startDate && <span>Starts {formatDate(offer.startDate)}</span>}
+                                    {offer.startDate && <span>{t("hiring.offers.startsPrefix", { date: formatDate(offer.startDate) })}</span>}
                                     {offer.expiresAt && (
                                       <span className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
-                                        Expires {formatDate(offer.expiresAt)}
+                                        {t("hiring.offers.expiresPrefix", { date: formatDate(offer.expiresAt) })}
                                       </span>
                                     )}
                                   </div>
@@ -467,7 +471,7 @@ export default function HiringOnboarding() {
                                       ) : (
                                         <Send className="h-4 w-4 mr-1" />
                                       )}
-                                      Send
+                                      {t("hiring.offers.send")}
                                     </Button>
                                   )}
                                   <Button
@@ -476,7 +480,7 @@ export default function HiringOnboarding() {
                                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                     disabled={busy}
                                     onClick={() => deleteOffer(offer.id)}
-                                    title="Delete offer"
+                                    title={t("hiring.offers.deleteTitle")}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -494,7 +498,7 @@ export default function HiringOnboarding() {
                     <div className="flex justify-end">
                       <Button onClick={openChecklistCreate}>
                         <Plus className="h-4 w-4 mr-1" />
-                        New checklist
+                        {t("hiring.checklists.new")}
                       </Button>
                     </div>
 
@@ -506,9 +510,9 @@ export default function HiringOnboarding() {
                       <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-2">
                           <ClipboardList className="h-10 w-10 text-muted-foreground" />
-                          <h3 className="text-lg font-medium">No onboarding checklists yet</h3>
+                          <h3 className="text-lg font-medium">{t("hiring.checklists.emptyTitle")}</h3>
                           <p className="text-sm text-muted-foreground">
-                            Create a checklist to onboard your next hire.
+                            {t("hiring.checklists.emptyBody")}
                           </p>
                         </CardContent>
                       </Card>
@@ -534,53 +538,55 @@ export default function HiringOnboarding() {
       <Dialog open={offerDialogOpen} onOpenChange={setOfferDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New offer letter</DialogTitle>
+            <DialogTitle>{t("hiring.dialog.offer.title")}</DialogTitle>
             <DialogDescription>
-              Drafts are private until you click <span className="font-medium">Send</span> from the
-              list. The offer body is HTML — paste rich text or write plain text.
+              <Trans
+                i18nKey="hiring.dialog.offer.description"
+                components={[<span className="font-medium" />]}
+              />
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Candidate name</Label>
+                <Label>{t("hiring.dialog.offer.candidateName")}</Label>
                 <Input
                   value={offerDraft.candidateName}
                   onChange={(e) => setOfferDraft((d) => ({ ...d, candidateName: e.target.value }))}
-                  placeholder="Alex Doe"
+                  placeholder={t("hiring.dialog.offer.candidateNamePlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Candidate email</Label>
+                <Label>{t("hiring.dialog.offer.candidateEmail")}</Label>
                 <Input
                   type="email"
                   value={offerDraft.candidateEmail}
                   onChange={(e) => setOfferDraft((d) => ({ ...d, candidateEmail: e.target.value }))}
-                  placeholder="alex@example.com"
+                  placeholder={t("hiring.dialog.offer.candidateEmailPlaceholder")}
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Job title</Label>
+                <Label>{t("hiring.dialog.offer.jobTitle")}</Label>
                 <Input
                   value={offerDraft.jobTitle}
                   onChange={(e) => setOfferDraft((d) => ({ ...d, jobTitle: e.target.value }))}
-                  placeholder="Senior Engineer"
+                  placeholder={t("hiring.dialog.offer.jobTitlePlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Company name</Label>
+                <Label>{t("hiring.dialog.offer.companyName")}</Label>
                 <Input
                   value={offerDraft.companyName}
                   onChange={(e) => setOfferDraft((d) => ({ ...d, companyName: e.target.value }))}
-                  placeholder="Contoso Inc."
+                  placeholder={t("hiring.dialog.offer.companyNamePlaceholder")}
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label>Salary (optional)</Label>
+                <Label>{t("hiring.dialog.offer.salary")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -591,11 +597,11 @@ export default function HiringOnboarding() {
                       salary: e.target.value ? Number(e.target.value) : undefined,
                     }))
                   }
-                  placeholder="120000"
+                  placeholder={t("hiring.dialog.offer.salaryPlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Currency</Label>
+                <Label>{t("fields.currency.label")}</Label>
                 <Input
                   value={offerDraft.currency}
                   maxLength={3}
@@ -605,7 +611,7 @@ export default function HiringOnboarding() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Expires in (days)</Label>
+                <Label>{t("hiring.dialog.offer.expiresInDays")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -621,7 +627,7 @@ export default function HiringOnboarding() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Start date (optional)</Label>
+              <Label>{t("hiring.dialog.offer.startDate")}</Label>
               <Input
                 type="date"
                 value={offerDraft.startDate ? offerDraft.startDate.slice(0, 10) : ""}
@@ -634,22 +640,22 @@ export default function HiringOnboarding() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Offer body (HTML or plain text)</Label>
+              <Label>{t("hiring.dialog.offer.body")}</Label>
               <Textarea
                 rows={10}
                 value={offerDraft.bodyHtml}
                 onChange={(e) => setOfferDraft((d) => ({ ...d, bodyHtml: e.target.value }))}
-                placeholder="Dear Alex, we are pleased to offer you the position of…"
+                placeholder={t("hiring.dialog.offer.bodyPlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOfferDialogOpen(false)} disabled={savingOffer}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={saveOffer} disabled={savingOffer}>
               {savingOffer ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Save draft
+              {t("hiring.dialog.offer.saveDraft")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -659,37 +665,36 @@ export default function HiringOnboarding() {
       <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New onboarding checklist</DialogTitle>
+            <DialogTitle>{t("hiring.dialog.checklist.title")}</DialogTitle>
             <DialogDescription>
-              Tasks are completed by you (or your team) as the new hire ramps up. The first
-              completed task moves the checklist from Pending to In progress automatically.
+              {t("hiring.dialog.checklist.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Candidate name</Label>
+                <Label>{t("hiring.dialog.checklist.candidateName")}</Label>
                 <Input
                   value={checklistDraft.candidateName}
                   onChange={(e) =>
                     setChecklistDraft((d) => ({ ...d, candidateName: e.target.value }))
                   }
-                  placeholder="Alex Doe"
+                  placeholder={t("hiring.dialog.offer.candidateNamePlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Job title (optional)</Label>
+                <Label>{t("hiring.dialog.checklist.jobTitle")}</Label>
                 <Input
                   value={checklistDraft.jobTitle}
                   onChange={(e) =>
                     setChecklistDraft((d) => ({ ...d, jobTitle: e.target.value }))
                   }
-                  placeholder="Senior Engineer"
+                  placeholder={t("hiring.dialog.offer.jobTitlePlaceholder")}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Start date (optional)</Label>
+              <Label>{t("hiring.dialog.checklist.startDate")}</Label>
               <Input
                 type="date"
                 value={checklistDraft.startDate}
@@ -701,10 +706,10 @@ export default function HiringOnboarding() {
 
             <div className="border-t pt-3 space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Tasks</Label>
+                <Label>{t("hiring.dialog.checklist.tasksLabel")}</Label>
                 <Button size="sm" variant="outline" onClick={addChecklistTask}>
                   <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add task
+                  {t("hiring.dialog.checklist.addTask")}
                 </Button>
               </div>
               {checklistDraft.tasks.map((task, idx) => (
@@ -713,7 +718,7 @@ export default function HiringOnboarding() {
                     <Input
                       value={task.title}
                       onChange={(e) => updateChecklistTask(idx, { title: e.target.value })}
-                      placeholder={`Task ${idx + 1} title`}
+                      placeholder={t("hiring.dialog.checklist.taskTitlePlaceholder", { n: idx + 1 })}
                       className="flex-1"
                     />
                     {checklistDraft.tasks.length > 1 && (
@@ -722,7 +727,7 @@ export default function HiringOnboarding() {
                         variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => removeChecklistTask(idx)}
-                        title="Remove task"
+                        title={t("hiring.dialog.checklist.removeTaskTitle")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -734,13 +739,13 @@ export default function HiringOnboarding() {
                     onChange={(e) =>
                       updateChecklistTask(idx, { description: e.target.value })
                     }
-                    placeholder="Description (optional)"
+                    placeholder={t("hiring.dialog.checklist.descriptionPlaceholder")}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       value={task.category}
                       onChange={(e) => updateChecklistTask(idx, { category: e.target.value })}
-                      placeholder="Category"
+                      placeholder={t("hiring.dialog.checklist.categoryPlaceholder")}
                     />
                     <Input
                       type="date"
@@ -758,11 +763,11 @@ export default function HiringOnboarding() {
               onClick={() => setChecklistDialogOpen(false)}
               disabled={savingChecklist}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={saveChecklist} disabled={savingChecklist}>
               {savingChecklist ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Create checklist
+              {t("hiring.dialog.checklist.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -802,6 +807,7 @@ function ChecklistCard({
   checklist: OnboardingChecklist;
   onToggleTask: (taskId: string, currentlyCompleted: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const tasks = checklist.tasks ?? [];
   const pct = Number(checklist.completionPercentage ?? 0);
 
@@ -818,10 +824,10 @@ function ChecklistCard({
           <div className="flex items-center gap-2">
             <Badge variant={checklist.status === "completed" ? "default" : "secondary"}>
               {checklist.status === "in_progress"
-                ? "In progress"
+                ? t("hiring.status.inProgress")
                 : checklist.status === "completed"
-                ? "Completed"
-                : "Pending"}
+                ? t("hiring.status.completed")
+                : t("hiring.status.pending")}
             </Badge>
             <span className="text-xs text-muted-foreground">{pct}%</span>
           </div>
@@ -829,19 +835,19 @@ function ChecklistCard({
       </CardHeader>
       <CardContent className="space-y-1">
         {tasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tasks loaded.</p>
+          <p className="text-sm text-muted-foreground">{t("hiring.checklists.noTasks")}</p>
         ) : (
-          tasks.map((t) => (
+          tasks.map((task) => (
             <button
-              key={t.id}
+              key={task.id}
               type="button"
-              onClick={() => onToggleTask(t.id, t.isCompleted)}
-              disabled={t.isCompleted}
+              onClick={() => onToggleTask(task.id, task.isCompleted)}
+              disabled={task.isCompleted}
               className={`w-full flex items-start gap-3 rounded p-2 text-left transition-colors ${
-                t.isCompleted ? "opacity-60" : "hover:bg-muted/40"
+                task.isCompleted ? "opacity-60" : "hover:bg-muted/40"
               }`}
             >
-              {t.isCompleted ? (
+              {task.isCompleted ? (
                 <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
               ) : (
                 <Circle className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -849,17 +855,17 @@ function ChecklistCard({
               <div className="min-w-0 flex-1">
                 <div
                   className={`text-sm font-medium ${
-                    t.isCompleted ? "line-through" : ""
+                    task.isCompleted ? "line-through" : ""
                   }`}
                 >
-                  {t.title}
+                  {task.title}
                 </div>
-                {t.description && (
-                  <div className="text-xs text-muted-foreground mt-0.5">{t.description}</div>
+                {task.description && (
+                  <div className="text-xs text-muted-foreground mt-0.5">{task.description}</div>
                 )}
-                {t.dueDate && (
+                {task.dueDate && (
                   <div className="text-[10px] text-muted-foreground mt-0.5">
-                    Due {formatDate(t.dueDate)}
+                    {t("hiring.checklists.duePrefix", { date: formatDate(task.dueDate) })}
                   </div>
                 )}
               </div>

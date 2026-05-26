@@ -22,6 +22,11 @@ export const EVENT_KINDS = [
   "error",
   "navigation",
   "manual",
+  // Vendor Sync — emitted by the service worker when an autofill
+  // attempt finds no matching element on the vendor's edit page.
+  // Aggregated by (vendorId, blockSection) so DOM drift on LinkedIn /
+  // Indeed / etc. shows up on a dashboard. Gap #1453.
+  "vendor_selector_miss",
 ] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 

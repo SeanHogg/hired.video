@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/auth";
 import { buildShareAction } from "@/lib/card-share-action";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "@/components/ui/use-toast";
+import { courseService, type CourseEnrollment } from "@/lib/services/course-service";
 
 interface CourseAuthor {
   id: string;
@@ -124,6 +125,9 @@ export default function CoursePublicDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  // Existing enrollment for this user (if any) — drives the
+  // Enroll vs. Continue-learning CTA + the post-enroll redirect target.
+  const [enrollment, setEnrollment] = useState<CourseEnrollment | null>(null);
 
   useEffect(() => {
     if (!authorSlug || !courseSlug) return;
@@ -154,6 +158,26 @@ export default function CoursePublicDetail() {
     };
   }, [authorSlug, courseSlug]);
 
+  // Check if the viewer is already enrolled, so the CTA can switch to
+  // "Continue learning" + deep-link to /learn/:enrollmentId. The
+  // me/enrollments endpoint is small and authed; failures degrade
+  // silently to the unenrolled CTA.
+  useEffect(() => {
+    if (!isAuthenticated || !data) return;
+    let cancelled = false;
+    courseService
+      .listMyEnrollments()
+      .then((rows) => {
+        if (cancelled) return;
+        const found = rows.find((r) => r.course.id === data.course.id);
+        if (found) setEnrollment(found.enrollment);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, data]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -182,13 +206,21 @@ export default function CoursePublicDetail() {
       navigate(`/login?returnTo=/courses/${course.author.slug}/${course.slug}`);
       return;
     }
+    // Already enrolled — jump straight into the learner surface instead
+    // of re-POSTing the (idempotent) enroll call.
+    if (enrollment) {
+      navigate(`/learn/${enrollment.id}`);
+      return;
+    }
     setEnrolling(true);
     try {
-      await apiClient.post(`/api/courses/${course.id}/enroll`);
+      const created = await courseService.enroll(course.id);
+      setEnrollment(created);
       toast({
         title: "Enrolled!",
         description: `You're enrolled in ${course.title}.`,
       });
+      navigate(`/learn/${created.id}`);
     } catch (err) {
       toast({
         title: "Couldn't enroll",
@@ -244,6 +276,8 @@ export default function CoursePublicDetail() {
           <>
             <Loader2 className="h-4 w-4 animate-spin" /> Enrolling…
           </>
+        ) : enrollment ? (
+          <>Continue learning</>
         ) : (
           <>Enroll</>
         )}

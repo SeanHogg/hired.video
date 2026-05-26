@@ -538,6 +538,7 @@ async function deriveWorkforceBillingAndPayout(
         sourceKind: "timesheet",
         sourceId: ts.id,
         note: `Workforce hours — week of ${ts.periodStart}`,
+        db,
       });
       payoutEntryId = accrual.entryId;
     }

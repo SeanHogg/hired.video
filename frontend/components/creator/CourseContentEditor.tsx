@@ -94,6 +94,9 @@ interface LessonFormState {
   scormManifestUrl: string;
   scormEntryUrl: string;
   scormVersion: ScormVersion;
+  // #1440 — captured from extractAndUploadScormZip so the lesson row
+  // carries the R2 prefix uuid; delete cleanup uses it server-side.
+  scormPkgId: string;
   externalUrl: string;
   estimatedMinutes: string;
   isRequired: boolean;
@@ -110,6 +113,7 @@ function emptyLessonForm(moduleId: string | null): LessonFormState {
     scormManifestUrl: "",
     scormEntryUrl: "",
     scormVersion: "1.2",
+    scormPkgId: "",
     externalUrl: "",
     estimatedMinutes: "",
     isRequired: true,
@@ -127,6 +131,7 @@ function lessonToForm(l: CourseLesson): LessonFormState {
     scormManifestUrl: l.scormManifestUrl ?? "",
     scormEntryUrl: l.scormEntryUrl ?? "",
     scormVersion: (l.scormVersion ?? "1.2"),
+    scormPkgId: l.scormPkgId ?? "",
     externalUrl: l.externalUrl ?? "",
     estimatedMinutes: l.estimatedMinutes != null ? String(l.estimatedMinutes) : "",
     isRequired: l.isRequired,
@@ -309,6 +314,7 @@ export default function CourseContentEditor({ courseId }: Props) {
       scormManifestUrl: lessonForm.sourceType === "scorm_package" ? (lessonForm.scormManifestUrl.trim() || null) : null,
       scormEntryUrl: lessonForm.sourceType === "scorm_package" ? (lessonForm.scormEntryUrl.trim() || null) : null,
       scormVersion: lessonForm.sourceType === "scorm_package" ? lessonForm.scormVersion : null,
+      scormPkgId: lessonForm.sourceType === "scorm_package" ? (lessonForm.scormPkgId.trim() || null) : null,
       externalUrl: lessonForm.sourceType === "external_url" ? (lessonForm.externalUrl.trim() || null) : null,
       estimatedMinutes: lessonForm.estimatedMinutes ? parseInt(lessonForm.estimatedMinutes, 10) : undefined,
       isRequired: lessonForm.isRequired,
@@ -598,6 +604,7 @@ export default function CourseContentEditor({ courseId }: Props) {
                                 scormManifestUrl: result.manifestUrl,
                                 scormEntryUrl: result.entryUrl,
                                 scormVersion: result.version,
+                                scormPkgId: result.pkgId,
                               }));
                               toast({
                                 title: "SCORM package uploaded",

@@ -92,6 +92,7 @@ import { interviewAssignmentRoutes } from "./routes/interview-assignments.js";
 import { interviewQuestionSetRoutes } from "./routes/interview-question-sets.js";
 import { videoPitchRoutes } from "./routes/video-pitch.js";
 import { scorecardRoutes } from "./routes/scorecards.js";
+import { calibrationRoutes } from "./routes/calibration.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
 import { apiKeyRoutes } from "./routes/apikeys.js";
@@ -366,6 +367,14 @@ export function createApp() {
   // the callback authenticates via the HMAC-signed `state` it issued. The
   // rest of /api/integrations/email/* (accounts CRUD, rules, sync) stays
   // behind authMiddleware.
+  // #1460 — SCORM SCO iframes load assets without our JWT (they're
+  // launched from the learner page via plain <iframe src>), so the
+  // GET proxy at /api/courses/scorm-asset/<userId>/<pkgId>/<path>
+  // must skip every auth gate. Same public-read model as the R2 CDN
+  // it replaces. The handler validates userId/pkgId/path shape.
+  const COURSES_SCORM_ASSET_ROUTE =
+    /^\/api\/courses\/scorm-asset\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/.+$/i;
+
   const EMAIL_OAUTH_PUBLIC_ROUTE =
     /^\/api\/integrations\/email\/(?:gmail|outlook)\/(?:connect|callback)(?:$|\?|\/)/;
 
@@ -399,6 +408,7 @@ export function createApp() {
     if (POINTS_PUBLIC_ROUTE.test(path)) return "public";
     if (PREDICTIVE_ASSESSMENTS_PUBLIC_ROUTE.test(path)) return "public";
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
+    if (COURSES_SCORM_ASSET_ROUTE.test(path)) return "public";
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return "optional-auth";
@@ -592,6 +602,7 @@ export function createApp() {
   app.route("/api/interview-question-sets", interviewQuestionSetRoutes);
   app.route("/api/video-pitch", videoPitchRoutes);
   app.route("/api/scorecards", scorecardRoutes);
+  app.route("/api/calibration", calibrationRoutes);
   app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);
   app.route("/api/apikeys", apiKeyRoutes);

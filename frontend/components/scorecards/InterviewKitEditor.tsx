@@ -28,6 +28,10 @@ import {
   parseBlindReviewMode,
   type BlindReviewMode,
 } from "@/lib/scorecards/blind-review";
+import { StageQuestionsEditor } from "./StageQuestionsEditor";
+import { TakeHomePromptEditor } from "./TakeHomePromptEditor";
+import { KitCoverageBadge } from "./KitCoverageBadge";
+import type { StageKind } from "@/lib/services/scorecards-service";
 
 // Shared blind-review mode picker — used by both the new-kit form and the
 // kit detail editor. Self-renders the help text from the canonical
@@ -442,7 +446,10 @@ function KitDetailEditor({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Stages ({k.stages?.length ?? 0})</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Stages ({k.stages?.length ?? 0})</CardTitle>
+            <KitCoverageBadge kitId={k.id} />
+          </div>
           <Button variant="outline" size="sm" onClick={addStage}>
             <Plus className="mr-1 h-4 w-4" /> Add stage
           </Button>
@@ -484,23 +491,43 @@ function KitDetailEditor({
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              <Select
-                value={s.scorecardTemplateId ?? ""}
-                onValueChange={(v) =>
-                  updateStage(s.id, { scorecardTemplateId: v || undefined })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="No scorecard attached" />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select
+                  value={s.stageKind ?? "interview"}
+                  onValueChange={(v) =>
+                    updateStage(s.id, { stageKind: v as StageKind })
+                  }
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="interview">Interview</SelectItem>
+                    <SelectItem value="async_video">Async video</SelectItem>
+                    <SelectItem value="take_home">Take-home</SelectItem>
+                    <SelectItem value="assessment">Assessment</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={s.scorecardTemplateId ?? ""}
+                  onValueChange={(v) =>
+                    updateStage(s.id, { scorecardTemplateId: v || undefined })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="No scorecard attached" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <TakeHomePromptEditor stageId={s.id} stageKind={s.stageKind as StageKind} />
+              <StageQuestionsEditor companyId={k.companyId} stageId={s.id} />
             </div>
           ))}
         </CardContent>

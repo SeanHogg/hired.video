@@ -232,6 +232,10 @@ export async function rankTopIntroducers(
 export interface WarmIntroResult {
   conversationId: string;
   messageId: string;
+  /** True when this request opened a new conversation; false when an
+   *  identical pending request between (viewer → via → target) already
+   *  existed and we returned that one instead. */
+  created: boolean;
 }
 
 export type WarmIntroError =
@@ -269,6 +273,16 @@ export async function requestWarmIntro(
   ]);
   if (!viewerPeers.has(viaUserId) || !targetPeers.has(viaUserId)) {
     return { error: "via_not_mutual" };
+  }
+
+  // Dedup: if the same viewer already has a pending warm-intro ask to
+  // this via for this target, return that conversation instead of
+  // minting a new one. Mirrors the `uq_coffee_requests_pending_pair`
+  // pattern but enforced in service code since `targetUserId` lives in
+  // message metadata rather than a column we could index.
+  const existing = await findPendingWarmIntro(viewerId, viaUserId, targetUserId);
+  if (existing) {
+    return { conversationId: existing.conversationId, messageId: existing.messageId, created: false };
   }
 
   const targetName = targetRow.name?.trim() || "a connection";
@@ -322,7 +336,62 @@ export async function requestWarmIntro(
     }
   })();
 
-  return { conversationId: convo.id, messageId: msg.id };
+  return { conversationId: convo.id, messageId: msg.id, created: true };
+}
+
+/** Find an existing pending warm-intro from viewer → via for target.
+ *  Used by `requestWarmIntro` to dedupe and by callers that want to
+ *  check before opening the ask dialog. Returns null if none exists or
+ *  the existing one has already been forwarded. */
+async function findPendingWarmIntro(
+  viewerId: string,
+  viaUserId: string,
+  targetUserId: string,
+): Promise<{ conversationId: string; messageId: string } | null> {
+  const db = getDb();
+
+  // Conversations of type='warm_intro' where BOTH viewer and via are
+  // participants. We over-fetch on viewer alone, then narrow on via.
+  const viewerConvos = await db
+    .select({ conversationId: schema.conversationParticipants.conversationId })
+    .from(schema.conversationParticipants)
+    .innerJoin(
+      schema.conversations,
+      eq(schema.conversationParticipants.conversationId, schema.conversations.id),
+    )
+    .where(
+      and(
+        eq(schema.conversationParticipants.userId, viewerId),
+        eq(schema.conversations.type, "warm_intro"),
+      ),
+    )
+    .catch(() => [] as { conversationId: string }[]);
+  if (viewerConvos.length === 0) return null;
+
+  const ids = viewerConvos.map((r: any) => r.conversationId);
+  const viaPartRows = await db
+    .select({ conversationId: schema.conversationParticipants.conversationId })
+    .from(schema.conversationParticipants)
+    .where(
+      and(
+        inArray(schema.conversationParticipants.conversationId, ids),
+        eq(schema.conversationParticipants.userId, viaUserId),
+      ),
+    )
+    .catch(() => [] as { conversationId: string }[]);
+  if (viaPartRows.length === 0) return null;
+
+  const sharedIds = viaPartRows.map((r: any) => r.conversationId);
+  const msgMap = await fetchFirstAndForwardedMessages(sharedIds);
+  for (const convoId of sharedIds) {
+    const pair = msgMap.get(convoId);
+    if (!pair?.first) continue;
+    if (pair.forwarded) continue; // already forwarded — not pending
+    if (pair.first.senderId !== viewerId) continue;
+    if (pair.first?.metadata?.targetUserId !== targetUserId) continue;
+    return { conversationId: convoId, messageId: pair.first.id };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +418,7 @@ export interface WarmIntroSummary {
   conversationId: string;
   createdAt: string;
   message: string;
-  status: "pending" | "forwarded" | "declined";
+  status: "pending" | "forwarded";
   forwardedConversationId: string | null;
   requester: PersonRef;
   via: PersonRef;

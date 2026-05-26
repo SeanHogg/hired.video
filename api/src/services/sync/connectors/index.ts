@@ -13,17 +13,60 @@
  */
 
 import type { ResumeContent } from "../../../../../shared/resume.js";
-import type { VendorConnector } from "./types.js";
+import type { ExportBlock, VendorConnector } from "./types.js";
 import { renderDefaultBlocks } from "./default-blocks.js";
 import { linkedinConnector } from "./linkedin.js";
 import { githubConnector } from "./github.js";
 
+/** Per-vendor tuning applied uniformly by `defaultVendor()`. Keeping the
+ *  tuning declarative + colocated with the connector entry means we add
+ *  vendor-specific shaping (autofill selectors, char limits, etc.) without
+ *  per-vendor connector files for every default vendor. DRY rule: the
+ *  block-post-processing logic lives in `applyTuning` below, not inlined
+ *  N times. Closes gaps #434 + #1421. */
+interface VendorTuning {
+  /** Section name → CSS selector inside the vendor's profile-edit page.
+   *  When present, the matching block surfaces an Auto-fill button. */
+  autofillSelectors?: Record<string, string>;
+  /** Truncate the About/Summary block to this many characters with a
+   *  trailing "…". Wellfound elevator-pitch (~240), ZipRecruiter blurb
+   *  (~600), Monster highlights (~500). LinkedIn handles its own 2600
+   *  cap via charLimit (the user gets a red counter, not truncation). */
+  summaryMaxChars?: number;
+  /** Vendor calls the About section something else (e.g. Indeed
+   *  "Summary", Monster "Highlights"). Renames the rendered block. */
+  summaryLabel?: string;
+}
+
+function applyTuning(blocks: ExportBlock[], tuning: VendorTuning | undefined): ExportBlock[] {
+  if (!tuning) return blocks;
+  return blocks.map<ExportBlock>((block) => {
+    let out: ExportBlock = block;
+    if (tuning.summaryLabel && out.section === "About") {
+      out = { ...out, section: tuning.summaryLabel };
+    }
+    if (tuning.summaryMaxChars && (out.section === "About" || out.section === tuning.summaryLabel)) {
+      const cap = tuning.summaryMaxChars;
+      if (out.text.length > cap) {
+        out = { ...out, text: out.text.slice(0, cap - 1).trimEnd() + "…", charLimit: cap };
+      } else {
+        out = { ...out, charLimit: cap };
+      }
+    }
+    const sel = tuning.autofillSelectors?.[out.section];
+    if (sel) out = { ...out, autofillSelector: sel };
+    return out;
+  });
+}
+
 function defaultVendor(
-  partial: Omit<VendorConnector, "renderExportBlocks">,
+  partial: Omit<VendorConnector, "renderExportBlocks"> & { tuning?: VendorTuning },
 ): VendorConnector {
+  const { tuning, ...connector } = partial;
   return {
-    ...partial,
-    renderExportBlocks: (content: ResumeContent) => renderDefaultBlocks(content),
+    ...connector,
+    renderExportBlocks: (content: ResumeContent) =>
+      applyTuning(renderDefaultBlocks(content), tuning),
   };
 }
 
@@ -38,7 +81,14 @@ const indeedConnector = defaultVendor({
   // matches this host AND the legacy /resumes/* URL — fixes gap #1414.
   editProfileUrl: "https://profile.indeed.com/",
   supportsExtensionExtract: true,
-  supportsExtensionWrite: false,
+  supportsExtensionWrite: true,
+  tuning: {
+    summaryLabel: "Summary",
+    autofillSelectors: {
+      Headline: 'input[aria-label*="Headline" i], input[aria-label*="Title" i]',
+      Summary: 'textarea[aria-label*="Summary" i], textarea[aria-label*="About" i]',
+    },
+  },
 });
 
 const glassdoorConnector = defaultVendor({
@@ -50,7 +100,13 @@ const glassdoorConnector = defaultVendor({
     "Sync your work history and skills to your Glassdoor profile.",
   editProfileUrl: "https://www.glassdoor.com/member/profile/index.htm",
   supportsExtensionExtract: true,
-  supportsExtensionWrite: false,
+  supportsExtensionWrite: true,
+  tuning: {
+    autofillSelectors: {
+      Headline: 'input[aria-label*="Headline" i], input[name*="headline" i]',
+      About: 'textarea[aria-label*="About" i], textarea[aria-label*="Bio" i]',
+    },
+  },
 });
 
 const ziprecruiterConnector = defaultVendor({
@@ -62,7 +118,16 @@ const ziprecruiterConnector = defaultVendor({
     "Push your master resume into your ZipRecruiter profile and resume builder.",
   editProfileUrl: "https://www.ziprecruiter.com/profile",
   supportsExtensionExtract: true,
-  supportsExtensionWrite: false,
+  supportsExtensionWrite: true,
+  tuning: {
+    // ZipRecruiter profile blurb has a ~600-char soft cap; truncate and
+    // show the limit badge so the user sees they're at the edge.
+    summaryMaxChars: 600,
+    autofillSelectors: {
+      Headline: 'input[aria-label*="Title" i], input[name*="title" i]',
+      About: 'textarea[aria-label*="About" i], textarea[aria-label*="Summary" i]',
+    },
+  },
 });
 
 const wellfoundConnector = defaultVendor({
@@ -77,7 +142,17 @@ const wellfoundConnector = defaultVendor({
   // jobs board, which has nothing to do with syncing. Fixes gap #1415.
   editProfileUrl: "https://wellfound.com/profile",
   supportsExtensionExtract: false,
-  supportsExtensionWrite: false,
+  // Even without extract, autofill works once the user opens the profile
+  // editor — needs an "Open profile + Auto-fill" two-step UX.
+  supportsExtensionWrite: true,
+  tuning: {
+    // Wellfound's elevator-pitch field is intentionally short (~240 char).
+    summaryMaxChars: 240,
+    autofillSelectors: {
+      Headline: 'input[aria-label*="role" i], input[name*="role" i]',
+      About: 'textarea[aria-label*="bio" i], textarea[placeholder*="elevator" i]',
+    },
+  },
 });
 
 const diceConnector = defaultVendor({
@@ -89,7 +164,13 @@ const diceConnector = defaultVendor({
     "Sync to Dice's tech-focused profile — ideal for roles where keyword density matters.",
   editProfileUrl: "https://www.dice.com/dashboard/profile",
   supportsExtensionExtract: false,
-  supportsExtensionWrite: false,
+  supportsExtensionWrite: true,
+  tuning: {
+    autofillSelectors: {
+      Headline: 'input[aria-label*="Title" i], input[name*="title" i]',
+      About: 'textarea[aria-label*="Summary" i], textarea[name*="summary" i]',
+    },
+  },
 });
 
 const monsterConnector = defaultVendor({
@@ -101,7 +182,16 @@ const monsterConnector = defaultVendor({
     "Update your Monster profile from your hired.video master.",
   editProfileUrl: "https://www.monster.com/profile",
   supportsExtensionExtract: true,
-  supportsExtensionWrite: false,
+  supportsExtensionWrite: true,
+  tuning: {
+    summaryLabel: "Highlights",
+    // Monster's Highlights field favours tight bullets — ~500 char cap.
+    summaryMaxChars: 500,
+    autofillSelectors: {
+      Headline: 'input[aria-label*="Headline" i], input[aria-label*="Title" i]',
+      Highlights: 'textarea[aria-label*="Highlights" i], textarea[aria-label*="Summary" i]',
+    },
+  },
 });
 
 const personalSiteConnector = defaultVendor({

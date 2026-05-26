@@ -34,9 +34,10 @@ export interface ConnectionPath {
 export interface WarmIntroResult {
   conversationId: string;
   messageId: string;
+  created: boolean;
 }
 
-export type WarmIntroStatus = "pending" | "forwarded" | "declined";
+export type WarmIntroStatus = "pending" | "forwarded";
 
 export interface WarmIntroSummary {
   conversationId: string;

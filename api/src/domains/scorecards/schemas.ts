@@ -99,6 +99,8 @@ export const CreateTemplateSchema = z.object({
   description: z.string().optional(),
   ratingScale: RatingScaleEnum.default("1-4"),
   roleFamily: z.string().max(100).optional(),
+  /** Migration 0134 / gap #1384. Optional cert gate. */
+  requiredCertificationCourseId: z.string().uuid().nullable().optional(),
   attributes: z.array(AttributeInputSchema).min(1).max(20),
 });
 export type CreateTemplateInput = z.input<typeof CreateTemplateSchema>;
@@ -108,6 +110,7 @@ export const UpdateTemplateSchema = z.object({
   description: z.string().nullable().optional(),
   ratingScale: RatingScaleEnum.optional(),
   roleFamily: z.string().max(100).nullable().optional(),
+  requiredCertificationCourseId: z.string().uuid().nullable().optional(),
   isArchived: z.boolean().optional(),
 });
 export type UpdateTemplateInput = z.infer<typeof UpdateTemplateSchema>;

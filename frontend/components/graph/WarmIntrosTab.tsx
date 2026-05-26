@@ -19,6 +19,7 @@ import { ArrowRight, Loader2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { chatBus } from "@/lib/chat-bus";
 import {
   graphService,
   type WarmIntroSummary,
@@ -201,13 +202,14 @@ export function WarmIntrosTab() {
                   <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
                     <WarmIntroStatusBadge status={r.status} />
                     {r.status === "forwarded" && r.forwardedConversationId && (
-                      <Link
-                        to={`/messages/${r.forwardedConversationId}`}
+                      <button
+                        type="button"
+                        onClick={() => chatBus.open(r.forwardedConversationId!)}
                         className="text-blue-600 hover:underline flex items-center"
                       >
                         Open thread
                         <ArrowRight className="w-3 h-3 ml-0.5" />
-                      </Link>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -230,7 +232,5 @@ function WarmIntroStatusBadge({ status }: { status: WarmIntroSummary["status"] }
           Forwarded
         </Badge>
       );
-    case "declined":
-      return <Badge variant="outline">Declined</Badge>;
   }
 }

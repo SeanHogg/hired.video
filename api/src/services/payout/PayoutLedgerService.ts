@@ -33,7 +33,8 @@ export type LedgerSourceKind =
   | "template_license"
   | "service_order"
   | "course_enrollment"
-  | "article_pool_distribution";
+  | "article_pool_distribution"
+  | "timesheet";                  // Workforce contractor pay (#1349 Phase 3)
 
 export interface RecordAccrualInput {
   userId: string;
@@ -42,6 +43,10 @@ export interface RecordAccrualInput {
   sourceKind: LedgerSourceKind;
   sourceId: string;
   note?: string;
+  /** Optional db override for tests. Production callers omit this and
+   *  fall through to `getDb()` — same convention the workforce service
+   *  uses for its testability seam. */
+  db?: ReturnType<typeof getDb>;
 }
 
 export class PayoutLedgerService {
@@ -54,7 +59,7 @@ export class PayoutLedgerService {
     if (input.amountCents <= 0) {
       throw new Error("recordAccrual: amountCents must be positive");
     }
-    const db = getDb();
+    const db = input.db ?? getDb();
 
     // ON CONFLICT DO NOTHING on the partial unique index. Drizzle's
     // .onConflictDoNothing() doesn't take a partial-index target, so we

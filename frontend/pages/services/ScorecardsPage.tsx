@@ -13,11 +13,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScorecardTemplateEditor } from "@/components/scorecards/ScorecardTemplateEditor";
 import { InterviewKitEditor } from "@/components/scorecards/InterviewKitEditor";
 import { CompetencyLibraryEditor } from "@/components/scorecards/CompetencyLibraryEditor";
+import { InterviewerReliabilityPanel } from "@/components/scorecards/InterviewerReliabilityPanel";
+import { CalibrationManager } from "@/components/scorecards/CalibrationManager";
+import { useAuth } from "@/lib/auth";
 
 export default function ScorecardsPage() {
   const location = useLocation();
   const { companyId, loading, hasNoCompany } = useCurrentCompanyScope();
   const peopleTabs = usePeopleTabs();
+  const { user } = useAuth();
 
   useSEO(location.pathname, {
     title: "Scorecards & Interview Kits — Hired.Video",
@@ -40,6 +44,8 @@ export default function ScorecardsPage() {
             </p>
           </div>
 
+          {user?.id && <InterviewerReliabilityPanel userId={user.id} />}
+
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : hasNoCompany || !companyId ? (
@@ -55,6 +61,7 @@ export default function ScorecardsPage() {
                 <TabsTrigger value="templates">Templates</TabsTrigger>
                 <TabsTrigger value="kits">Interview kits</TabsTrigger>
                 <TabsTrigger value="competencies">Competency library</TabsTrigger>
+                <TabsTrigger value="calibration">Calibration</TabsTrigger>
               </TabsList>
               <TabsContent value="templates" className="mt-4">
                 <ScorecardTemplateEditor companyId={companyId} />
@@ -64,6 +71,9 @@ export default function ScorecardsPage() {
               </TabsContent>
               <TabsContent value="competencies" className="mt-4">
                 <CompetencyLibraryEditor companyId={companyId} />
+              </TabsContent>
+              <TabsContent value="calibration" className="mt-4">
+                <CalibrationManager companyId={companyId} />
               </TabsContent>
             </Tabs>
           )}

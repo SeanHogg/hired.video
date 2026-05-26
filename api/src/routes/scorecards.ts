@@ -21,6 +21,13 @@ import { kitRoutes, stageRoutes } from "./scorecards/kits.js";
 import { submissionRoutes, debriefRoutes } from "./scorecards/submissions.js";
 import { decisionRoutes } from "./scorecards/decisions.js";
 import { competencyRoutes } from "./scorecards/competencies.js";
+import { reliabilityRoutes, assignmentRoutes } from "./scorecards/sla.js";
+import { biasRoutes } from "./scorecards/bias.js";
+import {
+  stageQuestionRoutes,
+  takeHomeRoutes,
+  coverageRoutes,
+} from "./scorecards/takehome.js";
 
 const buildService = () => new ScorecardsService(defaultScorecardsServiceDeps());
 
@@ -34,5 +41,11 @@ scorecardRoutes.route("/submissions", submissionRoutes(buildService));
 scorecardRoutes.route("/debrief", debriefRoutes(buildService));
 scorecardRoutes.route("/decisions", decisionRoutes(buildService));
 scorecardRoutes.route("/competencies", competencyRoutes(buildService));
+scorecardRoutes.route("/reliability", reliabilityRoutes(buildService));
+scorecardRoutes.route("/assignments", assignmentRoutes(buildService));
+scorecardRoutes.route("/bias-check", biasRoutes);
+scorecardRoutes.route("/stage-questions", stageQuestionRoutes(buildService));
+scorecardRoutes.route("/take-home", takeHomeRoutes(buildService));
+scorecardRoutes.route("/coverage", coverageRoutes(buildService));
 
 export default scorecardRoutes;

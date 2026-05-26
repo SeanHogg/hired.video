@@ -29,6 +29,7 @@ import {
   countSkillItems,
 } from "../services/resume/skills.js";
 import type { ResumeContent } from "../../../shared/resume.js";
+import { RESUME_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 // Static imports of handlers + deps. The previous lazy `await import()` form
 // was a workaround for circular-import ordering during the route extraction;
 // the cycle has since been broken and these can load eagerly. (#4 punch list)
@@ -778,6 +779,14 @@ resumeRoutes.get("/public", async (c) => {
       limit: Number(c.req.query("limit") ?? 20) || 20,
     },
   );
+  // `?fields=` projection (gap #1370). Resume `content` is a heavy JSONB
+  // blob; list views (browse, search results) rarely need it. Projecting
+  // here trims the wire payload without changing the handler contract.
+  const fields = parseFields(c.req.query("fields"), RESUME_LIST_FIELDS);
+  if (fields && result.body && typeof result.body === "object" && Array.isArray((result.body as { data?: { items?: unknown } }).data?.items)) {
+    const body = result.body as { data: { items: Array<Record<string, unknown>> } };
+    body.data.items = projectRows(body.data.items, fields) as Array<Record<string, unknown>>;
+  }
   return c.json(result.body as any, result.status as any);
 });
 

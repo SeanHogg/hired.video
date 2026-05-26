@@ -312,6 +312,7 @@ export const defaultExtensionSettings = () => ({
     autoDetectProfiles: true,
     autoDetectCompanies: true,
     autoScore: false,
+    telemetryOptOut: false,
   },
   ai: {
     autoApplyChanges: false,

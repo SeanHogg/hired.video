@@ -15,7 +15,10 @@ import assert from "node:assert/strict";
 import {
   findMutualConnections,
   findShortestPath,
+  forwardWarmIntro,
+  listWarmIntros,
   rankTopIntroducers,
+  requestWarmIntro,
 } from "../professionalGraph.js";
 
 describe("professionalGraph public API", () => {
@@ -35,5 +38,27 @@ describe("professionalGraph public API", () => {
   it("findShortestPath returns degree 'none' for self-query without hitting the DB", async () => {
     const r = await findShortestPath("u1", "u1");
     assert.equal(r.degree, "none");
+  });
+});
+
+describe("professionalGraph warm-intro public API", () => {
+  it("exports the three warm-intro entry points", () => {
+    assert.equal(typeof requestWarmIntro, "function");
+    assert.equal(typeof listWarmIntros, "function");
+    assert.equal(typeof forwardWarmIntro, "function");
+  });
+
+  // The self-case branches return before touching the DB — locking
+  // these down catches accidental refactors of the precondition guards.
+  it("requestWarmIntro rejects when any two of (viewer, via, target) collide", async () => {
+    for (const [v, m, t] of [
+      ["a", "a", "b"],
+      ["a", "b", "a"],
+      ["a", "b", "b"],
+    ] as const) {
+      const r = await requestWarmIntro(v, m, t, "hi");
+      assert.ok("error" in r);
+      assert.equal((r as { error: string }).error, "self");
+    }
   });
 });

@@ -162,6 +162,9 @@ const CreateLessonSchema = z.object({
   scormManifestUrl: z.string().url().optional(),
   scormEntryUrl: z.string().url().optional(),
   scormVersion: z.enum(SCORM_VERSIONS).optional(),
+  // #1440 — uuid of the R2 prefix that wraps every file in a SCORM
+  // package. Recorded on insert so the DELETE handler can bulk-clean.
+  scormPkgId: z.string().uuid().optional(),
   externalUrl: z.string().url().optional(),
   bodyMd: z.string().optional(),
   estimatedMinutes: z.number().int().min(0).max(100_000).optional(),
@@ -178,6 +181,73 @@ const ProgressUpdateSchema = z.object({
   scoreRaw: z.number().optional(),
   scoreMax: z.number().optional(),
   timeSpentSec: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// SCORM same-origin asset proxy (#1460).
+//
+// Streams `uploads/<userId>/scorm/<pkgId>/<path>` from R2 over the
+// app's own origin. Critical because the SCORM SCO iframe needs
+// `window.parent.API` / `window.parent.API_1484_11` — which fails
+// silently under same-origin policy when the iframe loads from a
+// different host than the editor parent (e.g. `cdn.hired.video` vs
+// `app.hired.video`). By serving every SCORM file through this
+// route, the iframe and the parent share an origin and the SCORM
+// hand-shake works.
+//
+// Public (no auth) because the SCORM iframe runs without our JWT —
+// matches the existing R2 CDN's public-read model. Path validation
+// rejects traversal segments so a caller can't read arbitrary keys.
+// Whitelisted in [app.ts](../app.ts) `COURSES_SCORM_ASSET_ROUTE` so
+// the global auth middleware lets the public GET through.
+// ---------------------------------------------------------------------------
+
+courseRoutes.get("/scorm-asset/:userId/:pkgId/*", async (c) => {
+  const userId = c.req.param("userId");
+  const pkgId = c.req.param("pkgId");
+  // Hono's `*` param captures everything after the last named segment,
+  // but it's accessed via `c.req.path`. Strip the prefix to get the
+  // in-package path.
+  const fullPath = c.req.path;
+  const prefix = `/api/courses/scorm-asset/${userId}/${pkgId}/`;
+  if (!fullPath.startsWith(prefix)) {
+    return c.json(error("VALIDATION_ERROR", "Malformed scorm-asset URL"), 400);
+  }
+  const relPath = fullPath.slice(prefix.length);
+
+  // Mirror the upload route's path validation — same rules, so any path
+  // that passed write-time validation is fetchable.
+  if (!/^[0-9a-f-]{36}$/i.test(userId) || !/^[0-9a-f-]{36}$/i.test(pkgId)) {
+    return c.json(error("VALIDATION_ERROR", "userId / pkgId must be uuids"), 400);
+  }
+  if (!relPath
+      || relPath.startsWith("/")
+      || relPath.includes("\\")
+      || relPath.split("/").some((seg) => seg === "" || seg === ".." || seg === ".")) {
+    return c.json(error("VALIDATION_ERROR", "path must be traversal-free"), 400);
+  }
+
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(error("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+
+  const key = `uploads/${userId}/scorm/${pkgId}/${relPath}`;
+  const obj = await bucket.get(key);
+  if (!obj) return c.json(error("NOT_FOUND", "Asset not found"), 404);
+
+  // Reuse the content type the upload stored (we set it explicitly per
+  // file extension in scorm-upload.ts) so HTML / JS / CSS / images all
+  // serve with the right MIME and the iframe executes scripts.
+  const contentType = obj.httpMetadata?.contentType ?? "application/octet-stream";
+  return new Response(obj.body, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=3600",
+      // SCORM iframes embed via <iframe src=...>; same-origin so no
+      // X-Frame-Options block needed, but explicit is friendlier.
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -465,6 +535,58 @@ courseRoutes.get("/me/enrollments", async (c) => {
   return c.json(success(rows), 200);
 });
 
+// Learner-side full content fetch — the only path a non-owner can get
+// lesson bodies, SCORM URLs, and progress in one call. Gated on the
+// requester owning the enrollment row; doesn't leak content if a
+// different user knows the enrollment id.
+courseRoutes.get("/enrollments/:enrollmentId/content", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [enrollment] = await db.select()
+    .from(courseEnrollments)
+    .where(and(
+      eq(courseEnrollments.id, c.req.param("enrollmentId")),
+      eq(courseEnrollments.userId, userId),
+    ))
+    .limit(1);
+  if (!enrollment) return c.json(error("NOT_FOUND", "Enrollment not found"), 404);
+
+  const [course] = await db.select().from(courses)
+    .where(eq(courses.id, enrollment.courseId))
+    .limit(1);
+  if (!course) return c.json(error("NOT_FOUND", "Course not found"), 404);
+
+  const modules = await db.select().from(courseModules)
+    .where(eq(courseModules.courseId, course.id))
+    .orderBy(courseModules.sortOrder);
+  const lessons = await db.select().from(courseLessons)
+    .where(eq(courseLessons.courseId, course.id))
+    .orderBy(courseLessons.sortOrder);
+
+  // Surface the issued certificate (when it exists) so the learner page
+  // can show a "View certificate" CTA without a second round-trip.
+  // Project the public-safe columns only — signed_payload + recipient
+  // PII stay server-side until the verify endpoint replays them.
+  const [certificate] = await db.select({
+    certNumber: courseCertificates.certNumber,
+    issuedAt: courseCertificates.issuedAt,
+    expiresAt: courseCertificates.expiresAt,
+  })
+    .from(courseCertificates)
+    .where(eq(courseCertificates.enrollmentId, enrollment.id))
+    .limit(1);
+
+  return c.json(success({
+    enrollment,
+    course,
+    modules,
+    lessons,
+    certificate: certificate ?? null,
+  }), 200);
+});
+
 courseRoutes.get("/:id", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -741,6 +863,7 @@ courseRoutes.post("/:id/lessons", async (c) => {
     scormManifestUrl: parsed.data.scormManifestUrl ?? null,
     scormEntryUrl: parsed.data.scormEntryUrl ?? null,
     scormVersion: parsed.data.scormVersion ?? null,
+    scormPkgId: parsed.data.scormPkgId ?? null,
     externalUrl: parsed.data.externalUrl ?? null,
     bodyMd: parsed.data.bodyMd ?? null,
     estimatedMinutes: parsed.data.estimatedMinutes ?? null,
@@ -771,7 +894,7 @@ courseRoutes.patch("/lessons/:lessonId", async (c) => {
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   for (const k of [
     "title", "summary", "moduleId", "sourceType", "studioProjectId",
-    "scormManifestUrl", "scormEntryUrl", "scormVersion", "externalUrl",
+    "scormManifestUrl", "scormEntryUrl", "scormVersion", "scormPkgId", "externalUrl",
     "bodyMd", "estimatedMinutes", "isRequired", "knowledgeCheckFormId", "sortOrder",
   ] as const) {
     if (k in parsed.data) (patch as any)[k] = (parsed.data as any)[k];
@@ -786,8 +909,16 @@ courseRoutes.delete("/lessons/:lessonId", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  // Also read the SCORM package id + source type so we can prefix-delete
+  // the R2 bundle when the lesson goes away (#1440). Selecting the
+  // sourceType keeps the cleanup precise — no R2 list call on text_md /
+  // external_url lessons that have nothing to clean.
   const [existing] = await db
-    .select({ ownerId: courses.userId })
+    .select({
+      ownerId: courses.userId,
+      sourceType: courseLessons.sourceType,
+      scormPkgId: courseLessons.scormPkgId,
+    })
     .from(courseLessons)
     .innerJoin(courses, eq(courses.id, courseLessons.courseId))
     .where(eq(courseLessons.id, c.req.param("lessonId")))
@@ -796,6 +927,33 @@ courseRoutes.delete("/lessons/:lessonId", async (c) => {
     return c.json(error("NOT_FOUND", "Lesson not found"), 404);
   }
   await db.delete(courseLessons).where(eq(courseLessons.id, c.req.param("lessonId")));
+
+  // #1440 — bulk-delete the SCORM package's R2 prefix. Best-effort;
+  // failures don't block the lesson delete (DB row is gone, R2 just
+  // ends up with orphans the next pass would clean).
+  if (existing.sourceType === "scorm_package" && existing.scormPkgId) {
+    try {
+      const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+      if (bucket) {
+        const prefix = `uploads/${userId}/scorm/${existing.scormPkgId}/`;
+        const listed = await bucket.list({ prefix, limit: 1000 });
+        if (listed.objects.length > 0) {
+          await bucket.delete(listed.objects.map((o) => o.key));
+        }
+        // Re-list once for packages that ship >1000 files (uncommon but
+        // SCORM 2004 4th edition is generous). The R2 list cursor would
+        // be the strictly-correct loop; this short-circuit covers the
+        // 99% case without a recursion budget.
+        if (listed.truncated) {
+          const more = await bucket.list({ prefix, limit: 1000 });
+          if (more.objects.length > 0) await bucket.delete(more.objects.map((o) => o.key));
+        }
+      }
+    } catch {
+      // swallow — orphaned R2 keys are recoverable; missing lesson row isn't.
+    }
+  }
+
   return c.json(success({ deleted: c.req.param("lessonId") }), 200);
 });
 
@@ -1288,21 +1446,4 @@ courseRoutes.post("/xapi/statements", async (c) => {
 
   // If this xAPI statement is a passed/completed verb against a known
   // lesson, mirror it into PATCH-progress so the gamification + cert
-  // pipeline fires once. We don't double-fire — the dedup-uniq on the
-  // lesson-completed action collapses repeats.
-  const isCompletion = parsed.data.verb.id === XAPI_VERBS.PASSED.id
-    || parsed.data.verb.id === XAPI_VERBS.COMPLETED.id;
-  if (isCompletion && parsed.data.enrollmentId && parsed.data.lessonId) {
-    await withGamification(c, "xapi-completed", (game, role, uid2) =>
-      game.onLessonCompleted({
-        userId: uid2,
-        role,
-        courseId: parsed.data.courseId ?? "",
-        lessonId: parsed.data.lessonId!,
-        enrollmentId: parsed.data.enrollmentId!,
-      }),
-    );
-  }
-
-  return c.json(success({ id: created!.id }), 201);
-});
+  // pipeline fires once. We don't double-

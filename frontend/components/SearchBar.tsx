@@ -17,6 +17,7 @@ import {
   List,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,9 +86,12 @@ export interface SearchBarProps {
   hideFilters?: boolean;
 }
 
+// Icon + filter-section layout per context. Placeholder copy lives in the
+// i18n catalogue under `search.bar.placeholder.<context>` so each locale
+// can rephrase it idiomatically; the heading label lives under
+// `search.bar.contextHeading.<context>`.
 const contextConfig = {
   people: {
-    placeholder: "Search professionals by name, role, or skills...",
     icon: Users,
     filterSections: [
       "role",
@@ -98,17 +102,14 @@ const contextConfig = {
     ],
   },
   companies: {
-    placeholder: "Search companies, industries, or locations...",
     icon: Building2,
     filterSections: ["industry", "size", "location"],
   },
   resumes: {
-    placeholder: "Search resumes by name, title, or skills...",
     icon: FileText,
     filterSections: ["privacy", "type", "experience", "skills"],
   },
   jobs: {
-    placeholder: "Search jobs, companies, or skills...",
     icon: Briefcase,
     filterSections: [
       "location",
@@ -119,7 +120,6 @@ const contextConfig = {
     ],
   },
   all: {
-    placeholder: "Search videos, professions, companies...",
     icon: Search,
     filterSections: ["location", "experience", "education", "datePosted", "media"],
   },
@@ -139,6 +139,7 @@ export default function SearchBar({
   onViewModeChange,
   hideFilters = false,
 }: SearchBarProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState(value);
   const [showFilters, setShowFilters] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(showAdvanced);
@@ -177,7 +178,7 @@ export default function SearchBar({
       case "role":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Role</label>
+            <label className="text-sm font-medium mb-2 block">{t("labels.role")}</label>
             <Select
               value={filters.role || "all"}
               onValueChange={(value) =>
@@ -185,13 +186,13 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All roles" />
+                <SelectValue placeholder={t("search.bar.all.roles")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All roles</SelectItem>
-                <SelectItem value="job_seeker">Job Seekers</SelectItem>
-                <SelectItem value="recruiter">Recruiters</SelectItem>
-                <SelectItem value="employer">Employers</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.roles")}</SelectItem>
+                <SelectItem value="job_seeker">{t("labels.jobSeekers")}</SelectItem>
+                <SelectItem value="recruiter">{t("labels.recruiters")}</SelectItem>
+                <SelectItem value="employer">{t("labels.employers")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -200,7 +201,7 @@ export default function SearchBar({
       case "industry":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Industry</label>
+            <label className="text-sm font-medium mb-2 block">{t("fields.industry.label")}</label>
             <Select
               value={filters.industry || "all"}
               onValueChange={(value) =>
@@ -211,10 +212,10 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All industries" />
+                <SelectValue placeholder={t("search.bar.all.industries")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All industries</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.industries")}</SelectItem>
                 {INDUSTRIES.map((industry) => (
                   <SelectItem key={industry} value={industry}>
                     {industry}
@@ -229,7 +230,7 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">
-              Company Size
+              {t("search.bar.companySize")}
             </label>
             <Select
               value={filters.size || "all"}
@@ -238,10 +239,10 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All sizes" />
+                <SelectValue placeholder={t("search.bar.all.sizes")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All sizes</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.sizes")}</SelectItem>
                 {COMPANY_SIZE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -255,9 +256,9 @@ export default function SearchBar({
       case "location":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Location</label>
+            <label className="text-sm font-medium mb-2 block">{t("fields.location.label")}</label>
             <Input
-              placeholder="City, State"
+              placeholder={t("search.bar.placeholder.cityState")}
               value={filters.location || ""}
               onChange={(e) => handleFilterChange("location", e.target.value)}
             />
@@ -267,9 +268,9 @@ export default function SearchBar({
       case "skills":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Skills</label>
+            <label className="text-sm font-medium mb-2 block">{t("fields.skills.label")}</label>
             <Input
-              placeholder="e.g. React, Python"
+              placeholder={t("search.bar.placeholder.skillsExample")}
               value={filters.skills || ""}
               onChange={(e) => handleFilterChange("skills", e.target.value)}
             />
@@ -280,7 +281,7 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">
-              Availability
+              {t("search.bar.availability")}
             </label>
             <Select
               value={filters.openToWork?.toString() || "all"}
@@ -292,12 +293,12 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All professionals" />
+                <SelectValue placeholder={t("search.bar.all.professionals")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All professionals</SelectItem>
-                <SelectItem value="true">Open to work</SelectItem>
-                <SelectItem value="false">Not looking</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.professionals")}</SelectItem>
+                <SelectItem value="true">{t("search.bar.availability.openToWork")}</SelectItem>
+                <SelectItem value="false">{t("search.bar.availability.notLooking")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -308,7 +309,7 @@ export default function SearchBar({
           <div>
             <label className="text-sm font-medium mb-2 block flex items-center gap-1">
               <Briefcase className="w-3 h-3" />
-              Experience Level
+              {t("search.bar.experienceLevel")}
             </label>
             <Select
               value={filters.experienceLevel || "all"}
@@ -320,14 +321,14 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All levels" />
+                <SelectValue placeholder={t("search.bar.all.levels")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All levels</SelectItem>
-                <SelectItem value="entry">Entry Level</SelectItem>
-                <SelectItem value="mid">Mid Level</SelectItem>
-                <SelectItem value="senior">Senior Level</SelectItem>
-                <SelectItem value="executive">Executive</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.levels")}</SelectItem>
+                <SelectItem value="entry">{t("labels.experienceLevel.entry")}</SelectItem>
+                <SelectItem value="mid">{t("labels.experienceLevel.mid")}</SelectItem>
+                <SelectItem value="senior">{t("labels.experienceLevel.senior")}</SelectItem>
+                <SelectItem value="executive">{t("labels.experienceLevel.executive")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -336,7 +337,7 @@ export default function SearchBar({
       case "privacy":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Privacy</label>
+            <label className="text-sm font-medium mb-2 block">{t("headings.privacy")}</label>
             <Select
               value={filters.privacy || "all"}
               onValueChange={(value) =>
@@ -347,13 +348,13 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All privacy levels" />
+                <SelectValue placeholder={t("search.bar.all.privacyLevels")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All privacy levels</SelectItem>
-                <SelectItem value="private">Private</SelectItem>
-                <SelectItem value="recruiter_only">Recruiter Only</SelectItem>
-                <SelectItem value="public">Public</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.privacyLevels")}</SelectItem>
+                <SelectItem value="private">{t("labels.privacy.private")}</SelectItem>
+                <SelectItem value="recruiter_only">{t("labels.privacy.recruiterOnly")}</SelectItem>
+                <SelectItem value="public">{t("labels.privacy.public")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -362,7 +363,7 @@ export default function SearchBar({
       case "type":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Type</label>
+            <label className="text-sm font-medium mb-2 block">{t("labels.transactionType")}</label>
             <Select
               value={
                 filters.isMaster === undefined
@@ -379,12 +380,12 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All types" />
+                <SelectValue placeholder={t("search.bar.all.types")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="master">Master</SelectItem>
-                <SelectItem value="variation">Variation</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.types")}</SelectItem>
+                <SelectItem value="master">{t("labels.master")}</SelectItem>
+                <SelectItem value="variation">{t("search.bar.resumeType.variation")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -394,7 +395,7 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">
-              Employment Type
+              {t("search.bar.employmentType")}
             </label>
             <Select
               value={filters.employmentType || "all"}
@@ -406,14 +407,14 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All types" />
+                <SelectValue placeholder={t("search.bar.all.types")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="full-time">Full-time</SelectItem>
-                <SelectItem value="part-time">Part-time</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="internship">Internship</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.types")}</SelectItem>
+                <SelectItem value="full-time">{t("labels.employmentType.fullTime")}</SelectItem>
+                <SelectItem value="part-time">{t("labels.employmentType.partTime")}</SelectItem>
+                <SelectItem value="contract">{t("labels.employmentType.contract")}</SelectItem>
+                <SelectItem value="internship">{t("labels.employmentType.internship")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -422,7 +423,7 @@ export default function SearchBar({
       case "remote":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Remote</label>
+            <label className="text-sm font-medium mb-2 block">{t("labels.remote")}</label>
             <Select
               value={filters.remote?.toString() || "all"}
               onValueChange={(value) =>
@@ -433,12 +434,12 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All locations" />
+                <SelectValue placeholder={t("search.bar.all.locations")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All locations</SelectItem>
-                <SelectItem value="true">Remote only</SelectItem>
-                <SelectItem value="false">On-site only</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.locations")}</SelectItem>
+                <SelectItem value="true">{t("search.bar.remoteOnly")}</SelectItem>
+                <SelectItem value="false">{t("search.bar.onsiteOnly")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -448,12 +449,12 @@ export default function SearchBar({
         return (
           <div className="col-span-2">
             <label className="text-sm font-medium mb-2 block">
-              Salary Range
+              {t("search.bar.salaryRange")}
             </label>
             <div className="flex gap-2">
               <Input
                 type="number"
-                placeholder="Min salary"
+                placeholder={t("search.bar.placeholder.minSalary")}
                 value={filters.salaryMin || ""}
                 onChange={(e) =>
                   handleFilterChange(
@@ -464,7 +465,7 @@ export default function SearchBar({
               />
               <Input
                 type="number"
-                placeholder="Max salary"
+                placeholder={t("search.bar.placeholder.maxSalary")}
                 value={filters.salaryMax || ""}
                 onChange={(e) =>
                   handleFilterChange(
@@ -480,7 +481,7 @@ export default function SearchBar({
       case "media":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Media</label>
+            <label className="text-sm font-medium mb-2 block">{t("search.bar.media")}</label>
             <Select
               value={filters.hasMedia?.toString() || "all"}
               onValueChange={(value) =>
@@ -491,12 +492,12 @@ export default function SearchBar({
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="All content" />
+                <SelectValue placeholder={t("search.bar.all.content")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All content</SelectItem>
-                <SelectItem value="true">With videos/images</SelectItem>
-                <SelectItem value="false">Text only</SelectItem>
+                <SelectItem value="all">{t("search.bar.all.content")}</SelectItem>
+                <SelectItem value="true">{t("search.bar.media.withVideosImages")}</SelectItem>
+                <SelectItem value="false">{t("search.bar.media.textOnly")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -514,7 +515,7 @@ export default function SearchBar({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder={placeholder || config.placeholder}
+            placeholder={placeholder || t(`search.bar.placeholder.${context}`)}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10 min-h-[44px]"
@@ -531,7 +532,7 @@ export default function SearchBar({
               className="gap-2 min-h-[44px]"
             >
               <Filter className="w-4 h-4" />
-              Filters
+              {t("studio.sidebar.filters")}
               {getActiveFilterCount() > 0 && (
                 <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 text-xs min-w-[1.25rem] h-5 flex items-center justify-center">
                   {getActiveFilterCount()}
@@ -548,7 +549,7 @@ export default function SearchBar({
               className="gap-2 min-h-[44px]"
             >
               <SlidersHorizontal className="w-4 h-4" />
-              Advanced
+              {t("marketing.pricing.value.advanced")}
               <ChevronDown
                 className={`w-3 h-3 transition-transform ${showAdvancedFilters ? "rotate-180" : ""}`}
               />
@@ -562,7 +563,7 @@ export default function SearchBar({
                 size="sm"
                 onClick={() => onViewModeChange("grid")}
                 className="rounded-r-none min-h-[44px]"
-                aria-label="Grid view"
+                aria-label={t("actions.gridView")}
               >
                 <Grid className="h-4 w-4" />
               </Button>
@@ -571,7 +572,7 @@ export default function SearchBar({
                 size="sm"
                 onClick={() => onViewModeChange("list")}
                 className="rounded-l-none min-h-[44px]"
-                aria-label="List view"
+                aria-label={t("actions.listView")}
               >
                 <List className="h-4 w-4" />
               </Button>
@@ -587,9 +588,9 @@ export default function SearchBar({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <IconComponent className="w-4 h-4" />
-                {(context || "all").charAt(0).toUpperCase() +
-                  (context || "all").slice(1)}{" "}
-                Filters
+                {t("search.bar.filtersHeading", {
+                  context: t(`search.bar.contextHeading.${context}`),
+                })}
               </h3>
               <Button
                 variant="ghost"
@@ -597,7 +598,7 @@ export default function SearchBar({
                 onClick={clearAllFilters}
                 className="text-xs"
               >
-                Clear All
+                {t("actions.clearAll")}
               </Button>
             </div>
 
@@ -616,7 +617,7 @@ export default function SearchBar({
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground">
-                Advanced Filters
+                {t("search.bar.advancedFilters")}
               </h3>
               <Button
                 variant="ghost"
@@ -624,7 +625,7 @@ export default function SearchBar({
                 onClick={clearAllFilters}
                 className="text-xs"
               >
-                Clear All
+                {t("actions.clearAll")}
               </Button>
             </div>
 
@@ -633,7 +634,7 @@ export default function SearchBar({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
-                  Search Radius
+                  {t("search.bar.searchRadius")}
                 </label>
                 <Select
                   value={filters.searchRadius || "25"}
@@ -645,12 +646,12 @@ export default function SearchBar({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5">5 miles</SelectItem>
-                    <SelectItem value="10">10 miles</SelectItem>
-                    <SelectItem value="25">25 miles</SelectItem>
-                    <SelectItem value="50">50 miles</SelectItem>
-                    <SelectItem value="100">100 miles</SelectItem>
-                    <SelectItem value="remote">Remote</SelectItem>
+                    <SelectItem value="5">{t("search.bar.radius.miles", { count: 5 })}</SelectItem>
+                    <SelectItem value="10">{t("search.bar.radius.miles", { count: 10 })}</SelectItem>
+                    <SelectItem value="25">{t("search.bar.radius.miles", { count: 25 })}</SelectItem>
+                    <SelectItem value="50">{t("search.bar.radius.miles", { count: 50 })}</SelectItem>
+                    <SelectItem value="100">{t("search.bar.radius.miles", { count: 100 })}</SelectItem>
+                    <SelectItem value="remote">{t("search.bar.radius.remote")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -659,7 +660,7 @@ export default function SearchBar({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <Briefcase className="w-3 h-3" />
-                  Experience Level
+                  {t("search.bar.experienceLevel")}
                 </label>
                 <Select
                   value={filters.experienceLevel || "all"}
@@ -674,11 +675,11 @@ export default function SearchBar({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="entry">Entry Level</SelectItem>
-                    <SelectItem value="mid">Mid Level</SelectItem>
-                    <SelectItem value="senior">Senior Level</SelectItem>
-                    <SelectItem value="executive">Executive</SelectItem>
+                    <SelectItem value="all">{t("search.bar.all.levels")}</SelectItem>
+                    <SelectItem value="entry">{t("labels.experienceLevel.entry")}</SelectItem>
+                    <SelectItem value="mid">{t("labels.experienceLevel.mid")}</SelectItem>
+                    <SelectItem value="senior">{t("labels.experienceLevel.senior")}</SelectItem>
+                    <SelectItem value="executive">{t("labels.experienceLevel.executive")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -687,7 +688,7 @@ export default function SearchBar({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <GraduationCap className="w-3 h-3" />
-                  Education
+                  {t("headings.education")}
                 </label>
                 <Select
                   value={filters.education || "all"}
@@ -702,12 +703,12 @@ export default function SearchBar({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Education</SelectItem>
-                    <SelectItem value="high-school">High School</SelectItem>
-                    <SelectItem value="associate">Associate Degree</SelectItem>
-                    <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
-                    <SelectItem value="master">Master's Degree</SelectItem>
-                    <SelectItem value="phd">PhD</SelectItem>
+                    <SelectItem value="all">{t("search.bar.all.education")}</SelectItem>
+                    <SelectItem value="high-school">{t("search.bar.education.highSchool")}</SelectItem>
+                    <SelectItem value="associate">{t("search.bar.education.associate")}</SelectItem>
+                    <SelectItem value="bachelor">{t("search.bar.education.bachelor")}</SelectItem>
+                    <SelectItem value="master">{t("search.bar.education.master")}</SelectItem>
+                    <SelectItem value="phd">{t("search.bar.education.phd")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -716,7 +717,7 @@ export default function SearchBar({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  Date Posted
+                  {t("search.bar.datePosted")}
                 </label>
                 <Select
                   value={filters.datePosted || "all"}
@@ -731,11 +732,11 @@ export default function SearchBar({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Any Time</SelectItem>
-                    <SelectItem value="24h">Last 24 hours</SelectItem>
-                    <SelectItem value="3d">Last 3 days</SelectItem>
-                    <SelectItem value="week">Last week</SelectItem>
-                    <SelectItem value="month">Last month</SelectItem>
+                    <SelectItem value="all">{t("search.bar.date.anyTime")}</SelectItem>
+                    <SelectItem value="24h">{t("search.bar.date.last24h")}</SelectItem>
+                    <SelectItem value="3d">{t("search.bar.date.last3d")}</SelectItem>
+                    <SelectItem value="week">{t("search.bar.date.lastWeek")}</SelectItem>
+                    <SelectItem value="month">{t("search.bar.date.lastMonth")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -744,7 +745,7 @@ export default function SearchBar({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <TrendingUp className="w-3 h-3" />
-                  Sort By
+                  {t("search.bar.sortBy")}
                 </label>
                 <Select
                   value={filters.sortBy || "recent"}
@@ -759,25 +760,25 @@ export default function SearchBar({
                     <SelectItem value="recent">
                       <div className="flex items-center gap-2">
                         <Clock className="w-3 h-3" />
-                        Recent
+                        {t("search.bar.sort.recent")}
                       </div>
                     </SelectItem>
                     <SelectItem value="featured">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-3 h-3" />
-                        Featured
+                        {t("search.bar.sort.featured")}
                       </div>
                     </SelectItem>
                     <SelectItem value="top">
                       <div className="flex items-center gap-2">
                         <TrendingUp className="w-3 h-3" />
-                        Top
+                        {t("search.bar.sort.top")}
                       </div>
                     </SelectItem>
                     <SelectItem value="latest">
                       <div className="flex items-center gap-2">
                         <Clock className="w-3 h-3" />
-                        Latest
+                        {t("search.bar.sort.latest")}
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -788,7 +789,7 @@ export default function SearchBar({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <FileText className="w-3 h-3" />
-                  Media Content
+                  {t("search.bar.mediaContent")}
                 </label>
                 <Select
                   value={filters.hasMedia?.toString() || "all"}
@@ -803,9 +804,9 @@ export default function SearchBar({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Content</SelectItem>
-                    <SelectItem value="true">With Videos/Images</SelectItem>
-                    <SelectItem value="false">Text Only</SelectItem>
+                    <SelectItem value="all">{t("search.bar.all.content")}</SelectItem>
+                    <SelectItem value="true">{t("search.bar.media.withVideosImages")}</SelectItem>
+                    <SelectItem value="false">{t("search.bar.media.textOnly")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

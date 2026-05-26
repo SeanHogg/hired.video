@@ -23,6 +23,7 @@ import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 import { jobItems } from "./jobs.js";
 import { interviews } from "./messaging.js"; // scheduled recruiter↔candidate interview
+import { courses } from "./courses.js";
 
 // ---------------------------------------------------------------------------
 // Scorecard templates — reusable rubric per role / role family.
@@ -43,6 +44,12 @@ export const scorecardTemplates = pgTable(
     ratingScale: varchar("rating_scale", { length: 16 }).notNull().default("1-4"),
     // Optional role-family tag so we can filter templates by role.
     roleFamily: varchar("role_family", { length: 100 }),
+    // Migration 0134 / gap #1384. Optional cert gate — submitters must
+    // hold an active `course_certificates` row for this course.
+    requiredCertificationCourseId: uuid("required_certification_course_id").references(
+      () => courses.id,
+      { onDelete: "set null" },
+    ),
     isArchived: boolean("is_archived").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

@@ -52,6 +52,8 @@ export * from "./jobpipeline.js";
 export * from "./lists.js";
 export * from "./integrations.js";
 export * from "./scorecards.js";
+export * from "./calibration.js";
+export * from "./takehome.js";
 export * from "./sourcing.js";
 export * from "./workspacegrants.js";
 export * from "./nle.js";

@@ -228,6 +228,59 @@ export interface UpdateCompetencyInput {
   levels?: CompetencyLevelInput[];
 }
 
+/** Stage question (#1390). */
+export interface StageQuestion {
+  id: string;
+  kitStageId: string;
+  competencyId: string | null;
+  prompt: string;
+  difficulty: string | null;
+  expectedAnswer: "star" | "technical" | "coding" | "portfolio" | "open";
+  displayOrder: number;
+  createdAt: string;
+}
+
+/** Take-home assignment (#1386). */
+export interface TakeHomeAssignment {
+  id: string;
+  kitStageId: string;
+  prompt: string;
+  deliveryFormat: "github_url" | "file_upload" | "code_paste" | "doc_link";
+  dueInHours: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Kit coverage row (#1390). */
+export interface KitCoverageRow {
+  competencyId: string;
+  competencyName: string;
+  hasQuestions: boolean;
+}
+
+/** Bias-linter flag (#1385). */
+export interface BiasFlag {
+  phrase: string;
+  severity: "low" | "medium" | "high";
+  rationale: string;
+  suggestedReplacement?: string;
+}
+
+export interface BiasLintResponse {
+  flags: BiasFlag[];
+}
+
+/** Per-interviewer SLA reliability metrics (#1434). */
+export interface InterviewerReliability {
+  evaluatorUserId: string;
+  totalWithSla: number;
+  onTimeCount: number;
+  lateCount: number;
+  overdueDraftCount: number;
+  avgLagMs: number | null;
+  last30dCount: number;
+}
+
 export interface HiringDecisionRecord {
   id: string;
   companyId: string;
@@ -362,6 +415,19 @@ export const scorecardsService = {
       )
     ).data ?? [];
   },
+  // Bias linter (#1385)
+  async lintBias(input: {
+    summary?: string;
+    strengths?: string;
+    concerns?: string;
+  }): Promise<BiasLintResponse> {
+    return (
+      (
+        await apiClient.post<BiasLintResponse>("/api/scorecards/bias-check", input)
+      ).data ?? { flags: [] }
+    );
+  },
+
   async createDecision(input: {
     companyId: string;
     applicationId: string;
@@ -371,6 +437,83 @@ export const scorecardsService = {
     reason?: string;
   }): Promise<HiringDecisionRecord> {
     return (await apiClient.post<HiringDecisionRecord>("/api/scorecards/decisions", input)).data!;
+  },
+
+  // Stage questions + take-home (#1386/#1390)
+  async listStageQuestions(stageId: string): Promise<StageQuestion[]> {
+    return (
+      await apiClient.get<StageQuestion[]>(
+        `/api/scorecards/stage-questions/${stageId}`,
+      )
+    ).data ?? [];
+  },
+  async addStageQuestion(
+    stageId: string,
+    input: {
+      prompt: string;
+      competencyId?: string | null;
+      difficulty?: string | null;
+      expectedAnswer?: StageQuestion["expectedAnswer"];
+    },
+  ): Promise<StageQuestion> {
+    return (
+      await apiClient.post<StageQuestion>(
+        `/api/scorecards/stage-questions/${stageId}`,
+        input,
+      )
+    ).data!;
+  },
+  async deleteStageQuestion(id: string): Promise<void> {
+    await apiClient.delete(`/api/scorecards/stage-questions/items/${id}`);
+  },
+
+  async getTakeHome(stageId: string): Promise<TakeHomeAssignment | null> {
+    return (
+      await apiClient.get<TakeHomeAssignment>(`/api/scorecards/take-home/${stageId}`)
+    ).data ?? null;
+  },
+  async upsertTakeHome(
+    stageId: string,
+    input: {
+      prompt: string;
+      deliveryFormat?: TakeHomeAssignment["deliveryFormat"];
+      dueInHours?: number;
+    },
+  ): Promise<TakeHomeAssignment> {
+    return (
+      await apiClient.put<TakeHomeAssignment>(
+        `/api/scorecards/take-home/${stageId}`,
+        input,
+      )
+    ).data!;
+  },
+
+  async getKitCoverage(kitId: string): Promise<KitCoverageRow[]> {
+    return (
+      (await apiClient.get<KitCoverageRow[]>(`/api/scorecards/coverage/${kitId}`))
+        .data ?? []
+    );
+  },
+
+  // Reliability + assignments (#1383/#1434/#1435)
+  async getReliability(userId: string): Promise<InterviewerReliability | null> {
+    return (
+      await apiClient.get<InterviewerReliability>(
+        `/api/scorecards/reliability/${encodeURIComponent(userId)}`,
+      )
+    ).data ?? null;
+  },
+  async assignSubmission(input: {
+    templateId: string;
+    applicationId: string;
+    evaluatorUserId: string;
+    kitStageId?: string;
+    candidateUserId?: string;
+    dueAt: string;
+  }): Promise<ScorecardSubmission> {
+    return (
+      await apiClient.post<ScorecardSubmission>("/api/scorecards/assignments", input)
+    ).data!;
   },
 
   // Competencies (#1382)

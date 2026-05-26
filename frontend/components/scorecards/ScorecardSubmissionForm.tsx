@@ -25,6 +25,7 @@ import {
 } from "@/lib/services/scorecards-service";
 import { BlindReviewBadge } from "./BlindReviewBadge";
 import { DueInBadge } from "./DueInBadge";
+import { BiasFlagPanel } from "./BiasFlagPanel";
 
 interface Props {
   templateId: string;
@@ -271,6 +272,14 @@ export function ScorecardSubmissionForm({
             onChange={(e) => setSummary(e.target.value)}
           />
         </div>
+
+        {!isSubmitted && (
+          <BiasFlagPanel
+            summary={summary}
+            strengths={strengths}
+            concerns={concerns}
+          />
+        )}
 
         <div>
           <Label>Overall recommendation</Label>

@@ -125,6 +125,11 @@ export const courseLessons = pgTable(
     scormManifestUrl: text("scorm_manifest_url"),
     scormEntryUrl: text("scorm_entry_url"),
     scormVersion: varchar("scorm_version", { length: 16 }),
+    // #1440 — pkgId returned by `extractAndUploadScormZip`. Lets the
+    // lesson DELETE handler prefix-delete every R2 key under
+    // `uploads/<ownerId>/scorm/<scormPkgId>/` instead of orphaning the
+    // entire package. Only populated for scormPackage-sourced lessons.
+    scormPkgId: uuid("scorm_pkg_id"),
     externalUrl: text("external_url"),
     bodyMd: text("body_md"),
     estimatedMinutes: integer("estimated_minutes"),

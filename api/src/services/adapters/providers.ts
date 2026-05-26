@@ -77,6 +77,7 @@ export type LLMUseCase =
   | "email_classify"
   | "email_summary"
   | "email_digest"
+  | "scorecard_bias_check"
   | "default";
 
 /** A leaf inference profile — model + sampling, no further fallbacks. */
@@ -267,6 +268,13 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   },
   email_summary: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.3, maxTokens: 220 },
   email_digest: { model: "google/gemma-4-31b-it:free", temperature: 0.4, maxTokens: 600 },
+  // Scorecard bias linter (#1385). Short input + strict JSON output; the
+  // gemma 4 instruct family hits the sweet spot of cheap + structured.
+  scorecard_bias_check: {
+    model: "google/gemma-4-26b-a4b-it:free",
+    temperature: 0.1,
+    maxTokens: 600,
+  },
   default: { model: "google/gemma-4-31b-it:free", temperature: 0.7 },
 };
 

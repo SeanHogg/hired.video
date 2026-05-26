@@ -157,6 +157,7 @@ const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
 const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplatePreview"));
 const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
 const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
+const CourseLearner = lazy(() => import("./pages/CourseLearner"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
 // viewer became the default at /resumes/:id. Old links redirect in-place.
@@ -924,6 +925,11 @@ const App = () => (
                       <Route path="/marketplace/templates/:templateId" element={<MarketplaceTemplatePreview />} />
                       <Route path="/marketplace/voices/:voiceCloneId" element={<VoicePublicDetail />} />
                       <Route path="/courses/:authorSlug/:courseSlug" element={<CoursePublicDetail />} />
+                      {/* Learner playback surface — opened from a course
+                          page's Continue-learning CTA. Authed-only;
+                          self-gates on the requester owning the
+                          enrollment row (API 404s otherwise). */}
+                      <Route path="/learn/:enrollmentId" element={<CourseLearner />} />
                       <Route path="/account" element={<Navigate to="/settings" replace />} />
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
