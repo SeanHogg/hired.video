@@ -251,7 +251,7 @@ export function serializeListFields(
   fields: readonly string[] | undefined | null,
 ): string | null {
   if (!fields || fields.length === 0) return null;
-  const allow = new Set(LIST_FIELDS_BY_KIND[kind]);
+  const allow = new Set<string>(LIST_FIELDS_BY_KIND[kind]);
   const kept = fields.filter((f) => allow.has(f));
   return kept.length > 0 ? kept.join(",") : null;
 }
