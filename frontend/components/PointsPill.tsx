@@ -13,6 +13,7 @@ import {
   pointsService,
   isPointsEligible,
   type PointsSummary,
+  type ShowcaseBadge,
 } from "@/lib/services/points-service";
 import { BadgeIcon } from "@/components/badges/BadgeIcon";
 
@@ -43,7 +44,7 @@ function fmt(n: number): string {
 }
 
 export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const enabled = isPointsEligible(user);
 
   const { data, isLoading } = useQuery<PointsSummary>({
@@ -52,6 +53,81 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
     enabled,
     staleTime: 60_000,
   });
+
+  // Public badge catalog — feeds the "X badges to earn" count shown to
+  // logged-out visitors. Same endpoint /rewards uses, so signed-out users
+  // see the same total they'd see on the marketing page.
+  const { data: showcase } = useQuery<ShowcaseBadge[]>({
+    queryKey: ["points", "badges", "showcase"],
+    queryFn: () => pointsService.listAllBadges(),
+    enabled: !isAuthenticated,
+    staleTime: 5 * 60_000,
+  });
+
+  // Logged-out teaser — surfaces the count of earnable badges and links to
+  // /rewards (the public marketing article). Self-gates here so the sidebar
+  // doesn't have to branch on auth.
+  if (!isAuthenticated) {
+    const totalBadges = showcase?.length ?? 0;
+    if (collapsed) {
+      return (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to="/rewards"
+                onClick={onNavigate}
+                className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
+                aria-label="Points and badges"
+              >
+                <Trophy className="h-4 w-4 text-muted-foreground" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+              <div className="space-y-1 text-xs">
+                <div className="font-medium">Earn points + badges</div>
+                <div className="text-muted-foreground">
+                  {totalBadges > 0
+                    ? `${totalBadges} badges to unlock — sign up to start earning.`
+                    : "Sign up to start earning."}
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    return (
+      <Link
+        to="/rewards"
+        onClick={onNavigate}
+        className="block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
+        aria-label="Points and badges"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <Coins className="h-3.5 w-3.5 text-primary" />
+            <span>Points</span>
+          </div>
+          <span className="text-[11px] font-semibold text-primary">
+            Learn more →
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Trophy className="h-3 w-3" />
+            <span className="tabular-nums">
+              {totalBadges > 0 ? `${totalBadges} badges to earn` : "Badges to earn"}
+            </span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Flame className="h-3 w-3" />
+            <span>Streaks</span>
+          </span>
+        </div>
+      </Link>
+    );
+  }
 
   if (!enabled) return null;
   if (isLoading || !data) return null;

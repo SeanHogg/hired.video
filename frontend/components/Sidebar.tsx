@@ -256,6 +256,20 @@ export default function Sidebar({
 
           {/* Footer */}
           <div className="border-t border-border p-4 space-y-2">
+            {/* AI Token Budget Pill — self-gates on auth: shows a free-tier
+                teaser linking to /pricing for signed-out visitors so the
+                marketing surface is always reachable from the sidebar. */}
+            <div className={cn(collapsed ? "mb-1" : "mb-3")}>
+              <AITokenPill collapsed={collapsed} onNavigate={onClose} />
+            </div>
+
+            {/* Points + streak pill — self-gates on auth + role: shows a
+                "X badges to earn" teaser linking to /rewards for signed-out
+                visitors; renders null for ineligible authed roles. */}
+            <div className={cn(collapsed ? "mb-1" : "mb-3")}>
+              <PointsPill collapsed={collapsed} onNavigate={onClose} />
+            </div>
+
             {isAuthenticated && user ? (
               <>
                 {/* Upgrade Account CTA — free-tier users only */}
@@ -265,16 +279,6 @@ export default function Sidebar({
                   className={cn(collapsed ? "mb-1" : "mb-3")}
                   onNavigate={onClose}
                 />
-
-                {/* AI Token Budget Pill */}
-                <div className={cn(collapsed ? "mb-1" : "mb-3")}>
-                  <AITokenPill collapsed={collapsed} onNavigate={onClose} />
-                </div>
-
-                {/* Points + streak pill (self-gates on role; job_seeker only in V1) */}
-                <div className={cn(collapsed ? "mb-1" : "mb-3")}>
-                  <PointsPill collapsed={collapsed} onNavigate={onClose} />
-                </div>
 
                 {/* Account Switcher */}
                 {!collapsed && (

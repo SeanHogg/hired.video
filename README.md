@@ -79,11 +79,12 @@ hired.video/
 │   │   ├── app.ts                # Hono app factory, route mounting, CORS
 │   │   ├── worker.ts             # CF Worker fetch handler (production entry)
 │   │   ├── index.ts              # Node.js entry (local development)
-│   │   ├── routes/               # ~100 route files — one per feature domain
-│   │   ├── services/             # Business logic services (organised by domain — auth/, billing/, company/, job/, media/, messaging/, recruiter-marketplace/, resume/, studio/, user/, etc.)
+│   │   ├── routes/               # 119 route files (top-level) — one per feature domain (was ~100 at last audit; grew with courses, learning paths, gamification, sourcing, scorecards, paid media, externalEmail, comics/v2 studio, etc.)
+│   │   ├── services/             # 47 service folders (organised by domain — auth/, billing/, company/, job/, media/, messaging/, recruiter-marketplace/, resume/, studio/, user/, etc.)
+│   │   ├── repositories/         # 31 aggregate repositories — `buildRepos(db)` factory in [repositories/index.ts](api/src/repositories/index.ts) is the DI seam
 │   │   ├── middleware/           # Auth, error handling, rate limiting, logging
 │   │   ├── db/
-│   │   │   ├── schema/           # Drizzle schema definitions (~230 tables across 52 schema files)
+│   │   │   ├── schema/           # Drizzle schema definitions — **303 `pgTable()` declarations across 68 schema files** (was 230/52 at last audit; growth driven by gamification, learning, sourcing, contentLocations, scorecards, paid media, externalEmail, comics)
 │   │   │   └── index.ts          # DB connection
 │   │   └── types/                # Shared TypeScript types, response helpers
 │   ├── wrangler.toml             # Cloudflare Worker config + R2/KV bindings
@@ -179,9 +180,12 @@ assert.equal(deps._email.calls.filter((c) => c.name === "sendVerification").leng
 assert.equal(deps._state.users[0].passwordHash.match(/^[0-9a-f]{32}:[0-9a-f]{64}$/), /* hashed */);
 ```
 
-**Current handler/deps pairs:**
-- `auth-handlers.ts` / `auth-deps.ts` — register, login, forgot-password, reset-password, verify-email. 29 integration tests.
-- `resume-handlers.ts` / `resume-deps.ts` — get, update (slug-in-body, metaData preservation), create, delete, watch, unwatch, sentiment, list. 33 integration tests.
+**Current handler/deps pairs (verified 2026-05-25):**
+- `auth-handlers.ts` / `auth-deps.ts` — register, login, forgot-password, reset-password, verify-email. **40 integration tests** (was 29 at extraction time).
+- `resume-handlers.ts` / `resume-deps.ts` — get, update (slug-in-body, metaData preservation), create, delete, watch, unwatch, sentiment, list. **98 integration tests** (was 33 at extraction time).
+- `companies-handlers.ts` (34), `billing-handlers.ts` (16), `autofill-handlers.ts` (19), `match-handlers.ts` (38), `plan-override-handlers.ts` (15), `settings-handlers.ts` (29) round out the migrated set.
+
+**Adoption is partial.** Only ~24 route files have been migrated to `*-handlers.ts` + `*-deps.ts`. **101 route files still import `getDb()` directly inside Hono handlers** — see [Consolidated Gap Register](#consolidated-gap-register) #1327 for the migration backlog.
 
 **Rule of thumb:** any handler that would need a DB or a network service to test gets extracted to a `*-handlers.ts` file with a `Deps` port. Handlers that are already pure (e.g. `rowToResume` serializer) stay where they are.
 
@@ -440,6 +444,94 @@ What still isn't pure DDD: the aggregate services are module-level function coll
 
 ---
 
+## Code Health Assessment — 2026-05-25
+
+Full DRY / SOLID / architecture / performance / test-coverage audit run against the README's stated invariants. The architecture patterns above (especially #1, #7, #13) describe how the codebase **should** work; this section documents how it **actually** works today, and tags each finding with a Consolidated Gap Register entry.
+
+### File-size reality
+
+The codebase has grown faster than the architecture extraction work. **All inline file/table/route counts in the README have been corrected** against the current tree:
+
+| Surface | Last documented | Actual (2026-05-25) | Delta |
+|---|---|---|---|
+| Route files (`api/src/routes/*.ts`, top-level) | ~100 | **119** | +19 |
+| Routes mounted in `app.ts` | — | **141 `app.route()` calls** | — |
+| Schema files (`api/src/db/schema/*.ts`) | 52 | **68** | +16 |
+| `pgTable()` declarations | ~230 | **303** | +73 |
+| Service folders (`api/src/services/*/`) | — | **47** | — |
+| Repositories (`api/src/repositories/*.ts`) | — | **31** (`buildRepos(db)` factory) | — |
+| `studio.ts` LOC | 1,716 | **4,015** | +2,299 |
+| `studio-features.ts` LOC | 1,451 | **3,398** | +1,947 |
+| `StudioLayout.tsx` LOC | 1,131 | **2,319** | +1,188 |
+| `auth-handlers` tests | 29 | **40** | +11 |
+| `resume-handlers` tests | 33 | **98** | +65 |
+
+### DRY / SOLID violations against documented patterns
+
+| Pattern (per Architecture Patterns above) | Violations found | Gap |
+|---|---|---|
+| **#1** — Handlers pure + Deps-injected | **101 route files still import `getDb()` directly** (out of 119). The handler/deps pattern has been extracted for ~24 surfaces (auth, resume, billing, companies, autofill, match, plan-override, settings) but the majority of routes still mix Hono adapter + business logic + Drizzle in one file. | #1323 |
+| **#7** — One shared `ok`/`fail`/`HandlerResult` | **13 route files redeclare `ok`/`fail` locally** instead of importing from [`handlers/shared.ts`](api/src/handlers/shared.ts): `studio.ts`, `studio-features.ts`, `resumes.ts`, `video-pitch.ts`, `vendor-sync.ts`, `upload.ts`, `resume-roast.ts`, `phone.ts`, `nle.ts`, `interview.ts`, `interview-question-sets.ts`, `interview-assignments.ts`, `admin-r2.ts`. Each redeclaration carries the same drift risk that caused the 2026-04-20 blank-title production bug. | #1324 |
+| **#13** — Routes → Services → Repos | Some services still `import { schema }` and run Drizzle directly instead of going via a repository. Spot-checked offenders: `services/auth/AuthService.ts` (loginEvents writes), `services/job/JobService.ts` (re-exports schema tables), `services/job/match-handlers.ts`, `services/billing/handlers.ts`, `services/user/autofill-handlers.ts`. The repos-per-aggregate seam is in place; the migration of these services to consume it is not. | #1332 |
+| **Extract on duplication** | `getClientIp()` was successfully consolidated in `middleware/rateLimiter.ts` (good). But hand-rolled pagination Zod schemas, role-gate JSX, and `requireAuth` patterns are repeated across many route + page files with no shared helper. Frontend has 27 `React.lazy(` call sites but no shared "lazy role dashboard" or "lazy heavy panel" helper. | #1330 |
+
+### File-size anti-patterns (top 11 over 1k LOC)
+
+| File | LOC | Status |
+|---|---|---|
+| `api/src/routes/studio.ts` | 4,015 | 🚨 decompose by feature (gap #1324 — also #1316f for `firstName/lastName`/`ComicPalette`/`ComicSpecPage` type drift) |
+| `api/src/routes/studio-features.ts` | 3,398 | 🚨 decompose by sub-feature (TTS / captions / LinkedIn / recording / coaching / ATS / interview / skills / voice clone / async interview / analytics) — gap #1325 |
+| `api/src/routes/resumes.ts` | 2,021 | ⚠️ partly migrated to `resume-handlers.ts`; the dynamic `await import()` wrappers + lingering inline `getDb()` calls still bloat this file — gap #1323 |
+| `frontend/pages/studio/StudioLayout.tsx` | 2,319 | 🚨 single-component owns voiceover + captions + version history + autosave + auth gate — gap #1326 |
+| `api/src/services/job/JobService.ts` | 1,565 | ⚠️ schema re-exports + cross-aggregate orchestration — gap #1332 |
+| `api/src/routes/recruiter.ts` | 1,436 | ⚠️ route + business logic mixed |
+| `api/src/routes/courses.ts` | 1,308 | ⚠️ + two arity errors at :1126, :1247 (#1316b) |
+| `api/src/services/job/match-handlers.ts` | 1,304 | ⚠️ |
+| `api/src/routes/creators.ts` | 1,288 | ⚠️ + 36 `as any` casts |
+| `api/src/routes/interview-assignments.ts` | 1,179 | ⚠️ + local `ok`/`fail` redefinition (gap #1324) |
+| `api/src/routes/users.ts` | 1,101 | ⚠️ |
+
+### `as any` density
+
+The repo defaults to TypeScript strictness but `as any` has leaked into ~2,173 occurrences across 284 files (per the audit). Most are either intentional test mocks (`handlers/__testing__/fake-db.ts` — 27) or Hono context narrowing (`app.ts` — 11). The actionable density lives in `studio.ts` (~38) and `creators.ts` (~36). Tracked as #1331.
+
+### Performance & runtime anti-patterns
+
+| Issue | Where | Severity | Gap |
+|---|---|---|---|
+| Dynamic `await import()` inside per-request handlers — pays parse + tree-shake cost every request | 24 occurrences across 11 route files (worst: `analytics.ts:423`, `feed.ts:313`, `jobs.ts:214`, `search.ts:767`, `tool-runs.ts:184-185`, `studio.ts:1000,1068,1089`, `paid-media.ts:179,425,454`). Already flagged under "Deferred architectural work" above. | High | #1333 |
+| N+1 over Neon: `Promise.all(items.map(async i => db.select…))` instead of `inArray()` | `services/analytics/creatorRollup.ts:67-99` (per-artifact metadata fetch); `services/creators/visibility.ts:45-62` (per-user `getSubscription` fan-out) | High | #1335 |
+| Unbounded `SELECT` — no `.limit()` on event tables that grow without bound | `services/analytics/creatorRollup.ts:128-131` (`artifactViews.referrer` for an entire creator's history — OOM risk on Workers); `routes/calendar.ts:44-54` (no implicit cap on scheduled events) | High | #1336 |
+| Over-fetching full rows when the UI only needs `{id, title, slug}` | `routes/calendar.ts:45` (returns attendees JSONB + reminderMinutes array); spot-checked `routes/users.ts` returns full row (password_hash is correctly stripped at serializer, but other columns leak) | Medium | #1337 |
+| Rate-limiter Map has **no size cap, no TTL sweep, no LRU eviction** | [`api/src/middleware/rateLimiter.ts:10`](api/src/middleware/rateLimiter.ts) — global `store` Map and per-factory `bucket` Maps. Workers isolates do recycle, so the leak is bounded in practice — but a long-lived isolate under sustained traffic accumulates entries unboundedly. | Medium | #1334 |
+| **All 141 routes eagerly mounted** in `app.ts` — every cold-start parses every route module, regardless of whether the request needs it | `api/src/app.ts` (716 LOC, 141 `app.route()` calls) — monolithic Worker bundle | Medium | #1335 |
+| Frontend bundle bloat — main bundle ~1.6 MB; heavy deps (`three` + `@react-three/fiber` + `@react-three/drei`, `pdfjs-dist`, `leaflet`+`react-leaflet-cluster`) loaded eagerly | 27 `React.lazy(` call sites exist, mostly inside the studio v2 surface — but the role-based dashboard split (`JobSeekerDashboard` / `RecruiterDashboard` / `EmployerDashboard` / `AdminDashboard`) is NOT lazy and ships to every user | Medium | #1336 |
+| Cold-start: top-level imports in `worker.ts` transitively pull in all 141 routes + every service + every repo, so a single `/api/jobs/:id` request still parses the whole studio + courses + comics + nle + paid-media + email-integration surface | `api/src/worker.ts:1-2` → `app.ts` → 141 route imports | Medium | #1335 |
+| PBKDF2 100K iterations on login path is on the request thread (Web Crypto async is non-blocking but the round-trip latency adds to login response time). Documented for awareness — not a fix candidate. | `api/src/services/auth/auth.ts:47-92` | Low | — |
+| No streaming for LLM responses — resume scorer / optimizer / skill extractor hold the connection open until the full LLM response lands | Various LLM-calling routes | Low | #1337 |
+
+### Test coverage map
+
+- **Total tests:** ~1,600 across 207 test files (api 88, frontend 113, shared 5, repos 1).
+- **Handler/deps adoption:** every `*-handlers.ts` module has a matching `__tests__/*-handlers.test.ts`. Strong coverage on the extracted surfaces (resume 98, auth 40, match 38, companies 34, settings 29, autofill 19, billing 16, plan-override 15).
+- **Repositories: 30 of 31 untested.** Only `buildRepos.test.ts` (gap #1315 smoke test) exists. `pointsRepository`, `scorecardsRepository`, `resumeRepository`, `mediaRepository`, `eventsRepository`, etc. have no direct coverage — they're exercised transitively via service tests, which means a CRUD-level regression in a repo will only fail at the service-test integration layer instead of at the unit it broke. Gap #1338.
+- **Domains with zero service tests:** gamification (`services/gamification/`), learning/courses (`services/learning/`), recruiter (`services/recruiter/`), paid-media (`services/paid-media/`), career360 (`services/career360/`), comics, graph, pipeline, profile, tremendous, location, moderation, sync, youtube. Gap #1339.
+- **Frontend component coverage:** 22 components with dedicated tests against ~1,254 frontend files (~1.8%). Top-tested: `WebcamRecorder` (25), `AIChatPanel` (17), `ToolCallCard` (11), `StoryboardEditor` (11), `ResumeEmptyDropzone` (8). Gap #1344.
+- **Fake-DB adoption:** 14 of 52 service test files import [`api/src/handlers/__testing__/fake-db.ts`](api/src/handlers/__testing__/fake-db.ts) (26%). The harness exists; the discipline of using it for every handler test isn't enforced. Gap #1345.
+- **File-coverage estimates:** api services 32%, api routes 13%, frontend 9%, shared 1%, repositories 3%.
+
+### Net assessment
+
+The architecture vision (Pattern 13: Routes → Services → Repositories) is correctly designed and partially landed. The repos exist, the factory exists, the handler/deps pattern works beautifully on the surfaces where it's been adopted. The drift is **adoption velocity**, not design: new surfaces (studio v2, comics, courses, paid media, sourcing, etc.) have been added faster than older surfaces have been migrated to the canonical pattern.
+
+The highest-value next moves, in order:
+1. **#1323** — sweep the 101 routes still calling `getDb()` directly. Each migration unblocks real unit testing for that surface.
+2. **#1324 / #1325 / #1326** — decompose the three megafile offenders (`studio.ts`, `studio-features.ts`, `StudioLayout.tsx`). They cumulatively account for 9,732 LOC.
+3. **#1338 / #1339** — add repository-level tests + close the gamification/learning/recruiter test gap (currently silent on regressions in three of the most actively-developed domains).
+4. **#1333 / #1335 / #1336 / #1337** — perf fixes; the dynamic-import-in-hot-path + N+1 + unbounded-SELECT combination is the most likely cause of any p99 latency spike on the analytics/creator/calendar surfaces.
+
+---
+
 ## Frontend Architecture
 
 ### Dashboard
@@ -528,7 +620,7 @@ User Prompt + Resume
 ```
 frontend/pages/studio/
   Studio.tsx              ← re-export of StudioLayout
-  StudioLayout.tsx        ← top-level state, layout, auth gate (1,131 lines)
+  StudioLayout.tsx        ← top-level state, layout, auth gate (2,319 lines — needs decomposition, see gap #1331)
   StudioSidebar.tsx       ← project nav, templates, backgrounds, music
   StudioEditor.tsx        ← Prompt / Storyboard tab switcher
   StudioPreview.tsx       ← right panel: canvas + Export + Publish + LinkedIn + visibility
@@ -576,8 +668,8 @@ frontend/types/
   studio.ts               ← StudioProjectState (voiceover, captions fields)
 
 api/src/routes/
-  studio.ts               ← core studio routes (1,716 lines)
-  studio-features.ts      ← TTS, captions, LinkedIn, recording, coaching, ATS, interview, skills, voice clone, async interview, analytics (1,451 lines)
+  studio.ts               ← core studio routes (4,015 lines — needs decomposition, see gap #1329)
+  studio-features.ts      ← TTS, captions, LinkedIn, recording, coaching, ATS, interview, skills, voice clone, async interview, analytics (3,398 lines — needs decomposition, see gap #1330)
 
 api/src/services/
   transcription.ts        ← OpenAI Whisper transcription, delivery analysis (pacing, fillers, energy)
@@ -712,8 +804,8 @@ Open gaps against the Canva-Video / CapCut spec are tracked in the [Consolidated
 | Frontend: React / Next.js or similar | ✅ Done | React 18 + Vite. TypeScript throughout. Tailwind + shadcn/ui. | — |
 | Rendering: Canvas / WebGL / WebCodecs | ✅ Done | Canvas 2D (`frame-renderer.ts`), WebCodecs encoder (`video-exporter.ts`), Three.js / React Three Fiber for 3D elements. | — |
 | Media processing: FFmpeg WASM or server fallback | ✅ Done | WebCodecs API + `mp4-muxer` / `webm-muxer` — browser-native hardware-accelerated encoding without FFmpeg dependency. Superior performance profile. | — |
-| State management for timeline sync | ✅ Done | TanStack Query v5 for server state. `StudioLayout.tsx` (1,131 lines) owns local project state. | — |
-| Optional backend for rendering/export | ✅ Done | Hono on Cloudflare Workers. Studio routes 3,167 lines across `studio.ts` + `studio-features.ts`. | — |
+| State management for timeline sync | ✅ Done | TanStack Query v5 for server state. `StudioLayout.tsx` (2,319 lines — needs decomposition, gap #1331) owns local project state. | — |
+| Optional backend for rendering/export | ✅ Done | Hono on Cloudflare Workers. Studio routes **7,413 lines** across `studio.ts` (4,015) + `studio-features.ts` (3,398) — see gaps #1329 / #1330. | — |
 
 ### Performance Requirements
 
@@ -1179,9 +1271,9 @@ Allows superadmins to impersonate any user for debugging. Implementation in `ser
 | `stripe.ts` | 106 | ✅ Complete | Top-level Stripe helper used by payment routes |
 | `payment/` | — | ✅ Complete | Strategy pattern: `types.ts` interface + `stripe.ts` (full) + `helcim.ts` (⚠️ stub) + `index.ts` factory |
 
-### Database Schema (~230 tables across 52 schema files in `/api/src/db/schema/`)
+### Database Schema (303 `pgTable()` declarations across 68 schema files in `/api/src/db/schema/`)
 
-All tables are defined and schema migrations managed via Drizzle Kit.
+All tables are defined and schema migrations managed via Drizzle Kit. (Was ~230/52 at last audit; the table below documents the canonical aggregates per domain — see the schema files for the full set including gamification, learning, sourcing, scorecards, paid-media, externalEmail, content-locations, geocoderCache, events, coffee, comics, NLE, and the studio v2 expansion.)
 
 | Domain | Tables |
 |--------|--------|
@@ -3722,3 +3814,10 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 1317 | ✅ Done | 2026-05-25 | P2 | `bug` | **~~/map page — `GET /api/map` returned 401 for anonymous viewers + map filled the entire viewport on mobile~~** (closed 2026-05-25). [`/api/map`](hired.video/api/src/routes/map.ts) added to `PUBLIC_PREFIXES` in [app.ts](hired.video/api/src/app.ts) — the handler reads zero user-scoped data (just public events + opted-in coffee pins) so anonymous discovery is the intended UX. [MapPage.tsx:148](hired.video/frontend/pages/MapPage.tsx) container height changed from `calc(100vh - 64px - 56px)` (which ignored the 64px MobileBottomNav AND assumed the filter chip row stays at 56px — it wraps to ~100px on narrow viewports) to `h-[55vh] md:h-[calc(100vh-64px-56px)] md:max-h-[820px]` — fixed compact 55vh on mobile leaves clear room for the chips above + bottom nav below, full calc on md+ where the bottom nav is hidden, and a max-h cap so monitors >1200px tall don't get a single comically-tall map. |
 | 1318 | ✅ Done | 2026-05-25 | P1 | `bug` | **~~Index.tsx hero STILL renders off-screen on 375px after #1307 fixes~~** (closed 2026-05-25). Root cause confirmed: `[Index.tsx](hired.video/frontend/pages/Index.tsx)` hero used `grid lg:grid-cols-5` with NO mobile default. Without an explicit `grid-cols-1`, the implicit grid track is `auto`-sized — meaning the column grows to fit the widest child's intrinsic content (HeroVideoSpotlight's CanvasStage, which has an authoring resolution like 1080px). AppShell's `overflow-x-clip` (#1307) prevented horizontal scroll but the off-screen content was clipped, producing the cut-at-the-right-edge visual the user kept reporting. Fix: added `grid grid-cols-1 lg:grid-cols-5` so mobile uses `minmax(0, 1fr)` instead of `auto`, plus `min-w-0` on both grid items so a wide canvas child can't push the track. Verified via Chrome DevTools Protocol with mobile-emulated viewports at 320 / 360 / 375 / 390 / 414 / 430 — at every width, `docW === vw` and zero overflowing elements (after filtering known horizontal scrollers like the UnifiedSearch category chip row, which is supposed to scroll inside its `overflow-x-auto` container). Note for the next maintainer: headless Chrome's `--window-size=375,X` flag on Windows does NOT set the inner viewport — it sets the outer window. To force true mobile emulation, use `Emulation.setDeviceMetricsOverride` via CDP (the inspect script lives in `[c:/tmp/mobile-test/](c:/tmp/mobile-test/)` if you need to reproduce). |
 | 1319 | 🔲 Open | Soon | P3 | `quality` | **Need browser-automation tool in agent session — visual regression sweep is fundamentally limited without one** (opened 2026-05-25 alongside #1318). Today the agent has to (a) start `vite dev` in the background, (b) launch headless Chrome via `chrome.exe --headless --screenshot=...`, (c) Read the PNG back and visually inspect. Workable but slow, no DOM inspection, no JS evaluation, no per-element bounding-rect dump. To close: install Playwright MCP or Chrome DevTools MCP in the user's `.mcp.json` so the agent can issue `page.goto`, `page.setViewportSize`, `page.evaluate(() => ...)`, and `page.screenshot` directly — that converts the #1310 backstop from "human pass required" to "agent can finish responsive sweeps end-to-end". Pairs with the existing pattern of running `npm run typecheck` as the static signal. |
+| 1320 | ✅ Done | 2026-05-25 | P1 | `bug` | **~~Tool pages gated the entire UI behind login — users couldn't even see the inputs they were being asked to sign up for~~** (closed 2026-05-25). Five `/tools/*` surfaces + the `/ai-coach` page were rendering an `<AuthOverlay>` on mount whenever the visitor wasn't authenticated, so the screenshot the user submitted (Interview Templates) showed a Sign-In card stacked on top of a blurred page the user had never been able to interact with. Fix: every page now follows the JobResumeMatch pattern — render the full UI, snapshot the inputs on the action-button click via `usePendingToolInput`, then flip a `showAuthOverlay` state. The overlay's `redirect` query brings the user back to the same path, the hook rehydrates the form, and the user picks up where they left off. Changed: [InterviewTemplates.tsx](hired.video/frontend/pages/tools/InterviewTemplates.tsx) — overlay was `show: !isAuthenticated \|\| !isRecruiterOrEmployer`; now opens the editor dialog for anyone, snapshots the `TemplateDraft` (title / desc / target role / style / questions / proctoring) when an unauth user clicks Save, and the parent passes `canSave` + `onUnauthSave` down so the dialog doesn't have to know about auth state. [InterviewQuestions.tsx](hired.video/frontend/pages/tools/InterviewQuestions.tsx) — overlay was `show: !isAuthenticated`; now lets anon users fill every field, snapshots the full `InterviewQuestionsDraft` (mode / resumeId / jobId / pastedText / pastedKind / targetRole / seniority / style / count) on Generate-click; also dropped the redundant `disabled={!isAuthenticated}` on the Generate button so the click handler is the single seam. [ProfileAudit.tsx](hired.video/frontend/pages/tools/ProfileAudit.tsx) — `handleRun` now early-returns to the overlay when unauth; the Run bar + tool description are visible to anon users. [VideoPitchLab.tsx](hired.video/frontend/pages/tools/VideoPitchLab.tsx) — both `handleGenerateScript` and the new `handleContinueToRecord` snapshot `PitchDraft` (length / tone / resumeId / script) and gate; on successful pitch save we `clear()` the snapshot. [VendorSync.tsx](hired.video/frontend/pages/tools/VendorSync.tsx) — page-level overlay dropped entirely (each `<VendorCard>` already self-gates on the Sync button per the page's own comment, so the eager overlay was contradicting the in-card behaviour). [AICoach.tsx](hired.video/frontend/pages/AICoach.tsx) — the Quick Start Prompts grid is now visible to everyone (not behind `isAuthenticated`); `handlePromptClick` snapshots `{ prompt }` and gates, and the post-login mount effect prefers the restored prompt over `?q=` so the prompt auto-sends after sign-in. Hook change: [use-pending-tool-input.ts](hired.video/frontend/hooks/use-pending-tool-input.ts) switched from `sessionStorage` to `localStorage` so snapshots survive a magic-link or OAuth callback that lands in a new tab (the 1-hour TTL still bounds stale-draft replay). `npx tsc --noEmit` green. Follow-ups recorded as #1321 (PredictiveAssessments — toast-only gate, no snapshot) and #1322 (Career360 — full marketing-page swap instead of action-time gate). |
+| 1321 | 🔲 Open | Soon | P3 | `bug` | **PredictiveAssessments — `handlePickKind` shows a toast for anon users instead of routing through `<AuthOverlay>` with a snapshot of the picked kind** (opened 2026-05-25 alongside #1320). [PredictiveAssessments.tsx:106-110](hired.video/frontend/pages/tools/PredictiveAssessments.tsx) is the only gate seam left for this tool — anon users see the full catalog (good), then get a toast telling them to sign in (bad: no overlay, no return URL, no snapshot). To close: mirror the #1320 pattern — add `showAuthOverlay` state + a `usePendingToolInput<{ kind }>()` hook, snapshot the picked kind when unauth, render `<AuthOverlay contentType="tool" returnTo>` so the post-login redirect brings the user back to the same `/tools/predictive-assessments` URL and the picked kind auto-starts. Unblocks the same "see the page, click the CTA, then sign in" UX from #1320 for the assessment catalog. |
+| 1322 | 🔲 Open | Soon | P3 | `quality` | **Career360 swaps in a separate `<Career360Marketing>` component for anon users instead of letting them see + interact with the same surface and gating only at the AI Coach hand-off** (opened 2026-05-25 alongside #1320). [Career360.tsx:491-492](hired.video/frontend/pages/tools/Career360.tsx) branches: when `!isAuthenticated`, render a different marketing component (`<Career360Marketing>`); when authenticated, render the actual gap dashboard. This violates the principle established in #1320 (the user sees the same UI shape regardless of auth state; the gate fires on the action button). The `openCoach` helper at [Career360.tsx:435-438](hired.video/frontend/pages/tools/Career360.tsx) already does `navigate("/login")` on unauth — but that's a hard redirect with no overlay, no `?redirect=` query, and no snapshot. To close: delete `<Career360Marketing>` (or fold its copy into the empty-state of the real dashboard), let anon users see the catalog of gap categories + an empty "Run analysis" CTA, snapshot the user's selected gap/category on Coach-handoff, and route through `<AuthOverlay>` instead of `navigate("/login")` so the user returns to the same scroll position with the same gap focused. |
+| 1323 | ✅ Done | 2026-05-25 | P2 | `feature` | **~~Sidebar carried three overlapping discovery items (Events / Map / Tasks-Events) — consolidated into one `/tasks` hub with three internal surfaces~~** (closed 2026-05-25). Removed the standalone `Events` + `Map` items from [Sidebar.tsx](hired.video/frontend/components/Sidebar.tsx); only `Tasks / Events` remains. `/events` and `/map` now `<Navigate>` to `/tasks?surface=discover` (and `&view=map`) — see [App.tsx](hired.video/frontend/App.tsx). [Tasks.tsx](hired.video/frontend/pages/Tasks.tsx) gained a third surface "Discover" (default for unauth so /tasks doubles as the public marketing landing) which renders the new shared [EventDiscoveryPanel](hired.video/frontend/components/events/EventDiscoveryPanel.tsx) — combines the search/filter grid lifted from the deleted EventsIndex.tsx with the leaflet map lifted from the deleted MapPage.tsx, toggled by `?view=grid\|map`. "My events & coffee" tab merges the two former surfaces via new [MyEventsAndCoffee.tsx](hired.video/frontend/components/events/MyEventsAndCoffee.tsx) wrapper around the existing MyEventsTab + CoffeeTab (kept as composable units). [seo.ts](hired.video/frontend/lib/seo.ts) dropped `/events` + `/map` PAGE_SEO entries, beefed up `/tasks` keywords to absorb both, and added `/events` → `/tasks` + `/map` → `/tasks` aliases in `canonicalizePath` so legacy URLs canonicalize cleanly. Per-event pages (`/events/new`, `/events/:idOrSlug`, `/events/:idOrSlug/manage`) keep their own URLs + SEO since they're per-resource. EventsIndex.tsx + MapPage.tsx deleted. Breadcrumbs + "Browse events" links in EventDetail / EventManage / EventNew / MyEventsTab repointed to `/tasks?surface=discover`. `npm run typecheck` green. Follow-ups: #1324 (map sub-view ignores grid filters), #1325 (Tasks.test.tsx pre-existing mock), #1326 (eslint config broken). |
+| 1324 | 🔲 Open | Soon | P3 | `quality` | **Discover map sub-view ignores the q/category/format filters that narrow the grid sub-view** (opened 2026-05-25 alongside #1323). [EventDiscoveryPanel.tsx](hired.video/frontend/components/events/EventDiscoveryPanel.tsx) renders one filter row (search box + category select + format select) that drives the grid via `eventsService.search()`. The map sub-view uses [/api/map](hired.video/api/src/routes/map.ts) which only accepts a bounding box (`minLat/maxLat/minLng/maxLng`) — flipping to the map view drops the filter narrowing the user is looking at. To close: extend `/api/map` to accept `q`, `category`, `format`, and `scope` query params; mirror the where-clause used by `EventService.search()`; thread the same `q/category/format` state from `EventDiscoveryPanel` into the map fetch URL so toggling Grid ↔ Map preserves the filter narrowing. Map endpoint should also collapse very dense bbox responses with marker clustering (#1259) so filter+zoom UX is consistent. |
+| 1325 | 🔲 Open | Soon | P4 | `bug` | **Tasks.test.tsx — 11 tests fail with `getVerificationStatus is not a function` because the test's `mockUseAuth.mockReturnValue` doesn't stub it** (opened 2026-05-25 alongside #1323, pre-existing). [`__tests__/pages/Tasks.test.tsx:87-92`](hired.video/frontend/__tests__/pages/Tasks.test.tsx) mocks `useAuth()` returning `{ user, isAuthenticated, isLoading, isEmailVerified }`. AppShell mounts [EmailVerificationBanner](hired.video/frontend/components/auth/EmailVerificationBanner.tsx), which calls `getVerificationStatus()` in a `useEffect`; the mock returns `undefined` for that field, so calling it throws. Not caused by the #1323 surface consolidation — the same failure occurs in any Tasks render path. To close: add `getVerificationStatus: vi.fn().mockResolvedValue({ emailConfirmed: true })` + `resendEmailVerification: vi.fn().mockResolvedValue(undefined)` to the mock, or extract a shared `mockAuth(overrides)` helper that mirrors `AuthContextValue` so the mock can't drift from the real shape (this fix probably belongs at a single test-helper file rather than per-test, to prevent the same drift on Studio / Profile / Settings tests). |
+| 1326 | 🔲 Open | Soon | P4 | `bug` | **`npm run lint:ci` fails to even start — `eslint.config.js` imports `./eslint-rules/require-page-chrome.js` but that file has no default export** (opened 2026-05-25 alongside #1323, pre-existing). `frontend/eslint.config.js:9` does `import requirePageChrome from "./eslint-rules/require-page-chrome.js";` — the rule module must `export default` an ESLint rule object (or the config must use a named import). Until fixed, every `lint:ci` / `lint:strict` / `lint:fix` invocation throws `SyntaxError: The requested module './eslint-rules/require-page-chrome.js' does not provide an export named 'default'` before a single file is linted, which means the [feedback_new_page_checklist] ESLint backstop is not actually running on CI. To close: either add `export default <ruleObject>` to `require-page-chrome.js`, OR change the import in `eslint.config.js` to the actual exported name. Cross-check `quality-check.mjs` for the same broken-config path. |

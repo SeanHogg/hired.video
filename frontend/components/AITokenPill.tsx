@@ -8,8 +8,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/lib/auth";
 import { useTokenBudget, formatTokens } from "@/hooks/use-token-budget";
 import { cn } from "@/lib/utils";
+import { FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
 import { API_ERROR_EVENT, type ApiErrorEvent } from "@shared/errors/apiErrorEvent";
 
 interface AITokenPillProps {
@@ -18,7 +20,67 @@ interface AITokenPillProps {
 }
 
 export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps) {
+  const { isAuthenticated } = useAuth();
   const budget = useTokenBudget();
+
+  // Logged-out teaser — same chrome as the free-tier pill so the sidebar
+  // looks consistent for anonymous visitors. Click-through routes to the
+  // /pricing marketing page (NOT /settings) so signed-out users land on
+  // something they can actually act on.
+  if (!isAuthenticated) {
+    if (collapsed) {
+      return (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to="/pricing"
+                onClick={onNavigate}
+                className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
+                aria-label="AI tokens — see plans"
+              >
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full ring-2 ring-background bg-emerald-500" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+              <div className="space-y-1 text-xs">
+                <div className="font-medium">
+                  {formatTokens(FREE_AI_MONTHLY_TOKENS)} free AI tokens / month
+                </div>
+                <div className="text-muted-foreground">
+                  Sign up to use AI tools. See plans for more capacity.
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    return (
+      <Link
+        to="/pricing"
+        onClick={onNavigate}
+        className="block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
+        aria-label="AI tokens — see plans"
+      >
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium">
+            <Zap className="h-3.5 w-3.5 text-primary" />
+            <span>AI tokens</span>
+          </div>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {formatTokens(FREE_AI_MONTHLY_TOKENS)} free / mo
+          </span>
+        </div>
+        <Progress value={0} className="h-1.5" />
+        <div className="flex items-center justify-between mt-1.5 text-[11px] text-muted-foreground">
+          <span>0% used</span>
+          <span className="font-medium text-primary">See plans →</span>
+        </div>
+      </Link>
+    );
+  }
 
   // Vendor plan exhaustion (or any other AI_USAGE_LIMIT_REACHED hit)
   // is global to the operator, not per-user — the pill's per-user
