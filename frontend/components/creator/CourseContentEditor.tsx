@@ -8,10 +8,9 @@ import {
   Video,
   Link as LinkIcon,
   Package,
-  ChevronUp,
-  ChevronDown,
   Pencil,
 } from "lucide-react";
+import { SortableList, SortableDragHandle } from "@/components/resume-sections/SortableList";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -238,30 +237,42 @@ export default function CourseContentEditor({ courseId }: Props) {
     }
   };
 
-  const moveModule = async (idx: number, dir: -1 | 1) => {
-    const swapWith = idx + dir;
-    if (swapWith < 0 || swapWith >= modules.length) return;
-    const a = modules[idx];
-    const b = modules[swapWith];
-    if (!a || !b) return;
-    const aOrder = a.sortOrder;
-    const bOrder = b.sortOrder;
-    // Optimistic — reorder both rows by swapping sortOrder.
-    setModules((cur) =>
-      cur.map((m) => {
-        if (m.id === a.id) return { ...m, sortOrder: bOrder };
-        if (m.id === b.id) return { ...m, sortOrder: aOrder };
-        return m;
-      }).sort((x, y) => x.sortOrder - y.sortOrder),
-    );
+  // #1411 — drag-handle reorder via dnd-kit. SortableList hands us the
+  // already-rearranged array; we recompute sortOrder by position and PATCH
+  // every changed row. One handler covers modules + lessons (DRY:
+  // computeAndPersistOrder is sort-target-agnostic).
+  const persistOrder = async <T extends { id: string; sortOrder: number }>(
+    next: T[],
+    patch: (id: string, sortOrder: number) => Promise<unknown>,
+  ): Promise<void> => {
+    const changes = next
+      .map((row, i) => ({ id: row.id, oldOrder: row.sortOrder, newOrder: i }))
+      .filter((c) => c.oldOrder !== c.newOrder);
+    if (changes.length === 0) return;
     try {
-      await Promise.all([
-        courseService.updateModule(a.id, { sortOrder: bOrder }),
-        courseService.updateModule(b.id, { sortOrder: aOrder }),
-      ]);
+      await Promise.all(changes.map((c) => patch(c.id, c.newOrder)));
     } catch (e: unknown) {
-      toast({ title: "Reorder failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
+      toast({
+        title: "Reorder failed",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
     }
+  };
+
+  const reorderModules = (next: CourseModule[]) => {
+    const renumbered = next.map((m, i) => ({ ...m, sortOrder: i }));
+    setModules(renumbered);
+    void persistOrder(next, (id, sortOrder) => courseService.updateModule(id, { sortOrder }));
+  };
+
+  const reorderLessons = (next: CourseLesson[]) => {
+    const renumbered = next.map((l, i) => ({ ...l, sortOrder: i }));
+    setLessons((cur) => {
+      const others = cur.filter((l) => !renumbered.some((r) => r.id === l.id));
+      return [...others, ...renumbered];
+    });
+    void persistOrder(next, (id, sortOrder) => courseService.updateLesson(id, { sortOrder }));
   };
 
   // ── Lesson handlers ──
@@ -371,61 +382,61 @@ export default function CourseContentEditor({ courseId }: Props) {
             </div>
           ) : null}
 
-          {modules.map((m, idx) => {
-            const moduleLessons = lessonsByModule.get(m.id) ?? [];
-            const isEditing = editingModuleId === m.id;
-            return (
-              <div key={m.id} className="rounded-md border bg-card/30">
-                <div className="flex items-center gap-2 p-3 border-b">
-                  <div className="flex flex-col">
-                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => moveModule(idx, -1)} disabled={idx === 0} aria-label="Move module up">
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => moveModule(idx, 1)} disabled={idx === modules.length - 1} aria-label="Move module down">
-                      <ChevronDown className="h-3.5 w-3.5" />
+          <SortableList items={modules} getId={(m) => m.id} onReorder={reorderModules}>
+            {(m) => {
+              const moduleLessons = lessonsByModule.get(m.id) ?? [];
+              const isEditing = editingModuleId === m.id;
+              return (
+                <div className="rounded-md border bg-card/30 mb-3">
+                  <div className="flex items-center gap-2 p-3 border-b">
+                    <SortableDragHandle className="!h-7 !w-7 shrink-0" />
+                    {isEditing ? (
+                      <>
+                        <Input
+                          autoFocus
+                          value={editingModuleTitle}
+                          onChange={(e) => setEditingModuleTitle(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveModuleEdit(); if (e.key === "Escape") setEditingModuleId(null); }}
+                          className="flex-1"
+                        />
+                        <Button size="sm" onClick={saveModuleEdit}>Save</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingModuleId(null)}>Cancel</Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">{m.title}</div>
+                          {m.summary && <div className="text-xs text-muted-foreground">{m.summary}</div>}
+                        </div>
+                        <Badge variant="outline" className="text-[10px]">
+                          {moduleLessons.length} {moduleLessons.length === 1 ? "lesson" : "lessons"}
+                        </Badge>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingModuleId(m.id); setEditingModuleTitle(m.title); }} aria-label="Edit module">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => removeModule(m)} aria-label="Delete module">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  <LessonList
+                    lessons={moduleLessons}
+                    onEdit={openEditLesson}
+                    onDelete={removeLesson}
+                    onReorder={(next) => reorderLessons(next)}
+                  />
+
+                  <div className="p-2 border-t bg-muted/20">
+                    <Button size="sm" variant="ghost" onClick={() => openCreateLesson(m.id)}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add lesson
                     </Button>
                   </div>
-                  {isEditing ? (
-                    <>
-                      <Input
-                        autoFocus
-                        value={editingModuleTitle}
-                        onChange={(e) => setEditingModuleTitle(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") saveModuleEdit(); if (e.key === "Escape") setEditingModuleId(null); }}
-                        className="flex-1"
-                      />
-                      <Button size="sm" onClick={saveModuleEdit}>Save</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setEditingModuleId(null)}>Cancel</Button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{m.title}</div>
-                        {m.summary && <div className="text-xs text-muted-foreground">{m.summary}</div>}
-                      </div>
-                      <Badge variant="outline" className="text-[10px]">
-                        {moduleLessons.length} {moduleLessons.length === 1 ? "lesson" : "lessons"}
-                      </Badge>
-                      <Button size="sm" variant="ghost" onClick={() => { setEditingModuleId(m.id); setEditingModuleTitle(m.title); }} aria-label="Edit module">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => removeModule(m)} aria-label="Delete module">
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </>
-                  )}
                 </div>
-
-                <LessonList lessons={moduleLessons} onEdit={openEditLesson} onDelete={removeLesson} />
-
-                <div className="p-2 border-t bg-muted/20">
-                  <Button size="sm" variant="ghost" onClick={() => openCreateLesson(m.id)}>
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add lesson
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            }}
+          </SortableList>
 
           {/* Unsorted (no module) lessons */}
           {unsorted.length > 0 && (

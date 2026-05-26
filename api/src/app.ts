@@ -21,6 +21,7 @@ import { errorsRoutes } from "./routes/errors.js";
 import { metaRoutes } from "./routes/meta.js";
 import { extensionRoutes } from "./routes/extension.js";
 import { accountRoutes } from "./routes/account.js";
+import { workforceRoutes } from "./routes/workforce.js";
 import { userRoutes } from "./routes/users.js";
 import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
 import { jobRoutes } from "./routes/jobs.js";
@@ -494,6 +495,7 @@ export function createApp() {
   app.route("/api/_meta", metaRoutes);
   app.route("/api/extension", extensionRoutes);
   app.route("/api/account", accountRoutes);
+  app.route("/api/workforce", workforceRoutes);
   app.route("/api/users", userRoutes);
   // Hono sub-router root path workaround: sub-router handlers registered at "/"
   // are never matched when mounted via app.route(prefix, router). Register explicitly.

@@ -10,7 +10,7 @@ import {
   Heart,
   GraduationCap,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
@@ -100,6 +100,23 @@ export default function Tools() {
   // (built-in Learning Content Library; competes with LinkedIn Learning's
   // separately-licensed library by being bundled into every plan).
   const tabParam = searchParams.get("tab") === "learning" ? "learning" : "tools";
+
+  // #1401 — on the Learning tab the AI-tool filter params (audience /
+  // tier / category) are irrelevant; the chip rows that set them aren't
+  // rendered either. Scrub them from the URL on tab switch so the URL
+  // never carries stale state that nothing reads.
+  useEffect(() => {
+    if (tabParam !== "learning") return;
+    const next = new URLSearchParams(searchParams);
+    let changed = false;
+    for (const key of ["audience", "tier", "category"] as const) {
+      if (next.has(key)) {
+        next.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) setSearchParams(next, { replace: true });
+  }, [tabParam, searchParams, setSearchParams]);
 
   const setCategoryFilter = (next: CategoryFilter) => {
     const params = new URLSearchParams(searchParams);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, GraduationCap, Loader2, Plus } from "lucide-react";
+import { ArrowRight, GraduationCap, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -67,6 +67,12 @@ export default function AttachToCourseDialog({
   const [moduleId, setModuleId] = useState<string>("__none__");
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
+  // Inline "Quick-create course" — POSTs a fresh draft course with the
+  // Studio project's title, selects it, then proceeds to attach the
+  // lesson in the same flow. Closes #1413: no more route-out when the
+  // creator has no courses yet.
+  const [quickCreating, setQuickCreating] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
 
   // Fetch courses on open. We only fetch when the dialog actually opens
   // so the list reflects any course the user authored since last attach.
@@ -75,6 +81,7 @@ export default function AttachToCourseDialog({
     let cancelled = false;
     setLoading(true);
     setTitle(defaultTitle ?? "");
+    setQuickTitle(defaultTitle ?? "");
     courseService
       .listMine()
       .then((list) => {
@@ -126,6 +133,31 @@ export default function AttachToCourseDialog({
       cancelled = true;
     };
   }, [courseId]);
+
+  const quickCreate = async () => {
+    const t = quickTitle.trim();
+    if (!t) {
+      toast({ title: "Course title required", variant: "destructive" });
+      return;
+    }
+    setQuickCreating(true);
+    try {
+      const created = await courseService.create({ title: t });
+      setCourses((cur) => [created, ...cur]);
+      setCourseId(created.id);
+      // Module list will be empty for a brand-new course; the effect on
+      // courseId already handles refetching modules.
+      toast({ title: "Course created", description: `"${t}" is a draft. Publish from the Courses tab when ready.` });
+    } catch (e: unknown) {
+      toast({
+        title: "Create failed",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setQuickCreating(false);
+    }
+  };
 
   const attach = async () => {
     if (!studioProjectId) {
@@ -186,20 +218,36 @@ export default function AttachToCourseDialog({
             <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading your courses…
           </div>
         ) : courses.length === 0 ? (
-          <div className="rounded-md border border-dashed p-6 text-center space-y-3">
-            <GraduationCap className="h-8 w-8 mx-auto text-muted-foreground" />
-            <div>
-              <p className="font-medium">No courses yet</p>
-              <p className="text-sm text-muted-foreground">
-                You haven't authored any courses. Create one first, then
-                come back here to attach this lesson.
+          <div className="space-y-4">
+            <div className="rounded-md border border-dashed p-4 text-center space-y-2">
+              <GraduationCap className="h-7 w-7 mx-auto text-muted-foreground" />
+              <p className="text-sm font-medium">No courses yet — create one now</p>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Quick-create a draft course in one click, attach this Studio
+                project as its first lesson, then add more modules + lessons
+                from the Courses tab.
               </p>
             </div>
-            <Button asChild>
-              <Link to="/services/creator/courses">
-                <Plus className="h-4 w-4 mr-1" /> Create a course <ArrowRight className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
+            <div>
+              <Label htmlFor="quick-course-title">Course title</Label>
+              <Input
+                id="quick-course-title"
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                placeholder="What is this course about?"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={quickCreate} disabled={quickCreating || !quickTitle.trim()}>
+                {quickCreating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                Quick-create course
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/services/creator/courses">
+                  Or open Courses tab <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">

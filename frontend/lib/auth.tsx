@@ -366,8 +366,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   ): Promise<void> => {
     setIsLoading(true);
     try {
-      // Filter out SuperAdmin from registration - it's internal only
-      const registrationRole = role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN : role;
+      // Filter out SuperAdmin from registration - it's internal only.
+      // Employee is invite-only (#1349); if someone tries to signup as
+      // one, coerce to job_seeker — they'll get a normal user account
+      // and have to be properly invited by an employer to gain workforce
+      // membership.
+      const registrationRole =
+        role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN :
+        role === USER_ROLES.EMPLOYEE ? USER_ROLES.JOB_SEEKER :
+        role;
 
       // Inbound attribution — read once at submit time from the shared
       // first-touch store (cookie, 30-day TTL; populated by
