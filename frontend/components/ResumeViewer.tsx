@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ export default function ResumeViewer({
   showToolbar = true,
   selectedMediaId,
 }: ResumeViewerProps) {
+  const { t } = useTranslation();
   const [privacy, setPrivacy] = useState<ResumePrivacy>(resume?.privacy || "private");
   const [showShareAlert, setShowShareAlert] = useState(false);
 
@@ -97,8 +99,8 @@ export default function ResumeViewer({
   if (!resume) {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
-        <h2 className="text-xl font-semibold mb-2">Resume data not available</h2>
-        <p className="text-muted-foreground">Unable to load resume information.</p>
+        <h2 className="text-xl font-semibold mb-2">{t("resumeViewer.error.dataTitle")}</h2>
+        <p className="text-muted-foreground">{t("resumeViewer.error.dataBody")}</p>
       </div>
     );
   }
@@ -107,8 +109,8 @@ export default function ResumeViewer({
   if (!resume.content) {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
-        <h2 className="text-xl font-semibold mb-2">Resume content not available</h2>
-        <p className="text-muted-foreground">Resume data structure is incomplete.</p>
+        <h2 className="text-xl font-semibold mb-2">{t("resumeViewer.error.contentTitle")}</h2>
+        <p className="text-muted-foreground">{t("resumeViewer.error.contentBody")}</p>
       </div>
     );
   }
@@ -159,7 +161,7 @@ export default function ResumeViewer({
   const formatMMMYYYY = (dateString: string): string => {
     const raw = (dateString || "").trim();
     if (!raw) return "";
-    if (/^present$/i.test(raw) || /^current$/i.test(raw) || /^now$/i.test(raw)) return "Present";
+    if (/^present$/i.test(raw) || /^current$/i.test(raw) || /^now$/i.test(raw)) return t("labels.present");
 
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -191,7 +193,7 @@ export default function ResumeViewer({
   const getDateText = (startDate?: string, endDate?: string, treatMissingEndAsPresent = false): string | null => {
     const start = formatMMMYYYY(startDate || "");
     let end = formatMMMYYYY(endDate || "");
-    if (!end && treatMissingEndAsPresent) end = "Present";
+    if (!end && treatMissingEndAsPresent) end = t("labels.present");
 
     if (!start && !end) return null;
     if (!start && end) return end;
@@ -217,15 +219,15 @@ export default function ResumeViewer({
   const getPrivacyText = (privacy: ResumePrivacy) => {
     switch (privacy) {
       case "public":
-        return "Public";
+        return t("labels.privacy.public");
       case "recruiter_only":
-        return "Recruiter Only";
+        return t("labels.privacy.recruiterOnly");
       case "connections":
-        return "Connections";
+        return t("labels.connections");
       case "private":
-        return "Private";
+        return t("labels.privacy.private");
       default:
-        return "Private";
+        return t("labels.privacy.private");
     }
   };
 
@@ -394,7 +396,7 @@ export default function ResumeViewer({
                     {videoMetaItems.length > 1 && (
                       <button
                         type="button"
-                        aria-label="Previous video"
+                        aria-label={t("resumeViewer.aria.previousVideo")}
                         className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
                         onClick={() => setVideoIndex((prev) => (prev - 1 + videoMetaItems.length) % videoMetaItems.length)}
                       >
@@ -406,7 +408,7 @@ export default function ResumeViewer({
                     {videoMetaItems.length > 1 && (
                       <button
                         type="button"
-                        aria-label="Next video"
+                        aria-label={t("resumeViewer.aria.nextVideo")}
                         className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
                         onClick={() => setVideoIndex((prev) => (prev + 1) % videoMetaItems.length)}
                       >
@@ -418,7 +420,7 @@ export default function ResumeViewer({
                       <iframe
                         className="absolute inset-0 w-full h-full"
                         src={youTubeEmbed(currentVideoMeta.url)}
-                        title={currentVideoMeta.name || "Video Resume"}
+                        title={currentVideoMeta.name || t("headings.videoResume")}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
@@ -460,7 +462,7 @@ export default function ResumeViewer({
             {/* Summary */}
             {resumeData.basics.summary && (
               <section>
-                <h2 className="text-2xl font-bold mb-4">Professional Summary</h2>
+                <h2 className="text-2xl font-bold mb-4">{t("fields.summary.label")}</h2>
                 <p className="text-muted-foreground leading-relaxed">
                   {resumeData.basics.summary}
                 </p>
@@ -483,7 +485,7 @@ export default function ResumeViewer({
             {/* Work Experience */}
             {resumeData.work.length > 0 && (
               <section>
-                <h2 className="text-2xl font-bold mb-6">Work Experience</h2>
+                <h2 className="text-2xl font-bold mb-6">{t("headings.workExperience")}</h2>
                 <div className="space-y-6">
                   {resumeData.work
                     .slice()
@@ -560,7 +562,7 @@ export default function ResumeViewer({
             {/* Education */}
             {resumeData.education.length > 0 && (
               <section>
-                <h2 className="text-2xl font-bold mb-6">Education</h2>
+                <h2 className="text-2xl font-bold mb-6">{t("headings.education")}</h2>
                 <div className="space-y-4">
                   {resumeData.education.map((edu, index) => (
 
@@ -606,7 +608,7 @@ export default function ResumeViewer({
               {/* Volunteer Experience */}
               {resumeData.volunteer.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Volunteer Experience</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("headings.volunteerExperience")}</h2>
                   <div className="space-y-4">
                     {resumeData.volunteer
                       .slice()
@@ -650,7 +652,7 @@ export default function ResumeViewer({
             {/* Skills */}
             {resumeData.skills.length > 0 && (
               <section>
-                <h2 className="text-2xl font-bold mb-6">Skills</h2>
+                <h2 className="text-2xl font-bold mb-6">{t("headings.skills")}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {resumeData.skills.map((skill, index) => (
                     <div key={index} className="flex flex-col gap-2 p-3 border rounded-lg" data-section-id={skill.id}>
@@ -692,7 +694,7 @@ export default function ResumeViewer({
               {/* Projects */}
               {resumeData.projects.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Projects</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("headings.projects")}</h2>
                   <div className="space-y-6">
                     {resumeData.projects.map((project, index) => (
                       <div key={index} className="border-b pb-6 last:border-b-0 last:pb-0" data-section-id={project.id}>
@@ -735,7 +737,7 @@ export default function ResumeViewer({
               {/* Awards */}
               {resumeData.awards.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Awards</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("tabs.awards")}</h2>
                   <div className="space-y-4">
                     {resumeData.awards.map((award, index) => (
                       <div key={index} className="border rounded-lg p-4">
@@ -757,7 +759,7 @@ export default function ResumeViewer({
               {/* Certificates */}
               {resumeData.certificates.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Certificates</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("tabs.certificates")}</h2>
                   <div className="space-y-4">
                     {resumeData.certificates.map((cert, index) => (
                       <div key={index} className="border rounded-lg p-4">
@@ -784,7 +786,7 @@ export default function ResumeViewer({
               {/* Publications */}
               {resumeData.publications.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Publications</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("tabs.publications")}</h2>
                   <div className="space-y-4">
                     {resumeData.publications.map((pub, index) => (
                       <div key={index} className="border rounded-lg p-4">
@@ -811,7 +813,7 @@ export default function ResumeViewer({
               {/* Languages */}
               {resumeData.languages.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Languages</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("headings.languages")}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {resumeData.languages.map((language, index) => (
                       <div key={index} className="p-4 border rounded-lg">
@@ -828,7 +830,7 @@ export default function ResumeViewer({
               {/* Interests */}
               {resumeData.interests.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">Interests</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("headings.interests")}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {resumeData.interests.map((interest, index) => (
                       <div key={index} className="p-4 border rounded-lg">
@@ -851,7 +853,7 @@ export default function ResumeViewer({
               {/* References */}
               {resumeData.references.length > 0 && (
                 <section>
-                  <h2 className="text-2xl font-bold mb-6">References</h2>
+                  <h2 className="text-2xl font-bold mb-6">{t("tabs.references")}</h2>
                   <div className="space-y-4">
                     {resumeData.references.map((reference, index) => (
                       <div key={index} className="border rounded-lg p-4">
@@ -868,16 +870,16 @@ export default function ResumeViewer({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Created</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("labels.created")}</p>
               <p>{new Date(resume.createdAt).toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("resumeViewer.labels.lastUpdated")}</p>
               <p>{new Date(resume.updatedAt).toLocaleString()}</p>
             </div>
             {canEdit && (
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Views</p>
+                <p className="text-sm font-medium text-muted-foreground">{t("labels.views")}</p>
                 <p className="flex items-center gap-1">
                   <Eye className="h-4 w-4" />
                   {resume.viewCount}
@@ -888,8 +890,8 @@ export default function ResumeViewer({
 
           {resume.parentId && (
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">Variation of</p>
-              <Badge variant="outline">Master Resume</Badge>
+              <p className="text-sm font-medium text-muted-foreground mb-2">{t("resumeViewer.labels.variationOf")}</p>
+              <Badge variant="outline">{t("resumeViewer.labels.masterResume")}</Badge>
             </div>
           )}
         </CardContent>

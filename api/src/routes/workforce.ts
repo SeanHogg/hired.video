@@ -39,6 +39,11 @@ import {
   recalculateWorkforceSeats,
   resolveEmployerCompanyIds,
 } from "../services/workforce/index.js";
+import {
+  listEmployerIntegrations,
+  disconnectByEmployer,
+  type IntegrationProvider,
+} from "../services/workforce/integrations.js";
 
 export const workforceRoutes = new Hono<AppEnv>();
 
@@ -210,4 +215,31 @@ workforceRoutes.post("/reconcile-seats", async (c) => {
     results.push(await recalculateWorkforceSeats(companyId));
   }
   return c.json(success({ results }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Integrations (#1441) — list + disconnect. OAuth callback handlers
+// per provider land separately when client IDs are configured.
+// ---------------------------------------------------------------------------
+
+workforceRoutes.get("/integrations", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const integrations = await listEmployerIntegrations(userId);
+  return c.json(success({ integrations }), 200);
+});
+
+workforceRoutes.post("/integrations/:provider/disconnect", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const provider = c.req.param("provider") as IntegrationProvider;
+  if (!["quickbooks", "xero", "gusto", "docusign", "helcim"].includes(provider)) {
+    return c.json(error("BAD_REQUEST", `Unknown provider: ${provider}`), 400);
+  }
+  const body = await c.req.json().catch(() => ({}));
+  if (!body.companyId) {
+    return c.json(error("BAD_REQUEST", "companyId is required"), 400);
+  }
+  await disconnectByEmployer(userId, body.companyId, provider);
+  return c.json(success({ disconnected: true }), 200);
 });

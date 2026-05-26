@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 
 export type ArticleKind = "article" | "faq" | "guide";
 
@@ -147,13 +148,20 @@ export const articleService = {
   },
 
   async listPublished(
-    opts: { limit?: number; kind?: ArticleKind; sector?: string; audience?: string } = {},
+    opts: { limit?: number; kind?: ArticleKind; sector?: string; audience?: string; fields?: readonly string[] } = {},
   ): Promise<PublicArticleCard[]> {
     const params = new URLSearchParams();
     if (opts.limit) params.set("limit", String(opts.limit));
     if (opts.kind) params.set("kind", opts.kind);
     if (opts.sector) params.set("sector", opts.sector);
     if (opts.audience) params.set("audience", opts.audience);
+    // `?fields=` projection (gap #1444) — article `body` markdown stays
+    // server-side until the detail view asks for it.
+    const fields = serializeListFields(
+      "articles",
+      opts.fields ?? CARD_FIELDS_BY_KIND.articles,
+    );
+    if (fields) params.set("fields", fields);
     const qs = params.toString();
     const res = await apiClient.get<PublicArticleCard[]>(
       `/api/articles/public${qs ? `?${qs}` : ""}`,
@@ -163,9 +171,15 @@ export const articleService = {
     return res.data ?? [];
   },
 
-  async listPublishedByUser(userId: string, limit = 50): Promise<PublicArticleCard[]> {
+  async listPublishedByUser(userId: string, limit = 50, options: { fields?: readonly string[] } = {}): Promise<PublicArticleCard[]> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    const fields = serializeListFields(
+      "articles",
+      options.fields ?? CARD_FIELDS_BY_KIND.articles,
+    );
+    if (fields) params.set("fields", fields);
     const res = await apiClient.get<PublicArticleCard[]>(
-      `/api/articles/public/by-user/${userId}?limit=${limit}`,
+      `/api/articles/public/by-user/${userId}?${params.toString()}`,
       undefined,
       { suppressErrorEvent: true },
     );

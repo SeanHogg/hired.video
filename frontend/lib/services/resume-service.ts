@@ -7,6 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import { ResumeSchema } from "@shared/resume";
+import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis, ConsolidateBulletsRequest, ConsolidateBulletsResult } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
@@ -159,11 +160,24 @@ export class ResumeService {
   /**
    * Get all public resumes
    */
-  async getPublicResumes(page = 1, limit = 20): Promise<PaginatedResumes> {
+  async getPublicResumes(
+    page = 1,
+    limit = 20,
+    options: { fields?: readonly string[] } = {},
+  ): Promise<PaginatedResumes> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
+
+    // `?fields=` projection (gap #1444) — resume `content` JSONB is the
+    // heavy column; list view never needs it. Default to the card subset;
+    // callers asking for the full row pass `fields: []`.
+    const fields = serializeListFields(
+      "resumes",
+      options.fields ?? CARD_FIELDS_BY_KIND.resumes,
+    );
+    if (fields) params.set("fields", fields);
 
     const response = await apiClient.get<any>(
       `/api/resumes/public?${params.toString()}`,

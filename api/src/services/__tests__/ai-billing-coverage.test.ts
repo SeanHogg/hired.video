@@ -19,10 +19,15 @@
  * justification.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import { strict as assert } from "node:assert";
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
+// ESM-safe equivalent of CJS __dirname — the api package is ESM
+// (`"type": "module"`) so the original `__dirname` reference threw.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTES_DIR = join(__dirname, "..", "..", "routes");
 
 /** Files allowed to call the LLM without a `useCase` (because they
@@ -54,27 +59,40 @@ describe("AI billing coverage", () => {
       const fileName = file.split(/[\\/]/).pop()!;
       if (ALLOWLISTED_RAW_LLM_FILES.has(fileName)) continue;
 
-      const source = readFileSync(file, "utf8");
+      const rawSource = readFileSync(file, "utf8");
+      // Pre-strip line + block comments so the regex doesn't fire on
+      // prose references like `// see llm.callJson(...)`. Replaced with
+      // same-length spaces so character offsets in error messages still
+      // point at the right line for human debugging.
+      const source = rawSource
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => " ".repeat(m.length))
+        .replace(/(^|[^:])\/\/[^\n]*/g, (m, lead: string) => lead + " ".repeat(m.length - lead.length));
       const llmHits = source.match(LLM_CALL_PATTERN);
       if (!llmHits) continue;
 
       // Heuristic: for each `callJson(...)` site, ensure a `useCase:`
-      // appears within the next ~600 characters. We don't need an AST
+      // appears within the next ~3000 characters. We don't need an AST
       // — the calls are syntactically uniform: `llm.callJson("slug",
-      // { useCase: "...", ... })`.
+      // { useCase: "...", ... })`. The window must comfortably exceed
+      // a long template-literal `userMessage` + `systemPrompt` (the
+      // dashboard insights call clocks in around 1.2 KB of literals
+      // before reaching `useCase`); 3000 chars covers every legitimate
+      // call shape in routes/* today while still being tight enough to
+      // catch a truly unmetered callsite.
       LLM_CALL_PATTERN.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = LLM_CALL_PATTERN.exec(source)) !== null) {
-        const window = source.slice(m.index, m.index + 600);
+        const window = source.slice(m.index, m.index + 3000);
         if (!USE_CASE_PATTERN.test(window)) {
           offenders.push(`${fileName}:${m.index} — ${m[1]}(...) without an adjacent useCase`);
         }
       }
     }
 
-    expect(
+    assert.equal(
       offenders.length,
+      0,
       `Found ${offenders.length} LLM call site(s) missing a \`useCase\` — these calls won't be metered and will silently re-introduce the billing leak fixed in #428:\n${offenders.map((o) => `  • ${o}`).join("\n")}\n\nWrap each via \`llm.callJson("<slug>", { useCase: "<feature_key>", ... })\` or add the file to ALLOWLISTED_RAW_LLM_FILES with justification.`,
-    ).toBe(0);
+    );
   });
 });

@@ -114,6 +114,12 @@ const VENDOR_HINTS: Record<string, string> = {
     "ZipRecruiter candidate profile. Sections: Profile blurb (basics.summary, ~600 char soft limit), Work experience, Education, Skills.",
   monster:
     "Monster profile page. Sections: Highlights (basics.summary), Experience, Education, Skills.",
+  wellfound:
+    "Wellfound (formerly AngelList Talent) profile at /u/<handle>. Sections: One-line role (basics.label), short elevator bio (basics.summary, ~240 chars), Work experience, Skills. Bias toward startup-flavoured copy.",
+  dice:
+    "Dice tech profile. Sections: Title (basics.label), Summary (keyword-dense bullets preferred over prose), Work experience, Skills (highly weighted on Dice).",
+  github:
+    "GitHub user profile page (github.com/<username>). basics.name = the display name, basics.label = the user's bio line (160 char limit), basics.location from the profile sidebar. Work/Education are NOT typically present — emit empty arrays if missing. Pinned-repo names + descriptions can populate projects[].",
 };
 
 export interface ExtractFromHtmlInput {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Users, ClipboardCheck, CheckCircle2, XCircle, UserMinus, DollarSign, TrendingUp } from "lucide-react";
+import { Loader2, Users, ClipboardCheck, CheckCircle2, XCircle, UserMinus, DollarSign, TrendingUp, Plug, Unplug } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ import {
   type RosterRow,
   type DeskMarginRow,
   type PlacementDocument,
+  type Integration,
+  type IntegrationProvider,
 } from "@/lib/services/workforce-service";
 
 /**
@@ -52,7 +54,121 @@ export function WorkforceSettings() {
       <RosterCard />
       <DeskMarginCard />
       <DocumentsCard />
+      <IntegrationsCard />
     </div>
+  );
+}
+
+const ALL_PROVIDERS: { id: IntegrationProvider; label: string; description: string }[] = [
+  { id: "quickbooks", label: "QuickBooks Online", description: "Push workforce invoices outbound for AR." },
+  { id: "xero", label: "Xero", description: "Push workforce invoices outbound for AR." },
+  { id: "gusto", label: "Gusto", description: "Contractor pay rails — 1099 + ACH." },
+  { id: "docusign", label: "DocuSign", description: "E-sign envelopes for compliance docs." },
+  { id: "helcim", label: "Helcim", description: "Default payment + recurring billing rails." },
+];
+
+function IntegrationsCard() {
+  const { toast } = useToast();
+  const [items, setItems] = useState<Integration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const r = await workforceService.listIntegrations();
+      setItems(r.integrations);
+    } catch (e) {
+      toast({ title: "Failed to load integrations", description: String((e as Error).message), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const handleDisconnect = async (it: Integration) => {
+    const key = `${it.companyId}:${it.provider}`;
+    setBusyKey(key);
+    try {
+      await workforceService.disconnectIntegration(it.provider, it.companyId);
+      toast({ title: "Disconnected", description: `${it.provider} disconnected from your workspace.` });
+      await refresh();
+    } catch (e) {
+      toast({ title: "Disconnect failed", description: String((e as Error).message), variant: "destructive" });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const byProvider = new Map(items.filter((i) => i.status === "connected").map((i) => [i.provider, i] as const));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Plug className="h-5 w-5" />
+          Integrations
+          {!loading && byProvider.size > 0 && (
+            <Badge variant="secondary">{byProvider.size} connected</Badge>
+          )}
+        </CardTitle>
+        <CardDescription>
+          Connect your accounting + e-sign providers so workforce timesheets push invoices outbound and
+          docs sign through your preferred provider. OAuth handshake handlers land per provider once
+          client IDs are configured.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="text-sm text-muted-foreground">Loading…</div>
+        ) : (
+          <div className="space-y-2">
+            {ALL_PROVIDERS.map((p) => {
+              const connected = byProvider.get(p.id);
+              return (
+                <div key={p.id} className="border rounded-md p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+                  <div className="flex-1">
+                    <div className="font-medium">{p.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.description}
+                      {connected?.externalAccountId && ` · ${connected.externalAccountId}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {connected ? (
+                      <>
+                        <Badge variant="default">connected</Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyKey === `${connected.companyId}:${connected.provider}`}
+                          onClick={() => handleDisconnect(connected)}
+                        >
+                          {busyKey === `${connected.companyId}:${connected.provider}`
+                            ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            : <Unplug className="h-4 w-4 mr-1" />}
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        title="OAuth handshake lands when provider client ID + redirect URL are configured"
+                      >
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

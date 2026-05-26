@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Chrome, Loader2 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
@@ -36,7 +37,7 @@ import {
 } from "@/lib/services/vendor-sync-service";
 import VendorCard, { useVendorSyncFocusedListener } from "@/components/sync/VendorCard";
 import {
-  VENDOR_CATEGORY_LABEL,
+  useCategoryLabels,
   VENDOR_CATEGORY_ORDER,
   type VendorCategory,
 } from "@/components/sync/category-labels";
@@ -48,6 +49,8 @@ type CategoryFilter = VendorCategory | "all";
 export default function VendorSync() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  const categoryLabels = useCategoryLabels();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [connectors, setConnectors] = useState<VendorConnectorListItem[]>([]);
@@ -135,8 +138,8 @@ export default function VendorSync() {
     if (!connector) return;
     if (!connector.supportsExtensionExtract) {
       toast({
-        title: `${connector.label} doesn't support extension sync yet`,
-        description: "Use the paste-ready blocks instead.",
+        title: t("tools.vendorSync.error.notSupportedTitle", { vendor: connector.label }),
+        description: t("tools.vendorSync.error.notSupportedDesc"),
         variant: "destructive",
       });
       autoSyncFiredRef.current = true;
@@ -163,20 +166,20 @@ export default function VendorSync() {
       pendingConnectorRef.current = null;
       if (!connectorId) {
         toast({
-          title: "Couldn't identify the vendor",
-          description: payload.error ?? "Open your profile on a supported site (LinkedIn, Indeed) and try again.",
+          title: t("tools.vendorSync.error.couldNotIdentify"),
+          description: payload.error ?? t("tools.vendorSync.error.couldNotIdentifyDesc"),
           variant: "destructive",
         });
         return;
       }
       if (!payload.html) {
         toast({
-          title: "No profile detected",
+          title: t("tools.vendorSync.error.noProfileDetected"),
           description: payload.error === "NO_PROFILE_TAB"
-            ? "Open your profile on a supported site (LinkedIn, Indeed) in another tab, then click Sync again."
+            ? t("tools.vendorSync.error.noProfileTab")
             : payload.error === "NO_FOCUSED_PANE"
-            ? "We couldn't read the profile pane on that page. Make sure you're on your own /in/<handle> page."
-            : payload.error ?? "Try again with the profile tab focused.",
+            ? t("tools.vendorSync.error.paneNotFound")
+            : payload.error ?? t("tools.vendorSync.error.tryAgain"),
           variant: "destructive",
         });
         return;
@@ -193,7 +196,7 @@ export default function VendorSync() {
         setMergeDialogOpen(true);
       } catch (err) {
         toast({
-          title: "Failed to extract profile",
+          title: t("tools.vendorSync.error.failedToExtract"),
           description: err instanceof Error ? err.message : "Unknown error",
           variant: "destructive",
         });
@@ -231,14 +234,8 @@ export default function VendorSync() {
       header={{
         icon: <Chrome className="h-6 w-6 text-blue-600" />,
         iconBgClassName: "bg-blue-100 dark:bg-blue-900/30",
-        title: "LinkedIn & Profile Sync",
-        // Honest framing: extension-driven sync works today for a subset
-        // (LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster); the rest
-        // are paste-ready blocks the user copies into the profile editor
-        // themselves. The "Extension" badge on each card signals which is
-        // which. Pairs with #1417 from the Gap Register.
-        description:
-          "Render your master resume into paste-ready blocks for LinkedIn, Indeed, Glassdoor, GitHub, ZipRecruiter and more — and pull updates back from supported sites via the Chrome extension.",
+        title: t("tools.vendorSync.title"),
+        description: t("tools.vendorSync.subtitle"),
       }}
     >
         {/* Extension highlight */}
@@ -249,11 +246,10 @@ export default function VendorSync() {
             </div>
             <div className="text-sm">
               <div className="font-semibold mb-1">
-                Faster with the hired.video Chrome extension
+                {t("tools.vendorSync.extensionCard.title")}
               </div>
               <p className="text-muted-foreground">
-                Install the extension to sync changes directly between your hired.video master and your live profile pages —
-                no copy/paste required. The cards below highlight which vendors support extension-driven sync today.
+                {t("tools.vendorSync.extensionCard.body")}
                 {" "}
                 <a
                   href="https://chromewebstore.google.com/search/hired.video"
@@ -261,7 +257,7 @@ export default function VendorSync() {
                   rel="noopener noreferrer"
                   className="underline"
                 >
-                  Get the extension
+                  {t("tools.vendorSync.extensionCard.cta")}
                 </a>
               </p>
             </div>
@@ -275,21 +271,21 @@ export default function VendorSync() {
         {isAuthenticated && resumes.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-end gap-3">
             <div className="flex-1">
-              <Label htmlFor="resume-picker">Resume to sync</Label>
+              <Label htmlFor="resume-picker">{t("tools.vendorSync.resumePicker.label")}</Label>
               <Select value={selectedResumeId ?? ""} onValueChange={(v) => setSelectedResumeId(v)}>
                 <SelectTrigger id="resume-picker" className="mt-1">
-                  <SelectValue placeholder="Choose a resume" />
+                  <SelectValue placeholder={t("tools.vendorSync.resumePicker.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {resumes.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.title}{r.isMaster ? " (master)" : ""}
+                      {r.title}{r.isMaster ? ` (${t("tools.vendorSync.master")})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Imports always merge into your master. Exports render from the resume you pick here.
+                {t("tools.vendorSync.resumePicker.help")}
               </p>
             </div>
           </div>
@@ -310,7 +306,7 @@ export default function VendorSync() {
         {importingFromExt && (
           <div className="bg-muted border rounded-md p-3 text-sm flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Extracting your profile and analyzing for merge…
+            {t("tools.vendorSync.importingProgress")}
           </div>
         )}
 
@@ -321,11 +317,11 @@ export default function VendorSync() {
             <CategoryFilterBar
               value={activeCategory}
               onChange={(next) => setActiveCategory(next)}
-              allLabel="All vendors"
+              allLabel={t("tools.vendorSync.allVendors")}
               allCount={connectors.length}
               options={VENDOR_CATEGORY_ORDER.map((cat) => ({
                 value: cat,
-                label: VENDOR_CATEGORY_LABEL[cat],
+                label: categoryLabels.long[cat],
                 count: categoryCounts.get(cat) ?? 0,
               }))}
             />
@@ -346,7 +342,7 @@ export default function VendorSync() {
 
             {visibleConnectors.length === 0 && (
               <div className="text-sm text-muted-foreground py-6 text-center">
-                No vendors in this category yet — switch the filter or pick All vendors.
+                {t("tools.vendorSync.emptyCategory")}
               </div>
             )}
           </>

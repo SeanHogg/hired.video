@@ -28,7 +28,7 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -1097,7 +1097,7 @@ interviewAssignmentRoutes.get("/compare", async (c) => {
     .where(
       and(
         eq(studioAsyncInterviews.recruiterId, user.sub),
-        sql`${studioAsyncInterviews.id} = ANY(${ids})`,
+        inArray(studioAsyncInterviews.id, ids),
       ),
     );
   if (interviews.length === 0) {
@@ -1110,7 +1110,7 @@ interviewAssignmentRoutes.get("/compare", async (c) => {
   const responses = await db
     .select()
     .from(studioAsyncResponses)
-    .where(sql`${studioAsyncResponses.interviewId} = ANY(${interviewIds})`);
+    .where(inArray(studioAsyncResponses.interviewId, interviewIds));
 
   const buckets = new Map<string, typeof responses>();
   for (const r of responses) {

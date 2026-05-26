@@ -88,7 +88,10 @@ export const githubConnector: VendorConnector = {
   description:
     "Generate a profile-README.md and a 160-char bio from your master resume — paste straight into GitHub.",
   editProfileUrl: "https://github.com/settings/profile",
-  supportsExtensionExtract: false,
+  // Extraction reads the public profile page at github.com/<username>
+  // (bio + location + pinned repos), NOT settings. Write-back stays
+  // false because the README lives in a repo, not a form field.
+  supportsExtensionExtract: true,
   supportsExtensionWrite: false,
 
   renderExportBlocks(content: ResumeContent): ExportBlock[] {

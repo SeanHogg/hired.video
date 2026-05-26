@@ -8,6 +8,7 @@ import { apiClient } from "../api-client";
 import { UnverifiedAccountError } from "../errors";
 import { isVerificationKnownBlocked } from "../verification-gate";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
+import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 
 // ============================================================================
 // SCHEMAS
@@ -394,7 +395,10 @@ export class UserService {
   /**
    * Get all public users with optional filters
    */
-  async getPublicUsers(filters?: UserFilters): Promise<PaginatedPublicUsers> {
+  async getPublicUsers(
+    filters?: UserFilters,
+    options: { fields?: readonly string[] } = {},
+  ): Promise<PaginatedPublicUsers> {
     const params = new URLSearchParams();
 
     if (filters) {
@@ -408,6 +412,14 @@ export class UserService {
         }
       });
     }
+
+    // `?fields=` projection (gap #1444) — default to the People card
+    // subset; opt-out by passing `fields: []`.
+    const fields = serializeListFields(
+      "users",
+      options.fields ?? CARD_FIELDS_BY_KIND.users,
+    );
+    if (fields) params.set("fields", fields);
 
     const endpoint = `/api/users/public${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<any>(

@@ -341,7 +341,7 @@ export const FEATURE_ROWS: FeatureRow[] = [
     feature: "Public, programmable API + OpenAPI 3.1 spec",
     icon: KeyRound,
     values: { hired: "yes", loxo: "partial", linkedin: "yes", greenhouse: "yes", bullhorn: "yes" },
-    note: "SHA-256-hashed API keys with per-call scoping (Premium tier). Spec at /api/openapi.json + Swagger UI at /docs.",
+    note: "SHA-256-hashed API keys with per-call scoping (Pro tier). Spec at /api/openapi.json + Swagger UI at /docs.",
   },
   {
     feature: "Creator monetisation (95/5 split on voice clones + templates + future media)",

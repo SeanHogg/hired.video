@@ -640,7 +640,7 @@ searchRoutes.post("/recruiter", async (c) => {
           200,
         );
       }
-      conditions.push(sql`${users.id} = ANY(${allow}::uuid[])`);
+      conditions.push(inArray(users.id, allow));
     }
   }
 

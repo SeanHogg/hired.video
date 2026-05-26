@@ -303,7 +303,7 @@ function RedemptionGrid({
     icon: typeof Sparkles;
   }> = [
     { kind: "ai_credits", label: "AI Credits", icon: Sparkles },
-    { kind: "premium_month", label: "Premium Time", icon: Calendar },
+    { kind: "premium_month", label: "Pro Time", icon: Calendar },
     { kind: "gift_card", label: "Gift Cards", icon: Gift },
   ];
 

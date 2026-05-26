@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
+import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 import { isValidCompanyName } from "../utils/company-validation";
 
 // ============================================================================
@@ -237,6 +238,7 @@ export class CompanyService {
    */
   async getPublicCompanies(
     filters?: CompanyFilters,
+    options: { fields?: readonly string[] } = {},
   ): Promise<PaginatedCompanies> {
     const params = new URLSearchParams();
 
@@ -251,6 +253,17 @@ export class CompanyService {
         }
       });
     }
+
+    // `?fields=` projection (gap #1444). Companies grid only needs name +
+    // logo + industry — description / culture / values blobs stay server-
+    // side until the detail view asks for them. Note: `name` is filtered
+    // post-fetch via `isValidCompanyName`, so we must keep it in the set
+    // even when callers don't explicitly request it.
+    const fields = serializeListFields(
+      "companies",
+      options.fields ?? CARD_FIELDS_BY_KIND.companies,
+    );
+    if (fields) params.set("fields", fields);
 
     const endpoint = `/api/Companies/public${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<PaginatedCompanies>(

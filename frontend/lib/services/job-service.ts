@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
+import { CARD_FIELDS_BY_KIND, serializeListFields } from "@shared/projection";
 
 // ============================================================================
 // SCHEMAS
@@ -161,7 +162,10 @@ export class JobService {
   /**
    * Get all public jobs
    */
-  async getPublicJobs(filters?: JobFilters): Promise<PaginatedJobs> {
+  async getPublicJobs(
+    filters?: JobFilters,
+    options: { fields?: readonly string[] } = {},
+  ): Promise<PaginatedJobs> {
     const params = new URLSearchParams();
 
     if (filters) {
@@ -175,6 +179,16 @@ export class JobService {
         }
       });
     }
+
+    // `?fields=` projection (gap #1444). Default to the JOBS card subset
+    // so unconditional list calls automatically benefit; callers that
+    // need the full row pass `fields: []` or override with their own
+    // narrower / wider set.
+    const fields = serializeListFields(
+      "jobs",
+      options.fields ?? CARD_FIELDS_BY_KIND.jobs,
+    );
+    if (fields) params.set("fields", fields);
 
     const endpoint = `/api/Job${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<z.infer<typeof PaginatedJobsSchema>>(endpoint, PaginatedJobsSchema);

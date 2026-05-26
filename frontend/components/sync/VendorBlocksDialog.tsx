@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { Copy, Loader2, ExternalLink, Wand2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription,
@@ -35,6 +36,7 @@ export default function VendorBlocksDialog({
   open, onClose, connector, resumeId, resumeTitle,
 }: VendorBlocksDialogProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<ExportBlock[]>([]);
@@ -55,19 +57,25 @@ export default function VendorBlocksDialog({
       setAutofillingSection(null);
       if (payload.status === "filled") {
         toast({
-          title: `Filled ${payload.blockSection ?? "field"} on ${connector.label}`,
-          description: "Review the value on the page and click Save.",
+          title: t("tools.vendorSync.autofillSuccess.title", {
+            section: payload.blockSection ?? "field",
+            vendor: connector.label,
+          }),
+          description: t("tools.vendorSync.autofillSuccess.description"),
         });
       } else {
         const reason = payload.error === "NO_VENDOR_TAB"
-          ? `Open ${connector.label} in another tab first, then try again.`
+          ? t("tools.vendorSync.autofillError.noTab", { vendor: connector.label })
           : payload.error === "FIELD_NOT_FOUND"
-          ? `Open the ${payload.blockSection ?? "section"} edit modal on ${connector.label} first — autofill targets the modal's textarea.`
+          ? t("tools.vendorSync.autofillError.fieldNotFound", {
+              section: payload.blockSection ?? "section",
+              vendor: connector.label,
+            })
           : payload.error === "INJECTION_FAILED"
-          ? "Couldn't load the autofill helper on that tab."
-          : "Autofill couldn't write that field — copy/paste as a fallback.";
+          ? t("tools.vendorSync.autofillError.injection")
+          : t("tools.vendorSync.autofillError.unknown");
         toast({
-          title: "Autofill skipped",
+          title: t("tools.vendorSync.autofillSkipped"),
           description: reason,
           variant: "destructive",
         });
@@ -113,8 +121,9 @@ export default function VendorBlocksDialog({
   const handleCopy = useCallback(async (block: ExportBlock) => {
     try {
       await navigator.clipboard.writeText(block.text);
+      const sectionLabel = block.section + (block.subSection ? ` — ${block.subSection}` : "");
       toast({
-        title: `Copied ${block.section}${block.subSection ? ` — ${block.subSection}` : ""}`,
+        title: t("tools.vendorSync.copiedToast", { section: sectionLabel }),
       });
     } catch (err) {
       toast({
@@ -123,15 +132,19 @@ export default function VendorBlocksDialog({
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, t]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Paste-ready blocks for {connector.label}</DialogTitle>
+          <DialogTitle>{t("tools.vendorSync.dialog.title", { vendor: connector.label })}</DialogTitle>
           <DialogDescription>
-            Rendered from <strong>{resumeTitle}</strong>. Copy each block and paste it into the matching section on {connector.label}.
+            <Trans
+              i18nKey="tools.vendorSync.dialog.description"
+              values={{ title: resumeTitle, vendor: connector.label }}
+              components={{ strong: <strong /> }}
+            />
             {connector.editProfileUrl && (
               <>
                 {" "}
@@ -141,7 +154,7 @@ export default function VendorBlocksDialog({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 underline"
                 >
-                  Open profile editor <ExternalLink className="h-3 w-3" />
+                  {t("tools.vendorSync.dialog.openEditor")} <ExternalLink className="h-3 w-3" />
                 </a>
               </>
             )}
@@ -162,8 +175,7 @@ export default function VendorBlocksDialog({
 
         {!loading && !error && blocks.length === 0 && (
           <div className="text-sm text-muted-foreground py-6 text-center">
-            This resume doesn't have enough content to render blocks for {connector.label}.
-            Add work experience, skills, and a summary to your master resume first.
+            {t("tools.vendorSync.dialog.emptyState", { vendor: connector.label })}
           </div>
         )}
 
@@ -200,6 +212,7 @@ function BlockCard({
   onAutofill: () => void;
   autofilling: boolean;
 }) {
+  const { t } = useTranslation();
   const overLimit = typeof block.charLimit === "number" && block.text.length > block.charLimit;
   return (
     <div className="border rounded-md p-3 space-y-2 bg-muted/20">
@@ -228,7 +241,7 @@ function BlockCard({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <ExternalLink className="h-3 w-3 mr-1" /> Open
+                <ExternalLink className="h-3 w-3 mr-1" /> {t("tools.vendorSync.button.open")}
               </a>
             </Button>
           )}
@@ -238,17 +251,17 @@ function BlockCard({
               variant="ghost"
               onClick={onAutofill}
               disabled={autofilling}
-              title={`Open the ${block.section} edit modal on ${vendorLabel}, then click Auto-fill.`}
+              title={t("tools.vendorSync.autofillTooltip", { section: block.section, vendor: vendorLabel })}
             >
               {autofilling ? (
-                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Filling…</>
+                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> {t("tools.vendorSync.button.filling")}</>
               ) : (
-                <><Wand2 className="h-3 w-3 mr-1" /> Auto-fill</>
+                <><Wand2 className="h-3 w-3 mr-1" /> {t("tools.vendorSync.button.autofill")}</>
               )}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onCopy}>
-            <Copy className="h-3 w-3 mr-1" /> Copy
+            <Copy className="h-3 w-3 mr-1" /> {t("tools.vendorSync.button.copy")}
           </Button>
         </div>
       </div>

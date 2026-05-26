@@ -6,8 +6,28 @@ import { getDb, schema } from "../db/index.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
+import {
+  NOTIFICATION_LIST_FIELDS,
+  parseFields,
+  pickSelectShape,
+} from "../../../shared/projection.js";
 
 const { notifications } = schema;
+
+// Full row-select shape — every column the table exposes. The Drizzle
+// pushdown helper subsets this down to the requested `?fields=` set so
+// the DB only reads + ships what the caller asked for (gap #1445). Keys
+// MUST match `NOTIFICATION_LIST_FIELDS` exactly for the projection to
+// hit; anything missing here falls back to the full row.
+const NOTIFICATION_SELECT_SHAPE = {
+  id: notifications.id,
+  type: notifications.type,
+  title: notifications.title,
+  message: notifications.message,
+  isRead: notifications.isRead,
+  createdAt: notifications.createdAt,
+  data: notifications.data,
+} as const;
 
 export const notificationRoutes = new Hono<AppEnv>();
 
@@ -27,8 +47,14 @@ notificationRoutes.get("/", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  // Drizzle-side projection (gap #1445) — `?fields=` narrows the SELECT
+  // shape so Neon only reads + ships the columns the caller asked for.
+  // Saves the `data` jsonb blob (typically the heaviest column) on
+  // card-view consumers that just need title + message + timestamp.
+  const fields = parseFields(c.req.query("fields"), NOTIFICATION_LIST_FIELDS);
+  const shape = pickSelectShape(NOTIFICATION_SELECT_SHAPE, fields);
   const rows = await db
-    .select()
+    .select(shape)
     .from(notifications)
     .where(eq(notifications.userId, uid))
     .orderBy(desc(notifications.createdAt))

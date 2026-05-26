@@ -60,9 +60,18 @@ export function assignmentRoutes(
     if (!parsed.success) {
       return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
     }
+    // Zod widens `dueAt` to optional after `.union().transform()` even
+    // though the schema doesn't call `.optional()`. We narrow here so
+    // the service contract stays strict.
+    const { dueAt, ...rest } = parsed.data;
+    if (!dueAt) {
+      return c.json(error("VALIDATION_ERROR", "dueAt is required"), 400);
+    }
     try {
       return c.json(
-        success(await service().assignSubmission(auth.userId, parsed.data)),
+        success(
+          await service().assignSubmission(auth.userId, { ...rest, dueAt }),
+        ),
         201,
       );
     } catch (e) {

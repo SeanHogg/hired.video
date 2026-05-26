@@ -116,6 +116,24 @@ export interface SeatReconcileResult {
   delta: number;
 }
 
+export type IntegrationProvider =
+  | "quickbooks" | "xero" | "gusto" | "docusign" | "helcim";
+
+export interface Integration {
+  id: string;
+  companyId: string;
+  provider: IntegrationProvider;
+  status: "connected" | "disconnected" | "error";
+  externalAccountId: string | null;
+  expiresAt: string | null;
+  scopes: unknown;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  metadata: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
 async function unwrap<T>(p: Promise<{ data: T }>): Promise<T> {
   const r = await p;
   return r.data;
@@ -185,6 +203,17 @@ class WorkforceService {
    *  the UCRA flip + workforce seat reconciliation (#1406). */
   deactivateEmployee(userId: string) {
     return apiClient.delete<{ success: boolean }>(`/api/account/users/${userId}`);
+  }
+
+  listIntegrations() {
+    return unwrap(apiClient.get<{ integrations: Integration[] }>("/api/workforce/integrations"));
+  }
+
+  disconnectIntegration(provider: IntegrationProvider, companyId: string) {
+    return unwrap(apiClient.post<{ disconnected: boolean }>(
+      `/api/workforce/integrations/${provider}/disconnect`,
+      { companyId },
+    ));
   }
 }
 

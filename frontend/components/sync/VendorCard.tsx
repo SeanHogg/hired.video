@@ -23,6 +23,7 @@
 
 import { useCallback, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Briefcase, Building, Chrome, Code, ExternalLink,
   Ghost, Github, Globe, Linkedin, LogIn, Rocket, Zap,
@@ -39,7 +40,7 @@ import {
   type VendorConnectorListItem,
 } from "@/lib/services/vendor-sync-service";
 import VendorBlocksDialog from "./VendorBlocksDialog";
-import { VENDOR_CATEGORY_SHORT_LABEL } from "./category-labels";
+import { useCategoryLabels } from "./category-labels";
 
 /** Lucide icon resolver. Backend ships an `iconKey` string; the FE maps
  *  it to a component here so we never import lucide on the server. */
@@ -88,6 +89,8 @@ export default function VendorCard({
 }: VendorCardProps) {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
+  const categoryLabels = useCategoryLabels();
   const location = useLocation();
   const [blocksOpen, setBlocksOpen] = useState(false);
   const [pendingExt, setPendingExt] = useState(false);
@@ -123,17 +126,17 @@ export default function VendorCard({
         sourceResumeId: selectedResumeId,
       });
       toast({
-        title: `Marked synced to ${connector.label}`,
-        description: `Tracked against "${selectedResumeTitle}". You can see this on the History tab.`,
+        title: t("tools.vendorSync.markedSyncedTitle", { vendor: connector.label }),
+        description: t("tools.vendorSync.markedSyncedDesc", { title: selectedResumeTitle }),
       });
     } catch (err) {
       toast({
-        title: "Failed to record sync",
+        title: t("tools.vendorSync.markSyncedFailed"),
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     }
-  }, [connector.id, connector.label, selectedResumeId, selectedResumeTitle, toast]);
+  }, [connector.id, connector.label, selectedResumeId, selectedResumeTitle, toast, t]);
 
   const lastSynced = fmtDate(connector.lastRun?.completedAt ?? connector.lastRun?.startedAt ?? null);
 
@@ -150,18 +153,18 @@ export default function VendorCard({
                 <div className="font-semibold">{connector.label}</div>
                 {lastSynced && (
                   <div className="text-xs text-muted-foreground">
-                    Last synced {lastSynced}
+                    {t("tools.vendorSync.lastSynced", { date: lastSynced })}
                   </div>
                 )}
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                {VENDOR_CATEGORY_SHORT_LABEL[connector.category]}
+                {categoryLabels.short[connector.category]}
               </Badge>
               {connector.supportsExtensionExtract && (
                 <Badge variant="secondary" className="gap-1">
-                  <Chrome className="h-3 w-3" /> Extension
+                  <Chrome className="h-3 w-3" /> {t("tools.vendorSync.extensionBadge")}
                 </Badge>
               )}
             </div>
@@ -179,7 +182,7 @@ export default function VendorCard({
                   size="sm"
                   onClick={() => setBlocksOpen(true)}
                 >
-                  View paste-ready blocks
+                  {t("tools.vendorSync.button.viewBlocks")}
                 </Button>
 
                 {connector.supportsExtensionExtract && (
@@ -190,9 +193,9 @@ export default function VendorCard({
                     disabled={pendingExt}
                   >
                     {pendingExt ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting for extension…</>
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("tools.vendorSync.button.waitingExtension")}</>
                     ) : (
-                      <>Sync from {connector.label} tab</>
+                      <>{t("tools.vendorSync.button.syncFromTab", { vendor: connector.label })}</>
                     )}
                   </Button>
                 )}
@@ -211,7 +214,7 @@ export default function VendorCard({
                         rel="noopener noreferrer"
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Open profile
+                        {t("tools.vendorSync.button.openProfile")}
                       </a>
                     </Button>
                   )}
@@ -221,7 +224,7 @@ export default function VendorCard({
                     onClick={handleMarkSynced}
                     className="flex-1"
                   >
-                    Mark synced
+                    {t("tools.vendorSync.button.markSynced")}
                   </Button>
                 </div>
               </>
@@ -230,7 +233,7 @@ export default function VendorCard({
                 <Button asChild variant="default" size="sm">
                   <Link to={`/signup${redirectQuery}`}>
                     <LogIn className="h-4 w-4 mr-2" />
-                    Sign in to sync {connector.label}
+                    {t("tools.vendorSync.button.signInToSync", { vendor: connector.label })}
                   </Link>
                 </Button>
                 {connector.editProfileUrl && (
@@ -241,7 +244,7 @@ export default function VendorCard({
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      Open profile
+                      {t("tools.vendorSync.button.openProfile")}
                     </a>
                   </Button>
                 )}

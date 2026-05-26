@@ -1122,7 +1122,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     mediaKind: "image",
     audiences: ["designer", "founder", "employer", "recruiter"],
     defaultName: "Billboard 970×250 banner",
-    defaultPrompt: "Design a 970×250 IAB Billboard: hero visual on the left, large headline + CTA on the right. Premium publisher inventory — design to that standard.",
+    defaultPrompt: "Design a 970×250 IAB Billboard: hero visual on the left, large headline + CTA on the right. High-end publisher inventory — design to that standard.",
     firstTabLabel: "Setup",
     IntakeForm: BasicIntake,
   },

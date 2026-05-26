@@ -39,7 +39,8 @@ export const BiasLintResponseSchema = z.object({
 export type BiasLintResponse = z.infer<typeof BiasLintResponseSchema>;
 
 const ingest = defineLenientIngest<BiasLintResponse, BiasLintResponse>({
-  wireSchema: BiasLintResponseSchema,
+  name: "scorecard_bias_check",
+  ingest: BiasLintResponseSchema,
   coerce: (wire) => wire,
 });
 

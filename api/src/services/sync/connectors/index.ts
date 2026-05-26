@@ -141,9 +141,7 @@ const wellfoundConnector = defaultVendor({
   // profile editor. The previous `/jobs` link pointed at the candidate
   // jobs board, which has nothing to do with syncing. Fixes gap #1415.
   editProfileUrl: "https://wellfound.com/profile",
-  supportsExtensionExtract: false,
-  // Even without extract, autofill works once the user opens the profile
-  // editor — needs an "Open profile + Auto-fill" two-step UX.
+  supportsExtensionExtract: true,
   supportsExtensionWrite: true,
   tuning: {
     // Wellfound's elevator-pitch field is intentionally short (~240 char).
@@ -163,7 +161,7 @@ const diceConnector = defaultVendor({
   description:
     "Sync to Dice's tech-focused profile — ideal for roles where keyword density matters.",
   editProfileUrl: "https://www.dice.com/dashboard/profile",
-  supportsExtensionExtract: false,
+  supportsExtensionExtract: true,
   supportsExtensionWrite: true,
   tuning: {
     autofillSelectors: {

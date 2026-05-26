@@ -336,6 +336,7 @@
   <url><loc>https://hired.video/for/game_dev</loc><lastmod>2026-05-22</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/for/illustrator</loc><lastmod>2026-05-22</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/for/animator</loc><lastmod>2026-05-24</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/cad_user</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
 
   <!-- ===== Studio per-template landing pages (#901) ===== -->
   <!-- One per TEMPLATE_CATALOG entry (id is the slug). weekly/0.7 — high
@@ -353,6 +354,9 @@
   <url><loc>https://hired.video/templates/company_promo</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/sizzle_reel</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/tool_promo</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/course_lesson_explainer</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/course_lesson_demo</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/course_lesson_walkthrough</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/self_tape</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/monologue</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/showreel</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
@@ -392,6 +396,18 @@
   <url><loc>https://hired.video/templates/comic_retro80s</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/comic_webtoon</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/comic_adventure</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/cad-floor-plan</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/cad-part-drawing</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/cad-electrical-schematic</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/cad-blueprint</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_mpu_300x250</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_large_rect_336x280</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_leaderboard_728x90</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_half_page_300x600</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_skyscraper_160x600</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_billboard_970x250</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_mobile_banner_320x50</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/ad_iab_large_mobile_320x100</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
 
   <!-- ===== Legal ===== -->
   <url>

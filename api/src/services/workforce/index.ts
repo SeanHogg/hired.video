@@ -12,7 +12,7 @@
  * off-boarded employee (UCRA isActive=false) can't keep punching.
  */
 
-import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
 
@@ -684,10 +684,9 @@ export async function getCompanyApprovalQueue(
     .innerJoin(users, eq(users.id, timesheets.userId))
     .where(and(
       eq(timesheets.status, "submitted"),
-      // drizzle's inArray works here; if employerCompanies is huge we'd
-      // chunk. For typical agency size (<100 companies per employer) the
-      // single query is fine.
-      sql`${timesheets.companyId} = ANY(${employerCompanies}::uuid[])`,
+      // Drizzle's inArray covers typical agency size (<100 companies
+      // per employer) in one query; chunk only if we ever see >1k rows.
+      inArray(timesheets.companyId, employerCompanies),
     ))
     .orderBy(desc(timesheets.submittedAt));
 }
@@ -740,7 +739,11 @@ export async function getDeskMargin(
     .from(billingEvents)
     .where(and(
       eq(billingEvents.eventType, "workforce_timesheet_derived"),
-      sql`(${billingEvents.payload}->>'companyId')::uuid = ANY(${employerCompanies}::uuid[])`,
+      // The LHS is a JSONB-extracted uuid cast, not a column reference,
+      // so we pass a SQL expression to inArray. Drizzle binds the array
+      // as IN (param1, …) which avoids the worker pg driver's broken
+      // ANY-with-JS-array coercion (#1419 root cause).
+      inArray(sql<string>`(${billingEvents.payload}->>'companyId')::uuid`, employerCompanies),
     ));
 
   if (events.length === 0) return [];
@@ -780,13 +783,13 @@ export async function getDeskMargin(
 
   // Hydrate the placement rows in one query.
   const placementRows = await db.select().from(placements)
-    .where(sql`${placements.id} = ANY(${Array.from(placementIds)}::uuid[])`);
+    .where(inArray(placements.id, Array.from(placementIds)));
 
   // Recruiter name lookup.
-  const recruiterIds = Array.from(new Set(placementRows.map((p) => p.recruiterId).filter(Boolean)));
+  const recruiterIds = Array.from(new Set(placementRows.map((p) => p.recruiterId).filter(Boolean))) as string[];
   const recruiterRows = recruiterIds.length > 0
     ? await db.select({ id: users.id, name: users.name }).from(users)
-        .where(sql`${users.id} = ANY(${recruiterIds}::uuid[])`)
+        .where(inArray(users.id, recruiterIds))
     : [];
   const recruiterNameById = new Map(recruiterRows.map((r) => [r.id, r.name]));
 
@@ -875,7 +878,7 @@ export async function listCompanyPlacementDocuments(
   const employerCompanies = await resolveEmployerCompanyIds(employerId, db);
   if (employerCompanies.length === 0) return [];
   return await db.select().from(placementDocuments)
-    .where(sql`${placementDocuments.companyId} = ANY(${employerCompanies}::uuid[])`)
+    .where(inArray(placementDocuments.companyId, employerCompanies))
     .orderBy(desc(placementDocuments.createdAt));
 }
 
@@ -900,7 +903,7 @@ export async function getCompanyRoster(employerId: string, db = getDb()) {
     .innerJoin(users, eq(users.id, userCompanyRoleAssociations.userId))
     .where(and(
       eq(userCompanyRoleAssociations.role, "employee"),
-      sql`${userCompanyRoleAssociations.companyId} = ANY(${employerCompanies}::uuid[])`,
+      inArray(userCompanyRoleAssociations.companyId, employerCompanies),
     ));
 
   // Roll up last-7-days totals per employee. One query per employee
@@ -914,7 +917,7 @@ export async function getCompanyRoster(employerId: string, db = getDb()) {
     })
       .from(taskTimeEntries)
       .where(and(
-        sql`${taskTimeEntries.userId} = ANY(${userIds}::uuid[])`,
+        inArray(taskTimeEntries.userId, userIds),
         gte(taskTimeEntries.startedAt, sevenDaysAgo),
       ))
       .groupBy(taskTimeEntries.userId);

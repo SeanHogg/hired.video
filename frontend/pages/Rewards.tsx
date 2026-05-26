@@ -242,7 +242,7 @@ export default function RewardsPage() {
             />
             <CashoutColumn
               icon={<Award className="h-5 w-5" />}
-              title="Premium Time"
+              title="Pro Time"
               subtitle="Free month of Pro"
               items={catalog.data.redemptions.filter((r) => r.kind === "premium_month")}
             />

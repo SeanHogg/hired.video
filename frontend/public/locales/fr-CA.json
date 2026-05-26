@@ -5770,5 +5770,14 @@
   "hiring.toast.checklistCreated": "Liste créée",
   "hiring.toast.checklistCreateFailed": "Échec de la création de la liste",
   "hiring.toast.taskUpdateFailed": "Échec de la mise à jour de la tâche",
-  "hiring.confirm.deleteOffer": "Supprimer cette lettre d'offre? Cette action est irréversible."
+  "hiring.confirm.deleteOffer": "Supprimer cette lettre d'offre? Cette action est irréversible.",
+  "resumeViewer.error.dataTitle": "Données du CV non disponibles",
+  "resumeViewer.error.dataBody": "Impossible de charger les renseignements du CV.",
+  "resumeViewer.error.contentTitle": "Contenu du CV non disponible",
+  "resumeViewer.error.contentBody": "La structure des données du CV est incomplète.",
+  "resumeViewer.aria.previousVideo": "Vidéo précédente",
+  "resumeViewer.aria.nextVideo": "Vidéo suivante",
+  "resumeViewer.labels.lastUpdated": "Dernière mise à jour",
+  "resumeViewer.labels.variationOf": "Variante de",
+  "resumeViewer.labels.masterResume": "CV maître"
 }

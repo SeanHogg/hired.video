@@ -177,7 +177,7 @@ export default function Pricing() {
         "50K AI tokens / mo",
         "Career Home dashboard & community feed",
         "Unlimited networking — connections & followers",
-        "Apply to jobs with video / comic intros + 1-click Auto-Apply (Premium-gated for bulk)",
+        "Apply to jobs with video / comic intros + 1-click Auto-Apply (Pro-gated for bulk)",
         "AI Studio — 1080p video, PNG-strip comic export (with watermark)",
         "AI interview practice (limited) + AI Coach / Career360 gap analysis",
         "Public profile + per-section visibility controls (10 gateable sections)",

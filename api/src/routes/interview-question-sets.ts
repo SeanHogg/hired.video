@@ -24,7 +24,7 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -136,7 +136,7 @@ interviewQuestionSetRoutes.get("/", async (c) => {
         or(
           eq(interviewQuestionSets.ownerUserId, user.sub),
           companyIds.length > 0
-            ? sql`${interviewQuestionSets.ownerCompanyId} = ANY(${companyIds})`
+            ? inArray(interviewQuestionSets.ownerCompanyId, companyIds)
             : isNull(interviewQuestionSets.ownerCompanyId), // never matches anything if no companies — fine
         ),
       ),

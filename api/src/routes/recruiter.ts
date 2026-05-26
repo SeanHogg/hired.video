@@ -5,6 +5,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { TALENT_POOL_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/company/recruiter-match.js";
 import {
@@ -154,7 +155,9 @@ recruiterRoutes.post("/talent-pool", async (c) => {
 	return c.json(success(rowToTalentPoolEntry(entry)), 201);
 });
 
-// GET /talent-pool — list all talent pool entries for current recruiter
+// GET /talent-pool — list all talent pool entries for current recruiter.
+// Supports `?fields=` projection (gap #1370 / #1446) so the kanban / grid
+// view doesn't drag the full notes/tags/contact blob over the wire.
 recruiterRoutes.get("/talent-pool", async (c) => {
 	const user = c.get("user");
 	const db = getDb();
@@ -163,7 +166,9 @@ recruiterRoutes.get("/talent-pool", async (c) => {
 		.from(schema.talentPoolCandidates)
 		.where(eq(schema.talentPoolCandidates.recruiterId, user.sub))
 		.orderBy(desc(schema.talentPoolCandidates.addedAt));
-	return c.json(success(entries.map(rowToTalentPoolEntry)));
+	const fields = parseFields(c.req.query("fields"), TALENT_POOL_LIST_FIELDS);
+	const items = projectRows(entries.map(rowToTalentPoolEntry) as Array<Record<string, unknown>>, fields);
+	return c.json(success(items));
 });
 
 // GET /talent-pool/export — download pool as CSV (must be before /:id)

@@ -59,6 +59,11 @@ const FILE_ALLOWLIST = new Set<string>([
   "api/src/services/__tests__/tier-copy-guard.test.ts",
   // Tier-copy template tests reference the canonical literal strings.
   "api/src/services/__tests__/tier-copy.test.ts",
+  // Editorial blog content quotes external vendors' actual product
+  // tier names (ZipRecruiter "Premium", LinkedIn "Premium", etc.) —
+  // these are third-party brand references, not our own tier copy.
+  // Replacing them with "Pro" would misquote the competitor.
+  "frontend/data/blog-posts.ts",
 ]);
 
 /** Walk a directory tree and yield every file path with a scannable extension. */
