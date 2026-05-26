@@ -2898,6 +2898,37 @@ studioFeaturesRoutes.post("/forms/:id/submit", async (c) => {
 
   const ipCountry = c.req.header("cf-ipcountry") ?? null;
 
+  // #201 — Knowledge-check scoring. When formType === 'knowledge_check',
+  // grade against the stored answer_key and emit cmi.score.raw-style
+  // metadata on the submission. The remediation jump + max-attempts gate
+  // are enforced client-side from the response payload.
+  let scoreRaw: number | null = null;
+  let scoreMax: number | null = null;
+  let passed: boolean | null = null;
+  let remediationJumpToSceneId: string | null = null;
+  if (form.formType === "knowledge_check" && form.answerKey) {
+    const key = form.answerKey as Record<string, {
+      correctAnswer: string;
+      points?: number;
+    }>;
+    let earned = 0;
+    let max = 0;
+    for (const [fieldKey, spec] of Object.entries(key)) {
+      const pts = spec.points ?? 1;
+      max += pts;
+      if (String(parsed.data.answers[fieldKey] ?? "").trim().toLowerCase() ===
+          String(spec.correctAnswer).trim().toLowerCase()) {
+        earned += pts;
+      }
+    }
+    scoreRaw = earned;
+    scoreMax = max;
+    const pct = max === 0 ? 0 : Math.round((earned / max) * 100);
+    const threshold = form.passingScorePct ?? 80;
+    passed = pct >= threshold;
+    if (!passed) remediationJumpToSceneId = form.remediationJumpToSceneId ?? null;
+  }
+
   const [submission] = await db.insert(studioVideoFormSubmissions).values({
     formId: id,
     projectId: form.projectId,
@@ -2908,6 +2939,9 @@ studioFeaturesRoutes.post("/forms/:id/submit", async (c) => {
     timestampSec: parsed.data.timestampSec ?? null,
     referrer: parsed.data.referrer ?? null,
     ipCountry,
+    scoreRaw,
+    scoreMax,
+    passed,
   } as any).returning();
 
   // Mirror into global lead inbox (#54 / #38)
@@ -2929,6 +2963,12 @@ studioFeaturesRoutes.post("/forms/:id/submit", async (c) => {
   return c.json(ok({
     id: submission.id,
     redirectUrl: form.redirectUrl,
+    // #201 — knowledge-check fields. Null for lead-capture forms.
+    formType: form.formType,
+    scoreRaw,
+    scoreMax,
+    passed,
+    remediationJumpToSceneId,
   }), 201);
 });
 

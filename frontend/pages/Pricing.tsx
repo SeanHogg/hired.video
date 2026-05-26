@@ -42,7 +42,6 @@ import {
   MapPin,
   Phone,
   ListChecks,
-  Send,
   Wand2,
 } from "lucide-react";
 import {

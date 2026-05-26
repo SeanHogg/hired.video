@@ -122,6 +122,49 @@ jobRoutes.get("/", async (c) => {
   return c.json(success({ ...data, items: projectRows(data.items, fields) }));
 });
 
+/** POST /api/jobs/:id/archive — soft-delete the job (#154). Owner only.
+ *  Mirrors resume archive: hides from default listings, preserves slug
+ *  + analytics history. */
+jobRoutes.post("/:id/archive", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const db = getDb();
+  const [row] = await db
+    .select({ id: schema.jobItems.id, userId: schema.jobItems.userId })
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, id))
+    .limit(1);
+  if (!row) return c.json(error("NOT_FOUND", "Job not found"), 404);
+  if (row.userId !== userId) return c.json(error("FORBIDDEN", "Not your job"), 403);
+  const [updated] = await db
+    .update(schema.jobItems)
+    .set({ archivedAt: new Date(), updatedAt: new Date() } as any)
+    .where(eq(schema.jobItems.id, id))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+jobRoutes.post("/:id/unarchive", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const db = getDb();
+  const [row] = await db
+    .select({ id: schema.jobItems.id, userId: schema.jobItems.userId })
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, id))
+    .limit(1);
+  if (!row) return c.json(error("NOT_FOUND", "Job not found"), 404);
+  if (row.userId !== userId) return c.json(error("FORBIDDEN", "Not your job"), 403);
+  const [updated] = await db
+    .update(schema.jobItems)
+    .set({ archivedAt: null, updatedAt: new Date() } as any)
+    .where(eq(schema.jobItems.id, id))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
 /** POST /api/jobs or /api/job — create a new job */
 jobRoutes.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);

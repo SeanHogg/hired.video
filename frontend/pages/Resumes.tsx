@@ -79,6 +79,7 @@ import MetadataModal from "@/components/MetadataModal";
 import RenameResumeDialog from "@/components/RenameResumeDialog";
 import QRCodeDialog from "@/components/QRCodeDialog";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
+import EntityVersionHistoryDialog from "@/components/EntityVersionHistoryDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
 import ViewModeToggle from "@/components/ViewModeToggle";
@@ -296,10 +297,21 @@ export default function Resumes() {
     initialMetadata: [],
   });
 
+  /** #154 — toggle to include archived rows. Persisted in URL search
+   *  params so a refresh keeps the filter. */
+  const [includeArchived, setIncludeArchived] = useState(false);
+
+  /** #155 — version-history dialog state. Single dialog reused for the
+   *  whole list. */
+  const [versionHistoryFor, setVersionHistoryFor] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+
   // Consolidated fetch
   const getResumesForDisplay = async (): Promise<ResumeWithOwnership[]> => {
     try {
-      return await resumeService.getResumesForDisplay();
+      return await resumeService.getResumesForDisplay({ includeArchived });
     } catch (error) {
       console.error("Error fetching resumes:", error);
       return [];
@@ -316,7 +328,9 @@ export default function Resumes() {
     if (isAuthenticated) {
       loadResumes();
     }
-  }, [id, isAuthenticated]);
+    // includeArchived is in the dep list so toggling it re-fetches with
+    // the new filter without a router-level navigation.
+  }, [id, isAuthenticated, includeArchived]);
 
   // The Chrome extension's side panel can upload resumes into the same
   // account while this page is open. The extension's auth-bridge content
@@ -1336,6 +1350,16 @@ export default function Resumes() {
                     onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                     onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
                     onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+                    isArchived={!!resume.archivedAt}
+                    onArchive={async () => {
+                      await resumeService.archiveResume(resume.id);
+                      await loadResumes({ notifyExtension: true });
+                    }}
+                    onUnarchive={async () => {
+                      await resumeService.unarchiveResume(resume.id);
+                      await loadResumes({ notifyExtension: true });
+                    }}
+                    onViewVersionHistory={() => setVersionHistoryFor({ id: resume.id, title: resume.title })}
                     onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
                     onScoreClick={(toolIds) => openToolHistory({ id: resume.id, title: resume.title }, toolIds)}
                     onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
@@ -1398,6 +1422,16 @@ export default function Resumes() {
       </Button>
       <ViewModeToggle value={viewMode} onChange={setViewMode} />
       <ListsButton entityType="resume" />
+      {/* #154 — Include archived. Off by default. Toggling refetches via
+          the includeArchived useEffect dep. */}
+      <Button
+        variant={includeArchived ? "secondary" : "outline"}
+        size="sm"
+        onClick={() => setIncludeArchived((v) => !v)}
+        title="Show archived resumes alongside active ones"
+      >
+        {includeArchived ? "Hiding none" : "Include archived"}
+      </Button>
     </>
   );
 
@@ -1666,6 +1700,32 @@ export default function Resumes() {
           onClose={() => setAnalyticsDialog({ open: false, target: null })}
           resumeName={analyticsDialog.target.title}
           views={analyticsDialog.target.viewCount ?? 0}
+        />
+      )}
+
+      {/* #155 — Version history. Single instance reused across rows so we
+          don't carry one Dialog per card. Adapter wraps the REST endpoints
+          defined in api/src/routes/resumes.ts and exposed via
+          resumeService.{listVersions, createVersion, restoreVersion}. */}
+      {versionHistoryFor && (
+        <EntityVersionHistoryDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setVersionHistoryFor(null);
+          }}
+          entityLabel="Resume"
+          canSnapshot
+          adapter={{
+            list: () => resumeService.listVersions(versionHistoryFor.id),
+            snapshot: () => resumeService.createVersion(versionHistoryFor.id, {
+              label: "manual snapshot",
+              isAutosave: false,
+            }),
+            restore: async (vid) => {
+              await resumeService.restoreVersion(versionHistoryFor.id, vid);
+              await loadResumes({ notifyExtension: true });
+            },
+          }}
         />
       )}
     </>

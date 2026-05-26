@@ -131,6 +131,8 @@ import { articleRoutes } from "./routes/articles.js";
 import { adminArticleRoutes } from "./routes/admin-articles.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import { courseRoutes } from "./routes/courses.js";
+import { courseAuthoringRoutes } from "./routes/course-authoring.js";
+import { campaignDollarsRoutes } from "./routes/campaign-dollars.js";
 import { learningPathRoutes } from "./routes/learning-paths.js";
 import { verifyRoutes } from "./routes/verify.js";
 import { legalRoutes } from "./routes/legal.js";
@@ -643,10 +645,19 @@ export function createApp() {
   app.route("/api/reports", reportRoutes);
   app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/courses", courseRoutes);
+  // Authoring helpers (#162 AI generator, #200 LMS connectors, etc.)
+  // mount under the same prefix so the client never has to learn a
+  // second course namespace. Order matters — must follow the catch-all-
+  // free courseRoutes registration above, and the authoring router
+  // defines no overlapping literal paths.
+  app.route("/api/courses", courseAuthoringRoutes);
   app.route("/api/learning-paths", learningPathRoutes);
   app.route("/api/verify", verifyRoutes);
   app.route("/api/legal", legalRoutes);
   app.route("/api/advertising", advertisingRoutes);
+  // #169 — Campaign $ redemption store. Read-only balance + tx surface
+  // for the redemption UI; debit happens server-side from boosts.ts.
+  app.route("/api/campaign-dollars", campaignDollarsRoutes);
   app.route("/api/paid-media", paidMediaRoutes);
   app.route("/api/career", careerRoutes);
   app.route("/api/phone", phoneRoutes);

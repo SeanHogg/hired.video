@@ -458,6 +458,402 @@ articleRoutes.delete("/:id", async (c) => {
   return c.json(success({ deleted: deleted.id }), 200);
 });
 
+// ===========================================================================
+// #170 / #155 — Article version history. Mirrors resumes + studio.
+// ===========================================================================
+
+const ARTICLE_AUTOSAVE_CAP = 50;
+const ARTICLE_AUTOSAVE_RETENTION_DAYS = 30;
+
+articleRoutes.get("/:id/versions", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [parent] = await db.select({ userId: articles.userId })
+    .from(articles).where(eq(articles.id, c.req.param("id"))).limit(1);
+  if (!parent) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  if (parent.userId !== userId) return c.json(error("FORBIDDEN", "Not your article"), 403);
+  const versions = await db.select({
+    id: articleVersions.id,
+    versionNumber: articleVersions.versionNumber,
+    label: articleVersions.label,
+    isAutosave: articleVersions.isAutosave,
+    createdAt: articleVersions.createdAt,
+  }).from(articleVersions)
+    .where(eq(articleVersions.articleId, c.req.param("id")))
+    .orderBy(desc(articleVersions.versionNumber))
+    .limit(200);
+  return c.json(success({ versions }), 200);
+});
+
+const CreateArticleVersionSchema = z.object({
+  label: z.string().trim().max(120).optional(),
+  isAutosave: z.boolean().optional(),
+});
+
+articleRoutes.post("/:id/versions", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = CreateArticleVersionSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid version payload"), 400);
+  const db = getDb();
+  const [parent] = await db.select({
+    userId: articles.userId,
+    title: articles.title,
+    bodyMd: articles.bodyMd,
+    bodyJson: articles.bodyJson,
+  }).from(articles).where(eq(articles.id, id)).limit(1);
+  if (!parent) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  if (parent.userId !== userId) return c.json(error("FORBIDDEN", "Not your article"), 403);
+
+  const [{ maxVersion }] = await db.select({
+    maxVersion: sql<number>`COALESCE(MAX(${articleVersions.versionNumber}), 0)`,
+  }).from(articleVersions).where(eq(articleVersions.articleId, id));
+
+  const [created] = await db.insert(articleVersions).values({
+    articleId: id,
+    userId,
+    versionNumber: (maxVersion ?? 0) + 1,
+    label: parsed.data.label,
+    title: parent.title,
+    bodyMd: parent.bodyMd,
+    bodyJson: parent.bodyJson as any,
+    isAutosave: parsed.data.isAutosave ?? false,
+  }).returning();
+
+  if (created.isAutosave) {
+    const cutoff = new Date(Date.now() - ARTICLE_AUTOSAVE_RETENTION_DAYS * 86_400_000);
+    await db.delete(articleVersions).where(and(
+      eq(articleVersions.articleId, id),
+      eq(articleVersions.isAutosave, true),
+      sql`${articleVersions.createdAt} < ${cutoff}`,
+    ));
+    const autosaves = await db.select({ id: articleVersions.id })
+      .from(articleVersions)
+      .where(and(
+        eq(articleVersions.articleId, id),
+        eq(articleVersions.isAutosave, true),
+      ))
+      .orderBy(desc(articleVersions.createdAt));
+    if (autosaves.length > ARTICLE_AUTOSAVE_CAP) {
+      const toDrop = autosaves.slice(ARTICLE_AUTOSAVE_CAP).map((r) => r.id);
+      for (const dropId of toDrop) {
+        await db.delete(articleVersions).where(eq(articleVersions.id, dropId));
+      }
+    }
+  }
+  return c.json(success({ version: created }), 201);
+});
+
+articleRoutes.post("/:id/versions/:vid/restore", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const vid = c.req.param("vid");
+  const db = getDb();
+  const [parent] = await db.select({ userId: articles.userId })
+    .from(articles).where(eq(articles.id, id)).limit(1);
+  if (!parent) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  if (parent.userId !== userId) return c.json(error("FORBIDDEN", "Not your article"), 403);
+  const [version] = await db.select().from(articleVersions)
+    .where(and(eq(articleVersions.id, vid), eq(articleVersions.articleId, id)))
+    .limit(1);
+  if (!version) return c.json(error("NOT_FOUND", "Version not found"), 404);
+  const [updated] = await db.update(articles)
+    .set({
+      title: version.title,
+      bodyMd: version.bodyMd ?? "",
+      bodyJson: version.bodyJson as any,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(articles.id, id))
+    .returning();
+  return c.json(success({ restoredVersion: version, article: updated }), 200);
+});
+
+// ===========================================================================
+// #171 — Engagement tracking. Three event paths upsert into
+// article_engagement (per-day rollup). Only authenticated reads count
+// toward the partner pool; the anonymous_read_seconds counter holds
+// unauthenticated traffic for analytics.
+// ===========================================================================
+
+const ReadProgressSchema = z.object({
+  seconds: z.number().min(1).max(600), // beacon every ~30s; cap protects against tampering
+});
+
+articleRoutes.post("/:id/read-progress", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = ReadProgressSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid payload"), 400);
+
+  const db = getDb();
+  const [art] = await db.select({ id: articles.id, status: articles.status })
+    .from(articles).where(eq(articles.id, id)).limit(1);
+  if (!art || art.status !== "published") {
+    return c.json(error("NOT_FOUND", "Article not found"), 404);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const seconds = parsed.data.seconds;
+  const userId = uid(c);
+  const colToBump = userId ? articleEngagement.readSeconds : articleEngagement.anonymousReadSeconds;
+  await db.insert(articleEngagement).values({
+    articleId: id,
+    day: today,
+    readSeconds: userId ? seconds : 0,
+    anonymousReadSeconds: userId ? 0 : seconds,
+    uniqueReaders: 0,
+  }).onConflictDoUpdate({
+    target: [articleEngagement.articleId, articleEngagement.day],
+    set: {
+      readSeconds: userId
+        ? sql`${articleEngagement.readSeconds} + ${seconds}`
+        : articleEngagement.readSeconds,
+      anonymousReadSeconds: userId
+        ? articleEngagement.anonymousReadSeconds
+        : sql`${articleEngagement.anonymousReadSeconds} + ${seconds}`,
+      updatedAt: new Date(),
+    },
+  });
+  return c.json(success({ counted: !!userId }), 200);
+});
+
+const ClapSchema = z.object({
+  delta: z.number().int().min(1).max(50),
+});
+
+articleRoutes.post("/:id/clap", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required for claps"), 401);
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = ClapSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid clap payload"), 400);
+
+  const db = getDb();
+  const [art] = await db.select({ status: articles.status })
+    .from(articles).where(eq(articles.id, id)).limit(1);
+  if (!art || art.status !== "published") {
+    return c.json(error("NOT_FOUND", "Article not found"), 404);
+  }
+
+  const CLAP_CAP = 50;
+  const [existing] = await db.select({ count: articleClaps.count })
+    .from(articleClaps)
+    .where(and(eq(articleClaps.articleId, id), eq(articleClaps.userId, userId)))
+    .limit(1);
+  const current = existing?.count ?? 0;
+  const newTotal = Math.min(CLAP_CAP, current + parsed.data.delta);
+  const actualDelta = newTotal - current;
+  if (actualDelta <= 0) {
+    return c.json(success({ total: current, addedThisCall: 0 }), 200);
+  }
+
+  await db.insert(articleClaps)
+    .values({ articleId: id, userId, count: newTotal })
+    .onConflictDoUpdate({
+      target: [articleClaps.userId, articleClaps.articleId],
+      set: { count: newTotal, updatedAt: new Date() },
+    });
+
+  const today = new Date().toISOString().slice(0, 10);
+  await db.insert(articleEngagement).values({
+    articleId: id, day: today, clapCount: actualDelta,
+  }).onConflictDoUpdate({
+    target: [articleEngagement.articleId, articleEngagement.day],
+    set: {
+      clapCount: sql`${articleEngagement.clapCount} + ${actualDelta}`,
+      updatedAt: new Date(),
+    },
+  });
+  return c.json(success({ total: newTotal, addedThisCall: actualDelta }), 200);
+});
+
+const ShareSchema = z.object({
+  channel: z.enum(["twitter", "linkedin", "email", "copy_link", "rss"]),
+});
+
+articleRoutes.post("/:id/share", async (c) => {
+  const id = c.req.param("id");
+  const userId = uid(c);
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = ShareSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid share payload"), 400);
+  const db = getDb();
+  await db.insert(articleShares).values({
+    articleId: id,
+    userId,
+    channel: parsed.data.channel,
+    userAgent: c.req.header("user-agent") ?? null,
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  await db.insert(articleEngagement).values({
+    articleId: id, day: today, shareCount: 1,
+  }).onConflictDoUpdate({
+    target: [articleEngagement.articleId, articleEngagement.day],
+    set: {
+      shareCount: sql`${articleEngagement.shareCount} + 1`,
+      updatedAt: new Date(),
+    },
+  });
+  return c.json(success({ recorded: true }), 200);
+});
+
+articleRoutes.get("/:id/engagement", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const db = getDb();
+  const [parent] = await db.select({ userId: articles.userId })
+    .from(articles).where(eq(articles.id, id)).limit(1);
+  if (!parent) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  if (parent.userId !== userId) return c.json(error("FORBIDDEN", "Not your article"), 403);
+  const rollups = await db.select().from(articleEngagement)
+    .where(eq(articleEngagement.articleId, id))
+    .orderBy(desc(articleEngagement.day))
+    .limit(60);
+  return c.json(success({ rollups }), 200);
+});
+
+// ===========================================================================
+// #175 — On-demand AI moderation classify. Author-triggered preview or
+// publish-time gate. Writes quality_score + moderation_findings on the
+// row, flips status / partner_program_eligible per severity.
+// ===========================================================================
+
+articleRoutes.post("/:id/classify", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const id = c.req.param("id");
+  const db = getDb();
+  const [art] = await db.select().from(articles).where(eq(articles.id, id)).limit(1);
+  if (!art) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  if (art.userId !== userId) return c.json(error("FORBIDDEN", "Not your article"), 403);
+
+  const env = (c.env as any) ?? {};
+  const llm = createLLMClient(env, c.var.user ?? null);
+  try {
+    const result = await classifyArticle({
+      llm,
+      title: art.title,
+      body: (art.bodyMd ?? "") || JSON.stringify(art.bodyJson ?? {}),
+    });
+    const gate = gateForSeverity(result.findings.severity);
+    const now = new Date();
+    const update: Record<string, unknown> = {
+      qualityScore: result.qualityScore,
+      qualityRationale: result.qualityRationale,
+      qualityCheckedAt: now,
+      moderationScore: result.qualityScore,
+      moderationFindings: toFindings(result),
+      moderationScannedAt: now,
+      moderationScannedBy: userId,
+      partnerProgramEligible: gate.partnerProgramEligible,
+      updatedAt: now,
+    };
+    if (gate.status) update.status = gate.status;
+    const [updated] = await db.update(articles)
+      .set(update as any)
+      .where(eq(articles.id, id))
+      .returning();
+    return c.json(success({ article: updated, findings: result }), 200);
+  } catch (e) {
+    return c.json(error("CLASSIFIER_FAILED", e instanceof Error ? e.message : String(e)), 500);
+  }
+});
+
+// ===========================================================================
+// #173 — Writer Partner Program opt-in. Mirrors voice-clone consent.
+// ===========================================================================
+
+const OptInSchema = z.object({
+  legalDocsAccepted: z.array(z.string().uuid()).default([]),
+  /** Optional explicit Pro subscription id; default behaviour pulls it
+   *  from the user's active sub at opt-in time. */
+  proSubscriptionId: z.string().uuid().optional(),
+});
+
+articleRoutes.post("/partner-program/opt-in", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = OptInSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid opt-in payload"), 400);
+  const db = getDb();
+
+  // Deactivate any existing active row before inserting the new one
+  // (unique partial index guards a second active row at the DB level).
+  await db.update(partnerProgramOptIns)
+    .set({ isActive: false, deactivatedAt: new Date(), deactivatedReason: "superseded" })
+    .where(and(
+      eq(partnerProgramOptIns.userId, userId),
+      eq(partnerProgramOptIns.isActive, true),
+    ));
+
+  const [inserted] = await db.insert(partnerProgramOptIns).values({
+    userId,
+    legalDocsAccepted: parsed.data.legalDocsAccepted as any,
+    consentIp: c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null,
+    consentUa: c.req.header("user-agent") ?? null,
+    proSubscriptionId: parsed.data.proSubscriptionId,
+    isActive: true,
+  } as any).returning();
+
+  // Write a legal_document_acceptances row for every doc id in the
+  // payload so the audit trail mirrors the gift-card / voice-clone
+  // consent flow. Soft-fails on a missing doc — the opt-in row is the
+  // primary record.
+  for (const docId of parsed.data.legalDocsAccepted) {
+    try {
+      await db.insert(legalDocumentAcceptances).values({
+        userId,
+        documentId: docId,
+        kind: "partner_program_terms",
+        version: "snapshot",
+        ip: c.req.header("cf-connecting-ip") ?? null,
+        userAgent: c.req.header("user-agent") ?? null,
+        context: "partner_program_opt_in",
+      } as any);
+    } catch (e) {
+      console.warn("[articles] partner-program opt-in legal-doc acceptance failed:", e);
+    }
+  }
+
+  return c.json(success({ optIn: inserted }), 201);
+});
+
+articleRoutes.post("/partner-program/opt-out", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  await db.update(partnerProgramOptIns)
+    .set({ isActive: false, deactivatedAt: new Date(), deactivatedReason: "user_opted_out" })
+    .where(and(
+      eq(partnerProgramOptIns.userId, userId),
+      eq(partnerProgramOptIns.isActive, true),
+    ));
+  return c.json(success({ deactivated: true }), 200);
+});
+
+articleRoutes.get("/partner-program/status", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [optIn] = await db.select().from(partnerProgramOptIns)
+    .where(and(
+      eq(partnerProgramOptIns.userId, userId),
+      eq(partnerProgramOptIns.isActive, true),
+    ))
+    .limit(1);
+  const [balance] = await db.select().from(partnerProgramBalances)
+    .where(eq(partnerProgramBalances.userId, userId))
+    .limit(1);
+  return c.json(success({ optIn: optIn ?? null, balance: balance ?? null }), 200);
+});
+
 // ---------------------------------------------------------------------------
 // Shared row → public card mapper (used by /public + /public/by-user).
 // ---------------------------------------------------------------------------
