@@ -175,7 +175,9 @@ gamesRoutes.post("/:projectId/invites", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
   }
   const guard = await loadActableProject(projectId, user.sub);
-  if (!guard.ok) return c.json(fail(guard.code, "Project not found"), guard.status);
+  if (guard.ok === false) {
+    return c.json(fail(guard.code, "Project not found"), guard.status);
+  }
 
   const body = await c.req.json().catch(() => ({}));
   const parsed = CreateInviteSchema.safeParse(body ?? {});
@@ -210,7 +212,9 @@ gamesRoutes.get("/:projectId/invites", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
   }
   const guard = await loadActableProject(projectId, user.sub);
-  if (!guard.ok) return c.json(fail(guard.code, "Project not found"), guard.status);
+  if (guard.ok === false) {
+    return c.json(fail(guard.code, "Project not found"), guard.status);
+  }
 
   const db = getDb();
   const rows = await db
@@ -231,7 +235,9 @@ gamesRoutes.delete("/:projectId/invites/:inviteId", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid id"), 400);
   }
   const guard = await loadActableProject(projectId, user.sub);
-  if (!guard.ok) return c.json(fail(guard.code, "Project not found"), guard.status);
+  if (guard.ok === false) {
+    return c.json(fail(guard.code, "Project not found"), guard.status);
+  }
 
   const db = getDb();
   await db

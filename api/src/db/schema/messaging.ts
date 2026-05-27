@@ -31,7 +31,7 @@ export const conversationParticipants = pgTable("conversation_participants", {
   role: varchar("role", { length: 50 }).default("member").notNull(),
   joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
   leftAt: timestamp("left_at", { withTimezone: true }),
-  // Added in 0160 — role changes + leftAt updates need audit.
+  // Added in 0163 — role changes + leftAt updates need audit.
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -59,7 +59,7 @@ export const messageReadReceipts = pgTable("message_read_receipts", {
   messageId: uuid("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   readAt: timestamp("read_at", { withTimezone: true }).defaultNow().notNull(),
-  // Added in 0160 — receipt retraction / re-mark-unread should be auditable.
+  // Added in 0163 — receipt retraction / re-mark-unread should be auditable.
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

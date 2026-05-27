@@ -192,7 +192,7 @@ export const promoProjects = pgTable(
 
     // The studio project the creator is editing — uuid + FK SET NULL (so
     // deleting the project doesn't cascade the promo project, which stays
-    // for audit). Was text pre-#1641; migration 0160 converted + added FK.
+    // for audit). Was text pre-#1641; migration 0163 converted + added FK.
     studioProjectId: uuid("studio_project_id").references(() => studioProjects.id, { onDelete: "set null" }),
 
     // Brief inputs the customer attached

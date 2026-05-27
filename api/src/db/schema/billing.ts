@@ -36,7 +36,7 @@ export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   // SET NULL (was RESTRICT) so a tier can be deprecated without the
-  // archived subscription rows blocking the delete — migration 0159.
+  // archived subscription rows blocking the delete — migration 0162.
   planId: uuid("plan_id").references(() => subscriptionPlans.id, { onDelete: "set null" }),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
   stripeCustomerId: text("stripe_customer_id"),
@@ -106,7 +106,7 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   unitPrice: numeric("unit_price").notNull(),
   amount: numeric("amount").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  // Added 2026-05-26 alongside migration 0160 — line items are mutable
+  // Added 2026-05-26 alongside migration 0163 — line items are mutable
   // (qty / price corrections); the schema treated them as immutable.
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
