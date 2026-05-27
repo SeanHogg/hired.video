@@ -33,6 +33,7 @@ import {
   Music,
   Mic,
   Pencil,
+  UserPlus,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { preloadStudioFonts } from "@/lib/studio/font-catalog";
@@ -2352,6 +2353,11 @@ export default function StudioEditorV2() {
                 : state.scenes.some((s) => s.widgets.length > 0)
           }
           onOpenPreview={() => setPreviewOpen(true)}
+          mediaKind={currentMediaKind}
+          gameEngine={gameState?.engine ?? null}
+          gamePlaying={gamePlaying}
+          onTogglePlaytest={() => setGamePlaying((p) => !p)}
+          onOpenInvite={() => setGameInviteOpen(true)}
           onExport={handleExport}
           exporting={exporting}
           onPublishToYouTube={handlePublishToYouTube}
@@ -3229,6 +3235,15 @@ export default function StudioEditorV2() {
           onClose={() => setPreviewOpen(false)}
         />
       )}
+      {/* 3D-world Invite dialog — modal mounted at the editor root so
+          the InviteDialog's full-screen backdrop overlays everything.
+          Trigger lives in the EditorHeader; this is the receiver. */}
+      {gameInviteOpen && gameState?.engine === "world-3d" && (
+        <InviteDialog
+          projectId={projectId === "new" ? null : projectId}
+          onClose={() => setGameInviteOpen(false)}
+        />
+      )}
       {/* LinkedIn publisher modal — opened by `onPublishToLinkedIn`
           AFTER ensureRendered has uploaded the video. Mirrors v1's
           StudioLayout LinkedIn modal so the publish UX is identical
@@ -3314,6 +3329,11 @@ function EditorHeader({
   onSaveImageToLibrary,
   onPublishAsCourseLesson,
   usesTimelineChrome,
+  mediaKind,
+  gameEngine,
+  gamePlaying,
+  onTogglePlaytest,
+  onOpenInvite,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -3332,6 +3352,15 @@ function EditorHeader({
   onPublishToYouTube: () => void;
   onPublishToLinkedIn: () => void;
   onPublishToProfile: () => void;
+  /** Game-kind chrome — the header hosts Playtest + Invite next to
+   *  Save (replacing the previous in-canvas overlays). Both buttons
+   *  self-gate inline: Playtest only when mediaKind === "game",
+   *  Invite only when the game's engine is "world-3d". */
+  mediaKind: import("@shared/media-kinds").MediaKind;
+  gameEngine: import("@shared/game-state").GameEngineId | null;
+  gamePlaying: boolean;
+  onTogglePlaytest: () => void;
+  onOpenInvite: () => void;
   /** Image-kind only: handler bound to the SaveMenu's `asset-library`
    *  publish destination. Falls through unbound (the dropdown row
    *  self-disables) for non-image projects. */
@@ -3465,12 +3494,12 @@ function EditorHeader({
             previously a canvas overlay; moved here to match the
             studio's existing chrome pattern (header actions, not
             in-canvas floaters). */}
-        {currentMediaKind === "game" && (
+        {mediaKind === "game" && (
           <Button
             variant="secondary"
             size="sm"
             className="h-8 gap-1"
-            onClick={() => setGamePlaying((p) => !p)}
+            onClick={onTogglePlaytest}
           >
             {gamePlaying ? (
               <>
@@ -3488,12 +3517,12 @@ function EditorHeader({
         {/* 3D-world Invite — appears only for engine === "world-3d"
             projects (the canvas-2d mini-games don't have a multi-
             user share surface). Same header slot as Playtest above. */}
-        {currentMediaKind === "game" && gameState?.engine === "world-3d" && (
+        {mediaKind === "game" && gameEngine === "world-3d" && (
           <Button
             variant="outline"
             size="sm"
             className="h-8 gap-1"
-            onClick={() => setGameInviteOpen(true)}
+            onClick={onOpenInvite}
           >
             <UserPlus className="h-4 w-4" />
             Invite
