@@ -83,6 +83,13 @@ export const DEFAULT_SEO: SEOData = {
  * Page-specific SEO configurations
  */
 export const PAGE_SEO: Record<string, SEOData> = {
+  // 3D world play-invite landing (gap #1637). Token route — useSEO
+  // resolves the literal path key; the loader overlays the project's
+  // label as a runtime customSEO patch.
+  "/play/:token": {
+    title: "Join the game — hired.video",
+    description: "Play a 3D world built in the hired.video studio. WASD to move, space to jump.",
+  },
   "/": {
     title:
       "AI Video Resumes, Resume Builder & AI Job Search — hired.video",

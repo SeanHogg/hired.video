@@ -38,6 +38,9 @@ import {
   initChallengeRuntime,
   type ChallengeRuntimeState,
 } from "@/lib/studio/game/challenge-runtime";
+import { useGameRoom } from "@/lib/studio/game/use-game-room";
+import { saveCachedGameState } from "@/lib/studio/game/game-state-cache";
+import { useAuth } from "@/lib/auth";
 import BlockPalette from "./world-3d/BlockPalette";
 import Scene3D from "./world-3d/Scene3D";
 import RightRailDock from "./world-3d/RightRailDock";
@@ -79,6 +82,30 @@ export default function GameStage3D({
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const world = gameState ? getWorld(gameState) : null;
+
+  // ─── Multiplayer room (gap #1636) ─────────────────────────────────────
+  // The room is enabled when the project is persisted (has a projectId)
+  // AND we're in play mode AND the env var is configured. Self-gated
+  // inside the hook — when any predicate fails it returns a no-op
+  // stub with `connected: false` / empty peers. Single seam — no
+  // prop-drilled `isMultiplayerActive` boolean.
+  const { user } = useAuth();
+  const roomIdentity = user
+    ? { userId: user.id, displayName: user.name ?? user.email ?? "Player" }
+    : null;
+  const room = useGameRoom(projectId, roomIdentity, mode === "play");
+
+  // PWA / offline support: mirror every gameState write to IndexedDB
+  // so a reload-with-no-network still opens the editor on the latest
+  // local snapshot. The studio service is still the SSoT for the
+  // server row — this is a side-channel that lets the editor open
+  // instantly + survive flight-mode editing. Fire-and-forget; the
+  // helper self-gates when indexedDB isn't available.
+  useEffect(() => {
+    if (!projectId || !gameState) return;
+    if (gameState.engine !== "world-3d") return;
+    void saveCachedGameState(projectId, gameState);
+  }, [projectId, gameState]);
 
   // Ensure the world exists on first mount.
   useEffect(() => {
@@ -134,22 +161,14 @@ export default function GameStage3D({
           challengesRef.current,
           { kind: "trigger", event },
         );
-        // Award points for each just-completed challenge. Fire and forget
-        // — the route handler is gentle (one ledger row); a failure
-        // doesn't roll the player back.
-        if (justCompleted.length > 0 && projectId) {
+        // Award points for each just-completed challenge via the
+        // shared `room.claimChallenge` seam. Single-player still
+        // works (the hook self-gates — direct fetch when the room
+        // isn't enabled); multiplayer adds a peer-broadcast on top.
+        // DRY: one award path for single + multiplayer.
+        if (justCompleted.length > 0) {
           for (const challengeId of justCompleted) {
-            void fetch(`/api/games/${projectId}/challenge-complete`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({
-                challengeId,
-                durationMs: Date.now() - next.startedAt,
-              }),
-            }).catch(() => {
-              // Network failures shouldn't break the play loop.
-            });
+            room.claimChallenge(challengeId);
           }
         }
         // Hazards reset the player. Same hook — no separate hazard handler.
@@ -229,6 +248,8 @@ export default function GameStage3D({
             onPlaceAt={handlePlaceAt}
             onTrigger={handleTrigger}
             respawnNonce={respawnNonce}
+            peers={room.peers}
+            onBroadcastPosition={room.broadcastPosition}
           />
         </Canvas>
 

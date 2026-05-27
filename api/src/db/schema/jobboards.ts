@@ -54,6 +54,10 @@ export const boardBids = pgTable("board_bids", {
   boardId: uuid("board_id").references(() => exclusiveBoards.id, { onDelete: "cascade" }),
   // Required for sourcing bids; legacy board bids may attach an optional jobId.
   jobId: uuid("job_id").references(() => jobItems.id, { onDelete: "set null" }),
+  // Canonical polymorphic-target pair (#1641). 'board' | 'job'.
+  // Backfilled by 0165 from the boardId/jobId XOR pair.
+  targetType: varchar("target_type", { length: 16 }),
+  targetId: uuid("target_id"),
   bidderId: uuid("bidder_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   // Used as "post fee" for board bids and "proposed sourcing fee" for sourcing bids.
   bidAmount: numeric("bid_amount").notNull(),

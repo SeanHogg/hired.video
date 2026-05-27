@@ -125,6 +125,7 @@ import { userAuditRoutes } from "./routes/user-audit.js";
 import { hiringInsightsRoutes } from "./routes/hiring-insights.js";
 import { graphRoutes } from "./routes/graph.js";
 import { chatSocketRoutes } from "./routes/chat-socket.js";
+import { gameSocketRoutes } from "./routes/game-socket.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { autofillRoutes } from "./routes/autofill.js";
 import { discoveryRoutes } from "./routes/discovery.js";
@@ -642,6 +643,7 @@ export function createApp() {
   app.route("/api/recruiter/hiring-insights", hiringInsightsRoutes);
   app.route("/api/graph", graphRoutes);
   app.route("/api/chat/socket", chatSocketRoutes);
+  app.route("/api/games", gameSocketRoutes);
   app.route("/api/auto-apply", autoApplyRoutes);
   app.route("/api/autofill", autofillRoutes);
   app.route("/api/discovery", discoveryRoutes);

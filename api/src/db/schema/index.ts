@@ -1,4 +1,5 @@
 export * from "./users.js";
+export * from "./workspaces.js";
 export * from "./taxonomies.js";
 export * from "./creator.js";
 export * from "./companies.js";

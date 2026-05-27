@@ -499,8 +499,15 @@ export const interviewQuestionSets = pgTable(
   "interview_question_sets",
   {
     id:              uuid("id").primaryKey().defaultRandom(),
-    ownerUserId:     uuid("owner_user_id"),       // xor with ownerCompanyId (constraint enforced in SQL)
+    // Legacy XOR pair — kept during transition; migrations 0153 enforce
+    // exactly-one-set, 0165 added (ownerType, ownerId) below as the
+    // canonical pair routed through canActFor() per #1641.
+    ownerUserId:     uuid("owner_user_id"),
     ownerCompanyId:  uuid("owner_company_id"),
+    /** Canonical polymorphic-owner pair (#1641). 'user' | 'company'.
+     *  Backfilled by 0165 from the legacy XOR pair. */
+    ownerType:       varchar("owner_type", { length: 16 }),
+    ownerId:         uuid("owner_id"),
     title:           varchar("title", { length: 200 }).notNull(),
     description:     text("description"),
     targetRole:      varchar("target_role", { length: 120 }),

@@ -51,6 +51,22 @@ export default defineConfig(({ mode }) => {
             utils: ["clsx", "tailwind-merge", "date-fns"],
             query: ["@tanstack/react-query"],
             forms: ["react-hook-form", "@hookform/resolvers", "zod"],
+            // 3D world studio bundle (gap #1636). Splitting Three.js +
+            // R3F + drei + Rapier into a named chunk so:
+            //   (a) 2D mini-game projects + every non-game route never
+            //       load these ~600KB gzipped of code (the chunk is
+            //       lazy-loaded via the `GameStage.tsx` dispatcher);
+            //   (b) the chunk URL is content-hashed independently —
+            //       the PWA precache caches it once and re-uses across
+            //       sessions until the bundle actually changes;
+            //   (c) routine app updates (UI tweaks) don't invalidate
+            //       the 3D cache.
+            "three-d": [
+              "three",
+              "@react-three/fiber",
+              "@react-three/drei",
+              "@react-three/rapier",
+            ],
           },
         },
       },

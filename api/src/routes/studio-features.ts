@@ -36,6 +36,7 @@ import {
 import { cdnUrl } from "../utils/cdn.js";
 import { slugify } from "../../../shared/slugify.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
+import { passesGate } from "../services/learning/scoring.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
 import { recordArtifactView } from "../services/analytics/artifactView.js";
 
@@ -2954,9 +2955,11 @@ studioFeaturesRoutes.post("/forms/:id/submit", async (c) => {
     }
     scoreRaw = earned;
     scoreMax = max;
-    const pct = max === 0 ? 0 : Math.round((earned / max) * 100);
+    // #1642 — pass-gate check routes through the shared scoring seam
+    // (services/learning/scoring.ts) so the rounding semantics match
+    // every other "did the learner pass?" callsite in the codebase.
     const threshold = form.passingScorePct ?? 80;
-    passed = pct >= threshold;
+    passed = passesGate({ scoreRaw, scoreMin: 0, scoreMax }, threshold);
     if (!passed) remediationJumpToSceneId = form.remediationJumpToSceneId ?? null;
   }
 

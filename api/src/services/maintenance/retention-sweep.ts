@@ -15,12 +15,15 @@
  *
  * Tables explicitly NOT in this list (audit-required or user-facing):
  *   - points_ledger / point_redemptions / usage_ledger (financial audit)
- *   - admin_audit_log (audit retention is policy-driven, separate)
  *   - external_email_messages (user inbox; the user expects persistence)
  *
  * Notifications were initially excluded too, but at millions-of-users
  * scale unread-but-never-clicked notifications accumulate indefinitely.
  * The 90-day cap matches the "user would have seen it by now" floor.
+ *
+ * `admin_audit_log` is retained for 365 days (#1613). SOC 2 requires
+ * minimum 12 months admin-action audit retention; archive to cold
+ * storage prior to delete is the long-term move (separately tracked).
  *
  * Adding a row here is a load-bearing change: review the table's audit
  * + product semantics before extending.
@@ -76,6 +79,13 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
   // unread notifications also drop so the table stays bounded — if
   // the user hasn't read it in 90 days, the notification is dead.
   { table: "notifications",      ageColumn: "created_at", retentionDays: 90, maxRowsPerRun: 5000 },
+
+  // admin_audit_log — 365d (SOC 2 floor for admin-action retention).
+  // Beyond a year, the row is unlikely to be referenced by an active
+  // compliance review. #1613 deferred the cold-storage archive path —
+  // when that lands, this retention becomes "delete after S3 export
+  // confirms." Today it's a straight delete.
+  { table: "admin_audit_log",    ageColumn: "created_at", retentionDays: 365, maxRowsPerRun: 5000 },
 ] as const;
 
 export interface RetentionRunSummary {

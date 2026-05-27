@@ -5,6 +5,9 @@ import { runScheduled } from "./scheduled.js";
 // can construct instances. The binding name in wrangler.toml is
 // CHAT_ROOM → class_name = "ChatRoom".
 export { ChatRoom } from "./durable/ChatRoom.js";
+// 3D world multiplayer signaling (gap #1636). Binding name in
+// wrangler.toml is GAME_ROOM → class_name = "GameSignalingRoom".
+export { GameSignalingRoom } from "./durable/GameSignalingRoom.js";
 
 // NOTE: `wrangler dev` will inject env vars via `wrangler.toml` or your shell.
 // This file intentionally avoids bundling `dotenv` to keep the worker bundle small.

@@ -34,11 +34,21 @@ interface PlayerControllerProps {
    *  to spawn. Used by the host's "respawn" button + the hazard handler
    *  (Phase 2) without forcing the controller to re-mount. */
   respawnNonce?: number;
+  /** Per-frame position broadcaster (gap #1636 multiplayer). When
+   *  passed, the controller pushes its position + rotation to the
+   *  multiplayer room each tick — `useGameRoom` throttles internally
+   *  so this is safe to call at 60 Hz. No-op when omitted (single-
+   *  player). */
+  onBroadcastPosition?: (
+    position: [number, number, number],
+    rotation: [number, number, number],
+  ) => void;
 }
 
 export default function PlayerController({
   spawn,
   respawnNonce = 0,
+  onBroadcastPosition,
 }: PlayerControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const camera = useThree((s) => s.camera) as ThreePerspectiveCamera;
@@ -140,6 +150,15 @@ export default function PlayerController({
 
     // Camera follows the capsule's "head" (top of the capsule).
     camera.position.set(translation.x, translation.y + 0.7, translation.z);
+
+    // Broadcast this frame's position to the multiplayer room.
+    // useGameRoom throttles internally — safe to call every frame.
+    if (onBroadcastPosition) {
+      onBroadcastPosition(
+        [translation.x, translation.y, translation.z],
+        [camera.rotation.x, camera.rotation.y, camera.rotation.z],
+      );
+    }
   });
 
   return (

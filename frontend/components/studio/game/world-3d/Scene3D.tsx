@@ -20,6 +20,8 @@ import type {
 } from "@shared/game-state";
 import EntityMesh, { type EntityTriggerEvent } from "./EntityMesh";
 import PlayerController from "./PlayerController";
+import PeerAvatars from "./PeerAvatars";
+import type { RemotePeer } from "@/lib/studio/game/use-game-room";
 
 interface Scene3DProps {
   world: World3DState;
@@ -38,6 +40,17 @@ interface Scene3DProps {
   /** Bumps when the host wants to teleport the player back to spawn
    *  (respawn button, hazard hit in Phase 2). */
   respawnNonce?: number;
+  /** Remote peers from `useGameRoom` (gap #1636). Empty map = single-
+   *  player or pre-connect; `<PeerAvatars>` self-gates and renders
+   *  nothing in that case. */
+  peers?: Map<string, RemotePeer>;
+  /** Position broadcaster — the PlayerController fans every frame
+   *  through this so peers see live motion over WebRTC data
+   *  channels. No-op when multiplayer is disabled. */
+  onBroadcastPosition?: (
+    position: [number, number, number],
+    rotation: [number, number, number],
+  ) => void;
 }
 
 export default function Scene3D({
@@ -49,6 +62,8 @@ export default function Scene3D({
   onPlaceAt,
   onTrigger,
   respawnNonce = 0,
+  peers,
+  onBroadcastPosition,
 }: Scene3DProps) {
   const sunDirRef = useRef(world.lighting.sun.direction);
   // Convert "direction the light shines toward" into a light position
@@ -139,8 +154,16 @@ export default function Scene3D({
         )}
 
         {mode === "play" && (
-          <PlayerController spawn={world.spawn} respawnNonce={respawnNonce} />
+          <PlayerController
+            spawn={world.spawn}
+            respawnNonce={respawnNonce}
+            onBroadcastPosition={onBroadcastPosition}
+          />
         )}
+
+        {/* Remote peers — self-gating, renders nothing when the
+            peers Map is undefined or empty. */}
+        {peers && <PeerAvatars peers={peers} />}
       </Physics>
 
       {mode === "edit" && (

@@ -63,6 +63,16 @@ binding = "AI"
 name = "CHAT_ROOM"
 class_name = "ChatRoom"
 
+# 3D world multiplayer (gap #1636). One DO per studio_projects.id —
+# holds WebRTC signaling sockets + authoritative challenge claims.
+# Per-frame gameplay (positions, animations) flows peer-to-peer over
+# data channels and never touches this DO; the room only sees join /
+# leave, SDP/ICE forwarding, and score claims. Hibernation keeps the
+# DO ~free between play sessions. See api/src/durable/GameSignalingRoom.ts.
+[[durable_objects.bindings]]
+name = "GAME_ROOM"
+class_name = "GameSignalingRoom"
+
 [[migrations]]
 tag = "v1"
 # SQLite-backed Durable Object — required on the Workers free plan (the
@@ -70,6 +80,13 @@ tag = "v1"
 # SQLite-backed DOs are the recommended default going forward and gain
 # the same hibernation / WebSocket APIs we use in ChatRoom.
 new_sqlite_classes = ["ChatRoom"]
+
+[[migrations]]
+tag = "v2"
+# GameSignalingRoom — added in the same `new_sqlite_classes` family
+# (SQLite-backed, hibernation-enabled) as ChatRoom. Separate migration
+# tag so the original `v1` migration stays content-stable.
+new_sqlite_classes = ["GameSignalingRoom"]
 
 [vars]
 # Partner domains are sourced from shared/security/partnerDomains.ts.

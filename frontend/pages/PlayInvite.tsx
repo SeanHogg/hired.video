@@ -13,8 +13,8 @@ import { useParams, Link } from "react-router-dom";
 import { Gamepad2, ArrowLeft } from "lucide-react";
 import type { GameState } from "@shared/game-state";
 import GameStage from "@/components/studio/game/GameStage";
-import { useSEO } from "@/hooks/use-seo";
-import AppShell from "@/components/AppShell";
+import { useSEO } from "@/lib/seo";
+import { AppShell } from "@/components/AppShell";
 
 interface ResolvedInvite {
   projectId: string;
@@ -28,7 +28,7 @@ export default function PlayInvite() {
   const [error, setError] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
 
-  useSEO({
+  useSEO("/play/:token", {
     title: invite?.label ? `Play: ${invite.label}` : "Join the game",
     description: "Play a 3D world built in the hired.video studio.",
   });
