@@ -19,7 +19,7 @@
  *     sensor-trigger events.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Gamepad2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -97,6 +97,13 @@ export default function GameStage3D({
   // selection → gameSelection (StudioEditorV2), invite → header
   // (StudioEditorV2). What's left here is canvas-local only.
   const [respawnNonce, setRespawnNonce] = useState(0);
+  /** Play-mode destroyed-entity set (gap #1661 — Roblox-style break).
+   *  Shot entities are removed from the rendered scene without
+   *  touching the authored `gameState`. Resets when the player
+   *  respawns (or play mode starts) so each playtest gets a fresh
+   *  world — the kid's authored level isn't permanently mutated by
+   *  test play. */
+  const [destroyedEntityIds, setDestroyedEntityIds] = useState<Set<string>>(() => new Set());
   /** Drop dispatch — DropPlacer (inside the R3F Canvas) sets this on
    *  mount; the outer drop event reads from `.current` so the HTML5
    *  drop handler can reach into R3F's camera + canvas for the
@@ -114,6 +121,34 @@ export default function GameStage3D({
   );
 
   const world = gameState ? getWorld(gameState) : null;
+
+  // Reset play-mode runtime sets every time the player respawns or play
+  // mode (re)starts. Mode change + respawn share one effect — same
+  // reset semantics, no fork.
+  useEffect(() => {
+    setDestroyedEntityIds(new Set());
+  }, [mode, respawnNonce]);
+
+  // Filtered render-time entity list — drops anything the player has
+  // shot during this play session. Edit mode shows everything (the
+  // destroyed set is reset on mode flip).
+  const visibleWorld = useMemo(() => {
+    if (!world) return null;
+    if (mode !== "play" || destroyedEntityIds.size === 0) return world;
+    return {
+      ...world,
+      entities: world.entities.filter((e) => !destroyedEntityIds.has(e.id)),
+    };
+  }, [world, mode, destroyedEntityIds]);
+
+  const handleShootHit = useCallback((entityId: string) => {
+    setDestroyedEntityIds((prev) => {
+      if (prev.has(entityId)) return prev;
+      const next = new Set(prev);
+      next.add(entityId);
+      return next;
+    });
+  }, []);
 
   // ─── Multiplayer room (gap #1636) ─────────────────────────────────────
   // The room is enabled when the project is persisted (has a projectId)
@@ -329,7 +364,11 @@ export default function GameStage3D({
           tabIndex={mode === "play" ? 0 : -1}
         >
           <Scene3D
-            world={world}
+            // Use the filtered visibleWorld in play mode so destroyed
+            // entities disappear from the rendered scene. Edit mode
+            // always shows the authored world (destroyedEntityIds is
+            // empty in that mode by virtue of the reset effect).
+            world={visibleWorld ?? world}
             mode={mode}
             selectedEntityId={selectedEntityId}
             onSelectEntity={selectEntity}
@@ -337,6 +376,7 @@ export default function GameStage3D({
             respawnNonce={respawnNonce}
             peers={room.peers}
             onBroadcastPosition={room.broadcastPosition}
+            onShootHit={handleShootHit}
           />
           {/* Invisible — registers a pure raycast helper via the
               shared ref. The outer drop handler reads the dataTransfer

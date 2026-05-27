@@ -57,6 +57,12 @@ export const ENTITY_KIND_DEFAULTS: Record<World3DEntityKind, EntityKindDefaults>
   goal:        { scale: [2, 2, 2],   color: "#22c55e", physics: "sensor" },
   hazard:      { scale: [2, 1, 2],   color: "#ef4444", physics: "sensor" },
   light:       { scale: [0.4, 0.4, 0.4], color: "#fef9c3", physics: "none" },
+  // Weapon prop (gap #1659 / Roblox-feature follow-on #1661). Roblox-
+  // standard "nerf gun" silhouette is a small orange L-shape; the
+  // runtime renders it as a tinted box with a barrel cap for v1. No
+  // collider — it's a prop, players don't bump into it (a pickup
+  // mechanic arrives with the equip system in #1661).
+  weapon:      { scale: [0.6, 0.4, 0.9], color: "#fb923c", physics: "none" },
 };
 
 // ─── World accessors ──────────────────────────────────────────────────────

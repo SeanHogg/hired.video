@@ -186,7 +186,12 @@ export interface World3DTransform {
  *   - `goal`         — finish-zone trigger. Fires a `reach` event on
  *                      player overlap.
  *   - `hazard`       — damage trigger. Fires a `harm` event.
- *   - `light`        — point light. Visual only; no collider. */
+ *   - `light`        — point light. Visual only; no collider.
+ *   - `weapon`       — Roblox-style pickup gun (gap #1659+#1661). In
+ *                      v1 every player has shoot-on-click from start;
+ *                      authored weapon entities are scene props that
+ *                      pickup-equip mechanics will gate behind in a
+ *                      future pass. */
 export type World3DEntityKind =
   | "block"
   | "ramp"
@@ -195,7 +200,8 @@ export type World3DEntityKind =
   | "collectible"
   | "goal"
   | "hazard"
-  | "light";
+  | "light"
+  | "weapon";
 
 /** Rapier body kind:
  *   - `static`    — immovable, infinite mass. Walls, floors.

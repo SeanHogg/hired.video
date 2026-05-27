@@ -94,6 +94,12 @@ export default function EntityMesh({
         position={entity.position}
         rotation={entity.rotation}
         scale={entity.scale}
+        // userData carries the entity id so the play-mode hitscan
+        // (PlayerController) can identify which entity a left-click
+        // raycast hit. DRY: every entity branch sets this — the
+        // raycast walks `o.parent` to find the first ancestor with
+        // `userData.entityId`.
+        userData={{ entityId: entity.id }}
       >
         <KindMesh
           kind={entity.kind}
@@ -131,7 +137,7 @@ export default function EntityMesh({
       }
     >
       <KindCollider kind={entity.kind} scale={entity.scale} sensor={isSensor} />
-      <group scale={entity.scale}>
+      <group scale={entity.scale} userData={{ entityId: entity.id }}>
         <KindMesh
           kind={entity.kind}
           color={entity.color}
@@ -225,6 +231,24 @@ function KindMesh({ kind, color, texture, selected, onClick }: KindMeshProps) {
           </mesh>
         </group>
       );
+    case "weapon":
+      // Roblox-style nerf-gun silhouette: a stubby grip + a barrel.
+      // Two box children inside one group; both pick up the parent
+      // entity's transform via the outer group in EntityMesh.
+      return (
+        <group onClick={onClick} castShadow>
+          {/* Grip — short vertical block */}
+          <mesh position={[0, -0.15, 0.2]} castShadow receiveShadow>
+            <boxGeometry args={[0.35, 0.6, 0.35]} />
+            {material}
+          </mesh>
+          {/* Barrel — long horizontal block */}
+          <mesh position={[0, 0.1, -0.15]} castShadow receiveShadow>
+            <boxGeometry args={[0.3, 0.3, 0.9]} />
+            {material}
+          </mesh>
+        </group>
+      );
   }
 }
 
@@ -264,6 +288,12 @@ function KindCollider({ kind, scale, sensor = false }: KindColliderProps) {
     case "hazard":
     case "goal":
     case "light":
+    // Weapon defaults to physics: "none" so this branch never fires
+    // for it at runtime — the case is here purely for switch
+    // exhaustiveness against `World3DEntityKind`. If a user overrides
+    // weapon physics to anything else, a Cuboid collider is a safe
+    // bounding-box default.
+    case "weapon":
       return <CuboidCollider args={halfExtents} sensor={sensor} />;
   }
 }

@@ -34,6 +34,7 @@ import {
   Mic,
   Pencil,
   UserPlus,
+  Download,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { preloadStudioFonts } from "@/lib/studio/font-catalog";
@@ -111,6 +112,7 @@ import Game3DPropertiesPanel from "@/components/studio/game/world-3d/Game3DPrope
 import ChallengesPanel from "@/components/studio/game/world-3d/ChallengesPanel";
 import AIAgentPanel from "@/components/studio/game/world-3d/AIAgentPanel";
 import InviteDialog from "@/components/studio/game/world-3d/InviteDialog";
+import { downloadRobloxFile } from "@/lib/studio/game/roblox-export";
 import GamePropertiesPanel, {
   type GameSelection,
 } from "@/components/studio/game/GamePropertiesPanel";
@@ -2358,6 +2360,11 @@ export default function StudioEditorV2() {
           gamePlaying={gamePlaying}
           onTogglePlaytest={() => setGamePlaying((p) => !p)}
           onOpenInvite={() => setGameInviteOpen(true)}
+          onExportRoblox={
+            gameState && gameState.engine === "world-3d"
+              ? () => downloadRobloxFile(gameState, `${title || "hired-world"}.rbxlx`)
+              : undefined
+          }
           onExport={handleExport}
           exporting={exporting}
           onPublishToYouTube={handlePublishToYouTube}
@@ -3334,6 +3341,7 @@ function EditorHeader({
   gamePlaying,
   onTogglePlaytest,
   onOpenInvite,
+  onExportRoblox,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -3361,6 +3369,11 @@ function EditorHeader({
   gamePlaying: boolean;
   onTogglePlaytest: () => void;
   onOpenInvite: () => void;
+  /** Roblox export — undefined when the project isn't 3D-world. When
+   *  set, the header renders an "Export → Roblox" button next to
+   *  Invite. The actual XML generation + download lives in
+   *  `lib/studio/game/roblox-export.ts` (gap #1661). */
+  onExportRoblox?: () => void;
   /** Image-kind only: handler bound to the SaveMenu's `asset-library`
    *  publish destination. Falls through unbound (the dropdown row
    *  self-disables) for non-image projects. */
@@ -3526,6 +3539,21 @@ function EditorHeader({
           >
             <UserPlus className="h-4 w-4" />
             Invite
+          </Button>
+        )}
+        {/* Export to Roblox — generates a `.rbxlx` place file from the
+            authored world (gap #1661 follow-on). Only meaningful for
+            3D-world projects; self-gates via the optional callback. */}
+        {mediaKind === "game" && gameEngine === "world-3d" && onExportRoblox && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={onExportRoblox}
+            title="Export as Roblox place file (.rbxlx)"
+          >
+            <Download className="h-4 w-4" />
+            Roblox
           </Button>
         )}
         {/* Single overflow `…` for project + template actions (clone,

@@ -29,13 +29,14 @@ interface PaletteEntry {
   glyph: string;
 }
 
-type GroupId = "building" | "triggers" | "props" | "fx";
+type GroupId = "building" | "triggers" | "props" | "fx" | "tools";
 
 const GROUP_LABELS: Record<GroupId, string> = {
   building: "Building",
   triggers: "Triggers",
   props: "Props",
   fx: "FX",
+  tools: "Tools",
 };
 
 const GROUPS: Record<GroupId, PaletteEntry[]> = {
@@ -50,6 +51,11 @@ const GROUPS: Record<GroupId, PaletteEntry[]> = {
     { kind: "hazard", label: "Hazard", glyph: "🔥" },
   ],
   props: [{ kind: "sphere", label: "Ball", glyph: "⚽" }],
+  // Roblox-style player tools. v1: every player can shoot during
+  // playtest by left-clicking with the canvas pointer-locked. Authored
+  // weapon entities are scene props that future pickup-equip mechanics
+  // (#1661) will gate weapon access behind.
+  tools: [{ kind: "weapon", label: "Nerf gun", glyph: "🔫" }],
   fx: [{ kind: "light", label: "Light", glyph: "💡" }],
 };
 

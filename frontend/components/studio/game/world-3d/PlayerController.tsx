@@ -21,7 +21,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { CapsuleCollider, RigidBody, useRapier } from "@react-three/rapier";
 import type { RapierRigidBody } from "@react-three/rapier";
 import { PointerLockControls } from "@react-three/drei";
-import { Vector3, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
+import { Raycaster, Vector2, Vector3, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
 import type { World3DTransform } from "@shared/game-state";
 
 const WALK_SPEED = 6; // m/s — slightly slower than a real-world run
@@ -43,15 +43,24 @@ interface PlayerControllerProps {
     position: [number, number, number],
     rotation: [number, number, number],
   ) => void;
+  /** Hit callback for the Roblox-style click-to-shoot hitscan
+   *  (gap #1661). Called when the player left-clicks while pointer-
+   *  locked and the camera-forward raycast lands on an entity. Host
+   *  is responsible for actually destroying the entity (so play
+   *  sessions can be replayed without permanently mutating the
+   *  authored gameState). */
+  onShootHit?: (entityId: string) => void;
 }
 
 export default function PlayerController({
   spawn,
   respawnNonce = 0,
   onBroadcastPosition,
+  onShootHit,
 }: PlayerControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const camera = useThree((s) => s.camera) as ThreePerspectiveCamera;
+  const scene = useThree((s) => s.scene);
   const keysRef = useRef<Set<string>>(new Set());
   const groundedRef = useRef(false);
   const { rapier, world } = useRapier();
@@ -71,6 +80,36 @@ export default function PlayerController({
       window.removeEventListener("keyup", up);
     };
   }, []);
+
+  // ─── Shoot (Roblox-style, gap #1661) ─────────────────────────────────
+  // Left-click while pointer-locked = hitscan from camera center.
+  // Walks the raycast hits, picks the first ancestor carrying
+  // `userData.entityId` (every EntityMesh group tags its own id), and
+  // hands the id up to the host. The host owns the runtime "destroyed"
+  // set — keeps play sessions from permanently mutating the authored
+  // gameState (a new playtest starts fresh).
+  useEffect(() => {
+    if (!onShootHit) return;
+    const raycaster = new Raycaster();
+    const centerNdc = new Vector2(0, 0);
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      // Only fire while the pointer is locked to the canvas — keeps
+      // accidental edit-mode clicks out of the play loop.
+      if (!document.pointerLockElement) return;
+      raycaster.setFromCamera(centerNdc, camera);
+      const hits = raycaster.intersectObjects(scene.children, true);
+      for (const hit of hits) {
+        const entityId = findEntityId(hit.object);
+        if (entityId) {
+          onShootHit(entityId);
+          return;
+        }
+      }
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [camera, scene, onShootHit]);
 
   // ─── Respawn ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -181,4 +220,18 @@ export default function PlayerController({
       <PointerLockControls />
     </>
   );
+}
+
+/** Walk a raycast-hit Object3D's ancestor chain looking for an entity
+ *  id tag. Every EntityMesh tags its outermost group with
+ *  `userData.entityId`; this helper finds it regardless of which mesh
+ *  inside the entity actually got hit. */
+function findEntityId(obj: Object3D | null): string | null {
+  let cur: Object3D | null = obj;
+  while (cur) {
+    const id = (cur.userData as { entityId?: string } | undefined)?.entityId;
+    if (typeof id === "string" && id.length > 0) return id;
+    cur = cur.parent;
+  }
+  return null;
 }

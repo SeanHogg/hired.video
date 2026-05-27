@@ -44,6 +44,11 @@ interface Scene3DProps {
     position: [number, number, number],
     rotation: [number, number, number],
   ) => void;
+  /** Play-mode hitscan callback (gap #1661 — Roblox-style click to
+   *  shoot). Forwarded to PlayerController; fires when the player
+   *  left-clicks with the pointer locked and the camera-forward
+   *  raycast lands on an authored entity. */
+  onShootHit?: (entityId: string) => void;
 }
 
 export default function Scene3D({
@@ -55,6 +60,7 @@ export default function Scene3D({
   respawnNonce = 0,
   peers,
   onBroadcastPosition,
+  onShootHit,
 }: Scene3DProps) {
   const sunDirRef = useRef(world.lighting.sun.direction);
   // Convert "direction the light shines toward" into a light position
@@ -147,6 +153,7 @@ export default function Scene3D({
             spawn={world.spawn}
             respawnNonce={respawnNonce}
             onBroadcastPosition={onBroadcastPosition}
+            onShootHit={onShootHit}
           />
         )}
 
