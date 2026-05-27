@@ -18,6 +18,10 @@ export const boards = pgTable("boards", {
   description: text("description"),
   color: varchar("color", { length: 50 }),
   isArchived: boolean("is_archived").default(false).notNull(),
+  // #1612 — canonical soft-delete timestamp, added in migration 0154.
+  // Backfilled from is_archived; reads should prefer this column going
+  // forward via the shared `services/db/soft-delete.ts` helper.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

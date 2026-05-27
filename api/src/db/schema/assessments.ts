@@ -48,6 +48,10 @@ export const assessmentAttempts = pgTable("assessment_attempts", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   assessmentId: uuid("assessment_id").notNull().references(() => skillAssessments.id, { onDelete: "cascade" }),
+  // Sequence number per (user, assessment) — added in migration 0155.
+  // Unique on (user_id, assessment_id, attempt_number) prevents double-
+  // submitting the same attempt; retries are explicit incremented rows.
+  attemptNumber: integer("attempt_number").default(1).notNull(),
   status: varchar("status", { length: 50 }).default("in_progress").notNull(), // in_progress | submitted | graded | expired
   // Candidate's answers: { questionId: answer }
   answers: jsonb("answers").default({}).$type<Record<string, string | number>>(),

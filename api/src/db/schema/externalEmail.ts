@@ -119,6 +119,8 @@ export const externalEmailMessages = pgTable(
 
     isRead: boolean("is_read").default(false).notNull(),
     isArchived: boolean("is_archived").default(false).notNull(),
+    // #1612 — canonical soft-delete timestamp, added in 0154.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     rawMetadata: jsonb("raw_metadata"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

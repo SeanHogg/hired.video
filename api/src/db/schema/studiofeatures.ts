@@ -511,6 +511,8 @@ export const interviewQuestionSets = pgTable(
     maxRetakes:      integer("max_retakes").notNull().default(1),
     proctoringOn:    boolean("proctoring_on").notNull().default(true),
     isArchived:      boolean("is_archived").notNull().default(false),
+    // #1612 — canonical soft-delete timestamp, added in 0154.
+    archivedAt:      timestamp("archived_at", { withTimezone: true }),
     useCount:        integer("use_count").notNull().default(0),
     createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

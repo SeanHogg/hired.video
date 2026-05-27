@@ -52,10 +52,11 @@ export const candidateResumes = pgTable(
       () => resumeInformation.id,
       { onDelete: "set null" },
     ),
-    // Self-reference intentionally not declared here — drizzle's type
-    // inference collapses the insert shape when a table references itself.
-    // The FK constraint lives in the SQL migration; the app layer
-    // validates parent belongs to the same company before insert.
+    // Self-reference intentionally not declared in Drizzle TS — type
+    // inference collapses the insert shape when a table references
+    // itself. The FK constraint (ON DELETE SET NULL) is added in
+    // migration 0152; app layer validates parent belongs to the same
+    // company before insert.
     parentId: uuid("parent_id"),
     isActive: boolean("is_active").default(false).notNull(),
     label: varchar("label", { length: 255 }),

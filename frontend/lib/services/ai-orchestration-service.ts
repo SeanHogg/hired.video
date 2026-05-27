@@ -9,6 +9,7 @@
 import type { AIContext, AIAction, AvailableAPI } from "@/lib/types/ai-context";
 import { apiClient } from "@/lib/api-client";
 import { getAPIById, getAPIsByAction } from "@/lib/config/ai-api-registry";
+import { buildEndpointUrl } from "@shared/ai-tools";
 
 // ============================================================================
 // TYPES
@@ -279,7 +280,7 @@ class AIOrchestrationService {
 
     for (const plan of plans) {
       try {
-        const response = await this.callAPI(plan.api, plan.payload);
+        const response = await this.callAPI(plan.api, plan.payload, context);
         results.push({
           api: plan.api,
           success: true,
@@ -297,23 +298,40 @@ class AIOrchestrationService {
     return results;
   }
 
+  /** Resolve `:id` placeholders in a tool endpoint from the current
+   *  page context. Falls back to whatever id the context exposes
+   *  (resume / job / task / user) — the planner only schedules an
+   *  entity-bound tool when the matching entity is loaded, so this
+   *  cannot leak the wrong id across kinds. */
+  private resolvePathParams(context: AIContext): Record<string, string | number> {
+    const params: Record<string, string | number> = {};
+    const ctx = context as Record<string, any>;
+    if (ctx.resume?.id) params.id = ctx.resume.id;
+    else if (ctx.job?.id) params.id = ctx.job.id;
+    else if (ctx.task?.id) params.id = ctx.task.id;
+    return params;
+  }
+
   /**
    * Call a single API
    */
-  private async callAPI(api: AvailableAPI, payload: any): Promise<any> {
+  private async callAPI(api: AvailableAPI, payload: any, context: AIContext): Promise<any> {
     const method = api.method.toLowerCase();
+    // Substitute `:param` placeholders from the page context. Plain
+    // paths (no placeholders) pass through buildEndpointUrl unchanged.
+    const url = buildEndpointUrl(api.endpoint, this.resolvePathParams(context));
 
     if (method === "get") {
-      const response = await apiClient.get(api.endpoint);
+      const response = await apiClient.get(url);
       return response.data;
     } else if (method === "post") {
-      const response = await apiClient.post(api.endpoint, payload);
+      const response = await apiClient.post(url, payload);
       return response.data;
     } else if (method === "put") {
-      const response = await apiClient.put(api.endpoint, payload);
+      const response = await apiClient.put(url, payload);
       return response.data;
     } else if (method === "delete") {
-      const response = await apiClient.delete(api.endpoint);
+      const response = await apiClient.delete(url);
       return response.data;
     }
 

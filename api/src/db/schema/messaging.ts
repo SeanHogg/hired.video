@@ -15,6 +15,8 @@ export const conversations = pgTable("conversations", {
   subject: varchar("subject", { length: 500 }),
   type: varchar("type", { length: 50 }).default("direct").notNull(),
   isArchived: boolean("is_archived").default(false).notNull(),
+  // #1612 — canonical soft-delete timestamp, added in 0154.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

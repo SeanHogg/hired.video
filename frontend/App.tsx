@@ -88,6 +88,7 @@ const AudienceLandingPage = lazy(() => import("./pages/landing/AudienceLandingPa
 const ForIndex = lazy(() => import("./pages/ForIndex"));
 const LocationLandingPage = lazy(() => import("./pages/landing/LocationLandingPage"));
 const SitemapLocations = lazy(() => import("./pages/SitemapLocations"));
+const AdminAudienceTagger = lazy(() => import("./pages/admin/AdminAudienceTagger"));
 const TemplateLandingPage = lazy(() => import("./pages/landing/TemplateLandingPage"));
 const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
@@ -643,6 +644,7 @@ const App = () => (
                       <Route path="/in/:country/:state" element={<LocationLandingPage />} />
                       <Route path="/in/:country/:state/:city" element={<LocationLandingPage />} />
                       <Route path="/sitemap/locations" element={<SitemapLocations />} />
+                      <Route path="/admin/audiences" element={<AdminAudienceTagger />} />
                       <Route path="/templates/:slug" element={<TemplateLandingPage />} />
                       <Route
                         path="/compare"

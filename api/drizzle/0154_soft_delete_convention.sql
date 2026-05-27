@@ -55,11 +55,13 @@ BEGIN
 END;
 $func$;
 
--- Tables with the `is_archived boolean` convention.
+-- Tables with the `is_archived boolean` convention. Verified against
+-- the schema TS — `messaging.conversations` (not "messaging_threads")
+-- and `interview_kits` (not "scorecard_kits") were the actual names.
 SELECT public.__mig_0154_add_archived_at('external_email_messages');
-SELECT public.__mig_0154_add_archived_at('messaging_threads');
+SELECT public.__mig_0154_add_archived_at('conversations');
 SELECT public.__mig_0154_add_archived_at('boards');
-SELECT public.__mig_0154_add_archived_at('scorecard_kits');
+SELECT public.__mig_0154_add_archived_at('interview_kits');
 SELECT public.__mig_0154_add_archived_at('scorecard_attributes');
 SELECT public.__mig_0154_add_archived_at('scorecard_templates');
 SELECT public.__mig_0154_add_archived_at('interview_question_sets');

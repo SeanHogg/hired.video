@@ -114,7 +114,7 @@ export const companyBoosts = pgTable("company_boosts", {
 // ---------------------------------------------------------------------------
 export const adCampaigns = pgTable("ad_campaigns", {
   id:          uuid("id").primaryKey().defaultRandom(),
-  userId:      text("user_id").notNull(),
+  userId:      uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name:        text("name").notNull(),
   objective:   text("objective").notNull().default("TRAFFIC"), // AWARENESS | TRAFFIC | APPLICATIONS | EMPLOYER_BRAND
   status:      text("status").notNull().default("draft"),      // draft | active | paused | completed | archived
@@ -135,8 +135,8 @@ export const adCampaigns = pgTable("ad_campaigns", {
 // ---------------------------------------------------------------------------
 export const adSets = pgTable("ad_sets", {
   id:                uuid("id").primaryKey().defaultRandom(),
-  campaignId:        text("campaign_id").notNull(),
-  userId:            text("user_id").notNull(),
+  campaignId:        uuid("campaign_id").notNull().references(() => adCampaigns.id, { onDelete: "cascade" }),
+  userId:            uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name:              text("name").notNull(),
   placementType:     text("placement_type").notNull().default("search_top"), // search_top | discovery_feed | both | email | push
   pricingModel:      text("pricing_model").notNull().default("cpc"),         // cpm | cpc | auto
@@ -165,8 +165,8 @@ export const adSets = pgTable("ad_sets", {
 // ---------------------------------------------------------------------------
 export const ads = pgTable("ads", {
   id:             uuid("id").primaryKey().defaultRandom(),
-  adSetId:        text("ad_set_id").notNull(),
-  userId:         text("user_id").notNull(),
+  adSetId:        uuid("ad_set_id").notNull().references(() => adSets.id, { onDelete: "cascade" }),
+  userId:         uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name:           text("name").notNull(),
   headline:       text("headline").notNull(),
   description:    text("description"),
@@ -191,7 +191,7 @@ export const ads = pgTable("ads", {
 // ---------------------------------------------------------------------------
 export const enrichmentCredits = pgTable("enrichment_credits", {
   id:             uuid("id").primaryKey().defaultRandom(),
-  userId:         text("user_id").notNull().unique(),
+  userId:         uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   balance:        integer("balance").notNull().default(0),
   totalPurchased: integer("total_purchased").notNull().default(0),
   totalConsumed:  integer("total_consumed").notNull().default(0),
@@ -200,7 +200,7 @@ export const enrichmentCredits = pgTable("enrichment_credits", {
 
 export const enrichmentTransactions = pgTable("enrichment_transactions", {
   id:            uuid("id").primaryKey().defaultRandom(),
-  userId:        text("user_id").notNull(),
+  userId:        uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type:          text("type").notNull(), // purchase | deduction | refund | monthly_grant
   amount:        integer("amount").notNull(),    // positive = credit, negative = debit
   balanceAfter:  integer("balance_after").notNull(),
@@ -261,7 +261,7 @@ export type NewCampaignDollarsTransaction = typeof campaignDollarsTransactions.$
 // ---------------------------------------------------------------------------
 export const careerResilienceReports = pgTable("career_resilience_reports", {
   id:          uuid("id").primaryKey().defaultRandom(),
-  userId:      text("user_id").notNull(),
+  userId:      uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   currentRole: text("current_role").notNull(),
   riskScore:   integer("risk_score").notNull(),         // 0-100 (higher = more at risk from AI)
   reportJson:  jsonb("report_json").notNull().default("{}"), // { skillGaps, adjacentRoles, retrainingRoadmap, salaryTrajectory, marketSignals }

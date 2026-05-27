@@ -51,6 +51,8 @@ export const scorecardTemplates = pgTable(
       { onDelete: "set null" },
     ),
     isArchived: boolean("is_archived").notNull().default(false),
+    // #1612 — canonical soft-delete timestamp, added in 0154.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -79,6 +81,8 @@ export const competencies = pgTable(
     // 'technical' | 'behavioral' | 'leadership' | 'execution' | 'other'
     taxonomy: varchar("taxonomy", { length: 32 }).notNull().default("other"),
     isArchived: boolean("is_archived").notNull().default(false),
+    // #1612 — canonical soft-delete timestamp, added in 0154.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdByUserId: uuid("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -173,6 +177,8 @@ export const interviewKits = pgTable(
       onDelete: "set null",
     }),
     isArchived: boolean("is_archived").notNull().default(false),
+    // #1612 — canonical soft-delete timestamp, added in 0154.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
