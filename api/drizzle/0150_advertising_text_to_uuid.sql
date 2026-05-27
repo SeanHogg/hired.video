@@ -135,3 +135,7 @@ SELECT public.__mig_0150_convert_text_user_id('enrichment_transactions');
 -- career_resilience_reports — user_id text → uuid + FK.
 -- ---------------------------------------------------------------------------
 SELECT public.__mig_0150_convert_text_user_id('career_resilience_reports');
+
+-- Cleanup migration-scoped helpers.
+DROP FUNCTION IF EXISTS public.__mig_0150_convert_text_user_id(text);
+DROP FUNCTION IF EXISTS public.__mig_0150_convert_text_fk(text, text, text, text, text);
