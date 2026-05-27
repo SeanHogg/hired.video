@@ -64,6 +64,14 @@ interface GameStage3DProps {
    *  (both server endpoints address the row by id). Null for unsaved
    *  drafts; the affected panels gracefully degrade. */
   projectId?: string | null;
+  /** Zoom multiplier — same contract as the 2D `<GameStage>`. The
+   *  wrapper applies the scale to its CSS dimensions; R3F detects the
+   *  resize via its built-in ResizeObserver and re-renders at the new
+   *  pixel size (so the canvas stays sharp at every zoom level — no
+   *  blurry bitmap scale). The wrapper's drop receiver uses the
+   *  scaled bounding rect for the raycast so drop placement stays
+   *  accurate at any zoom. */
+  zoom?: number;
   hideRuntimeBanner?: boolean;
   className?: string;
 }
@@ -73,6 +81,7 @@ export default function GameStage3D({
   mode,
   onChange,
   projectId = null,
+  zoom = 1,
   hideRuntimeBanner = false,
   className,
 }: GameStage3DProps) {
@@ -243,7 +252,10 @@ export default function GameStage3D({
     <div className={cn("relative", className)}>
       <div
         className="relative overflow-hidden rounded-md shadow-lg"
-        style={{ width: `${gameState.width}px`, height: `${gameState.height}px` }}
+        style={{
+          width: `${gameState.width * zoom}px`,
+          height: `${gameState.height * zoom}px`,
+        }}
         aria-label={`3D world ${mode === "play" ? "playback" : "preview"}`}
         // Drop receiver — accepts the left-rail palette's drag
         // payload (mime `application/x-world3d-kind`) and forwards

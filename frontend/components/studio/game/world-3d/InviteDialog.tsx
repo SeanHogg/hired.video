@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { gamesApiJson } from "@/lib/services/games-api";
 
 interface Invite {
   id: string;
@@ -45,13 +46,8 @@ export default function InviteDialog({ projectId, onClose }: InviteDialogProps) 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/games/${projectId}/invites`, { credentials: "include" });
-      const json = await res.json();
-      if (!res.ok || !json?.success) {
-        setError(json?.error?.message ?? "Failed to load invites");
-        return;
-      }
-      setInvites(json.data ?? []);
+      const data = await gamesApiJson<Invite[]>(`/api/games/${projectId}/invites`);
+      setInvites(data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network failure");
     } finally {
@@ -64,23 +60,16 @@ export default function InviteDialog({ projectId, onClose }: InviteDialogProps) 
     setCreating(true);
     setError(null);
     try {
-      const res = await fetch(`/api/games/${projectId}/invites`, {
+      await gamesApiJson(`/api/games/${projectId}/invites`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+        body: {
           label: newLabel.trim() || undefined,
           // Default 7-day expiry — kids share links via screenshot / discord;
           // links rotting after a week is a reasonable default. Owners can
           // create unlimited new ones for free.
           expiresInHours: 24 * 7,
-        }),
+        },
       });
-      const json = await res.json();
-      if (!res.ok || !json?.success) {
-        setError(json?.error?.message ?? "Create failed");
-        return;
-      }
       setNewLabel("");
       await refresh();
     } catch (e) {
@@ -93,10 +82,7 @@ export default function InviteDialog({ projectId, onClose }: InviteDialogProps) 
   const revoke = async (inviteId: string) => {
     if (!projectId) return;
     try {
-      await fetch(`/api/games/${projectId}/invites/${inviteId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      await gamesApiJson(`/api/games/${projectId}/invites/${inviteId}`, { method: "DELETE" });
       await refresh();
     } catch {
       // Refresh will surface the actual state; UI doesn't need to throw.

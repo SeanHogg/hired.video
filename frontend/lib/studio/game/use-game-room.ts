@@ -32,6 +32,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { gamesApiJson, gamesSocketUrl } from "@/lib/services/games-api";
 
 export interface RemotePeer {
   id: string;
@@ -172,11 +173,9 @@ export function useGameRoom(
   const claimChallenge = useCallback(
     (challengeId: string) => {
       if (projectId) {
-        void fetch(`/api/games/${projectId}/challenge-complete`, {
+        void gamesApiJson(`/api/games/${projectId}/challenge-complete`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ challengeId }),
+          body: { challengeId },
         }).catch(() => {
           // Network failures shouldn't break the play loop.
         });
@@ -205,30 +204,21 @@ function resolveEnabled(
   if (!active) return false;
   if (!projectId || !identity) return false;
   if (typeof window === "undefined") return false;
-  // Env var is set in vite config. Empty / undefined → multiplayer off.
-  const url = (import.meta as { env?: Record<string, string | undefined> }).env
-    ?.VITE_GAME_REALTIME_URL;
-  return Boolean(url);
+  // Multiplayer is gated by `VITE_GAME_REALTIME_URL` (explicit
+  // override) — when unset, single-player only. URL derivation lives
+  // in `gamesSocketUrl` so both this gate + the WS-open path read the
+  // same env (DRY).
+  return Boolean(
+    (import.meta as { env?: Record<string, string | undefined> }).env
+      ?.VITE_GAME_REALTIME_URL,
+  );
 }
 
 function buildSocketUrl(
   projectId: string,
   identity: { userId: string; displayName: string },
 ): string | null {
-  const base = (import.meta as { env?: Record<string, string | undefined> }).env
-    ?.VITE_GAME_REALTIME_URL;
-  if (!base) return null;
-  const proto = base.startsWith("https") ? "wss" : base.startsWith("http") ? "ws" : null;
-  if (!proto) {
-    // Already a ws/wss url — pass through.
-    return `${base.replace(/\/$/, "")}/${projectId}/socket?userId=${encodeURIComponent(identity.userId)}&name=${encodeURIComponent(identity.displayName)}`;
-  }
-  const u = new URL(base);
-  u.protocol = proto;
-  u.pathname = `${u.pathname.replace(/\/$/, "")}/${projectId}/socket`;
-  u.searchParams.set("userId", identity.userId);
-  u.searchParams.set("name", identity.displayName);
-  return u.toString();
+  return gamesSocketUrl(projectId, identity);
 }
 
 // ─── Signaling envelope handling ──────────────────────────────────────

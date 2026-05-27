@@ -15,6 +15,7 @@ import type { GameState } from "@shared/game-state";
 import GameStage from "@/components/studio/game/GameStage";
 import { useSEO } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
+import { gamesApiJson } from "@/lib/services/games-api";
 
 interface ResolvedInvite {
   projectId: string;
@@ -38,18 +39,13 @@ export default function PlayInvite() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/games/invites/${encodeURIComponent(token)}`, {
-          credentials: "include",
-        });
-        const json = await res.json();
+        const data = await gamesApiJson<ResolvedInvite>(
+          `/api/games/invites/${encodeURIComponent(token)}`,
+        );
         if (cancelled) return;
-        if (!res.ok || !json?.success) {
-          setError(json?.error?.message ?? "Invite not found");
-          return;
-        }
-        setInvite(json.data);
+        setInvite(data);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Network failure");
+        if (!cancelled) setError(e instanceof Error ? e.message : "Invite not found");
       }
     })();
     return () => {
@@ -60,9 +56,8 @@ export default function PlayInvite() {
   const join = async () => {
     if (!token) return;
     try {
-      await fetch(`/api/games/invites/${encodeURIComponent(token)}/join`, {
+      await gamesApiJson(`/api/games/invites/${encodeURIComponent(token)}/join`, {
         method: "POST",
-        credentials: "include",
       });
     } catch {
       // Best-effort — the user can play even if the counter bump fails.

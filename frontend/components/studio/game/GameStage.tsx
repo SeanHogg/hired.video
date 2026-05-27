@@ -122,6 +122,7 @@ export default function GameStage({
           mode={mode}
           onChange={onChange ?? (() => {})}
           projectId={projectId}
+          zoom={zoom}
           hideRuntimeBanner={hideRuntimeBanner}
           className={className}
         />

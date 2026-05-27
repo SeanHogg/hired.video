@@ -16,6 +16,7 @@ import {
   GAME_AGENT_TOOL_LABELS,
   type GameAgentToolName,
 } from "@shared/game-agent-tools";
+import { gamesApiJson } from "@/lib/services/games-api";
 
 interface AIAgentPanelProps {
   /** Persisted project id. Null when the draft hasn't been saved yet —
@@ -49,14 +50,11 @@ export default function AIAgentPanel({ projectId, onApplyState }: AIAgentPanelPr
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/studio/game-agent/${projectId}/conversation`, {
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const json = await res.json();
+        const data = await gamesApiJson<{ messages: PersistedMessage[] }>(
+          `/api/studio/game-agent/${projectId}/conversation`,
+        );
         if (cancelled) return;
-        const restored = restoreTurns(json?.data?.messages ?? []);
-        setTurns(restored);
+        setTurns(restoreTurns(data?.messages ?? []));
       } catch {
         // Hydration is best-effort. A fresh start works fine.
       }
@@ -77,31 +75,27 @@ export default function AIAgentPanel({ projectId, onApplyState }: AIAgentPanelPr
     const userMsg = prompt.trim();
     setPrompt("");
     try {
-      const res = await fetch(`/api/studio/game-agent/${projectId}/turn`, {
+      const data = await gamesApiJson<{
+        newGameState?: GameState;
+        toolCalls: { name: GameAgentToolName; applied: boolean; error?: string }[];
+        assistantMessage?: string;
+      }>(`/api/studio/game-agent/${projectId}/turn`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ message: userMsg }),
+        body: { message: userMsg },
       });
-      const json = await res.json();
-      if (!res.ok || !json?.success) {
-        setError(json?.error?.message ?? "Agent failed");
-        return;
-      }
-      const { newGameState, toolCalls, assistantMessage } = json.data;
       setTurns((t) => [
         ...t,
         {
           user: userMsg,
-          assistant: assistantMessage ?? "",
-          toolCalls: toolCalls.map((tc: { name: GameAgentToolName; applied: boolean; error?: string }) => ({
+          assistant: data.assistantMessage ?? "",
+          toolCalls: data.toolCalls.map((tc) => ({
             name: tc.name,
             applied: tc.applied,
             error: tc.error,
           })),
         },
       ]);
-      if (newGameState) onApplyState(newGameState as GameState);
+      if (data.newGameState) onApplyState(data.newGameState);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network failure");
     } finally {
