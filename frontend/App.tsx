@@ -85,6 +85,8 @@ const People = lazy(() => import("./pages/People"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Competitors = lazy(() => import("./pages/Competitors"));
 const AudienceLandingPage = lazy(() => import("./pages/landing/AudienceLandingPage"));
+const ForIndex = lazy(() => import("./pages/ForIndex"));
+const LocationLandingPage = lazy(() => import("./pages/landing/LocationLandingPage"));
 const TemplateLandingPage = lazy(() => import("./pages/landing/TemplateLandingPage"));
 const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
@@ -102,6 +104,7 @@ const SummarizeResume = lazy(() => import("./pages/tools/SummarizeResume"));
 const PdfToJson = lazy(() => import("./pages/tools/PdfToJson"));
 const ResumeOptimizer = lazy(() => import("./pages/tools/ResumeOptimizer"));
 const SalaryCalculator = lazy(() => import("./pages/tools/SalaryCalculator"));
+const EmployerResearch = lazy(() => import("./pages/tools/EmployerResearch"));
 const AIResumeScorer = lazy(() => import("./pages/tools/AIResumeScorer"));
 const ValueProposition = lazy(() => import("./pages/tools/ValueProposition"));
 const ResumeTailor = lazy(() => import("./pages/tools/ResumeTailor"));
@@ -633,7 +636,11 @@ const App = () => (
                       />
                       <Route path="/pricing" element={<Pricing />} />
                       <Route path="/vs-competitors" element={<Competitors />} />
+                      <Route path="/for" element={<ForIndex />} />
                       <Route path="/for/:audience" element={<AudienceLandingPage />} />
+                      <Route path="/in/:country" element={<LocationLandingPage />} />
+                      <Route path="/in/:country/:state" element={<LocationLandingPage />} />
+                      <Route path="/in/:country/:state/:city" element={<LocationLandingPage />} />
                       <Route path="/templates/:slug" element={<TemplateLandingPage />} />
                       <Route
                         path="/compare"
@@ -806,6 +813,7 @@ const App = () => (
                       <Route path="/tools/resume-optimizer" element={<ResumeOptimizer />} />
                       <Route path="/Tools/SalaryCalculator" element={<Navigate to="/tools/salary-calculator" replace />} />
                       <Route path="/tools/salary-calculator" element={<SalaryCalculator />} />
+                      <Route path="/tools/employer-research" element={<EmployerResearch />} />
                       <Route path="/Tools/AIResumeScorer" element={<Navigate to="/tools/ai-resume-scorer" replace />} />
                       <Route path="/tools/ai-resume-scorer" element={<AIResumeScorer />} />
                       <Route path="/Tools/ValueProposition" element={<Navigate to="/tools/value-proposition" replace />} />

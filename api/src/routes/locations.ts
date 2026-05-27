@@ -84,6 +84,101 @@ locationRoutes.get("/states", async (c) => {
   return c.json(success(rows), 200);
 });
 
+/**
+ * GET /api/locations/resolve?country=us&state=tx&city=austin
+ *
+ * Slug-based resolver for the /in/[country]/[state?]/[city?] landing
+ * page routes (#1628). Each segment is optional — a country-only call
+ * returns {country, state: null, city: null}, and so on. Slugs match:
+ *   - country: lowercased iso2 ("us") OR iso3 ("usa") OR slugified name
+ *   - state:   lowercased code ("tx") OR slugified name
+ *   - city:    cities.slug (UNIQUE per state, backfilled by migration 0149)
+ *
+ * Returns 404 when any non-null segment fails to resolve, so the page
+ * can render a clean 404 instead of a soft mismatch.
+ */
+locationRoutes.get("/resolve", async (c) => {
+  const countrySlug = (c.req.query("country") ?? "").trim().toLowerCase();
+  const stateSlug = (c.req.query("state") ?? "").trim().toLowerCase();
+  const citySlug = (c.req.query("city") ?? "").trim().toLowerCase();
+  if (!countrySlug) return c.json(error("VALIDATION_ERROR", "country is required"), 400);
+  const db = getDb();
+
+  // Country: iso2 (2 chars), iso3 (3 chars), or slugified name.
+  let countryRow: { id: number; name: string; iso2: string } | null = null;
+  if (countrySlug.length === 2) {
+    const [r] = await db
+      .select({ id: countries.id, name: countries.name, iso2: countries.iso2 })
+      .from(countries)
+      .where(and(eq(sql`lower(${countries.iso2})`, countrySlug), eq(countries.isActive, true)))
+      .limit(1);
+    countryRow = r ?? null;
+  } else if (countrySlug.length === 3) {
+    const [r] = await db
+      .select({ id: countries.id, name: countries.name, iso2: countries.iso2 })
+      .from(countries)
+      .where(and(eq(sql`lower(${countries.iso3})`, countrySlug), eq(countries.isActive, true)))
+      .limit(1);
+    countryRow = r ?? null;
+  }
+  if (!countryRow) {
+    // Name slug fallback — lowercased name with hyphens.
+    const [r] = await db
+      .select({ id: countries.id, name: countries.name, iso2: countries.iso2 })
+      .from(countries)
+      .where(
+        and(
+          eq(sql`lower(regexp_replace(${countries.name}, '[^a-zA-Z0-9]+', '-', 'g'))`, countrySlug),
+          eq(countries.isActive, true),
+        ),
+      )
+      .limit(1);
+    countryRow = r ?? null;
+  }
+  if (!countryRow) return c.json(error("NOT_FOUND", "country not found"), 404);
+
+  // State: lowercased code OR slugified name within country.
+  let stateRow: { id: string; name: string; code: string | null } | null = null;
+  if (stateSlug) {
+    const [r] = await db
+      .select({ id: stateProvinces.id, name: stateProvinces.name, code: stateProvinces.code })
+      .from(stateProvinces)
+      .where(
+        and(
+          eq(stateProvinces.countryId, countryRow.id),
+          sql`(lower(${stateProvinces.code}) = ${stateSlug}
+               OR lower(regexp_replace(${stateProvinces.name}, '[^a-zA-Z0-9]+', '-', 'g')) = ${stateSlug})`,
+          eq(stateProvinces.isActive, true),
+        ),
+      )
+      .limit(1);
+    stateRow = r ?? null;
+    if (!stateRow) return c.json(error("NOT_FOUND", "state not found"), 404);
+  }
+
+  // City: cities.slug within state.
+  let cityRow: { id: string; name: string; slug: string } | null = null;
+  if (citySlug) {
+    if (!stateRow) return c.json(error("VALIDATION_ERROR", "city requires state"), 400);
+    const [r] = await db
+      .select({ id: cities.id, name: cities.name, slug: cities.slug })
+      .from(cities)
+      .where(and(eq(cities.stateId, stateRow.id), eq(cities.slug, citySlug), eq(cities.isActive, true)))
+      .limit(1);
+    cityRow = r ?? null;
+    if (!cityRow) return c.json(error("NOT_FOUND", "city not found"), 404);
+  }
+
+  return c.json(
+    success({
+      country: countryRow,
+      state: stateRow,
+      city: cityRow,
+    }),
+    200,
+  );
+});
+
 locationRoutes.get("/cities", async (c) => {
   const stateId = c.req.query("stateId");
   const q = (c.req.query("q") ?? "").trim();

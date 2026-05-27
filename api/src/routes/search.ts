@@ -10,7 +10,9 @@ import { getPublicJobs, getHiredVideoCommunityCompanyId, JobEntity } from "../se
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { buildApiDeps } from "../services/apiDeps.js";
 import { LocationService } from "../services/location/LocationService.js";
+import { AudienceService } from "../services/audience/AudienceService.js";
 import type { ContentLocationKind, LocationFilter } from "../../../shared/content-locations.js";
+import { AudienceKeySchema, type AudienceKey } from "../../../shared/audiences.js";
 import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents } = schema;
@@ -237,12 +239,29 @@ searchRoutes.get("/public", async (c) => {
   const includeJobs = category === "all" || category === "jobs";
   const includeCompanies = category === "all" || category === "companies";
   const includePeople = category === "all" || category === "people";
-  const includeResumes = category === "all" || category === "resumes";
+  // `templates` is a UNION view across template-shaped surfaces — public
+  // resumes (which today double as resume templates, no isTemplate flag
+  // on the schema) AND studio templates. Per #1613, the original bug was
+  // that `category=templates` returned only `studio_templates` rows. The
+  // frontend categoryToTypes("templates") matches by emitting both
+  // "template" + "resume" card types under the templates category.
+  const includeResumes = category === "all" || category === "resumes" || category === "templates";
   const includeVoices = category === "all" || category === "voices";
   const includeMedia = category === "all" || category === "media";
   const includeTemplates = category === "all" || category === "templates";
   const includeArticles = category === "all" || category === "articles";
   const includeEvents = category === "all" || category === "events";
+
+  // Audience filter — orthogonal to geo. When set, every kind's
+  // candidate set is intersected with the entity_ids tagged with this
+  // audience key in content_audiences. Per #1616 / Resource Maps.
+  const audienceParam = c.req.query("audience");
+  const audienceParsed = audienceParam
+    ? AudienceKeySchema.safeParse(audienceParam)
+    : null;
+  const audienceKey: AudienceKey | null = audienceParsed?.success
+    ? audienceParsed.data
+    : null;
 
   // Structured geo filter — every kind shares one LocationService call
   // per kind to translate the filter into an entity_id allowlist.
@@ -266,15 +285,39 @@ searchRoutes.get("/public", async (c) => {
   const env = (c.env ?? {}) as Record<string, string | undefined>;
   const deps = buildApiDeps(env);
   const locationService = new LocationService(deps);
+  const audienceService = new AudienceService({ db: getDb() });
 
-  /** Resolve the allowlist for one entity_kind. Returns null when no
-   *  geo filter is set OR when the kind is excluded by category. */
+  /** Intersect two allowlists, preserving "null = no filter" semantics:
+   *    - both null → null (no constraint)
+   *    - one null  → return the other (single filter applied)
+   *    - both set  → set intersection (empty array = short-circuit) */
+  const intersectAllowlists = (
+    a: string[] | null,
+    b: string[] | null,
+  ): string[] | null => {
+    if (a === null && b === null) return null;
+    if (a === null) return b;
+    if (b === null) return a;
+    if (a.length === 0 || b.length === 0) return [];
+    const setB = new Set(b);
+    return a.filter((id) => setB.has(id));
+  };
+
+  /** Resolve the allowlist for one entity_kind. Layers geo + audience
+   *  filters (each independent); returns null when neither filter is set
+   *  OR the kind is excluded by category. */
   const allowlistFor = async (
     kind: ContentLocationKind,
     enabled: boolean,
   ): Promise<string[] | null> => {
-    if (!enabled || !hasStructuredGeo) return null;
-    return locationService.applyLocationFilter(kind, geoFilter);
+    if (!enabled) return null;
+    const [geoAllow, audienceAllow] = await Promise.all([
+      hasStructuredGeo
+        ? locationService.applyLocationFilter(kind, geoFilter)
+        : Promise.resolve(null),
+      audienceService.applyAudienceFilter(kind, audienceKey),
+    ]);
+    return intersectAllowlists(geoAllow, audienceAllow);
   };
 
   const [

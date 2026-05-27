@@ -433,6 +433,38 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "hired.video pricing, video resume pricing, resume builder cost, recruiter plan, ats pricing, annual subscription, built-in learning library pricing, LinkedIn Learning alternative pricing, SCORM courses included",
   },
+  "/for": {
+    title: "Resource Maps — Find Your Path · hired.video",
+    description:
+      "Targeted landing pages for every situation: recent grads, job seekers, recruiters, employers, gig workers, veterans, returning workforce, layoff recovery, senior execs, and more. Same platform, different starting point.",
+    keywords:
+      "career resources, job search by audience, recent graduates job search, layoff recovery, returning to workforce, veterans job search, gig economy jobs, senior executive career, career change resources",
+  },
+  "/for/:audience": {
+    title: "Resource Map · hired.video",
+    description:
+      "Tools, templates, articles, and jobs tailored to your moment. Pick the situation that fits and we'll show you what's built for it.",
+    keywords:
+      "career resources, job search resources, resume templates, video resume, job board, career articles, learning paths",
+  },
+  "/in/:country": {
+    title: "Jobs and Career Resources by Country · hired.video",
+    description:
+      "Jobs, employers, relocation guides, and career resources for the country.",
+    keywords: "jobs by country, international jobs, work abroad, visa sponsorship, relocation",
+  },
+  "/in/:country/:state": {
+    title: "Jobs and Career Resources by State/Province · hired.video",
+    description:
+      "Jobs, employers, and career resources for the state or province.",
+    keywords: "state jobs, province jobs, regional employment, local hiring",
+  },
+  "/in/:country/:state/:city": {
+    title: "Jobs in [City] — Employers, Articles, and Career Tools · hired.video",
+    description:
+      "Local jobs, key employers, relocation guides, and career resources for the city.",
+    keywords: "city jobs, local jobs, key employers, relocation guide, neighborhood",
+  },
   "/for-recruiters": {
     title:
       "For Recruiters: AI Candidate Sourcing, Screening & Video Resumes — hired.video",
@@ -968,6 +1000,26 @@ export const PAGE_SEO: Record<string, SEOData> = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       url: "https://hired.video/tools/predictive-assessments",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/employer-research": {
+    title: "Employer Research: Reviews + Role × City Salary in 10 Minutes — hired.video",
+    description:
+      "Pressure-test a company and an offer in 10 minutes. Multi-axis employee reviews — culture, leadership, work-life balance, compensation, growth, diversity — alongside role × city salary data from active listings. Free, no signup required.",
+    keywords:
+      "employer research, company reviews, glassdoor alternative, multi-axis ratings, salary by city, before you accept an offer, salary negotiation, company culture research, role × city salary",
+    ogTitle: "Employer Research — reviews + role × city salary, side by side",
+    ogDescription:
+      "Run a 10-minute pre-offer audit. Reviews + role × city salary in one tool — pressure-test before you sign.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Employer Research",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/employer-research",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
   },

@@ -13,6 +13,7 @@ export * from "./analytics.js";
 export * from "./productivity.js";
 export * from "./locations.js";
 export * from "./contentLocations.js";
+export * from "./contentAudiences.js";
 export * from "./geocoderCache.js";
 export * from "./ai.js";
 export * from "./feed.js";

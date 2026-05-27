@@ -126,6 +126,46 @@ interface TypedFetchResult {
   total: number;
 }
 
+/** Minimum length a search query must reach before any fetcher (or any
+ *  client-side filter) treats it as an active filter. Below this length
+ *  the query is silently treated as empty so:
+ *    - the first keystroke ("R") doesn't fire a fanout to every per-domain
+ *      endpoint with a noise-tier filter,
+ *    - the user keeps seeing the default feed until the query is real,
+ *    - URL deep links like `/?q=A` degrade gracefully to the full feed
+ *      instead of an empty results page.
+ *  2 chars instead of 3 because real platform queries like "AI", "Go",
+ *  "QA", "UX", "VP", "ML", "C#" are common skill/role searches our
+ *  audience types verbatim. */
+export const MIN_SEARCH_QUERY_LENGTH = 2;
+
+/** Single source of truth for "does this raw input count as an active
+ *  search query?" Trims, then gates by `MIN_SEARCH_QUERY_LENGTH`.
+ *  Returns the empty string when the query is too short — callers can
+ *  use the returned value directly as a needle (empty needle = no
+ *  filter per `matchesNeedle`) and as a dedupe-key component (the same
+ *  effective empty string for "", "A", " ", null). Used by card-feed
+ *  fetchers AND by `UnifiedSearch` client-side filtering so both sides
+ *  of the seam agree — per the DRY rule, if 1 char shouldn't filter
+ *  the fetch it shouldn't filter the in-memory narrowing either. */
+export function effectiveSearchQuery(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  return trimmed.length >= MIN_SEARCH_QUERY_LENGTH ? trimmed : "";
+}
+
+/** Lowercased needle-includes match against any of the candidate strings.
+ *  Returns true when needle is empty so callers can pass the search filter
+ *  through unconditionally — the empty-needle case is the "no filter"
+ *  path. Used by every static fetcher (articles, guides, tools, faqs,
+ *  templates) so a single keyword like "research" narrows the in-memory
+ *  catalogue BEFORE pagination — without this, recent items push relevant
+ *  matches off the first page and search appears broken. */
+function matchesNeedle(needle: string, ...haystack: Array<string | null | undefined>): boolean {
+  if (!needle) return true;
+  const q = needle.toLowerCase();
+  return haystack.some((s) => typeof s === "string" && s.toLowerCase().includes(q));
+}
+
 async function fetchResumes(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await resumeService.getPublicResumes(page, limit);
@@ -238,12 +278,25 @@ async function fetchCompanies(
 async function fetchTemplates(
   limit: number,
   page: number,
+  search?: string,
 ): Promise<TypedFetchResult> {
   // Pulled through the unified template registry so resume + studio
   // (built-in and creator-published) templates surface under the same
   // "templates" category. New kinds register in one place and land here
   // automatically.
-  const all = getStaticTemplates();
+  //
+  // #1613: filter by search query client-side against the static catalog
+  // (name + blurb + industry + tags). The original bug was that
+  // ?q=education returned every static template ignored of search — only
+  // pagination narrowed it. Backend unification (resumes + studio +
+  // future job/learning_path templates) lands separately via
+  // /api/search/public; until that path is wired into card-feed, the
+  // client-side filter against the static catalog covers the reported
+  // UX: typing in the search box narrows the visible templates.
+  const haystack = getStaticTemplates();
+  const all = search && search.trim().length > 0
+    ? haystack.filter((t) => templateMatchesQuery(t, search))
+    : haystack;
   const start = Math.max(0, (page - 1) * limit);
   const slice = all.slice(start, start + limit);
   // Stable synthetic createdAt so sort order is deterministic across reloads
@@ -270,7 +323,24 @@ async function fetchTemplates(
   return { items, total: all.length };
 }
 
-async function fetchArticles(limit: number, page: number): Promise<TypedFetchResult> {
+/** Case-insensitive match across the searchable text fields of a static
+ *  template meta. Mirrors the matchesQuery helper in
+ *  frontend/lib/templates/registry.ts so /search and /studio surfaces
+ *  filter identically. */
+function templateMatchesQuery(meta: ReturnType<typeof getStaticTemplates>[number], query: string): boolean {
+  const needle = query.toLowerCase().trim();
+  if (!needle) return true;
+  if (meta.name.toLowerCase().includes(needle)) return true;
+  if (meta.blurb.toLowerCase().includes(needle)) return true;
+  if (meta.industry?.toLowerCase().includes(needle)) return true;
+  return (meta.tags ?? []).some((t) => t.toLowerCase().includes(needle));
+}
+
+async function fetchArticles(
+  limit: number,
+  page: number,
+  search = "",
+): Promise<TypedFetchResult> {
   // Two sources merge into the "articles" feed:
   //   (a) the static editorial blog at frontend/data/blog-posts.ts — hired.video's
   //       owned content, primarily SEO-driven.
@@ -278,9 +348,13 @@ async function fetchArticles(limit: number, page: number): Promise<TypedFetchRes
   //       long-form (#170 foundation; engagement tracking + Partner Program
   //       payouts come later).
   // Both surface as `type: "article"` cards so search treats them identically.
-  const sortedStatic = [...BLOG_POSTS].sort(
-    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
+  const sortedStatic = [...BLOG_POSTS]
+    .filter((p) =>
+      matchesNeedle(search, p.title, p.description, p.keywords, p.category, p.slug),
+    )
+    .sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+    );
   const staticItems: RawApiItem[] = sortedStatic.map((post) => ({
     type: "article",
     id: `blog-${post.slug}`,
@@ -303,7 +377,17 @@ async function fetchArticles(limit: number, page: number): Promise<TypedFetchRes
   try {
     const { articleService } = await import("@/lib/services/article-service");
     const published = await articleService.listPublished({ limit: 50 });
-    dynamicItems = published.map((a) => ({
+    dynamicItems = published
+      .filter((a) =>
+        matchesNeedle(
+          search,
+          a.title,
+          a.summary ?? "",
+          (a.tags ?? []).join(" "),
+          a.category ?? "",
+        ),
+      )
+      .map((a) => ({
       type: "article",
       id: a.id,
       slug: a.slug,
@@ -335,12 +419,19 @@ async function fetchArticles(limit: number, page: number): Promise<TypedFetchRes
   return { items, total: merged.length };
 }
 
-async function fetchGuides(limit: number, page: number): Promise<TypedFetchResult> {
+async function fetchGuides(
+  limit: number,
+  page: number,
+  search = "",
+): Promise<TypedFetchResult> {
   // Static how-to pages curated for /help; merged into search so users never
   // have to know the difference between "help" and "search".
+  const filtered = HELP_GUIDES.filter((g) =>
+    matchesNeedle(search, g.title, g.description),
+  );
   const start = Math.max(0, (page - 1) * limit);
   const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
-  const slice = HELP_GUIDES.slice(start, start + limit);
+  const slice = filtered.slice(start, start + limit);
   const items = slice.map((guide, idx) => {
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
@@ -355,13 +446,27 @@ async function fetchGuides(limit: number, page: number): Promise<TypedFetchResul
     } as RawApiItem;
     return { ...item, sortKey: toSortKey(item) };
   });
-  return { items, total: HELP_GUIDES.length };
+  return { items, total: filtered.length };
 }
 
-async function fetchTools(limit: number, page: number): Promise<TypedFetchResult> {
+async function fetchTools(
+  limit: number,
+  page: number,
+  search = "",
+): Promise<TypedFetchResult> {
+  const filtered = TOOLS_CATALOG.filter((t) =>
+    matchesNeedle(
+      search,
+      t.title,
+      t.description,
+      (t.features ?? []).join(" "),
+      t.category,
+      t.id,
+    ),
+  );
   const start = Math.max(0, (page - 1) * limit);
   const baseTime = new Date("2026-02-01T00:00:00Z").getTime();
-  const slice = TOOLS_CATALOG.slice(start, start + limit);
+  const slice = filtered.slice(start, start + limit);
   const items = slice.map((tool, idx) => {
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
@@ -378,15 +483,19 @@ async function fetchTools(limit: number, page: number): Promise<TypedFetchResult
     } as RawApiItem;
     return { ...item, sortKey: toSortKey(item) };
   });
-  return { items, total: TOOLS_CATALOG.length };
+  return { items, total: filtered.length };
 }
 
-async function fetchFaqs(limit: number, page: number): Promise<TypedFetchResult> {
+async function fetchFaqs(
+  limit: number,
+  page: number,
+  search = "",
+): Promise<TypedFetchResult> {
   // Flatten the categorised FAQ list so each Q&A becomes its own card and the
   // search layer can match against individual answers.
   const flat = HELP_FAQS.flatMap((cat) =>
     cat.questions.map((q) => ({ category: cat.category, ...q })),
-  );
+  ).filter((q) => matchesNeedle(search, q.question, q.answer, q.category));
   const start = Math.max(0, (page - 1) * limit);
   const baseTime = new Date("2026-03-01T00:00:00Z").getTime();
   const slice = flat.slice(start, start + limit);
@@ -538,6 +647,11 @@ export async function fetchCardFeed(
     sort = "recent",
     geo,
   } = options;
+  // Normalise the search query through the shared gate before fanning
+  // out — sub-threshold inputs ("", "A") become the empty string here
+  // so every downstream fetcher sees "no filter" without each one
+  // re-implementing the length check.
+  const search = effectiveSearchQuery(options.search);
 
   const tasks: Promise<TypedFetchResult>[] = [];
   if (types.includes("resume")) tasks.push(fetchResumes(limitPerType, page));
@@ -545,11 +659,11 @@ export async function fetchCardFeed(
   if (types.includes("company")) tasks.push(fetchCompanies(limitPerType, page));
   if (types.includes("people")) tasks.push(fetchPeople(limitPerType, page));
   if (types.includes("video")) tasks.push(fetchVideos(limitPerType, page));
-  if (types.includes("template")) tasks.push(fetchTemplates(limitPerType, page));
-  if (types.includes("article")) tasks.push(fetchArticles(limitPerType, page));
-  if (types.includes("guide")) tasks.push(fetchGuides(limitPerType, page));
-  if (types.includes("tool")) tasks.push(fetchTools(limitPerType, page));
-  if (types.includes("faq")) tasks.push(fetchFaqs(limitPerType, page));
+  if (types.includes("template")) tasks.push(fetchTemplates(limitPerType, page, search));
+  if (types.includes("article")) tasks.push(fetchArticles(limitPerType, page, search));
+  if (types.includes("guide")) tasks.push(fetchGuides(limitPerType, page, search));
+  if (types.includes("tool")) tasks.push(fetchTools(limitPerType, page, search));
+  if (types.includes("faq")) tasks.push(fetchFaqs(limitPerType, page, search));
   if (types.includes("event")) tasks.push(fetchEvents(limitPerType, page, geo));
 
   const results = await Promise.all(tasks);

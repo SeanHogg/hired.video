@@ -13,7 +13,6 @@
 
 "use client";
 
-import { useRef, useState } from "react";
 import { Mic, Play, Pause, ShoppingCart, Check, Globe2, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import { useCart } from "@/lib/cart-context";
 import { buildShareAction } from "@/lib/card-share-action";
+import { useAudioPreview } from "@/lib/hooks/useAudioPreview";
 import { toast } from "sonner";
 
 export interface VoiceMarketplaceCardItem {
@@ -52,32 +52,14 @@ function formatPrice(cents: number, currency: string): string {
 
 export default function VoiceMarketplaceCard({ item }: Props) {
   const { addItem, items } = useCart();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const { toggle, isActive } = useAudioPreview();
 
   const cartId = `voice:${item.voiceCloneId}`;
   const inCart = items.some((i) => i.id === cartId);
+  const playing = isActive(item.voiceCloneId);
 
   const togglePreview = () => {
-    if (!item.previewAudioUrl) {
-      toast.message("This voice has no preview yet.");
-      return;
-    }
-    if (!audioRef.current) {
-      audioRef.current = new Audio(item.previewAudioUrl);
-      audioRef.current.onended = () => setPlaying(false);
-      audioRef.current.onerror = () => {
-        setPlaying(false);
-        toast.error("Couldn't load preview.");
-      };
-    }
-    if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
-    } else {
-      audioRef.current.play().catch(() => setPlaying(false));
-      setPlaying(true);
-    }
+    void toggle(item.voiceCloneId, item.previewAudioUrl);
   };
 
   const handleAddToCart = () => {

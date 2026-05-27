@@ -14,6 +14,7 @@ import { BuilderforceClient } from "@seanhogg/builderforce-sdk";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
+import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
 export const aiRoutes = new Hono<AppEnv>();
 
@@ -40,9 +41,10 @@ aiRoutes.get("/models", superAdminMiddleware, async (c) => {
   }
 });
 
-const SYSTEM_PROMPT = `You are an AI career assistant for hired.video, a platform for video resumes, job search, and talent management.
-Help users with: resume writing and optimization, video resume tips, job searching and applications, interview preparation, career advice, networking, and recruitment.
-Be concise, actionable, and encouraging. When relevant, suggest platform features that could help.`;
+// Career-coach persona — single source in shared/ai-prompts/. The
+// in-app AIChatPanel reads from the same prompt so the persona never
+// drifts between the panel's enhanced prompt and this route's default.
+const SYSTEM_PROMPT = getPrompt("career-coach").render({});
 
 function estimateTokens(text: string): number {
   return Math.max(1, Math.round(text.length / 4));

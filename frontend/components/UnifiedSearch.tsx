@@ -35,9 +35,9 @@ import { Button } from "@/components/ui/button";
 import { useCardRenderer } from "@/lib/card-factory";
 import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useAuth, USER_ROLES } from "@/lib/auth";
-import { companyService } from "@/lib/services/company-service";
 import { type SearchFilters } from "@/lib/services/search-service";
 import {
+  effectiveSearchQuery,
   fetchCardFeed,
   type CardFeedResponse,
   type CardFeedType,
@@ -95,7 +95,13 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       // Courses also bypass the card-feed pipeline (separate /api/courses/public)
       return [];
     case "templates":
-      return ["template"];
+      // Templates = UNION of every template-shaped surface: studio
+      // templates AND public resumes (which serve as resume templates;
+      // no isTemplate flag exists on the resume schema today — every
+      // public resume is reusable). Per #1613 fix. Future kinds
+      // (job_templates, learning_path_templates) get added here as they
+      // ship.
+      return ["template", "resume"];
     case "articles":
       return ["article"];
     case "guides":
@@ -210,6 +216,10 @@ export default function UnifiedSearch({
         p: pageToUse,
         l: limitToUse,
         s: searchFilters.sortBy || "recent",
+        // Include search in the dedupe key so typing in the search box
+        // re-fires the fetch (otherwise lastRequestRef short-circuits and
+        // results never update). Per #1613.
+        q: searchFilters.search ?? "",
       });
       if (lastRequestRef.current === requestKey) return;
       lastRequestRef.current = requestKey;
@@ -225,6 +235,11 @@ export default function UnifiedSearch({
         page: pageToUse,
         limitPerType,
         sort: (searchFilters.sortBy as any) || "recent",
+        // Per-type fetchers that support query filtering read this. Today
+        // fetchTemplates uses it to narrow the static template catalog;
+        // other fetchers ignore it for now (#1613 follow-up tracks the
+        // server-side unification of per-type query filtering).
+        search: searchFilters.search,
         geo: {
           countryId: geoFilter.countryId ?? undefined,
           stateId: geoFilter.stateId ?? undefined,
@@ -298,36 +313,6 @@ export default function UnifiedSearch({
   const handleDownload = (item: any) => console.log("Download item:", item.id);
   const handleDelete = (item: any) => console.log("Delete item:", item.id);
   const handleTrack = (item: any) => console.log("Track candidate:", item.id);
-
-  const fetchCompanies = async () => {
-    try {
-      await loadContent();
-    } catch (error) {
-      console.error("Failed to refresh companies:", error);
-    }
-  };
-
-  // Wire up follow/unfollow hooks for downstream cards that may call them.
-  const _handleFollowCompany = async (companyId: string) => {
-    if (!user) return;
-    try {
-      await companyService.followCompany(companyId);
-      await fetchCompanies();
-    } catch (error) {
-      console.error("Failed to follow company:", error);
-    }
-  };
-  const _handleUnfollowCompany = async (companyId: string) => {
-    if (!user) return;
-    try {
-      await companyService.unfollowCompany(companyId);
-      await fetchCompanies();
-    } catch (error) {
-      console.error("Failed to unfollow company:", error);
-    }
-  };
-  void _handleFollowCompany;
-  void _handleUnfollowCompany;
 
   const contentItems = (searchResults
     ? searchResults.items.filter((item) => {
@@ -504,12 +489,19 @@ export default function UnifiedSearch({
     ? filteredItems.slice(startIndex, endIndex)
     : filteredItems;
 
+  // Always run the fetch — `search` is plumbed down to the per-type
+  // fetchers (card-feed.ts) so static catalogues (articles, guides,
+  // tools, faqs, templates) filter their in-memory entries by the query
+  // BEFORE pagination. Without this, a fresh load of `/?q=research` was
+  // gated to zero items (the previous `!hasClientSideFiltering` guard
+  // skipped the fetch entirely when a URL search was present), and a
+  // typed-in search never reached beyond the few items the recency
+  // sort happened to leave on page 1. `hasClientSideFiltering` still
+  // governs pagination + count semantics below.
   React.useEffect(() => {
-    if (!hasClientSideFiltering) {
-      loadContent(selectedCategory, currentPage, itemsPerPage);
-    }
+    loadContent(selectedCategory, currentPage, itemsPerPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, currentPage, itemsPerPage, hasClientSideFiltering, searchFilters.sortBy, geoFilter]);
+  }, [selectedCategory, currentPage, itemsPerPage, searchFilters.sortBy, searchFilters.search, geoFilter]);
 
   const totalFound = hasClientSideFiltering
     ? filteredItems.length

@@ -7,6 +7,7 @@
 import {
   BarChart3,
   Brain,
+  Building2,
   Calculator,
   Chrome,
   ClipboardCheck,
@@ -374,6 +375,31 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Market rate analysis", "Location adjustments", "Negotiation tips"],
     ctaLabel: "Calculate Salary",
+  },
+  {
+    id: "employer-research",
+    href: "/tools/employer-research",
+    title: "Employer Research",
+    description:
+      "Pressure-test a company and an offer in 10 minutes — multi-axis reviews + role × city salary data, side by side.",
+    tier: "free",
+    category: "Career",
+    icon: Building2,
+    iconBgClassName: "bg-purple-100",
+    iconColorClassName: "text-brand-purple",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "6", label: "Review Axes", valueClassName: "text-purple-600" },
+      { value: "Role × City", label: "Salary", valueClassName: "text-purple-600" },
+    ],
+    features: [
+      "Multi-axis review ratings (culture, leadership, pay, …)",
+      "Average / min / max salary for the role × city pair",
+      "Deeplinks into the full reviews + salary guide pages",
+    ],
+    ctaLabel: "Research Employer",
+    showOnHome: true,
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "job-resume-match",

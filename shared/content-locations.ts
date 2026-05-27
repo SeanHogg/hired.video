@@ -10,7 +10,7 @@
  * See migration 0108_content_locations.sql for storage layout.
  */
 import { z } from "zod";
-
+
 import { UuidLikeSchema } from "./validation.js";
 /**
  * Every content type that supports geo targeting. Adding a new kind here
@@ -29,6 +29,7 @@ export const CONTENT_LOCATION_KINDS = [
   "user_profile",
   "company",
   "event",
+  "learning_path",
 ] as const;
 export type ContentLocationKind = (typeof CONTENT_LOCATION_KINDS)[number];
 

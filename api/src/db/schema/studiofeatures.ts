@@ -25,6 +25,7 @@ import {
   jsonb,
   real,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { studioProjects } from "./resumes.js";
 import { users } from "./users.js";
@@ -308,9 +309,9 @@ export const studioAtsPackages = pgTable(
   "studio_ats_packages",
   {
     id:             uuid("id").primaryKey().defaultRandom(),
-    userId:         text("user_id").notNull(),
-    projectId:      text("project_id").notNull(),
-    slug:           text("slug").notNull(),           // unique URL slug
+    userId:         uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId:      uuid("project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
+    slug:           text("slug").notNull(),           // globally unique URL slug
     videoUrl:       text("video_url"),
     thumbnailUrl:   text("thumbnail_url"),
     candidateName:  text("candidate_name").notNull(),
@@ -325,7 +326,9 @@ export const studioAtsPackages = pgTable(
   },
   (t) => [
     index("idx_studio_ats_user").on(t.userId),
-    index("idx_studio_ats_slug").on(t.slug),
+    // Was a plain index; #1607 promoted it to UNIQUE to enforce the
+    // "unique URL slug" contract the inline comment claims.
+    uniqueIndex("uq_studio_ats_packages_slug").on(t.slug),
   ],
 );
 

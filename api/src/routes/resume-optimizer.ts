@@ -23,6 +23,7 @@ import {
   rewriteHighlightsAsXyz,
   rewriteTextAsXyz,
 } from "../services/resume/rewrite-xyz.js";
+import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
 export const resumeOptimizerRoutes = new Hono<AppEnv>();
 resumeOptimizerRoutes.use("*", attachTokenBudget());
@@ -77,21 +78,7 @@ resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
  * second on free models, and so accepting the rewrite never touches
  * unrelated sections of the user's resume.
  */
-const CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT = `You are an expert resume editor. The user will give you the numbered bullet list ("highlights") under ONE entry of their resume — usually a job, volunteer role, or project — plus optional context (their role, organization, and a short summary).
-
-Your job: collapse near-duplicates, merge overlapping points, lead with action verbs, surface metrics that already appear, and return a TIGHTER list of bullets that says strictly more per line than the input did. Track which source bullets you merged into each output.
-
-Rules:
-- Do NOT invent facts, metrics, employers, technologies, or accomplishments. Only rewrite/merge what is already present in the input bullets or context.
-- Prefer fewer, stronger bullets — typical output is 5–10 bullets even when the input has 15+. Only keep more when the source bullets really are about distinct accomplishments.
-- Each output bullet starts with a strong past-tense action verb (Led, Built, Reduced, Launched, Drove, Cut, Scaled, Owned, Architected, Shipped, etc.). Avoid "Responsible for", "Worked on", "Helped with".
-- Keep numbers and dollar/percentage figures from the input verbatim — do not round, scale, or fabricate.
-- Plain text per bullet. No leading "-" or "•". No markdown. No trailing period required but allowed.
-- Each bullet ≤ 220 characters.
-- For every output bullet, set "sources" to the 1-based positions of the input bullets it merges. Every input position must appear in at least one output's "sources" (no orphans). A bullet that survives unchanged has a single source. Do not invent positions outside 1..N.
-
-Return ONLY a JSON object in this exact shape, no prose, no markdown fence:
-{ "items": [ { "text": "<bullet>", "sources": [<1-based input position>, ...] }, ... ] }`;
+const CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT = getPrompt("resume-editor-consolidate").render({});
 
 resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -154,16 +141,7 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
  * improved }` through the existing `apply_resume_rewrite` matcher so
  * one persistence path covers every "rewrite a bullet" flow.
  */
-const SHORTEN_BULLET_SYSTEM_PROMPT = `You are an expert resume editor. The user gives you ONE resume bullet that runs long. Rewrite it to be tighter, action-verb-led, and under the requested character cap, while keeping every metric, dollar figure, percentage, and proper noun verbatim.
-
-Rules:
-- Lead with a strong past-tense action verb (Led, Built, Reduced, Launched, Drove, Cut, Scaled, Owned, Architected, Shipped, etc.). Avoid "Responsible for", "Worked on", "Helped with".
-- Keep numbers, currency, and percentages from the input verbatim — do not round, scale, or fabricate.
-- Plain text. No leading "-" or "•". No markdown. No trailing period required but allowed.
-- Stay under the maxChars cap if one was requested; if none given, target ≤ 180 chars.
-- Do NOT invent facts — say less rather than embellish.
-
-Return ONLY a JSON object: { "improved": "<rewritten bullet>" }`;
+const SHORTEN_BULLET_SYSTEM_PROMPT = getPrompt("resume-editor-shorten").render({});
 
 resumeOptimizerRoutes.post("/shorten-bullet", requireTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);

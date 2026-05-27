@@ -2,15 +2,15 @@
  * Company integrations service (#1441).
  *
  * Manages the `company_integrations` rows that the workforce connectors
- * (`./connectors/*`) read at runtime. List + connect (insert OAuth result)
- * + disconnect (status flip) — the actual OAuth handshake lives in route
- * handlers wired per provider once real client IDs are configured.
+ * (`./connectors/*`) read at runtime. List + disconnect today; the actual
+ * OAuth handshake (and the `upsertIntegration` writer) is not wired yet —
+ * tracked separately as #1614 in the Consolidated Gap Register.
  *
- * Token encryption / decryption is intentionally NOT in this file —
- * route layer wraps the OAuth callback with the [payout/encryption.ts](../payout/encryption.ts)
- * AES-GCM helper, then calls `upsertIntegration` with already-encrypted
- * blobs. Keeping crypto out of the service means tests can pass plain
- * strings and the boundary stays small.
+ * When the OAuth callback wiring lands it should:
+ *   - encrypt access_token / refresh_token via
+ *     [services/crypto/secrets.ts](../crypto/secrets.ts) — the same shared
+ *     seam paid-media + email-integration use post-#1604.
+ *   - insert/update via the (companyId, provider) composite unique key.
  */
 
 import { and, desc, eq } from "drizzle-orm";
@@ -26,64 +26,6 @@ export type IntegrationProvider =
   | "gusto"
   | "docusign"
   | "helcim";
-
-export interface UpsertIntegrationInput {
-  companyId: string;
-  provider: IntegrationProvider;
-  accessTokenEnc?: string | null;
-  refreshTokenEnc?: string | null;
-  expiresAt?: Date | null;
-  scopes?: string[] | null;
-  externalAccountId?: string | null;
-  connectedByUserId?: string | null;
-  metadata?: Record<string, unknown> | null;
-}
-
-/** Insert-or-update a company's integration. Triggered after a successful
- *  OAuth callback for the provider; the (companyId, provider) unique
- *  index makes this an upsert by composite natural key. */
-export async function upsertIntegration(
-  input: UpsertIntegrationInput,
-  db = getDb(),
-) {
-  const now = new Date();
-  const [existing] = await db.select().from(companyIntegrations)
-    .where(and(
-      eq(companyIntegrations.companyId, input.companyId),
-      eq(companyIntegrations.provider, input.provider),
-    ))
-    .limit(1);
-
-  if (existing) {
-    const [updated] = await db.update(companyIntegrations).set({
-      status: "connected",
-      accessTokenEnc: input.accessTokenEnc ?? existing.accessTokenEnc,
-      refreshTokenEnc: input.refreshTokenEnc ?? existing.refreshTokenEnc,
-      expiresAt: input.expiresAt ?? existing.expiresAt,
-      scopes: input.scopes ?? existing.scopes,
-      externalAccountId: input.externalAccountId ?? existing.externalAccountId,
-      connectedByUserId: input.connectedByUserId ?? existing.connectedByUserId,
-      metadata: input.metadata ?? existing.metadata,
-      lastError: null,
-      updatedAt: now,
-    } as any).where(eq(companyIntegrations.id, existing.id)).returning();
-    return updated;
-  }
-
-  const [created] = await db.insert(companyIntegrations).values({
-    companyId: input.companyId,
-    provider: input.provider,
-    status: "connected",
-    accessTokenEnc: input.accessTokenEnc ?? null,
-    refreshTokenEnc: input.refreshTokenEnc ?? null,
-    expiresAt: input.expiresAt ?? null,
-    scopes: input.scopes ?? null,
-    externalAccountId: input.externalAccountId ?? null,
-    connectedByUserId: input.connectedByUserId ?? null,
-    metadata: input.metadata ?? null,
-  } as any).returning();
-  return created;
-}
 
 /** Disconnect: keep the row (audit trail), flip status. Tokens stay
  *  encrypted in case the user reconnects with the same external account

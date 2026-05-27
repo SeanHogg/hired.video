@@ -8,10 +8,10 @@
  * so every consumer gets the same audition behaviour without rolling
  * their own playback state.
  */
-import { useEffect, useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
 import { MUSIC_TRACKS, type MusicTrack } from "@/lib/studio/music-catalog";
 import { hasProceduralMusic, getProceduralMusicUrl } from "@/lib/studio/music-procedural";
+import { useAudioPreview } from "@/lib/hooks/useAudioPreview";
 import { cn } from "@/lib/utils";
 
 export interface MusicPickerProps {
@@ -29,19 +29,9 @@ export default function MusicPicker({
   onSelect,
   className,
 }: MusicPickerProps) {
-  const [previewingId, setPreviewingId] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Stop any preview when the picker unmounts.
-  useEffect(() => () => audioRef.current?.pause(), []);
+  const { toggle, isActive: isPreviewing } = useAudioPreview();
 
   async function togglePreview(track: MusicTrack) {
-    if (previewingId === track.id) {
-      audioRef.current?.pause();
-      setPreviewingId(null);
-      return;
-    }
-    audioRef.current?.pause();
     // Resolve the playable URL — static file when one exists, otherwise
     // lazy-render the procedural WAV (the catalog ships without bundled
     // MP3s so this is the path every stock track actually takes today).
@@ -54,24 +44,20 @@ export default function MusicPicker({
       }
     }
     if (!url) return;
-    setPreviewingId(track.id);
-    const audio = new Audio(url);
-    audio.onended = () => setPreviewingId(null);
-    audio.play().catch(() => setPreviewingId(null));
-    audioRef.current = audio;
+    await toggle(track.id, url);
   }
 
   return (
     <ul className={cn("flex flex-col gap-1.5", className)}>
       {MUSIC_TRACKS.map((track) => {
-        const isActive = track.id === activeSelectionId;
-        const isPreviewing = track.id === previewingId;
+        const isSelected = track.id === activeSelectionId;
+        const previewing = isPreviewing(track.id);
         return (
           <li
             key={track.id}
             className={cn(
               "flex items-center gap-2 rounded-md border bg-card px-2 py-1.5 transition",
-              isActive ? "border-brand-purple" : "border-border",
+              isSelected ? "border-brand-purple" : "border-border",
             )}
           >
             <button
@@ -88,10 +74,10 @@ export default function MusicPicker({
                 onClick={() => {
                   void togglePreview(track);
                 }}
-                aria-label={isPreviewing ? "Stop preview" : "Preview track"}
+                aria-label={previewing ? "Stop preview" : "Preview track"}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
               >
-                {isPreviewing ? (
+                {previewing ? (
                   <Pause className="h-3.5 w-3.5" />
                 ) : (
                   <Play className="h-3.5 w-3.5" />

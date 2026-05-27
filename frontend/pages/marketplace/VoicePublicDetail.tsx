@@ -9,7 +9,7 @@
 // resume-template marketplace (#700/#761). All share affordances route
 // through the platform-wide `buildShareAction` helper.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
   Check,
@@ -30,6 +30,7 @@ import { CardContent } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
 import { useCart } from "@/lib/cart-context";
 import { buildShareAction } from "@/lib/card-share-action";
+import { useAudioPreview } from "@/lib/hooks/useAudioPreview";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "sonner";
 
@@ -74,8 +75,7 @@ export default function VoicePublicDetail() {
   const [clone, setClone] = useState<VoiceCloneDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const { toggle: togglePreviewAudio, isActive, stop: stopPreviewAudio } = useAudioPreview();
   const { addItem, items } = useCart();
 
   useEffect(() => {
@@ -104,9 +104,9 @@ export default function VoicePublicDetail() {
       });
     return () => {
       cancelled = true;
-      audioRef.current?.pause();
+      stopPreviewAudio();
     };
-  }, [voiceCloneId]);
+  }, [voiceCloneId, stopPreviewAudio]);
 
   if (loading) {
     return (
@@ -127,26 +127,9 @@ export default function VoicePublicDetail() {
     copySuccessDescription: "Voice listing link has been copied to your clipboard.",
   });
 
+  const playing = isActive(clone.id);
   const togglePreview = () => {
-    if (!clone.previewAudioUrl) {
-      toast.message("This voice has no preview yet.");
-      return;
-    }
-    if (!audioRef.current) {
-      audioRef.current = new Audio(clone.previewAudioUrl);
-      audioRef.current.onended = () => setPlaying(false);
-      audioRef.current.onerror = () => {
-        setPlaying(false);
-        toast.error("Couldn't load preview.");
-      };
-    }
-    if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
-    } else {
-      audioRef.current.play().catch(() => setPlaying(false));
-      setPlaying(true);
-    }
+    void togglePreviewAudio(clone.id, clone.previewAudioUrl);
   };
 
   const handleAddToCart = () => {

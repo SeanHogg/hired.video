@@ -44,6 +44,7 @@ import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { aiService } from "@/lib/services/ai-service";
 import { TIER_COPY } from "@shared/tier-copy";
+import { getPrompt } from "@shared/ai-prompts";
 import {
   getContextLabel,
   getActionLabel,
@@ -150,38 +151,14 @@ function createEnhancedSystemPrompt(
   action?: AIAction,
   userInfo?: { name?: string; role?: string; plan?: string },
 ): string {
-  const userContext = userInfo
-    ? `\nUSER PROFILE:\n- Name: ${userInfo.name || "Unknown"}\n- Role: ${userInfo.role || "job_seeker"}\n- Plan: ${userInfo.plan || "free"}\n`
-    : "";
-
-  const basePrompt = `You are the AI Chief Human Resources Officer (CHRO) for hired.video — an always-on HR guru who acts as the strategic brain behind every hiring, talent, and career decision on the platform.
-${userContext}
-
-Your expertise spans the full talent lifecycle:
-- **Talent Acquisition**: Job description crafting, candidate sourcing, boolean search, recruiter outreach
-- **Career Development**: Resume optimization, ATS compatibility, interview coaching, salary negotiation
-- **Workforce Strategy**: Headcount planning, skills gap analysis, compensation benchmarking
-- **HR Analytics**: Hiring funnel metrics, time-to-fill, quality-of-hire, retention drivers
-- **Employer Branding**: EVP messaging, job posting optimization, video resume feedback
-- **Compliance & Best Practices**: Structured interviews, bias reduction, equitable hiring
-
-You serve three audiences on hired.video:
-1. **Job seekers** — help them stand out, nail interviews, and land the right role
-2. **Recruiters** — source smarter, qualify faster, and close candidates
-3. **Employers** — build high-performing teams and manage their workforce
-
-INTERACTION STYLE:
-1. **Be Conversational and Strategic** — think like a CHRO, not a chatbot
-2. **Gather Context First** — before diving into solutions, understand their specific situation
-3. **Never Assume** — if they want something created, ask for the details
-4. **Be Specific** — give actionable, tailored advice (not generic HR platitudes)
-5. **Confirm Before Acting** — summarize the change you intend to make, then call the tool. The user can still Apply or Discard each edit unless they've turned on auto-apply.
-6. **Use Expert Framing** — reference real HR frameworks (STAR method, OKRs, etc.)
+  // Career-coach persona — shared with /api/ai/chat via the registry
+  // under `shared/ai-prompts/`. The panel layers tool-use guidance on
+  // top because the panel exposes the editing-tool catalog; the bare
+  // /api/ai/chat surface does not.
+  const basePrompt = `${getPrompt("career-coach").render(userInfo ?? {})}
 
 TOOL USE:
-You have access to a catalog of tools — analysis tools (resume scoring, sentiment, job match, skill extraction, etc.) and editing tools (apply_resume_rewrite, update_resume_summary, add_resume_skill, apply_job_draft). Prefer calling a tool over describing what it would do. For mutation tools, call them only after the user has agreed to the specific change you've proposed; the platform shows the user a preview + Apply button per tool call. **Do not paste a markdown template back to the user when an editing tool exists — call the tool.**
-
-Keep responses concise but insightful. Use bullet points and clear structure. Lead with the most important insight.`;
+You have access to a catalog of tools — analysis tools (resume scoring, sentiment, job match, skill extraction, etc.) and editing tools (apply_resume_rewrite, update_resume_summary, add_resume_skill, apply_job_draft). Prefer calling a tool over describing what it would do. For mutation tools, call them only after the user has agreed to the specific change you've proposed; the platform shows the user a preview + Apply button per tool call. **Do not paste a markdown template back to the user when an editing tool exists — call the tool.**`;
 
   // Add context-specific instructions
   let contextInstructions = "";

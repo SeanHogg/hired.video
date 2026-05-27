@@ -5,6 +5,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { jobItems } from "./jobs.js";
@@ -41,6 +42,11 @@ export const resumeMatchScores = pgTable("resume_match_scores", {
     t.jobId,
     t.resumeId,
   ),
+  // The composite covers point lookups but not "all matches for user X"
+  // / "all matches for job Y" rollups — those table-scanned without
+  // these plain indexes.
+  index("idx_resume_match_scores_user").on(t.userId),
+  index("idx_resume_match_scores_job").on(t.jobId),
 ]);
 
 export type ResumeMatchScore = typeof resumeMatchScores.$inferSelect;

@@ -1448,24 +1448,24 @@ export const BLOG_POSTS: BlogPost[] = [
 // ── Reviews + Salary value prop ─────────────────────────────────────────
 BLOG_POSTS.push({
   slug: "research-employers-with-reviews-and-salary-data",
-  title: "How to Research an Employer in 10 Minutes with Reviews and Salary Data",
+  title: "How to Use the Employer Research Tool: Reviews and Salary Data in 10 Minutes",
   description:
-    "Use hired.video's company reviews, multi-axis ratings, and role × city salary guides to pressure-test an offer before you accept — or to negotiate the one you have.",
+    "A walkthrough of hired.video's Employer Research tool — combine multi-axis company reviews with role × city salary data to pressure-test an offer before you accept, or to negotiate the one you have.",
   publishedAt: "2026-05-25",
-  updatedAt: "2026-05-25",
+  updatedAt: "2026-05-26",
   readingTime: 7,
   author: "hired.video",
-  toolSlug: "companies",
-  toolName: "Company Reviews + Salary Guides",
-  toolUrl: "/companies",
+  toolSlug: "employer-research",
+  toolName: "Employer Research",
+  toolUrl: "/tools/employer-research",
   keywords:
     "company reviews, employer research, salary by city, glassdoor alternative, before you accept an offer, employee reviews, salary negotiation, company culture research",
   heroAlt: "Side-by-side view of a company reviews page and a salary-by-city guide",
   category: "Job Search Strategy",
   sections: [
     {
-      heading: "The 10-Minute Pre-Offer Audit",
-      body: "Before you accept any offer, run this 10-minute audit. Most candidates skip it and find out about the bad parts of the company in week three. With public reviews and real salary data, you can pressure-test the offer before you sign.\n\n**Minute 1–3 — Company reviews.** Open `/companies/{name}/reviews`. Skim the overall rating, then the six sub-axis ratings: culture, leadership, work-life balance, compensation, career growth, diversity. If any single axis is more than 1.0 below the overall average, that's where you should ask follow-up questions in your final round.\n\n**Minute 4–6 — Salary by role × city.** Open `/salary/{role}/{city}` (for example, `/salary/senior-software-engineer/san-francisco`). This page shows the entry-level, average, and senior salary derived from real active listings on the platform — not self-reported levels.fyi data. If your offer falls below the average for your level in that city, you have grounds to negotiate.\n\n**Minute 7–10 — Cross-reference.** Search the company reviews for the keyword \"compensation\" or \"pay\". A high compensation rating combined with a market-aligned offer is the green light. A low compensation rating combined with a below-market offer is a hard signal to negotiate or walk away.",
+      heading: "Open the Tool and Run a 10-Minute Pre-Offer Audit",
+      body: "Open the [Employer Research tool](/tools/employer-research) and you'll see three inputs: **Company**, **Role**, and **City**. Fill any combination and hit Run Research — the tool runs the company-reviews lookup and the role × city salary fetch in parallel and renders both panels side by side.\n\nMost candidates skip this step and find out about the bad parts of the company in week three. The tool exists so you don't have to flip between three tabs to do the same audit.\n\n**Minutes 1–3 — Reviews.** Type the company name. The Companies panel returns up to 6 matches with their overall rating + review count. Click *Reviews* on any match to jump to the full reviews page (`/companies/{slug}/reviews`) and read the six sub-axis ratings: culture, leadership, work-life balance, compensation, career growth, diversity. If any single axis is more than 1.0 below the overall average, that's where you should ask follow-up questions in your final round.\n\n**Minutes 4–6 — Salary by role × city.** Type your target role and city. The Salary panel shows the average, min, and max salary derived from real active listings on the platform — not self-reported levels.fyi data. Click *Open full salary guide* to see related cities and related roles at `/salary/{role}/{city}`.\n\n**Minutes 7–10 — Cross-reference.** On the full reviews page, search the written reviews for the keyword *compensation* or *pay*. A high compensation rating combined with a market-aligned offer from the salary panel is the green light. A low compensation rating combined with a below-market offer is a hard signal to negotiate or walk away.",
     },
     {
       heading: "What the Six Sub-Axis Ratings Actually Mean",
@@ -1477,7 +1477,7 @@ BLOG_POSTS.push({
     },
     {
       heading: "Three Negotiation Plays You Can Run Today",
-      body: "**Play 1 — The Market Citation.** When you receive an offer below the city-level average for your role, reply with: \"Thanks for the offer. Based on active listings for this role in {city}, the average is {fmt(avg)}. I'd like to anchor the conversation around that number.\" Cite the URL. This shifts the burden from \"why I want more\" to \"why your offer is below market.\"\n\n**Play 2 — The Reviews Pivot.** When the comp axis on company reviews is below 3.5, accept that compensation isn't the company's strength — and negotiate hard for what *is*. If the career growth axis is 4.7, push for promotion-track clarity and a 6-month review with a defined raise. If work-life balance is 4.5, push for an explicit remote-work guarantee.\n\n**Play 3 — The Stale Offer Refresh.** If your offer is 2+ weeks old and you've found a higher market rate since, write: \"Since we last spoke, I've reviewed current pay bands for similar roles in {city}. I'd like to revisit the offer to align with the {percentile} percentile.\" This is most effective in cities where salary guides have updated within the offer-pending window.\n\nAll three plays work better when the company knows you've done the homework. Pasting the hired.video URL signals you're using a public benchmark, not an aspirational anchor.",
+      body: "Once the tool has populated both panels, you have enough to run any of these:\n\n**Play 1 — The Market Citation.** When the salary panel shows your offer is below the city-level average for your role, reply with: \"Thanks for the offer. Based on active listings for this role in {city}, the average is {fmt(avg)}. I'd like to anchor the conversation around that number.\" Cite the `/salary/{role}/{city}` URL from the *Open full salary guide* button. This shifts the burden from \"why I want more\" to \"why your offer is below market.\"\n\n**Play 2 — The Reviews Pivot.** When the comp axis on the company-reviews page is below 3.5, accept that compensation isn't the company's strength — and negotiate hard for what *is*. If the career growth axis is 4.7, push for promotion-track clarity and a 6-month review with a defined raise. If work-life balance is 4.5, push for an explicit remote-work guarantee.\n\n**Play 3 — The Stale Offer Refresh.** If your offer is 2+ weeks old and the salary panel now shows a higher market rate, write: \"Since we last spoke, I've reviewed current pay bands for similar roles in {city}. I'd like to revisit the offer to align with the {percentile} percentile.\" This is most effective in cities where salary guides have updated within the offer-pending window.\n\nAll three plays work better when the company knows you've done the homework. Pasting a hired.video URL from the tool signals you're using a public benchmark, not an aspirational anchor.",
     },
     {
       heading: "When to Trust Reviews and When to Discount Them",

@@ -1,13 +1,15 @@
-// Per-audience landing page (#900) at `/for/:audience`.
+// /for/:audience — dispatcher across the two audience taxonomies.
 //
-// Public SEO surface for the demographic — hero, kind-coverage chips,
-// templates grouped by `mediaKind` (so podcasters see Podcast templates
-// adjacent to their video templates, not interleaved). Cards link into
-// /templates/:slug (#901) which is the conversion-optimised page.
+//   - Life-stage  → renders <LifeStageLandingPage /> (#1629, Resource Maps)
+//   - Profession  → renders the existing studio-templates view (#900)
 //
-// Per DRY: filter logic is `TEMPLATE_CATALOG.filter(t => t.audiences.includes(slug))`
-// inline — no parallel `AUDIENCE_TO_TEMPLATES` lookup, no prop-drilled
-// `templates[]` from a parent.
+// Single route entry point per the DRY rule — both taxonomies share the
+// /for URL space; dispatch happens here so consumers don't fork by
+// taxonomy at routing time.
+//
+// Slug shape: kebab-case in URL, snake_case in the enum (e.g.
+// `/for/recent-graduates` ↔ `recent_graduates`); `audienceKeyFromSlug`
+// in shared/audiences.ts owns the conversion.
 
 import { useParams, Navigate, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
@@ -18,9 +20,31 @@ import { StudioTemplateLinkCard } from "@/components/studio/templates/StudioTemp
 import { StudioOpenCTA } from "@/components/studio/templates/StudioOpenCTA";
 import { AUDIENCE_BY_ID, type Audience } from "@/components/studio/templates/audiences";
 import { templatesForAudience } from "@/components/studio/templates/templates-by-audience";
+import { audienceKeyFromSlug, taxonomyOf } from "@shared/audiences";
+import { lifeStageAudienceMeta } from "@shared/audiences-registry";
+import { LifeStageLandingPage } from "./LifeStageLandingPage";
 
 export default function AudienceLandingPage(): JSX.Element {
-  const { audience: slug } = useParams<{ audience: string }>();
+  const { audience: slug = "" } = useParams<{ audience: string }>();
+
+  // Resolve the slug across both taxonomies. The shared helper
+  // (audienceKeyFromSlug) normalises kebab-case URL → snake_case enum and
+  // checks both LIFE_STAGE_AUDIENCES and PROFESSION_AUDIENCES.
+  const audienceKey = audienceKeyFromSlug(slug);
+  const taxonomy = audienceKey ? taxonomyOf(audienceKey) : null;
+
+  if (taxonomy === "life_stage") {
+    const meta = lifeStageAudienceMeta(audienceKey as Parameters<typeof lifeStageAudienceMeta>[0]);
+    if (!meta) return <Navigate to="/for" replace />;
+    return <LifeStageLandingPage meta={meta} />;
+  }
+
+  // Fall through to the existing profession-audience surface (studio
+  // templates grouped by media kind).
+  return <ProfessionAudienceLandingPage slug={slug} />;
+}
+
+function ProfessionAudienceLandingPage({ slug }: { slug: string }): JSX.Element {
   const location = useLocation();
   const audience = slug && slug in AUDIENCE_BY_ID ? AUDIENCE_BY_ID[slug as Audience] : null;
 
@@ -36,19 +60,16 @@ export default function AudienceLandingPage(): JSX.Element {
       : undefined,
   );
 
-  if (!audience) return <Navigate to="/studio" replace />;
+  if (!audience) return <Navigate to="/for" replace />;
 
   const templates = templatesForAudience(audience.id);
   if (templates.length === 0) return <Navigate to="/studio" replace />;
 
-  // MEDIA_KINDS imposes a stable display order (video → podcast → voice →
-  // animation) instead of insertion-order ambiguity from `new Set`.
   const kindsCovered = MEDIA_KINDS.filter((k) => templates.some((t) => t.mediaKind === k));
 
   return (
     <AppShell bgClassName="bg-background">
       <div>
-        {/* Hero */}
         <section className="px-4 py-20 text-center sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
           <div>
             <Badge variant="outline" className="mb-4">
@@ -60,7 +81,6 @@ export default function AudienceLandingPage(): JSX.Element {
           </div>
         </section>
 
-        {/* Kind coverage strip — only renders when multiple kinds are present */}
         {kindsCovered.length > 1 && (
           <section className="border-y bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -74,7 +94,6 @@ export default function AudienceLandingPage(): JSX.Element {
           </section>
         )}
 
-        {/* Templates grid — grouped by mediaKind */}
         <section className="px-4 py-12 sm:px-6 lg:px-8">
           <div className="space-y-12">
             {kindsCovered.map((kind) => {
@@ -98,7 +117,6 @@ export default function AudienceLandingPage(): JSX.Element {
           </div>
         </section>
 
-        {/* Final CTA */}
         <section className="bg-gradient-to-br from-brand-purple/5 to-brand-blue/5 px-4 py-16 text-center sm:px-6 lg:px-8">
           <div>
             <h2 className="mb-4 text-3xl font-bold">Make something great</h2>

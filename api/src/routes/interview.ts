@@ -8,6 +8,7 @@ import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
+import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -189,18 +190,7 @@ interviewRoutes.post("/questions", async (c) => {
 
   if (hasAnyLLMProviderKey(c.env)) {
     try {
-      const systemPrompt = `You are an expert interviewer conducting a ${type} interview. Generate exactly ${count} interview questions.
-
-CRITICAL RULES — read carefully:
-1. Every question MUST reference specific skills, responsibilities, or technologies mentioned in the job description below. Generic questions are forbidden.
-2. Use the exact role title and company context from the JD in at least 2 questions.
-3. If a resume is provided, tailor questions to probe the candidate's specific experience gaps or highlight relevant wins.
-4. Mix difficulty: 1-2 warm-up, 2-3 core, 1 stretch question.
-5. Set timeLimit (seconds): 60 for simple, 90 for behavioural, 120-180 for technical/design.
-6. Return ONLY valid JSON — no markdown, no explanation.
-
-JSON schema:
-{ "questions": [{ "id": "q1", "question": "...", "category": "behavioral|technical|system-design", "timeLimit": 90 }] }`;
+      const systemPrompt = getPrompt("interview-question-generator").render({ type, count });
 
       const userContent = `Job Description:\n${jobDescription.slice(0, 3000)}${resumeText ? `\n\nCandidate Resume:\n${resumeText.slice(0, 2000)}` : ""}`;
 
@@ -394,20 +384,7 @@ interviewRoutes.post("/answers/:answerId/analyze", async (c) => {
 
   if (hasAnyLLMProviderKey(c.env)) {
     try {
-      const systemPrompt = `You are an expert interview coach. Evaluate the candidate's answer and return a JSON object.
-
-Scoring dimensions (0-10, be calibrated: 6-7 is good, 8-9 is excellent):
-- clarity: how clearly and concisely the answer is communicated
-- confidence: assertive, first-person language with no hedging
-- structure: logical flow; STAR method or equivalent
-- relevance: how directly the answer addresses THIS specific role and JD (penalise generic answers heavily)
-- impact: quantifiable outcomes, metrics, business results
-
-Rules:
-- strengths: 2-3 specific things from their actual answer (not generic praise)
-- improvements: 2-3 actionable, specific improvements referencing the JD where applicable
-- suggestedAnswer: a concrete model answer for this exact question and role — not a generic template
-- Return ONLY valid JSON
+      const systemPrompt = `${getPrompt("interview-answer-coach").render({})}
 
 Schema:
 {

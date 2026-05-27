@@ -8,6 +8,11 @@ import {
   serial,
   char,
   doublePrecision,
+  integer,
+  bigint,
+  date,
+  uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const countries = pgTable("countries", {
@@ -17,6 +22,12 @@ export const countries = pgTable("countries", {
   iso3: char("iso3", { length: 3 }).unique(),
   phoneCode: varchar("phone_code", { length: 20 }),
   currency: varchar("currency", { length: 10 }),
+  // Demographic columns added by #0149 — backfilled lazily from the
+  // GeoNames cities500 import job (deferred). Null until backfilled;
+  // page templates fall back to density-based ranking when absent.
+  population: bigint("population", { mode: "number" }),
+  populationAsOf: date("population_as_of"),
+  populationSource: varchar("population_source", { length: 32 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -24,27 +35,54 @@ export const countries = pgTable("countries", {
 export type Country = typeof countries.$inferSelect;
 export type NewCountry = typeof countries.$inferInsert;
 
-export const stateProvinces = pgTable("state_provinces", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  countryId: serial("country_id").notNull().references(() => countries.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  code: varchar("code", { length: 10 }),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const stateProvinces = pgTable(
+  "state_provinces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    countryId: serial("country_id").notNull().references(() => countries.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    code: varchar("code", { length: 10 }),
+    // Demographic columns added by #0149.
+    population: bigint("population", { mode: "number" }),
+    populationAsOf: date("population_as_of"),
+    populationSource: varchar("population_source", { length: 32 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("state_provinces_population_desc_idx").on(t.population),
+  ],
+);
 
 export type StateProvince = typeof stateProvinces.$inferSelect;
 export type NewStateProvince = typeof stateProvinces.$inferInsert;
 
-export const cities = pgTable("cities", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  stateId: uuid("state_id").notNull().references(() => stateProvinces.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  latitude: doublePrecision("latitude"),
-  longitude: doublePrecision("longitude"),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const cities = pgTable(
+  "cities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stateId: uuid("state_id").notNull().references(() => stateProvinces.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    // URL-safe slug — UNIQUE per (state_id, slug). Backfilled by #0149
+    // from slugified name; disambiguates duplicates within a state.
+    slug: varchar("slug", { length: 64 }).notNull(),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    // Demographic + cross-dataset anchor columns added by #0149.
+    population: integer("population"),
+    populationAsOf: date("population_as_of"),
+    populationSource: varchar("population_source", { length: 32 }),
+    timezone: varchar("timezone", { length: 48 }),
+    geonameId: integer("geoname_id"),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("cities_state_slug_uniq").on(t.stateId, t.slug),
+    uniqueIndex("cities_geoname_id_uniq").on(t.geonameId),
+    index("cities_population_desc_idx").on(t.population),
+  ],
+);
 
 export type City = typeof cities.$inferSelect;
 export type NewCity = typeof cities.$inferInsert;
