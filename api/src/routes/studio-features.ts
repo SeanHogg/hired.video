@@ -3149,7 +3149,7 @@ studioFeaturesRoutes.post("/projects/:projectId/comments", async (c) => {
     authorEmail: user.email,
     body: parsed.data.body,
     timestampSec: parsed.data.timestampSec ?? null,
-  } as any).returning();
+  }).returning();
 
   return c.json(ok(comment), 201);
 });

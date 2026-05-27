@@ -5,6 +5,12 @@
  * "mark-passed" tools, backfill scripts, the learning-path completion
  * fan-out).
  *
+ * Score math routes through `services/learning/scoring.ts` (gap #1606
+ * seam) — `aggregateBasisPoints` for the average and a basis-point
+ * comparison instead of float-percent. This kills the rounding-bug
+ * class where `scoreRaw / scoreMax * 100` drifted under round() and a
+ * passing learner got denied at the gate.
+ *
  * Rules:
  *   1. Every lesson marked `is_required = true` must have its
  *      enrollment-progress entry at `status === "passed"`. Optional
@@ -15,18 +21,10 @@
  *      at least one lesson actually reported a score. A text_md /
  *      studio_video course with no quizzes has nothing to evaluate
  *      against the score, so the completion-of-required-lessons signal
- *      IS the passing bar. Without this carve-out every text_md-only
- *      course is uncompletable (the user reported exactly this: 4/4
- *      lessons green, course still "in progress").
- *
- * Returns:
- *   - shouldFlipToPassed: true when a previously-not-passed enrollment
- *     would now flip to passed under both rules.
- *   - finalScorePct: averaged percent across scored lessons, or null
- *     when no lesson reported a score.
- *   - passedRequiredCount / requiredCount: counts surfaced for the
- *     caller's audit / progress-bar plumbing.
+ *      IS the passing bar.
  */
+
+import { aggregateBasisPoints } from "./scoring.js";
 
 export interface LessonForCompletion {
   id: string;
@@ -63,24 +61,30 @@ export function evaluateCourseCompletion(input: CourseCompletionInput): CourseCo
   const passedRequiredCount = passedRequired.length;
   const allRequiredPassed = requiredCount > 0 && passedRequiredCount === requiredCount;
 
-  // Average across lessons that reported BOTH a numeric scoreRaw AND
-  // a positive scoreMax. Lessons that didn't ship a quiz never enter
-  // the denominator — they don't drag the average to 0%.
-  let scoreSum = 0;
-  let scoredLessonCount = 0;
-  for (const l of input.lessons) {
-    const lp = input.progress[l.id];
-    if (lp?.scoreRaw != null && typeof lp.scoreMax === "number" && lp.scoreMax > 0) {
-      scoreSum += (lp.scoreRaw / lp.scoreMax) * 100;
-      scoredLessonCount += 1;
-    }
-  }
-  const finalScorePct = scoredLessonCount > 0 ? Math.round(scoreSum / scoredLessonCount) : null;
+  // Route the per-lesson score aggregation through the shared scoring
+  // seam (#1606). `aggregateBasisPoints` returns 0..10000 (representing
+  // 0.00%..100.00%) and skips lessons whose progress entry has no
+  // numeric scoreRaw — same carve-out semantics as the previous
+  // inline averaging but with integer-stable comparison math.
+  const scoredLessons = input.lessons
+    .map((l) => {
+      const lp = input.progress[l.id];
+      if (lp?.scoreRaw == null || typeof lp.scoreMax !== "number" || lp.scoreMax <= 0) return null;
+      return { scoreRaw: lp.scoreRaw, scoreMin: 0, scoreMax: lp.scoreMax };
+    })
+    .filter((x): x is { scoreRaw: number; scoreMin: number; scoreMax: number } => x !== null);
+
+  const scoredLessonCount = scoredLessons.length;
+  const aggregateBp = aggregateBasisPoints(scoredLessons);
+  // finalScorePct is the integer percent surfaced to callers; rounding
+  // the basis-points value drops one decimal but matches the existing
+  // shape (Math.round(scoreSum / scoredLessonCount)).
+  const finalScorePct = aggregateBp == null ? null : Math.round(aggregateBp / 100);
 
   const meetsPassingScore =
     input.passingScorePct == null
     || scoredLessonCount === 0
-    || (finalScorePct ?? 0) >= input.passingScorePct;
+    || (aggregateBp != null && aggregateBp >= input.passingScorePct * 100);
 
   const shouldFlipToPassed = !input.wasPassed && allRequiredPassed && meetsPassingScore;
 

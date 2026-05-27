@@ -65,8 +65,8 @@ export const studioVoiceovers = pgTable(
   "studio_voiceovers",
   {
     id:          uuid("id").primaryKey().defaultRandom(),
-    userId:      text("user_id").notNull(),
-    projectId:   text("project_id"),
+    userId:      uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId:   uuid("project_id").references(() => studioProjects.id, { onDelete: "set null" }),
     sceneId:     text("scene_id"),              // null = full-video voiceover
     provider:    text("provider").notNull().default("vibevoice"), // vibevoice | kokoro | piper | web-speech
     voiceId:     text("voice_id").notNull(),     // engine-specific voice ID (web-speech voiceURI, kokoro voice key, or studioVoiceClones.id)
@@ -737,7 +737,7 @@ export const studioVideoFormSubmissions = pgTable(
 // Review Comments (gap #145) — Frame.io-style time-coded comments for
 // async team review of draft videos. Public review links via shareToken.
 // ---------------------------------------------------------------------------
-export const studioReviewComments: any = pgTable(
+export const studioReviewComments = pgTable(
   "studio_review_comments",
   {
     id:           uuid("id").primaryKey().defaultRandom(),

@@ -202,11 +202,17 @@ export type World3DEntityKind =
  *   - `dynamic`   — full physics. Falls with gravity, collides.
  *   - `kinematic` — moved by scripts, not by physics. Moving
  *                    platforms in later phases.
+ *   - `sensor`    — overlap-only collider. Fires intersection
+ *                    events but doesn't push the player back.
+ *                    Used for collectibles, goals, hazards —
+ *                    Phase-2 challenge runtime hooks fire from
+ *                    these (gap #1635).
  *   - `none`      — no collider at all. Decorative or pure light. */
 export type World3DPhysicsKind =
   | "static"
   | "dynamic"
   | "kinematic"
+  | "sensor"
   | "none";
 
 export interface World3DEntity extends World3DTransform {

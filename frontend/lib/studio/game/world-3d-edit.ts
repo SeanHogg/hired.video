@@ -50,9 +50,12 @@ export const ENTITY_KIND_DEFAULTS: Record<World3DEntityKind, EntityKindDefaults>
   // inspector defaults to a "platform feel" (4×0.5×4) without the
   // author having to retype the scale.
   platform:    { scale: [4, 0.5, 4], color: "#a3a3a3", physics: "static" },
-  collectible: { scale: [0.6, 0.6, 0.6], color: "#facc15", physics: "none" },
-  goal:        { scale: [2, 2, 2],   color: "#22c55e", physics: "none" },
-  hazard:      { scale: [2, 1, 2],   color: "#ef4444", physics: "none" },
+  // Sensor entities — Rapier intersection events fire from these into
+  // the Phase-2 challenge runtime. No physical pushback; the player
+  // passes through and the runtime emits `collect` / `reach` / `harm`.
+  collectible: { scale: [0.6, 0.6, 0.6], color: "#facc15", physics: "sensor" },
+  goal:        { scale: [2, 2, 2],   color: "#22c55e", physics: "sensor" },
+  hazard:      { scale: [2, 1, 2],   color: "#ef4444", physics: "sensor" },
   light:       { scale: [0.4, 0.4, 0.4], color: "#fef9c3", physics: "none" },
 };
 
