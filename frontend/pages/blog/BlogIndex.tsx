@@ -9,6 +9,7 @@ import { AppShell } from "@/components/AppShell";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import ContentCard from "@/components/search/ContentCard";
 import { BLOG_POSTS } from "@/data/blog-posts";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { articleService, type PublicArticleCard } from "@/lib/services/article-service";
 import { mergeUnifiedPosts, type UnifiedPost } from "@/lib/unified-posts";
 import { slugify } from "@shared/slugify";
@@ -92,7 +93,9 @@ export default function BlogIndex() {
     return Array.from(seen, ([slug, label]) => ({ slug, label }));
   }, [sortedPosts]);
 
-  const query = searchParams.get("q") ?? "";
+  // Gate at 2 chars via the shared hook so single-keystroke ?q=A
+  // doesn't narrow the guides grid to noise.
+  const { effective: query } = useSearchQueryParam();
   const viewMode = (searchParams.get("view") === "list" ? "list" : "grid") as
     | "grid"
     | "list";

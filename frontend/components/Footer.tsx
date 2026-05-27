@@ -7,6 +7,7 @@ import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { useAuth } from "@/lib/auth";
 import { AudienceLinks } from "@/components/landing/AudienceLinks";
+import { LocationsSitemap } from "@/components/landing/LocationsSitemap";
 
 /**
  * Footer — self-gates by authenticated state per #1628.
@@ -28,7 +29,7 @@ export default function Footer() {
   return (
     <footer className="bg-background border-t border-border">
       <div id="footer-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className={`grid grid-cols-1 gap-8 ${expanded ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
+        <div className={`grid grid-cols-1 gap-8 ${expanded ? "md:grid-cols-6" : "md:grid-cols-4"}`}>
           {/* Logo + tagline */}
           <div className="md:col-span-2 md:pl-4">
             <Link to="/" className="flex items-center space-x-2 mb-4">
@@ -80,6 +81,12 @@ export default function Footer() {
               self-gates layout by `variant` so the consumer doesn't pass
               per-audience props. */}
           <AudienceLinks variant={expanded ? "expanded" : "compact"} />
+
+          {/* Locations column — expanded mode only. Anonymous visitors
+              (incl. Googlebot) see a curated top-countries grid + a link
+              to /sitemap/locations for the full tree. Per the
+              Indeed/ZipRecruiter SEO playbook (#1628). */}
+          {expanded ? <LocationsSitemap variant="footer-grid" /> : null}
         </div>
 
         {/* Bottom Section */}

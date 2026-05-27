@@ -28,6 +28,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
@@ -181,7 +182,11 @@ export default function Jobs() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Jobs", url: "/jobs" }]);
   const { isAuthenticated, user } = useAuth();
-  const urlQuery = searchParams.get("q") ?? "";
+  // `effective` applies the 2-char threshold so single-keystroke ?q=A
+  // doesn't fire a full /api/jobs/public fanout. Raw value isn't needed
+  // here — the header search component renders its own input from the
+  // URL, this page only consumes the resolved filter.
+  const { effective: urlQuery } = useSearchQueryParam();
   const urlEmploymentType = searchParams.get("employmentType") ?? "";
   const urlExperienceLevel = searchParams.get("experienceLevel") ?? "";
   const urlRemote = searchParams.get("remote") ?? "";

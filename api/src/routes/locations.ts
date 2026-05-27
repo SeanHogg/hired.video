@@ -85,6 +85,102 @@ locationRoutes.get("/states", async (c) => {
 });
 
 /**
+ * GET /api/locations/sitemap
+ *
+ * Returns the country → state → top-cities tree powering both
+ * `/sitemap/locations` and the expanded-footer Locations column. Cities
+ * are ranked by `population` DESC (NULLs last) and capped at 25 per
+ * state so the sitemap page renders without spilling — full city lists
+ * live at /in/[country]/[state].
+ *
+ * No content-count join yet — every active country/state surfaces. A
+ * future pass can layer the "≥10 jobs" threshold on top via a
+ * materialized view over content_locations + job_items.
+ */
+locationRoutes.get("/sitemap", async (c) => {
+  const db = getDb();
+  // Single query — pull every active country/state/top-25-city tuple
+  // and roll up client-side. ~250 countries × ~50 states × 25 cities is
+  // tiny; this is also cache-friendly (response is identical across
+  // anonymous visitors so it can be cached at the edge).
+  const rows = await db
+    .select({
+      countryId: countries.id,
+      countryName: countries.name,
+      countryIso2: countries.iso2,
+      countryPopulation: countries.population,
+      stateId: stateProvinces.id,
+      stateName: stateProvinces.name,
+      stateCode: stateProvinces.code,
+      statePopulation: stateProvinces.population,
+      cityId: cities.id,
+      cityName: cities.name,
+      citySlug: cities.slug,
+      cityPopulation: cities.population,
+    })
+    .from(countries)
+    .leftJoin(stateProvinces, and(eq(stateProvinces.countryId, countries.id), eq(stateProvinces.isActive, true)))
+    .leftJoin(cities, and(eq(cities.stateId, stateProvinces.id), eq(cities.isActive, true)))
+    .where(eq(countries.isActive, true))
+    .orderBy(asc(countries.name), asc(stateProvinces.name), sql`${cities.population} DESC NULLS LAST`, asc(cities.name));
+
+  // Group + cap top 25 cities per state in one pass.
+  type CityEntry = { id: string; name: string; slug: string; population: number | null };
+  type StateEntry = {
+    id: string;
+    name: string;
+    code: string | null;
+    population: number | null;
+    cities: CityEntry[];
+  };
+  type CountryEntry = {
+    id: number;
+    name: string;
+    iso2: string;
+    population: number | null;
+    states: StateEntry[];
+  };
+  const out: CountryEntry[] = [];
+  let currentCountry: CountryEntry | null = null;
+  let currentState: StateEntry | null = null;
+  const CITY_CAP_PER_STATE = 25;
+
+  for (const r of rows) {
+    if (!currentCountry || currentCountry.id !== r.countryId) {
+      currentCountry = {
+        id: r.countryId,
+        name: r.countryName,
+        iso2: r.countryIso2,
+        population: r.countryPopulation as number | null,
+        states: [],
+      };
+      out.push(currentCountry);
+      currentState = null;
+    }
+    if (r.stateId && (!currentState || currentState.id !== r.stateId)) {
+      currentState = {
+        id: r.stateId,
+        name: r.stateName!,
+        code: r.stateCode ?? null,
+        population: r.statePopulation as number | null,
+        cities: [],
+      };
+      currentCountry.states.push(currentState);
+    }
+    if (r.cityId && currentState && currentState.cities.length < CITY_CAP_PER_STATE) {
+      currentState.cities.push({
+        id: r.cityId,
+        name: r.cityName!,
+        slug: r.citySlug!,
+        population: r.cityPopulation as number | null,
+      });
+    }
+  }
+
+  return c.json(success(out), 200);
+});
+
+/**
  * GET /api/locations/resolve?country=us&state=tx&city=austin
  *
  * Slug-based resolver for the /in/[country]/[state?]/[city?] landing

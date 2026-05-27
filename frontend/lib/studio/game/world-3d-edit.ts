@@ -1,5 +1,5 @@
 /**
- * Pure immutable helpers for editing a `World3DState` (gap #1633 —
+ * Pure immutable helpers for editing a `World3DState` (gap #1634 —
  * the 3D-engine variant of `mediaKind: "game"` studio projects).
  * Parallel to `game-state-edit.ts` for the 2D path; same DRY rule —
  * every mutation lives here so the editor UI, the agent-tool consumer
@@ -194,7 +194,7 @@ export function updateSkyColor(state: GameState, skyColor: string): GameState {
 // ─── Challenge mutations ──────────────────────────────────────────────────
 //
 // Phase 1 surfaces challenges as data only — the runtime event bus +
-// HUD wiring is Phase 2 (gap #1634). The CRUD helpers ship now so the
+// HUD wiring is Phase 2 (gap #1635). The CRUD helpers ship now so the
 // schema doesn't churn between phases and the agent-tool consumer
 // (Phase 5) has the mutation surface ready.
 

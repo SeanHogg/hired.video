@@ -13,7 +13,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
+
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { useAI } from "@/lib/ai-context";
 import {
   Accordion,
@@ -47,8 +49,10 @@ export default function Help() {  const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { openAIChat } = useAI();
   const { openContactPanel } = useContactPanel();
-  const [searchParams] = useSearchParams();
-  const searchQuery = searchParams.get("q") ?? "";
+  // Gate at 2 chars so single-keystroke ?q=A doesn't narrow the FAQ
+  // list to noise — Help renders the full catalogue until the query is
+  // meaningful.
+  const { effective: searchQuery } = useSearchQueryParam();
 
   const faqs = HELP_FAQS;
   void HELP_GUIDES;

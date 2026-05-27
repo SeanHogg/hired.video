@@ -26,7 +26,7 @@
 -- Documentation: docs/conventions/soft-delete.md (written alongside).
 
 -- Helper: add archived_at if missing, then backfill from is_archived.
-CREATE OR REPLACE FUNCTION pg_temp.__add_archived_at(target_table text)
+CREATE OR REPLACE FUNCTION public.__mig_0154_add_archived_at(target_table text)
 RETURNS void
 LANGUAGE plpgsql
 AS $func$
@@ -56,10 +56,12 @@ END;
 $func$;
 
 -- Tables with the `is_archived boolean` convention.
-SELECT pg_temp.__add_archived_at('external_email_messages');
-SELECT pg_temp.__add_archived_at('messaging_threads');
-SELECT pg_temp.__add_archived_at('boards');
-SELECT pg_temp.__add_archived_at('scorecard_kits');
-SELECT pg_temp.__add_archived_at('scorecard_attributes');
-SELECT pg_temp.__add_archived_at('scorecard_templates');
-SELECT pg_temp.__add_archived_at('interview_question_sets');
+SELECT public.__mig_0154_add_archived_at('external_email_messages');
+SELECT public.__mig_0154_add_archived_at('messaging_threads');
+SELECT public.__mig_0154_add_archived_at('boards');
+SELECT public.__mig_0154_add_archived_at('scorecard_kits');
+SELECT public.__mig_0154_add_archived_at('scorecard_attributes');
+SELECT public.__mig_0154_add_archived_at('scorecard_templates');
+SELECT public.__mig_0154_add_archived_at('interview_question_sets');
+
+DROP FUNCTION IF EXISTS public.__mig_0154_add_archived_at(text);

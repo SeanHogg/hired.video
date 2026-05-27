@@ -9,9 +9,10 @@
 // grid for sourcing browsing.
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { resumeService } from "@/lib/services/resume-service";
 import ResumeCard from "@/components/ResumeCard";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 
 // Loose shape — `getPublicResumes` normalises the wire payload into a
 // hybrid (some `description` + `summary`, some new field names) so we
@@ -34,10 +35,10 @@ const PAGE_SIZE = 24;
 
 export default function AvailableResumesPanel(): JSX.Element {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  // The shared HeaderSearch writes `?q=` into the URL — read it here so this
-  // panel filters by the same input rather than maintaining its own box.
-  const search = searchParams.get("q") ?? "";
+  // The shared HeaderSearch writes `?q=` into the URL — `useSearchQueryParam`
+  // reads it via the canonical 2-char gate so sub-threshold input doesn't
+  // narrow the available-resumes grid to noise.
+  const { effective: search } = useSearchQueryParam();
   const [items, setItems] = useState<PublicResumeItem[]>([]);
   const [loading, setLoading] = useState(true);
 

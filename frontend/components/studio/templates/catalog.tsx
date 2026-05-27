@@ -94,7 +94,7 @@ export type ContentTemplate =
   | "voice_ivr_prompt"
   | "voice_audiobook_chapter"
   | "product_promo"
-  // 3D world (gap #1633) — Three.js + react-three-fiber + Rapier
+  // 3D world (gap #1634) — Three.js + react-three-fiber + Rapier
   // first-person editable world. Headline of the games shelf; the
   // three 2D entries below are the "mini-game" lane.
   | "game_3d_world"
@@ -782,7 +782,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     firstTabLabel: "Promo",
     IntakeForm: BasicIntake,
   },
-  // ─── Game templates (#927 / gap #1633) ─────────────────────────────────
+  // ─── Game templates (#927 / gap #1634) ─────────────────────────────────
   // `mediaKind: "game"` routes the editor's `<CanvasRouter>` to mount
   // `<GameStage>` instead of `<CanvasStage>`. Two engine lanes under
   // the same mediaKind, discriminated by `gameState.engine`:
@@ -805,7 +805,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "personal_brand",
     category: "showcase",
     mediaKind: "game",
-    audiences: ["game_dev", "creator", "developer", "designer", "student"],
+    audiences: ["game_dev", "creator", "developer", "designer", "educator"],
     defaultName: "3D World",
     defaultPrompt:
       "Design a 3D world game: place platforms, ramps, collectibles, and a goal. Invite friends to play, set a challenge (collect N coins, reach the goal under T seconds). Use the AI panel to prototype the level by describing it in plain English.",

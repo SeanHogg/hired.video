@@ -1,6 +1,6 @@
 /**
  * GameStage3D — the canvas runtime surface for `engine === "world-3d"`
- * game projects (gap #1633). Mounts the R3F Canvas, the Rapier physics
+ * game projects (gap #1634). Mounts the R3F Canvas, the Rapier physics
  * world, the block palette (edit mode), the playtest toggle, and the
  * minimal HUD (play mode).
  *

@@ -12,7 +12,7 @@ interface PaletteEntry {
   label: string;
   /** Single emoji glyph — keeps the palette icon-light without
    *  pulling another icon library. The 3D editor swaps these for
-   *  rendered thumbnails when the geometry library lands (gap #1634). */
+   *  rendered thumbnails when the geometry library lands (gap #1639). */
   glyph: string;
 }
 

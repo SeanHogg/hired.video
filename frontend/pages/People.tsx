@@ -105,6 +105,7 @@ import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import { useAuth, USER_ROLES } from "@/lib/auth";
@@ -147,7 +148,10 @@ export default function People() {
   useEffect(() => {
     writeEntityHubActiveTab("person", activeTab);
   }, [activeTab]);
-  const urlQuery = searchParams.get("q") ?? "";
+  // 2-char threshold via the shared hook so single-keystroke ?q=A
+  // doesn't fire /api/users/public. Header search owns the visible
+  // input — this page only consumes the resolved filter.
+  const { effective: urlQuery } = useSearchQueryParam();
   const urlRole = searchParams.get("role") ?? "";
   const urlSkills = searchParams.get("skills") ?? "";
   const urlOpenToWork = searchParams.get("openToWork") ?? "";

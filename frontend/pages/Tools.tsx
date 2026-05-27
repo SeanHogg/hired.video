@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { ToolCard } from "@/components/ToolCard";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import LearningPanel from "@/components/courses/LearningPanel";
@@ -90,7 +91,9 @@ export default function Tools() {
   useSEO(location.pathname);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const toolQuery = searchParams.get("q") ?? "";
+  // Gate at 2 chars via the shared hook so single-keystroke ?q=A
+  // doesn't narrow the tools grid to noise.
+  const { effective: toolQuery } = useSearchQueryParam();
   const tierParam = searchParams.get("tier") ?? "";
   const tierFilter: TierFilter =
     tierParam === "free" || tierParam === "pro" ? tierParam : "all";

@@ -34,6 +34,7 @@ import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
 import { COMPANIES_HUB_DEFAULT_TAB, COMPANIES_HUB_TABS } from "@/hooks/use-companies-tabs";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import {
   Card,
@@ -57,7 +58,10 @@ export default function Companies() {
   useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
   const { isAuthenticated, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlQuery = searchParams.get("q") ?? "";
+  // 2-char threshold via the shared hook so single-keystroke ?q=A
+  // doesn't fire /api/companies/public. Header search owns the visible
+  // input — this page only consumes the resolved filter.
+  const { effective: urlQuery } = useSearchQueryParam();
   const urlIndustry = searchParams.get("industry") ?? "";
   const urlSize = searchParams.get("size") ?? "";
   const urlLocation = searchParams.get("location") ?? "";

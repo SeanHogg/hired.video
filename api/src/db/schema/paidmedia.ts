@@ -26,6 +26,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { users } from "./users.js";
 
 /** Supported external ad networks. Adapters in
  *  services/paid-media/adapters/<platform>/ implement PaidMediaAdapter
@@ -42,7 +43,7 @@ export const paidMediaConnections = pgTable(
   "paid_media_connections",
   {
     id:                   uuid("id").primaryKey().defaultRandom(),
-    userId:               text("user_id").notNull(),         // actor who owns this connection (workspace user)
+    userId:               uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     companyId:            uuid("company_id"),                // workspace company (null = personal)
     platform:             varchar("platform", { length: 16 }).notNull(),
     externalUserId:       text("external_user_id"),          // platform's user id (Meta uid, Google sub, etc.)
@@ -70,7 +71,7 @@ export const paidMediaAccounts = pgTable(
   {
     id:               uuid("id").primaryKey().defaultRandom(),
     connectionId:     uuid("connection_id").notNull(),
-    userId:           text("user_id").notNull(),
+    userId:           uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     companyId:        uuid("company_id"),
     platform:         varchar("platform", { length: 16 }).notNull(),
     externalAccountId: text("external_account_id").notNull(), // act_XXXX (Meta), customer_id (Google), etc.
@@ -97,7 +98,7 @@ export const paidMediaCampaigns = pgTable(
   "paid_media_campaigns",
   {
     id:                 uuid("id").primaryKey().defaultRandom(),
-    userId:             text("user_id").notNull(),
+    userId:             uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     companyId:          uuid("company_id"),
     name:               text("name").notNull(),
     // platform-neutral objective; adapters translate to platform-specific
@@ -137,7 +138,7 @@ export const paidMediaAdSets = pgTable(
   {
     id:                uuid("id").primaryKey().defaultRandom(),
     campaignId:        uuid("campaign_id").notNull().references(() => paidMediaCampaigns.id, { onDelete: "cascade" }),
-    userId:            text("user_id").notNull(),
+    userId:            uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     companyId:         uuid("company_id"),
     name:              text("name").notNull(),
     status:            varchar("status", { length: 24 }).notNull().default("draft"),

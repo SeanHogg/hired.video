@@ -4,7 +4,7 @@
 // Self-gating row action "Add to Job" bridges pool → pipeline.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation, Trans } from "react-i18next";
 import {
   Briefcase,
@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -107,12 +108,11 @@ export default function CandidatesPanel({
   const setSelectedCompanyId = internalScope.setCompanyId;
 
   const unnamedFallback = t("labels.unnamedCandidate");
-  // Read the search query from the URL (`?q=`) — the global HeaderSearch
-  // above this panel writes there. Filtering here instead of via a second
-  // local search input keeps a single search box on /jobs?tab=candidates
-  // and /resumes?tab=sourced.
-  const [searchParams] = useSearchParams();
-  const searchText = searchParams.get("q") ?? "";
+  // Read the search query from the URL (`?q=`) via the canonical 2-char
+  // gate — the global HeaderSearch writes there, sub-threshold input
+  // ("A") collapses to "" so the panel shows the full candidate list
+  // until the query is meaningful.
+  const { effective: searchText } = useSearchQueryParam();
 
   const [candidates, setCandidates] = useState<CandidateResumeRow[]>([]);
   const [loading, setLoading] = useState(true);

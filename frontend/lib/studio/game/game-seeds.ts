@@ -201,7 +201,7 @@ const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
     return base;
   },
 
-  // 3D world seed (gap #1633). Empty Roblox-style starter world with
+  // 3D world seed (gap #1634). Empty Roblox-style starter world with
   // a few scattered platforms + a goal block — enough to let the
   // playtest first-person controller actually do something on first
   // open, but light enough that the AI agent (Phase 5) has room to

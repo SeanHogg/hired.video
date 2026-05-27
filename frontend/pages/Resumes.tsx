@@ -70,6 +70,7 @@ import CandidatesPanel, {
 import AvailableResumesPanel from "@/components/resumes/AvailableResumesPanel";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { RESUMES_HUB_DEFAULT_TAB, RESUMES_HUB_TABS } from "@/hooks/use-resumes-tabs";
+import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
@@ -175,7 +176,10 @@ export default function Resumes() {
     parentName: string;
   }>({ open: false, target: null, parentName: "" });
   const [searchParams] = useSearchParams();
-  const urlQuery = searchParams.get("q") ?? "";
+  // 2-char threshold via the shared hook so single-keystroke ?q=A
+  // doesn't fire /api/resumes/public. Header search owns the visible
+  // input — this page only consumes the resolved filter.
+  const { effective: urlQuery } = useSearchQueryParam();
   const urlPrivacy = searchParams.get("privacy") ?? "";
   const urlIsMaster = searchParams.get("isMaster") ?? "";
 

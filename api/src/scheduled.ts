@@ -31,6 +31,7 @@ import {
 import { TremendousClient } from "./services/tremendous/client.js";
 import { seedSuperAdminAndCompany } from "./seed.js";
 import { runRetentionSweep } from "./services/maintenance/retention-sweep.js";
+import { runCounterRecompute } from "./services/maintenance/counter-recompute.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -496,6 +497,32 @@ async function processRetentionSweep(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Counter cache recompute (gap #1605)
+// ---------------------------------------------------------------------------
+// Once-daily UPDATE pass over the denormalised count columns enumerated in
+// `services/maintenance/counter-recompute.ts`. The 04:20 UTC /5 window
+// sits between retention (04:15) and fraud (04:30). Each policy only
+// touches rows whose cached value drifted from the recomputed count, so
+// the pass is cheap when the counters are already accurate.
+async function processCounterRecompute(): Promise<void> {
+  const now = new Date();
+  if (now.getUTCHours() !== 4 || now.getUTCMinutes() < 20 || now.getUTCMinutes() >= 25) return;
+  try {
+    const summaries = await runCounterRecompute();
+    const totalAdjusted = summaries.reduce((sum, s) => sum + s.rowsAdjusted, 0);
+    if (totalAdjusted > 0 || summaries.some((s) => s.errorMessage)) {
+      const breakdown = summaries
+        .filter((s) => s.rowsAdjusted > 0 || s.errorMessage)
+        .map((s) => `${s.table}.${s.column}=${s.rowsAdjusted}${s.errorMessage ? `(ERR: ${s.errorMessage})` : ""}`)
+        .join(" ");
+      console.log(`[scheduled] counter recompute adjusted ${totalAdjusted} rows — ${breakdown}`);
+    }
+  } catch (err) {
+    console.error("[scheduled] counter recompute failed:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Pure tick-rotation + window-guard predicates (gap #1617 — extracted from
 // inline code so they're unit-testable). The /5 cron tick calls these to
 // decide which sweeps fire on the current minute. Keeping these pure +
@@ -582,6 +609,7 @@ export async function runScheduled(): Promise<void> {
     processPartnerProgramPool(),
     processSeedSuperAdmin(),
     processRetentionSweep(),
+    processCounterRecompute(),
   ];
   if (isQuarterTick(now)) sweeps.push(processRegisteredWorkers());
   if (isHalfTick(now))    sweeps.push(scrapeAllActiveSources());

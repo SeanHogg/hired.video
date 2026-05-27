@@ -38,7 +38,7 @@ export const GAME_STATE_SCHEMA_VERSION = 1;
  *    that string before #1014); the 2D runtime treats both identically.
  *    `matter-js` reserved for the future physics-engine swap.
  *  - `world-3d` — Three.js + react-three-fiber + Rapier 3D runtime
- *    (gap #1633). Reads `world` (a `World3DState` scene graph) instead
+ *    (gap #1634). Reads `world` (a `World3DState` scene graph) instead
  *    of `levels` / `sprites`. The 3D `<GameStage3D>` mounts on this
  *    discriminator; legacy 2D `<GameStage>` mounts on all other values.
  */
@@ -75,7 +75,7 @@ export interface GameState {
    *  Setting `physics: { gravity: 1200 }` turns on the gravity solver
    *  for sprites that opt in via `GameSprite.physics.kind = "dynamic"`. */
   physics?: GamePhysicsSettings;
-  /** 3D scene graph (gap #1633). Present when `engine === "world-3d"`;
+  /** 3D scene graph (gap #1634). Present when `engine === "world-3d"`;
    *  ignored by the 2D runtime. `levels` / `sprites` stay empty for
    *  3D projects but the surrounding shape (schemaVersion / assets /
    *  startLevelId) is shared so persistence + save chrome don't fork
@@ -85,7 +85,7 @@ export interface GameState {
 
 // ─── 3D world ───────────────────────────────────────────────────────────────
 //
-// The 3D scene graph for `engine === "world-3d"` projects (gap #1633).
+// The 3D scene graph for `engine === "world-3d"` projects (gap #1634).
 // Holds everything the Three.js + Rapier runtime needs to render +
 // simulate a Roblox-style world: ground, sky, lighting, the spawn
 // transform, an entity list (blocks / ramps / collectibles / goals /

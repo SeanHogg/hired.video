@@ -735,13 +735,13 @@ export const studioVideoFormSubmissions = pgTable(
 // Review Comments (gap #145) — Frame.io-style time-coded comments for
 // async team review of draft videos. Public review links via shareToken.
 // ---------------------------------------------------------------------------
-export const studioReviewComments = pgTable(
+export const studioReviewComments: any = pgTable(
   "studio_review_comments",
   {
     id:           uuid("id").primaryKey().defaultRandom(),
-    projectId:    text("project_id").notNull(),
-    parentId:     text("parent_id"),                      // null = root, else thread reply
-    authorUserId: text("author_user_id"),                  // null for anonymous via shareToken
+    projectId:    uuid("project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
+    parentId:     uuid("parent_id"),                       // null = root, else thread reply (self-FK in SQL migration 0152)
+    authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
     authorName:   text("author_name").notNull(),
     authorEmail:  text("author_email"),
     body:         text("body").notNull(),

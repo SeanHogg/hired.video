@@ -13,6 +13,9 @@
 import {
   pgTable, uuid, text, varchar, integer, boolean, timestamp, jsonb, index, numeric,
 } from "drizzle-orm/pg-core";
+import { users } from "./users.js";
+import { jobItems } from "./jobs.js";
+import { companyProfiles } from "./companies.js";
 
 // ---------------------------------------------------------------------------
 // Boosts (polymorphic) — promote any user-generated subject. See

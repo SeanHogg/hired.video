@@ -135,7 +135,7 @@ function KindMesh({ kind, color, selected, onClick }: KindMeshProps) {
       // via vertex displacement isn't worth the cost — use a fallback
       // "slope" approximation by rotating a half-thickness box. Good
       // enough for the Phase-1 designer; a proper ramp mesh lands when
-      // the geometry library lands (#1634).
+      // the geometry library lands (gap #1639).
       return (
         <mesh onClick={onClick} castShadow receiveShadow rotation={[0, 0, -Math.PI / 6]}>
           <boxGeometry args={[1, 0.2, 1]} />

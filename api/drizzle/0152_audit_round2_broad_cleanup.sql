@@ -308,3 +308,6 @@ BEGIN
       )) NOT VALID;
   END IF;
 END $$;
+
+-- Cleanup migration-scoped helper.
+DROP FUNCTION IF EXISTS public.__mig_0152_convert_text_user_id(text);
