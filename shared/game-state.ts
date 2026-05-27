@@ -232,7 +232,7 @@ export interface World3DEntity extends World3DTransform {
   /** Optional texture URL. When set, the entity renders with the
    *  image mapped onto its mesh — lets users drag sprites from the
    *  studio's existing sprite library or MediaPicker uploads into the
-   *  3D world (gap #1657). Same asset URL the 2D mini-game runtime
+   *  3D world (gap #1659). Same asset URL the 2D mini-game runtime
    *  resolves via `state.assets` — one asset pipeline for both
    *  engines (DRY). */
   textureUrl?: string;

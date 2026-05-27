@@ -175,12 +175,29 @@ export default function SpritePalette({
   );
 }
 
+/** Asset drag MIME — payload is JSON `{ url, label }`. The 3D-world
+ *  drop receiver ([GameStage3D.tsx](./GameStage3D.tsx)) reads this so
+ *  sprites can be dragged from the left rail directly into the 3D
+ *  scene as textured entities. The 2D editor uses the same SpriteTile
+ *  with click-to-add — both interactions coexist on the same element
+ *  (DRY: one tile, two consumers). */
+export const ASSET_DRAG_MIME = "application/x-world3d-asset";
+
 function SpriteTile({ sprite, onPick }: { sprite: BuiltinSprite; onPick: () => void }) {
   return (
     <button
       type="button"
       onClick={onPick}
-      title={sprite.label}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "copy";
+        e.dataTransfer.setData(
+          ASSET_DRAG_MIME,
+          JSON.stringify({ url: sprite.url, label: sprite.label }),
+        );
+        e.dataTransfer.setData("text/plain", sprite.label);
+      }}
+      title={`${sprite.label} — click to add (2D) or drag into the 3D world`}
       className="flex flex-col items-center gap-1 rounded border border-border bg-card p-1.5 transition-colors hover:border-fuchsia-400 hover:bg-fuchsia-50/40"
     >
       <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-muted/40">

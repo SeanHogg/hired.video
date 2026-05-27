@@ -45,6 +45,7 @@ import Scene3D from "./world-3d/Scene3D";
 import ChallengeHUD from "./world-3d/ChallengeHUD";
 import DropPlacer, { type DropPlacerHandler } from "./world-3d/DropPlacer";
 import { ENTITY_DRAG_MIME } from "./world-3d/EntityPaletteLeft";
+import { ASSET_DRAG_MIME } from "./SpritePalette";
 import type { EntityTriggerEvent } from "./world-3d/EntityMesh";
 
 interface GameStage3DProps {
@@ -229,18 +230,36 @@ export default function GameStage3D({
   }, [mode, selectedEntityId, gameState, onChange, selectEntity]);
 
   // ─── Click-to-place ───────────────────────────────────────────────────
-  /** Drop-receiver — called by DropPlacer with the raycast hit point.
-   *  Adds the dragged entity kind at that position via the shared
-   *  mutation seam (same `addEntity` the AI agent uses — DRY). */
-  const handlePlaceAt = useCallback(
+  /** Place a primitive-kind entity at a raycast position. */
+  const placePrimitive = useCallback(
     (kind: World3DEntityKind, position: [number, number, number]) => {
       if (!gameState) return;
       const result = addEntity(gameState, {
         kind,
-        // Lift placed entities so they sit on the ground rather than
-        // partially submerged — the default scale's half-height keeps
-        // their base flush with y=0.
+        // Lift entities so they sit on the ground rather than partially
+        // submerged — default scale half-heights keep the base at y=0.
         position: [position[0], position[1] + 0.5, position[2]],
+      });
+      onChange(result.state);
+      selectEntity(result.entity.id);
+    },
+    [gameState, onChange, selectEntity],
+  );
+
+  /** Place a textured entity from a dragged sprite / asset (gap #1659).
+   *  Defaults to a `block` kind tinted white so the texture renders
+   *  true to color. The author can swap kind / scale / physics from
+   *  the inspector afterward. Same `addEntity` seam the AI agent +
+   *  the primitive-drop path use (DRY). */
+  const placeAsset = useCallback(
+    (asset: { url: string; label: string }, position: [number, number, number]) => {
+      if (!gameState) return;
+      const result = addEntity(gameState, {
+        kind: "block",
+        position: [position[0], position[1] + 0.5, position[2]],
+        color: "#ffffff",
+        textureUrl: asset.url,
+        tag: asset.label,
       });
       onChange(result.state);
       selectEntity(result.entity.id);
@@ -272,16 +291,36 @@ export default function GameStage3D({
         // Edit-mode only — play-mode drops are no-ops.
         onDragOver={(e) => {
           if (mode !== "edit") return;
-          if (!e.dataTransfer.types.includes(ENTITY_DRAG_MIME)) return;
+          const types = e.dataTransfer.types;
+          if (!types.includes(ENTITY_DRAG_MIME) && !types.includes(ASSET_DRAG_MIME)) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
         }}
         onDrop={(e) => {
           if (mode !== "edit") return;
-          const kind = e.dataTransfer.getData(ENTITY_DRAG_MIME) as World3DEntityKind;
-          if (!kind) return;
+          // Resolve the raycast position once; both drop kinds use the
+          // same world-space hit. DropPlacer is pure — it doesn't know
+          // what's being placed (DRY: one drop seam, every drag source).
+          const position = dropHandlerRef.current?.(e.clientX, e.clientY);
+          if (!position) return;
           e.preventDefault();
-          dropHandlerRef.current?.(kind, e.clientX, e.clientY);
+          // Primitive kind (drag from EntityPaletteLeft).
+          const kind = e.dataTransfer.getData(ENTITY_DRAG_MIME) as World3DEntityKind | "";
+          if (kind) {
+            placePrimitive(kind, position);
+            return;
+          }
+          // Sprite / asset (drag from SpritePalette tile or future
+          // MediaPicker custom upload).
+          const assetJson = e.dataTransfer.getData(ASSET_DRAG_MIME);
+          if (assetJson) {
+            try {
+              const asset = JSON.parse(assetJson) as { url: string; label: string };
+              if (asset.url) placeAsset(asset, position);
+            } catch {
+              // Malformed payload — ignore.
+            }
+          }
         }}
       >
         <Canvas
@@ -299,12 +338,11 @@ export default function GameStage3D({
             peers={room.peers}
             onBroadcastPosition={room.broadcastPosition}
           />
-          {/* Invisible — registers the drop→world raycast handler
-              via the shared ref. Only active in edit mode; in play
-              the ref stays null and the outer drop handler bails. */}
-          {mode === "edit" && (
-            <DropPlacer handlerRef={dropHandlerRef} onPlace={handlePlaceAt} />
-          )}
+          {/* Invisible — registers a pure raycast helper via the
+              shared ref. The outer drop handler reads the dataTransfer
+              MIME to decide whether to place a primitive or a textured
+              asset; DropPlacer itself doesn't know which (DRY). */}
+          {mode === "edit" && <DropPlacer handlerRef={dropHandlerRef} />}
         </Canvas>
 
         {/* Edit-mode chrome — the in-canvas overlays are gone. The

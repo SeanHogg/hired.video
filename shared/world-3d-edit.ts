@@ -99,6 +99,7 @@ export function addEntity(
     color?: string;
     physics?: World3DPhysicsKind;
     tag?: string;
+    textureUrl?: string;
   },
 ): { state: GameState; entity: World3DEntity } {
   const world = ensureWorld(state).world!;
@@ -113,6 +114,7 @@ export function addEntity(
     color: opts.color ?? defaults.color,
     physics: opts.physics ?? defaults.physics,
     tag: opts.tag,
+    textureUrl: opts.textureUrl,
   };
   const next = writeWorld(ensureWorld(state), {
     ...world,
