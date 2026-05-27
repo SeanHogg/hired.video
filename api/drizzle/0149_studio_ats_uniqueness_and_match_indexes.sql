@@ -41,7 +41,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_studio_ats_packages_slug
 -- studio_ats_packages — text → uuid for user_id and project_id (#1595)
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION pg_temp.__convert_text_user_id(target_table text)
+CREATE OR REPLACE FUNCTION public.__mig_0149_convert_text_user_id(target_table text)
 RETURNS void
 LANGUAGE plpgsql
 AS $func$
@@ -76,7 +76,7 @@ BEGIN
 END;
 $func$;
 
-SELECT pg_temp.__convert_text_user_id('studio_ats_packages');
+SELECT public.__mig_0149_convert_text_user_id('studio_ats_packages');
 
 -- project_id text → uuid + FK to studio_projects(id).
 DO $$
@@ -117,3 +117,6 @@ CREATE INDEX IF NOT EXISTS idx_resume_match_scores_user
 
 CREATE INDEX IF NOT EXISTS idx_resume_match_scores_job
   ON resume_match_scores (job_id);
+
+-- Cleanup migration-scoped helper.
+DROP FUNCTION IF EXISTS public.__mig_0149_convert_text_user_id(text);

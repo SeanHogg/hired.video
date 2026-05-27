@@ -22,6 +22,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import type { ApiDeps } from "../apiDeps.js";
+import { slugify } from "../../../../shared/slugify.js";
 import type {
   ContentLocationInput,
   ContentLocationKind,
@@ -210,11 +211,20 @@ export class LocationService {
         .limit(1);
       cityId = (existing as { id: string } | undefined)?.id ?? null;
       if (!cityId) {
+        // cities.slug is NOT NULL after migration 0149. Generate via the
+        // canonical slugify() so the runtime ensure-on-write path matches
+        // the migration's SQL backfill regex. Collisions within a state
+        // (two cities with the same slugified name — rare for Mapbox
+        // results) are disambiguated by appending `-2`, `-3`, … against
+        // the existing rows in this state.
+        const baseSlug = slugify(place.cityName, { fallback: "city", maxLen: 64 });
+        const slug = await this.findFreeCitySlug(db, stateId, baseSlug);
         const [inserted] = (await db
           .insert(cities)
           .values({
             stateId,
             name: place.cityName,
+            slug,
             latitude: place.latitude,
             longitude: place.longitude,
           } as any)
@@ -232,6 +242,29 @@ export class LocationService {
       label: place.label,
       postalCode: place.postalCode ?? null,
     };
+  }
+
+  /** Probe for the first free `(state_id, slug)` pair starting from
+   *  `base` and appending `-2`, `-3`, … as needed. Idempotent — if a row
+   *  already owns `base` for a different name, the next caller for the
+   *  same name will hit it and re-use the existing city via the name
+   *  check that ran above this. */
+  private async findFreeCitySlug(db: any, stateId: string, base: string): Promise<string> {
+    let candidate = base;
+    let suffix = 2;
+    // Hard cap at ~50 iterations so a pathological name doesn't spin.
+    for (let i = 0; i < 50; i++) {
+      const [taken] = await db
+        .select({ id: cities.id })
+        .from(cities)
+        .where(and(eq(cities.stateId, stateId), eq(cities.slug, candidate)))
+        .limit(1);
+      if (!taken) return candidate;
+      candidate = `${base}-${suffix++}`;
+    }
+    // Pathological fallback — extremely unlikely; suffix with a random
+    // 4-char hex so the insert still succeeds.
+    return `${base}-${Math.random().toString(16).slice(2, 6)}`;
   }
 
   /** Token-absent path — case-insensitive lookups in countries/states/cities. */

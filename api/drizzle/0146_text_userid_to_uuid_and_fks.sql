@@ -8,25 +8,23 @@
 -- YouTube account links.
 --
 -- Idempotence: every block checks `information_schema.columns.data_type`
--- before issuing ALTER COLUMN TYPE. Necessary because a previous run of
--- this migration partially landed in CI (29/31 statements applied;
--- youtube_accounts.user_id was already uuid via a prior drizzle-kit push)
--- and the file is now safe to re-execute regardless of column state.
--- FK ADD CONSTRAINT statements are wrapped in `IF NOT EXISTS` guards.
+-- before issuing ALTER COLUMN TYPE. Re-running this file against an
+-- already-converted column is a safe no-op. FK ADD CONSTRAINT statements
+-- are wrapped in `IF NOT EXISTS` guards.
+--
+-- Why `public.__mig_0146_*` instead of `pg_temp.*` (#1625): the migration
+-- runner uses Neon's HTTP driver where each statement is a separate
+-- request → separate backend → pg_temp functions die between statements.
+-- Named functions in public schema are committed after CREATE and visible
+-- to subsequent requests; we drop them at the end of the file so they
+-- don't pollute the long-lived schema.
 --
 -- DRY: the same convert-text-userId-to-uuid logic appears across 10
--- tables (phone family + studio family + linkedin/youtube). Extracted
--- into a pg_temp helper function `__convert_text_user_id`; each table
--- becomes a one-liner call. Drops automatically when the session ends.
+-- tables. The helper consolidates it.
 --
 -- Closes #1603 and the FK-half of #1595's "still open" list.
 
--- ---------------------------------------------------------------------------
--- Helper: convert <table>.user_id from text → uuid (if still text), then
--- add the FK to users(id) ON DELETE CASCADE (if missing). Idempotent.
--- ---------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION pg_temp.__convert_text_user_id(target_table text)
+CREATE OR REPLACE FUNCTION public.__mig_0146_convert_text_user_id(target_table text)
 RETURNS void
 LANGUAGE plpgsql
 AS $func$
@@ -39,9 +37,6 @@ BEGIN
   WHERE table_name = target_table AND column_name = 'user_id';
 
   IF col_type = 'text' THEN
-    -- DELETE orphan rows: invalid UUID strings or refs to nonexistent
-    -- users. Both predicates can be applied to text but only one of
-    -- them to uuid, hence the gated execution.
     EXECUTE format(
       'DELETE FROM %I WHERE user_id IS NULL OR user_id !~ %L OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = %I.user_id)',
       target_table,
@@ -67,27 +62,24 @@ $func$;
 -- ---------------------------------------------------------------------------
 -- Phone family
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('business_phone_numbers');
-SELECT pg_temp.__convert_text_user_id('call_logs');
-SELECT pg_temp.__convert_text_user_id('sms_messages');
-SELECT pg_temp.__convert_text_user_id('phone_balances');
-SELECT pg_temp.__convert_text_user_id('phone_balance_transactions');
+SELECT public.__mig_0146_convert_text_user_id('business_phone_numbers');
+SELECT public.__mig_0146_convert_text_user_id('call_logs');
+SELECT public.__mig_0146_convert_text_user_id('sms_messages');
+SELECT public.__mig_0146_convert_text_user_id('phone_balances');
+SELECT public.__mig_0146_convert_text_user_id('phone_balance_transactions');
 
 -- ---------------------------------------------------------------------------
--- Studio voice clones — user_id only (voice_clone_id case handled below)
+-- Studio voice clones
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('studio_voice_clones');
+SELECT public.__mig_0146_convert_text_user_id('studio_voice_clones');
 
 -- ---------------------------------------------------------------------------
--- studio_voice_clone_licenses — user_id (text→uuid) PLUS voice_clone_id
--- (already uuid, needs FK only). The user_id conversion goes through the
--- helper; the voice_clone_id orphan-clean + FK is one extra block.
+-- studio_voice_clone_licenses — user_id (helper) PLUS voice_clone_id FK only.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('studio_voice_clone_licenses');
+SELECT public.__mig_0146_convert_text_user_id('studio_voice_clone_licenses');
 
 DO $$
 BEGIN
-  -- Drop orphans whose voice_clone_id no longer points at a real row.
   DELETE FROM studio_voice_clone_licenses
   WHERE NOT EXISTS (
     SELECT 1 FROM studio_voice_clones WHERE studio_voice_clones.id = studio_voice_clone_licenses.voice_clone_id
@@ -101,11 +93,10 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- studio_captions — user_id (helper) + project_id (text → uuid + FK).
--- project_id can't use the generic helper because its parent table is
--- studio_projects, not users; spell it out inline.
+-- studio_captions — user_id (helper) + project_id (inline since parent
+-- is studio_projects, not users).
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('studio_captions');
+SELECT public.__mig_0146_convert_text_user_id('studio_captions');
 
 DO $$
 DECLARE
@@ -134,5 +125,8 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- OAuth account-link tables
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('linkedin_accounts');
-SELECT pg_temp.__convert_text_user_id('youtube_accounts');
+SELECT public.__mig_0146_convert_text_user_id('linkedin_accounts');
+SELECT public.__mig_0146_convert_text_user_id('youtube_accounts');
+
+-- Clean up the helper so it doesn't pollute the long-lived schema.
+DROP FUNCTION IF EXISTS public.__mig_0146_convert_text_user_id(text);

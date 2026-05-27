@@ -3,7 +3,7 @@
 -- Tables converted: boosts, job_boosts, company_boosts, ad_campaigns,
 -- ad_sets, ads, enrichment_credits, enrichment_transactions, career_resilience_reports.
 --
--- Pattern is identical to 0146 + 0149; same `pg_temp.__convert_text_user_id`
+-- Pattern is identical to 0146 + 0149; same `public.__mig_0150_convert_text_user_id`
 -- helper. Advertising is not in the active-feature list (per the user's
 -- "only inbox / profiles / resumes / studio templates are in active use"
 -- scope), so orphan-DELETE pre-flights are safe.
@@ -12,7 +12,7 @@
 -- campaign_id, ad_set_id) each get a small inline DO block since the
 -- generic helper only knows about user_id.
 
-CREATE OR REPLACE FUNCTION pg_temp.__convert_text_user_id(target_table text)
+CREATE OR REPLACE FUNCTION public.__mig_0150_convert_text_user_id(target_table text)
 RETURNS void
 LANGUAGE plpgsql
 AS $func$
@@ -50,7 +50,7 @@ $func$;
 -- Reusable helper: convert a non-user FK column (e.g. job_id → jobs,
 -- campaign_id → ad_campaigns). Pass the FK column name, the parent
 -- table, the parent column, and the desired ON DELETE behavior.
-CREATE OR REPLACE FUNCTION pg_temp.__convert_text_fk(
+CREATE OR REPLACE FUNCTION public.__mig_0150_convert_text_fk(
   target_table   text,
   fk_column      text,
   parent_table   text,
@@ -93,45 +93,45 @@ $func$;
 -- ---------------------------------------------------------------------------
 -- boosts — user_id is uuid already (per pass-1 schema), just missing FK.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('boosts');
+SELECT public.__mig_0150_convert_text_user_id('boosts');
 
 -- ---------------------------------------------------------------------------
 -- job_boosts — user_id + job_id text → uuid + FKs.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('job_boosts');
-SELECT pg_temp.__convert_text_fk('job_boosts', 'job_id', 'job_items', 'id', 'CASCADE');
+SELECT public.__mig_0150_convert_text_user_id('job_boosts');
+SELECT public.__mig_0150_convert_text_fk('job_boosts', 'job_id', 'job_items', 'id', 'CASCADE');
 
 -- ---------------------------------------------------------------------------
 -- company_boosts — user_id + company_id text → uuid + FKs.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('company_boosts');
-SELECT pg_temp.__convert_text_fk('company_boosts', 'company_id', 'company_profiles', 'id', 'CASCADE');
+SELECT public.__mig_0150_convert_text_user_id('company_boosts');
+SELECT public.__mig_0150_convert_text_fk('company_boosts', 'company_id', 'company_profiles', 'id', 'CASCADE');
 
 -- ---------------------------------------------------------------------------
 -- ad_campaigns — user_id text → uuid + FK.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('ad_campaigns');
+SELECT public.__mig_0150_convert_text_user_id('ad_campaigns');
 
 -- ---------------------------------------------------------------------------
 -- ad_sets — user_id + campaign_id text → uuid + FKs.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('ad_sets');
-SELECT pg_temp.__convert_text_fk('ad_sets', 'campaign_id', 'ad_campaigns', 'id', 'CASCADE');
+SELECT public.__mig_0150_convert_text_user_id('ad_sets');
+SELECT public.__mig_0150_convert_text_fk('ad_sets', 'campaign_id', 'ad_campaigns', 'id', 'CASCADE');
 
 -- ---------------------------------------------------------------------------
 -- ads — user_id + ad_set_id text → uuid + FKs.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('ads');
-SELECT pg_temp.__convert_text_fk('ads', 'ad_set_id', 'ad_sets', 'id', 'CASCADE');
+SELECT public.__mig_0150_convert_text_user_id('ads');
+SELECT public.__mig_0150_convert_text_fk('ads', 'ad_set_id', 'ad_sets', 'id', 'CASCADE');
 
 -- ---------------------------------------------------------------------------
 -- enrichment_credits + enrichment_transactions — user_id text → uuid + FK.
 -- enrichment_credits has a UNIQUE on user_id; the type change preserves it.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('enrichment_credits');
-SELECT pg_temp.__convert_text_user_id('enrichment_transactions');
+SELECT public.__mig_0150_convert_text_user_id('enrichment_credits');
+SELECT public.__mig_0150_convert_text_user_id('enrichment_transactions');
 
 -- ---------------------------------------------------------------------------
 -- career_resilience_reports — user_id text → uuid + FK.
 -- ---------------------------------------------------------------------------
-SELECT pg_temp.__convert_text_user_id('career_resilience_reports');
+SELECT public.__mig_0150_convert_text_user_id('career_resilience_reports');

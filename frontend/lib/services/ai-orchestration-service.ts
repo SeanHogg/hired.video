@@ -118,7 +118,7 @@ class AIOrchestrationService {
 
     // Add APIs based on intent
     if (intent.needsResumeData && context.contextType.startsWith("resume")) {
-      const resumeGetAPI = context.availableAPIs.find((api) => api.id === "resume_get");
+      const resumeGetAPI = context.availableAPIs.find((api) => api.id === "resume-get");
       if (resumeGetAPI && !plans.some((p) => p.api.id === resumeGetAPI.id)) {
         plans.push({
           api: resumeGetAPI,
@@ -129,7 +129,7 @@ class AIOrchestrationService {
     }
 
     if (intent.needsOptimization && context.contextType.startsWith("resume")) {
-      const optimizeAPI = context.availableAPIs.find((api) => api.id === "resume_optimize");
+      const optimizeAPI = context.availableAPIs.find((api) => api.id === "resume-optimize");
       if (optimizeAPI && !plans.some((p) => p.api.id === optimizeAPI.id)) {
         plans.push({
           api: optimizeAPI,
@@ -142,7 +142,7 @@ class AIOrchestrationService {
     if (intent.needsATSScore && context.contextType.startsWith("resume")) {
       // The score endpoint returns ATS + content + keyword + format +
       // impact subscores in one call (ats-analysis got merged into it).
-      const scoreAPI = context.availableAPIs.find((api) => api.id === "resume_score");
+      const scoreAPI = context.availableAPIs.find((api) => api.id === "resume-score");
       if (scoreAPI && !plans.some((p) => p.api.id === scoreAPI.id)) {
         plans.push({
           api: scoreAPI,
@@ -153,7 +153,7 @@ class AIOrchestrationService {
     }
 
     if (intent.needsJobData && context.contextType.startsWith("job")) {
-      const jobListAPI = context.availableAPIs.find((api) => api.id === "job_list_public");
+      const jobListAPI = context.availableAPIs.find((api) => api.id === "job-list-public");
       if (jobListAPI && !plans.some((p) => p.api.id === jobListAPI.id)) {
         plans.push({
           api: jobListAPI,
@@ -164,7 +164,7 @@ class AIOrchestrationService {
     }
 
     if (intent.needsSalaryData) {
-      const salaryAPI = context.availableAPIs.find((api) => api.id === "salary_analyze");
+      const salaryAPI = context.availableAPIs.find((api) => api.id === "salary-analyze");
       if (salaryAPI && !plans.some((p) => p.api.id === salaryAPI.id)) {
         plans.push({
           api: salaryAPI,
@@ -220,21 +220,21 @@ class AIOrchestrationService {
 
     // Resume-related payloads — every resume_* API takes resumeText
     // (merged endpoint, see services/resume/analyze.ts).
-    if (api.id.startsWith("resume_") && "resume" in context) {
+    if (api.id.startsWith("resume-") && "resume" in context) {
       payload.resumeText = this.extractResumeText(context.resume);
     }
 
     // Job-related payloads
-    if (api.id.startsWith("job_") && "job" in context) {
-      if (api.id === "job_list_public") {
+    if (api.id.startsWith("job-") && "job" in context) {
+      if (api.id === "job-list-public") {
         payload.page = 1;
         payload.limit = 20;
       }
     }
 
     // Salary-related payloads
-    if (api.id.startsWith("salary_") && "job" in context) {
-      if (api.id === "salary_analyze") {
+    if (api.id.startsWith("salary-") && "job" in context) {
+      if (api.id === "salary-analyze") {
         payload.jobTitle = context.job?.title || "";
         payload.location = context.job?.location || "";
         payload.experienceYears = 5; // Default, should be extracted from context
@@ -387,7 +387,7 @@ class AIOrchestrationService {
 
     results.forEach((result) => {
       if (
-        (result.api.id === "resume_optimize" || result.api.id === "resume_score") &&
+        (result.api.id === "resume-optimize" || result.api.id === "resume-score") &&
         result.data?.result
       ) {
         messages.push(
@@ -395,11 +395,11 @@ class AIOrchestrationService {
         );
       }
 
-      if (result.api.id === "job_list_public" && result.data?.result) {
+      if (result.api.id === "job-list-public" && result.data?.result) {
         messages.push(`Found ${result.data.result.total} job openings that might interest you.`);
       }
 
-      if (result.api.id === "salary_analyze" && result.data?.result) {
+      if (result.api.id === "salary-analyze" && result.data?.result) {
         messages.push(
           `Salary Analysis: The median salary for this position is $${result.data.result.medianSalary}.`,
         );
@@ -419,11 +419,11 @@ class AIOrchestrationService {
     const suggestions: string[] = [];
 
     results.forEach((result) => {
-      if (result.api.id === "resume_optimize" && result.data?.result?.overallScore < 80) {
+      if (result.api.id === "resume-optimize" && result.data?.result?.overallScore < 80) {
         suggestions.push("Consider improving your resume to increase your ATS score");
       }
 
-      if (result.api.id === "job_list_public") {
+      if (result.api.id === "job-list-public") {
         suggestions.push("Would you like me to match these jobs with your resume?");
       }
     });

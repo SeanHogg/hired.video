@@ -29,14 +29,24 @@
 
 export const GAME_STATE_SCHEMA_VERSION = 1;
 
-/** Which runtime executes this state. `canvas-2d` is the honest current
- *  value — `runtime-core.js` is a hand-rolled Canvas-2D draw loop with
- *  the physics solver added in #1009. The `phaser-3` enum slot is kept
- *  for backwards compatibility (existing rows seeded the field with
- *  that string before #1014 honesty cleanup); the runtime treats both
- *  values identically today (the Canvas-2D loop). `matter-js` is
- *  reserved for the future physics-engine swap. Closes #1014. */
-export type GameEngineId = "canvas-2d" | "phaser-3" | "matter-js";
+/** Which runtime executes this state.
+ *
+ *  - `canvas-2d` — hand-rolled Canvas-2D draw loop (#1009 physics).
+ *    Reads `levels` + `sprites`. Backs the "mini-game" 2D templates
+ *    (endless runner, quiz, memory match). The `phaser-3` slot is kept
+ *    for backwards compatibility (existing rows seeded the field with
+ *    that string before #1014); the 2D runtime treats both identically.
+ *    `matter-js` reserved for the future physics-engine swap.
+ *  - `world-3d` — Three.js + react-three-fiber + Rapier 3D runtime
+ *    (gap #1633). Reads `world` (a `World3DState` scene graph) instead
+ *    of `levels` / `sprites`. The 3D `<GameStage3D>` mounts on this
+ *    discriminator; legacy 2D `<GameStage>` mounts on all other values.
+ */
+export type GameEngineId =
+  | "canvas-2d"
+  | "phaser-3"
+  | "matter-js"
+  | "world-3d";
 
 export interface GameState {
   schemaVersion: number;
@@ -65,7 +75,173 @@ export interface GameState {
    *  Setting `physics: { gravity: 1200 }` turns on the gravity solver
    *  for sprites that opt in via `GameSprite.physics.kind = "dynamic"`. */
   physics?: GamePhysicsSettings;
+  /** 3D scene graph (gap #1633). Present when `engine === "world-3d"`;
+   *  ignored by the 2D runtime. `levels` / `sprites` stay empty for
+   *  3D projects but the surrounding shape (schemaVersion / assets /
+   *  startLevelId) is shared so persistence + save chrome don't fork
+   *  per engine. The 3D runtime is the SSoT for what `world` means. */
+  world?: World3DState;
 }
+
+// ─── 3D world ───────────────────────────────────────────────────────────────
+//
+// The 3D scene graph for `engine === "world-3d"` projects (gap #1633).
+// Holds everything the Three.js + Rapier runtime needs to render +
+// simulate a Roblox-style world: ground, sky, lighting, the spawn
+// transform, an entity list (blocks / ramps / collectibles / goals /
+// hazards), and a `challenges` meta the engagement layer ties into
+// (Phase 2 of the 3D build — the field is reserved so the schema
+// doesn't churn when challenge handlers land).
+//
+// Authoring (the editor's left-rail block palette + drag/place +
+// inspector) and runtime (the play-mode renderer + physics + camera
+// + character controller) BOTH read this single shape. Same DRY
+// commitment the 2D runtime makes with `GameLevel`.
+
+/** Schema version of the 3D world shape — separate from the parent
+ *  `GAME_STATE_SCHEMA_VERSION` so 3D migrations don't force a global
+ *  rev. Bump on any breaking field change. */
+export const WORLD_3D_SCHEMA_VERSION = 1;
+
+export interface World3DState {
+  schemaVersion: number;
+  /** Sky / clear color. Used by the R3F `<Canvas>` background +
+   *  ambient fog fallback when fog is disabled. */
+  skyColor: string;
+  /** Single flat ground plane. Heightmap terrain is a follow-on
+   *  (tracked in the gap register under the 3D build phases). */
+  ground: World3DGround;
+  /** One ambient + one directional ("sun") light. Multi-light setups
+   *  are a follow-on; this covers the Roblox-baseline lighting that
+   *  every starter world needs. */
+  lighting: World3DLighting;
+  /** Where new players appear on `play` mode entry. Editor exposes a
+   *  green spawn gizmo at this position; the runtime spawns the
+   *  controlled character body here. */
+  spawn: World3DTransform;
+  /** Authored entities — blocks, ramps, props, collectibles, goals,
+   *  hazards. Order is paint-order for the editor's left-rail list
+   *  (no z-fighting concern in 3D; the renderer sorts by camera
+   *  distance). */
+  entities: World3DEntity[];
+  /** Challenge meta — the engagement layer. The field is reserved
+   *  (schema-stable) so Phase 2 challenge handlers can light up
+   *  without a state migration. Empty list = no challenges defined.
+   *  Each entry's `kind` declares its semantics ("collect N",
+   *  "reach zone", "time trial", "score X"); the runtime event bus
+   *  ties entity interactions to challenge progress in Phase 2. */
+  challenges: World3DChallenge[];
+}
+
+export interface World3DGround {
+  /** Square plane edge length in world units (meters). Default 100m
+   *  — enough room for a starter world without making collectibles
+   *  feel like specks. */
+  size: number;
+  /** Plane color (CSS hex). The runtime renders the ground as a
+   *  flat-shaded material; a grass texture is an asset upgrade. */
+  color: string;
+}
+
+export interface World3DLighting {
+  ambient: {
+    /** Hemisphere ambient strength. 0.4 is a comfortable baseline
+     *  that keeps shadow sides legible without flattening. */
+    intensity: number;
+    color: string;
+  };
+  sun: {
+    /** Directional light strength. 1.0 reads as "midday sun"; drop
+     *  to 0.5 for golden-hour, raise to 1.5 for harsh noon. */
+    intensity: number;
+    /** Normalized direction the light shines TOWARD (i.e. -[sunPos]).
+     *  Default `[1, -1, 0.5]` gives slanted afternoon shadows. */
+    direction: [number, number, number];
+    color: string;
+  };
+}
+
+/** Position + Euler rotation (radians, XYZ order) + non-uniform scale.
+ *  Single transform shape used by spawn + every entity — no per-kind
+ *  fork (DRY rule). */
+export interface World3DTransform {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+}
+
+/** Authored entity kinds. Each kind picks the right Three.js mesh +
+ *  Rapier collider in the runtime:
+ *   - `block`        — axis-aligned cube. Static by default. Walls,
+ *                      floors, platforms.
+ *   - `ramp`         — right-triangular prism. Static by default.
+ *                      Walkable slopes.
+ *   - `sphere`       — ball. Dynamic by default (rolls). Decorative
+ *                      or kickable.
+ *   - `platform`     — thin block; same as block but thinner, kept
+ *                      as its own kind so the inspector can default
+ *                      scale to `[4, 0.5, 4]`.
+ *   - `collectible`  — pickup. Triggers a `collect` event on player
+ *                      overlap; Phase 2 challenges count these.
+ *   - `goal`         — finish-zone trigger. Fires a `reach` event on
+ *                      player overlap.
+ *   - `hazard`       — damage trigger. Fires a `harm` event.
+ *   - `light`        — point light. Visual only; no collider. */
+export type World3DEntityKind =
+  | "block"
+  | "ramp"
+  | "sphere"
+  | "platform"
+  | "collectible"
+  | "goal"
+  | "hazard"
+  | "light";
+
+/** Rapier body kind:
+ *   - `static`    — immovable, infinite mass. Walls, floors.
+ *   - `dynamic`   — full physics. Falls with gravity, collides.
+ *   - `kinematic` — moved by scripts, not by physics. Moving
+ *                    platforms in later phases.
+ *   - `none`      — no collider at all. Decorative or pure light. */
+export type World3DPhysicsKind =
+  | "static"
+  | "dynamic"
+  | "kinematic"
+  | "none";
+
+export interface World3DEntity extends World3DTransform {
+  id: string;
+  kind: World3DEntityKind;
+  /** Display color (CSS hex). The runtime maps this to a flat
+   *  material; textured material is a follow-on. */
+  color: string;
+  /** Physics body kind — defaults are kind-specific (see seed
+   *  helpers) but every entity can override. */
+  physics: World3DPhysicsKind;
+  /** Optional tag for Phase 2 challenge wiring. Free-form string —
+   *  challenges reference these to count "collect items tagged
+   *  X" / "reach zone tagged Y". */
+  tag?: string;
+}
+
+/** Challenge meta. Phase 2 ties these to runtime events. The shape
+ *  is forward-declared so the schema doesn't churn between phases. */
+export interface World3DChallenge {
+  id: string;
+  /** Human label shown in the engagement HUD. */
+  label: string;
+  kind: World3DChallengeKind;
+  /** Per-kind params. Kept open-shape (Record) so adding a new
+   *  challenge kind doesn't break older readers — Phase 2 lands a
+   *  zod-checked discriminated union when the handlers are wired. */
+  params: Record<string, unknown>;
+}
+
+export type World3DChallengeKind =
+  | "collect"
+  | "reach"
+  | "score"
+  | "timer";
 
 /** Project-level physics knobs. Single source — every runtime tick
  *  reads from here. Default values match a "2D platformer" feel: 1200
@@ -274,10 +450,64 @@ export function defaultLevel(id: string, label: string): GameLevel {
 
 /** True when the game state has at least one level and that level
  *  declares a startLevelId that resolves. The `<GameStage>` placeholder
- *  + the future Phaser runtime + the export pipeline all read this. */
+ *  + the future Phaser runtime + the export pipeline all read this.
+ *  For 3D worlds (engine === "world-3d") the check pivots: a 3D world
+ *  is playable when `world` is populated (the 3D runtime doesn't use
+ *  `levels` / `startLevelId`). */
 export function isPlayable(state: GameState): boolean {
+  if (state.engine === "world-3d") {
+    return state.world != null;
+  }
   if (state.levels.length === 0) return false;
   return state.levels.some((l) => l.id === state.startLevelId);
+}
+
+/** Build an empty 3D world state — flat green ground, midday sun,
+ *  spawn at origin, no entities, no challenges. Used by the
+ *  `game_3d_world` template seed + the editor's "+ New world" path.
+ *  Single source so seed / mutation / migration consumers don't drift. */
+export function emptyWorld3DState(): World3DState {
+  return {
+    schemaVersion: WORLD_3D_SCHEMA_VERSION,
+    skyColor: "#7dd3fc",
+    ground: { size: 100, color: "#65a30d" },
+    lighting: {
+      ambient: { intensity: 0.45, color: "#ffffff" },
+      sun: {
+        intensity: 1.0,
+        direction: [1, -1, 0.5],
+        color: "#ffffff",
+      },
+    },
+    spawn: {
+      position: [0, 2, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    },
+    entities: [],
+    challenges: [],
+  };
+}
+
+/** Build a 3D-engine `GameState` with a populated `world` field.
+ *  Mirrors `emptyGameState()` but for the world-3d path; the 2D
+ *  `levels` array is left empty since the 3D runtime ignores it. */
+export function empty3DGameState(opts: {
+  width?: number;
+  height?: number;
+  fps?: number;
+} = {}): GameState {
+  return {
+    schemaVersion: GAME_STATE_SCHEMA_VERSION,
+    engine: "world-3d",
+    width: opts.width ?? 1280,
+    height: opts.height ?? 720,
+    fps: opts.fps ?? 60,
+    startLevelId: "",
+    levels: [],
+    assets: [],
+    world: emptyWorld3DState(),
+  };
 }
 
 // NOTE: `findStartLevel` used to live here, but every consumer is

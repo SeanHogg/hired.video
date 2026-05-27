@@ -210,16 +210,20 @@ export default function UnifiedSearch({
       const searchCategory = category || selectedCategory;
       const pageToUse = typeof pageArg === "number" ? pageArg : 1;
       const limitToUse = typeof limitArg === "number" ? limitArg : 12;
+      // Single source of truth for "is the query active?" — sub-threshold
+      // input ("", "A") normalises to "" here so the dedupe key, the
+      // fetch payload, and the client-side filter below all agree.
+      const effQuery = effectiveSearchQuery(searchFilters.search);
 
       const requestKey = JSON.stringify({
         c: searchCategory,
         p: pageToUse,
         l: limitToUse,
         s: searchFilters.sortBy || "recent",
-        // Include search in the dedupe key so typing in the search box
-        // re-fires the fetch (otherwise lastRequestRef short-circuits and
-        // results never update). Per #1613.
-        q: searchFilters.search ?? "",
+        // Include effective search in the dedupe key so typing past the
+        // threshold ("AI") re-fires the fetch, but earlier keystrokes ("A")
+        // don't — they collapse to the empty-query key and reuse cache.
+        q: effQuery,
       });
       if (lastRequestRef.current === requestKey) return;
       lastRequestRef.current = requestKey;
@@ -239,7 +243,7 @@ export default function UnifiedSearch({
         // fetchTemplates uses it to narrow the static template catalog;
         // other fetchers ignore it for now (#1613 follow-up tracks the
         // server-side unification of per-type query filtering).
-        search: searchFilters.search,
+        search: effQuery,
         geo: {
           countryId: geoFilter.countryId ?? undefined,
           stateId: geoFilter.stateId ?? undefined,
@@ -389,9 +393,16 @@ export default function UnifiedSearch({
     setSearchParams(next, { replace: true });
   };
 
+  // Same gate the fetcher uses — keeps "is this query active?" decided
+  // in one place (effectiveSearchQuery). Without this, a 1-char URL
+  // could ignore the fetcher's gate (which would return the unfiltered
+  // feed) while the client-side filter below silently re-narrowed to a
+  // noisy match set.
+  const clientSearchNeedle = effectiveSearchQuery(searchFilters.search);
+
   const filteredItems = combinedItems
     .filter((item) => {
-      const q = searchFilters.search || "";
+      const q = clientSearchNeedle;
       const needle = q.toLowerCase();
       const matchesSearch =
         q === "" ||
@@ -456,9 +467,10 @@ export default function UnifiedSearch({
       }
     });
 
+  // Mirror the fetcher's gate — sub-threshold queries don't flip
+  // pagination/count math into the client-side narrowing branch.
   const hasClientSideFiltering =
-    (searchFilters.search && searchFilters.search.length > 0) ||
-    searchFilters.hasMedia !== undefined;
+    clientSearchNeedle !== "" || searchFilters.hasMedia !== undefined;
 
   const {
     currentPage,
@@ -559,7 +571,7 @@ export default function UnifiedSearch({
           <div className="mb-4 sm:mb-6">
             <p className="text-xs sm:text-sm text-muted-foreground">
               {totalFound} items found
-              {searchFilters.search && ` for "${searchFilters.search}"`}
+              {clientSearchNeedle !== "" && ` for "${clientSearchNeedle}"`}
               {totalFound > itemsPerPage &&
                 ` (showing ${startIndex + 1}-${Math.min(endIndex, totalFound)})`}
             </p>
