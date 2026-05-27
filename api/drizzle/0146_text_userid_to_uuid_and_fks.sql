@@ -7,153 +7,91 @@
 -- phone family, studio voice clones + licences + captions, LinkedIn /
 -- YouTube account links.
 --
--- Pattern per table:
---   1. DELETE rows whose text user_id isn't a valid UUID (orphans by
---      definition — users.id is uuid so nothing valid joins back).
---   2. ALTER COLUMN TYPE … USING …::uuid (NULLIF guards empty strings).
---   3. ADD CONSTRAINT … FOREIGN KEY … REFERENCES users(id) ON DELETE
---      CASCADE, via DO block for idempotency.
+-- Idempotence: every block checks `information_schema.columns.data_type`
+-- before issuing ALTER COLUMN TYPE. Necessary because a previous run of
+-- this migration partially landed in CI (29/31 statements applied;
+-- youtube_accounts.user_id was already uuid via a prior drizzle-kit push)
+-- and the file is now safe to re-execute regardless of column state.
+-- FK ADD CONSTRAINT statements are wrapped in `IF NOT EXISTS` guards.
+--
+-- DRY: the same convert-text-userId-to-uuid logic appears across 10
+-- tables (phone family + studio family + linkedin/youtube). Extracted
+-- into a pg_temp helper function `__convert_text_user_id`; each table
+-- becomes a one-liner call. Drops automatically when the session ends.
 --
 -- Closes #1603 and the FK-half of #1595's "still open" list.
 
 -- ---------------------------------------------------------------------------
--- Phone family — five tables that all reference users.user_id as text.
+-- Helper: convert <table>.user_id from text → uuid (if still text), then
+-- add the FK to users(id) ON DELETE CASCADE (if missing). Idempotent.
 -- ---------------------------------------------------------------------------
 
-DELETE FROM business_phone_numbers
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = business_phone_numbers.user_id);
-
-ALTER TABLE business_phone_numbers
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
+CREATE OR REPLACE FUNCTION pg_temp.__convert_text_user_id(target_table text)
+RETURNS void
+LANGUAGE plpgsql
+AS $func$
+DECLARE
+  col_type text;
+  fk_name  text := target_table || '_user_id_fkey';
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'business_phone_numbers_user_id_fkey') THEN
-    ALTER TABLE business_phone_numbers
-      ADD CONSTRAINT business_phone_numbers_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+  SELECT data_type INTO col_type
+  FROM information_schema.columns
+  WHERE table_name = target_table AND column_name = 'user_id';
+
+  IF col_type = 'text' THEN
+    -- DELETE orphan rows: invalid UUID strings or refs to nonexistent
+    -- users. Both predicates can be applied to text but only one of
+    -- them to uuid, hence the gated execution.
+    EXECUTE format(
+      'DELETE FROM %I WHERE user_id IS NULL OR user_id !~ %L OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = %I.user_id)',
+      target_table,
+      '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+      target_table
+    );
+
+    EXECUTE format(
+      'ALTER TABLE %I ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, %L)::uuid',
+      target_table, ''
+    );
   END IF;
-END $$;
 
--- call_logs
-DELETE FROM call_logs
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = call_logs.user_id);
-
-ALTER TABLE call_logs
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'call_logs_user_id_fkey') THEN
-    ALTER TABLE call_logs
-      ADD CONSTRAINT call_logs_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = fk_name) THEN
+    EXECUTE format(
+      'ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE',
+      target_table, fk_name
+    );
   END IF;
-END $$;
-
--- sms_messages
-DELETE FROM sms_messages
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = sms_messages.user_id);
-
-ALTER TABLE sms_messages
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sms_messages_user_id_fkey') THEN
-    ALTER TABLE sms_messages
-      ADD CONSTRAINT sms_messages_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-END $$;
-
--- phone_balances
-DELETE FROM phone_balances
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = phone_balances.user_id);
-
-ALTER TABLE phone_balances
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'phone_balances_user_id_fkey') THEN
-    ALTER TABLE phone_balances
-      ADD CONSTRAINT phone_balances_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-END $$;
-
--- phone_balance_transactions
-DELETE FROM phone_balance_transactions
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = phone_balance_transactions.user_id);
-
-ALTER TABLE phone_balance_transactions
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'phone_balance_transactions_user_id_fkey') THEN
-    ALTER TABLE phone_balance_transactions
-      ADD CONSTRAINT phone_balance_transactions_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-END $$;
+END;
+$func$;
 
 -- ---------------------------------------------------------------------------
--- Studio voice clones + licences + captions
+-- Phone family
 -- ---------------------------------------------------------------------------
+SELECT pg_temp.__convert_text_user_id('business_phone_numbers');
+SELECT pg_temp.__convert_text_user_id('call_logs');
+SELECT pg_temp.__convert_text_user_id('sms_messages');
+SELECT pg_temp.__convert_text_user_id('phone_balances');
+SELECT pg_temp.__convert_text_user_id('phone_balance_transactions');
 
--- studio_voice_clones.user_id text → uuid + FK
-DELETE FROM studio_voice_clones
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = studio_voice_clones.user_id);
+-- ---------------------------------------------------------------------------
+-- Studio voice clones — user_id only (voice_clone_id case handled below)
+-- ---------------------------------------------------------------------------
+SELECT pg_temp.__convert_text_user_id('studio_voice_clones');
 
-ALTER TABLE studio_voice_clones
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'studio_voice_clones_user_id_fkey') THEN
-    ALTER TABLE studio_voice_clones
-      ADD CONSTRAINT studio_voice_clones_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-END $$;
-
--- studio_voice_clone_licenses.user_id text → uuid + FK
-DELETE FROM studio_voice_clone_licenses
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = studio_voice_clone_licenses.user_id);
-
--- Same row may also have a stale voice_clone_id (already uuid-typed but
--- never FK-checked). Drop those orphans before adding the FK below.
-DELETE FROM studio_voice_clone_licenses
-WHERE NOT EXISTS (
-  SELECT 1 FROM studio_voice_clones WHERE studio_voice_clones.id = studio_voice_clone_licenses.voice_clone_id
-);
-
-ALTER TABLE studio_voice_clone_licenses
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
+-- ---------------------------------------------------------------------------
+-- studio_voice_clone_licenses — user_id (text→uuid) PLUS voice_clone_id
+-- (already uuid, needs FK only). The user_id conversion goes through the
+-- helper; the voice_clone_id orphan-clean + FK is one extra block.
+-- ---------------------------------------------------------------------------
+SELECT pg_temp.__convert_text_user_id('studio_voice_clone_licenses');
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'studio_voice_clone_licenses_user_id_fkey') THEN
-    ALTER TABLE studio_voice_clone_licenses
-      ADD CONSTRAINT studio_voice_clone_licenses_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
+  -- Drop orphans whose voice_clone_id no longer points at a real row.
+  DELETE FROM studio_voice_clone_licenses
+  WHERE NOT EXISTS (
+    SELECT 1 FROM studio_voice_clones WHERE studio_voice_clones.id = studio_voice_clone_licenses.voice_clone_id
+  );
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'studio_voice_clone_licenses_voice_clone_id_fkey') THEN
     ALTER TABLE studio_voice_clone_licenses
@@ -162,25 +100,28 @@ BEGIN
   END IF;
 END $$;
 
--- studio_captions.user_id + project_id text → uuid + FKs
-DELETE FROM studio_captions
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR project_id IS NULL
-   OR project_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = studio_captions.user_id)
-   OR NOT EXISTS (SELECT 1 FROM studio_projects WHERE studio_projects.id::text = studio_captions.project_id);
-
-ALTER TABLE studio_captions
-  ALTER COLUMN user_id    TYPE uuid USING NULLIF(user_id, '')::uuid,
-  ALTER COLUMN project_id TYPE uuid USING NULLIF(project_id, '')::uuid;
+-- ---------------------------------------------------------------------------
+-- studio_captions — user_id (helper) + project_id (text → uuid + FK).
+-- project_id can't use the generic helper because its parent table is
+-- studio_projects, not users; spell it out inline.
+-- ---------------------------------------------------------------------------
+SELECT pg_temp.__convert_text_user_id('studio_captions');
 
 DO $$
+DECLARE
+  col_type text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'studio_captions_user_id_fkey') THEN
-    ALTER TABLE studio_captions
-      ADD CONSTRAINT studio_captions_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+  SELECT data_type INTO col_type
+  FROM information_schema.columns
+  WHERE table_name = 'studio_captions' AND column_name = 'project_id';
+
+  IF col_type = 'text' THEN
+    DELETE FROM studio_captions
+    WHERE project_id IS NULL
+       OR project_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       OR NOT EXISTS (SELECT 1 FROM studio_projects WHERE studio_projects.id::text = studio_captions.project_id);
+
+    EXECUTE 'ALTER TABLE studio_captions ALTER COLUMN project_id TYPE uuid USING NULLIF(project_id, '''')::uuid';
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'studio_captions_project_id_fkey') THEN
@@ -191,41 +132,7 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- linkedin_accounts / youtube_accounts — OAuth account-link tables.
--- Both are non-active surfaces (per scope-limit conversation). user_id
--- text → uuid + FK.
+-- OAuth account-link tables
 -- ---------------------------------------------------------------------------
-
-DELETE FROM linkedin_accounts
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = linkedin_accounts.user_id);
-
-ALTER TABLE linkedin_accounts
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'linkedin_accounts_user_id_fkey') THEN
-    ALTER TABLE linkedin_accounts
-      ADD CONSTRAINT linkedin_accounts_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-END $$;
-
-DELETE FROM youtube_accounts
-WHERE user_id IS NULL
-   OR user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-   OR NOT EXISTS (SELECT 1 FROM users WHERE users.id::text = youtube_accounts.user_id);
-
-ALTER TABLE youtube_accounts
-  ALTER COLUMN user_id TYPE uuid USING NULLIF(user_id, '')::uuid;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'youtube_accounts_user_id_fkey') THEN
-    ALTER TABLE youtube_accounts
-      ADD CONSTRAINT youtube_accounts_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-END $$;
+SELECT pg_temp.__convert_text_user_id('linkedin_accounts');
+SELECT pg_temp.__convert_text_user_id('youtube_accounts');
