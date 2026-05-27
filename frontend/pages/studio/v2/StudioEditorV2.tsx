@@ -106,6 +106,10 @@ import GameStage from "@/components/studio/game/GameStage";
 import LevelsRail from "@/components/studio/game/LevelsRail";
 import SpritePalette from "@/components/studio/game/SpritePalette";
 import EntityPaletteLeft from "@/components/studio/game/world-3d/EntityPaletteLeft";
+import Game3DPropertiesPanel from "@/components/studio/game/world-3d/Game3DPropertiesPanel";
+import ChallengesPanel from "@/components/studio/game/world-3d/ChallengesPanel";
+import AIAgentPanel from "@/components/studio/game/world-3d/AIAgentPanel";
+import InviteDialog from "@/components/studio/game/world-3d/InviteDialog";
 import GamePropertiesPanel, {
   type GameSelection,
 } from "@/components/studio/game/GamePropertiesPanel";
@@ -899,6 +903,11 @@ export default function StudioEditorV2() {
   // per-kind prop drilling. Same Phaser-replacement runtime backs
   // both modes per the DRY commitment in PRD §1.2.
   const [gamePlaying, setGamePlaying] = useState(false);
+  /** 3D-world invite dialog open state — lifted to the editor so the
+   *  trigger button can live in the studio header (next to Save +
+   *  Playtest) per the existing chrome pattern. The dialog is mounted
+   *  once at this level; GameStage3D doesn't carry the affordance. */
+  const [gameInviteOpen, setGameInviteOpen] = useState(false);
   // `?capture=` deep-links + audio-only template seeds both land the user
   // on the Actions tab so the recorder / voiceover panel is the first
   // thing they see. Single SoT via `deriveKindDefaults` (#651 + #894).
@@ -2423,40 +2432,40 @@ export default function StudioEditorV2() {
                 />
               </div>
               <div className="flex h-[55%] min-h-[200px] flex-col bg-card">
-                {/* Engine-aware left-rail palette. 2D mini-games show
-                    the 2D sprite library; 3D worlds show the 3D
-                    entity palette (gap #1636 follow-up — drag-and-drop
-                    the building / trigger / prop kinds into the
-                    canvas). Single column header — the swap is purely
-                    on what fills it. DRY: no parallel section. */}
-                {gameState?.engine === "world-3d" ? (
+                {/* 3D-world projects get a primitive-shapes section
+                    ABOVE the regular sprite library — both panels
+                    are usable. The 3D primitives drag in as untextured
+                    blocks/platforms/ramps; the sprite library entries
+                    drag in as textured entities (sprite art mapped to
+                    a block face) + give access to the MediaPicker
+                    "Custom upload" affordance at the bottom — same
+                    way the 2D editor exposes user-uploaded assets.
+                    DRY: both engines share the SpritePalette section. */}
+                {gameState?.engine === "world-3d" && (
                   <>
                     <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Pieces
                     </div>
-                    <div className="min-h-0 flex-1">
+                    <div className="max-h-[40%] min-h-0 overflow-y-auto border-b border-border">
                       <EntityPaletteLeft />
                     </div>
                   </>
-                ) : (
-                  <>
-                    <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Sprites
-                    </div>
-                    <div className="min-h-0 flex-1">
-                      <SpritePalette
-                        gameState={gameState}
-                        onChange={setGameState}
-                        activeLevelId={activeLevelId}
-                        onSelectSprite={(spriteId) => {
-                          if (spriteId && activeLevelId) {
-                            setGameSelection({ kind: "sprite", levelId: activeLevelId, spriteId });
-                          }
-                        }}
-                      />
-                    </div>
-                  </>
                 )}
+                <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {gameState?.engine === "world-3d" ? "Sprites & assets" : "Sprites"}
+                </div>
+                <div className="min-h-0 flex-1">
+                  <SpritePalette
+                    gameState={gameState}
+                    onChange={setGameState}
+                    activeLevelId={activeLevelId}
+                    onSelectSprite={(spriteId) => {
+                      if (spriteId && activeLevelId) {
+                        setGameSelection({ kind: "sprite", levelId: activeLevelId, spriteId });
+                      }
+                    }}
+                  />
+                </div>
               </div>
             </CollapsiblePanel>
           )}
@@ -2669,18 +2678,30 @@ export default function StudioEditorV2() {
                             // first" message). DRY: one prop, all 3D
                             // server surfaces.
                             projectId={projectId === "new" ? null : projectId}
+                            // 3D entity selection bus — shared with
+                            // the right-rail Game3DPropertiesPanel so
+                            // clicking an entity in the canvas updates
+                            // the inspector and vice-versa.
+                            selectedEntityId={
+                              gameSelection.kind === "entity-3d"
+                                ? gameSelection.entityId
+                                : null
+                            }
+                            onSelectEntity={(entityId) =>
+                              setGameSelection(
+                                entityId
+                                  ? { kind: "entity-3d", entityId }
+                                  : { kind: "canvas" },
+                              )
+                            }
                           />
-                          {/* Playtest toggle — overlaid on the GameStage so
-                              the user has the affordance right next to the
-                              canvas. Single button flips both directions;
-                              the verb tells the user what happens next. */}
-                          <button
-                            type="button"
-                            onClick={() => setGamePlaying((p) => !p)}
-                            className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-fuchsia-500"
-                          >
-                            {gamePlaying ? "■ Stop" : "▶ Playtest"}
-                          </button>
+                          {/* Playtest moved to the studio header (next
+                              to Save) per the existing pattern — the
+                              video editor's Preview button lives there
+                              too. The canvas no longer carries
+                              overlay chrome; selection + edit affordances
+                              live in the left rail (palette) + right
+                              rail (properties / challenges / AI). */}
                           {aiChipNode}
                         </div>
                       ),
@@ -3049,25 +3070,55 @@ export default function StudioEditorV2() {
             />
           </CollapsiblePanel>
           ) : currentMediaKind === "game" && gameState ? (
-            <CollapsiblePanel
-              side="right"
-              label="Properties"
-              storageKey="studio.v2.panel.right"
-              expandedClassName="w-72"
-            >
-              {/* Game-kind right rail — selection-aware properties
-                  panel. Same shell slot Timeline kinds use for
-                  PropertiesPanel; the content adapts to the selection
-                  (canvas → game settings, level → level inspector,
-                  sprite → sprite inspector). Mirrors the Video editor
-                  pattern: click an element, see its meta on the right. */}
-              <GamePropertiesPanel
-                gameState={gameState}
-                onChange={setGameState}
-                selection={gameSelection}
-                onSelectionChange={setGameSelection}
-              />
-            </CollapsiblePanel>
+            <>
+              <CollapsiblePanel
+                side="right"
+                label="Properties"
+                storageKey="studio.v2.panel.right"
+                expandedClassName="w-72"
+              >
+                {/* Game-kind right rail — selection-aware properties
+                    panel. Same shell slot Timeline kinds use; the
+                    content adapts to the selection AND to the engine:
+                    canvas-2d projects use GamePropertiesPanel (sprite
+                    inspector etc.); world-3d projects use
+                    Game3DPropertiesPanel (entity inspector + 3D
+                    canvas settings). One slot, two engines, no
+                    visual fork — same CollapsiblePanel shell. */}
+                {gameState.engine === "world-3d" ? (
+                  <Game3DPropertiesPanel
+                    gameState={gameState}
+                    onChange={setGameState}
+                    selection={gameSelection}
+                    onSelectionChange={setGameSelection}
+                  />
+                ) : (
+                  <GamePropertiesPanel
+                    gameState={gameState}
+                    onChange={setGameState}
+                    selection={gameSelection}
+                    onSelectionChange={setGameSelection}
+                  />
+                )}
+              </CollapsiblePanel>
+              {/* Challenges — 3D-only authoring CRUD panel mounted as
+                  its own CollapsiblePanel below Properties. Same shell
+                  the cross-studio AI panel uses (next sibling). Self-
+                  gates inline (renders nothing for 2D mini-games). */}
+              {gameState.engine === "world-3d" && (
+                <CollapsiblePanel
+                  side="right"
+                  label="Challenges"
+                  storageKey="studio.v2.panel.right.challenges"
+                  expandedClassName="w-72"
+                  defaultOpen={false}
+                >
+                  <div className="p-3">
+                    <ChallengesPanel gameState={gameState} onChange={setGameState} />
+                  </div>
+                </CollapsiblePanel>
+              )}
+            </>
           ) : currentMediaKind === "image" ? (
             <CollapsiblePanel
               side="right"
@@ -3111,13 +3162,27 @@ export default function StudioEditorV2() {
               defaultOpen={false}
             >
               {currentMediaKind === "game" && gameState ? (
-                <MediaAiPromptPanel
-                  kindNoun="sprite"
-                  placeholder="A pixel-art hero sprite, side view…"
-                  onGenerated={(result, prompt) =>
-                    handleGameAiGenerated(result, prompt)
-                  }
-                />
+                gameState.engine === "world-3d" ? (
+                  /* 3D world projects host the game-builder AGENT here,
+                     not a sprite-generator. The agent calls server-side
+                     tools that mutate the world directly (place blocks,
+                     add challenges, change lighting, etc.) — same
+                     CollapsiblePanel shell every other kind's AI uses,
+                     different consumer. Self-gates internally on
+                     `projectId` ("save first" message when null). */
+                  <AIAgentPanel
+                    projectId={projectId === "new" ? null : projectId}
+                    onApplyState={setGameState}
+                  />
+                ) : (
+                  <MediaAiPromptPanel
+                    kindNoun="sprite"
+                    placeholder="A pixel-art hero sprite, side view…"
+                    onGenerated={(result, prompt) =>
+                      handleGameAiGenerated(result, prompt)
+                    }
+                  />
+                )
               ) : currentMediaKind === "animation" ? (
                 <MediaAiPromptPanel
                   kindNoun="frame"
@@ -3393,6 +3458,45 @@ function EditorHeader({
           >
             <Eye className="h-4 w-4" />
             Preview
+          </Button>
+        )}
+        {/* Game-kind Playtest — same slot the video editor uses for
+            Preview, mounting only when the project is game-kind. Was
+            previously a canvas overlay; moved here to match the
+            studio's existing chrome pattern (header actions, not
+            in-canvas floaters). */}
+        {currentMediaKind === "game" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={() => setGamePlaying((p) => !p)}
+          >
+            {gamePlaying ? (
+              <>
+                <Pause className="h-4 w-4" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Playtest
+              </>
+            )}
+          </Button>
+        )}
+        {/* 3D-world Invite — appears only for engine === "world-3d"
+            projects (the canvas-2d mini-games don't have a multi-
+            user share surface). Same header slot as Playtest above. */}
+        {currentMediaKind === "game" && gameState?.engine === "world-3d" && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={() => setGameInviteOpen(true)}
+          >
+            <UserPlus className="h-4 w-4" />
+            Invite
           </Button>
         )}
         {/* Single overflow `…` for project + template actions (clone,

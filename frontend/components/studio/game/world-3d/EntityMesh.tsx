@@ -11,9 +11,10 @@
  * separate gizmo per entity (DRY).
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CuboidCollider, RigidBody, BallCollider } from "@react-three/rapier";
 import type { ThreeEvent } from "@react-three/fiber";
+import { TextureLoader, type Texture } from "three";
 import type {
   World3DEntity,
   World3DEntityKind,
@@ -70,6 +71,13 @@ export default function EntityMesh({
   onSelect,
   onTrigger,
 }: EntityMeshProps) {
+  // Texture loader — when the entity carries a textureUrl (sprite or
+  // user-uploaded asset dragged in from the left rail), we resolve
+  // the image with vanilla TextureLoader + hold it in state. Avoids
+  // drei's `useTexture` Suspense behavior (which would require a
+  // Suspense boundary around every EntityMesh).
+  const texture = useEntityTexture(entity.textureUrl);
+
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (mode !== "edit" || !onSelect) return;
     // Stop the click bubbling to the ground placement handler — clicking
@@ -90,6 +98,7 @@ export default function EntityMesh({
         <KindMesh
           kind={entity.kind}
           color={entity.color}
+          texture={texture}
           selected={selected}
           onClick={handleClick}
         />
@@ -126,6 +135,7 @@ export default function EntityMesh({
         <KindMesh
           kind={entity.kind}
           color={entity.color}
+          texture={texture}
           selected={selected}
           onClick={handleClick}
         />
@@ -139,14 +149,18 @@ export default function EntityMesh({
 interface KindMeshProps {
   kind: World3DEntityKind;
   color: string;
+  /** Optional texture mapped onto the mesh — when present, the
+   *  `color` field tints the texture (white = unmodified). */
+  texture: Texture | null;
   selected: boolean;
   onClick: (e: ThreeEvent<MouseEvent>) => void;
 }
 
-function KindMesh({ kind, color, selected, onClick }: KindMeshProps) {
+function KindMesh({ kind, color, texture, selected, onClick }: KindMeshProps) {
   const material = (
     <meshStandardMaterial
       color={color}
+      map={texture ?? undefined}
       // Slight emissive on selection so the chrome reads even when the
       // entity is in shadow; cleared when not selected so colors stay
       // accurate during normal authoring.
@@ -252,4 +266,47 @@ function KindCollider({ kind, scale, sensor = false }: KindColliderProps) {
     case "light":
       return <CuboidCollider args={halfExtents} sensor={sensor} />;
   }
+}
+
+// ─── Texture loader hook ──────────────────────────────────────────────────
+
+/** Resolve a texture URL imperatively (no Suspense). Returns null
+ *  until the image is decoded; null also when the URL is absent.
+ *  Texture instances are kept in a small module-level cache so a
+ *  thousand collectible coins sharing one URL share one GPU upload. */
+const textureCache = new Map<string, Texture>();
+
+function useEntityTexture(url: string | undefined): Texture | null {
+  const [texture, setTexture] = useState<Texture | null>(() =>
+    url ? textureCache.get(url) ?? null : null,
+  );
+  useEffect(() => {
+    if (!url) {
+      setTexture(null);
+      return;
+    }
+    const cached = textureCache.get(url);
+    if (cached) {
+      setTexture(cached);
+      return;
+    }
+    let cancelled = false;
+    new TextureLoader().load(
+      url,
+      (tex) => {
+        if (cancelled) return;
+        textureCache.set(url, tex);
+        setTexture(tex);
+      },
+      undefined,
+      () => {
+        // Image failed to load — leave texture null so the entity
+        // falls back to its tint color.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return texture;
 }

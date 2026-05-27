@@ -219,7 +219,8 @@ export interface World3DEntity extends World3DTransform {
   id: string;
   kind: World3DEntityKind;
   /** Display color (CSS hex). The runtime maps this to a flat
-   *  material; textured material is a follow-on. */
+   *  material when `textureUrl` is absent; when a texture is set,
+   *  the color tints the texture (white = unmodified). */
   color: string;
   /** Physics body kind — defaults are kind-specific (see seed
    *  helpers) but every entity can override. */
@@ -228,6 +229,13 @@ export interface World3DEntity extends World3DTransform {
    *  challenges reference these to count "collect items tagged
    *  X" / "reach zone tagged Y". */
   tag?: string;
+  /** Optional texture URL. When set, the entity renders with the
+   *  image mapped onto its mesh — lets users drag sprites from the
+   *  studio's existing sprite library or MediaPicker uploads into the
+   *  3D world (gap #1657). Same asset URL the 2D mini-game runtime
+   *  resolves via `state.assets` — one asset pipeline for both
+   *  engines (DRY). */
+  textureUrl?: string;
 }
 
 /** Challenge meta. Phase 2 ties these to runtime events. The shape

@@ -81,6 +81,12 @@ interface GameStageProps {
    *  AI agent + invite endpoints can address the row. Null = unsaved
    *  draft; the affected panels gracefully degrade. */
   projectId?: string | null;
+  /** 3D entity selection bus — shared with the studio's right-rail
+   *  Game3DPropertiesPanel. Forwarded to `<GameStage3D>` when the
+   *  engine demands 3D; ignored on the 2D path (which has its own
+   *  fine-grained sprite-selection handlers). */
+  selectedEntityId?: string | null;
+  onSelectEntity?: (entityId: string | null) => void;
   className?: string;
 }
 
@@ -95,6 +101,8 @@ export default function GameStage({
   hideRuntimeBanner = false,
   onChange,
   projectId = null,
+  selectedEntityId = null,
+  onSelectEntity,
   className,
 }: GameStageProps) {
   // 3D-runtime dispatch — projects authored with `engine === "world-3d"`
@@ -123,6 +131,8 @@ export default function GameStage({
           onChange={onChange ?? (() => {})}
           projectId={projectId}
           zoom={zoom}
+          selectedEntityId={selectedEntityId}
+          onSelectEntity={onSelectEntity}
           hideRuntimeBanner={hideRuntimeBanner}
           className={className}
         />

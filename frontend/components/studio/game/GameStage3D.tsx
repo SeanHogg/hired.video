@@ -19,9 +19,9 @@
  *     sensor-trigger events.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Gamepad2, UserPlus } from "lucide-react";
+import { Gamepad2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   GameState,
@@ -42,12 +42,7 @@ import { useGameRoom } from "@/lib/studio/game/use-game-room";
 import { saveCachedGameState } from "@/lib/studio/game/game-state-cache";
 import { useAuth } from "@/lib/auth";
 import Scene3D from "./world-3d/Scene3D";
-import RightRailDock from "./world-3d/RightRailDock";
-import InspectorPanel from "./world-3d/InspectorPanel";
-import ChallengesPanel from "./world-3d/ChallengesPanel";
-import AIAgentPanel from "./world-3d/AIAgentPanel";
 import ChallengeHUD from "./world-3d/ChallengeHUD";
-import InviteDialog from "./world-3d/InviteDialog";
 import DropPlacer, { type DropPlacerHandler } from "./world-3d/DropPlacer";
 import { ENTITY_DRAG_MIME } from "./world-3d/EntityPaletteLeft";
 import type { EntityTriggerEvent } from "./world-3d/EntityMesh";
@@ -72,6 +67,14 @@ interface GameStage3DProps {
    *  scaled bounding rect for the raycast so drop placement stays
    *  accurate at any zoom. */
   zoom?: number;
+  /** Currently-selected entity id — supplied by the parent via
+   *  `gameSelection` so the right-rail Game3DPropertiesPanel + the
+   *  scene render-time outline share one selection bus (DRY). */
+  selectedEntityId?: string | null;
+  /** Selection setter — bubbles entity clicks back to the parent,
+   *  which writes them into `gameSelection`. When omitted (read-only
+   *  surfaces like ProjectPlayer), entity clicks no-op. */
+  onSelectEntity?: (entityId: string | null) => void;
   hideRuntimeBanner?: boolean;
   className?: string;
 }
@@ -82,22 +85,32 @@ export default function GameStage3D({
   onChange,
   projectId = null,
   zoom = 1,
+  selectedEntityId = null,
+  onSelectEntity,
   hideRuntimeBanner = false,
   className,
 }: GameStage3DProps) {
   // ─── Local UI state ───────────────────────────────────────────────────
-  // Palette kind selection moved out of GameStage3D entirely — the
-  // left-rail `<EntityPaletteLeft>` is the drag source; placement
-  // happens via HTML5 drag-and-drop (see `dropHandlerRef` below).
-  // No click-to-place state to track here.
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  // Palette / selection / invite-dialog state are all OUT of this
+  // component now: palette → left rail (StudioEditorV2),
+  // selection → gameSelection (StudioEditorV2), invite → header
+  // (StudioEditorV2). What's left here is canvas-local only.
   const [respawnNonce, setRespawnNonce] = useState(0);
-  const [inviteOpen, setInviteOpen] = useState(false);
   /** Drop dispatch — DropPlacer (inside the R3F Canvas) sets this on
    *  mount; the outer drop event reads from `.current` so the HTML5
    *  drop handler can reach into R3F's camera + canvas for the
    *  raycast. */
   const dropHandlerRef = useRef<DropPlacerHandler | null>(null);
+  /** Selection setter that falls back to a no-op when the parent
+   *  didn't wire `onSelectEntity` (e.g. ProjectPlayer mounting the
+   *  read-only public surface). DRY: every caller of this stays
+   *  unaware of whether selection is wired. */
+  const selectEntity = useCallback(
+    (id: string | null) => {
+      onSelectEntity?.(id);
+    },
+    [onSelectEntity],
+  );
 
   const world = gameState ? getWorld(gameState) : null;
 
@@ -209,11 +222,11 @@ export default function GameStage3D({
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       if (!gameState) return;
       onChange(deleteEntity(gameState, selectedEntityId));
-      setSelectedEntityId(null);
+      selectEntity(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, selectedEntityId, gameState, onChange]);
+  }, [mode, selectedEntityId, gameState, onChange, selectEntity]);
 
   // ─── Click-to-place ───────────────────────────────────────────────────
   /** Drop-receiver — called by DropPlacer with the raycast hit point.
@@ -230,15 +243,10 @@ export default function GameStage3D({
         position: [position[0], position[1] + 0.5, position[2]],
       });
       onChange(result.state);
-      setSelectedEntityId(result.entity.id);
+      selectEntity(result.entity.id);
     },
-    [gameState, onChange],
+    [gameState, onChange, selectEntity],
   );
-
-  const selectedEntity = useMemo(() => {
-    if (!world || !selectedEntityId) return null;
-    return world.entities.find((e) => e.id === selectedEntityId) ?? null;
-  }, [world, selectedEntityId]);
 
   // ─── Empty states ─────────────────────────────────────────────────────
   if (!gameState) {
@@ -285,7 +293,7 @@ export default function GameStage3D({
             world={world}
             mode={mode}
             selectedEntityId={selectedEntityId}
-            onSelectEntity={setSelectedEntityId}
+            onSelectEntity={selectEntity}
             onTrigger={handleTrigger}
             respawnNonce={respawnNonce}
             peers={room.peers}
@@ -299,36 +307,26 @@ export default function GameStage3D({
           )}
         </Canvas>
 
-        {/* Edit-mode chrome */}
-        {mode === "edit" && (
-          <>
-            <RightRailDock
-              mode="edit"
-              inspector={
-                <InspectorPanel
-                  gameState={gameState}
-                  selectedEntity={selectedEntity}
-                  onChange={onChange}
-                  onClearSelection={() => setSelectedEntityId(null)}
-                />
-              }
-              challenges={<ChallengesPanel gameState={gameState} onChange={onChange} />}
-              agent={<AIAgentPanel projectId={projectId} onApplyState={onChange} />}
-            />
-            {!hideRuntimeBanner && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 py-2">
-                <Gamepad2 className="h-4 w-4 text-fuchsia-300" />
-                <span className="text-[11px] font-semibold text-white">
-                  3D world · drag a piece from the left rail into the
-                  world · click a placed block to select · drag canvas
-                  to orbit · or talk to the AI agent
-                </span>
-              </div>
-            )}
-          </>
+        {/* Edit-mode chrome — the in-canvas overlays are gone. The
+            authoring surfaces all live in the studio shell now (palette
+            on the left rail, properties / challenges / AI on the right
+            rail, Playtest + Invite in the header) per the project's
+            existing chrome pattern. Same shape every other media kind
+            uses (Image / Video / Animation / CAD). */}
+        {mode === "edit" && !hideRuntimeBanner && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 py-2">
+            <Gamepad2 className="h-4 w-4 text-fuchsia-300" />
+            <span className="text-[11px] font-semibold text-white">
+              Drag pieces from the left rail · click placed blocks to
+              edit on the right · talk to the AI agent on the right
+            </span>
+          </div>
         )}
 
-        {/* Play-mode chrome */}
+        {/* Play-mode chrome — challenge HUD + respawn live on the
+            canvas because they're playback-time affordances (parity
+            with the video editor's playback overlay). Playtest /
+            Invite triggers stay in the header. */}
         {mode === "play" && (
           <>
             {challengeRuntime && (
@@ -352,24 +350,6 @@ export default function GameStage3D({
               ↻ Respawn
             </button>
           </>
-        )}
-
-        {/* Invite — reachable from both modes (owners share play links,
-            players in play mode also see the affordance so they can
-            invite more friends mid-session if they're the owner). The
-            dialog self-gates on the projectId; an unsaved draft just
-            sees a "save first" message. */}
-        <button
-          type="button"
-          onClick={() => setInviteOpen(true)}
-          className="absolute bottom-3 right-3 z-20 flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-emerald-500"
-          title="Invite a friend to play"
-        >
-          <UserPlus className="h-3 w-3" />
-          Invite
-        </button>
-        {inviteOpen && (
-          <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />
         )}
       </div>
     </div>
