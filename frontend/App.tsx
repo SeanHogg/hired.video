@@ -66,6 +66,7 @@ const BlogIndex = lazy(() => import("./pages/blog/BlogIndex"));
 const BlogPost = lazy(() => import("./pages/blog/BlogPost"));
 const PostAJob = lazy(() => import("./pages/PostAJob"));
 const SalaryPage = lazy(() => import("./pages/seo/SalaryPage"));
+const PlayInvite = lazy(() => import("./pages/PlayInvite"));
 const SalaryIndexPage = lazy(() => import("./pages/seo/SalaryIndexPage"));
 const ResumeGuidePage = lazy(() => import("./pages/seo/ResumeGuidePage"));
 const About = lazy(() => import("./pages/About"));
@@ -625,6 +626,9 @@ const App = () => (
                         element={<PersonaSelection />}
                       />
                       <Route path="/profile" element={<ProfileRedirect />} />
+                      {/* 3D world play invite (gap #1637) — public,
+                          no auth required. Anonymous guests can join. */}
+                      <Route path="/play/:token" element={<PlayInvite />} />
                       <Route path="/dashboard" element={<Home />} />
                       <Route path="/recruiter/placements/:id" element={<PlacementDetail />} />
                       <Route path="/points" element={<PointsPage />} />

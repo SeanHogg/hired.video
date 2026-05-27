@@ -34,6 +34,7 @@ import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { conversations } from "./messaging.js";
 import { serviceInquiries, serviceOfferings } from "./services.js";
+import { studioProjects } from "./resumes.js";
 
 // ---------------------------------------------------------------------------
 // Creator Profile — extension of userProfiles for opted-in service providers.
@@ -189,9 +190,10 @@ export const promoProjects = pgTable(
     // promo project creation. Comments and brief discussion live here.
     conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
 
-    // The studio project the creator is editing. Stored as text to match the
-    // studiofeatures.ts convention (which uses string project IDs).
-    studioProjectId: text("studio_project_id"),
+    // The studio project the creator is editing — uuid + FK SET NULL (so
+    // deleting the project doesn't cascade the promo project, which stays
+    // for audit). Was text pre-#1641; migration 0160 converted + added FK.
+    studioProjectId: uuid("studio_project_id").references(() => studioProjects.id, { onDelete: "set null" }),
 
     // Brief inputs the customer attached
     briefResumeId: uuid("brief_resume_id"),

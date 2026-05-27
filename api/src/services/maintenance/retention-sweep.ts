@@ -17,7 +17,10 @@
  *   - points_ledger / point_redemptions / usage_ledger (financial audit)
  *   - admin_audit_log (audit retention is policy-driven, separate)
  *   - external_email_messages (user inbox; the user expects persistence)
- *   - notifications (user-driven dismissal)
+ *
+ * Notifications were initially excluded too, but at millions-of-users
+ * scale unread-but-never-clicked notifications accumulate indefinitely.
+ * The 90-day cap matches the "user would have seen it by now" floor.
  *
  * Adding a row here is a load-bearing change: review the table's audit
  * + product semantics before extending.
@@ -66,6 +69,13 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
   // Mapbox geocoder cache is a true LRU — eviction by last_hit_at, not
   // creation date. A row that's still being hit weekly stays forever.
   { table: "geocoder_cache",     ageColumn: "last_hit_at", retentionDays: 90, maxRowsPerRun: 5000 },
+
+  // Notifications — once a user has dismissed an old notification or
+  // the platform-wide retention window passes, drop. 90 days matches
+  // the "unread badge would have been seen by now" assumption. Stale
+  // unread notifications also drop so the table stays bounded — if
+  // the user hasn't read it in 90 days, the notification is dead.
+  { table: "notifications",      ageColumn: "created_at", retentionDays: 90, maxRowsPerRun: 5000 },
 ] as const;
 
 export interface RetentionRunSummary {

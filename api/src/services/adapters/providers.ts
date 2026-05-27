@@ -80,6 +80,12 @@ export type LLMUseCase =
   | "scorecard_bias_check"
   | "article_moderation"
   | "course_generation"
+  // 3D world game-builder agent (gap #1638). Multi-turn tool-using
+  // agent that calls the world-3d mutation tools to build the game
+  // from natural-language prompts. Needs a model with strong tool-use
+  // + reasoning; defaults to anthropic/claude-3.5-sonnet which the
+  // gateway resolves to the latest tool-calling-capable variant.
+  | "studio_game_agent"
   | "default";
 
 /** A leaf inference profile — model + sampling, no further fallbacks. */
@@ -164,6 +170,7 @@ const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase>([
   "profile_audit",
   "resume_optimize",
   "resume_roast",
+  "studio_game_agent",
   "studio_script",
 ]);
 
@@ -231,6 +238,17 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   recruiter_outreach: { model: "google/gemma-4-31b-it:free", temperature: 0.7 },
   dashboard_summary: { model: "google/gemma-4-31b-it:free", temperature: 0.4 },
   article_writer: { model: "meta-llama/llama-3.3-70b-instruct:free", temperature: 0.7 },
+  studio_game_agent: {
+    // Tool-use intensive — needs a model that reliably emits structured
+    // function calls. Sonnet is the default; the gateway will substitute
+    // on cooldown / outage and the route surfaces resolvedModel.
+    model: "anthropic/claude-3.5-sonnet",
+    temperature: 0.4,
+    maxTokens: 4096,
+    fallbacks: [
+      { model: "openai/gpt-4o-mini", temperature: 0.4 },
+    ],
+  },
   // Job extraction (Chrome extension Track click → /api/jobs/extract).
   // One-shot, user-initiated, high-value: a bad extract makes the saved
   // job unusable downstream (match scoring, tailor, autofill all read

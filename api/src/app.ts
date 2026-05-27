@@ -12,6 +12,8 @@ import { errorSourceFilterMiddleware } from "./middleware/errorSourceFilter.js";
 import { getDb, schema } from "./db/index.js";
 import { studioRoutes } from "./routes/studio.js";
 import { studioFeaturesRoutes } from "./routes/studio-features.js";
+import { gamesRoutes } from "./routes/games.js";
+import { gameAgentRoutes } from "./routes/game-agent.js";
 import { studioTemplatesRoutes } from "./routes/studio-templates.js";
 import { studioDubbingRoutes } from "./routes/studio-dubbing.js";
 import { workspaceRoutes } from "./routes/workspaces.js";
@@ -593,6 +595,8 @@ export function createApp() {
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);
   app.route("/api/studio", studioFeaturesRoutes);
+  app.route("/api/games", gamesRoutes);
+  app.route("/api/studio/game-agent", gameAgentRoutes);
   app.route("/api/studio", studioTemplatesRoutes);
   app.route("/api/studio", studioDubbingRoutes);
   app.route("/api/studio", linkedInPostRoutes);

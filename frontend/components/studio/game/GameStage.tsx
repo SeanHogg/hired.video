@@ -77,6 +77,10 @@ interface GameStageProps {
    *  doesn't pass this so the public-page play surface stays
    *  read-only. */
   onChange?: (next: GameState) => void;
+  /** Persisted project id — passed through to the 3D runtime so the
+   *  AI agent + invite endpoints can address the row. Null = unsaved
+   *  draft; the affected panels gracefully degrade. */
+  projectId?: string | null;
   className?: string;
 }
 
@@ -90,6 +94,7 @@ export default function GameStage({
   onMoveSprite,
   hideRuntimeBanner = false,
   onChange,
+  projectId = null,
   className,
 }: GameStageProps) {
   // 3D-runtime dispatch — projects authored with `engine === "world-3d"`
@@ -116,6 +121,7 @@ export default function GameStage({
           gameState={gameState}
           mode={mode}
           onChange={onChange ?? (() => {})}
+          projectId={projectId}
           hideRuntimeBanner={hideRuntimeBanner}
           className={className}
         />

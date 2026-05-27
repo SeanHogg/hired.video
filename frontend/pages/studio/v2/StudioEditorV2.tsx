@@ -2641,6 +2641,14 @@ export default function StudioEditorV2() {
                             // The 2D path ignores `onChange` and keeps
                             // using the fine-grained sprite handlers.
                             onChange={setGameState}
+                            // The 3D agent + invite endpoints address
+                            // the project by id — pass through so the
+                            // panels can hit /api/games/:id/...
+                            // Falsy when projectId === "new" (unsaved
+                            // draft); the panels self-gate ("Save
+                            // first" message). DRY: one prop, all 3D
+                            // server surfaces.
+                            projectId={projectId === "new" ? null : projectId}
                           />
                           {/* Playtest toggle — overlaid on the GameStage so
                               the user has the affordance right next to the

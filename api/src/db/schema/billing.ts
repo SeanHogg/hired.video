@@ -35,7 +35,9 @@ export type NewSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  planId: uuid("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+  // SET NULL (was RESTRICT) so a tier can be deprecated without the
+  // archived subscription rows blocking the delete — migration 0159.
+  planId: uuid("plan_id").references(() => subscriptionPlans.id, { onDelete: "set null" }),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
   stripeCustomerId: text("stripe_customer_id"),
   status: varchar("status", { length: 50 }).default("active").notNull(),
@@ -104,6 +106,9 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   unitPrice: numeric("unit_price").notNull(),
   amount: numeric("amount").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  // Added 2026-05-26 alongside migration 0160 — line items are mutable
+  // (qty / price corrections); the schema treated them as immutable.
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;

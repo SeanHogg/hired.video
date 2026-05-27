@@ -18,7 +18,7 @@ import type {
   World3DEntityKind,
   World3DState,
 } from "@shared/game-state";
-import EntityMesh from "./EntityMesh";
+import EntityMesh, { type EntityTriggerEvent } from "./EntityMesh";
 import PlayerController from "./PlayerController";
 
 interface Scene3DProps {
@@ -30,6 +30,11 @@ interface Scene3DProps {
   paletteKind: World3DEntityKind | null;
   onSelectEntity: (id: string | null) => void;
   onPlaceAt: (position: [number, number, number]) => void;
+  /** Sensor-entity overlap events bubble up to the host's challenge
+   *  tracker. Only fires in play mode (the scene drops the handler in
+   *  edit mode so authoring clicks can't accidentally trigger
+   *  challenge progress). */
+  onTrigger?: (event: EntityTriggerEvent) => void;
   /** Bumps when the host wants to teleport the player back to spawn
    *  (respawn button, hazard hit in Phase 2). */
   respawnNonce?: number;
@@ -42,6 +47,7 @@ export default function Scene3D({
   paletteKind,
   onSelectEntity,
   onPlaceAt,
+  onTrigger,
   respawnNonce = 0,
 }: Scene3DProps) {
   const sunDirRef = useRef(world.lighting.sun.direction);
@@ -110,6 +116,7 @@ export default function Scene3D({
             mode={mode}
             selected={mode === "edit" && entity.id === selectedEntityId}
             onSelect={onSelectEntity}
+            onTrigger={mode === "play" ? onTrigger : undefined}
           />
         ))}
 

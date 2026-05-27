@@ -151,6 +151,7 @@ export const notifications = pgTable("notifications", {
   message: text("message").notNull(),
   data: jsonb("data"),
   isRead: boolean("is_read").default(false).notNull(),
+  // #1605 followup: index added in 0158 for user/created + partial on unread.
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -202,8 +202,10 @@ CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice    ON invoice_line_ite
 -- E. Other missing composite indexes.
 -- ---------------------------------------------------------------------------
 
-CREATE INDEX IF NOT EXISTS idx_admin_audit_log_user_created
-  ON admin_audit_log (user_id, created_at DESC) WHERE user_id IS NOT NULL;
+-- admin_audit_log uses `actor_id` (not `user_id`) per the schema —
+-- nullable since hard-deleting an actor cascades the audit row to NULL.
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_actor_created
+  ON admin_audit_log (actor_id, created_at DESC) WHERE actor_id IS NOT NULL;
 
 -- autofill_cache_entries — needs (user_id, context) for dedup-on-write.
 -- Table name guess; tolerate absence.
