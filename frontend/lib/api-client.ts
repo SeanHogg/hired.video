@@ -195,8 +195,29 @@ export interface ApiRequestLogEntry {
 }
 
 const MAX_LOG_ENTRIES = 10;
+// Cap each body at ~2KB so the ring buffer can never balloon (e.g. a single
+// resume fetch returning 100KB+) and so /api/errors/report stays under its
+// 64KB payload cap. Error envelopes are well under this; success bodies get
+// a JSON-stringified preview.
+const MAX_BODY_BYTES_FOR_LOG = 2048;
 let _logIdCounter = 0;
 const _recentApiRequests: ApiRequestLogEntry[] = [];
+
+function truncateBodyForLog(body: unknown): unknown {
+  if (body == null) return body;
+  let json: string;
+  try {
+    json = JSON.stringify(body);
+  } catch {
+    return "[unserializable]";
+  }
+  if (json.length <= MAX_BODY_BYTES_FOR_LOG) return body;
+  return {
+    _truncated: true,
+    _originalBytes: json.length,
+    _preview: json.slice(0, MAX_BODY_BYTES_FOR_LOG),
+  };
+}
 
 // ============================================================================
 // IMPERSONATION (SuperAdmin X-Emulation-Token)
@@ -225,6 +246,9 @@ function shouldAttachEmulationToken(url: string): boolean {
 }
 
 function pushApiLogEntry(entry: ApiRequestLogEntry): void {
+  if (entry.requestBody !== undefined) {
+    entry.requestBody = truncateBodyForLog(entry.requestBody);
+  }
   _recentApiRequests.push(entry);
   if (_recentApiRequests.length > MAX_LOG_ENTRIES) {
     _recentApiRequests.shift();
@@ -233,6 +257,20 @@ function pushApiLogEntry(entry: ApiRequestLogEntry): void {
 
 function findLogEntry(id: number): ApiRequestLogEntry | undefined {
   return _recentApiRequests.find((e) => e.id === id);
+}
+
+function recordLogEntryResponse(
+  id: number,
+  status: number,
+  body: unknown,
+  startTime: number,
+): void {
+  const entry = findLogEntry(id);
+  if (entry) {
+    entry.status = status;
+    entry.responseBody = truncateBodyForLog(body);
+    entry.durationMs = Date.now() - startTime;
+  }
 }
 
 /** Returns a snapshot of the most recent API requests/responses for error diagnostics. */
@@ -661,7 +699,7 @@ export class ApiClient {
         // whatever the server emitted, even if it doesn't match either
         // envelope shape.
         throw new NetworkError(`HTTP ${status}: Request failed`, undefined, {
-          responseBody: data,
+          responseBody: truncateBodyForLog(data),
         });
     }
   }
@@ -809,13 +847,7 @@ export class ApiClient {
 
         logApiCall(method, url, response.status);
 
-        // Update the log entry with response details
-        const entry = findLogEntry(logId);
-        if (entry) {
-          entry.status = response.status;
-          entry.responseBody = rawResponseBody;
-          entry.durationMs = Date.now() - startTime;
-        }
+        recordLogEntryResponse(logId, response.status, rawResponseBody, startTime);
 
         // Apply response interceptors
         const processedResponse =
@@ -928,12 +960,7 @@ export class ApiClient {
         );
       }
 
-      const entry = findLogEntry(logId);
-      if (entry) {
-        entry.status = response.status;
-        entry.responseBody = responseData;
-        entry.durationMs = Date.now() - startTime;
-      }
+      recordLogEntryResponse(logId, response.status, responseData, startTime);
 
       if (!response.ok) {
         this.handleErrorResponse(response.status, responseData);
@@ -1013,12 +1040,7 @@ export class ApiClient {
         );
       }
 
-      const entry = findLogEntry(logId);
-      if (entry) {
-        entry.status = response.status;
-        entry.responseBody = responseData;
-        entry.durationMs = Date.now() - startTime;
-      }
+      recordLogEntryResponse(logId, response.status, responseData, startTime);
 
       if (!response.ok) {
         this.handleErrorResponse(response.status, responseData);

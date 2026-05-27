@@ -393,6 +393,14 @@ export function createApp() {
   const PUBLIC_RESUME_DETAIL_ROUTE =
     /^\/api\/resumes\/(?!public(?:$|\/)|embedded(?:$|\/)|getresumesownedbyauthuser(?:$|\/)|withownership(?:$|\/)|mastergroups(?:$|\/)|validateslug(?:$|\/)|save(?:$|\/)|parse(?:$|\/)|createfromfile(?:$|\/)|discover(?:$|\/)|tailor(?:$|\/)|embed(?:$|\/)|upload-file(?:$|\/)|track(?:$|\/)|clone(?:$|\/)|merge(?:$|\/)|stats(?:$|\/)|slug(?:$|\/))[^/]+\/?(?:$|\?)/;
 
+  // /api/locations/* GETs are reference-data (countries / states / cities /
+  // sitemap / resolve / search / reverse / entity-tag reads) consumed by
+  // anonymous landing pages, the public sitemap, the signup LocationPicker,
+  // and Googlebot. POST /entities/:kind/:id (entity-tag writes) stays
+  // authenticated via the default branch — the handler's own owner check
+  // enforces per-entity authorization.
+  const LOCATIONS_REFERENCE_ROUTE = /^\/api\/locations(?:$|\/)/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -425,7 +433,8 @@ export function createApp() {
       (USER_PROFILE_ROUTE.test(path) ||
         PUBLIC_LISTING_ROUTE.test(path) ||
         ADS_CONFIG_ROUTE.test(path) ||
-        PUBLIC_RESUME_DETAIL_ROUTE.test(path))
+        PUBLIC_RESUME_DETAIL_ROUTE.test(path) ||
+        LOCATIONS_REFERENCE_ROUTE.test(path))
     ) {
       return "optional-auth";
     }
