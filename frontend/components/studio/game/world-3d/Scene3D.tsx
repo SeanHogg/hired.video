@@ -14,10 +14,7 @@ import { useRef } from "react";
 import { OrbitControls } from "@react-three/drei";
 import { Physics, RigidBody, CuboidCollider } from "@react-three/rapier";
 import type { ThreeEvent } from "@react-three/fiber";
-import type {
-  World3DEntityKind,
-  World3DState,
-} from "@shared/game-state";
+import type { World3DState } from "@shared/game-state";
 import EntityMesh, { type EntityTriggerEvent } from "./EntityMesh";
 import PlayerController from "./PlayerController";
 import PeerAvatars from "./PeerAvatars";
@@ -27,11 +24,7 @@ interface Scene3DProps {
   world: World3DState;
   mode: "edit" | "play";
   selectedEntityId: string | null;
-  /** Active block-palette kind. When set + mode === edit, clicking
-   *  the ground drops an entity of that kind at the hit point. */
-  paletteKind: World3DEntityKind | null;
   onSelectEntity: (id: string | null) => void;
-  onPlaceAt: (position: [number, number, number]) => void;
   /** Sensor-entity overlap events bubble up to the host's challenge
    *  tracker. Only fires in play mode (the scene drops the handler in
    *  edit mode so authoring clicks can't accidentally trigger
@@ -57,9 +50,7 @@ export default function Scene3D({
   world,
   mode,
   selectedEntityId,
-  paletteKind,
   onSelectEntity,
-  onPlaceAt,
   onTrigger,
   respawnNonce = 0,
   peers,
@@ -75,15 +66,13 @@ export default function Scene3D({
   ];
   sunDirRef.current = world.lighting.sun.direction;
 
-  const handleGroundClick = (e: ThreeEvent<MouseEvent>) => {
+  // Empty-ground click in edit mode = deselect any currently-selected
+  // entity. Placement uses HTML5 drag-and-drop now (the DropPlacer
+  // R3F component handles the drop raycast), so the ground click no
+  // longer needs to know about palette kind.
+  const handleGroundClick = (_e: ThreeEvent<MouseEvent>) => {
     if (mode !== "edit") return;
-    if (!paletteKind) {
-      // Empty-ground click with no palette kind selected = deselect.
-      onSelectEntity(null);
-      return;
-    }
-    e.stopPropagation();
-    onPlaceAt([e.point.x, e.point.y, e.point.z]);
+    onSelectEntity(null);
   };
 
   return (

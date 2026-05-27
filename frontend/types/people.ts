@@ -261,13 +261,12 @@ export interface SendMessageRequest {
   messageType?: "text" | "image" | "file";
 }
 
-// Derived data helpers
-export const getUserFullName = (user: UserProfile | UserMetadata): string => {
-  if ("data" in user) {
-    return `${user.data.firstName} ${user.data.lastName}`;
-  }
-  return user.fullName;
-};
+// Derived data helpers.
+// `getUserFullName` was removed 2026-05-26 (#1657) — its raw
+// `user.fullName` fallback was the source of blank-name bugs on the
+// People grid. Use `getPersonDisplayName` from `lib/person-display.ts`
+// instead, which has the canonical fallback chain (fullName → first+last
+// → name → externalPublicHandle → t("labels.user")).
 
 export const getCurrentPosition = (user: UserProfile): string | undefined => {
   const currentExp = user.data.experience.find((exp) => exp.isCurrent);

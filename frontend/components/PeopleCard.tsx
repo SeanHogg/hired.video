@@ -45,7 +45,8 @@ import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import EntityMedia from "@/components/studio/EntityMedia";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
-import { formatRoleForDisplay, normalizeRole, createRolePermissions } from "@/lib/role-utils";
+import { normalizeRole, createRolePermissions } from "@/lib/role-utils";
+import { getPersonDisplayName, getPersonInitials, getPersonRoleLabel } from "@/lib/person-display";
 import { USER_ROLES } from "@shared/user-roles";
 import type {
   UserMetadata,
@@ -165,27 +166,12 @@ export default function PeopleCard({
     }
   };
 
-  // Derive safe display name and initials
-  const displayFullName =
-    person.fullName && person.fullName.trim().length > 0
-      ? person.fullName
-      : (person as { name?: string })?.name?.toString()?.trim?.() ||
-        `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() ||
-        t("labels.user");
-  const firstInitial = (
-    person.firstName?.[0] ??
-    displayFullName?.trim()?.[0] ??
-    "?"
-  )
-    .toString()
-    .toUpperCase();
-  const lastInitial = (
-    person.lastName?.[0] ??
-    displayFullName?.trim()?.split(" ").slice(-1)[0]?.[0] ??
-    ""
-  )
-    .toString()
-    .toUpperCase();
+  // Display normalization — SINGLE seam at lib/person-display.ts
+  // (#1657 — fixed the duplicate-fallback anti-pattern that surfaced
+  // as blank names on the People grid when this card was a sibling
+  // copy of the same derivation logic in DiscoverPeopleGrid).
+  const displayFullName = getPersonDisplayName(person, t);
+  const initials = getPersonInitials(person, t);
 
   // Build the card footer actions — connection state drives the primary action.
   const fallbackActions: Array<DynamicCardAction | null> = [];
@@ -303,7 +289,7 @@ export default function PeopleCard({
           <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
             <Avatar className="w-10 h-10 flex-shrink-0">
               <AvatarImage src={person.avatar} alt={displayFullName} />
-              <AvatarFallback className="text-xs">{firstInitial}{lastInitial}</AvatarFallback>
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <a href={`/people/${person.slug || person.id}`} className="font-semibold hover:underline truncate block">
@@ -373,17 +359,14 @@ export default function PeopleCard({
             {/* Profile Avatar */}
             <Avatar className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
               <AvatarImage src={person.avatar} alt={displayFullName} />
-              <AvatarFallback className="text-xs sm:text-sm">
-                {firstInitial}
-                {lastInitial}
-              </AvatarFallback>
+              <AvatarFallback className="text-xs sm:text-sm">{initials}</AvatarFallback>
             </Avatar>
 
             {/* Person Info */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
                 <CardTitle className="text-base sm:text-lg hover:text-primary truncate">
-                  <Link to={`/people/${person.slug || person.id}`}>{person.fullName}</Link>
+                  <Link to={`/people/${person.slug || person.id}`}>{displayFullName}</Link>
                 </CardTitle>
                 <div className="flex items-center gap-1 sm:gap-2">
                   {person.emailConfirmed && (
@@ -416,7 +399,7 @@ export default function PeopleCard({
                   <>
                     <div className="flex items-center gap-1">
                       {getRoleIcon(person.role)}
-                      <span>{formatRoleForDisplay(person.role)}</span>
+                      <span>{getPersonRoleLabel(person.role, t)}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />

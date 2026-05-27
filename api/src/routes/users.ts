@@ -127,16 +127,27 @@ function toPublicUserCardDto(r: {
   yearsOfExperience?: number | null;
   profileVisibility?: string | null;
   customUrlSlug?: string | null;
+  externalPublicHandle?: string | null;
   isCreator?: boolean | null;
   creatorPrograms?: { video: boolean; voice: boolean; services: boolean; articles: boolean; courses: boolean; templates: boolean } | null;
 }) {
-  const { firstName, lastName } = splitName(r.name);
+  // Server-side guarantee: fullName is never empty. Fallback to the
+  // public handle (creator brand) if set, else a generic "User <id4>"
+  // so the frontend never has to do its own fallback chain (#1657 —
+  // the duplicate-fallback anti-pattern that blanked names on the
+  // People grid when consumers diverged on which fallback to use).
+  const trimmedName = (r.name ?? "").trim();
+  const fullName =
+    trimmedName
+    || (r.externalPublicHandle ?? "").trim()
+    || `User ${r.id.slice(0, 4)}`;
+  const { firstName, lastName } = splitName(fullName);
   return {
     id: r.id,
     type: "people" as const,
     firstName,
     lastName,
-    fullName: r.name,
+    fullName,
     role: r.role,
     headline: r.headline ?? r.currentRole ?? "",
     summary: r.summary ?? "",

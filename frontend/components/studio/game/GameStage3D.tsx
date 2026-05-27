@@ -41,7 +41,6 @@ import {
 import { useGameRoom } from "@/lib/studio/game/use-game-room";
 import { saveCachedGameState } from "@/lib/studio/game/game-state-cache";
 import { useAuth } from "@/lib/auth";
-import BlockPalette from "./world-3d/BlockPalette";
 import Scene3D from "./world-3d/Scene3D";
 import RightRailDock from "./world-3d/RightRailDock";
 import InspectorPanel from "./world-3d/InspectorPanel";
@@ -49,6 +48,8 @@ import ChallengesPanel from "./world-3d/ChallengesPanel";
 import AIAgentPanel from "./world-3d/AIAgentPanel";
 import ChallengeHUD from "./world-3d/ChallengeHUD";
 import InviteDialog from "./world-3d/InviteDialog";
+import DropPlacer, { type DropPlacerHandler } from "./world-3d/DropPlacer";
+import { ENTITY_DRAG_MIME } from "./world-3d/EntityPaletteLeft";
 import type { EntityTriggerEvent } from "./world-3d/EntityMesh";
 
 interface GameStage3DProps {
@@ -76,10 +77,18 @@ export default function GameStage3D({
   className,
 }: GameStage3DProps) {
   // ─── Local UI state ───────────────────────────────────────────────────
-  const [paletteKind, setPaletteKind] = useState<World3DEntityKind | null>("block");
+  // Palette kind selection moved out of GameStage3D entirely — the
+  // left-rail `<EntityPaletteLeft>` is the drag source; placement
+  // happens via HTML5 drag-and-drop (see `dropHandlerRef` below).
+  // No click-to-place state to track here.
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [respawnNonce, setRespawnNonce] = useState(0);
   const [inviteOpen, setInviteOpen] = useState(false);
+  /** Drop dispatch — DropPlacer (inside the R3F Canvas) sets this on
+   *  mount; the outer drop event reads from `.current` so the HTML5
+   *  drop handler can reach into R3F's camera + canvas for the
+   *  raycast. */
+  const dropHandlerRef = useRef<DropPlacerHandler | null>(null);
 
   const world = gameState ? getWorld(gameState) : null;
 
@@ -198,11 +207,14 @@ export default function GameStage3D({
   }, [mode, selectedEntityId, gameState, onChange]);
 
   // ─── Click-to-place ───────────────────────────────────────────────────
+  /** Drop-receiver — called by DropPlacer with the raycast hit point.
+   *  Adds the dragged entity kind at that position via the shared
+   *  mutation seam (same `addEntity` the AI agent uses — DRY). */
   const handlePlaceAt = useCallback(
-    (position: [number, number, number]) => {
-      if (!gameState || !paletteKind) return;
+    (kind: World3DEntityKind, position: [number, number, number]) => {
+      if (!gameState) return;
       const result = addEntity(gameState, {
-        kind: paletteKind,
+        kind,
         // Lift placed entities so they sit on the ground rather than
         // partially submerged — the default scale's half-height keeps
         // their base flush with y=0.
@@ -211,7 +223,7 @@ export default function GameStage3D({
       onChange(result.state);
       setSelectedEntityId(result.entity.id);
     },
-    [gameState, paletteKind, onChange],
+    [gameState, onChange],
   );
 
   const selectedEntity = useMemo(() => {
@@ -233,6 +245,24 @@ export default function GameStage3D({
         className="relative overflow-hidden rounded-md shadow-lg"
         style={{ width: `${gameState.width}px`, height: `${gameState.height}px` }}
         aria-label={`3D world ${mode === "play" ? "playback" : "preview"}`}
+        // Drop receiver — accepts the left-rail palette's drag
+        // payload (mime `application/x-world3d-kind`) and forwards
+        // to DropPlacer, which raycasts the cursor against the
+        // ground plane to compute the world-space position.
+        // Edit-mode only — play-mode drops are no-ops.
+        onDragOver={(e) => {
+          if (mode !== "edit") return;
+          if (!e.dataTransfer.types.includes(ENTITY_DRAG_MIME)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(e) => {
+          if (mode !== "edit") return;
+          const kind = e.dataTransfer.getData(ENTITY_DRAG_MIME) as World3DEntityKind;
+          if (!kind) return;
+          e.preventDefault();
+          dropHandlerRef.current?.(kind, e.clientX, e.clientY);
+        }}
       >
         <Canvas
           shadows
@@ -243,22 +273,23 @@ export default function GameStage3D({
             world={world}
             mode={mode}
             selectedEntityId={selectedEntityId}
-            paletteKind={paletteKind}
             onSelectEntity={setSelectedEntityId}
-            onPlaceAt={handlePlaceAt}
             onTrigger={handleTrigger}
             respawnNonce={respawnNonce}
             peers={room.peers}
             onBroadcastPosition={room.broadcastPosition}
           />
+          {/* Invisible — registers the drop→world raycast handler
+              via the shared ref. Only active in edit mode; in play
+              the ref stays null and the outer drop handler bails. */}
+          {mode === "edit" && (
+            <DropPlacer handlerRef={dropHandlerRef} onPlace={handlePlaceAt} />
+          )}
         </Canvas>
 
         {/* Edit-mode chrome */}
         {mode === "edit" && (
           <>
-            <div className="pointer-events-auto absolute left-3 top-3 z-20">
-              <BlockPalette activeKind={paletteKind} onPick={setPaletteKind} />
-            </div>
             <RightRailDock
               mode="edit"
               inspector={
@@ -276,8 +307,9 @@ export default function GameStage3D({
               <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 py-2">
                 <Gamepad2 className="h-4 w-4 text-fuchsia-300" />
                 <span className="text-[11px] font-semibold text-white">
-                  3D world · pick a block, click ground to place · click block to
-                  select · drag canvas to orbit · or talk to the AI agent
+                  3D world · drag a piece from the left rail into the
+                  world · click a placed block to select · drag canvas
+                  to orbit · or talk to the AI agent
                 </span>
               </div>
             )}

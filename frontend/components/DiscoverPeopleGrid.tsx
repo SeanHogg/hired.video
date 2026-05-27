@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useConnectionStatuses } from "@/lib/use-connection-statuses";
 import { createRolePermissions } from "@/lib/role-utils";
 import type { PublicUser } from "@/lib/services/user-service";
+import type { UserMetadata } from "@/types/people";
 
 interface DiscoverPeopleGridProps {
   /** The displayed slice — already filtered/paged by the parent. */
@@ -114,43 +115,25 @@ export default function DiscoverPeopleGrid({
           }
         >
           {visiblePeople.map((person) => {
-            const personMetadata = {
-              id: person.id,
-              slug: person.slug,
-              firstName:
-                (person as any).firstName ||
-                person.fullName?.split(" ")[0] ||
-                "",
-              lastName:
-                (person as any).lastName ||
-                person.fullName?.split(" ").slice(1).join(" ") ||
-                "",
-              fullName:
-                person.fullName ||
-                `${(person as any).firstName || ""} ${(person as any).lastName || ""}`.trim(),
-              avatar:
-                (person as any).profilePicture || person.avatar || "",
-              headline: person.headline || "",
-              bio: (person as any).bio || person.headline || "",
+            // No inline display-name / initials / role derivation —
+            // PeopleCard routes through lib/person-display.ts (#1657).
+            // The DTO from /api/users/people already guarantees
+            // non-empty fullName + firstName + lastName (server-side
+            // fallback in toPublicUserCardDto), so this mapper is now
+            // a thin shape coercion only.
+            const personMetadata: UserMetadata = {
+              ...(person as unknown as UserMetadata),
               location: person.location || "Location not specified",
-              role: person.role,
-              skills: person.skills,
-              openToWork: person.openToWork,
-              visibility: "public" as const,
-              status: "active" as const,
-              companyId: (person as any).companyId || "",
-              companyName: person.currentCompany || "",
-              createdAt: person.createdAt,
-              updatedAt: person.updatedAt,
-              lastActiveAt: person.updatedAt || "",
-              profileViews: (person as any).profileViews || 0,
+              visibility: "public",
+              status: "active",
+              lastActiveAt: person.updatedAt || person.createdAt || "",
+              profileViews: (person as { profileViews?: number }).profileViews ?? 0,
               connectionCount: 0,
               followerCount: 0,
               emailConfirmed: person.emailConfirmed || false,
               isPro: person.isPro || false,
-              experienceLevel: "Mid Level",
+              companyName: person.currentCompany || "",
               currentPosition: person.currentRole || "",
-              currentCompany: person.currentCompany || "",
             };
 
             return (

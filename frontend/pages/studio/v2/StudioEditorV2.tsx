@@ -105,6 +105,7 @@ import {
 import GameStage from "@/components/studio/game/GameStage";
 import LevelsRail from "@/components/studio/game/LevelsRail";
 import SpritePalette from "@/components/studio/game/SpritePalette";
+import EntityPaletteLeft from "@/components/studio/game/world-3d/EntityPaletteLeft";
 import GamePropertiesPanel, {
   type GameSelection,
 } from "@/components/studio/game/GamePropertiesPanel";
@@ -2422,21 +2423,40 @@ export default function StudioEditorV2() {
                 />
               </div>
               <div className="flex h-[55%] min-h-[200px] flex-col bg-card">
-                <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Sprites
-                </div>
-                <div className="min-h-0 flex-1">
-                  <SpritePalette
-                    gameState={gameState}
-                    onChange={setGameState}
-                    activeLevelId={activeLevelId}
-                    onSelectSprite={(spriteId) => {
-                      if (spriteId && activeLevelId) {
-                        setGameSelection({ kind: "sprite", levelId: activeLevelId, spriteId });
-                      }
-                    }}
-                  />
-                </div>
+                {/* Engine-aware left-rail palette. 2D mini-games show
+                    the 2D sprite library; 3D worlds show the 3D
+                    entity palette (gap #1636 follow-up — drag-and-drop
+                    the building / trigger / prop kinds into the
+                    canvas). Single column header — the swap is purely
+                    on what fills it. DRY: no parallel section. */}
+                {gameState?.engine === "world-3d" ? (
+                  <>
+                    <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Pieces
+                    </div>
+                    <div className="min-h-0 flex-1">
+                      <EntityPaletteLeft />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Sprites
+                    </div>
+                    <div className="min-h-0 flex-1">
+                      <SpritePalette
+                        gameState={gameState}
+                        onChange={setGameState}
+                        activeLevelId={activeLevelId}
+                        onSelectSprite={(spriteId) => {
+                          if (spriteId && activeLevelId) {
+                            setGameSelection({ kind: "sprite", levelId: activeLevelId, spriteId });
+                          }
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </CollapsiblePanel>
           )}
