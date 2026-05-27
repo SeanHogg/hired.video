@@ -868,6 +868,64 @@ adminRoutes.patch("/pricing", async (c) => {
   return c.json(ok(updated), 200);
 });
 
+// ─── Audience batch-tagging (manual backfill, #1629) ─────────────────
+//
+// Single endpoint accepts (kind, entityIds[], audienceKeys[]) and
+// applies the audiences as an ADDITIVE set on every entity — does not
+// remove existing tags. Matches the "batch tag from admin UI" workflow
+// where editors enrich existing content without wiping prior tags.
+const BatchAudienceBodySchema = z.object({
+  entityKind: z.enum(CONTENT_AUDIENCE_KINDS as readonly string[] as [ContentAudienceKind, ...ContentAudienceKind[]]),
+  entityIds: z.array(z.string().uuid()).min(1).max(500),
+  audienceKeys: z.array(AudienceKeySchema).min(1).max(20),
+});
+
+adminRoutes.post("/content-audiences/batch", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = BatchAudienceBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: { code: "VALIDATION_ERROR", message: parsed.error.message } },
+      400,
+    );
+  }
+  const { entityKind, entityIds, audienceKeys } = parsed.data;
+  const service = new AudienceService({ db: getDb() });
+  // Idempotent add: for each entity, union existing + requested. Repo
+  // unique index makes re-tagging a no-op so we don't need to fetch
+  // existing first — but doing so lets us return per-entity counts.
+  const results = await Promise.all(
+    entityIds.map(async (id) => {
+      const existing = await service.resolveForEntity(entityKind, id);
+      const existingKeys = new Set(existing.map((r) => r.audienceKey));
+      const merged: AudienceKey[] = [
+        ...existing.map((r) => r.audienceKey),
+        ...audienceKeys.filter((k) => !existingKeys.has(k)),
+      ];
+      await service.saveAudiences(
+        entityKind,
+        id,
+        merged.map((k) => ({ audienceKey: k })),
+      );
+      return { entityId: id, tagsApplied: audienceKeys.length, totalTags: merged.length };
+    }),
+  );
+  return c.json(ok({ entityKind, results }), 200);
+});
+
+/** Read endpoint for the admin UI — returns the current audience tag
+ *  set for one entity so the picker pre-fills before the editor adjusts. */
+adminRoutes.get("/content-audiences/:kind/:entityId", async (c) => {
+  const kindParam = c.req.param("kind");
+  const entityId = c.req.param("entityId");
+  if (!CONTENT_AUDIENCE_KINDS.includes(kindParam as ContentAudienceKind)) {
+    return c.json({ error: { code: "VALIDATION_ERROR", message: "Unknown kind" } }, 400);
+  }
+  const service = new AudienceService({ db: getDb() });
+  const rows = await service.resolveForEntity(kindParam as ContentAudienceKind, entityId);
+  return c.json(ok({ entityId, kind: kindParam, audiences: rows }), 200);
+});
+
 adminRoutes.all("*", (c) =>
 	c.json({ error: { code: "NOT_FOUND", message: "Admin route not found" } }, 404),
 );

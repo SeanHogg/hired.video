@@ -25,7 +25,7 @@ import { companyProfiles } from "./companies.js";
 // ---------------------------------------------------------------------------
 export const boosts = pgTable("boosts", {
   id:                    uuid("id").primaryKey().defaultRandom(),
-  userId:                uuid("user_id").notNull(),
+  userId:                uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   subjectType:           varchar("subject_type", { length: 32 }).notNull(),
   subjectId:             uuid("subject_id").notNull(),
   placementType:         varchar("placement_type", { length: 32 }).notNull().default("feed_top"),
@@ -57,8 +57,8 @@ export type NewBoost = typeof boosts.$inferInsert;
 // ---------------------------------------------------------------------------
 export const jobBoosts = pgTable("job_boosts", {
   id:                    uuid("id").primaryKey().defaultRandom(),
-  jobId:                 text("job_id").notNull(),
-  userId:                text("user_id").notNull(),
+  jobId:                 uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
+  userId:                uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   placementType:         text("placement_type").notNull(), // search_top | discovery_feed | both
   pricingModel:          text("pricing_model").notNull(),  // cpm | cpc
   budgetCents:           integer("budget_cents").notNull(),
@@ -87,8 +87,8 @@ export const jobBoosts = pgTable("job_boosts", {
 // ---------------------------------------------------------------------------
 export const companyBoosts = pgTable("company_boosts", {
   id:                    uuid("id").primaryKey().defaultRandom(),
-  companyId:             text("company_id").notNull(),
-  userId:                text("user_id").notNull(),                 // owner who paid
+  companyId:             uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
+  userId:                uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),  // owner who paid
   placementType:         text("placement_type").notNull(),           // directory_featured | dashboard_spotlight | discovery_feed | all
   pricingModel:          text("pricing_model").notNull(),            // flat | cpm
   budgetCents:           integer("budget_cents").notNull(),
