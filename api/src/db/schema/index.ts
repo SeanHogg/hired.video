@@ -66,6 +66,7 @@ export * from "./usage.js";
 export * from "./extension.js";
 export * from "./paidmedia.js";
 export * from "./gamification.js";
+export * from "./games.js";
 export * from "./liveScreening.js";
 export * from "./compliance.js";
 export * from "./workforce.js";

@@ -57,6 +57,16 @@ jobs:
         # /lastName/bio` (#1591) and other drift landed on main unnoticed.
         run: cd api && npm run typecheck
 
+      - name: Lint SQL migrations
+        # Gap #1643. Enforces the idempotent patterns in
+        # api/drizzle/TEMPLATE.md on every new migration (≥ 0156).
+        # Catches `pg_temp.*` (the pg_temp ban that broke pass-7 CI),
+        # `ALTER COLUMN TYPE` without data_type gate, `ADD CONSTRAINT`
+        # without pg_constraint gate, `DROP COLUMN/TABLE` without IF
+        # EXISTS. Pre-#1625 migrations are flagged advisory only since
+        # they're frozen in production.
+        run: cd api && node scripts/lint-migrations.mjs
+
       - name: Run api tests
         # 1944 node:test cases via scripts/run-tests.mjs (gap #1617).
         # Previous hand-glob in package.json missed `__tests__/` dirs in

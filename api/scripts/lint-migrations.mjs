@@ -99,20 +99,42 @@ function lintFile(name, raw) {
   return violations;
 }
 
+/** TEMPLATE.md was codified in pass-7 (#1625). Migrations created
+ *  before then are frozen in production and the lint can't retro-fix
+ *  them — they pass as-is. Files at or after this number are strict. */
+const LINT_STRICT_FROM = 156;
+
+function fileNumber(name) {
+  const m = name.match(/^0*(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 function main() {
   const files = readdirSync(DRIZZLE_DIR)
     .filter((f) => /^0\d+.*\.sql$/.test(f))
     .sort();
 
   let failed = 0;
+  let legacyFlagged = 0;
   for (const f of files) {
     const raw = readFileSync(join(DRIZZLE_DIR, f), "utf8");
     const vios = lintFile(f, raw);
-    if (vios.length > 0) {
+    if (vios.length === 0) continue;
+
+    const strict = fileNumber(f) >= LINT_STRICT_FROM;
+    if (strict) {
       failed++;
       console.error(`✗ ${f}`);
       for (const v of vios) console.error(`    ${v}`);
+    } else {
+      legacyFlagged++;
     }
+  }
+
+  if (legacyFlagged > 0) {
+    console.log(
+      `(${legacyFlagged} pre-#1625 file(s) violate the template — frozen, not enforced.)`,
+    );
   }
 
   if (failed > 0) {

@@ -113,6 +113,9 @@ export const ACTIONS = {
 
   // Badge unlock bonuses (written by the badge engine in phase 2)
   BADGE_UNLOCKED: "badge.unlocked",
+
+  // 3D world play (gap #1635 — challenge completions earn points)
+  PLAY_GAME_CHALLENGE: "play.game.challenge",
 } as const;
 
 export type ActionKey = (typeof ACTIONS)[keyof typeof ACTIONS];
@@ -289,6 +292,20 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     points: 0, // engine sets per-badge value
     category: "badge_bonus",
     source: "badge",
+  },
+
+  // 3D world play (gap #1635). Available to every scoring role — kids
+  // earn just like job-seekers since gamification points feed the same
+  // rewards catalog regardless of how they were earned. Daily cap keeps
+  // farming honest (replay-the-same-world-100-times not allowed).
+  [ACTIONS.PLAY_GAME_CHALLENGE]: {
+    key: ACTIONS.PLAY_GAME_CHALLENGE,
+    label: "Completed a 3D-world challenge",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 25,
+    category: "earn",
+    dailyCapPoints: 200,
+    source: "game",
   },
 
   // ── Recruiter catalog ───────────────────────────────────────────────
