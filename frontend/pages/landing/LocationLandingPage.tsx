@@ -199,10 +199,11 @@ export default function LocationLandingPage(): JSX.Element {
       </section>
 
       <MarketingFAQ
+        schemaId="in-location-faq"
         items={[
-          { q: `Is this page just for ${headerTitle}?`, a: "Yes — jobs, articles, templates, and video resumes tagged with this location appear here. Content is filtered geographically, not just by free-text matching." },
-          { q: "How do you decide which cities get pages?", a: "Cities with at least 10 active jobs or 1 tagged article get an auto-generated page. The top metros also get hand-curated relocation guides and key-employer lists." },
-          { q: "I want to write a relocation guide. How?", a: "Authenticated users with residency tenure on this location can submit relocation guides through the article publish flow — they earn the 'City Guide' badge plus points when accepted." },
+          { question: `Is this page just for ${headerTitle}?`, answer: "Yes — jobs, articles, templates, and video resumes tagged with this location appear here. Content is filtered geographically, not just by free-text matching." },
+          { question: "How do you decide which cities get pages?", answer: "Cities with at least 10 active jobs or 1 tagged article get an auto-generated page. The top metros also get hand-curated relocation guides and key-employer lists." },
+          { question: "I want to write a relocation guide. How?", answer: "Authenticated users with residency tenure on this location can submit relocation guides through the article publish flow — they earn the 'City Guide' badge plus points when accepted." },
         ]}
       />
     </AppShell>

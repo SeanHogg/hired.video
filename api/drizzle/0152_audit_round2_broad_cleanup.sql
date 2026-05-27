@@ -21,7 +21,7 @@
 -- Helpers (re-declared per migration; sessions are isolated).
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION pg_temp.__convert_text_user_id(target_table text)
+CREATE OR REPLACE FUNCTION public.__mig_0152_convert_text_user_id(target_table text)
 RETURNS void
 LANGUAGE plpgsql
 AS $func$
@@ -154,16 +154,16 @@ END $$;
 --    so orphan-DELETE pre-flights are safe.
 -- ---------------------------------------------------------------------------
 
-SELECT pg_temp.__convert_text_user_id('paid_media_connections');
-SELECT pg_temp.__convert_text_user_id('paid_media_accounts');
-SELECT pg_temp.__convert_text_user_id('paid_media_campaigns');
-SELECT pg_temp.__convert_text_user_id('paid_media_ad_sets');
+SELECT public.__mig_0152_convert_text_user_id('paid_media_connections');
+SELECT public.__mig_0152_convert_text_user_id('paid_media_accounts');
+SELECT public.__mig_0152_convert_text_user_id('paid_media_campaigns');
+SELECT public.__mig_0152_convert_text_user_id('paid_media_ad_sets');
 
 -- paid_media_pixels has user_id only if present; also bundle.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'paid_media_pixels' AND column_name = 'user_id') THEN
-    PERFORM pg_temp.__convert_text_user_id('paid_media_pixels');
+    PERFORM public.__mig_0152_convert_text_user_id('paid_media_pixels');
   END IF;
 END $$;
 

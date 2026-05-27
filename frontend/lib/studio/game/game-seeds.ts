@@ -20,11 +20,13 @@
 
 import {
   emptyGameState,
+  empty3DGameState,
   type GameAsset,
   type GameSprite,
   type GameState,
 } from "@shared/game-state";
 import type { ContentTemplate } from "@/components/studio/templates/catalog";
+import { addEntity } from "./world-3d-edit";
 import {
   BUILTIN_SPRITES,
   pickBuiltinSprite,
@@ -197,6 +199,51 @@ const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
       ),
     };
     return base;
+  },
+
+  // 3D world seed (gap #1633). Empty Roblox-style starter world with
+  // a few scattered platforms + a goal block — enough to let the
+  // playtest first-person controller actually do something on first
+  // open, but light enough that the AI agent (Phase 5) has room to
+  // build on top without competing with seeded geometry.
+  game_3d_world: () => {
+    let state = empty3DGameState({ width: 1280, height: 720, fps: 60 });
+    // Small platforms forming a step-up path
+    state = addEntity(state, {
+      kind: "platform",
+      position: [4, 1, 0],
+      scale: [3, 0.5, 3],
+      color: "#a3a3a3",
+    }).state;
+    state = addEntity(state, {
+      kind: "platform",
+      position: [8, 2.5, 0],
+      scale: [3, 0.5, 3],
+      color: "#9ca3af",
+    }).state;
+    state = addEntity(state, {
+      kind: "platform",
+      position: [12, 4, 0],
+      scale: [3, 0.5, 3],
+      color: "#94a3b8",
+    }).state;
+    // A goal at the top of the stairs
+    state = addEntity(state, {
+      kind: "goal",
+      position: [12, 5.5, 0],
+      scale: [2, 2, 2],
+      color: "#22c55e",
+      tag: "level-goal",
+    }).state;
+    // A collectible coin near the start
+    state = addEntity(state, {
+      kind: "collectible",
+      position: [-3, 1, -2],
+      scale: [0.6, 0.6, 0.6],
+      color: "#facc15",
+      tag: "coin",
+    }).state;
+    return state;
   },
 };
 

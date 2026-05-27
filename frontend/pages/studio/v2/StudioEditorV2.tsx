@@ -2632,6 +2632,15 @@ export default function StudioEditorV2() {
                                 prev ? gameUpdateSprite(prev, activeLevelId, spriteId, { x, y }) : prev,
                               );
                             }}
+                            // Whole-state writer — the 3D path
+                            // (engine === "world-3d") routes every
+                            // mutation through here so place / select /
+                            // delete / inspector edits all converge on
+                            // the same `setGameState` setter the 2D
+                            // path uses (DRY: one persistence pipeline).
+                            // The 2D path ignores `onChange` and keeps
+                            // using the fine-grained sprite handlers.
+                            onChange={setGameState}
                           />
                           {/* Playtest toggle — overlaid on the GameStage so
                               the user has the affordance right next to the

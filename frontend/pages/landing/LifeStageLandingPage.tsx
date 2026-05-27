@@ -57,10 +57,11 @@ export function LifeStageLandingPage({ meta }: LifeStageLandingPageProps): JSX.E
       </section>
 
       <MarketingFAQ
+        schemaId={`for-${meta.key}-faq`}
         items={[
-          { q: `Is hired.video really free for ${meta.label.toLowerCase()}?`, a: "Yes — the resume builder, profile, video resume, applying to jobs, and the resource map are free. Pro ($9.95/mo) unlocks AI scoring, optimization, and the studio template marketplace at no per-feature cost." },
-          { q: "How do I get tagged content for my situation?", a: `Browse the resource map above — articles, templates, video resumes, and learning paths tagged "${meta.label}" surface in each bucket. Tagged content grows as creators publish; check back as your situation evolves.` },
-          { q: "Can I switch to a different path later?", a: "Yes. Your account isn't locked to an audience — these landing pages are just curated entry points. Move between them freely." },
+          { question: `Is hired.video really free for ${meta.label.toLowerCase()}?`, answer: "Yes — the resume builder, profile, video resume, applying to jobs, and the resource map are free. Pro ($9.95/mo) unlocks AI scoring, optimization, and the studio template marketplace at no per-feature cost." },
+          { question: "How do I get tagged content for my situation?", answer: `Browse the resource map above — articles, templates, video resumes, and learning paths tagged "${meta.label}" surface in each bucket. Tagged content grows as creators publish; check back as your situation evolves.` },
+          { question: "Can I switch to a different path later?", answer: "Yes. Your account isn't locked to an audience — these landing pages are just curated entry points. Move between them freely." },
         ]}
       />
 

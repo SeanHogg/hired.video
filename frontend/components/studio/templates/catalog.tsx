@@ -94,6 +94,10 @@ export type ContentTemplate =
   | "voice_ivr_prompt"
   | "voice_audiobook_chapter"
   | "product_promo"
+  // 3D world (gap #1633) — Three.js + react-three-fiber + Rapier
+  // first-person editable world. Headline of the games shelf; the
+  // three 2D entries below are the "mini-game" lane.
+  | "game_3d_world"
   | "endless_runner"
   | "quiz_game"
   | "memory_match"
@@ -778,17 +782,40 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     firstTabLabel: "Promo",
     IntakeForm: BasicIntake,
   },
-  // ─── Game templates (#927 / Phase 1 — runtime is placeholder) ─────────
+  // ─── Game templates (#927 / gap #1633) ─────────────────────────────────
   // `mediaKind: "game"` routes the editor's `<CanvasRouter>` to mount
-  // `<GameStage>` instead of `<CanvasStage>`. Seeds live in
-  // `lib/studio/game/game-seeds.ts` (parallel to `template-seeds.ts`
-  // for Timeline kinds). All three reuse `BasicIntake` for the prose
-  // prompt; a game-specific intake (sprite picker + behavior chips)
-  // lands with the Phaser integration in a follow-on pass.
+  // `<GameStage>` instead of `<CanvasStage>`. Two engine lanes under
+  // the same mediaKind, discriminated by `gameState.engine`:
+  //   - `world-3d` — the 3D World template below. Three.js + R3F +
+  //     Rapier, first-person playable, designer drops blocks / ramps /
+  //     collectibles. Headline of the games shelf.
+  //   - `canvas-2d` — the three "mini-game" entries (endless runner,
+  //     quiz, memory match). Hand-rolled 2D Canvas runtime per #1009
+  //     + #1014. Kept as a faster path for arcade-style content.
+  // Seeds for both lanes live in `lib/studio/game/game-seeds.ts`. All
+  // entries reuse `BasicIntake` for the prose prompt; a 3D-specific
+  // intake with theme / vibe pickers lands when the AI agent (Phase 5)
+  // ships.
+  {
+    id: "game_3d_world",
+    label: "3D World",
+    desc: "Roblox-style 3D world — drop blocks, place a goal, invite friends to play.",
+    icon: Gamepad2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "game",
+    audiences: ["game_dev", "creator", "developer", "designer", "student"],
+    defaultName: "3D World",
+    defaultPrompt:
+      "Design a 3D world game: place platforms, ramps, collectibles, and a goal. Invite friends to play, set a challenge (collect N coins, reach the goal under T seconds). Use the AI panel to prototype the level by describing it in plain English.",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
   {
     id: "endless_runner",
-    label: "Endless runner",
-    desc: "Side-scrolling jump-and-dodge game — your sprite, your obstacles, your music.",
+    label: "Mini-game · Endless runner",
+    desc: "Side-scrolling 2D jump-and-dodge — your sprite, your obstacles, your music.",
     icon: Rabbit,
     importMode: "none",
     purpose: "personal_brand",
@@ -803,8 +830,8 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
   },
   {
     id: "quiz_game",
-    label: "Quiz game",
-    desc: "Multiple-choice trivia — title screen, questions, scoring, leaderboard.",
+    label: "Mini-game · Quiz",
+    desc: "2D multiple-choice trivia — title screen, questions, scoring, leaderboard.",
     icon: Brain,
     importMode: "none",
     purpose: "personal_brand",
@@ -819,8 +846,8 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
   },
   {
     id: "memory_match",
-    label: "Memory match",
-    desc: "Card-matching memory game — flip pairs, beat the clock, share your time.",
+    label: "Mini-game · Memory match",
+    desc: "2D card-matching memory game — flip pairs, beat the clock, share your time.",
     icon: Gamepad2,
     importMode: "none",
     purpose: "personal_brand",

@@ -20,11 +20,16 @@
  * The exported HTML5 bundle uses the SAME runtime module bundled
  * standalone. Three surfaces, one runtime — DRY commitment from PRD §1.2.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Gamepad2, Sparkles } from "lucide-react";
 import type { GameLevel, GameState } from "@shared/game-state";
 import { runGame, findStartLevel } from "@/lib/studio/game/runtime";
 import { cn } from "@/lib/utils";
+
+// 3D runtime — lazy because Three.js + R3F + Rapier add ~600KB gzipped
+// that 2D-mini-game projects shouldn't pay for. Loaded only when the
+// project's `engine` discriminator demands the 3D path.
+const GameStage3D = lazy(() => import("./GameStage3D"));
 
 interface GameStageProps {
   /** GameState pulled from `studioProject.gameState`. Null when the
@@ -64,6 +69,14 @@ interface GameStageProps {
    *  (entity cards + public pages) don't want the annotation
    *  bleeding into the playback view; the editor preview does. */
   hideRuntimeBanner?: boolean;
+  /** Whole-GameState writer — required for `engine === "world-3d"`
+   *  projects (3D editor mutates the world graph in many shapes;
+   *  threading per-field handlers would bloat the prop surface). The
+   *  2D path keeps the fine-grained `onSelectSprite` / `onMoveSprite`
+   *  handlers because their interactions are simpler. ProjectPlayer
+   *  doesn't pass this so the public-page play surface stays
+   *  read-only. */
+  onChange?: (next: GameState) => void;
   className?: string;
 }
 
@@ -76,8 +89,40 @@ export default function GameStage({
   onSelectSprite,
   onMoveSprite,
   hideRuntimeBanner = false,
+  onChange,
   className,
 }: GameStageProps) {
+  // 3D-runtime dispatch — projects authored with `engine === "world-3d"`
+  // mount the R3F + Rapier stage instead of the 2D Canvas loop. Single
+  // dispatch point per the canvas-runtime extensibility model in
+  // PRD §1.2; the host (`StudioEditorV2`) wires both paths through the
+  // same `setGameState` setter (DRY: one persistence pipeline).
+  if (gameState?.engine === "world-3d") {
+    return (
+      <Suspense
+        fallback={
+          <div
+            className={cn(
+              "flex aspect-video w-[640px] flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground",
+              className,
+            )}
+          >
+            <Gamepad2 className="h-10 w-10 text-fuchsia-500 animate-pulse" />
+            <p className="mt-2 text-xs">Loading 3D runtime…</p>
+          </div>
+        }
+      >
+        <GameStage3D
+          gameState={gameState}
+          mode={mode}
+          onChange={onChange ?? (() => {})}
+          hideRuntimeBanner={hideRuntimeBanner}
+          className={className}
+        />
+      </Suspense>
+    );
+  }
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // Drag state — set on pointer-down on a sprite; cleared on
   // pointer-up. `offsetX/Y` records the click offset within the
