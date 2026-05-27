@@ -58,7 +58,20 @@ interface FetchOpts {
   body?: unknown;
 }
 
-/** JSON fetch helper — sends + receives JSON, includes credentials.
+/** Resolve the current Authorization bearer header value, if any. The
+ *  hired.video auth layer reads `Authorization: Bearer <jwt>` (NOT
+ *  cookies) — see [api/src/middleware/auth.ts](../../../api/src/middleware/auth.ts).
+ *  This helper mirrors the same `localStorage.getItem("auth_token")`
+ *  pattern [api-client.ts](../api-client.ts) uses (DRY: one token
+ *  storage key across every fetch site). */
+function authBearerHeader(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = window.localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** JSON fetch helper — sends + receives JSON, attaches the Bearer
+ *  token from localStorage so the request passes authMiddleware.
  *  Returns the parsed `data` envelope on success, throws an Error on
  *  network or HTTP failure. Callers `.catch(...)` if they want to
  *  swallow; the helper itself never silently no-ops on a non-OK
@@ -67,7 +80,7 @@ interface FetchOpts {
 export async function gamesApiJson<T>(path: string, opts: FetchOpts = {}): Promise<T> {
   const res = await fetch(gamesApiUrl(path), {
     method: opts.method ?? "GET",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...authBearerHeader() },
     credentials: "include",
     body: opts.body != null ? JSON.stringify(opts.body) : undefined,
   });
