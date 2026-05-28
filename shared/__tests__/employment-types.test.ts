@@ -1,55 +1,55 @@
-// @ts-ignore vitest types aren't in the api package's tsconfig; shared
-// tests run under vitest (frontend) — same convention as the other
-// shared/__tests__ files.
-import { expect, test } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   EMPLOYMENT_TYPES,
   EMPLOYMENT_TYPE_LABELS,
   normalizeEmploymentType,
 } from "../employment-types.js";
 
-test("every canonical type has a display label", () => {
-  for (const t of EMPLOYMENT_TYPES) {
-    expect(EMPLOYMENT_TYPE_LABELS[t]).toBeTruthy();
-  }
-});
+describe("employment types", () => {
+  it("every canonical type has a display label", () => {
+    for (const t of EMPLOYMENT_TYPES) {
+      assert.ok(EMPLOYMENT_TYPE_LABELS[t]);
+    }
+  });
 
-test("exec opportunity types are present in the canonical set", () => {
-  for (const t of ["fractional", "advisor", "interim", "board-seat"] as const) {
-    expect(EMPLOYMENT_TYPES).toContain(t);
-  }
-});
+  it("exec opportunity types are present in the canonical set", () => {
+    for (const t of ["fractional", "advisor", "interim", "board-seat"] as const) {
+      assert.ok(EMPLOYMENT_TYPES.includes(t));
+    }
+  });
 
-test("normalizes the three legacy spellings to canonical kebab", () => {
-  // PascalCase (form), snake_case (scraper/AI), kebab (api) all fold in.
-  expect(normalizeEmploymentType("FullTime")).toBe("full-time");
-  expect(normalizeEmploymentType("full_time")).toBe("full-time");
-  expect(normalizeEmploymentType("full-time")).toBe("full-time");
-  expect(normalizeEmploymentType("PartTime")).toBe("part-time");
-  expect(normalizeEmploymentType("part_time")).toBe("part-time");
-  expect(normalizeEmploymentType("Contractor")).toBe("contract");
-  expect(normalizeEmploymentType("contract")).toBe("contract");
-  expect(normalizeEmploymentType("ContractToHire")).toBe("contract-to-hire");
-  expect(normalizeEmploymentType("contract_to_hire")).toBe("contract-to-hire");
-  expect(normalizeEmploymentType("Internship")).toBe("internship");
-  expect(normalizeEmploymentType("Freelance")).toBe("freelance");
-  expect(normalizeEmploymentType("Temporary")).toBe("temporary");
-  expect(normalizeEmploymentType("volunteer")).toBe("volunteer");
-});
+  it("normalizes the three legacy spellings to canonical kebab", () => {
+    // PascalCase (form), snake_case (scraper/AI), kebab (api) all fold in.
+    assert.equal(normalizeEmploymentType("FullTime"), "full-time");
+    assert.equal(normalizeEmploymentType("full_time"), "full-time");
+    assert.equal(normalizeEmploymentType("full-time"), "full-time");
+    assert.equal(normalizeEmploymentType("PartTime"), "part-time");
+    assert.equal(normalizeEmploymentType("part_time"), "part-time");
+    assert.equal(normalizeEmploymentType("Contractor"), "contract");
+    assert.equal(normalizeEmploymentType("contract"), "contract");
+    assert.equal(normalizeEmploymentType("ContractToHire"), "contract-to-hire");
+    assert.equal(normalizeEmploymentType("contract_to_hire"), "contract-to-hire");
+    assert.equal(normalizeEmploymentType("Internship"), "internship");
+    assert.equal(normalizeEmploymentType("Freelance"), "freelance");
+    assert.equal(normalizeEmploymentType("Temporary"), "temporary");
+    assert.equal(normalizeEmploymentType("volunteer"), "volunteer");
+  });
 
-test("normalizes exec opportunity types", () => {
-  expect(normalizeEmploymentType("BoardSeat")).toBe("board-seat");
-  expect(normalizeEmploymentType("board_seat")).toBe("board-seat");
-  expect(normalizeEmploymentType("board")).toBe("board-seat");
-  expect(normalizeEmploymentType("Fractional")).toBe("fractional");
-  expect(normalizeEmploymentType("Advisor")).toBe("advisor");
-  expect(normalizeEmploymentType("advisory")).toBe("advisor");
-  expect(normalizeEmploymentType("Interim")).toBe("interim");
-});
+  it("normalizes exec opportunity types", () => {
+    assert.equal(normalizeEmploymentType("BoardSeat"), "board-seat");
+    assert.equal(normalizeEmploymentType("board_seat"), "board-seat");
+    assert.equal(normalizeEmploymentType("board"), "board-seat");
+    assert.equal(normalizeEmploymentType("Fractional"), "fractional");
+    assert.equal(normalizeEmploymentType("Advisor"), "advisor");
+    assert.equal(normalizeEmploymentType("advisory"), "advisor");
+    assert.equal(normalizeEmploymentType("Interim"), "interim");
+  });
 
-test("returns null for unknown / empty values", () => {
-  expect(normalizeEmploymentType("nonsense")).toBeNull();
-  expect(normalizeEmploymentType("")).toBeNull();
-  expect(normalizeEmploymentType(null)).toBeNull();
-  expect(normalizeEmploymentType(undefined)).toBeNull();
+  it("returns null for unknown / empty values", () => {
+    assert.equal(normalizeEmploymentType("nonsense"), null);
+    assert.equal(normalizeEmploymentType(""), null);
+    assert.equal(normalizeEmploymentType(null), null);
+    assert.equal(normalizeEmploymentType(undefined), null);
+  });
 });

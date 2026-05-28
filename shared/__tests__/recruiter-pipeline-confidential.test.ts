@@ -1,59 +1,60 @@
-// @ts-ignore vitest types aren't in the api package's tsconfig; shared
-// tests run under vitest (frontend) — same convention as the other tests.
-import { expect, test } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   isConfidentialIdentityRevealed,
   maskConfidentialCandidate,
   CONFIDENTIAL_CANDIDATE_LABEL,
 } from "../recruiter-pipeline.js";
 
-test("identity stays hidden before shortlist, reveals at/after it", () => {
-  expect(isConfidentialIdentityRevealed("applied")).toBe(false);
-  expect(isConfidentialIdentityRevealed("longlist")).toBe(false);
-  expect(isConfidentialIdentityRevealed("screening")).toBe(false);
-  expect(isConfidentialIdentityRevealed("interviewing")).toBe(false);
-  expect(isConfidentialIdentityRevealed("shortlist")).toBe(true);
-  expect(isConfidentialIdentityRevealed("submitted")).toBe(true);
-  expect(isConfidentialIdentityRevealed("offer")).toBe(true);
-  expect(isConfidentialIdentityRevealed("hired")).toBe(true);
-});
+describe("recruiter pipeline confidential masking", () => {
+  it("identity stays hidden before shortlist, reveals at/after it", () => {
+    assert.equal(isConfidentialIdentityRevealed("applied"), false);
+    assert.equal(isConfidentialIdentityRevealed("longlist"), false);
+    assert.equal(isConfidentialIdentityRevealed("screening"), false);
+    assert.equal(isConfidentialIdentityRevealed("interviewing"), false);
+    assert.equal(isConfidentialIdentityRevealed("shortlist"), true);
+    assert.equal(isConfidentialIdentityRevealed("submitted"), true);
+    assert.equal(isConfidentialIdentityRevealed("offer"), true);
+    assert.equal(isConfidentialIdentityRevealed("hired"), true);
+  });
 
-test("rejected never reveals (confidential candidate rejected pre-shortlist stays anonymous)", () => {
-  expect(isConfidentialIdentityRevealed("rejected")).toBe(false);
-});
+  it("rejected never reveals (confidential candidate rejected pre-shortlist stays anonymous)", () => {
+    assert.equal(isConfidentialIdentityRevealed("rejected"), false);
+  });
 
-const entry = {
-  candidateName: "Jane Executive",
-  candidateEmail: "jane@corp.com",
-  candidatePhone: "+1 555 0100",
-  candidateLocation: "NYC",
-  candidateLinkedinUrl: "https://linkedin.com/in/jane",
-  candidateResumeUrl: "https://cdn/resume.pdf",
-  candidateAvatarUrl: "https://cdn/jane.jpg",
-  candidateUserId: "u-1",
-};
+  const entry = {
+    candidateName: "Jane Executive",
+    candidateEmail: "jane@corp.com",
+    candidatePhone: "+1 555 0100",
+    candidateLocation: "NYC",
+    candidateLinkedinUrl: "https://linkedin.com/in/jane",
+    candidateResumeUrl: "https://cdn/resume.pdf",
+    candidateAvatarUrl: "https://cdn/jane.jpg",
+    candidateUserId: "u-1",
+  };
 
-test("masks a confidential candidate before shortlist", () => {
-  const m = maskConfidentialCandidate(entry, { isConfidential: true, stage: "screening" });
-  expect(m.confidentialMasked).toBe(true);
-  expect(m.candidateName).toBe(CONFIDENTIAL_CANDIDATE_LABEL);
-  expect(m.candidateEmail).toBeNull();
-  expect(m.candidatePhone).toBeNull();
-  expect(m.candidateLinkedinUrl).toBeNull();
-  expect(m.candidateResumeUrl).toBeNull();
-  expect(m.candidateAvatarUrl).toBeNull();
-  expect(m.candidateUserId).toBeNull();
-});
+  it("masks a confidential candidate before shortlist", () => {
+    const m = maskConfidentialCandidate(entry, { isConfidential: true, stage: "screening" });
+    assert.equal(m.confidentialMasked, true);
+    assert.equal(m.candidateName, CONFIDENTIAL_CANDIDATE_LABEL);
+    assert.equal(m.candidateEmail, null);
+    assert.equal(m.candidatePhone, null);
+    assert.equal(m.candidateLinkedinUrl, null);
+    assert.equal(m.candidateResumeUrl, null);
+    assert.equal(m.candidateAvatarUrl, null);
+    assert.equal(m.candidateUserId, null);
+  });
 
-test("reveals a confidential candidate at shortlist", () => {
-  const m = maskConfidentialCandidate(entry, { isConfidential: true, stage: "shortlist" });
-  expect(m.confidentialMasked).toBe(false);
-  expect(m.candidateName).toBe("Jane Executive");
-  expect(m.candidateEmail).toBe("jane@corp.com");
-});
+  it("reveals a confidential candidate at shortlist", () => {
+    const m = maskConfidentialCandidate(entry, { isConfidential: true, stage: "shortlist" });
+    assert.equal(m.confidentialMasked, false);
+    assert.equal(m.candidateName, "Jane Executive");
+    assert.equal(m.candidateEmail, "jane@corp.com");
+  });
 
-test("never masks a non-confidential candidate", () => {
-  const m = maskConfidentialCandidate(entry, { isConfidential: false, stage: "applied" });
-  expect(m.confidentialMasked).toBe(false);
-  expect(m.candidateName).toBe("Jane Executive");
+  it("never masks a non-confidential candidate", () => {
+    const m = maskConfidentialCandidate(entry, { isConfidential: false, stage: "applied" });
+    assert.equal(m.confidentialMasked, false);
+    assert.equal(m.candidateName, "Jane Executive");
+  });
 });
