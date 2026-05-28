@@ -13,6 +13,14 @@
  * already routed by `mediaKind` long before this rename), so a Photoshop
  * tile reads as a drawing, a memory-match game as a game state, etc.
  *
+ * Collapsed-by-default / expand-to-load (universal across every entity
+ * card — resume / job / company / profile): the rail lives behind a single
+ * toggle and the projects fetch is DEFERRED until the viewer expands it.
+ * Mounting one EntityMedia per card on a grid (e.g. the People directory)
+ * otherwise fired an N+1 of `/studio/projects/public` requests on page
+ * load, most returning nothing for entities with no public media. The
+ * fetch now costs zero until the viewer opts in.
+ *
  * Self-contained per the DRY rule:
  *   • Owns its own data fetch. Owners hit the auth'd
  *     `studioService.getProjects({ kind, id })` so they see drafts +
@@ -39,7 +47,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Pencil, Play, Plus } from "lucide-react";
+import { ChevronDown, Loader2, Pencil, Play, Plus } from "lucide-react";
 import {
   formatStudioSubject,
   STUDIO_SUBJECT_LABEL,
@@ -50,6 +58,11 @@ import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import MediaKindBadge from "./shared/MediaKindBadge";
 import VideoProjectThumbnail from "./shared/VideoProjectThumbnail";
 
@@ -72,6 +85,13 @@ export default function EntityMedia({
 }: EntityMediaProps) {
   const apiReady = useApiReady();
   const [items, setItems] = useState<StudioProject[] | null>(null);
+  // Collapsed by default — the projects fetch below is gated on this so a
+  // closed panel costs zero API calls. This is universal across every
+  // entity that mounts EntityMedia (resume / job / company / profile
+  // cards): the rail lives behind an expand toggle so a grid of N cards
+  // no longer fires an N+1 of `/studio/projects/public` requests, most of
+  // which return nothing for entities with no public media.
+  const [open, setOpen] = useState(false);
 
   // Owner-only gate routed through the shared hook so this predicate
   // doesn't drift from the cards that wrap us. The studio API also
@@ -80,6 +100,10 @@ export default function EntityMedia({
   const { isOwner: viewerCanCreate } = useEntityOwnership({ ownerUserId });
 
   useEffect(() => {
+    // Lazy gate: we don't touch the network until the panel is expanded.
+    // Leaving `items` at null keeps a closed panel in its "not yet loaded"
+    // state (no loader, no request).
+    if (!open) return;
     let cancelled = false;
     setItems(null);
     // Owners hit the auth'd `/projects` endpoint so they see drafts,
@@ -109,7 +133,7 @@ export default function EntityMedia({
     return () => {
       cancelled = true;
     };
-  }, [apiReady, viewerCanCreate, subject.kind, subject.id]);
+  }, [apiReady, viewerCanCreate, subject.kind, subject.id, open]);
 
   // Header reads "X items" — fully kind-agnostic so a rail with one
   // video doesn't claim "1 Video" when the very next attachment might
@@ -118,24 +142,24 @@ export default function EntityMedia({
   // a count, not a taxonomy label.
   const headerLabel = itemsHeaderLabel(items);
 
-  // Hide the section entirely when the viewer can't create AND no items
-  // exist — there's nothing to render. Anonymous viewers (api-not-ready)
-  // hit this branch automatically since the fetch above short-circuits
-  // to an empty array for them.
-  if (!viewerCanCreate && (items?.length ?? 0) === 0 && items !== null) {
-    return null;
-  }
-
   const subjectLabel = STUDIO_SUBJECT_LABEL[subject.kind];
   const newItemHref = `/studio?subject=${formatStudioSubject(subject)}&new=1`;
+  // Collapsed trigger can't show a count (we haven't fetched yet), so it
+  // names the subject; once expanded + loaded it switches to the live
+  // "X items" count.
+  const triggerLabel = items === null ? `${subjectLabel} media` : headerLabel;
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {headerLabel}
-        </h4>
-      </div>
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className={cn("space-y-2", className)}
+    >
+      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors">
+        <span>{triggerLabel}</span>
+        <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
         {/* Create chip — first so it's always reachable, even when there's
             an empty list. Uses the same width/aspect as the tiles below
@@ -159,6 +183,13 @@ export default function EntityMedia({
           <div className="snap-start shrink-0 w-48 rounded-md border bg-muted/30 p-3 flex items-center justify-center text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />
           </div>
+        )}
+
+        {/* Expanded + loaded + empty + can't create — nothing to show but
+            the panel is already open, so say so rather than render a blank
+            rail. Owners always see the Create chip above instead. */}
+        {items !== null && items.length === 0 && !viewerCanCreate && (
+          <p className="text-xs text-muted-foreground py-2">No media yet.</p>
         )}
 
         {items?.map((v) => {
@@ -218,7 +249,8 @@ export default function EntityMedia({
           );
         })}
       </div>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
