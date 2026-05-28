@@ -74,9 +74,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS "content_audiences_entity_audience_uniq"
 
 -- Constrain the taxonomy discriminator to the two known values so a typo
 -- in a write site doesn't silently desync the read path.
-ALTER TABLE "content_audiences"
-  ADD CONSTRAINT "content_audiences_taxonomy_check"
-    CHECK ("audience_taxonomy" IN ('life_stage', 'profession')) NOT VALID;
+DO $migration_166_taxonomy_check$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'content_audiences_taxonomy_check'
+  ) THEN
+    ALTER TABLE "content_audiences"
+      ADD CONSTRAINT "content_audiences_taxonomy_check"
+        CHECK ("audience_taxonomy" IN ('life_stage', 'profession')) NOT VALID;
+  END IF;
+END
+$migration_166_taxonomy_check$;
 
 -- ─── cities: slug + demographics + timezone + geoname anchor ───────────
 ALTER TABLE "cities"

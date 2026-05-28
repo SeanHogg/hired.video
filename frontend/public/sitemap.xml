@@ -597,11 +597,12 @@
   <!-- Geographic landing pages (#1628). Country-level + sitemap entry
        point. State + city pages auto-generate on demand; the canonical
        /sitemap/locations index is the crawler's entry to every region. -->
-  <url><loc>https://hired.video/sitemap/locations</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://hired.video/in/us</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://hired.video/in/ca</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://hired.video/in/gb</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://hired.video/in/au</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://hired.video/in/mx</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <!-- Launch markets only (shared/launch-markets.ts): US live, CA + MX
+       building. AU / UK / EU are NOT promoted yet — /in/au + /in/gb
+       resolve-gate to 404, so they MUST stay out of the sitemap. -->
+  <url><loc>https://hired.video/sitemap/locations</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/in/us</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/in/ca</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://hired.video/in/mx</loc><lastmod>2026-05-27</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
 
 </urlset>

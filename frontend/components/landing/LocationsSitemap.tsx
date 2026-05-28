@@ -41,8 +41,6 @@ export interface LocationsSitemapProps {
   variant: "expanded" | "footer-grid";
 }
 
-const FOOTER_TOP_COUNTRIES = ["US", "CA", "GB", "AU", "MX"];
-
 export function LocationsSitemap({ variant }: LocationsSitemapProps): JSX.Element {
   const [tree, setTree] = useState<CountryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +76,15 @@ export function LocationsSitemap({ variant }: LocationsSitemapProps): JSX.Elemen
   }
 
   if (variant === "footer-grid") {
-    const topCountries = tree.filter((c) => FOOTER_TOP_COUNTRIES.includes(c.iso2));
+    // The endpoint already filters to launch markets (live + building)
+    // and drops empty countries, so render whatever it returns — no
+    // hardcoded country allowlist to drift from shared/launch-markets.ts.
+    if (tree.length === 0) return <></>;
     return (
       <div className="md:col-span-2">
         <h3 className="font-semibold text-foreground mb-4">Browse by location</h3>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          {topCountries.map((country) => {
+          {tree.map((country) => {
             // Show country + a curated handful of top states (by population)
             // — enough SEO surface area without bloating the footer.
             const topStates = country.states

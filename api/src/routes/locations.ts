@@ -16,7 +16,7 @@
  * lookup over the seeded cities/states/countries.
  */
 import { Hono } from "hono";
-import { and, asc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -27,6 +27,7 @@ import {
   ContentLocationSetSchema,
   type ContentLocationKind,
 } from "../../../shared/content-locations.js";
+import { PROMOTABLE_MARKET_ISO2, isPromotableMarket } from "../../../shared/launch-markets.js";
 
 const { countries, stateProvinces, cities, jobItems, resumeInformation, videos, studioVoiceClones, studioTemplates, articles, userProfiles, companyProfiles, talentPoolCandidates, serviceOfferings } = schema;
 
@@ -89,20 +90,26 @@ locationRoutes.get("/states", async (c) => {
  *
  * Returns the country → state → top-cities tree powering both
  * `/sitemap/locations` and the expanded-footer Locations column. Cities
- * are ranked by `population` DESC (NULLs last) and capped at 25 per
- * state so the sitemap page renders without spilling — full city lists
- * live at /in/[country]/[state].
+ * ranked by `population` DESC (NULLs last), capped at 25 per state.
  *
- * No content-count join yet — every active country/state surfaces. A
- * future pass can layer the "≥10 jobs" threshold on top via a
- * materialized view over content_locations + job_items.
+ * Three gates make this match the Indeed/ZipRecruiter playbook instead
+ * of dumping every ISO country:
+ *   1. **Launch markets only** — `countries.iso2 IN PROMOTABLE_MARKET_ISO2`
+ *      (live + building per shared/launch-markets.ts; US live, CA/MX
+ *      building). Planned markets (AU/UK/EU/etc.) are hidden — we don't
+ *      promote geo pages where we haven't launched.
+ *   2. **Defensive name-dedup of states** — `state_provinces` had no
+ *      unique constraint until migration 0167, so legacy data can carry
+ *      duplicate "Alberta"/"Texas"/etc. rows (the seed re-ran N times
+ *      with a no-op ON CONFLICT). We collapse by lowercased name here so
+ *      the UI never shows "Alberta ×4" even before that migration lands;
+ *      cities are de-duped by slug across the collapsed group.
+ *   3. **Drop empty countries** — a launch market with zero states (e.g.
+ *      MX before its subdivisions are seeded) is omitted rather than
+ *      rendered as a dead expand-to-nothing node.
  */
 locationRoutes.get("/sitemap", async (c) => {
   const db = getDb();
-  // Single query — pull every active country/state/top-25-city tuple
-  // and roll up client-side. ~250 countries × ~50 states × 25 cities is
-  // tiny; this is also cache-friendly (response is identical across
-  // anonymous visitors so it can be cached at the edge).
   const rows = await db
     .select({
       countryId: countries.id,
@@ -121,10 +128,14 @@ locationRoutes.get("/sitemap", async (c) => {
     .from(countries)
     .leftJoin(stateProvinces, and(eq(stateProvinces.countryId, countries.id), eq(stateProvinces.isActive, true)))
     .leftJoin(cities, and(eq(cities.stateId, stateProvinces.id), eq(cities.isActive, true)))
-    .where(eq(countries.isActive, true))
+    .where(
+      and(
+        eq(countries.isActive, true),
+        inArray(sql`upper(${countries.iso2})`, PROMOTABLE_MARKET_ISO2),
+      ),
+    )
     .orderBy(asc(countries.name), asc(stateProvinces.name), sql`${cities.population} DESC NULLS LAST`, asc(cities.name));
 
-  // Group + cap top 25 cities per state in one pass.
   type CityEntry = { id: string; name: string; slug: string; population: number | null };
   type StateEntry = {
     id: string;
@@ -143,6 +154,8 @@ locationRoutes.get("/sitemap", async (c) => {
   const out: CountryEntry[] = [];
   let currentCountry: CountryEntry | null = null;
   let currentState: StateEntry | null = null;
+  let currentStateNameKey = "";
+  let citySlugsInState = new Set<string>();
   const CITY_CAP_PER_STATE = 25;
 
   for (const r of rows) {
@@ -156,28 +169,44 @@ locationRoutes.get("/sitemap", async (c) => {
       };
       out.push(currentCountry);
       currentState = null;
+      currentStateNameKey = "";
     }
-    if (r.stateId && (!currentState || currentState.id !== r.stateId)) {
-      currentState = {
-        id: r.stateId,
-        name: r.stateName!,
-        code: r.stateCode ?? null,
-        population: r.statePopulation as number | null,
-        cities: [],
-      };
-      currentCountry.states.push(currentState);
-    }
-    if (r.cityId && currentState && currentState.cities.length < CITY_CAP_PER_STATE) {
-      currentState.cities.push({
-        id: r.cityId,
-        name: r.cityName!,
-        slug: r.citySlug!,
-        population: r.cityPopulation as number | null,
-      });
+    if (r.stateId) {
+      // Group by lowercased name (NOT id) so duplicate state rows collapse
+      // into one node. Rows are ordered by state name so all dupes are
+      // consecutive; the first id wins as the canonical link target.
+      const nameKey = r.stateName!.toLowerCase();
+      if (!currentState || currentStateNameKey !== nameKey) {
+        currentState = {
+          id: r.stateId,
+          name: r.stateName!,
+          code: r.stateCode ?? null,
+          population: r.statePopulation as number | null,
+          cities: [],
+        };
+        currentCountry.states.push(currentState);
+        currentStateNameKey = nameKey;
+        citySlugsInState = new Set<string>();
+      }
+      if (
+        r.cityId &&
+        currentState.cities.length < CITY_CAP_PER_STATE &&
+        !citySlugsInState.has(r.citySlug!)
+      ) {
+        citySlugsInState.add(r.citySlug!);
+        currentState.cities.push({
+          id: r.cityId,
+          name: r.cityName!,
+          slug: r.citySlug!,
+          population: r.cityPopulation as number | null,
+        });
+      }
     }
   }
 
-  return c.json(success(out), 200);
+  // Drop launch markets that have no states yet (e.g. MX pre-seed) so the
+  // tree never renders an empty expand-to-nothing country.
+  return c.json(success(out.filter((co) => co.states.length > 0)), 200);
 });
 
 /**
@@ -232,6 +261,14 @@ locationRoutes.get("/resolve", async (c) => {
     countryRow = r ?? null;
   }
   if (!countryRow) return c.json(error("NOT_FOUND", "country not found"), 404);
+
+  // Launch-market gate — a real country that we haven't launched in
+  // (AU/UK/EU/…) resolves at the DB level but must NOT render a geo
+  // landing page. 404 so /in/au is treated as a non-page rather than a
+  // thin/empty page Google would penalize. Per shared/launch-markets.ts.
+  if (!isPromotableMarket(countryRow.iso2)) {
+    return c.json(error("NOT_FOUND", "country not available"), 404);
+  }
 
   // State: lowercased code OR slugified name within country.
   let stateRow: { id: string; name: string; code: string | null } | null = null;

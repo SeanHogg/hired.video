@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const countries = pgTable("countries", {
   id: serial("id").primaryKey(),
@@ -51,6 +52,12 @@ export const stateProvinces = pgTable(
   },
   (t) => [
     index("state_provinces_population_desc_idx").on(t.population),
+    // Added by #0167 — dedupe + prevent the seed from re-inserting
+    // duplicate states (it had no conflict target before this).
+    uniqueIndex("state_provinces_country_lname_uniq").on(
+      t.countryId,
+      sql`lower(${t.name})`,
+    ),
   ],
 );
 
