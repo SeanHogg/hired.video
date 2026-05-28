@@ -445,10 +445,11 @@ userRoutes.get("/public", async (c) => {
     },
   }));
 
-  // `?fields=id,name,avatarUrl,headline,...` projection (gap #1370) — the
+  // `?fields=id,fullName,avatar,headline,...` projection (gap #1370) — the
   // /people directory card view only needs a handful of fields; clipping the
   // payload here saves the skills JSON + creator-program flags on every
-  // call. Detail endpoints still return the full row.
+  // call. Field names are `toPublicUserCardDto` DTO keys (see USER_LIST_FIELDS
+  // note). Detail endpoints still return the full row.
   const fields = parseFields(c.req.query("fields"), USER_LIST_FIELDS);
   const projected = projectRows(items as unknown as Array<Record<string, unknown>>, fields);
   return c.json(success({ items: projected, total: items.length, page, limit }));

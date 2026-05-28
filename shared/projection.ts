@@ -113,17 +113,35 @@ export const JOB_LIST_FIELDS = [
   "viewCount",
 ] as const;
 
+// NOTE: these are keys of the `toPublicUserCardDto` DTO (the post-join shape
+// /api/users/public ships), NOT raw `users`/`userProfiles` columns. The
+// projector matches top-level keys, so naming these after DB columns
+// (name / avatarUrl / city / country) silently drops them at projection
+// time — the People grid then renders "User", a blank avatar, and
+// "Active/Joined Unknown" because fullName / avatar / createdAt never
+// survive the trim. Keep this list in lockstep with `toPublicUserCardDto`.
 export const USER_LIST_FIELDS = [
   "id",
-  "name",
+  "type",
+  "fullName",
   "firstName",
   "lastName",
   "slug",
-  "avatarUrl",
+  "avatar",
   "headline",
+  "summary",
   "role",
-  "city",
-  "country",
+  "location",
+  "currentRole",
+  "currentCompany",
+  "openToWork",
+  "skills",
+  "yearsOfExperience",
+  "emailConfirmed",
+  "isCreator",
+  "creatorPrograms",
+  "createdAt",
+  "updatedAt",
 ] as const;
 
 export const COMPANY_LIST_FIELDS = [
@@ -240,7 +258,7 @@ type ListFieldsKind = keyof typeof LIST_FIELDS_BY_KIND;
  *  worst case is dropping a field from the wire payload. */
 export const CARD_FIELDS_BY_KIND: Record<ListFieldsKind, readonly string[]> = {
   jobs: ["id", "title", "slug", "companyName", "location", "isRemote", "employmentType", "salaryMin", "salaryMax", "postedAt"],
-  users: ["id", "name", "slug", "avatarUrl", "headline", "role"],
+  users: ["id", "type", "fullName", "firstName", "lastName", "slug", "avatar", "headline", "role", "location", "currentRole", "currentCompany", "openToWork", "emailConfirmed", "isCreator", "createdAt", "updatedAt"],
   companies: ["id", "name", "slug", "logoUrl", "industry", "openJobsCount"],
   resumes: ["id", "title", "slug", "privacy", "isMaster", "viewCount", "updatedAt"],
   articles: ["id", "kind", "title", "slug", "summary", "coverImageUrl", "category", "tags", "sector", "audience", "author", "readMinutes", "viewCount", "publishedAt"],
