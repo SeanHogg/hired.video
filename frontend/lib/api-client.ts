@@ -316,6 +316,15 @@ export class ApiClient {
   private requestInterceptors: RequestInterceptor[] = [];
   private responseInterceptors: ResponseInterceptor[] = [];
   private errorInterceptors: ErrorInterceptor[] = [];
+  // In-flight GET coalescing. Concurrent identical GETs share one network
+  // round-trip + one resolved value; the entry is cleared on settle. This
+  // collapses the duplicate fetches that fire when several components each
+  // call the same user-data hook (useSubscription, my-scope, token budget…)
+  // in one render. Keyed by URL + emulation token (auth token is
+  // session-global, so it can't differ between two concurrent requests in
+  // the same tab; the emulation token can, so it's part of the key).
+  // GET only — non-idempotent writes must never be deduped.
+  private inFlightGets = new Map<string, Promise<ApiSuccessResponse<unknown>>>();
 
   constructor(config: ApiClientConfig = {}) {
     // Use runtime config if available, otherwise fall back to build env vars.
@@ -788,6 +797,38 @@ export class ApiClient {
   // ============================================================================
 
   async request<T>(
+    endpoint: string,
+    config: RequestConfig = {},
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
+    const method = (config.method ?? "GET").toUpperCase();
+    // Writes are not idempotent — dispatch directly, never coalesce.
+    if (method !== "GET") {
+      return this.dispatchRequest<T>(endpoint, config, schema);
+    }
+
+    const url = this.createUrl(endpoint);
+    const emulationToken = _emulationTokenGetter() ?? "";
+    const key = `${url} ${emulationToken}`;
+
+    const existing = this.inFlightGets.get(key);
+    if (existing) {
+      return existing as Promise<ApiSuccessResponse<T>>;
+    }
+
+    const pending = this.dispatchRequest<T>(endpoint, config, schema).finally(
+      () => {
+        this.inFlightGets.delete(key);
+      },
+    );
+    this.inFlightGets.set(
+      key,
+      pending as Promise<ApiSuccessResponse<unknown>>,
+    );
+    return pending;
+  }
+
+  private async dispatchRequest<T>(
     endpoint: string,
     config: RequestConfig = {},
     schema?: z.ZodSchema<T>,
