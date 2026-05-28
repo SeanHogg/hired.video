@@ -1,6 +1,6 @@
 /**
  * Single source of truth for the two-axis audience taxonomy used by
- * Resource Maps (#1616) and the content_audiences table (#0149).
+ * Resource Maps (#1629) and the content_audiences table (#0166).
  *
  *   - LIFE_STAGE_AUDIENCES  → "where are you in the journey?"
  *                             Drives /for/[audience] landing pages.
@@ -12,7 +12,7 @@
  * picker, /for routes) import from here so the discriminator surface
  * can't drift across the wire.
  *
- * See migration 0149_audience_geo_demographics.sql for the storage
+ * See migration 0166_audience_geo_demographics.sql for the storage
  * layout — `audience_taxonomy` column on content_audiences distinguishes
  * the two; `audience_key` is one of the values below.
  */

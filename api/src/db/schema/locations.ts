@@ -22,7 +22,7 @@ export const countries = pgTable("countries", {
   iso3: char("iso3", { length: 3 }).unique(),
   phoneCode: varchar("phone_code", { length: 20 }),
   currency: varchar("currency", { length: 10 }),
-  // Demographic columns added by #0149 — backfilled lazily from the
+  // Demographic columns added by #0166 — backfilled lazily from the
   // GeoNames cities500 import job (deferred). Null until backfilled;
   // page templates fall back to density-based ranking when absent.
   population: bigint("population", { mode: "number" }),
@@ -42,7 +42,7 @@ export const stateProvinces = pgTable(
     countryId: serial("country_id").notNull().references(() => countries.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
     code: varchar("code", { length: 10 }),
-    // Demographic columns added by #0149.
+    // Demographic columns added by #0166.
     population: bigint("population", { mode: "number" }),
     populationAsOf: date("population_as_of"),
     populationSource: varchar("population_source", { length: 32 }),
@@ -63,12 +63,12 @@ export const cities = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     stateId: uuid("state_id").notNull().references(() => stateProvinces.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
-    // URL-safe slug — UNIQUE per (state_id, slug). Backfilled by #0149
+    // URL-safe slug — UNIQUE per (state_id, slug). Backfilled by #0166
     // from slugified name; disambiguates duplicates within a state.
     slug: varchar("slug", { length: 64 }).notNull(),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
-    // Demographic + cross-dataset anchor columns added by #0149.
+    // Demographic + cross-dataset anchor columns added by #0166.
     population: integer("population"),
     populationAsOf: date("population_as_of"),
     populationSource: varchar("population_source", { length: 32 }),

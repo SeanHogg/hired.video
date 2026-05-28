@@ -211,7 +211,7 @@ export class LocationService {
         .limit(1);
       cityId = (existing as { id: string } | undefined)?.id ?? null;
       if (!cityId) {
-        // cities.slug is NOT NULL after migration 0149. Generate via the
+        // cities.slug is NOT NULL after migration 0166. Generate via the
         // canonical slugify() so the runtime ensure-on-write path matches
         // the migration's SQL backfill regex. Collisions within a state
         // (two cities with the same slugified name — rare for Mapbox

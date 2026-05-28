@@ -2,7 +2,7 @@
  * content_audiences — polymorphic audience tags shared across every
  * content type. Mirrors the shape of content_locations.
  *
- * See migration 0149_audience_geo_demographics.sql for the design
+ * See migration 0166_audience_geo_demographics.sql for the design
  * rationale. A single row attaches one audience key to one
  * (entity_kind, entity_id) tuple. Two taxonomies share the table via the
  * `audience_taxonomy` discriminator:

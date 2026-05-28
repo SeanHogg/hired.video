@@ -498,6 +498,7 @@
   <url><loc>https://hired.video/templates/endless_runner</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/quiz_game</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/memory_match</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/templates/game_3d_world</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <!-- Image / drawing (3) -->
   <url><loc>https://hired.video/templates/drawing_blank</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/templates/drawing_social_square</loc><lastmod>2026-05-21</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
@@ -572,5 +573,35 @@
   <url><loc>https://hired.video/pivot-explorer</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://hired.video/resume-templates</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://hired.video/articles</loc><lastmod>2026-05-25</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+
+  <!-- Life-stage Resource Maps (#1629). Slugs MUST stay in sync with
+       LIFE_STAGE_AUDIENCES in shared/audiences.ts (kebab-cased). The
+       audience-key → URL conversion lives in audienceSlug() — same
+       helper LifeStageLandingPage / RelatedAudiences / Footer use. -->
+  <url><loc>https://hired.video/for</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hired.video/for/job-seekers</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/employers</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/recruiters</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/recent-graduates</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/students</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/unemployed</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/layoff-recovery</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/career-changers</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/returning-to-workforce</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/veterans</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/gig-economy</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/international-job-seekers</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/early-career</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/for/senior-executives</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
+  <!-- Geographic landing pages (#1628). Country-level + sitemap entry
+       point. State + city pages auto-generate on demand; the canonical
+       /sitemap/locations index is the crawler's entry to every region. -->
+  <url><loc>https://hired.video/sitemap/locations</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/in/us</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/in/ca</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/in/gb</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/in/au</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hired.video/in/mx</loc><lastmod>2026-05-26</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
 
 </urlset>

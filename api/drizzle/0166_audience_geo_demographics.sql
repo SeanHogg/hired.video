@@ -1,4 +1,6 @@
--- Migration 0149 — Audience taxonomy + geographic demographics foundation.
+-- Migration 0166 — Audience taxonomy + geographic demographics foundation.
+-- (Originally drafted as 0149; renumbered after the studio_ats/match-score
+-- closure landed at 0149 in parallel.)
 --
 -- Builds the storage primitives that #1615 (geographic landing pages) and
 -- #1616 (Resource Maps / per-audience landing pages) need, but stops at

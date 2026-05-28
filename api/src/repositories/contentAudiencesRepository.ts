@@ -1,6 +1,6 @@
 /**
  * ContentAudiencesRepository — pure data access for the polymorphic
- * content_audiences table (migration 0149).
+ * content_audiences table (migration 0166).
  *
  * Mirrors the shape of ContentLocationsRepository so the call surface is
  * predictable: replaceForEntity / findForEntity / matchingEntityIds. No

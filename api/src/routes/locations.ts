@@ -188,7 +188,7 @@ locationRoutes.get("/sitemap", async (c) => {
  * returns {country, state: null, city: null}, and so on. Slugs match:
  *   - country: lowercased iso2 ("us") OR iso3 ("usa") OR slugified name
  *   - state:   lowercased code ("tx") OR slugified name
- *   - city:    cities.slug (UNIQUE per state, backfilled by migration 0149)
+ *   - city:    cities.slug (UNIQUE per state, backfilled by migration 0166)
  *
  * Returns 404 when any non-null segment fails to resolve, so the page
  * can render a clean 404 instead of a soft mismatch.

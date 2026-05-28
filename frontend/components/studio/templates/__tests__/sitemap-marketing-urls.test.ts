@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import { AUDIENCE_BY_ID } from "../audiences";
 import { TEMPLATE_CATALOG } from "../catalog";
+import { LIFE_STAGE_AUDIENCES, audienceSlug } from "../../../../../shared/audiences";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SITEMAP_PATH = resolve(__dirname, "../../../../public/sitemap.xml");
@@ -40,13 +41,24 @@ function extractPaths(prefix: string): string[] {
 }
 
 describe("sitemap.xml marketing URLs", () => {
-  it("every /for/:audience slug exists in AUDIENCE_BY_ID", () => {
+  it("every /for/:audience slug resolves to a profession OR life-stage audience", () => {
     const slugs = extractPaths("/for/");
     expect(slugs.length).toBeGreaterThan(0);
+    // Two taxonomies live under /for/: profession audiences (in
+    // AUDIENCE_BY_ID, snake_case ids that double as their URL slug) and
+    // life-stage audiences (LIFE_STAGE_AUDIENCES, snake_case enum keys
+    // converted to kebab-case via audienceSlug()). The dispatcher in
+    // AudienceLandingPage routes by taxonomy; the sitemap test mirrors
+    // both lookup tables so neither axis can drift out of coverage.
+    const lifeStageSlugs = new Set<string>(
+      LIFE_STAGE_AUDIENCES.map((k) => audienceSlug(k)),
+    );
     for (const slug of slugs) {
+      const isProfession = slug in AUDIENCE_BY_ID;
+      const isLifeStage = lifeStageSlugs.has(slug);
       expect(
-        slug in AUDIENCE_BY_ID,
-        `sitemap lists /for/${slug} but no audience with id "${slug}" exists`,
+        isProfession || isLifeStage,
+        `sitemap lists /for/${slug} but no audience (profession or life-stage) with that slug exists`,
       ).toBe(true);
     }
   });
@@ -69,6 +81,17 @@ describe("sitemap.xml marketing URLs", () => {
       expect(
         slugs.has(id),
         `audience "${id}" is registered but has no /for/${id} entry in sitemap.xml`,
+      ).toBe(true);
+    }
+  });
+
+  it("every life-stage audience has a sitemap entry", () => {
+    const slugs = new Set(extractPaths("/for/"));
+    for (const key of LIFE_STAGE_AUDIENCES) {
+      const slug = audienceSlug(key);
+      expect(
+        slugs.has(slug),
+        `life-stage audience "${key}" → /for/${slug} is missing from sitemap.xml`,
       ).toBe(true);
     }
   });
