@@ -1,14 +1,13 @@
 /**
  * ResourceMap — content discovery grid grouped by ContentLocationKind,
- * filtered by a single audience key. Each kind is one bucket; buckets
- * self-hide when they have zero items so empty buckets never render.
+ * filtered by EITHER an audience key (/for/[audience]) or a structured
+ * geo filter (/in/[country]/[state]/[city]). Each kind is one bucket;
+ * buckets self-hide when they have zero items so empty buckets never
+ * render.
  *
- * Single component handles both:
- *   - `audienceKey` mode: shows content tagged with that audience key
- *   - `locationKey` mode (future): shows content tagged with that location
- *
- * Per the DRY rule — same component, two filter axes, the consumer
- * passes which axis is in play.
+ * Per the DRY rule (#1663) — ONE component, two filter axes. The
+ * consumer passes which axis is in play via the discriminated `filter`
+ * prop; the fetch + "see all" links + empty-state branch on it.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -17,18 +16,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import {
-  fetchAudienceContent,
+  fetchResourceContent,
   type AudienceContentItem,
+  type ResourceFilter,
 } from "@/lib/services/audience-content-service";
 import type { ContentLocationKind } from "@shared/content-locations";
 
 export interface ResourceMapProps {
-  /** Audience key to filter by (e.g. "recent_graduates"). */
-  audienceKey: string;
+  /** Which axis is in play — audience key OR structured geo filter. */
+  filter: ResourceFilter;
   /** Ordered list of content kinds to surface. Empty buckets self-hide. */
   kinds: ContentLocationKind[];
   /** Per-kind item cap. Default 6. */
   limit?: number;
+  /** Optional section heading override. */
+  heading?: string;
+  subheading?: string;
 }
 
 const KIND_LABELS: Partial<Record<ContentLocationKind, string>> = {
@@ -45,32 +48,55 @@ const KIND_LABELS: Partial<Record<ContentLocationKind, string>> = {
   service: "Services",
 };
 
-const KIND_SEE_ALL: Partial<Record<ContentLocationKind, (audience: string) => string>> = {
-  job: (a) => `/jobs?audience=${encodeURIComponent(a)}`,
-  resume: (a) => `/search?category=resumes&audience=${encodeURIComponent(a)}`,
-  video: (a) => `/search?category=media&audience=${encodeURIComponent(a)}`,
-  article: (a) => `/articles?audience=${encodeURIComponent(a)}`,
-  template: (a) => `/search?category=templates&audience=${encodeURIComponent(a)}`,
-  learning_path: (a) => `/learn?audience=${encodeURIComponent(a)}`,
-  event: (a) => `/events?audience=${encodeURIComponent(a)}`,
-};
+/** Build the "see all" deep-link for a bucket. Encodes whichever filter
+ *  axis is active so the destination list page stays scoped. */
+function seeAllHref(kind: ContentLocationKind, filter: ResourceFilter): string | undefined {
+  const qs = new URLSearchParams();
+  if ("audienceKey" in filter) {
+    qs.set("audience", filter.audienceKey);
+  } else {
+    qs.set("countryId", String(filter.geo.countryId));
+    if (filter.geo.stateId) qs.set("stateId", filter.geo.stateId);
+    if (filter.geo.cityId) qs.set("cityId", filter.geo.cityId);
+  }
+  const suffix = `?${qs.toString()}`;
+  switch (kind) {
+    case "job": return `/jobs${suffix}`;
+    case "article": return `/articles${suffix}`;
+    case "template": return `/search?category=templates&${qs.toString()}`;
+    case "resume": return `/search?category=resumes&${qs.toString()}`;
+    case "video": return `/search?category=media&${qs.toString()}`;
+    case "learning_path": return `/search?category=learning_paths&${qs.toString()}`;
+    case "event": return `/events${suffix}`;
+    default: return undefined;
+  }
+}
 
 interface BucketState {
   loading: boolean;
   items: AudienceContentItem[];
 }
 
-export function ResourceMap({ audienceKey, kinds, limit = 6 }: ResourceMapProps): JSX.Element {
+/** Stable key for the filter so the fetch effect re-runs when it changes
+ *  without depending on object identity. */
+function filterKey(filter: ResourceFilter): string {
+  return "audienceKey" in filter
+    ? `a:${filter.audienceKey}`
+    : `g:${filter.geo.countryId}:${filter.geo.stateId ?? ""}:${filter.geo.cityId ?? ""}`;
+}
+
+export function ResourceMap({ filter, kinds, limit = 6, heading, subheading }: ResourceMapProps): JSX.Element {
   const [buckets, setBuckets] = useState<Record<string, BucketState>>(() =>
     Object.fromEntries(kinds.map((k) => [k, { loading: true, items: [] }])),
   );
+  const fKey = filterKey(filter);
 
   useEffect(() => {
     let cancelled = false;
     setBuckets(Object.fromEntries(kinds.map((k) => [k, { loading: true, items: [] }])));
     void Promise.all(
       kinds.map(async (kind) => {
-        const items = await fetchAudienceContent(kind, audienceKey, limit);
+        const items = await fetchResourceContent(kind, filter, limit);
         if (cancelled) return;
         setBuckets((prev) => ({ ...prev, [kind]: { loading: false, items } }));
       }),
@@ -78,24 +104,21 @@ export function ResourceMap({ audienceKey, kinds, limit = 6 }: ResourceMapProps)
     return () => {
       cancelled = true;
     };
-  }, [audienceKey, kinds.join(","), limit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fKey, kinds.join(","), limit]);
 
   const visibleKinds = useMemo(() => {
     return kinds.filter((k) => {
       const b = buckets[k];
-      // Show while loading + show when populated; hide when settled-empty.
       return !b || b.loading || b.items.length > 0;
     });
   }, [kinds, buckets]);
 
   if (visibleKinds.length === 0) {
-    // Every bucket settled empty — fall back to a generic "explore" call
-    // rather than an empty section. Per the spec ("Resource Map" bucket
-    // self-hides), the whole map can also self-hide if nothing matches.
     return (
       <section className="px-4 py-12 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground">
-          <p>Resources for this audience are being curated. In the meantime, explore the full library.</p>
+          <p>Resources here are being curated. In the meantime, explore the full library.</p>
           <Button asChild variant="outline" className="mt-4">
             <Link to="/search">Browse everything</Link>
           </Button>
@@ -108,20 +131,22 @@ export function ResourceMap({ audienceKey, kinds, limit = 6 }: ResourceMapProps)
     <section className="px-4 py-12 sm:px-6 lg:px-8 bg-muted/20">
       <div className="max-w-6xl mx-auto space-y-12">
         <div className="text-center">
-          <h2 className="text-3xl font-bold">Resource map</h2>
-          <p className="mt-2 text-muted-foreground">Hand-picked across templates, articles, video, learning paths, and open roles.</p>
+          <h2 className="text-3xl font-bold">{heading ?? "Resource map"}</h2>
+          <p className="mt-2 text-muted-foreground">
+            {subheading ?? "Hand-picked across templates, articles, video, learning paths, and open roles."}
+          </p>
         </div>
         {visibleKinds.map((kind) => {
           const bucket = buckets[kind] ?? { loading: true, items: [] };
           const label = KIND_LABELS[kind] ?? kind;
-          const seeAllHref = KIND_SEE_ALL[kind]?.(audienceKey);
+          const href = seeAllHref(kind, filter);
           return (
             <div key={kind}>
               <div className="mb-4 flex items-end justify-between">
                 <h3 className="text-xl font-semibold">{label}</h3>
-                {seeAllHref ? (
+                {href ? (
                   <Button asChild variant="ghost" size="sm">
-                    <Link to={seeAllHref}>
+                    <Link to={href}>
                       See all
                       <ArrowRight className="ml-1 h-4 w-4" />
                     </Link>
@@ -176,6 +201,8 @@ function hrefForItem(item: AudienceContentItem): string {
     case "media":
     case "video":
       return `/v/${item.id}`;
+    case "learning_path":
+      return `/courses/${item.id}`;
     case "event":
       return `/events/${item.id}`;
     default:

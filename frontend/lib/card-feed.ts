@@ -18,6 +18,7 @@ import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
 import { studioService } from "@/lib/services/studio-service";
+import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import { getStaticTemplates } from "@/lib/templates/registry";
 import { BLOG_POSTS } from "@/data/blog-posts";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
@@ -294,15 +295,13 @@ async function fetchTemplates(
   // client-side filter against the static catalog covers the reported
   // UX: typing in the search box narrows the visible templates.
   const haystack = getStaticTemplates();
-  const all = search && search.trim().length > 0
+  const staticFiltered = search && search.trim().length > 0
     ? haystack.filter((t) => templateMatchesQuery(t, search))
     : haystack;
-  const start = Math.max(0, (page - 1) * limit);
-  const slice = all.slice(start, start + limit);
   // Stable synthetic createdAt so sort order is deterministic across reloads
   // and templates don't all pile up at the exact same instant.
   const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
-  const items = slice.map((meta, idx) => {
+  const staticItems = staticFiltered.map((meta, idx) => {
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
       type: "template",
@@ -320,7 +319,44 @@ async function fetchTemplates(
     } as RawApiItem;
     return { ...item, sortKey: toSortKey(item) };
   });
-  return { items, total: all.length };
+
+  // #1626: merge DB-published creator studio templates with the
+  // code-defined built-ins/presets. The static catalogue is NOT a
+  // stopgap — built-ins + resume presets are legitimately client-side
+  // (code-defined render templates). The gap was that creators' public
+  // studio templates (real DB rows) never showed in the templates feed.
+  // Best-effort: a backend hiccup falls back to the static set alone.
+  let dbItems: SortableCard[] = [];
+  try {
+    const rows = await studioTemplatesService.listPublic({
+      search: search?.trim() || undefined,
+      limit: 100,
+    });
+    const staticKeys = new Set(staticFiltered.map((t) => t.slug));
+    dbItems = rows
+      .filter((r) => !staticKeys.has(r.listingSlug ?? r.id))
+      .map((r) => {
+        const item: RawApiItem = {
+          type: "template",
+          id: r.listingSlug ?? r.id,
+          name: r.name,
+          title: r.name,
+          summary: r.description ?? "",
+          priceCents: r.priceCents,
+          avatar: r.thumbnailUrl ?? undefined,
+          views: r.viewCount ?? 0,
+          createdAt: (r.publishedAt ?? r.createdAt) as string,
+        } as RawApiItem;
+        return { ...item, sortKey: toSortKey(item) };
+      });
+  } catch (err) {
+    console.warn("card-feed: studio template fetch failed, using static catalogue only", err);
+  }
+
+  const merged = [...staticItems, ...dbItems];
+  const start = Math.max(0, (page - 1) * limit);
+  const slice = merged.slice(start, start + limit);
+  return { items: slice, total: merged.length };
 }
 
 /** Case-insensitive match across the searchable text fields of a static

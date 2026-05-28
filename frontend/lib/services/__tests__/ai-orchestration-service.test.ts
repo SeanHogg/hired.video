@@ -82,7 +82,7 @@ describe("AIOrchestrationService", () => {
       );
 
       expect(plans.length).toBeGreaterThan(0);
-      expect(plans.some((p: any) => p.api.id === "resume_optimize")).toBe(true);
+      expect(plans.some((p: any) => p.api.id === "resume-optimize")).toBe(true);
     });
 
     it("should plan APIs based on intent", () => {
@@ -96,7 +96,7 @@ describe("AIOrchestrationService", () => {
       );
 
       expect(plans.length).toBeGreaterThan(0);
-      expect(plans.some((p: any) => p.api.id === "resume_score")).toBe(true);
+      expect(plans.some((p: any) => p.api.id === "resume-score")).toBe(true);
     });
 
     it("should prioritize APIs correctly", () => {
@@ -110,8 +110,8 @@ describe("AIOrchestrationService", () => {
       );
 
       // Resume get should have higher priority (lower number) than optimize
-      const getIndex = plans.findIndex((p: any) => p.api.id === "resume_get");
-      const optimizeIndex = plans.findIndex((p: any) => p.api.id === "resume_optimize");
+      const getIndex = plans.findIndex((p: any) => p.api.id === "resume-get");
+      const optimizeIndex = plans.findIndex((p: any) => p.api.id === "resume-optimize");
 
       if (getIndex !== -1 && optimizeIndex !== -1) {
         expect(plans[getIndex].priority).toBeLessThan(plans[optimizeIndex].priority);
@@ -156,7 +156,7 @@ describe("AIOrchestrationService", () => {
       });
 
       const service = aiOrchestrationService as any;
-      const api = context.availableAPIs.find((a) => a.id === "resume_optimize");
+      const api = context.availableAPIs.find((a) => a.id === "resume-optimize");
 
       if (api) {
         const payload = service.buildPayload(api, context);
@@ -169,7 +169,7 @@ describe("AIOrchestrationService", () => {
     it("should build job list payload", () => {
       const context = createJobContext("job-list");
       const service = aiOrchestrationService as any;
-      const api = context.availableAPIs.find((a) => a.id === "job_list_public");
+      const api = context.availableAPIs.find((a) => a.id === "job-list-public");
 
       if (api) {
         const payload = service.buildPayload(api, context);
@@ -210,7 +210,7 @@ describe("AIOrchestrationService", () => {
 
       const apiResults = [
         {
-          api: { id: "resume_optimize", endpoint: "/api/ResumeOptimizer/optimize" },
+          api: { id: "resume-optimize", endpoint: "/api/resumeoptimizer/optimize" },
           success: true,
           data: {
             result: {
@@ -235,7 +235,7 @@ describe("AIOrchestrationService", () => {
 
       const apiResults = [
         {
-          api: { id: "resume_optimize", endpoint: "/api/ResumeOptimizer/optimize" },
+          api: { id: "resume-optimize", endpoint: "/api/resumeoptimizer/optimize" },
           success: false,
           error: "API error",
         },
@@ -253,7 +253,7 @@ describe("AIOrchestrationService", () => {
 
       const apiResults = [
         {
-          api: { id: "resume_optimize", endpoint: "/api/ResumeOptimizer/optimize" },
+          api: { id: "resume-optimize", endpoint: "/api/resumeoptimizer/optimize" },
           success: true,
           data: {
             result: {

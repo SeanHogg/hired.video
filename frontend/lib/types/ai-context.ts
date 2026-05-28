@@ -1,9 +1,19 @@
 /**
  * AI Context Types
- * 
+ *
  * Defines comprehensive context interfaces for AI integration across different pages.
  * Each context type provides page-specific metadata and available AI actions.
  */
+
+import type {
+  AIContextType,
+  GeneralShapedContextType,
+} from "@shared/ai-context-types";
+
+// Re-export the canonical union (moved to shared/ under gap #1626) so
+// the many `import { AIContextType } from "@/lib/types/ai-context"`
+// callsites keep working unchanged.
+export type { AIContextType } from "@shared/ai-context-types";
 
 // ============================================================================
 // BASE CONTEXT TYPES
@@ -53,26 +63,8 @@ export interface BaseAIContext {
   formSnapshot?: Record<string, unknown>;
 }
 
-/**
- * Available context types across the application
- */
-export type AIContextType =
-  | "resume-list"
-  | "resume-create"
-  | "resume-edit"
-  | "resume-view"
-  | "job-list"
-  | "job-create"
-  | "job-edit"
-  | "job-view"
-  | "profile-view"
-  | "profile-edit"
-  | "outreach"
-  | "messaging"
-  | "search"
-  | "dashboard"
-  | "tasks"
-  | "general";
+// AIContextType is imported + re-exported from @shared/ai-context-types
+// at the top of this file (gap #1626 close).
 
 // ============================================================================
 // RESUME CONTEXTS
@@ -337,10 +329,19 @@ export type TasksAIAction =
 // ============================================================================
 
 /**
- * General context for pages without specific context
+ * General context — the carrier for pages without a bespoke context
+ * interface. Beyond plain "general", it also carries the studio +
+ * content surfaces (`studio`, `article-*`, `company-*`, `course-*`,
+ * `learning`, `interview-practice`) added under gap #1621. Those
+ * differentiate the system prompt + quick-action suggestions by
+ * `contextType` + page URL even though they share this payload shape;
+ * bespoke payloads are a later per-surface enhancement.
+ *
+ * `GENERAL_SHAPED_CONTEXT_TYPES` in @shared/ai-context-types is the
+ * authoritative list — keep this discriminant in sync with it.
  */
 export interface GeneralContext extends BaseAIContext {
-  contextType: "general";
+  contextType: GeneralShapedContextType;
   /** Available AI actions for this context */
   availableActions: GeneralAIAction[];
 }

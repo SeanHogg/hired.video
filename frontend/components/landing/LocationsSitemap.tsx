@@ -81,9 +81,9 @@ export function LocationsSitemap({ variant }: LocationsSitemapProps): JSX.Elemen
     // hardcoded country allowlist to drift from shared/launch-markets.ts.
     if (tree.length === 0) return <></>;
     return (
-      <div className="md:col-span-2">
+      <div>
         <h3 className="font-semibold text-foreground mb-4">Browse by location</h3>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        <ul className="space-y-2">
           {tree.map((country) => {
             // Show country + a curated handful of top states (by population)
             // — enough SEO surface area without bloating the footer.
@@ -92,36 +92,39 @@ export function LocationsSitemap({ variant }: LocationsSitemapProps): JSX.Elemen
               .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
               .slice(0, 4);
             return (
-              <div key={country.id}>
+              <li key={country.id}>
                 <Link
                   to={`/in/${country.iso2.toLowerCase()}`}
                   className="font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {country.name}
                 </Link>
-                <div className="pl-2 space-y-1">
-                  {topStates.map((s) => (
-                    <Link
-                      key={s.id}
-                      to={`/in/${country.iso2.toLowerCase()}/${(s.code ?? s.name).toLowerCase()}`}
-                      className="block text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {s.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
+                {topStates.length > 0 && (
+                  <ul className="mt-1 pl-3 space-y-1 text-sm">
+                    {topStates.map((s) => (
+                      <li key={s.id}>
+                        <Link
+                          to={`/in/${country.iso2.toLowerCase()}/${(s.code ?? s.name).toLowerCase()}`}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {s.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
             );
           })}
-        </div>
-        <div className="mt-4">
-          <Link
-            to="/sitemap/locations"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Browse all locations →
-          </Link>
-        </div>
+          <li>
+            <Link
+              to="/sitemap/locations"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Browse all locations →
+            </Link>
+          </li>
+        </ul>
       </div>
     );
   }

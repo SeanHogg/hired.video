@@ -37,7 +37,7 @@ export function LifeStageLandingPage({ meta }: LifeStageLandingPageProps): JSX.E
     <AppShell bgClassName="bg-background">
       <AudienceHero meta={meta} />
       <ToolShowcase features={meta.focusFeatures} eyebrow={`Built for ${meta.label.toLowerCase()}`} />
-      <ResourceMap audienceKey={meta.key} kinds={meta.focusContentKinds} />
+      <ResourceMap filter={{ audienceKey: meta.key }} kinds={meta.focusContentKinds} />
 
       <section className="px-4 py-16 sm:px-6 lg:px-8 text-center bg-gradient-to-br from-brand-purple/5 to-brand-blue/5">
         <div className="max-w-2xl mx-auto">

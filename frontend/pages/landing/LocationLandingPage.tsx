@@ -2,29 +2,20 @@
  * /in/[country]/[state?]/[city?] — geographic Resource Map (#1628).
  *
  * Resolves the slug triple via /api/locations/resolve, then renders the
- * SAME stack the audience pages use — hero, tool showcase, resource
- * grid — filtered by location instead of audience.
- *
- * Per DRY rule: shares <ToolShowcase>, <MarketingFAQ>, <AppShell> with
- * /for; reuses card-feed.fetchCardFeed's geo filter for the resource
- * grid so jobs/people/etc. continue to fetch through their canonical
- * domain endpoints.
- *
- * City-level pages include the relocation-guide CTA + "key employers"
- * + "open jobs near here" sections. State/country-level pages omit the
- * city-specific bits and surface sub-locations.
+ * SAME <ResourceMap> stack the audience pages use — just on the geo axis
+ * instead of the audience axis (#1663). One render surface for both
+ * axes; new card features land once, not twice.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MarketingFAQ from "@/components/MarketingFAQ";
+import { ResourceMap } from "@/components/landing/ResourceMap";
 import { useSEO } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
-import { fetchCardFeed, type CardFeedResponse } from "@/lib/card-feed";
 
 interface ResolvedLocation {
   country: { id: number; name: string; iso2: string };
@@ -38,7 +29,6 @@ export default function LocationLandingPage(): JSX.Element {
 
   const [resolved, setResolved] = useState<ResolvedLocation | null>(null);
   const [status, setStatus] = useState<"loading" | "ok" | "notfound">("loading");
-  const [feed, setFeed] = useState<CardFeedResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,26 +58,6 @@ export default function LocationLandingPage(): JSX.Element {
       cancelled = true;
     };
   }, [params.country, params.state, params.city]);
-
-  useEffect(() => {
-    if (status !== "ok" || !resolved) return;
-    let cancelled = false;
-    void (async () => {
-      const feedResult = await fetchCardFeed({
-        types: ["job", "article", "template", "video"],
-        limitPerType: 6,
-        geo: {
-          countryId: resolved.country.id,
-          stateId: resolved.state?.id,
-          cityId: resolved.city?.id,
-        },
-      });
-      if (!cancelled) setFeed(feedResult);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, resolved]);
 
   const headerTitle = useMemo(() => {
     if (!resolved) return "";
@@ -173,30 +143,18 @@ export default function LocationLandingPage(): JSX.Element {
         </div>
       </section>
 
-      <section className="px-4 py-12 sm:px-6 lg:px-8 max-w-6xl mx-auto">
-        <h2 className="mb-6 text-2xl font-bold">Recent for this location</h2>
-        {feed && feed.items.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {feed.items.slice(0, 12).map((item: any) => (
-              <Card key={`${item.type}:${item.id}`} className="h-full hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <Badge variant="secondary" className="mb-2">{item.type}</Badge>
-                  <p className="font-medium line-clamp-2">{item.title ?? item.name}</p>
-                  {item.summary || item.description ? (
-                    <p className="mt-2 text-sm text-muted-foreground line-clamp-3">
-                      {item.summary ?? item.description}
-                    </p>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-center py-8">
-            Content for this location is being curated. Check back soon.
-          </p>
-        )}
-      </section>
+      <ResourceMap
+        filter={{
+          geo: {
+            countryId: resolved.country.id,
+            stateId: resolved.state?.id,
+            cityId: resolved.city?.id,
+          },
+        }}
+        kinds={["job", "article", "template", "video", "learning_path"]}
+        heading={`In ${headerTitle}`}
+        subheading="Jobs, articles, templates, and learning paths tagged to this location."
+      />
 
       <MarketingFAQ
         schemaId="in-location-faq"

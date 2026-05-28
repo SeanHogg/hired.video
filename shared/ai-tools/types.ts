@@ -18,28 +18,12 @@
  * actual mount points in [app.ts](../../api/src/app.ts).
  */
 
-/** AIContextType — duplicated from
- *  [frontend/lib/types/ai-context.ts](../../frontend/lib/types/ai-context.ts)
- *  pending the canonical move into `shared/` under gap #1621. Until
- *  then this string union is the source of truth that both sides agree
- *  on; the frontend AIContextType is a structural-compatible alias. */
-export type AIContextType =
-  | "resume-list"
-  | "resume-create"
-  | "resume-edit"
-  | "resume-view"
-  | "job-list"
-  | "job-create"
-  | "job-edit"
-  | "job-view"
-  | "profile-view"
-  | "profile-edit"
-  | "outreach"
-  | "messaging"
-  | "search"
-  | "dashboard"
-  | "tasks"
-  | "general";
+// AIContextType is now canonical in shared/ai-context-types.ts (gap
+// #1626 close). Imported for local use in AIToolDef + re-exported so
+// existing `import { AIContextType } from "@shared/ai-tools"` callsites
+// keep working.
+import type { AIContextType } from "../ai-context-types.js";
+export type { AIContextType } from "../ai-context-types.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 

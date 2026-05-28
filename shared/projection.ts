@@ -151,20 +151,28 @@ export const RESUME_LIST_FIELDS = [
   "viewCount",
 ] as const;
 
+// NOTE: these are keys of the `toPublicCard` DTO (the post-join shape every
+// public articles list endpoint ships), NOT raw `articles` columns. The
+// projector matches top-level keys, so `author` is the nested
+// {id,name,avatarUrl,slug} object and `readMinutes` is camelCase. Naming these
+// after DB columns (authorName / readingMinutes) silently drops them at
+// projection time and crashes consumers that read `article.author.slug`.
 export const ARTICLE_LIST_FIELDS = [
   "id",
+  "type",
+  "kind",
   "title",
   "slug",
   "summary",
   "coverImageUrl",
-  "authorId",
-  "authorName",
-  "authorAvatarUrl",
-  "publishedAt",
-  "readingMinutes",
-  "viewCount",
-  "tags",
   "category",
+  "tags",
+  "sector",
+  "audience",
+  "author",
+  "readMinutes",
+  "viewCount",
+  "publishedAt",
 ] as const;
 
 export const FEED_POST_LIST_FIELDS = [
@@ -235,7 +243,7 @@ export const CARD_FIELDS_BY_KIND: Record<ListFieldsKind, readonly string[]> = {
   users: ["id", "name", "slug", "avatarUrl", "headline", "role"],
   companies: ["id", "name", "slug", "logoUrl", "industry", "openJobsCount"],
   resumes: ["id", "title", "slug", "privacy", "isMaster", "viewCount", "updatedAt"],
-  articles: ["id", "title", "slug", "summary", "coverImageUrl", "authorName", "authorAvatarUrl", "publishedAt", "readingMinutes"],
+  articles: ["id", "kind", "title", "slug", "summary", "coverImageUrl", "category", "tags", "sector", "audience", "author", "readMinutes", "viewCount", "publishedAt"],
   feedPosts: ["id", "authorName", "authorAvatarUrl", "kind", "title", "preview", "thumbnailUrl", "createdAt", "likeCount", "commentCount", "isLikedByMe"],
   talentPool: ["id", "candidateName", "candidateAvatarUrl", "candidateHeadline", "stage", "tags", "addedAt"],
   notifications: ["id", "type", "title", "message", "isRead", "createdAt"],

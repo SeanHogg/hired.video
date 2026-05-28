@@ -42,9 +42,9 @@ function toAvailable(tool: AIToolDef): AvailableAPI {
 
 /** Get available APIs for a specific context type. */
 export function getAPIsForContext(contextType: AIContextType): AvailableAPI[] {
-  // The shared `AIContextType` mirrors the frontend one — same string
-  // union, pending the canonical move under #1621.
-  return getToolsForContext(contextType as never).map(toAvailable);
+  // `AIContextType` is now canonical in @shared/ai-context-types and
+  // shared by both sides (#1626), so no cast is needed.
+  return getToolsForContext(contextType).map(toAvailable);
 }
 
 /** Get an API by its stable id. Returns undefined if no match — the

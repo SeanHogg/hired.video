@@ -68,6 +68,7 @@ import { ogRoutes } from "./routes/og.js";
 import { linkedInPostRoutes } from "./routes/linkedin-post.js";
 import { vendorSyncRoutes } from "./routes/vendor-sync.js";
 import { locationRoutes } from "./routes/locations.js";
+import { contentAudienceRoutes } from "./routes/content-audiences.js";
 import { adminRoutes } from "./routes/admin.js";
 import { adminR2Routes } from "./routes/admin-r2.js";
 import { adminWorkerRoutes } from "./routes/admin-workers.js";
@@ -594,6 +595,7 @@ export function createApp() {
   app.route("/api/profile", profileRoutes);
   app.route("/api/channels", channelRoutes);
   app.route("/api/locations", locationRoutes);
+  app.route("/api/content-audiences", contentAudienceRoutes);
   app.route("/api/passwordmanagement", passwordManagementRoutes);
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.

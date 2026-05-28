@@ -37,6 +37,9 @@ import {
   type ContentLocationSet,
 } from "@/lib/services/locations-service";
 import { SectorPicker } from "@/components/sector/SectorPicker";
+import { AudiencePicker } from "@/components/landing/AudiencePicker";
+import { contentAudiencesService } from "@/lib/services/content-audiences-service";
+import type { AudienceKey } from "@shared/audiences";
 import {
   ARTICLE_AUDIENCES,
   ARTICLE_AUDIENCE_LABELS,
@@ -86,6 +89,11 @@ export default function ArticlesManagerPanel() {
   // not bound to a vertical (general career advice) stay null.
   const [sector, setSector] = useState<Sector | null>(null);
   const [audience, setAudience] = useState<ArticleAudience | "">("");
+  // Resource-Map audience tags (#1644) — multi-select across both
+  // taxonomies, distinct from the legacy single-value `audience` above.
+  // Persisted via content_audiences so the article surfaces on the
+  // matching /for/[audience] Resource Maps.
+  const [audienceTags, setAudienceTags] = useState<AudienceKey[]>([]);
   // Structured geo tags (gap #1138). Hydrated from the server on edit
   // open; persisted via locationsService.setForEntity after the article
   // save resolves. Optional — articles can be country-wide / global.
@@ -125,6 +133,7 @@ export default function ArticlesManagerPanel() {
     setCoverImageUrl("");
     setSector(null);
     setAudience("");
+    setAudienceTags([]);
     setLocations({ origin: null, serves: [] });
     setMode("edit");
   };
@@ -179,6 +188,11 @@ export default function ArticlesManagerPanel() {
         });
       })
       .catch(() => setLocations({ origin: null, serves: [] }));
+    // Hydrate existing audience tags — same best-effort contract as geo.
+    void contentAudiencesService
+      .getForEntity("article", a.id)
+      .then(setAudienceTags)
+      .catch(() => setAudienceTags([]));
   };
 
   const buildInput = () => ({
@@ -217,6 +231,12 @@ export default function ArticlesManagerPanel() {
         } catch (locErr) {
           console.warn("Failed to save article locations:", locErr);
         }
+      }
+      // Persist Resource-Map audience tags — best-effort, same as geo.
+      try {
+        await contentAudiencesService.setForEntity("article", saved.id, audienceTags);
+      } catch (audErr) {
+        console.warn("Failed to save article audience tags:", audErr);
       }
       toast({ title: "Saved" });
     } catch (e: unknown) {
@@ -507,6 +527,14 @@ export default function ArticlesManagerPanel() {
               showRemote={false}
               originLabel="Primary location"
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Resource maps (optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Tag the situations or professions this piece helps. Tagged articles surface on the
+              matching <span className="font-medium">/for</span> Resource Map pages (e.g. Recent Graduates, Veterans).
+            </p>
+            <AudiencePicker value={audienceTags} onChange={setAudienceTags} />
           </div>
           <div>
             <Label htmlFor="body">Body</Label>

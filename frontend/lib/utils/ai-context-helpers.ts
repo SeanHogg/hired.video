@@ -341,9 +341,17 @@ export function createDashboardContext(
 }
 
 /**
- * Create a general context (fallback)
+ * Create a general-shaped context. Carries plain "general" by default
+ * but also the studio + content surfaces (studio, article-*, company-*,
+ * course-*, learning, interview-practice) added under #1621 — the
+ * caller passes the resolved `contextType` so the page keeps its label
+ * through the system prompt + suggestions instead of being flattened to
+ * "general".
  */
-export function createGeneralContext(userRole?: string): GeneralContext {
+export function createGeneralContext(
+  userRole?: string,
+  contextType: GeneralContext["contextType"] = "general",
+): GeneralContext {
   const actions: GeneralAIAction[] = [];
 
   // Add role-specific general actions
@@ -378,10 +386,10 @@ export function createGeneralContext(userRole?: string): GeneralContext {
     );
   }
 
-  const availableAPIs = getAPIsForContext("general");
+  const availableAPIs = getAPIsForContext(contextType);
 
   return {
-    contextType: "general",
+    contextType,
     pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
@@ -466,6 +474,15 @@ export function getContextLabel(contextType: AIContextType): string {
     search: "Search",
     dashboard: "Dashboard",
     tasks: "Task Management",
+    studio: "Studio",
+    "article-view": "Article",
+    "article-edit": "Edit Article",
+    "company-view": "Company",
+    "company-edit": "Edit Company",
+    "course-learn": "Course",
+    "course-author": "Author Course",
+    learning: "Learning",
+    "interview-practice": "Interview Practice",
     general: "General",
   };
 
@@ -556,6 +573,15 @@ export function getContextIcon(contextType: AIContextType): string {
     search: "Search",
     dashboard: "LayoutDashboard",
     tasks: "CheckSquare",
+    studio: "Clapperboard",
+    "article-view": "Newspaper",
+    "article-edit": "PenLine",
+    "company-view": "Building2",
+    "company-edit": "Building2",
+    "course-learn": "GraduationCap",
+    "course-author": "GraduationCap",
+    learning: "GraduationCap",
+    "interview-practice": "Mic",
     general: "Brain",
   };
 

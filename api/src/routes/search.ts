@@ -15,7 +15,7 @@ import type { ContentLocationKind, LocationFilter } from "../../../shared/conten
 import { AudienceKeySchema, type AudienceKey } from "../../../shared/audiences.js";
 import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 
-const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents } = schema;
+const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents, courses } = schema;
 
 export const searchRoutes = new Hono<AppEnv>();
 
@@ -178,6 +178,27 @@ function toArticleItem(a: typeof articles.$inferSelect) {
   };
 }
 
+function toLearningPathItem(course: typeof courses.$inferSelect) {
+  // Published LMS courses surface under the `learning_path` kind so the
+  // Resource Map's "Learning paths" bucket can populate (#1667). The kind
+  // discriminator is `learning_path` to match content_audiences tags +
+  // CONTENT_LOCATION_KINDS; the card layer routes it to /courses/:id.
+  return {
+    id: course.id,
+    type: "learning_path" as const,
+    title: course.title,
+    description: course.summary ?? "",
+    summary: course.summary ?? "",
+    avatar: course.coverImageUrl ?? undefined,
+    category: course.category ?? undefined,
+    difficulty: course.difficulty ?? undefined,
+    estimatedMinutes: course.estimatedMinutes ?? undefined,
+    createdAt: (course.publishedAt ?? course.createdAt).toISOString(),
+    updatedAt: course.updatedAt.toISOString(),
+    isFeatured: false,
+  };
+}
+
 function toMediaItem(video: typeof videos.$inferSelect, ownerName: string | null) {
   const title = video.title || `${ownerName ?? "Unknown"}'s Video Resume`;
   return {
@@ -251,6 +272,7 @@ searchRoutes.get("/public", async (c) => {
   const includeTemplates = category === "all" || category === "templates";
   const includeArticles = category === "all" || category === "articles";
   const includeEvents = category === "all" || category === "events";
+  const includeLearningPaths = category === "all" || category === "learning_paths";
 
   // Audience filter — orthogonal to geo. When set, every kind's
   // candidate set is intersected with the entity_ids tagged with this
@@ -330,6 +352,7 @@ searchRoutes.get("/public", async (c) => {
     articlesAllow,
     companiesAllow,
     eventsAllow,
+    learningPathsAllow,
   ] = await Promise.all([
     allowlistFor("job", includeJobs),
     allowlistFor("user_profile", includePeople),
@@ -340,6 +363,7 @@ searchRoutes.get("/public", async (c) => {
     allowlistFor("article", includeArticles),
     allowlistFor("company", includeCompanies),
     allowlistFor("event", includeEvents),
+    allowlistFor("learning_path", includeLearningPaths),
   ]);
 
   const jobsPromise = includeJobs
@@ -526,6 +550,29 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof articles.$inferSelect[]);
 
+  // Learning paths — published LMS courses (#1667). Surfaces under the
+  // `learning_path` kind so the Resource Map bucket + audience filter
+  // work; mirrors the articles path (status gate + search + allowlist).
+  const learningPathsWhereParts: any[] = [eq(courses.status, "published")];
+  if (search) {
+    learningPathsWhereParts.push(
+      or(
+        ilike(courses.title, `%${search}%`),
+        ilike(courses.summary, `%${search}%`),
+      )!,
+    );
+  }
+  const learningPathsAllowCl = allowClause(courses.id, learningPathsAllow);
+  if (learningPathsAllowCl) learningPathsWhereParts.push(learningPathsAllowCl);
+  const learningPathsPromise = includeLearningPaths && !allowEmpty(learningPathsAllow)
+    ? db
+        .select()
+        .from(courses)
+        .where(and(...learningPathsWhereParts))
+        .orderBy(desc(courses.publishedAt))
+        .limit(100)
+    : Promise.resolve([] as typeof courses.$inferSelect[]);
+
   // Events — public, non-cancelled, upcoming (or matching the geo/text filter).
   // Discovery surface only: `visibility='public'` + `type IN ('event','coffee')`.
   // Cancelled events stay out of search.
@@ -553,7 +600,7 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof scheduledEvents.$inferSelect[]);
 
-  const [jobs, companies, people, resumes, voices, templates, media, articlesList, events] = await Promise.all([
+  const [jobs, companies, people, resumes, voices, templates, media, articlesList, events, learningPaths] = await Promise.all([
     jobsPromise,
     companyPromise,
     peoplePromise,
@@ -563,6 +610,7 @@ searchRoutes.get("/public", async (c) => {
     mediaPromise,
     articlesPromise,
     eventsPromise,
+    learningPathsPromise,
   ]);
 
   // When searching "all", we merge and paginate by createdAt.
@@ -576,6 +624,7 @@ searchRoutes.get("/public", async (c) => {
     ...media.map(({ video, ownerName }) => toMediaItem(video, ownerName)),
     ...articlesList.map(toArticleItem),
     ...events.map(toEventItem),
+    ...learningPaths.map(toLearningPathItem),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));
 

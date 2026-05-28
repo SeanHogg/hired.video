@@ -45,7 +45,7 @@ export const resumeScore: AIToolDef = {
   requiresAuth: false,
   useCase: "resume_score",
   supportedActions: ["ats-score", "optimize-content"],
-  contextTypes: ["resume-list", "resume-view"],
+  contextTypes: ["resume-list", "resume-view", "resume-edit", "resume-create"],
   requestSchema: { resumeText: "string" },
   responseSchema: {
     overallScore: "number",

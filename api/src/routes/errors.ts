@@ -104,9 +104,9 @@ function buildEmailHtml(report: ErrorReport, clientIp: string): string {
   let contextBlock = "";
   if (report.context) {
     const json = JSON.stringify(report.context, null, 2);
-    // Cap rendered context at 32k so an inflated payload can't DoS the
-    // mail provider.
-    const capped = json.length > 32_000 ? `${json.slice(0, 32_000)}\n…(truncated)` : json;
+    const capped = json.length > MAX_CONTEXT_RENDER_CHARS
+      ? `${json.slice(0, MAX_CONTEXT_RENDER_CHARS)}\n…(truncated)`
+      : json;
     contextBlock = `<h3 style="margin-top:24px;font-size:14px;">Context</h3><pre style="background:#f5f5f5;padding:12px;border-radius:4px;white-space:pre-wrap;overflow-x:auto;font-size:11px;line-height:1.4;">${escapeHtml(capped)}</pre>`;
   }
 
@@ -125,13 +125,22 @@ function buildEmailHtml(report: ErrorReport, clientIp: string): string {
 
 const REPORT_RECIPIENT = "seanhogg@gmail.com";
 
+// Reject bodies larger than this before parsing. The client truncates each
+// logged request/response body (api-client.ts truncateBodyForLog), so a real
+// report is well under this — but a crash with a full snapshot of resume/AI
+// payloads in `context.recentApiRequests` can legitimately run large, so we
+// leave generous headroom rather than 413 a genuine report.
+const MAX_REPORT_BYTES = 512 * 1024; // 512 KB
+// Cap rendered context in the email so an inflated payload can't DoS the
+// mail provider. Larger than MAX before, since we now accept larger reports.
+const MAX_CONTEXT_RENDER_CHARS = 128_000;
+
 export const errorsRoutes = new Hono<AppEnv>();
 
 errorsRoutes.post("/report", reportRateLimiter, async (c) => {
-  // Reject bodies bigger than ~64KB before even parsing — a real client
-  // payload is well under 8KB. Anything larger is either a bug or abuse.
+  // Reject oversized bodies before even parsing. See MAX_REPORT_BYTES.
   const lengthHeader = c.req.header("content-length");
-  if (lengthHeader && Number(lengthHeader) > 65_536) {
+  if (lengthHeader && Number(lengthHeader) > MAX_REPORT_BYTES) {
     return c.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "Report payload too large." } }, 413);
   }
 

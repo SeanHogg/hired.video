@@ -57,6 +57,7 @@ import {
   createGeneralContext
 } from "@/lib/utils/ai-context-helpers";
 import type { AIAction, AIContextType, AIContext } from "@/lib/types/ai-context";
+import { detectContextType } from "@/lib/config/page-context-registry";
 import { useAIUsage } from "@/hooks/use-ai-usage";
 import { AIUsageLimitBanner, AIUsageLimitErrorBanner } from "@/components/AIUsageLimitBanner";
 
@@ -371,26 +372,13 @@ export default function AIChatPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAIChatOpen, pendingMessage]);
 
-  // Auto-detect and set context based on current route and user role
+  // Auto-detect and set context based on current route and user role.
+  // Route → contextType resolution lives in the declarative
+  // page-context registry (single source of truth, gap #1621).
   useEffect(() => {
-    console.log('[AIChatPanel] Route changed, detecting context for:', location.pathname);
-    console.log('[AIChatPanel] User role:', user?.role || 'unauthenticated');
-
     try {
-      const contextType = detectContextFromRoute(location.pathname);
-      console.log('[AIChatPanel] Detected context type:', contextType);
-
-      if (!contextType) {
-        console.log('[AIChatPanel] No context detected, clearing');
-        setPageContext(undefined);
-        return;
-      }
-
-      // Create appropriate context based on type and user role
-      const userRole = user?.role;
-      const context = createContextForType(contextType, userRole);
-      console.log('[AIChatPanel] Created context with role:', { contextType, userRole });
-
+      const contextType = detectContextType(location.pathname);
+      const context = createContextForType(contextType, user?.role);
       setPageContext(context);
     } catch (error) {
       console.error('[AIChatPanel] Error detecting/setting context:', error);
@@ -1242,71 +1230,12 @@ export default function AIChatPanel() {
 }
 
 // ============================================================================
-// HELPER FUNCTIONS - Route Detection & Context Creation
+// HELPER FUNCTIONS - Context Creation
 // ============================================================================
-
-/**
- * Detect AI context type from current route
- */
-function detectContextFromRoute(pathname: string): AIContextType | null {
-  // Dashboard
-  if (pathname === "/dashboard") return "dashboard";
-
-  // Resume routes
-  if (pathname.startsWith("/resumes/new") || pathname.startsWith("/resumes/create")) {
-    return "resume-create";
-  }
-  if (pathname.startsWith("/resumes/edit/") || (pathname.includes("/resumes/") && pathname.includes("/edit"))) {
-    return "resume-edit";
-  }
-  if (pathname.startsWith("/resumes/") && !pathname.includes("/edit")) {
-    return "resume-view";
-  }
-  if (pathname === "/resumes") return "resume-list";
-
-  // Job routes
-  if (pathname.startsWith("/jobs/new") || pathname.startsWith("/jobs/create")) {
-    return "job-create";
-  }
-  if (pathname.startsWith("/jobs/edit/") || (pathname.includes("/jobs/") && pathname.includes("/edit"))) {
-    return "job-edit";
-  }
-  if (pathname.startsWith("/jobs/") && !pathname.includes("/edit")) {
-    return "job-view";
-  }
-  if (pathname === "/jobs") return "job-list";
-
-  // Profile routes
-  if (pathname.startsWith("/profile/edit") || pathname === "/settings") {
-    return "profile-edit";
-  }
-  if (pathname.startsWith("/profile/") || pathname.startsWith("/people/")) {
-    return "profile-view";
-  }
-
-  // Tasks route
-  if (pathname === "/tasks" || pathname.startsWith("/tasks")) {
-    return "tasks";
-  }
-
-  // AI Coach route
-  if (pathname === "/chat") {
-    return "general"; // Use general context for AI Coach page
-  }
-
-  // Other routes
-  if (pathname === "/outreach") return "outreach";
-  if (pathname === "/messages" || pathname.startsWith("/messages/")) return "messaging";
-  if (pathname === "/search" || pathname === "/people" || pathname === "/companies") {
-    return "search";
-  }
-
-  // Home page
-  if (pathname === "/" || pathname === "/index") return "search";
-
-  // Default: general context
-  return "general";
-}
+// Route → contextType resolution lives in the declarative
+// page-context registry (page-context-registry.ts) — `detectContextType`
+// is imported above. This file only maps a resolved contextType to a
+// concrete context object.
 
 /**
  * Create appropriate context object for a given context type and user role
@@ -1338,10 +1267,24 @@ function createContextForType(contextType: AIContextType, userRole?: string) {
     case "tasks":
       return createTasksContext(undefined, userRole);
 
+    // Studio + content surfaces — general-shaped payload, but pass the
+    // resolved contextType through so the page keeps its label in the
+    // system prompt + suggestions instead of flattening to "general".
+    case "studio":
+    case "article-view":
+    case "article-edit":
+    case "company-view":
+    case "company-edit":
+    case "course-learn":
+    case "course-author":
+    case "learning":
+    case "interview-practice":
+      return createGeneralContext(userRole, contextType);
+
+    // outreach / messaging carry the general payload today (no bespoke
+    // wiring in this panel); general is the fallback for everything else.
     case "outreach":
     case "messaging":
-      return createGeneralContext(userRole);
-
     case "general":
     default:
       return createGeneralContext(userRole);
