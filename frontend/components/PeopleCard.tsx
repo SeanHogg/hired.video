@@ -387,25 +387,27 @@ export default function PeopleCard({
                 </div>
               </div>
 
-              <CardDescription className="text-xs sm:text-sm mb-2 line-clamp-2">
-                {person.headline}
-              </CardDescription>
+              {person.headline && (
+                <CardDescription className="text-xs sm:text-sm mb-2 line-clamp-2">
+                  {person.headline}
+                </CardDescription>
+              )}
 
-              {/* Role, location, active/joined are authenticated-only. Anonymous
-                  viewers still see name, headline, current position, and company
-                  — enough to identify the person and click through. */}
+              {/* Role chip is public info (already visible on the public
+                  profile page). Location is authenticated-only — that's
+                  PII a casual viewer shouldn't see. Active/joined ditto. */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground">
-                {isAuthenticated && (
-                  <>
-                    <div className="flex items-center gap-1">
-                      {getRoleIcon(person.role)}
-                      <span>{getPersonRoleLabel(person.role, t)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>{person.location}</span>
-                    </div>
-                  </>
+                {person.role && (
+                  <div className="flex items-center gap-1">
+                    {getRoleIcon(person.role)}
+                    <span>{getPersonRoleLabel(person.role, t)}</span>
+                  </div>
+                )}
+                {isAuthenticated && person.location && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    <span>{person.location}</span>
+                  </div>
                 )}
                 {person.currentCompany && (
                   <div className="flex items-center gap-1">

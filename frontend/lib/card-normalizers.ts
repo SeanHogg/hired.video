@@ -116,24 +116,43 @@ export function normalizeCompanyData(
 }
 
 /**
- * Normalize person data from various API formats
+ * Normalize person data from various API formats.
+ *
+ * Display-derivation is NOT this normalizer's job (#1657 / #1659) —
+ * it only does shape coercion. Empty strings flow through; the
+ * canonical seam at `lib/person-display.ts` decides what to render
+ * for blank values. Pre-#1657 this normalizer hardcoded "Unknown
+ * User" / "Professional" / `role` as `currentPosition`, which
+ * surfaced as snake_case role chips and generic "Professional"
+ * headlines on the homepage People cards.
+ *
+ * If a field is missing from the API, this normalizer returns
+ * empty string / undefined. Components MUST handle empty values
+ * (either hide the section or render the i18n fallback). Inventing
+ * generic display text here would re-create the duplicate-fallback
+ * anti-pattern this module exists to prevent.
  */
 export function normalizePersonData(
   item: RawApiItem,
   context: CardContext,
 ): NormalizedPersonData {
-  // The backend toPublicUserCardDto returns canonical field names:
-  // firstName, lastName, fullName, avatar, headline, currentCompany, etc.
   return {
     id: item.id,
     type: "people" as const,
     firstName: item.firstName || "",
     lastName: item.lastName || "",
-    fullName: item.fullName || item.name || "Unknown User",
+    // Empty when API doesn't supply — getPersonDisplayName in the
+    // consumer renders the i18n "User" fallback.
+    fullName: item.fullName || item.name || "",
     avatar: item.avatar,
-    headline: item.headline || "Professional",
-    location: item.location || "Location not specified",
-    role: item.role || "Professional",
+    // Empty when not set — consumer renders nothing for the headline
+    // rather than fabricating "Professional".
+    headline: item.headline || "",
+    location: item.location || "",
+    // Raw role enum (e.g. JOB_SEEKER / RECRUITER). Consumers MUST
+    // render via getPersonRoleLabel from lib/person-display.ts so
+    // the snake_case enum never reaches the DOM.
+    role: item.role || "",
     visibility: item.visibility || "public",
     status: item.status || "active",
     createdAt: item.createdAt || new Date().toISOString(),
@@ -151,7 +170,10 @@ export function normalizePersonData(
     isCreator: item.isCreator === true,
     creatorPrograms: item.creatorPrograms ?? { video: false, voice: false, services: false },
     experienceLevel: item.experienceLevel,
-    currentPosition: item.currentRole || item.role,
+    // Use the proper current-position field. NEVER fall back to the
+    // raw role enum — that's how "recruiter" / "job_seeker" leaked
+    // into the Briefcase chip on the public People cards (#1659).
+    currentPosition: item.currentRole || undefined,
     currentCompany: item.currentCompany,
     ownership:
       determineOwnership(item, context) === "none"

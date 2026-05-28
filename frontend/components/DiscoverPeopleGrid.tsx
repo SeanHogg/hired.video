@@ -123,7 +123,10 @@ export default function DiscoverPeopleGrid({
             // a thin shape coercion only.
             const personMetadata: UserMetadata = {
               ...(person as unknown as UserMetadata),
-              location: person.location || "Location not specified",
+              // Empty string flows through — PeopleCard guards the
+              // location chip on truthy value instead of rendering
+              // fabricated "Location not specified" copy (#1659).
+              location: person.location || "",
               visibility: "public",
               status: "active",
               lastActiveAt: person.updatedAt || person.createdAt || "",
