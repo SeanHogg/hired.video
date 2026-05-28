@@ -14,6 +14,13 @@ export const PRO_MONTHLY_PRICE = 9.95;
 /** 20% annual discount: 9.95 × 12 × 0.8 = 95.52 */
 export const PRO_YEARLY_PRICE = +(PRO_MONTHLY_PRICE * 12 * 0.8).toFixed(2);
 
+/** Canonical per-seat monthly price in cents. Every workforce seat / creator
+ *  seat is $9.95 (see project_pricing_seats). Single source of truth for the
+ *  workforce seat-billing reconciliation AND the seat soft-cap confirm prompt
+ *  (#1678) — replaces the stale 4900¢ default + the private 995 const that
+ *  used to live in services/workforce/index.ts. */
+export const SEAT_PRICE_CENTS = 995;
+
 // ── Token allowances (true token metering, not request counts) ──────────────
 /** Free tier: monthly token allowance from the platform-paid LLM budget. */
 export const FREE_AI_MONTHLY_TOKENS = 50_000;

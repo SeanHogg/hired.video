@@ -17,7 +17,9 @@ import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 import {
   PIPELINE_STAGES,
   PIPELINE_STAGE_LABELS,
+  maskConfidentialCandidate,
 } from "../../../shared/recruiter-pipeline.js";
+import { confidentialCandidateIds } from "../services/pipeline/PipelineService.js";
 
 export const pipelineShareRoutes = new Hono<AppEnv>();
 export const pipelinePublicRoutes = new Hono<AppEnv>();
@@ -122,10 +124,11 @@ pipelinePublicRoutes.get("/:shareToken", async (c) => {
     .limit(1);
   if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
 
-  const entries = await db
+  const rawEntries = await db
     .select({
       id: schema.jobPipelineEntries.id,
       stage: schema.jobPipelineEntries.stage,
+      candidateUserId: schema.jobPipelineEntries.candidateUserId,
       candidateName: schema.jobPipelineEntries.candidateName,
       candidateLocation: schema.jobPipelineEntries.candidateLocation,
       candidateAvatarUrl: schema.jobPipelineEntries.candidateAvatarUrl,
@@ -136,6 +139,19 @@ pipelinePublicRoutes.get("/:shareToken", async (c) => {
     .from(schema.jobPipelineEntries)
     .where(eq(schema.jobPipelineEntries.jobId, link.jobId))
     .orderBy(desc(schema.jobPipelineEntries.stageChangedAt));
+
+  // Confidential-applicant masking (#1679) — same gate as the recruiter
+  // kanban: hidden until shortlist. The hiring-manager portal is an
+  // employer-facing surface, so it must honor it too.
+  const confidential = await confidentialCandidateIds(
+    rawEntries.map((e) => e.candidateUserId).filter(Boolean) as string[],
+  );
+  const entries = rawEntries.map((e) =>
+    maskConfidentialCandidate(e, {
+      isConfidential: !!e.candidateUserId && confidential.has(e.candidateUserId),
+      stage: (e.stage as string) ?? "applied",
+    }),
+  );
 
   const grouped: Record<string, typeof entries> = Object.fromEntries(
     PIPELINE_STAGES.map((s) => [s, [] as typeof entries]),

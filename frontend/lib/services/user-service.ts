@@ -205,6 +205,8 @@ export const PublicUserSchema = z.object({
   // Modelled here (not just on `data`) so callers reading them directly off
   // the DTO — like authService.getCurrentUser — don't have them stripped.
   profileVisibility: z.enum(["public", "private", "connections"]).optional(),
+  confidentialMode: nullableBoolean(),
+  confidentialBlocklist: z.array(z.string()).nullish(),
   openToRemote: nullableBoolean(),
   industries: z
     .array(z.string())

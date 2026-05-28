@@ -11,13 +11,28 @@
  *
  * Share links are a sibling aggregate — see PipelineShareService.
  */
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import {
   PIPELINE_STAGES,
+  maskConfidentialCandidate,
   type PipelineStage,
   type PipelineTouchpointType,
 } from "../../../../shared/recruiter-pipeline.js";
+
+/** Resolve which of the given candidate userIds are in confidential search
+ *  mode (#1679). Used by every pipeline read surface (recruiter kanban +
+ *  hiring-manager share portal) to mask identity until shortlist. Exported
+ *  so both surfaces share one query — no drift. */
+export async function confidentialCandidateIds(userIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return new Set();
+  const rows = await getDb()
+    .select({ userId: schema.userProfiles.userId })
+    .from(schema.userProfiles)
+    .where(and(inArray(schema.userProfiles.userId, ids), eq(schema.userProfiles.confidentialMode, true)));
+  return new Set(rows.map((r: { userId: string }) => r.userId));
+}
 
 export async function logTouchpoint(input: {
   entryId: string;
@@ -36,11 +51,25 @@ export async function logTouchpoint(input: {
 
 export async function listEntriesByStage(jobId: string) {
   const db = getDb();
-  const rows = await db
+  const raw = await db
     .select()
     .from(schema.jobPipelineEntries)
     .where(eq(schema.jobPipelineEntries.jobId, jobId))
     .orderBy(desc(schema.jobPipelineEntries.stageChangedAt));
+
+  // Confidential-applicant masking (#1679): a candidate in confidential
+  // search mode stays anonymous to the employer until advanced to the
+  // shortlist stage. Redaction happens HERE at the read boundary, never
+  // in storage, so the underlying identity is preserved for the reveal.
+  const confidential = await confidentialCandidateIds(
+    raw.map((r: any) => r.candidateUserId).filter(Boolean) as string[],
+  );
+  const rows = raw.map((row: any) =>
+    maskConfidentialCandidate(row, {
+      isConfidential: !!row.candidateUserId && confidential.has(row.candidateUserId),
+      stage: (row.stage as PipelineStage) ?? "applied",
+    }),
+  );
 
   const grouped: Record<PipelineStage, typeof rows> = Object.fromEntries(
     PIPELINE_STAGES.map((s) => [s, [] as typeof rows]),

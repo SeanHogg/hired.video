@@ -119,6 +119,11 @@ export const userCompanyRoleAssociations = pgTable("user_company_role_associatio
   companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
   role: varchar("role", { length: 100 }).notNull().default("member"),
   isActive: boolean("is_active").default(true).notNull(),
+  // Optional per-member AI-token ceiling within the shared company pool
+  // (gap #1679). Null = no sub-cap (member can draw the whole pool). When
+  // set, a member's month-to-date company-attributed token usage may not
+  // exceed this. Set by the employer in workforce settings.
+  monthlyTokenLimit: integer("monthly_token_limit"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

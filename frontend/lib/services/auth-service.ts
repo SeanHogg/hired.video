@@ -157,6 +157,8 @@ export type UserProfile = {
   salaryCurrency?: string;
   yearsOfExperience?: number;
   profileVisibility?: "public" | "private" | "connections";
+  confidentialMode?: boolean;
+  confidentialBlocklist?: string[];
   isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -200,6 +202,12 @@ export type ProfileUpdate = Partial<
   >
 > & {
   summary?: string;
+  /** Confidential search mode (#1627) — opt out of the public people
+   *  directory. Lives on the profile; forwarded as `confidentialMode`. */
+  confidentialMode?: boolean;
+  /** Confidential employer blocklist (#1679) — company names hidden from
+   *  in recruiter search. */
+  confidentialBlocklist?: string[];
   /** Per-section visibility map for /people/[id]. Partial of `ProfileSections`
    * (shared/profile-sections.ts); missing keys fall back to role defaults. */
   profileSections?: Record<string, boolean>;
@@ -501,6 +509,8 @@ export class AuthService {
       salaryCurrency: dto.salaryCurrency ?? undefined,
       yearsOfExperience: dto.yearsOfExperience ?? undefined,
       profileVisibility: dto.profileVisibility ?? "public",
+      confidentialMode: dto.confidentialMode ?? false,
+      confidentialBlocklist: dto.confidentialBlocklist ?? [],
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
@@ -568,6 +578,8 @@ export class AuthService {
     if (updates.yearsOfExperience !== undefined) payload.yearsOfExperience = updates.yearsOfExperience;
     if (updates.profilePicture !== undefined) payload.avatar = updates.profilePicture;
     if (updates.profileVisibility !== undefined) payload.profileVisibility = updates.profileVisibility;
+    if (updates.confidentialMode !== undefined) payload.confidentialMode = updates.confidentialMode;
+    if (updates.confidentialBlocklist !== undefined) payload.confidentialBlocklist = updates.confidentialBlocklist;
     if (updates.role !== undefined) payload.role = updates.role;
     if (updates.profileSections !== undefined) payload.profileSections = updates.profileSections;
 

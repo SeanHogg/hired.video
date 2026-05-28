@@ -116,6 +116,27 @@ export interface SeatReconcileResult {
   delta: number;
 }
 
+export interface TokenPoolMember {
+  userId: string;
+  name: string;
+  email: string;
+  monthlyTokenLimit: number | null;
+  monthlyUsed: number;
+}
+
+export interface TokenPoolView {
+  companyId: string;
+  budget: {
+    monthlyLimit: number;
+    monthlyUsed: number;
+    monthlyRemaining: number;
+    packBalance: number;
+    totalAvailable: number;
+    seatCount: number;
+  };
+  members: TokenPoolMember[];
+}
+
 export type IntegrationProvider =
   | "quickbooks" | "xero" | "gusto" | "docusign" | "helcim";
 
@@ -213,6 +234,19 @@ class WorkforceService {
     return unwrap(apiClient.post<{ disconnected: boolean }>(
       `/api/workforce/integrations/${provider}/disconnect`,
       { companyId },
+    ));
+  }
+
+  /** Employer's shared AI token pool + per-member usage/sub-caps (#1679). */
+  getTokenPool() {
+    return unwrap(apiClient.get<TokenPoolView>("/api/workforce/token-pool"));
+  }
+
+  /** Set (number) or clear (null) a member's monthly AI-token sub-cap. */
+  setMemberTokenLimit(userId: string, limit: number | null) {
+    return unwrap(apiClient.patch<{ updated: boolean }>(
+      `/api/workforce/members/${userId}/token-limit`,
+      { limit },
     ));
   }
 }

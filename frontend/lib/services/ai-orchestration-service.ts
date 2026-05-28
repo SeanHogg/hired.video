@@ -305,7 +305,13 @@ class AIOrchestrationService {
    *  cannot leak the wrong id across kinds. */
   private resolvePathParams(context: AIContext): Record<string, string | number> {
     const params: Record<string, string | number> = {};
-    const ctx = context as Record<string, any>;
+    // The AIContext union exposes entity payloads on kind-specific keys;
+    // narrow to the id-bearing shape without `any`.
+    const ctx = context as {
+      resume?: { id?: string };
+      job?: { id?: string };
+      task?: { id?: string };
+    };
     if (ctx.resume?.id) params.id = ctx.resume.id;
     else if (ctx.job?.id) params.id = ctx.job.id;
     else if (ctx.task?.id) params.id = ctx.task.id;

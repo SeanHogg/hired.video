@@ -6,6 +6,7 @@ import { createRolePermissions } from "@/lib/role-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
   type PlacementDocument,
   type Integration,
   type IntegrationProvider,
+  type TokenPoolView,
 } from "@/lib/services/workforce-service";
 
 /**
@@ -53,10 +55,128 @@ export function WorkforceSettings() {
       </div>
       <ApprovalQueueCard />
       <RosterCard />
+      <TokenPoolCard />
       <DeskMarginCard />
       <DocumentsCard />
       <IntegrationsCard />
     </div>
+  );
+}
+
+/** Shared AI token pool + per-member sub-caps (#1679). Self-gates: renders
+ *  null when the employer manages no workspace (the endpoint 403s). */
+function TokenPoolCard() {
+  const { toast } = useToast();
+  const [pool, setPool] = useState<TokenPoolView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hidden, setHidden] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const view = await workforceService.getTokenPool();
+      setPool(view);
+      setDrafts(
+        Object.fromEntries(
+          view.members.map((m) => [m.userId, m.monthlyTokenLimit?.toString() ?? ""]),
+        ),
+      );
+    } catch {
+      // 403 = caller manages no workspace → self-gate out.
+      setHidden(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const handleSave = async (userId: string) => {
+    const raw = (drafts[userId] ?? "").trim();
+    const limit = raw === "" ? null : Math.max(0, Math.floor(Number(raw)));
+    if (raw !== "" && !Number.isFinite(limit)) {
+      toast({ title: "Invalid limit", description: "Enter a number of tokens or leave blank for no cap.", variant: "destructive" });
+      return;
+    }
+    setSavingId(userId);
+    try {
+      await workforceService.setMemberTokenLimit(userId, limit);
+      toast({ title: "Saved", description: limit === null ? "Member sub-cap cleared." : `Member capped at ${limit.toLocaleString()} tokens/mo.` });
+      await refresh();
+    } catch (e) {
+      toast({ title: "Save failed", description: String((e as Error).message), variant: "destructive" });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  if (hidden) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <DollarSign className="h-5 w-5" />
+          AI token pool
+        </CardTitle>
+        <CardDescription>
+          Your workspace shares one AI token pool ({pool ? pool.budget.seatCount : 0} seat
+          {pool && pool.budget.seatCount === 1 ? "" : "s"} × monthly allowance). Set an optional
+          per-member monthly cap so no one drains the pool.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="text-sm text-muted-foreground">Loading…</div>
+        ) : !pool ? (
+          <div className="text-sm text-muted-foreground">No pool yet — add a workforce member to provision one.</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-sm">
+              Pool this month:{" "}
+              <span className="font-medium">{pool.budget.monthlyUsed.toLocaleString()}</span> /{" "}
+              {pool.budget.monthlyLimit.toLocaleString()} tokens used
+              {pool.budget.packBalance > 0 && ` · +${pool.budget.packBalance.toLocaleString()} pack`}
+            </div>
+            <div className="space-y-2">
+              {pool.members.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No active members.</div>
+              ) : pool.members.map((m) => (
+                <div key={m.userId} className="border rounded-md p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+                  <div className="flex-1">
+                    <div className="font-medium">{m.name || m.email}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {m.monthlyUsed.toLocaleString()} tokens used this month
+                      {m.monthlyTokenLimit != null && ` · cap ${m.monthlyTokenLimit.toLocaleString()}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="No cap"
+                      value={drafts[m.userId] ?? ""}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [m.userId]: e.target.value }))}
+                      className="w-32"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={savingId === m.userId}
+                      onClick={() => handleSave(m.userId)}
+                    >
+                      {savingId === m.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

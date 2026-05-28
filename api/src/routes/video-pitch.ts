@@ -16,6 +16,7 @@ import { buildRepos } from "../repositories/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { ResumeContent } from "../../../shared/resume.js";
+import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
 export const videoPitchRoutes = new Hono<AppEnv>();
 videoPitchRoutes.use("*", attachTokenBudget());
@@ -100,15 +101,10 @@ videoPitchRoutes.post("/script", async (c) => {
     return c.json(ok({ script, targetWordCount }));
   }
 
-  const systemPrompt = `You are an expert pitch coach for job seekers. You write spoken-word elevator pitches that hit a hook, value proposition, and a forward-looking ask in under the target word count.
-Rules:
-- Write for SPEAKING, not reading — short sentences, one idea each.
-- Target ~${targetWordCount} words total (assume 140 wpm).
-- Tone: ${parsed.data.tone}. ${parsed.data.tone === "casual" ? "Contractions OK." : parsed.data.tone === "enthusiastic" ? "Lead with energy; concrete metrics > adjectives." : "Crisp, confident, third-person-friendly."}
-- Begin with a one-line hook (not "Hi, my name is…").
-- Include one specific result (metric, deliverable, recognised outcome) if any resume context is supplied.
-- End with a forward-looking line ("…and I'm looking for…" or "the next problem I want to solve is…").
-Return ONLY JSON: { "script": "the full pitch as one paragraph" }`;
+  const systemPrompt = getPrompt("video-pitch").render({
+    targetWordCount,
+    tone: parsed.data.tone,
+  });
 
   const userMessage = resumeContext
     ? `Resume context:\n${resumeContext}\n\nWrite the pitch.`

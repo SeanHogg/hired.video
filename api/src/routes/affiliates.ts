@@ -2,7 +2,7 @@
 // Multi-tier system: Bronze → Silver → Gold → Platinum based on conversion count.
 
 import { Hono } from "hono";
-import { and, count, desc, eq, sum } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -11,6 +11,15 @@ export const affiliateRoutes = new Hono<AppEnv>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+/** Platform-admin gate for the /admin/* affiliate endpoints. */
+function isAdmin(c: any): boolean {
+  const u = c.var.user;
+  if (!u) return false;
+  if (u.isSuperAdmin === true) return true;
+  const roles: string[] = u.roles ?? [];
+  return roles.includes("admin") || roles.includes("super_admin");
 }
 
 function ok<T>(data: T) {
@@ -322,7 +331,7 @@ affiliateRoutes.get("/leaderboard", async (c) => {
   const profiles = profileIds.length > 0
     ? await db.select({ id: schema.affiliateProfiles.id, referralCode: schema.affiliateProfiles.referralCode })
         .from(schema.affiliateProfiles)
-        .where(eq(schema.affiliateProfiles.id, profileIds[0])) // simple single-lookup; scale with inArray
+        .where(inArray(schema.affiliateProfiles.id, profileIds))
     : [];
   const profileMap = Object.fromEntries(profiles.map((p) => [p.id, p.referralCode]));
 
@@ -407,19 +416,110 @@ affiliateRoutes.post("/payout", async (c) => {
   return c.json(ok({ ...payout, note: "Payout request submitted. Processing within 5–7 business days." }), 201);
 });
 
-// ─── Admin stubs ─────────────────────────────────────────────────────────────
+// ─── Admin ────────────────────────────────────────────────────────────────────
+// Gap #1684: these used to return `{success:true}` with no DB write. They now
+// require a platform admin and actually mutate the affiliate's status / payout
+// state. `:userId` is the affiliate's USER id; we resolve to their profile.
 
-affiliateRoutes.post("/admin/:userId/activate", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.post("/admin/:userId/deactivate", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.post("/admin/:userId/suspend", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.post("/admin/:userId/unsuspend", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.get("/admin/:userId/referrals", (c) => c.json(ok([]), 200));
-affiliateRoutes.get("/admin/:userId/conversions", (c) => c.json(ok([]), 200));
-affiliateRoutes.get("/admin/pending-payouts", (c) => c.json(ok([]), 200));
-affiliateRoutes.post("/admin/payout/:payoutId/approve", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.post("/admin/payout/:payoutId/reject", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.post("/admin/payout/:payoutId/process", (c) => c.json(ok({ success: true }), 200));
-affiliateRoutes.get("/admin/payout/:payoutId/status", (c) => c.json(ok({ status: "pending" }), 200));
+function requireAdmin(c: any) {
+  return isAdmin(c) ? null : c.json(error("FORBIDDEN", "Admin access required"), 403);
+}
+
+/** Set an affiliate profile's status by the owner's userId. */
+async function setAffiliateStatus(c: any, status: string) {
+  const guard = requireAdmin(c);
+  if (guard) return guard;
+  const db = getDb();
+  const [row] = await db.update(schema.affiliateProfiles)
+    .set({ status, updatedAt: new Date() } as any)
+    .where(eq(schema.affiliateProfiles.userId, c.req.param("userId")))
+    .returning({ id: schema.affiliateProfiles.id, status: schema.affiliateProfiles.status });
+  if (!row) return c.json(error("NOT_FOUND", "Affiliate profile not found"), 404);
+  return c.json(ok(row), 200);
+}
+
+affiliateRoutes.post("/admin/:userId/activate", (c) => setAffiliateStatus(c, "active"));
+affiliateRoutes.post("/admin/:userId/deactivate", (c) => setAffiliateStatus(c, "disabled"));
+affiliateRoutes.post("/admin/:userId/suspend", (c) => setAffiliateStatus(c, "suspended"));
+affiliateRoutes.post("/admin/:userId/unsuspend", (c) => setAffiliateStatus(c, "active"));
+
+affiliateRoutes.get("/admin/:userId/referrals", async (c) => {
+  const guard = requireAdmin(c);
+  if (guard) return guard;
+  const db = getDb();
+  const [profile] = await db.select({ id: schema.affiliateProfiles.id })
+    .from(schema.affiliateProfiles).where(eq(schema.affiliateProfiles.userId, c.req.param("userId"))).limit(1);
+  if (!profile) return c.json(ok([]), 200);
+  const rows = await db.select().from(schema.affiliateReferrals)
+    .where(eq(schema.affiliateReferrals.affiliateId, profile.id))
+    .orderBy(desc(schema.affiliateReferrals.createdAt)).limit(200);
+  return c.json(ok(rows), 200);
+});
+
+affiliateRoutes.get("/admin/:userId/conversions", async (c) => {
+  const guard = requireAdmin(c);
+  if (guard) return guard;
+  const db = getDb();
+  const [profile] = await db.select({ id: schema.affiliateProfiles.id })
+    .from(schema.affiliateProfiles).where(eq(schema.affiliateProfiles.userId, c.req.param("userId"))).limit(1);
+  if (!profile) return c.json(ok([]), 200);
+  const rows = await db.select().from(schema.affiliateConversions)
+    .where(eq(schema.affiliateConversions.affiliateId, profile.id))
+    .orderBy(desc(schema.affiliateConversions.createdAt)).limit(200);
+  return c.json(ok(rows), 200);
+});
+
+affiliateRoutes.get("/admin/pending-payouts", async (c) => {
+  const guard = requireAdmin(c);
+  if (guard) return guard;
+  const db = getDb();
+  const rows = await db.select().from(schema.affiliatePayouts)
+    .where(eq(schema.affiliatePayouts.status, "pending"))
+    .orderBy(desc(schema.affiliatePayouts.createdAt)).limit(200);
+  return c.json(ok(rows), 200);
+});
+
+/** Move a payout through its lifecycle. `process` also credits the affiliate's
+ *  totalPaid so the dashboard's paid total reflects processed payouts. */
+async function setPayoutStatus(c: any, status: string) {
+  const guard = requireAdmin(c);
+  if (guard) return guard;
+  const db = getDb();
+  const set: Record<string, unknown> = { status, updatedAt: new Date() };
+  if (status === "processed") set.processedAt = new Date();
+  const [payout] = await db.update(schema.affiliatePayouts)
+    .set(set as any)
+    .where(eq(schema.affiliatePayouts.id, c.req.param("payoutId")))
+    .returning();
+  if (!payout) return c.json(error("NOT_FOUND", "Payout not found"), 404);
+  if (status === "processed") {
+    await db.update(schema.affiliateProfiles)
+      .set({ totalPaid: sql`${schema.affiliateProfiles.totalPaid} + ${payout.amount}`, updatedAt: new Date() } as any)
+      .where(eq(schema.affiliateProfiles.id, payout.affiliateId));
+    // Mark the affiliate's pending conversions as paid so they aren't paid twice.
+    await db.update(schema.affiliateConversions)
+      .set({ status: "paid", paidAt: new Date(), updatedAt: new Date() } as any)
+      .where(and(
+        eq(schema.affiliateConversions.affiliateId, payout.affiliateId),
+        eq(schema.affiliateConversions.status, "pending"),
+      ));
+  }
+  return c.json(ok(payout), 200);
+}
+
+affiliateRoutes.post("/admin/payout/:payoutId/approve", (c) => setPayoutStatus(c, "approved"));
+affiliateRoutes.post("/admin/payout/:payoutId/reject", (c) => setPayoutStatus(c, "rejected"));
+affiliateRoutes.post("/admin/payout/:payoutId/process", (c) => setPayoutStatus(c, "processed"));
+
+affiliateRoutes.get("/admin/payout/:payoutId/status", async (c) => {
+  const guard = requireAdmin(c);
+  if (guard) return guard;
+  const db = getDb();
+  const [payout] = await db.select({ status: schema.affiliatePayouts.status })
+    .from(schema.affiliatePayouts).where(eq(schema.affiliatePayouts.id, c.req.param("payoutId"))).limit(1);
+  if (!payout) return c.json(error("NOT_FOUND", "Payout not found"), 404);
+  return c.json(ok({ status: payout.status }), 200);
+});
 
 affiliateRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Affiliate route not found" } }, 404),

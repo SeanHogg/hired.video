@@ -25,18 +25,23 @@ import {
   interviewAnswerCoachPrompt,
   interviewQuestionGeneratorPrompt,
 } from "./interview.js";
+import { careerResiliencePrompt } from "./career.js";
+import { videoPitchPrompt } from "./video-pitch.js";
 
-export type { PromptDef, PromptId, CareerCoachVars } from "./types.js";
+export type { PromptDef, PromptId, PromptArgument, CareerCoachVars } from "./types.js";
 export type { InterviewQuestionVars } from "./interview.js";
+export type { VideoPitchVars } from "./video-pitch.js";
 
 /** Every shipped prompt. Keyed by PromptId for O(1) lookup. */
 export const PROMPTS = {
   "career-coach": careerCoachPrompt,
+  "career-resilience": careerResiliencePrompt,
   "resume-editor-consolidate": consolidateHighlightsPrompt,
   "resume-editor-shorten": shortenBulletPrompt,
   "resume-roast": resumeRoastPrompt,
   "interview-question-generator": interviewQuestionGeneratorPrompt,
   "interview-answer-coach": interviewAnswerCoachPrompt,
+  "video-pitch": videoPitchPrompt,
 } as const satisfies Record<PromptId, PromptDef<any>>;
 
 /** Look up a prompt by id. Throws on unknown id so a typo at a call

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { DEFAULT_LOCALE, PUBLIC_LOCALES, type Locale } from "@shared/i18n";
+import { resolvePageSeoKey } from "@/lib/config/page-meta-registry";
 
 export interface SEOData {
   title?: string;
@@ -439,6 +440,20 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Start free, upgrade when you're ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — including the built-in Learning Content Library (AI, RAG, prompt engineering, must-have skills) bundled at no extra cost vs LinkedIn Learning's separately-licensed ~$379/seat/yr SKU. Cancel anytime.",
     keywords:
       "hired.video pricing, video resume pricing, resume builder cost, recruiter plan, ats pricing, annual subscription, built-in learning library pricing, LinkedIn Learning alternative pricing, SCORM courses included",
+  },
+  "/retained-search": {
+    title: "Retained Executive Search Firm Directory · hired.video",
+    description:
+      "Browse leading retained executive-search firms for C-suite and board roles — global firms and specialist boutiques. Built for senior executives.",
+    keywords:
+      "retained executive search, executive search firms, C-suite recruiters, board search, senior executive recruiters",
+  },
+  "/tools/comp-analyzer": {
+    title: "Executive Compensation Analyzer · hired.video",
+    description:
+      "Break down a total-comp offer — base, bonus, equity (vested), and sign-on — into one comparable annualized number. Built for senior executives.",
+    keywords:
+      "executive compensation, total comp calculator, equity vesting calculator, RSU value, offer comparison, comp analyzer",
   },
   "/for": {
     title: "Resource Maps — Find Your Path · hired.video",
@@ -1383,8 +1398,21 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
     // Canonicalize route path and normalize origin
     const canonicalPath = canonicalizePath(pathname);
 
+    // Resolve the effective SEO key. An exact PAGE_SEO entry wins; if
+    // there isn't one (dynamic / detail routes like /studio/editor/:id,
+    // /jobs/:id, /articles/:slug), fall back to the parent surface's key
+    // declared in the page-meta registry so the route inherits real
+    // title / description / structured data instead of generic
+    // DEFAULT_SEO (gap #1622). PAGE_SEO stays the single SEO store.
+    const fallbackKey = resolvePageSeoKey(pathname);
+    const effectiveSeoKey = PAGE_SEO[canonicalPath]
+      ? canonicalPath
+      : fallbackKey && PAGE_SEO[fallbackKey]
+        ? fallbackKey
+        : canonicalPath;
+
     // Get page-specific SEO or use defaults
-    const pageSEO = PAGE_SEO[canonicalPath] || {};
+    const pageSEO = PAGE_SEO[effectiveSeoKey] || {};
 
     // Merge default, page-specific, and custom SEO data
     const seoData: SEOData = {
@@ -1414,8 +1442,8 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
     // visitor sees translated meta tags in the browser tab and in
     // shared/social previews. Missing keys silently fall back to the
     // English defaults (no flash of raw key — `defaultValue: ""`).
-    const titleKey = `seo.${canonicalPath}.title`;
-    const descKey = `seo.${canonicalPath}.description`;
+    const titleKey = `seo.${effectiveSeoKey}.title`;
+    const descKey = `seo.${effectiveSeoKey}.description`;
     const localizedTitle = t(titleKey, { defaultValue: "" });
     const localizedDesc = t(descKey, { defaultValue: "" });
     if (localizedTitle) {

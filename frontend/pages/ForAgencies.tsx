@@ -106,7 +106,7 @@ const FAQ_ITEMS = [
   {
     question: "Do I need a separate account for my employees?",
     answer:
-      "No — invite-only flow. From Settings → Account & Billing, invite an employee by email with role=employee. The accept-invitation flow creates their account (if new) and links them to your workspace via user_company_role_associations. They sign in with their own credentials; nothing shared.",
+      "No — invite-only flow. From Settings → Account & Billing, invite an employee by email with role=employee. They get an email link; if they're new they sign up with that same email first, then accept — which links them to your workspace via user_company_role_associations. They sign in with their own credentials; nothing shared.",
   },
   {
     question: "How do I see how my recruiters are performing?",

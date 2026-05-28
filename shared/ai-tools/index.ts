@@ -36,6 +36,15 @@ import {
   taskList,
   taskSave,
 } from "./task-tools.js";
+import {
+  autoApply,
+  careerResilience,
+  discoveryJobs,
+  interviewQuestions,
+  profileAudit,
+  skillExtract,
+  videoPitchScript,
+} from "./feature-tools.js";
 
 export type { AIContextType, AIToolDef, HttpMethod } from "./types.js";
 export { buildEndpointUrl } from "./types.js";
@@ -64,6 +73,14 @@ export const TOOLS: Record<string, AIToolDef> = {
   "task-list": taskList,
   "task-save": taskSave,
   "task-delete": taskDelete,
+  // LLM-feature tools
+  "interview-questions": interviewQuestions,
+  "video-pitch-script": videoPitchScript,
+  "skill-extract": skillExtract,
+  "career-resilience": careerResilience,
+  "profile-audit": profileAudit,
+  "auto-apply": autoApply,
+  "discovery-jobs": discoveryJobs,
 };
 
 /** All registered tool ids. */

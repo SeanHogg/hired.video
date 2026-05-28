@@ -75,7 +75,21 @@ export function AccountManagementPanel() {
 
   const handleInviteUser = async (inviteData: any) => {
     try {
-      await accountService.inviteUser(inviteData);
+      let result = await accountService.inviteUser(inviteData);
+      // Seat soft-cap (#1678): the server declined to send because the invite
+      // adds a paid seat past the authorized limit. Confirm the cost, then
+      // re-send with explicit authorization.
+      if (result.requiresSeatConfirmation) {
+        const price = ((result.seatInfo?.pricePerSeatCents ?? 0) / 100).toFixed(2);
+        const confirmed = window.confirm(
+          `${result.message} This adds a seat at $${price}/mo to your bill. Add it?`,
+        );
+        if (!confirmed) {
+          setInviteModalOpen(false);
+          return;
+        }
+        result = await accountService.inviteUser({ ...inviteData, confirmPaidSeat: true });
+      }
       toast({
         title: t("labels.success"),
         description: t("messages.userInvitedSuccess"),

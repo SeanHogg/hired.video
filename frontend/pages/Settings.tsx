@@ -74,6 +74,7 @@ import { AccountManagementPanel } from "@/components/account/AccountManagementPa
 import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import RecruitSharingSettings from "@/components/recruit/RecruitSharingSettings";
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
+import ConfidentialModeToggle from "@/components/settings/ConfidentialModeToggle";
 import ProfileSectionsSettingsCard from "@/components/settings/ProfileSectionsSettingsCard";
 import { AccountAuditLogPanel } from "@/components/settings/AccountAuditLogPanel";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
@@ -1164,6 +1165,8 @@ function SettingsContent() {
                     </div>
                     <Separator />
                     <PromoteWithoutAuthToggle />
+                    <Separator />
+                    <ConfidentialModeToggle asCard={false} />
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">

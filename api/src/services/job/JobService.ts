@@ -2,6 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { classifyJobSector } from "../../../../shared/sectors.js";
+import { normalizeEmploymentType } from "../../../../shared/employment-types.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
 
@@ -441,7 +442,9 @@ export async function getPublicJobs(filters?: JobQuery,
     filters?.entityIdAllowlist && filters.entityIdAllowlist.length > 0
       ? inArray(jobItems.id, filters.entityIdAllowlist)
       : undefined,
-    filters?.employmentType ? eq(jobItems.jobType, filters.employmentType) : undefined,
+    filters?.employmentType
+      ? eq(jobItems.jobType, normalizeEmploymentType(filters.employmentType) ?? filters.employmentType)
+      : undefined,
     filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,
     filters?.isRemote !== undefined ? eq(jobItems.isRemote, filters.isRemote) : undefined,
     filters?.salaryMin !== undefined ? gte(jobItems.salaryMin as any, String(filters.salaryMin)) : undefined,
@@ -1198,7 +1201,8 @@ export async function createTrackedJob(input: {
       description: input.description ?? "",
       company,
       location: input.location,
-      jobType: input.jobType,
+      // Canonicalize on write (#1673) so the exact-eq search filter matches.
+      jobType: normalizeEmploymentType(input.jobType) ?? input.jobType,
       experienceLevel: input.experienceLevel,
       salaryMin: input.salaryMin !== undefined ? String(input.salaryMin) : undefined,
       salaryMax: input.salaryMax !== undefined ? String(input.salaryMax) : undefined,

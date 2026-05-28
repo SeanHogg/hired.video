@@ -4,9 +4,10 @@
  * and/or small pure JS functions that can be used on both client and server
  */
 
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "./validation.js";
 import { USER_ROLES } from "./user-roles.js";
+import { EmploymentTypeSchema } from "./employment-types.js";
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -232,13 +233,7 @@ export const JobListResponseSchema = z.object({
           country: z.string(),
           remote: z.boolean(),
         }),
-        employmentType: z.enum([
-          "full-time",
-          "part-time",
-          "contract",
-          "freelance",
-          "internship",
-        ]),
+        employmentType: EmploymentTypeSchema,
         experienceLevel: z.enum([
           "entry",
           "mid",
@@ -266,13 +261,7 @@ export const CreateJobRequestSchema = z.object({
   responsibilities: z.array(z.string()).default([]),
   skills: z.array(z.string()).default([]),
   experienceLevel: z.enum(["entry", "mid", "senior", "lead", "executive"]),
-  employmentType: z.enum([
-    "full-time",
-    "part-time",
-    "contract",
-    "freelance",
-    "internship",
-  ]),
+  employmentType: EmploymentTypeSchema,
   location: z.object({
     city: z.string(),
     state: z.string(),

@@ -19,11 +19,21 @@ import type { UserRole } from "../user-roles.js";
  *  shipped id — add a new one alongside and migrate callers. */
 export type PromptId =
   | "career-coach"
+  | "career-resilience"
   | "resume-editor-consolidate"
   | "resume-editor-shorten"
   | "resume-roast"
   | "interview-question-generator"
-  | "interview-answer-coach";
+  | "interview-answer-coach"
+  | "video-pitch";
+
+/** One accepted argument, in the MCP `prompts/list` argument shape so
+ *  the registry can be surfaced verbatim to external agents (#1620). */
+export interface PromptArgument {
+  name: string;
+  description: string;
+  required?: boolean;
+}
 
 export interface PromptDef<Vars = Record<string, never>> {
   /** Stable identifier — see PromptId. */
@@ -31,6 +41,10 @@ export interface PromptDef<Vars = Record<string, never>> {
   /** One-line description used by MCP `prompts/list` and the SuperAdmin
    *  prompt browser. */
   description: string;
+  /** Arguments the prompt accepts. Drives MCP `prompts/list` argument
+   *  metadata; omit for prompts that take no variables. (Interim until
+   *  the richer Zod `variables` schema lands per #1624.) */
+  arguments?: PromptArgument[];
   /** Render the final system-prompt string. Pure function — no I/O. */
   render: (vars: Vars) => string;
 }

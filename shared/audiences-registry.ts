@@ -133,6 +133,24 @@ const FEATURES = {
     blurb: "Publish long-form to build authority; surfaced on your profile + the public feed.",
     href: "/articles",
   } satisfies AudienceFocusFeature,
+  confidentialSearch: {
+    key: "confidential_search",
+    label: "Confidential search",
+    blurb: "Stay invisible in the public directory while you explore — built for execs who are still employed. Toggle in Settings → Privacy.",
+    href: "/settings?tab=privacy",
+  } satisfies AudienceFocusFeature,
+  retainedSearch: {
+    key: "retained_search",
+    label: "Retained search directory",
+    blurb: "The retained executive-search firms that fill C-suite + board roles — browse by tier and specialty.",
+    href: "/retained-search",
+  } satisfies AudienceFocusFeature,
+  compAnalyzer: {
+    key: "comp_analyzer",
+    label: "Comp analyzer",
+    blurb: "Break a total-comp offer into base + bonus + equity + sign-on — compare offers on annualized total, not base.",
+    href: "/tools/comp-analyzer",
+  } satisfies AudienceFocusFeature,
 } as const;
 
 /** The full registry. Order in this array drives /for/index display order. */
@@ -292,9 +310,9 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     key: "senior_executives",
     label: "Senior Executives",
     thesis:
-      "Exec brand + warm intros + thought leadership. Confidential mode, board seats, fractional roles — full suite coming.",
+      "Confidential search while you're still employed, exec brand, warm intros, and thought leadership. Board seats + fractional roles coming next.",
     primaryRole: "job_seeker",
-    focusFeatures: [FEATURES.studio, FEATURES.articles, FEATURES.coffeeChats, FEATURES.skillNetwork, FEATURES.profile],
+    focusFeatures: [FEATURES.confidentialSearch, FEATURES.retainedSearch, FEATURES.compAnalyzer, FEATURES.studio, FEATURES.articles],
     focusContentKinds: ["article", "video", "template", "job", "learning_path"],
     jobFilter: { experienceLevel: "executive" },
     ctaPrimary: { label: "Build my exec brand", href: "/studio?audience=senior-executives" },

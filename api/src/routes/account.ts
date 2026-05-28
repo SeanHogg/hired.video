@@ -3,6 +3,11 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import {
+  AcceptInvitationRequestSchema,
+  BulkInviteRequestSchema,
+  InviteUserRequestSchema,
+} from "../../../shared/account.js";
+import {
   acceptInvitation,
   bulkInviteUsers,
   cancelInvitation,
@@ -11,7 +16,7 @@ import {
   getAccountSettings,
   getAvailableAccounts,
   getInvitationAnalytics,
-  getInvitationDetails,
+  getInvitationDetailsByToken,
   listPendingInvitations,
   inviteAccountUser,
   listAccountUsers,
@@ -47,8 +52,11 @@ accountRoutes.post("/invite", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const limitError = await servicesProcessor.enforce(c, "team_invite");
   if (limitError) return limitError;
-  const request = await c.req.json();
-  const result = await inviteAccountUser(request, userId);
+  const parsed = InviteUserRequestSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid invitation request"), 400);
+  }
+  const result = await inviteAccountUser(parsed.data, userId);
   // Mirror to the central usage ledger so the Usage Statement panel shows
   // team-invite consumption alongside every other metered dimension.
   servicesProcessor.meterEvent(c, "team_invite", { route: "/invite" });
@@ -85,13 +93,23 @@ accountRoutes.post("/switch", async (c) => {
   return c.json(success({ success: true, message: "Switched account" }), 200);
 });
 
-accountRoutes.get("/invitation/:id", async (c) =>
-  c.json(await getInvitationDetails(c.req.param("id")), 200),
+// Public (token-bearer) — the accept page loads this before the invitee has
+// signed in. Keyed by the secret token, NOT an enumerable id (gap #1674).
+accountRoutes.get("/invitation/by-token/:token", async (c) =>
+  c.json(await getInvitationDetailsByToken(c.req.param("token")), 200),
 );
 
-accountRoutes.post("/accept-invitation/:id", async (c) =>
-  c.json(await acceptInvitation(c.req.param("id")), 200),
-);
+// Authenticated — the caller's email must match the invite (gap #1674). The
+// token travels in the body so it isn't logged in URLs/referrers.
+accountRoutes.post("/accept-invitation", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = AcceptInvitationRequestSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Missing invitation token"), 400);
+  }
+  return c.json(await acceptInvitation(parsed.data.token, userId), 200);
+});
 
 accountRoutes.get("/invitations/pending", async (c) => {
   const userId = getCurrentUserId(c);
@@ -123,10 +141,12 @@ accountRoutes.post("/bulk-invite", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const limitError = await servicesProcessor.enforce(c, "team_invite");
   if (limitError) return limitError;
-  const body = await c.req.json();
-  const result = await bulkInviteUsers(userId, body);
-  const invitedCount = Array.isArray(body?.invites) ? body.invites.length : 1;
-  servicesProcessor.meterEvent(c, "team_invite", { route: "/bulk-invite" }, invitedCount);
+  const parsed = BulkInviteRequestSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid bulk-invite request"), 400);
+  }
+  const result = await bulkInviteUsers(userId, parsed.data);
+  servicesProcessor.meterEvent(c, "team_invite", { route: "/bulk-invite" }, parsed.data.invites.length);
   return c.json(result, 200);
 });
 

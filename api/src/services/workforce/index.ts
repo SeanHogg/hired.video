@@ -15,6 +15,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { ForbiddenError } from "../../middleware/errorHandler.js";
+import { SEAT_PRICE_CENTS } from "../../../../shared/pricing.js";
 
 const {
   taskTimeEntries,
@@ -23,6 +24,7 @@ const {
   userCompanyRoleAssociations,
   users,
   companySubscriptions,
+  accountInvitations,
   billingEvents,
   invoices,
   invoiceLineItems,
@@ -31,11 +33,12 @@ const {
   placementDocuments,
 } = schema;
 
-/** Universal seat price per `[[project_pricing_seats]]` — $9.95/mo.
- *  The 4900¢ default on companySubscriptions.pricePerSeatCents is stale
- *  (still 49 $) and tracked under that memory; workforce rows always
+/** Universal seat price per `[[project_pricing_seats]]` — $9.95/mo. Canonical
+ *  value lives in shared/pricing.ts `SEAT_PRICE_CENTS`; aliased here so the
+ *  existing call sites stay terse. The 4900¢ default on
+ *  companySubscriptions.pricePerSeatCents is stale; workforce rows always
  *  stamp the correct 995¢ at create time. */
-const WORKFORCE_SEAT_PRICE_CENTS = 995;
+const WORKFORCE_SEAT_PRICE_CENTS = SEAT_PRICE_CENTS;
 
 // ---------------------------------------------------------------------------
 // Tenant resolution
@@ -173,6 +176,76 @@ export async function recalculateWorkforceSeats(
     totalMonthlyCents,
     delta,
   };
+}
+
+export interface SeatCommitment {
+  /** Active employee memberships + pending employee invites — the seats the
+   *  company is already on the hook for. */
+  committedSeats: number;
+  /** Authorized paid-seat ceiling the owner has explicitly agreed to. New
+   *  seats beyond this require owner confirmation (gap #1678). */
+  seatLimit: number;
+  pricePerSeatCents: number;
+}
+
+/** Count the seats a company has already committed to: active `employee`
+ *  UCRAs + still-pending `employee` invitations. Used by the seat soft-cap
+ *  to decide whether a new employee invite needs owner confirmation. */
+export async function getSeatCommitment(companyId: string, db = getDb()): Promise<SeatCommitment> {
+  const activeEmployees = await db
+    .select({ id: userCompanyRoleAssociations.id })
+    .from(userCompanyRoleAssociations)
+    .where(and(
+      eq(userCompanyRoleAssociations.companyId, companyId),
+      eq(userCompanyRoleAssociations.role, "employee"),
+      eq(userCompanyRoleAssociations.isActive, true),
+    ));
+  const pendingInvites = await db
+    .select({ id: accountInvitations.id })
+    .from(accountInvitations)
+    .where(and(
+      eq(accountInvitations.companyId, companyId),
+      eq(accountInvitations.role, "employee"),
+      eq(accountInvitations.status, "pending"),
+    ));
+  const [sub] = await db
+    .select({ seatLimit: companySubscriptions.seatLimit })
+    .from(companySubscriptions)
+    .where(eq(companySubscriptions.companyId, companyId))
+    .limit(1);
+  return {
+    committedSeats: activeEmployees.length + pendingInvites.length,
+    seatLimit: sub?.seatLimit ?? 0,
+    pricePerSeatCents: SEAT_PRICE_CENTS,
+  };
+}
+
+/** Raise a company's authorized paid-seat ceiling to `newLimit` (never lowers
+ *  it — that happens implicitly as seats free up). Upserts the
+ *  company_subscriptions row with workforce defaults if it doesn't exist yet,
+ *  so a brand-new workspace can authorize its first seat (gap #1678). */
+export async function authorizeSeats(companyId: string, newLimit: number, db = getDb()): Promise<void> {
+  const [existing] = await db
+    .select({ id: companySubscriptions.id, seatLimit: companySubscriptions.seatLimit })
+    .from(companySubscriptions)
+    .where(eq(companySubscriptions.companyId, companyId))
+    .limit(1);
+  if (existing) {
+    if (newLimit <= existing.seatLimit) return;
+    await db.update(companySubscriptions)
+      .set({ seatLimit: newLimit, updatedAt: new Date() } as any)
+      .where(eq(companySubscriptions.id, existing.id));
+  } else {
+    await db.insert(companySubscriptions).values({
+      companyId,
+      planTier: "workforce",
+      seatCount: 0,
+      seatLimit: newLimit,
+      pricePerSeatCents: WORKFORCE_SEAT_PRICE_CENTS,
+      status: "active",
+      billingInterval: "monthly",
+    } as any);
+  }
 }
 
 /** Resolve the companies an employer can manage. An employer ↔ company

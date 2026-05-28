@@ -1,20 +1,23 @@
 /**
- * Tests for the declarative page-context registry — the replacement for
- * the hand-maintained `detectContextFromRoute` switch (gap #1621).
+ * Tests for the unified page-meta registry (gaps #1621 + #1622) — the
+ * replacement for the hand-maintained `detectContextFromRoute` switch
+ * and the folded `page-context-registry`.
  *
- * Covers: every previously-recognized route still resolves to the same
- * contextType (no regression), the newly-added studio/content surfaces
- * resolve, specificity ordering (create/edit beats view beats list),
- * and the general fallback for unmatched routes.
+ * Covers: contextType resolution (regression + new surfaces +
+ * specificity + general fallback), and the new `seoKey` resolution that
+ * lets dynamic/detail routes inherit a parent PAGE_SEO entry.
  */
 
 import { describe, it, expect } from "vitest";
 import {
-  PAGE_CONTEXT_RULES,
+  PAGE_META_RULES,
   detectContextType,
-} from "../page-context-registry";
+  getPageMeta,
+  resolvePageSeoKey,
+} from "../page-meta-registry";
+import { PAGE_SEO } from "../../seo";
 
-describe("page-context-registry", () => {
+describe("page-meta-registry — contextType", () => {
   describe("regression — routes the old switch recognized", () => {
     const cases: Array<[string, string]> = [
       ["/dashboard", "dashboard"],
@@ -48,7 +51,7 @@ describe("page-context-registry", () => {
     });
   });
 
-  describe("new studio + content surfaces (gap #1621)", () => {
+  describe("new studio + content surfaces", () => {
     const cases: Array<[string, string]> = [
       ["/studio", "studio"],
       ["/studio/editor", "studio"],
@@ -102,11 +105,50 @@ describe("page-context-registry", () => {
       expect(detectContextType(path)).toBe("general");
     });
   });
+});
 
-  it("every rule resolves to a valid contextType string", () => {
-    for (const rule of PAGE_CONTEXT_RULES) {
-      expect(typeof rule.contextType).toBe("string");
-      expect(rule.test).toBeInstanceOf(RegExp);
+describe("page-meta-registry — seoKey resolution", () => {
+  it("dynamic/detail routes resolve to a parent PAGE_SEO key", () => {
+    expect(resolvePageSeoKey("/studio/editor/abc")).toBe("/studio");
+    expect(resolvePageSeoKey("/jobs/some-job-id")).toBe("/jobs");
+    expect(resolvePageSeoKey("/resumes/abc/edit")).toBe("/resumes");
+    expect(resolvePageSeoKey("/articles/my-post")).toBe("/articles");
+    expect(resolvePageSeoKey("/companies/acme")).toBe("/companies");
+    expect(resolvePageSeoKey("/people/jane")).toBe("/people");
+    expect(resolvePageSeoKey("/courses/c1")).toBe("/learning");
+  });
+
+  it("uncovered tool + sector pages inherit their landing SEO", () => {
+    expect(resolvePageSeoKey("/tools/some-new-tool")).toBe("/tools");
+    expect(resolvePageSeoKey("/sectors/aerospace")).toBe("/sectors");
+  });
+
+  it("unmatched routes resolve to null (fall through to DEFAULT_SEO)", () => {
+    expect(resolvePageSeoKey("/pricing")).toBe(null);
+    expect(resolvePageSeoKey("/login")).toBe(null);
+  });
+
+  it("every non-null seoKey references a real PAGE_SEO entry (no dangling keys)", () => {
+    for (const rule of PAGE_META_RULES) {
+      if (rule.seoKey) {
+        expect(
+          PAGE_SEO[rule.seoKey],
+          `seoKey "${rule.seoKey}" (rule ${rule.test}) is not a real PAGE_SEO key`,
+        ).toBeDefined();
+      }
     }
+  });
+});
+
+describe("page-meta-registry — getPageMeta", () => {
+  it("returns both contextType and seoKey", () => {
+    expect(getPageMeta("/studio/editor")).toEqual({
+      contextType: "studio",
+      seoKey: "/studio",
+    });
+    expect(getPageMeta("/totally-unmatched")).toEqual({
+      contextType: "general",
+      seoKey: null,
+    });
   });
 });

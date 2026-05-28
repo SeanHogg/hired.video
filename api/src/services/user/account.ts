@@ -1,5 +1,5 @@
 
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import {
@@ -8,15 +8,18 @@ import {
   AccountSettings,
   AccountUser,
   AcceptInvitationResponse,
+  BulkInviteRequest,
   BulkInviteResponse,
+  InvitationDetailsResponse,
   InviteStatus,
   InviteUserRequest,
   InviteUserResponse,
   getAvailableRolesForInvite,
 } from "../../../../shared/account.js";
-import { USER_ROLES } from "../../../../shared/user-roles.js";
-import { ForbiddenError } from "../../middleware/errorHandler.js";
+import { ConflictError, ForbiddenError, NotFoundError } from "../../middleware/errorHandler.js";
 import { splitName } from "./userActor.js";
+import { sendInvitationEmail } from "../adapters/email.js";
+import { revokeAllSessionsForUser } from "../auth/sessions.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -37,7 +40,79 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
   };
 };
 
-const { users, userProfiles, accountPreferences, accountInvitations, userCompanyRoleAssociations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
+const { users, userProfiles, accountPreferences, accountInvitations, userCompanyRoleAssociations, companyProfiles, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
+
+/** Days a seat invitation stays valid before accept rejects it (gap #1680). */
+const INVITE_TTL_DAYS = 14;
+
+/** Title-case a USER_ROLES value for human-facing copy (email + UI). */
+function roleLabel(role: string): string {
+  return String(role)
+    .split("_")
+    .map((w) => (w ? w[0]!.toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/** Resolve the inviter's display name + team name for the invite email. */
+async function resolveInviteContext(
+  db: ReturnType<typeof getDb>,
+  invite: { invitedBy: string | null; companyId: string | null; role: string },
+): Promise<{ inviterName: string; teamName: string }> {
+  let inviterName = "A teammate";
+  if (invite.invitedBy) {
+    const [inviter] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, invite.invitedBy))
+      .limit(1);
+    if (inviter) inviterName = (inviter.name ?? "").trim() || inviter.email;
+  }
+  let teamName = "hired.video";
+  if (invite.companyId) {
+    const [company] = await db
+      .select({ name: companyProfiles.name })
+      .from(companyProfiles)
+      .where(eq(companyProfiles.id, invite.companyId))
+      .limit(1);
+    if (company?.name) teamName = company.name;
+  }
+  return { inviterName, teamName };
+}
+
+/**
+ * Authority gate for managing an existing invitation (cancel / resend).
+ * Allowed when the caller is a platform admin, the original inviter, or an
+ * active employer in the invite's bound company. Throws ForbiddenError
+ * otherwise — NEVER fail-open (gap #1675).
+ */
+async function assertCanManageInvitation(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  invite: { invitedBy: string | null; companyId: string | null },
+): Promise<void> {
+  const [caller] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const role = (caller?.role ?? "").toLowerCase();
+  if (role === "admin" || role === "super_admin") return;
+  if (invite.invitedBy && invite.invitedBy === userId) return;
+  if (invite.companyId) {
+    const [assoc] = await db
+      .select({ id: userCompanyRoleAssociations.id })
+      .from(userCompanyRoleAssociations)
+      .where(and(
+        eq(userCompanyRoleAssociations.userId, userId),
+        eq(userCompanyRoleAssociations.companyId, invite.companyId),
+        eq(userCompanyRoleAssociations.role, "employer"),
+        eq(userCompanyRoleAssociations.isActive, true),
+      ))
+      .limit(1);
+    if (assoc) return;
+  }
+  throw new ForbiddenError("You are not allowed to manage this invitation");
+}
 
 /** Display name + email pattern stamped over the row when a user deletes
  *  their account. The email pattern preserves the unique-constraint while
@@ -205,7 +280,36 @@ export async function inviteAccountUser(request: InviteUserRequest, invitedByUse
   // this is the security guard against hand-crafted POSTs that send a
   // role the inviter has no business assigning (eg recruiter → employer).
   await assertCanAssignRole(db, invitedByUserId, String(request.role));
+
+  // Seat soft-cap (gap #1678): inviting a workforce employee consumes a paid
+  // $9.95/mo seat. If the company is already at its authorized seat limit and
+  // the owner hasn't confirmed the extra cost, return a confirmation prompt
+  // instead of sending the invite. Confirming raises the authorized limit.
+  // Only `employee` (the workforce-billable role) is gated; recruiter/employer
+  // invites aren't seat-billed.
+  if (String(request.role).toLowerCase() === "employee" && request.companyId) {
+    const { getSeatCommitment, authorizeSeats } = await import("../workforce/index.js");
+    const commitment = await getSeatCommitment(request.companyId, db);
+    if (commitment.committedSeats + 1 > commitment.seatLimit) {
+      if (!request.confirmPaidSeat) {
+        return {
+          success: false,
+          requiresSeatConfirmation: true,
+          message: `Adding this member adds a paid seat at $${(commitment.pricePerSeatCents / 100).toFixed(2)}/mo.`,
+          inviteId: "",
+          seatInfo: {
+            committedSeats: commitment.committedSeats,
+            seatLimit: commitment.seatLimit,
+            pricePerSeatCents: commitment.pricePerSeatCents,
+          },
+        };
+      }
+      await authorizeSeats(request.companyId, commitment.committedSeats + 1, db);
+    }
+  }
+
   const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
   const [row] = await db
     .insert(accountInvitations)
     .values({
@@ -215,8 +319,31 @@ export async function inviteAccountUser(request: InviteUserRequest, invitedByUse
       invitedBy: invitedByUserId,
       status: "pending",
       companyId: request.companyId ?? null,
+      expiresAt,
     } as any)
     .returning();
+
+  // Actually deliver the invite. Best-effort: a mailer outage must not roll
+  // back the invitation row (the inviter can resend), so failures are logged
+  // not thrown (gap #1673).
+  try {
+    const { inviterName, teamName } = await resolveInviteContext(db, {
+      invitedBy: invitedByUserId,
+      companyId: request.companyId ?? null,
+      role: String(request.role),
+    });
+    await sendInvitationEmail({
+      to: request.email,
+      inviterName,
+      teamName,
+      roleLabel: roleLabel(String(request.role)),
+      token,
+      expiryDays: INVITE_TTL_DAYS,
+    });
+  } catch (err) {
+    console.error("[invite] Failed to send invitation email:", err);
+  }
+
   return {
     success: true,
     message: `Invitation sent to ${request.email}`,
@@ -242,6 +369,17 @@ export async function removeAccountUser(currentUserId: string, userId: string,
   if (role === "admin" || role === "super_admin") {
     // Platform admins can deactivate anyone, full stop.
     await db.update(users).set({ isActive: false } as any).where(eq(users.id, userId));
+    // Kill live access immediately — deactivating users.isActive only blocks
+    // the NEXT login; existing JWTs validate against their session row, so we
+    // revoke every session + refresh token to invalidate tokens already in
+    // the wild (gap #1676).
+    await revokeUserAccess(db, userId);
+    // Deactivate every active employee membership + reconcile each company's
+    // seat billing — a deactivated user must stop counting as a billed seat,
+    // and recalculateWorkforceSeats counts active UCRAs (not users.isActive),
+    // so leaving the UCRA active would keep charging for a vacated seat
+    // (gap #1677).
+    await deactivateEmployeeSeats(db, userId);
     return;
   }
   if (role === "employer") {
@@ -274,12 +412,53 @@ export async function removeAccountUser(currentUserId: string, userId: string,
     await db.update(userCompanyRoleAssociations)
       .set({ isActive: false, updatedAt: new Date() } as any)
       .where(eq(userCompanyRoleAssociations.id, targetEmployment.id));
+    // Revoke the removed member's sessions + refresh tokens so a live JWT
+    // can't keep hitting company-scoped endpoints after they've been pulled
+    // from the workspace. On their next login they re-auth fresh and the
+    // now-inactive UCRA gates them out of the workspace (gap #1676).
+    await revokeUserAccess(db, userId);
     // Reconcile seat billing — fewer active employees, fewer seats charged.
     // Imported dynamically to avoid a service-layer cycle (workforce → account
     // is the natural direction; the reverse import would be).
     const { recalculateWorkforceSeats } = await import("../workforce/index.js");
     await recalculateWorkforceSeats(targetEmployment.companyId, db);
     return;
+  }
+}
+
+/** Invalidate every live credential for a user: revoke all session rows
+ *  (kills JWTs whose `sid` validates against them) + revoke refresh tokens.
+ *  Shared by both removal paths so neither can drift (gap #1676). */
+async function revokeUserAccess(db: ReturnType<typeof getDb>, userId: string): Promise<void> {
+  await revokeAllSessionsForUser(db, userId, "removed_from_account");
+  await db.update(refreshTokens).set({ revoked: true } as any).where(eq(refreshTokens.userId, userId));
+}
+
+/** Deactivate every active `employee` membership for a user and reconcile
+ *  each affected company's seat billing. recalculateWorkforceSeats counts
+ *  ACTIVE employee UCRAs (not users.isActive), so a deactivated user keeps
+ *  billing a seat until their UCRA is flipped (gap #1677). */
+async function deactivateEmployeeSeats(db: ReturnType<typeof getDb>, userId: string): Promise<void> {
+  const memberships = await db
+    .select({ id: userCompanyRoleAssociations.id, companyId: userCompanyRoleAssociations.companyId })
+    .from(userCompanyRoleAssociations)
+    .where(and(
+      eq(userCompanyRoleAssociations.userId, userId),
+      eq(userCompanyRoleAssociations.role, "employee"),
+      eq(userCompanyRoleAssociations.isActive, true),
+    ));
+  if (memberships.length === 0) return;
+  await db.update(userCompanyRoleAssociations)
+    .set({ isActive: false, updatedAt: new Date() } as any)
+    .where(and(
+      eq(userCompanyRoleAssociations.userId, userId),
+      eq(userCompanyRoleAssociations.role, "employee"),
+      eq(userCompanyRoleAssociations.isActive, true),
+    ));
+  const { recalculateWorkforceSeats } = await import("../workforce/index.js");
+  const companyIds = [...new Set(memberships.map((m) => m.companyId))];
+  for (const companyId of companyIds) {
+    await recalculateWorkforceSeats(companyId, db);
   }
 }
 
@@ -305,77 +484,88 @@ export async function switchAccount(currentUserId: string, accountId: string): P
   // In future, this could set a session value or cookie to switch context.
 }
 
-export async function getInvitationDetails(invitationId: string,
-  deps?: Partial<AccountDeps>): Promise<AcceptInvitationResponse> {
+/** True when a pending invite is past its deadline. Legacy rows missing
+ *  expiresAt fall back to createdAt + INVITE_TTL_DAYS. */
+function inviteIsExpired(invite: { expiresAt: Date | null; createdAt: Date }): boolean {
+  const deadline = invite.expiresAt
+    ? new Date(invite.expiresAt as any).getTime()
+    : new Date(invite.createdAt as any).getTime() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000;
+  return Date.now() > deadline;
+}
+
+/**
+ * Public details for the accept page, resolved from the SECRET token (not
+ * the enumerable invitation id — gap #1674). Knowing the 192-bit token is
+ * the bearer credential. Throws NotFoundError for an unknown token and
+ * ConflictError when the invite is no longer acceptable (cancelled /
+ * accepted / expired) so the page renders the "invalid invitation" state.
+ */
+export async function getInvitationDetailsByToken(token: string,
+  deps?: Partial<AccountDeps>): Promise<InvitationDetailsResponse> {
   const d = resolveDeps(deps); const db = d.db;
-  const [invite] = await db.select().from(accountInvitations).where(eq(accountInvitations.id, invitationId)).limit(1);
-  if (!invite) {
-    return {
-      success: false,
-      message: "Invitation not found",
-      companyName: "",
-      assignedRoles: [],
-      requiredRegistration: false,
-      redirectUrl: "",
-    };
+  const [invite] = await db.select().from(accountInvitations).where(eq(accountInvitations.token, token)).limit(1);
+  if (!invite) throw new NotFoundError("Invitation not found");
+  if (invite.status !== "pending") throw new ConflictError("This invitation is no longer active");
+  if (inviteIsExpired(invite)) throw new ConflictError("This invitation has expired");
+
+  const { inviterName, teamName } = await resolveInviteContext(db, invite);
+  let companyDescription: string | undefined;
+  let companyLogoUrl: string | undefined;
+  if (invite.companyId) {
+    const [company] = await db
+      .select({ description: companyProfiles.description, logoUrl: companyProfiles.logoUrl })
+      .from(companyProfiles)
+      .where(eq(companyProfiles.id, invite.companyId))
+      .limit(1);
+    companyDescription = company?.description ?? undefined;
+    companyLogoUrl = company?.logoUrl ?? undefined;
   }
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, invite.email)).limit(1);
+
   return {
-    success: true,
-    message: "Invitation found",
-    companyName: "Your Organization",
-    assignedRoles: [invite.role as any],
-    requiredRegistration: true,
-    redirectUrl: `/signup?invite=${invite.id}`,
+    invitationId: invite.id,
+    companyName: teamName,
+    companyDescription,
+    companyLogoUrl,
+    inviterName,
+    invitedEmail: invite.email,
+    rolesToAssign: [invite.role],
+    invitedAt: new Date(invite.createdAt as any).toISOString(),
+    userExists: !!existing,
   };
 }
 
-export async function acceptInvitation(invitationId: string,
+/**
+ * Accept a seat invitation. Keyed by the secret token and requires an
+ * AUTHENTICATED caller whose email matches the invite (gap #1674). Validates
+ * status + expiry, binds the membership, marks the invite accepted. Does NOT
+ * create users — a brand-new invitee registers through the normal signup flow
+ * first (which sets a real password + sends verification), then accepts.
+ */
+export async function acceptInvitation(token: string, currentUserId: string,
   deps?: Partial<AccountDeps>): Promise<AcceptInvitationResponse> {
   const d = resolveDeps(deps); const db = d.db;
-  const [invite] = await db.select().from(accountInvitations).where(eq(accountInvitations.id, invitationId)).limit(1);
-  if (!invite) {
-    return {
-      success: false,
-      message: "Invitation not found",
-      companyName: "",
-      assignedRoles: [],
-      requiredRegistration: false,
-      redirectUrl: "",
-    };
+  const [invite] = await db.select().from(accountInvitations).where(eq(accountInvitations.token, token)).limit(1);
+  if (!invite) throw new NotFoundError("Invitation not found");
+  if (invite.status !== "pending") throw new ConflictError("This invitation is no longer active");
+  if (inviteIsExpired(invite)) throw new ConflictError("This invitation has expired");
+
+  const [current] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, currentUserId))
+    .limit(1);
+  if (!current) throw new NotFoundError("User not found");
+  if (current.email.toLowerCase() !== invite.email.toLowerCase()) {
+    throw new ForbiddenError(`This invitation was sent to ${invite.email}. Sign in with that email to accept it.`);
   }
 
   await db
     .update(accountInvitations)
     .set({ status: "accepted", acceptedAt: new Date() } as any)
-    .where(eq(accountInvitations.id, invitationId));
+    .where(eq(accountInvitations.id, invite.id));
 
-  const [existing] = await db.select().from(users).where(eq(users.email, invite.email)).limit(1);
-  let acceptedUserId: string;
-  if (existing) {
-    await db.update(users).set({ role: invite.role as any, isActive: true } as any).where(eq(users.id, existing.id));
-    acceptedUserId = existing.id;
-  } else {
-    const passwordHash = ""; // no password set; user should reset
-    const now = new Date();
-    // Seed `name` with the email local-part so the row renders as
-    // something meaningful in Team Members until the invitee updates
-    // their profile. `users.name` is NOT NULL — saving `""` here used
-    // to surface every accepted invitee as "Unknown User" forever.
-    const placeholderName =
-      invite.email.split("@")[0]?.replace(/[._-]+/g, " ").trim() || invite.email;
-    const [created] = await db.insert(users).values({
-      email: invite.email,
-      name: placeholderName,
-      passwordHash,
-      role: invite.role as any,
-      isActive: true,
-      emailVerified: false,
-      mustChangePassword: true,
-      createdAt: now,
-      updatedAt: now,
-    } as any).returning({ id: users.id });
-    acceptedUserId = created!.id;
-  }
+  await db.update(users).set({ role: invite.role as any, isActive: true } as any).where(eq(users.id, current.id));
 
   // Workforce / company-bound invites: bind the accepted user to the
   // inviting employer's workspace via userCompanyRoleAssociations. The
@@ -385,7 +575,7 @@ export async function acceptInvitation(invitationId: string,
   if (invite.companyId) {
     const [existingAssoc] = await db.select().from(userCompanyRoleAssociations)
       .where(and(
-        eq(userCompanyRoleAssociations.userId, acceptedUserId),
+        eq(userCompanyRoleAssociations.userId, current.id),
         eq(userCompanyRoleAssociations.companyId, invite.companyId),
       ))
       .limit(1);
@@ -395,7 +585,7 @@ export async function acceptInvitation(invitationId: string,
         .where(eq(userCompanyRoleAssociations.id, existingAssoc.id));
     } else {
       await db.insert(userCompanyRoleAssociations).values({
-        userId: acceptedUserId,
+        userId: current.id,
         companyId: invite.companyId,
         role: invite.role as string,
         isActive: true,
@@ -410,10 +600,11 @@ export async function acceptInvitation(invitationId: string,
     }
   }
 
+  const { teamName } = await resolveInviteContext(db, invite);
   return {
     success: true,
     message: "Invitation accepted",
-    companyName: "Your Organization",
+    companyName: teamName,
     assignedRoles: [invite.role as any],
     requiredRegistration: false,
     redirectUrl: `/dashboard`,
@@ -423,14 +614,46 @@ export async function acceptInvitation(invitationId: string,
 export async function listPendingInvitations(currentUserId: string,
   deps?: Partial<AccountDeps>): Promise<AccountUser[]> {
   const d = resolveDeps(deps); const db = d.db;
+
+  // Scope (gap #1682): platform admins see every pending invite; everyone
+  // else sees only invitations they personally sent OR invitations bound to
+  // a company they're an active employer in. NEVER return the whole table to
+  // a non-admin caller — that leaked other workspaces' invites.
+  const [caller] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, currentUserId))
+    .limit(1);
+  const callerRole = (caller?.role ?? "").toLowerCase();
+  const isPlatformAdmin = callerRole === "admin" || callerRole === "super_admin";
+
+  let scope;
+  if (isPlatformAdmin) {
+    scope = eq(accountInvitations.status, "pending");
+  } else {
+    const employerCompanies = await db
+      .select({ companyId: userCompanyRoleAssociations.companyId })
+      .from(userCompanyRoleAssociations)
+      .where(and(
+        eq(userCompanyRoleAssociations.userId, currentUserId),
+        eq(userCompanyRoleAssociations.role, "employer"),
+        eq(userCompanyRoleAssociations.isActive, true),
+      ));
+    const companyIds = employerCompanies.map((r) => r.companyId);
+    const ownership = companyIds.length > 0
+      ? or(eq(accountInvitations.invitedBy, currentUserId), inArray(accountInvitations.companyId, companyIds))
+      : eq(accountInvitations.invitedBy, currentUserId);
+    scope = and(eq(accountInvitations.status, "pending"), ownership);
+  }
+
   const invites = await db
     .select()
     .from(accountInvitations)
-    .where(eq(accountInvitations.status, "pending"))
+    .where(scope)
     .orderBy(desc(accountInvitations.createdAt))
     .limit(100);
 
-  return invites.map((row) => normalizeInvitation(row, { currentUserRole: "admin" }));
+  return invites.map((row) => normalizeInvitation(row, { currentUserRole: isPlatformAdmin ? "admin" : callerRole }));
 }
 
 export async function getAccountSettings(userId: string,
@@ -533,31 +756,41 @@ export async function getAccountAnalytics(userId: string, userRole: string,
   };
 }
 
-export async function bulkInviteUsers(userId: string, payload: unknown,
+export async function bulkInviteUsers(userId: string, payload: BulkInviteRequest,
   deps?: Partial<AccountDeps>): Promise<BulkInviteResponse> {
-  const d = resolveDeps(deps); const db = d.db;
-  const data = payload as { emails?: string[]; role?: string };
-  const emails = Array.isArray(data.emails) ? data.emails : [];
-  const role = data.role ?? USER_ROLES.JOB_SEEKER;
-  // Authority check once per bulk call rather than once per email — same
-  // ForbiddenError surface as the single-invite path, just avoids N round-trips.
-  await assertCanAssignRole(db, userId, String(role));
+  // One canonical request shape now (gap #1686): `{ invites: [{email, role}], companyId? }`.
+  // The route validates with BulkInviteRequestSchema before we get here.
+  const invites = payload.invites;
   const results: BulkInviteResponse = {
-    totalProcessed: emails.length,
+    totalProcessed: invites.length,
     successCount: 0,
     failureCount: 0,
     successfulInvitations: [],
     failedInvitations: [],
     message: "",
   };
-  for (const email of emails) {
+  for (const invite of invites) {
     try {
-      await inviteAccountUser({ email, role: role as any }, userId, deps);
+      // inviteAccountUser runs the per-role authority check (assertCanAssignRole)
+      // + sends the email, so a single bad role fails just that row rather than
+      // the whole batch.
+      const res = await inviteAccountUser(
+        { email: invite.email, role: invite.role as any, companyId: payload.companyId, confirmPaidSeat: payload.confirmPaidSeat },
+        userId,
+        deps,
+      );
+      // An unconfirmed paid-seat invite comes back success:false rather than
+      // throwing — surface it as a failed row with a clear reason (gap #1678).
+      if (res.requiresSeatConfirmation) {
+        results.failureCount += 1;
+        results.failedInvitations.push({ email: invite.email, reason: res.message });
+        continue;
+      }
       results.successCount += 1;
-      results.successfulInvitations.push({ email });
+      results.successfulInvitations.push({ email: invite.email });
     } catch (e) {
       results.failureCount += 1;
-      results.failedInvitations.push({ email, reason: String(e) });
+      results.failedInvitations.push({ email: invite.email, reason: String(e) });
     }
   }
   results.message = `Processed ${results.totalProcessed} invitations.`;
@@ -568,17 +801,44 @@ export async function resendInvitation(userId: string, invitationId: string,
   deps?: Partial<AccountDeps>): Promise<void> {
   const d = resolveDeps(deps); const db = d.db;
   const [invite] = await db.select().from(accountInvitations).where(eq(accountInvitations.id, invitationId)).limit(1);
-  if (!invite) return;
+  if (!invite) throw new NotFoundError("Invitation not found");
+  // Only the inviter / company employer / platform admin may resend (gap #1675).
+  await assertCanManageInvitation(db, userId, invite);
+  // Resend is for live invites only. A cancelled or accepted invite must NOT
+  // be silently resurrected — to re-invite, send a fresh invitation.
+  if (invite.status !== "pending") {
+    throw new ConflictError("Only pending invitations can be resent");
+  }
+  // Rotate the token + extend the deadline so the resent link is fresh.
   const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
   await db
     .update(accountInvitations)
-    .set({ token, status: "pending" } as any)
+    .set({ token, status: "pending", expiresAt } as any)
     .where(eq(accountInvitations.id, invitationId));
+
+  try {
+    const { inviterName, teamName } = await resolveInviteContext(db, invite);
+    await sendInvitationEmail({
+      to: invite.email,
+      inviterName,
+      teamName,
+      roleLabel: roleLabel(String(invite.role)),
+      token,
+      expiryDays: INVITE_TTL_DAYS,
+    });
+  } catch (err) {
+    console.error("[invite] Failed to resend invitation email:", err);
+  }
 }
 
 export async function cancelInvitation(userId: string, invitationId: string,
   deps?: Partial<AccountDeps>): Promise<void> {
   const d = resolveDeps(deps); const db = d.db;
+  const [invite] = await db.select().from(accountInvitations).where(eq(accountInvitations.id, invitationId)).limit(1);
+  if (!invite) throw new NotFoundError("Invitation not found");
+  // Only the inviter / company employer / platform admin may cancel (gap #1675).
+  await assertCanManageInvitation(db, userId, invite);
   await db
     .update(accountInvitations)
     .set({ status: "cancelled", cancelledAt: new Date() } as any)

@@ -88,20 +88,11 @@ export enum ProfileStatus {
   Hiring = 2,
 }
 
-// Request/Response DTOs
-export interface InviteUserRequest {
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  roles: string[];
-  message?: string;
-}
-
-export interface InviteUserResponse {
-  success: boolean;
-  message: string;
-  inviteId?: string;
-}
+// Request/Response DTOs — SSoT in shared/account.ts so the modal, service,
+// and backend agree on the single-role invite shape + the seat-confirmation
+// fields (gaps #1673/#1678). Previously this declared `roles: string[]` which
+// no backend accepts.
+export type { InviteUserRequest, InviteUserResponse, SeatInfo } from "../../shared/account";
 
 export interface AcceptInvitationResponse {
   success: boolean;
@@ -112,31 +103,20 @@ export interface AcceptInvitationResponse {
   redirectUrl?: string;
 }
 
-export interface InvitationDetailsResponse {
-  invitationId: string;
-  companyName: string;
-  companyDescription?: string;
-  companyLogoUrl?: string;
-  inviterName: string;
-  invitedEmail: string;
-  rolesToAssign: string[];
-  invitedAt: string;
-  userExists: boolean;
-  personalMessage?: string;
-}
+// SSoT lives in shared/account.ts so the backend by-token details endpoint
+// builds to the exact same shape the accept page renders (gap #1673).
+export type { InvitationDetailsResponse } from "../../shared/account";
 
-export interface BulkInviteUsersRequest {
-  users: BulkInviteUserItem[];
-  defaultRoles: string[];
-  defaultMessage?: string;
-}
+// Canonical request shape lives in shared/account.ts (gap #1686) so the
+// service + route + this modal can't drift. `BulkInviteUserItem` stays a
+// UI-only row type for the editable grid (names are collected for display
+// but the single-role invite model only sends email + role).
+export type { BulkInviteRequest } from "../../shared/account";
 
 export interface BulkInviteUserItem {
   email: string;
   firstName?: string;
   lastName?: string;
-  roles?: string[];
-  message?: string;
 }
 
 export interface BulkInviteUsersResponse {

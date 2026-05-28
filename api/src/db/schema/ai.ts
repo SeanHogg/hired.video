@@ -51,6 +51,11 @@ export type NewAiChatMessage = typeof aiChatMessages.$inferInsert;
 export const aiUsageRecords = pgTable("ai_usage_records", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Workspace this call was billed against (gap #1679). Set when an active
+  // workforce employee draws from their employer's shared token pool; null
+  // for personal/per-user consumption. Drives both the company-pool monthly
+  // total AND the per-member sub-cap accounting. FK added in migration 0172.
+  companyId: uuid("company_id"),
   model: varchar("model", { length: 100 }).notNull(),
   featureKey: varchar("feature_key", { length: 100 }).notNull(),
   promptTokens: integer("prompt_tokens").default(0).notNull(),
@@ -98,6 +103,25 @@ export const userTokenBalance = pgTable("user_token_balance", {
 
 export type UserTokenBalance = typeof userTokenBalance.$inferSelect;
 export type NewUserTokenBalance = typeof userTokenBalance.$inferInsert;
+
+/**
+ * Per-COMPANY purchased token pool (gap #1679). The workspace analog of
+ * userTokenBalance: top-up tokens an employer buys that all members draw
+ * from once the monthly seat-derived allowance is exhausted. One row per
+ * company. (The purchase/top-up flow itself is tracked separately — see the
+ * gap register; today the balance is only debited, seeded by future top-ups.)
+ */
+export const companyTokenBalance = pgTable("company_token_balance", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().unique(),
+  balance: integer("balance").default(0).notNull(),
+  lifetimeGranted: integer("lifetime_granted").default(0).notNull(),
+  lifetimeConsumed: integer("lifetime_consumed").default(0).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CompanyTokenBalance = typeof companyTokenBalance.$inferSelect;
+export type NewCompanyTokenBalance = typeof companyTokenBalance.$inferInsert;
 
 /**
  * Audit log of token-pack purchases. One row per Stripe charge. Pack

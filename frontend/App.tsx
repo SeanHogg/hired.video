@@ -90,6 +90,11 @@ const ForIndex = lazy(() => import("./pages/ForIndex"));
 const LocationLandingPage = lazy(() => import("./pages/landing/LocationLandingPage"));
 const SitemapLocations = lazy(() => import("./pages/SitemapLocations"));
 const AdminAudienceTagger = lazy(() => import("./pages/admin/AdminAudienceTagger"));
+const RetainedSearchDirectory = lazy(() => import("./pages/RetainedSearchDirectory"));
+const CompAnalyzer = lazy(() => import("./pages/tools/CompAnalyzer"));
+const References = lazy(() => import("./pages/References"));
+const ReferencesShared = lazy(() => import("./pages/ReferencesShared"));
+const WarmIntros = lazy(() => import("./pages/WarmIntros"));
 const TemplateLandingPage = lazy(() => import("./pages/landing/TemplateLandingPage"));
 const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
@@ -644,6 +649,10 @@ const App = () => (
                       <Route path="/vs-competitors" element={<Competitors />} />
                       <Route path="/for" element={<ForIndex />} />
                       <Route path="/for/:audience" element={<AudienceLandingPage />} />
+                      <Route path="/retained-search" element={<RetainedSearchDirectory />} />
+                      <Route path="/references" element={<References />} />
+                      <Route path="/references/shared/:token" element={<ReferencesShared />} />
+                      <Route path="/network/warm-intros" element={<WarmIntros />} />
                       <Route path="/in/:country" element={<LocationLandingPage />} />
                       <Route path="/in/:country/:state" element={<LocationLandingPage />} />
                       <Route path="/in/:country/:state/:city" element={<LocationLandingPage />} />
@@ -809,6 +818,7 @@ const App = () => (
                           ambiguity for crawlers and analytics outright. */}
                       <Route path="/Tools/SentimentAnalysis" element={<Navigate to="/tools/sentiment-analysis" replace />} />
                       <Route path="/tools/sentiment-analysis" element={<SentimentAnalysis />} />
+                      <Route path="/tools/comp-analyzer" element={<CompAnalyzer />} />
                       <Route path="/tools/predictive-assessments" element={<PredictiveAssessments />} />
                       <Route path="/Tools/JobResumeMatch" element={<Navigate to="/tools/job-resume-match" replace />} />
                       <Route path="/tools/job-resume-match" element={<JobResumeMatch />} />

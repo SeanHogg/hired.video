@@ -41,10 +41,15 @@ export default function AcceptInvitation() {
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const invitationId = searchParams.get("id");
+  const token = searchParams.get("token");
+  // The accept URL the visitor is on — used to bounce through login/signup
+  // and land back here so an unauthenticated invitee can complete the flow.
+  const acceptPath = `/accept-invitation?token=${encodeURIComponent(token ?? "")}`;
+  const loginHref = `/login?redirectTo=${encodeURIComponent(acceptPath)}`;
+  const signupHref = `/signup?redirectTo=${encodeURIComponent(acceptPath)}`;
 
   useEffect(() => {
-    if (!invitationId) {
+    if (!token) {
       setError(t("errors.invalidInvitationLink"));
       setLoading(false);
       return;
@@ -52,14 +57,14 @@ export default function AcceptInvitation() {
 
     loadInvitationDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invitationId]);
+  }, [token]);
 
   const loadInvitationDetails = async () => {
-    if (!invitationId) return;
+    if (!token) return;
 
     try {
       setLoading(true);
-      const details = await accountService.getInvitationDetails(invitationId);
+      const details = await accountService.getInvitationDetails(token);
       setInvitationDetails(details);
       setError(null);
     } catch (err) {
@@ -71,11 +76,11 @@ export default function AcceptInvitation() {
   };
 
   const handleAcceptInvitation = async () => {
-    if (!invitationId) return;
+    if (!token) return;
 
     try {
       setAccepting(true);
-      const result = await accountService.acceptInvitation(invitationId);
+      const result = await accountService.acceptInvitation(token);
 
       if (result.success) {
         toast({
@@ -242,33 +247,55 @@ export default function AcceptInvitation() {
             )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              onClick={handleAcceptInvitation}
-              disabled={accepting}
-              className="flex-1"
-            >
-              {accepting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  {t("status.acceptingInvitation")}
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {t("actions.acceptInvitation")}
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleDecline}
-              disabled={accepting}
-              className="flex-1"
-            >
-              {t("actions.decline")}
-            </Button>
-          </div>
+          {!isAuthenticated ? (
+            // Unauthenticated invitees must sign in (or sign up) with the
+            // invited email first — accept then matches their account to the
+            // invite server-side. Both links bounce back to this page.
+            <div className="flex gap-3 pt-4">
+              <Button asChild className="flex-1">
+                <a href={invitationDetails.userExists ? loginHref : signupHref}>
+                  {invitationDetails.userExists
+                    ? t("messages.invitationLogin")
+                    : t("messages.invitationSignup")}
+                </a>
+              </Button>
+              <Button variant="outline" onClick={handleDecline} className="flex-1">
+                {t("actions.decline")}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleAcceptInvitation}
+                disabled={
+                  accepting ||
+                  user?.email?.toLowerCase() !==
+                    invitationDetails.invitedEmail.toLowerCase()
+                }
+                className="flex-1"
+              >
+                {accepting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    {t("status.acceptingInvitation")}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {t("actions.acceptInvitation")}
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDecline}
+                disabled={accepting}
+                className="flex-1"
+              >
+                {t("actions.decline")}
+              </Button>
+            </div>
+          )}
 
           <p className="text-xs text-gray-500 text-center">
             {t("messages.invitedOn", {

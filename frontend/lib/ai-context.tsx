@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useRef, useCallback } from "react";
 import type { AIContext as AIContextData } from "@/lib/types/ai-context";
 
 // ============================================================================
@@ -23,6 +23,15 @@ interface AIContextType {
   clearPendingMessage: () => void;
   /** Set the current page context. */
   setPageContext: (context: AIContextData | undefined) => void;
+  /** Push (or clear) the live authoring-form snapshot. Backed by a ref,
+   *  NOT state — writing it does not re-render `useAI()` consumers, so
+   *  streaming a form's values on every keystroke is free. The panel
+   *  reads the latest value lazily at send time via `getFormSnapshot`. */
+  setFormSnapshot: (snapshot: Record<string, unknown> | undefined) => void;
+  /** Read the latest authoring-form snapshot (ref-backed; call at send
+   *  time). Held separately from `pageContext` so the route-change
+   *  effect that rebuilds `pageContext` never clobbers it. */
+  getFormSnapshot: () => Record<string, unknown> | undefined;
   /** Open AI chat with page context. */
   openAIWithPageContext: (context: AIContextData) => void;
   /** Open the panel with both page context and a priming message in one
@@ -42,6 +51,17 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [pageContext, setPageContext] = useState<AIContextData | undefined>(undefined);
   const [pendingMessage, setPendingMessage] = useState<string | undefined>(undefined);
+  // Ref, not state: authoring forms stream values here on every
+  // keystroke; a ref write skips the provider re-render cascade that
+  // useState would trigger across every useAI() consumer.
+  const formSnapshotRef = useRef<Record<string, unknown> | undefined>(undefined);
+  const setFormSnapshot = useCallback(
+    (snapshot: Record<string, unknown> | undefined) => {
+      formSnapshotRef.current = snapshot;
+    },
+    [],
+  );
+  const getFormSnapshot = useCallback(() => formSnapshotRef.current, []);
 
   const openAIChat = () => setIsAIChatOpen(true);
   const closeAIChat = () => {
@@ -75,6 +95,8 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     isAIChatOpen,
     pageContext,
     pendingMessage,
+    setFormSnapshot,
+    getFormSnapshot,
     openAIChat,
     openAIWithMessage,
     clearPendingMessage,

@@ -15,10 +15,10 @@ import {
   sanitizeProfileSectionsInput,
   type StoredProfileSections,
 } from "../../../shared/profile-sections.js";
-import { isUuid } from "../../../shared/value-types.js";
 import { USER_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import type { UserActorRow } from "../repositories/usersRepository.js";
 import { splitName, toUserActor } from "../services/user/userActor.js";
+import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 import { projectUserResumes } from "../handlers/resume-serializer.js";
 
@@ -36,6 +36,8 @@ const profileCols = {
   salaryCurrency: userProfiles.salaryCurrency, salaryExpectation: userProfiles.salaryExpectation,
   skills: userProfiles.skills, industries: userProfiles.industries, preferredRoles: userProfiles.preferredRoles,
   profileVisibility: userProfiles.profileVisibility, customUrlSlug: userProfiles.customUrlSlug,
+  confidentialMode: userProfiles.confidentialMode,
+  confidentialBlocklist: userProfiles.confidentialBlocklist,
   providesServices: userProfiles.providesServices,
   profileSections: userProfiles.profileSections,
   updatedAt: userProfiles.updatedAt,
@@ -86,6 +88,12 @@ const UpdateProfileSchema = z.object({
   preferredRoles: z.array(z.string()).optional(),
   role: z.string().optional(),
   profileVisibility: z.enum(["public", "private", "connections"]).optional(),
+  // Confidential search mode (#1627) — opt out of the public people
+  // directory while staying able to apply.
+  confidentialMode: z.boolean().optional(),
+  // Confidential employer blocklist (#1679) — company names hidden from
+  // in recruiter search.
+  confidentialBlocklist: z.array(z.string().max(200)).max(50).optional(),
   // Partial of `ProfileSections` (shared/profile-sections.ts). Each key
   // is optional and merged over current storage via upsert. Unknown keys
   // are dropped by `sanitizeProfileSectionsInput` server-side.
@@ -209,6 +217,8 @@ function toUserProfileDto(
     skills?: string[] | null; industries?: string[] | null; preferredRoles?: string[] | null;
     providesServices?: boolean | null;
     profileVisibility?: string | null;
+    confidentialMode?: boolean | null;
+    confidentialBlocklist?: string[] | null;
     profileSections?: StoredProfileSections | Record<string, boolean> | null;
     updatedAt?: Date | string | null;
   } | null,
@@ -289,6 +299,8 @@ function toUserProfileDto(
     isDemo: false,
     isVerified: row.emailVerified,
     profileVisibility: profile?.profileVisibility ?? "public",
+    confidentialMode: profile?.confidentialMode ?? false,
+    confidentialBlocklist: profile?.confidentialBlocklist ?? [],
     openToWork: profile?.openToWork ?? false,
     openToRemote: profile?.openToRemote ?? false,
     salaryCurrency: profile?.salaryCurrency ?? "USD",
@@ -376,6 +388,10 @@ userRoutes.get("/public", async (c) => {
       // NULL — still include them since the default visibility is public.
       isNull(userProfiles.userId),
     )!,
+    // Confidential search mode (#1627) — fail-closed exclusion. IS NOT
+    // TRUE (not `= false`) so profile-less users (NULL via the left join)
+    // stay included; only an explicit confidential_mode=true is hidden.
+    sql`${userProfiles.confidentialMode} IS NOT TRUE`,
   ];
 
   const rows = await db
@@ -500,6 +516,8 @@ function buildProfileUpdates(d: UpdateProfileInput): Record<string, unknown> {
   if (d.industries !== undefined) updates.industries = d.industries;
   if (d.preferredRoles !== undefined) updates.preferredRoles = d.preferredRoles;
   if (d.profileVisibility !== undefined) updates.profileVisibility = d.profileVisibility;
+  if (d.confidentialMode !== undefined) updates.confidentialMode = d.confidentialMode;
+  if (d.confidentialBlocklist !== undefined) updates.confidentialBlocklist = d.confidentialBlocklist;
   if (d.profileSections !== undefined) {
     updates.profileSections = sanitizeProfileSectionsInput(d.profileSections);
   }
@@ -868,13 +886,7 @@ userRoutes.get("/:id/resumes", async (c) => {
   const caller = c.var.user;
   const db = getDb();
 
-  let targetUserId: string | undefined;
-  if (isUuid(id)) {
-    targetUserId = id;
-  } else {
-    const [p] = await db.select({ userId: schema.userProfiles.userId }).from(schema.userProfiles).where(eq(schema.userProfiles.customUrlSlug, id)).limit(1);
-    targetUserId = p?.userId;
-  }
+  const targetUserId = await resolveUserRef(db, id);
   if (!targetUserId) return c.json(success([]), 200);
 
   const isOwner = caller?.sub === targetUserId;
@@ -942,28 +954,19 @@ userRoutes.get("/:id", async (c) => {
   let me: { id: string; email: string; name: string; role: string; emailVerified: boolean; createdAt: Date | string; updatedAt?: Date | string } | undefined;
   let profile: typeof userProfiles.$inferSelect | undefined;
 
-  if (isUuid(id)) {
+  // `:id` is the public user ref — a UUID or a customUrlSlug. Resolve once
+  // via the shared seam, then fetch identity + profile uniformly by userId.
+  const targetUserId = await resolveUserRef(db, id);
+  if (targetUserId) {
     const [row] = await db
       .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
       .from(users)
-      .where(eq(users.id, id))
+      .where(eq(users.id, targetUserId))
       .limit(1);
     me = row;
     if (me) {
       const [p] = await db.select(profileCols).from(userProfiles).where(eq(userProfiles.userId, me.id)).limit(1);
       profile = p as any;
-    }
-  } else {
-    // Slug lookup via userProfiles
-    const [p] = await db.select(profileCols).from(userProfiles).where(eq(userProfiles.customUrlSlug, id)).limit(1);
-    profile = p as any;
-    if (p) {
-      const [row] = await db
-        .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
-        .from(users)
-        .where(eq(users.id, p.userId))
-        .limit(1);
-      me = row;
     }
   }
 

@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { UserPlus, Mail, User, MessageSquare } from "lucide-react";
+import { UserPlus, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -19,7 +18,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   InviteUserRequest,
   getAvailableRolesForInvite,
@@ -39,13 +37,11 @@ export function InviteUserModal({
   onInvite,
   currentUserRoles,
 }: InviteUserModalProps) {
-  const [formData, setFormData] = useState({
-    email: "",
-    firstName: "",
-    lastName: "",
-    message: "",
-  });
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [email, setEmail] = useState("");
+  // One role per invitee — the invite model assigns exactly one role and the
+  // invitee fills in their own name at signup, so we no longer collect
+  // name/message fields that the backend ignored (gaps #1673/#1678).
+  const [selectedRole, setSelectedRole] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -54,22 +50,14 @@ export function InviteUserModal({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.email.trim()) {
+    if (!email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = "Please enter a valid email address";
     }
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required";
-    }
-
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required";
-    }
-
-    if (selectedRoles.length === 0) {
-      newErrors.roles = "Please select at least one role";
+    if (!selectedRole) {
+      newErrors.role = "Please select a role";
     }
 
     setErrors(newErrors);
@@ -86,16 +74,13 @@ export function InviteUserModal({
     setLoading(true);
     try {
       await onInvite({
-        email: formData.email.trim(),
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        roles: selectedRoles,
-        message: formData.message.trim() || undefined,
+        email: email.trim(),
+        role: selectedRole as InviteUserRequest["role"],
       });
 
       // Reset form
-      setFormData({ email: "", firstName: "", lastName: "", message: "" });
-      setSelectedRoles([]);
+      setEmail("");
+      setSelectedRole("");
       setErrors({});
     } catch {
       // Error handling is done in parent component
@@ -104,13 +89,10 @@ export function InviteUserModal({
     }
   };
 
-  const handleRoleToggle = (role: string) => {
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
-    // Clear role error when user selects a role
-    if (errors.roles) {
-      setErrors((prev) => ({ ...prev, roles: "" }));
+  const handleRoleSelect = (role: string) => {
+    setSelectedRole((prev) => (prev === role ? "" : role));
+    if (errors.role) {
+      setErrors((prev) => ({ ...prev, role: "" }));
     }
   };
 
@@ -150,73 +132,31 @@ export function InviteUserModal({
           onSubmit={handleSubmit}
           className="flex-1 overflow-y-auto px-6 py-4 space-y-6"
         >
-          {/* User Information */}
+          {/* Email */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <User className="h-4 w-4" />
-                User Information
+                Who are you inviting?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <Input
-                    id="firstName"
-                    value={formData.firstName}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        firstName: e.target.value,
-                      }))
-                    }
-                    placeholder="John"
-                    className={errors.firstName ? "border-red-500" : ""}
-                  />
-                  {errors.firstName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.firstName}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input
-                    id="lastName"
-                    value={formData.lastName}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        lastName: e.target.value,
-                      }))
-                    }
-                    placeholder="Doe"
-                    className={errors.lastName ? "border-red-500" : ""}
-                  />
-                  {errors.lastName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.lastName}
-                    </p>
-                  )}
-                </div>
-              </div>
-
               <div>
                 <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, email: e.target.value }))
-                  }
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="john.doe@company.com"
                   className={errors.email ? "border-red-500" : ""}
                 />
                 {errors.email && (
                   <p className="text-sm text-red-500 mt-1">{errors.email}</p>
                 )}
+                <p className="text-xs text-gray-500 mt-1">
+                  They'll get an email link and set up their own profile when they accept.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -224,10 +164,9 @@ export function InviteUserModal({
           {/* Role Selection */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Role Assignment *</CardTitle>
+              <CardTitle className="text-lg">Role *</CardTitle>
               <CardDescription>
-                Select the roles this user will have in your account. You can
-                assign multiple roles.
+                Select the role this person will have in your account.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -235,10 +174,11 @@ export function InviteUserModal({
                 {availableRoles.map((role) => (
                   <div key={role} className="flex items-start space-x-3">
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="invite-role"
                       id={`role-${role}`}
-                      checked={selectedRoles.includes(role)}
-                      onChange={() => handleRoleToggle(role)}
+                      checked={selectedRole === role}
+                      onChange={() => handleRoleSelect(role)}
                       className="mt-1"
                     />
                     <div className="flex-1">
@@ -256,44 +196,9 @@ export function InviteUserModal({
                 ))}
               </div>
 
-              {selectedRoles.length > 0 && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-blue-900 mb-2">
-                    Selected Roles:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedRoles.map((role) => (
-                      <Badge key={role} variant="secondary">
-                        {getRoleDisplayLabel(role)}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+              {errors.role && (
+                <p className="text-sm text-red-500 mt-2">{errors.role}</p>
               )}
-
-              {errors.roles && (
-                <p className="text-sm text-red-500 mt-2">{errors.roles}</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Optional Message */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Personal Message (Optional)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={formData.message}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, message: e.target.value }))
-                }
-                placeholder="Add a personal message to the invitation email..."
-                rows={3}
-              />
             </CardContent>
           </Card>
         </form>

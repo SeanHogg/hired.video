@@ -5,6 +5,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { sendMagicLinkEmail } from "../services/adapters/email.js";
+import { recordReferralAttribution } from "../services/auth/attribution.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { markUserLogin } from "./auth.js";
 import {
@@ -96,12 +97,45 @@ async function createJwt(sub: string, email: string, role: string, emailVerified
     .sign(secret);
 }
 
-async function createOAuthState(redirect: string, linkUserId?: string): Promise<string> {
+/** Inbound attribution carried through the OAuth handshake so "Continue with
+ *  Google" signups credit the affiliate + persist campaign UTMs the same way
+ *  password signups do (gaps #1683). Signed inside the HMAC state, so it can't
+ *  be tampered with between start and callback. */
+interface OAuthAttribution {
+  ref?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+  landingReferrer?: string;
+}
+
+/** Strip empties + cap lengths so a tampered/oversized start URL can't bloat
+ *  the signed state. Mirrors the 64/128-char ceilings used on the user row. */
+function sanitizeAttribution(a: OAuthAttribution | undefined): OAuthAttribution | undefined {
+  if (!a) return undefined;
+  const clip = (v: string | undefined, n: number) => (v ? String(v).slice(0, n) : undefined);
+  const out: OAuthAttribution = {
+    ref: clip(a.ref, 64),
+    utmSource: clip(a.utmSource, 128),
+    utmMedium: clip(a.utmMedium, 128),
+    utmCampaign: clip(a.utmCampaign, 128),
+    utmTerm: clip(a.utmTerm, 128),
+    utmContent: clip(a.utmContent, 128),
+    landingReferrer: clip(a.landingReferrer, 512),
+  };
+  const hasAny = Object.values(out).some((v) => v);
+  return hasAny ? out : undefined;
+}
+
+async function createOAuthState(redirect: string, linkUserId?: string, attribution?: OAuthAttribution): Promise<string> {
   const secret = getJwtSecret();
   const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now(), ...(linkUserId ? { linkUserId } : {}) });
+  const attr = sanitizeAttribution(attribution);
+  const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now(), ...(linkUserId ? { linkUserId } : {}), ...(attr ? { attr } : {}) });
   const key = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
@@ -111,7 +145,7 @@ async function createOAuthState(redirect: string, linkUserId?: string): Promise<
   return btoa(payload + "|" + sigHex);
 }
 
-async function verifyOAuthState(state: string): Promise<{ redirect: string; linkUserId?: string } | null> {
+async function verifyOAuthState(state: string): Promise<{ redirect: string; linkUserId?: string; attr?: OAuthAttribution } | null> {
   try {
     const secret = getJwtSecret();
     const decoded = atob(state);
@@ -125,9 +159,9 @@ async function verifyOAuthState(state: string): Promise<{ redirect: string; link
     const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
     const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
     if (!valid) return null;
-    const { redirect, ts, linkUserId } = JSON.parse(payload);
+    const { redirect, ts, linkUserId, attr } = JSON.parse(payload);
     if (Date.now() - ts > 10 * 60 * 1000) return null;
-    return { redirect: redirect || "/dashboard", linkUserId };
+    return { redirect: redirect || "/dashboard", linkUserId, attr };
   } catch {
     return null;
   }
@@ -285,7 +319,19 @@ oauthRoutes.get("/:provider", async (c) => {
     } catch { /* invalid token — treat as unauthenticated flow */ }
   }
 
-  const state = await createOAuthState(redirect, linkUserId);
+  // Carry inbound attribution forwarded by the frontend OAuth button so
+  // affiliate credit + campaign UTMs survive the handshake (gap #1683).
+  const attribution: OAuthAttribution = {
+    ref: c.req.query("ref") || undefined,
+    utmSource: c.req.query("utm_source") || undefined,
+    utmMedium: c.req.query("utm_medium") || undefined,
+    utmCampaign: c.req.query("utm_campaign") || undefined,
+    utmTerm: c.req.query("utm_term") || undefined,
+    utmContent: c.req.query("utm_content") || undefined,
+    landingReferrer: c.req.query("landing_referrer") || undefined,
+  };
+
+  const state = await createOAuthState(redirect, linkUserId, attribution);
   const callbackUrl = `${getApiBase()}/api/auth/oauth/${name}/callback`;
 
   const params = new URLSearchParams({
@@ -379,6 +425,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     if (existing) {
       userId = existing.id;
     } else {
+      const attr = stateData.attr;
       const [newUser] = await db.insert(users).values({
         email: providerUser.email!.toLowerCase(),
         name: providerUser.name,
@@ -389,6 +436,15 @@ oauthRoutes.get("/:provider/callback", async (c) => {
         // investigation works the same for password and OAuth signups.
         signupIp: extractClientIp(c),
         signupUserAgent: extractUserAgent(c),
+        // Campaign attribution carried through the signed OAuth state so
+        // OAuth signups populate the same UTM columns as password signups
+        // (gap #1683). Null across the board for organic OAuth.
+        utmSource: attr?.utmSource ?? null,
+        utmMedium: attr?.utmMedium ?? null,
+        utmCampaign: attr?.utmCampaign ?? null,
+        utmTerm: attr?.utmTerm ?? null,
+        utmContent: attr?.utmContent ?? null,
+        landingReferrer: attr?.landingReferrer ?? null,
       } as any).returning({ id: users.id });
 
       if (!newUser) return c.redirect(`${base}/login?error=auth_failed`);
@@ -400,6 +456,12 @@ oauthRoutes.get("/:provider/callback", async (c) => {
         kind: "register",
         success: true,
       });
+      // Credit the affiliate when the visitor arrived via ?ref=CODE — same
+      // helper + self-referral guards as the password path (gaps #1683/#1684).
+      await recordReferralAttribution(
+        { referralCode: attr?.ref, userId, ipAddress: extractClientIp(c), userAgent: extractUserAgent(c) },
+        db,
+      );
       // Seed onboarding tasks for the new user (fire-and-forget)
       c.executionCtx.waitUntil(
         seedOnboardingTasks(userId, "job_seeker").catch((err) =>

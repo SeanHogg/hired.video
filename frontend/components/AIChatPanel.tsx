@@ -57,7 +57,7 @@ import {
   createGeneralContext
 } from "@/lib/utils/ai-context-helpers";
 import type { AIAction, AIContextType, AIContext } from "@/lib/types/ai-context";
-import { detectContextType } from "@/lib/config/page-context-registry";
+import { detectContextType } from "@/lib/config/page-meta-registry";
 import { useAIUsage } from "@/hooks/use-ai-usage";
 import { AIUsageLimitBanner, AIUsageLimitErrorBanner } from "@/components/AIUsageLimitBanner";
 
@@ -299,7 +299,7 @@ const AI_FOOTER_CAPTION = "Powered by BuilderForce.ai";
 export default function AIChatPanel() {
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage } = useAI();
+  const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage, getFormSnapshot } = useAI();
   const isMobile = useIsMobile();
   const activeResumeId = resolveActiveResumeId(location.pathname, pageContext);
 
@@ -454,8 +454,15 @@ export default function AIChatPanel() {
         ? { name: user.name || user.email, role: user.role, plan: aiUsage.isUnlimited ? "pro" : "free" }
         : undefined;
 
-      // Always use context-aware AI with enhanced system prompt
-      const activeContext = pageContext;
+      // Always use context-aware AI with enhanced system prompt. Read
+      // the live authoring-form snapshot lazily (ref-backed getter — no
+      // re-render coupling) and merge it so the prompt sees the
+      // in-progress draft, held separately from pageContext so the route
+      // effect doesn't clobber it (#1621).
+      const liveFormSnapshot = getFormSnapshot();
+      const activeContext = pageContext
+        ? { ...pageContext, formSnapshot: liveFormSnapshot ?? pageContext.formSnapshot }
+        : pageContext;
       const systemContent = activeContext
         ? createEnhancedSystemPrompt(activeContext, action, userInfo)
         : `You are the AI CHRO for hired.video — an expert HR advisor helping ${userInfo?.role || "users"} with career, hiring, and workforce decisions. Be concise, actionable, and personalised.${userInfo ? `\n\nUser: ${userInfo.name}, Role: ${userInfo.role}, Plan: ${userInfo.plan}` : ""}`;
@@ -599,7 +606,7 @@ export default function AIChatPanel() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationHistory, currentSessionId, pageContext, user, aiUsage, isAuthenticated, activeResumeId]);
+  }, [conversationHistory, currentSessionId, pageContext, getFormSnapshot, user, aiUsage, isAuthenticated, activeResumeId]);
 
   /**
    * Get a conversational prompt for an action
@@ -1233,7 +1240,7 @@ export default function AIChatPanel() {
 // HELPER FUNCTIONS - Context Creation
 // ============================================================================
 // Route → contextType resolution lives in the declarative
-// page-context registry (page-context-registry.ts) — `detectContextType`
+// unified page-meta registry (page-meta-registry.ts) — `detectContextType`
 // is imported above. This file only maps a resolved contextType to a
 // concrete context object.
 

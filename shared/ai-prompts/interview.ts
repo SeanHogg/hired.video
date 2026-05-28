@@ -11,6 +11,10 @@ export const interviewQuestionGeneratorPrompt: PromptDef<InterviewQuestionVars> 
   id: "interview-question-generator",
   description:
     "Generate a calibrated set of interview questions tailored to a specific JD + resume. Returns JSON only.",
+  arguments: [
+    { name: "type", description: "Interview type (behavioural / technical / system-design)", required: true },
+    { name: "count", description: "Number of questions to generate", required: true },
+  ],
   render: ({ type, count }) =>
     `You are an expert interviewer conducting a ${type} interview. Generate exactly ${count} interview questions.
 

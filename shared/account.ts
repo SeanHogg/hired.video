@@ -60,16 +60,60 @@ export const InviteUserRequestSchema = z.object({
   // top-level role invites (recruiter / employer) that don't bind to a
   // specific company.
   companyId: UuidLikeSchema.optional(),
+  // Owner's explicit yes to paying for an extra seat when the employee invite
+  // would push the workspace past its authorized seat limit (gap #1678). The
+  // first request omits this; if the server responds requiresSeatConfirmation,
+  // the UI re-sends with confirmPaidSeat:true.
+  confirmPaidSeat: z.boolean().optional(),
 });
 export type InviteUserRequest = z.infer<typeof InviteUserRequestSchema>;
+
+// Seat soft-cap info surfaced when an employee invite needs owner confirmation.
+export const SeatInfoSchema = z.object({
+  committedSeats: z.number().int(),
+  seatLimit: z.number().int(),
+  pricePerSeatCents: z.number().int(),
+});
+export type SeatInfo = z.infer<typeof SeatInfoSchema>;
 
 // InviteUserResponse DTO
 export const InviteUserResponseSchema = z.object({
   success: z.boolean(),
   message: NonEmptyStringSchema,
   inviteId: z.string(),
+  // Set when the invite was NOT sent because it would add a paid seat beyond
+  // the authorized limit. The UI shows a confirm dialog using seatInfo, then
+  // re-sends with confirmPaidSeat:true (gap #1678).
+  requiresSeatConfirmation: z.boolean().optional(),
+  seatInfo: SeatInfoSchema.optional(),
 });
 export type InviteUserResponse = z.infer<typeof InviteUserResponseSchema>;
+
+// InvitationDetailsResponse DTO — the rich shape the public accept page
+// (`AcceptInvitation.tsx`) renders. Resolved server-side from the secret
+// invite token: knowing the 192-bit token is the bearer credential for
+// viewing these details (gap #1673/#1674).
+export const InvitationDetailsResponseSchema = z.object({
+  invitationId: z.string(),
+  companyName: z.string(),
+  companyDescription: z.string().optional(),
+  companyLogoUrl: z.string().optional(),
+  inviterName: z.string(),
+  invitedEmail: EmailSchema,
+  rolesToAssign: z.array(z.string()),
+  invitedAt: z.string(),
+  userExists: z.boolean(),
+  personalMessage: z.string().optional(),
+});
+export type InvitationDetailsResponse = z.infer<typeof InvitationDetailsResponseSchema>;
+
+// AcceptInvitationRequest DTO — accept is keyed by the secret token (NOT the
+// enumerable invitation id) and requires an authenticated, email-matched
+// caller (gap #1674).
+export const AcceptInvitationRequestSchema = z.object({
+  token: NonEmptyStringSchema,
+});
+export type AcceptInvitationRequest = z.infer<typeof AcceptInvitationRequestSchema>;
 
 // AcceptInvitationResponse DTO
 export const AcceptInvitationResponseSchema = z.object({
@@ -134,6 +178,22 @@ export function getAvailableRolesForInvite(userRoles: string | string[]): string
   }
   return [];
 }
+
+// Bulk invite request DTO — single canonical shape across service + route +
+// frontend (gap #1686). One role per invitee, matching the single-role invite
+// model; optional companyId binds employee invites to a workspace.
+export const BulkInviteRequestSchema = z.object({
+  invites: z.array(z.object({
+    email: EmailSchema,
+    role: z.nativeEnum(USER_ROLES),
+  })).min(1),
+  companyId: UuidLikeSchema.optional(),
+  // Owner's up-front yes to paying for the paid employee seats this batch adds
+  // (gap #1678). When false/omitted, employee rows past the authorized seat
+  // limit fail with a seat-confirmation reason rather than charging silently.
+  confirmPaidSeat: z.boolean().optional(),
+});
+export type BulkInviteRequest = z.infer<typeof BulkInviteRequestSchema>;
 
 // Bulk invite response DTO
 export const BulkInviteResponseSchema = z.object({

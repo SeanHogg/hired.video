@@ -50,8 +50,8 @@ import {
 import { SCORM_COMPLETION_STATUSES, XAPI_VERBS } from "../db/schema/learning.js";
 import { slugify } from "../../../shared/slugify.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
-import { isUuid } from "../../../shared/value-types.js";
 import { USER_ROLES, pickScoringRole } from "../../../shared/user-roles.js";
+import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
@@ -407,21 +407,11 @@ courseRoutes.get("/public/by-user/:userId", async (c) => {
 
 courseRoutes.get("/public/:userIdOrSlug/:slug", async (c) => {
   const db = getDb();
-  // The first URL segment is the author identifier — accept either a UUID
-  // (legacy) OR a userProfiles.customUrlSlug (what the marketplace card +
-  // share-URL helpers produce, see CourseMarketplaceCard / buildShareAction).
-  // Same resolution pattern as /api/users/:id and /api/users/:id/resumes.
-  const userIdOrSlug = c.req.param("userIdOrSlug");
-  let authorUserId = userIdOrSlug;
-  if (!isUuid(userIdOrSlug)) {
-    const [p] = await db
-      .select({ userId: userProfiles.userId })
-      .from(userProfiles)
-      .where(eq(userProfiles.customUrlSlug, userIdOrSlug))
-      .limit(1);
-    if (!p) return c.json(error("NOT_FOUND", "Course not found"), 404);
-    authorUserId = p.userId;
-  }
+  // First segment is the author ref — a UUID (legacy) or a customUrlSlug
+  // (what the marketplace card + share-URL helpers produce). resolveUserRef
+  // is the shared seam for that resolution (also used by the articles routes).
+  const authorUserId = await resolveUserRef(db, c.req.param("userIdOrSlug"));
+  if (!authorUserId) return c.json(error("NOT_FOUND", "Course not found"), 404);
   const [row] = await db
     .select({
       course: courses,

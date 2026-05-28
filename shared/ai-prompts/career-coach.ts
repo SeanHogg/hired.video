@@ -4,6 +4,11 @@ export const careerCoachPrompt: PromptDef<CareerCoachVars> = {
   id: "career-coach",
   description:
     "AI CHRO persona for hired.video — career, hiring, and workforce guidance across job seekers, recruiters, and employers.",
+  arguments: [
+    { name: "name", description: "User's display name", required: false },
+    { name: "role", description: "User role (job_seeker / recruiter / employer)", required: false },
+    { name: "plan", description: "Subscription plan (free / pro)", required: false },
+  ],
   render: ({ name, role, plan } = {}) => {
     const userBlock =
       name || role || plan

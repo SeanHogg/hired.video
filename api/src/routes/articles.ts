@@ -30,6 +30,7 @@ import { filterVisibleCreators, isCreatorVisible } from "../services/creators/vi
 import { scanContent } from "../services/moderation/contentScan.js";
 import { slugify } from "../../../shared/slugify.js";
 import { ARTICLE_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
+import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { ARTICLE_KINDS } from "../db/schema/articles.js";
 
@@ -147,9 +148,12 @@ articleRoutes.get("/public", async (c) => {
 
 articleRoutes.get("/public/by-user/:userId", async (c) => {
   const db = getDb();
-  const userId = c.req.param("userId");
+  // The path segment is the public author ref — a UUID or a customUrlSlug
+  // (see resolveUserRef + toPublicCard's `author.slug`). Resolve before
+  // filtering so vanity-slug links don't silently return [].
+  const userId = await resolveUserRef(db, c.req.param("userId"));
   const limit = Math.min(parseInt(c.req.query("limit") ?? "50", 10) || 50, 100);
-  if (!(await isCreatorVisible(userId))) {
+  if (!userId || !(await isCreatorVisible(userId))) {
     return c.json(success([] as unknown[]), 200);
   }
   try {
@@ -178,6 +182,11 @@ articleRoutes.get("/public/by-user/:userId", async (c) => {
 
 articleRoutes.get("/public/:userId/:slug", async (c) => {
   const db = getDb();
+  // First segment is the public author ref — a UUID or a customUrlSlug (the
+  // vanity slug the card link emits via `author.slug = customUrlSlug ?? id`).
+  // Resolve to a userId before the lookup so custom-slug links don't 404.
+  const authorUserId = await resolveUserRef(db, c.req.param("userId"));
+  if (!authorUserId) return c.json(error("NOT_FOUND", "Article not found"), 404);
   const [row] = await db
     .select({
       article: articles,
@@ -188,7 +197,7 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
     .innerJoin(users, eq(articles.userId, users.id))
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(and(
-      eq(articles.userId, c.req.param("userId")),
+      eq(articles.userId, authorUserId),
       eq(articles.slug, c.req.param("slug")),
       eq(articles.status, "published"),
       eq(users.emailVerified, true),

@@ -225,6 +225,23 @@ export function compilePredicate(cond: unknown): Predicate {
   return () => true;
 }
 
+/** Evaluate a select-aggregate (the non-column values in a `.select({...})`)
+ *  over the matched rows. `sum(col)` sums that column; everything else
+ *  (count(*), count(col), etc.) falls back to the row count — matching the
+ *  original harness behaviour. Lets token-budget reads that use `sum()` be
+ *  tested for real instead of silently counting rows. */
+function aggregateValue(agg: unknown, rows: Row[]): number {
+  if (isSQL(agg)) {
+    const text = agg.queryChunks.map(chunkText).join("").toLowerCase();
+    const col = agg.queryChunks.find(isColumn);
+    if (text.includes("sum") && col) {
+      const prop = jsPropNameForColumn(col);
+      return rows.reduce((acc, r) => acc + Number(r[prop] ?? 0), 0);
+    }
+  }
+  return rows.length;
+}
+
 function eqValue(a: unknown, b: unknown): boolean {
   if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
   if (a instanceof Date) return a.getTime() === new Date(b as any).getTime();
@@ -361,7 +378,7 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
                 .map(([k]) => k);
               if (aggregateAliases.length > 0) {
                 const row: Record<string, number> = {};
-                for (const alias of aggregateAliases) row[alias] = out.length;
+                for (const alias of aggregateAliases) row[alias] = aggregateValue(colsObj[alias], out);
                 resolveFn([row]);
                 return;
               }

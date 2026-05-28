@@ -22,18 +22,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  BulkInviteUsersRequest,
+  BulkInviteRequest,
   BulkInviteUserItem,
   BulkInviteUsersResponse,
   getAvailableRolesForInvite,
 } from "@/types/account";
+import type { UserRole } from "@shared/user-roles";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 interface BulkInviteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBulkInvite: (
-    data: BulkInviteUsersRequest,
+    data: BulkInviteRequest,
   ) => Promise<BulkInviteUsersResponse>;
   currentUserRoles: string[];
 }
@@ -45,8 +46,9 @@ export function BulkInviteModal({
   currentUserRoles,
 }: BulkInviteModalProps) {
   const [users, setUsers] = useState<BulkInviteUserItem[]>([]);
-  const [defaultRoles, setDefaultRoles] = useState<string[]>([]);
-  const [defaultMessage, setDefaultMessage] = useState("");
+  // Single role per batch — the invite model assigns exactly one role per
+  // invitee (gap #1686), so this is a select, not a multi-toggle.
+  const [defaultRole, setDefaultRole] = useState<string>("");
   const [csvInput, setCsvInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BulkInviteUsersResponse | null>(null);
@@ -72,10 +74,8 @@ export function BulkInviteModal({
     setUsers(updatedUsers);
   };
 
-  const handleRoleToggle = (role: string) => {
-    setDefaultRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
+  const handleRoleSelect = (role: string) => {
+    setDefaultRole((prev) => (prev === role ? "" : role));
   };
 
   const parseCsvInput = () => {
@@ -122,8 +122,8 @@ export function BulkInviteModal({
       validationErrors.push("At least one user must be added");
     }
 
-    if (defaultRoles.length === 0) {
-      validationErrors.push("At least one default role must be selected");
+    if (!defaultRole) {
+      validationErrors.push("A role must be selected");
     }
 
     users.forEach((user, index) => {
@@ -143,10 +143,10 @@ export function BulkInviteModal({
 
     setLoading(true);
     try {
-      const request: BulkInviteUsersRequest = {
-        users,
-        defaultRoles,
-        defaultMessage: defaultMessage.trim() || undefined,
+      const request: BulkInviteRequest = {
+        invites: users
+          .filter((u) => u.email.trim())
+          .map((u) => ({ email: u.email.trim(), role: defaultRole as UserRole })),
       };
 
       const response = await onBulkInvite(request);
@@ -167,8 +167,7 @@ export function BulkInviteModal({
 
   const handleClose = () => {
     setUsers([]);
-    setDefaultRoles([]);
-    setDefaultMessage("");
+    setDefaultRole("");
     setCsvInput("");
     setResult(null);
     setErrors([]);
@@ -301,35 +300,19 @@ export function BulkInviteModal({
             <CardContent className="space-y-4">
               {/* Default Roles */}
               <div>
-                <Label className="text-base font-medium">Default Roles</Label>
+                <Label className="text-base font-medium">Role</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {availableRoles.map((role) => (
                     <Badge
                       key={role}
-                      variant={
-                        defaultRoles.includes(role) ? "default" : "outline"
-                      }
+                      variant={defaultRole === role ? "default" : "outline"}
                       className="cursor-pointer"
-                      onClick={() => handleRoleToggle(role)}
+                      onClick={() => handleRoleSelect(role)}
                     >
                       {getRoleDisplayLabel(role)}
                     </Badge>
                   ))}
                 </div>
-              </div>
-
-              {/* Default Message */}
-              <div>
-                <Label htmlFor="defaultMessage">
-                  Default Message (Optional)
-                </Label>
-                <Textarea
-                  id="defaultMessage"
-                  value={defaultMessage}
-                  onChange={(e) => setDefaultMessage(e.target.value)}
-                  placeholder="Add a personal message to all invitations..."
-                  rows={3}
-                />
               </div>
             </CardContent>
           </Card>
@@ -453,7 +436,7 @@ export function BulkInviteModal({
           <Button
             onClick={handleSubmit}
             disabled={
-              loading || users.length === 0 || defaultRoles.length === 0
+              loading || users.length === 0 || !defaultRole
             }
           >
             {loading

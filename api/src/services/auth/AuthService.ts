@@ -49,10 +49,11 @@ import { recordFailedLogin } from "./bruteForce.js";
 import { scoreLoginRisk } from "./risk.js";
 import { detectCountry } from "./geo.js";
 import { checkEmailRateLimit } from "./emailRateLimit.js";
+import { recordReferralAttribution } from "./attribution.js";
 import { getDefaultProfileSections } from "../../../../shared/profile-sections.js";
 import { isLocale, type Locale } from "../../../../shared/i18n.js";
 
-const { users, userProfiles, accountPreferences, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, affiliateReferrals, loginEvents } = schema;
+const { users, userProfiles, accountPreferences, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
 
 // ---------------------------------------------------------------------------
 // recordLoginEvent — fire-and-forget insert into login_events. Awaited so
@@ -418,39 +419,17 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
 
   // Inbound referral attribution (#1194). If the visitor arrived via an
   // affiliate's `?ref=CODE` link, the frontend forwards that code here.
-  // Resolve it to a real `affiliate_profiles` row and stamp the linkage
-  // so the conversion lookup in `recordAffiliateConversion` (payment.ts)
-  // can credit the affiliate when this user eventually pays. Self-
-  // referrals (a user signing up with their own code, theoretically only
-  // possible after enableAffiliate just minted one this same request)
-  // are dropped — the affiliate profile lookup runs before the
-  // enableAffiliate insert above is visible to a fresh select on a
-  // different transaction, so this is best-effort either way and
-  // guarding here keeps the policy explicit.
-  if (referralCodeInput) {
-    try {
-      const [aff] = await deps.db
-        .select({ id: affiliateProfiles.id, userId: affiliateProfiles.userId, status: affiliateProfiles.status })
-        .from(affiliateProfiles)
-        .where(eq(affiliateProfiles.referralCode, referralCodeInput))
-        .limit(1);
-      if (aff && aff.userId !== user.id && aff.status !== "disabled") {
-        await deps.db.insert(affiliateReferrals).values({
-          affiliateId: aff.id,
-          referredUserId: user.id,
-          referralCode: referralCodeInput,
-          ipAddress: deps.clientIp,
-          userAgent: deps.userAgent,
-        } as any);
-      }
-    } catch (err) {
-      // Idempotency: a duplicate insert under the partial unique index
-      // (migration 0116) is the expected outcome for a retried POST
-      // /register. Log + continue — the existing row already attributes
-      // the user to the affiliate.
-      console.error("[register] Failed to record affiliate referral:", err);
-    }
-  }
+  // Shared with the OAuth callback (gap #1683) via recordReferralAttribution,
+  // which also owns the self-referral guards (gap #1684).
+  await recordReferralAttribution(
+    {
+      referralCode: referralCodeInput,
+      userId: user.id,
+      ipAddress: deps.clientIp,
+      userAgent: deps.userAgent,
+    },
+    deps.db,
+  );
 
   return ok(
     {

@@ -7,7 +7,7 @@
  */
 
 import { Hono, type Context } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { error, success } from "../types/index.js";
@@ -494,6 +494,24 @@ export async function recordAffiliateConversion(
   });
   const commission = revenue * specialty.effectiveRate;
 
+  // Atomic claim (#1684). The Neon HTTP driver can't span statements in a
+  // transaction, so instead of insert-then-stamp (which double-credits if a
+  // retry lands between the two), we CLAIM the referral first with a
+  // conditional update on `convertedAt IS NULL`. Postgres makes the single
+  // UPDATE atomic, so exactly one webhook run wins the claim; the rest get
+  // zero rows back and bail. Worst case on a mid-fan-out crash is one missed
+  // credit (re-runnable), not a duplicate — the safe failure direction.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const claimed = await db
+    .update(schema.affiliateReferrals)
+    .set({ convertedAt: new Date() } as any)
+    .where(and(
+      eq(schema.affiliateReferrals.id, referral.id),
+      isNull(schema.affiliateReferrals.convertedAt),
+    ))
+    .returning({ id: schema.affiliateReferrals.id });
+  if (claimed.length === 0) return; // another run already credited this referral
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (db.insert(schema.affiliateConversions) as any).values({
     affiliateId: referral.affiliateId,
@@ -504,17 +522,9 @@ export async function recordAffiliateConversion(
     status: "pending",
   });
 
-  // Stamp the referral as converted so the guard above blocks re-credit
-  // on the next webhook. Same transaction-ish window as the conversion
-  // insert — best effort under our current non-transactional fan-out.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await db.update(schema.affiliateReferrals).set({ convertedAt: new Date() } as any).where(eq(schema.affiliateReferrals.id, referral.id));
-
-  // Accumulator fix (#1197). The previous read used `existing[0]?...` on a
-  // value that had already been array-destructured — `existing[0]` was
-  // always undefined and `totalEarned` was overwritten to a single
-  // commission's value on every conversion. Read the column directly off
-  // the destructured row (we already have it from the profile select above).
+  // Accumulator fix (#1197). Read the column directly off the destructured
+  // profile row (a prior bug indexed an already-destructured value, so
+  // totalEarned was overwritten to a single commission each time).
   const newTotal = Number(profile.totalEarned ?? 0) + commission;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.update(schema.affiliateProfiles).set({ totalEarned: String(newTotal), updatedAt: new Date() } as any).where(eq(schema.affiliateProfiles.id, referral.affiliateId));

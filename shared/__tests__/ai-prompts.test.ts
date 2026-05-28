@@ -23,11 +23,13 @@ describe("ai-prompts registry", () => {
   it("registers every PromptId in the union", () => {
     const expected: PromptId[] = [
       "career-coach",
+      "career-resilience",
       "resume-editor-consolidate",
       "resume-editor-shorten",
       "resume-roast",
       "interview-question-generator",
       "interview-answer-coach",
+      "video-pitch",
     ];
     assert.deepStrictEqual([...PROMPT_IDS].sort(), [...expected].sort());
   });
@@ -55,10 +57,14 @@ describe("ai-prompts registry", () => {
     // career-coach and the editor/roast/coach prompts accept empty vars
     // (or vars-less); interview-question-generator needs type + count.
     for (const id of PROMPT_IDS) {
-      const rendered =
-        id === "interview-question-generator"
-          ? PROMPTS[id].render({ type: "behavioural", count: 5 })
-          : PROMPTS[id].render({});
+      let rendered: string;
+      if (id === "interview-question-generator") {
+        rendered = PROMPTS[id].render({ type: "behavioural", count: 5 });
+      } else if (id === "video-pitch") {
+        rendered = PROMPTS[id].render({ targetWordCount: 90, tone: "professional" });
+      } else {
+        rendered = (PROMPTS[id].render as (v: Record<string, unknown>) => string)({});
+      }
       assert.ok(
         rendered.trim().length > 0,
         `Prompt "${id}" rendered empty string`,

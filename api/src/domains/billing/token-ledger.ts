@@ -33,6 +33,11 @@ import {
 import type { LLMUsage } from "../../services/adapters/llm-client.js";
 import { isAdminRole } from "./audience.js";
 import { servicesProcessor } from "../services-processing/index.js";
+import {
+  resolveEmployeeAiContext,
+  checkCompanyBudget,
+  recordCompanyTokenUsage,
+} from "./company-token-ledger.js";
 
 /**
  * Thrown by `ensureBudget()` when a user has zero tokens available across
@@ -84,6 +89,16 @@ export const tokenLedger: TokenLedger = {
     // recorded on the charge side for audit.
     if (isAdminRole(user)) return;
 
+    // Workforce employees draw from their employer's shared pool + sub-cap
+    // (gap #1679). resolveEmployeeAiContext returns null for everyone else,
+    // who fall through to the unchanged per-user gate below.
+    const employeeCtx = await resolveEmployeeAiContext(user.sub);
+    if (employeeCtx) {
+      const blocked = await checkCompanyBudget(employeeCtx, user.sub);
+      if (blocked) throw new TokenBudgetExceededError(blocked);
+      return;
+    }
+
     const summary = await getTokenBudgetSummary(user.sub);
     if (summary.isUnlimited) return;
     if (summary.totalAvailable > 0) return;
@@ -96,15 +111,31 @@ export const tokenLedger: TokenLedger = {
     // DTO round-trip in that case.
     if (usage.totalTokens <= 0) return null;
 
-    await recordTokenUsage({
-      userId,
-      featureKey,
-      model: usage.model,
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-      sessionId,
-      toolRunId,
-    });
+    // Route the debit to the employer's shared pool for active employees;
+    // everyone else debits their personal allowance (gap #1679).
+    const employeeCtx = await resolveEmployeeAiContext(userId);
+    if (employeeCtx) {
+      await recordCompanyTokenUsage({
+        companyId: employeeCtx.companyId,
+        userId,
+        featureKey,
+        model: usage.model,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        sessionId,
+        toolRunId,
+      });
+    } else {
+      await recordTokenUsage({
+        userId,
+        featureKey,
+        model: usage.model,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        sessionId,
+        toolRunId,
+      });
+    }
 
     // Write-through to the central usage ledger so the Usage Statement panel
     // + monthly close cron can see AI consumption next to every other gated
@@ -136,6 +167,11 @@ export const tokenLedger: TokenLedger = {
         console.warn(`[token-ledger] failed to update tool_runs.tokens_used for ${toolRunId}:`, err);
       }
     }
+
+    // Employees draw from the shared pool, not a personal allowance — the
+    // per-user budget DTO would be misleading, so skip it. Their pill is fed
+    // by the company-pool endpoint instead (gap #1679).
+    if (employeeCtx) return null;
 
     try {
       return await buildTokenBudgetDTO(userId);

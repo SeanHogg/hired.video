@@ -422,6 +422,9 @@ searchRoutes.get("/public", async (c) => {
     // Exclude workforce members + platform staff from candidate search.
     // Same SSoT used by /api/users/public (#1407, DRY rule).
     notInArray(users.role, NON_CANDIDATE_ROLES as unknown as string[]),
+    // Confidential search mode (#1627) — fail-closed exclusion from the
+    // anonymous public directory for execs who can't be seen job-hunting.
+    eq(userProfiles.confidentialMode, false),
   );
   const peopleWhereParts: any[] = [peopleVisibilityClause];
   if (search) {
@@ -764,6 +767,25 @@ searchRoutes.post("/recruiter", async (c) => {
     // so a viewer who picks a city in the LocationFilter doesn't also
     // get noise from a stale free-text string.
     conditions.push(ilike(userProfiles.location, `%${location}%`));
+  }
+
+  // Confidential employer blocklist (#1679) — exclude any candidate whose
+  // confidential_blocklist names the VIEWING recruiter's own company.
+  // Resolved from the viewer's profile.current_company; case-insensitive.
+  if (userId) {
+    const [viewer] = await db
+      .select({ company: userProfiles.currentCompany })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1);
+    const viewerCompany = (viewer?.company ?? "").trim();
+    if (viewerCompany) {
+      conditions.push(sql`NOT EXISTS (
+        SELECT 1 FROM jsonb_array_elements_text(coalesce(
+          (SELECT confidential_blocklist FROM user_profiles WHERE user_id = ${users.id}), '[]'::jsonb)
+        ) b WHERE lower(b) = lower(${viewerCompany})
+      )`);
+    }
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

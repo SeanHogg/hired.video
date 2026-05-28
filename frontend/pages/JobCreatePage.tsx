@@ -43,6 +43,7 @@ import { jobService } from "@/lib/services/job-service";
 import { useAI } from "@/lib/ai-context";
 import { createJobContext } from "@/lib/utils/ai-context-helpers";
 import { useActiveFormBridge } from "@/lib/hooks/use-active-form-bridge";
+import { useAIFormSnapshot } from "@/hooks/use-ai-form-snapshot";
 import { JOB_CREATE_FORM_ID } from "@/lib/tools/registry";
 import MediaPicker from "@/components/shared/MediaPicker";
 import EntityEditShell from "@/components/EntityEditShell";
@@ -85,6 +86,13 @@ const jobCreateSchema = z.object({
         "ContractToHire",
         "Temporary",
         "Internship",
+        // Exec opportunity types (#1674). PascalCase to match this form's
+        // local convention; the backend normalizes every spelling to the
+        // canonical kebab value (shared/employment-types.ts) on write.
+        "Fractional",
+        "Advisor",
+        "Interim",
+        "BoardSeat",
       ]),
     )
     .min(1, "At least one employment type is required"),
@@ -195,6 +203,11 @@ export default function JobCreatePage() {
   });
 
   const watchedValues = watch();
+
+  // Stream the live form values into the AI context so the coach's
+  // system prompt sees the in-progress draft (#1621) — this is what
+  // `formatJobFormSnapshot` renders under "CURRENT FORM VALUES".
+  useAIFormSnapshot(watchedValues as Record<string, unknown>);
 
   // Publish this form to the active-form bridge so the AI coach's
   // `apply_job_draft` tool can write directly into the RHF state when
@@ -1052,6 +1065,15 @@ export default function JobCreatePage() {
                             <SelectItem value="ContractToHire">
                               Contract to Hire
                             </SelectItem>
+                            {/* Exec opportunity types (#1674). Canonical
+                                kebab values — the backend normalizes all
+                                spellings to canonical on write, so mixing
+                                with the PascalCase legacy values above is
+                                safe. */}
+                            <SelectItem value="Fractional">Fractional</SelectItem>
+                            <SelectItem value="Advisor">Advisor</SelectItem>
+                            <SelectItem value="Interim">Interim</SelectItem>
+                            <SelectItem value="BoardSeat">Board Seat</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

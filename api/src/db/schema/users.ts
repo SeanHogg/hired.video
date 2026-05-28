@@ -210,6 +210,14 @@ export const userProfiles = pgTable("user_profiles", {
   industries: jsonb("industries").$type<string[]>().default([]),
   preferredRoles: jsonb("preferred_roles").$type<string[]>().default([]),
   profileVisibility: varchar("profile_visibility", { length: 50 }).default("public").notNull(),
+  // Confidential search mode (#1627) — when true the profile is excluded
+  // from the anonymous public people-search (fail-closed). For senior
+  // execs who are still employed and can't be seen job-hunting publicly.
+  confidentialMode: boolean("confidential_mode").default(false).notNull(),
+  // Confidential employer blocklist (#1679) — company names this profile
+  // hides from in authenticated recruiter search (current employer /
+  // competitors). Visible to all other recruiters.
+  confidentialBlocklist: jsonb("confidential_blocklist").$type<string[]>().default([]).notNull(),
   customUrlSlug: varchar("custom_url_slug", { length: 100 }),
   // Featured candidate profile — paid one-off boost for recruiter search visibility
   featuredUntil: timestamp("featured_until", { withTimezone: true }),
@@ -347,6 +355,9 @@ export const accountInvitations = pgTable("account_invitations", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  // Hard expiry enforced on accept (gap #1680). Set by the invite service
+  // to createdAt + 14d; the accept handler rejects invites past this.
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
 
 export type AccountInvitation = typeof accountInvitations.$inferSelect;

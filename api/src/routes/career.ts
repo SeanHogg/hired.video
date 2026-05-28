@@ -6,6 +6,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { extractJson as extractJsonShared } from "../services/resume/parse.js";
+import { getPrompt } from "../../../shared/ai-prompts/index.js";
 
 export const careerRoutes = new Hono<AppEnv>();
 
@@ -85,20 +86,7 @@ careerRoutes.get("/resilience-report/:token", async (c) => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const RESILIENCE_SYSTEM_PROMPT = `You are an expert labour economist and AI impact analyst. Assess career resilience based on a professional's current role.
-
-Return ONLY valid JSON (no markdown, no explanation) matching this schema:
-{
-  "riskScore": number 0-100 (higher = more AI displacement risk),
-  "riskLabel": "Low Risk" | "Moderate Risk" | "High Risk" | "Critical Risk",
-  "summary": string (2-3 sentences explaining the risk level),
-  "displacementFactors": string[] (3-5 specific reasons for the risk score),
-  "skillGaps": [{ "skill": string, "importance": "Critical" | "High" | "Medium", "timeToLearn": string }],
-  "adjacentRoles": [{ "title": string, "salaryDelta": string, "transitionDifficulty": "Easy" | "Moderate" | "Hard", "aiSafeScore": number }],
-  "retrainingRoadmap": [{ "step": number, "action": string, "timeframe": string, "resource": string }],
-  "marketSignals": string[] (2-3 observable trends supporting the assessment),
-  "salaryTrajectory": { "current": string, "in2Years": string, "in5Years": string }
-}`;
+const RESILIENCE_SYSTEM_PROMPT = getPrompt("career-resilience").render({});
 
 function buildResiliencePrompt(role: string, years?: number, skills?: string[], industry?: string): string {
   return `Role: ${role}

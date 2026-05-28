@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useAIFormSnapshot } from "@/hooks/use-ai-form-snapshot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,10 @@ export default function JobEditForm({
   const [newRequirement, setNewRequirement] = useState("");
   const [newResponsibility, setNewResponsibility] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Stream the live form values into the AI context so the coach's
+  // system prompt sees the in-progress edit (#1621).
+  useAIFormSnapshot(formData as unknown as Record<string, unknown>);
 
   // Initialize form with job data
   useEffect(() => {

@@ -49,6 +49,10 @@ import {
   disconnectByEmployer,
   type IntegrationProvider,
 } from "../services/workforce/integrations.js";
+import {
+  getCompanyTokenPoolView,
+  setMemberTokenLimit,
+} from "../domains/billing/company-token-ledger.js";
 
 export const workforceRoutes = new Hono<AppEnv>();
 
@@ -336,4 +340,37 @@ workforceRoutes.post("/integrations/:provider/disconnect", async (c) => {
   }
   await disconnectByEmployer(userId, body.companyId, provider);
   return c.json(success({ disconnected: true }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// AI token pool — employer view + per-member sub-cap (gap #1679)
+// ---------------------------------------------------------------------------
+
+// GET /api/workforce/token-pool — the employer's shared AI pool + per-member
+// month-to-date usage and sub-caps.
+workforceRoutes.get("/token-pool", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const view = await getCompanyTokenPoolView(userId);
+  if (!view) return c.json(error("FORBIDDEN", "No workspace to manage"), 403);
+  return c.json(success(view), 200);
+});
+
+// PATCH /api/workforce/members/:userId/token-limit — set/clear a member's
+// monthly AI-token sub-cap. Body: { limit: number | null }.
+workforceRoutes.patch("/members/:userId/token-limit", async (c) => {
+  const userId = getCurrentUserId(c);
+  if (!userId) return unauthorized(c);
+  const targetUserId = c.req.param("userId");
+  const body = await c.req.json().catch(() => ({}));
+  const raw = body?.limit;
+  const limit =
+    raw === null || raw === undefined ? null
+    : Number.isFinite(Number(raw)) && Number(raw) >= 0 ? Math.floor(Number(raw))
+    : undefined;
+  if (limit === undefined) {
+    return c.json(error("BAD_REQUEST", "limit must be a non-negative number or null"), 400);
+  }
+  await setMemberTokenLimit(userId, targetUserId, limit);
+  return c.json(success({ updated: true }), 200);
 });

@@ -59,6 +59,7 @@ import { marketingRoutes } from "./routes/marketing.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { uploadRoutes } from "./routes/upload.js";
 import { aiRoutes } from "./routes/ai.js";
+import { mcpRoutes } from "./routes/mcp.js";
 import { profileAuditRoutes } from "./routes/profile-audit.js";
 import { career360Routes } from "./routes/career360.js";
 import { profileRoutes } from "./routes/profile.js";
@@ -69,6 +70,9 @@ import { linkedInPostRoutes } from "./routes/linkedin-post.js";
 import { vendorSyncRoutes } from "./routes/vendor-sync.js";
 import { locationRoutes } from "./routes/locations.js";
 import { contentAudienceRoutes } from "./routes/content-audiences.js";
+import { retainedSearchRoutes } from "./routes/retained-search.js";
+import { referenceRoutes } from "./routes/references.js";
+import { networkRoutes } from "./routes/network.js";
 import { adminRoutes } from "./routes/admin.js";
 import { adminR2Routes } from "./routes/admin-r2.js";
 import { adminWorkerRoutes } from "./routes/admin-workers.js";
@@ -216,6 +220,8 @@ export function createApp() {
     "/api/analytics/beacon",
     "/api/analytics/ads/impression",
     "/api/search/public",
+    "/api/retained-search/firms",
+    "/api/references/shared/",
     "/api/jobs/public",
     "/api/companies/public",
     "/api/resume/public",
@@ -387,6 +393,14 @@ export function createApp() {
   const EMAIL_OAUTH_PUBLIC_ROUTE =
     /^\/api\/integrations\/email\/(?:gmail|outlook)\/(?:connect|callback)(?:$|\?|\/)/;
 
+  // Seat-invite details preview — the invitee opens the accept page from
+  // their email link before signing in. Keyed by the 24-byte random token
+  // (same unguessable-bearer model as the live-screen invite above), so the
+  // GET is safe to leave public; the POST /accept-invitation that actually
+  // binds membership stays authenticated + email-matched (gap #1674).
+  const ACCOUNT_INVITE_PUBLIC_ROUTE =
+    /^\/api\/account\/invitation\/by-token\/[^/]+$/;
+
   // GET /api/resumes/:id (uuid or slug) — detail lookup. Route handler decides
   // access (owner OR public). Sub-routes like /export, /metadata, /diff, and
   // the POST/PUT/DELETE verbs stay behind full auth. Negative lookahead
@@ -425,6 +439,7 @@ export function createApp() {
     if (POINTS_PUBLIC_ROUTE.test(path)) return "public";
     if (PREDICTIVE_ASSESSMENTS_PUBLIC_ROUTE.test(path)) return "public";
     if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return "public";
+    if (ACCOUNT_INVITE_PUBLIC_ROUTE.test(path)) return "public";
     if (COURSES_SCORM_ASSET_ROUTE.test(path)) return "public";
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
@@ -590,12 +605,16 @@ export function createApp() {
   app.route("/api/upload", uploadRoutes);
   app.route("/api/communication", communicationRoutes);
   app.route("/api/ai", aiRoutes);
+  app.route("/api/mcp", mcpRoutes);
   app.route("/api/profile-audit", profileAuditRoutes);
   app.route("/api/career360", career360Routes);
   app.route("/api/profile", profileRoutes);
   app.route("/api/channels", channelRoutes);
   app.route("/api/locations", locationRoutes);
   app.route("/api/content-audiences", contentAudienceRoutes);
+  app.route("/api/retained-search", retainedSearchRoutes);
+  app.route("/api/references", referenceRoutes);
+  app.route("/api/network", networkRoutes);
   app.route("/api/passwordmanagement", passwordManagementRoutes);
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.

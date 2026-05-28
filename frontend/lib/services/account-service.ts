@@ -8,7 +8,7 @@ import {
   UpdateUserRolesRequest,
   AccountSwitchContext,
   AccountOption,
-  BulkInviteUsersRequest,
+  BulkInviteRequest,
   BulkInviteUsersResponse,
   InvitationDetailsResponse,
   AcceptInvitationResponse,
@@ -127,14 +127,14 @@ class AccountService {
   }
 
   /**
-   * Get invitation details
+   * Get invitation details by the secret invite token (from the email link).
    */
   async getInvitationDetails(
-    invitationId: string,
+    token: string,
   ): Promise<InvitationDetailsResponse> {
     try {
       const response = await apiClient.get<InvitationDetailsResponse>(
-        `/api/account/invitation/${invitationId}`,
+        `/api/account/invitation/by-token/${encodeURIComponent(token)}`,
       );
       return response.data;
     } catch (error) {
@@ -144,14 +144,16 @@ class AccountService {
   }
 
   /**
-   * Accept an invitation to join an account
+   * Accept an invitation to join an account. Requires the caller to be signed
+   * in with the invited email; the token travels in the body.
    */
   async acceptInvitation(
-    invitationId: string,
+    token: string,
   ): Promise<AcceptInvitationResponse> {
     try {
       const response = await apiClient.post<AcceptInvitationResponse>(
-        `/api/account/accept-invitation/${invitationId}`,
+        `/api/account/accept-invitation`,
+        { token },
       );
       return response.data;
     } catch (error) {
@@ -221,7 +223,7 @@ class AccountService {
    * Send bulk invitations to multiple users
    */
   async bulkInviteUsers(
-    request: BulkInviteUsersRequest,
+    request: BulkInviteRequest,
   ): Promise<BulkInviteUsersResponse> {
     try {
       const response = await apiClient.post<BulkInviteUsersResponse>(

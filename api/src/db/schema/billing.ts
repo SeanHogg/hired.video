@@ -167,6 +167,12 @@ export const companySubscriptions = pgTable("company_subscriptions", {
   // Plan tier: "starter" | "team" | "enterprise"
   planTier: varchar("plan_tier", { length: 50 }).default("starter").notNull(),
   seatCount: integer("seat_count").default(1).notNull(),
+  // Authorized paid-seat ceiling the owner has explicitly agreed to pay for.
+  // The seat soft-cap (#1678) blocks an employee invite that would push
+  // committed seats past this until the owner confirms the extra $9.95/seat,
+  // which raises the limit. Distinct from seatCount (the count actually
+  // billed). Default 0 = the first employee seat needs confirmation.
+  seatLimit: integer("seat_limit").default(0).notNull(),
   // Price in cents per seat per month (e.g. 4900 = $49)
   pricePerSeatCents: integer("price_per_seat_cents").default(4900).notNull(),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),

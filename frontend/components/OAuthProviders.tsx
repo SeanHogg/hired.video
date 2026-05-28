@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { readAttribution } from "@/lib/attribution";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL ?? "/api";
 
@@ -57,7 +58,18 @@ export default function OAuthProviders({ mode, redirect = "/dashboard" }: OAuthP
           aria-label={`${verb} ${p.name}`}
           className="w-full flex items-center gap-2 min-h-[44px] px-2 sm:px-4"
           onClick={() => {
-            window.location.href = `${API_BASE}/api/auth/oauth/${p.key}?redirect=${encodeURIComponent(redirect)}`;
+            // Forward captured attribution so OAuth signups credit the
+            // affiliate + persist campaign UTMs the same as password signups
+            // (gap #1683). The API signs these into the OAuth state.
+            const attr = readAttribution();
+            const params = new URLSearchParams({ redirect });
+            if (attr.ref) params.set("ref", attr.ref);
+            if (attr.utmSource) params.set("utm_source", attr.utmSource);
+            if (attr.utmMedium) params.set("utm_medium", attr.utmMedium);
+            if (attr.utmCampaign) params.set("utm_campaign", attr.utmCampaign);
+            if (attr.utmTerm) params.set("utm_term", attr.utmTerm);
+            if (attr.utmContent) params.set("utm_content", attr.utmContent);
+            window.location.href = `${API_BASE}/api/auth/oauth/${p.key}?${params.toString()}`;
           }}
         >
           {p.icon}
