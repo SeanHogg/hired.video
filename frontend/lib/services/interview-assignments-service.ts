@@ -28,6 +28,10 @@ export interface GeneratedQuestion {
 
 export type QuestionStyle = "behavioral" | "technical" | "mixed";
 export type SourceContext = "tool" | "ai-coach" | "career-360" | "pipeline" | "job-screening";
+
+/** Question-count choices offered by every generate surface. The backend
+ *  clamps to 3–10; these are the values we expose in the picker. */
+export const QUESTION_COUNT_OPTIONS = [3, 4, 5, 6, 7, 8, 10] as const;
 export type AssignmentType = "assign" | "invite" | "self" | "screening";
 export type InterviewDecision = "shortlist" | "maybe" | "reject";
 

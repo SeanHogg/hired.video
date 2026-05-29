@@ -26,6 +26,7 @@ import {
   Eye,
   Loader2,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
@@ -54,6 +55,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
+import { useInterviewQuestionGenerator } from "@/hooks/use-interview-question-generator";
 import {
   archiveQuestionSet,
   createQuestionSet,
@@ -61,7 +63,10 @@ import {
   updateQuestionSet,
   type InterviewQuestionSet,
 } from "@/lib/services/interview-question-sets-service";
-import type { GeneratedQuestion } from "@/lib/services/interview-assignments-service";
+import {
+  QUESTION_COUNT_OPTIONS,
+  type GeneratedQuestion,
+} from "@/lib/services/interview-assignments-service";
 import { toast } from "sonner";
 
 interface TemplateDraft {
@@ -299,6 +304,9 @@ function TemplateEditorDialog({
     maxDurationSec: 120,
   });
   const [saving, setSaving] = useState(false);
+  const [genCount, setGenCount] = useState(5);
+  const { generating, error: genError, setError: setGenError, generate } =
+    useInterviewQuestionGenerator();
 
   const totalMinutes = useMemo(
     () => Math.ceil(questions.reduce((sum, q) => sum + (q.maxDurationSec ?? 120), 0) / 60),
@@ -328,16 +336,8 @@ function TemplateEditorDialog({
     setQuestions((qs) => qs.filter((q) => q.id !== id));
   }
 
-  async function handleSave() {
-    if (!title.trim()) {
-      toast.error("Give the template a title");
-      return;
-    }
-    if (questions.length === 0) {
-      toast.error("Add at least one question");
-      return;
-    }
-    const draftPayload: TemplateDraft = {
+  function currentDraft(): TemplateDraft {
+    return {
       title: title.trim(),
       description: description.trim(),
       targetRole: targetRole.trim(),
@@ -347,6 +347,56 @@ function TemplateEditorDialog({
       maxRetakes,
       proctoringOn,
     };
+  }
+
+  async function generateQuestions() {
+    // Generation needs auth (any role); reuse the save bounce so an anon /
+    // wrong-role user snapshots the draft and returns here after signing in.
+    if (!canSave) {
+      onUnauthSave(currentDraft());
+      return;
+    }
+    if (!targetRole.trim()) {
+      const msg = "Enter a target role first — AI questions are generated from it.";
+      setGenError(msg);
+      toast.error(msg);
+      return;
+    }
+    const res = await generate({
+      targetRole: targetRole.trim(),
+      style,
+      count: genCount,
+      sourceContext: "tool",
+    });
+    if (!res) return;
+    if (res.questions.length === 0) {
+      setGenError("Couldn't generate questions for that role. Try a more specific title.");
+      return;
+    }
+    // Re-id on append so a second generate pass can't collide with ids
+    // already in the list, and skip questions whose text we already hold.
+    const seen = new Set(questions.map((q) => q.text.trim().toLowerCase()));
+    const fresh = res.questions
+      .filter((q) => !seen.has(q.text.trim().toLowerCase()))
+      .map((q, i) => ({ ...q, id: `gen-${Date.now()}-${i}` }));
+    if (fresh.length === 0) {
+      toast.info("Those questions are already in the list");
+      return;
+    }
+    setQuestions((qs) => [...qs, ...fresh]);
+    toast.success(`Added ${fresh.length} AI-generated question${fresh.length === 1 ? "" : "s"}`);
+  }
+
+  async function handleSave() {
+    if (!title.trim()) {
+      toast.error("Give the template a title");
+      return;
+    }
+    if (questions.length === 0) {
+      toast.error("Add at least one question");
+      return;
+    }
+    const draftPayload = currentDraft();
     if (!canSave) {
       onUnauthSave(draftPayload);
       return;
@@ -467,8 +517,54 @@ function TemplateEditorDialog({
                 </div>
               ))}
             </div>
+            <div className="rounded-md border border-brand-purple/30 bg-purple-50/50 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-brand-purple" />
+                <Label className="text-xs font-medium">Generate with AI</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Builds skill-tailored questions from the target role
+                {targetRole.trim() ? (
+                  <> (<span className="font-medium text-foreground">{targetRole.trim()}</span>)</>
+                ) : null}{" "}
+                and style above — each is added below so you can edit or remove it.
+              </p>
+              <div className="flex items-center gap-2">
+                <Select value={String(genCount)} onValueChange={(v) => setGenCount(Number(v))}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUESTION_COUNT_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} questions
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={generateQuestions}
+                  disabled={generating}
+                  className="ml-auto gap-1"
+                >
+                  {generating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Generate
+                </Button>
+              </div>
+              {genError && (
+                <Alert variant="destructive" className="py-2">
+                  <AlertDescription className="text-xs">{genError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
             <div className="rounded-md border-dashed border p-3 space-y-2">
-              <Label className="text-xs">Add a question</Label>
+              <Label className="text-xs">Add a question manually</Label>
               <Textarea
                 value={draft.text}
                 onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}

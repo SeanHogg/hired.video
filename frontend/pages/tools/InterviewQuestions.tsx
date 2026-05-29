@@ -53,14 +53,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
+import { useInterviewQuestionGenerator } from "@/hooks/use-interview-question-generator";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import {
   assignInterview,
   buildAICoachPracticeHref,
-  generateInterviewQuestions,
+  QUESTION_COUNT_OPTIONS,
   type ExtractedSkill,
   type GeneratedQuestion,
+  type GenerateRequest,
   type QuestionStyle,
   type SourceContext,
 } from "@/lib/services/interview-assignments-service";
@@ -116,8 +118,7 @@ export default function InterviewQuestions() {
   // resume role even when the user left the targetRole field blank.
   const [resolvedTargetRole, setResolvedTargetRole] = useState<string | null>(null);
   const [sourceDescription, setSourceDescription] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { generating, error, setError, generate } = useInterviewQuestionGenerator();
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   // Snapshot every form field so an anon user who clicks Generate, signs
@@ -188,40 +189,32 @@ export default function InterviewQuestions() {
       return;
     }
 
-    setGenerating(true);
-    try {
-      const payload: Parameters<typeof generateInterviewQuestions>[0] = {
-        style,
-        count,
-        seniority: seniority.trim() || undefined,
-        targetRole: targetRole.trim() || undefined,
-        sourceContext,
-      };
-      if (mode === "resume") {
-        payload.resumeId = resumeId;
-      } else if (mode === "job") {
-        payload.jobId = jobId;
-      } else if (mode === "text") {
-        payload.content = pastedText.trim();
-        payload.sourceType = pastedKind;
-      }
+    const payload: GenerateRequest = {
+      style,
+      count,
+      seniority: seniority.trim() || undefined,
+      targetRole: targetRole.trim() || undefined,
+      sourceContext,
+    };
+    if (mode === "resume") {
+      payload.resumeId = resumeId;
+    } else if (mode === "job") {
+      payload.jobId = jobId;
+    } else if (mode === "text") {
+      payload.content = pastedText.trim();
+      payload.sourceType = pastedKind;
+    }
 
-      const res = await generateInterviewQuestions(payload);
-      setSkills(res.skills);
-      setQuestions(res.questions);
-      setResolvedTargetRole(res.targetRole);
-      setSourceDescription(res.sourceDescription);
-      if (res.questions.length === 0) {
-        setError("Couldn't generate any questions for that input. Try a different source.");
-      } else {
-        clear();
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not generate questions";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setGenerating(false);
+    const res = await generate(payload);
+    if (!res) return;
+    setSkills(res.skills);
+    setQuestions(res.questions);
+    setResolvedTargetRole(res.targetRole);
+    setSourceDescription(res.sourceDescription);
+    if (res.questions.length === 0) {
+      setError("Couldn't generate any questions for that input. Try a different source.");
+    } else {
+      clear();
     }
   }
 
@@ -433,7 +426,7 @@ export default function InterviewQuestions() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[3, 4, 5, 6, 7, 8, 10].map((n) => (
+                  {QUESTION_COUNT_OPTIONS.map((n) => (
                     <SelectItem key={n} value={String(n)}>
                       {n} questions
                     </SelectItem>
