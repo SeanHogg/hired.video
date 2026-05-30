@@ -16,6 +16,7 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 
 export const artifactMetricsRoutes = new Hono<AppEnv>();
 
@@ -146,20 +147,20 @@ async function aggregateViews(args: {
 }
 
 artifactMetricsRoutes.get("/job/:id", async (c) => {
-  const u = uid(c);
-  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [job] = await db
-    .select({ id: schema.jobItems.id, userId: schema.jobItems.userId })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, c.req.param("id")))
-    .limit(1);
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-  if (job.userId !== u) return c.json(error("FORBIDDEN", "Owner only"), 403);
+  const jobId = c.req.param("id");
+  // Per the DRY rule + project_jobs ownership invariant (#438): every
+  // job-management route goes through `requireJobOwner` — it owns the
+  // super-admin + posted-by + company-team-member rules in one place.
+  // The previous inline `userId` check was reading a non-existent
+  // column (`job_items.user_id` doesn't exist; the field is
+  // `postedByUserId`) AND silently denied legitimate company team
+  // members + super-admins.
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
   const metrics = await aggregateViews({
     table: schema.jobViewEvents,
     entityCol: schema.jobViewEvents.jobId,
-    entityId: job.id,
+    entityId: jobId,
   });
   return c.json(success(metrics), 200);
 });
