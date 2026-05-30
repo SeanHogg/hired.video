@@ -363,22 +363,46 @@ function mapDeep(
           return s;
       }
     }
-    // Descend further — the target is nested below this statement.
+    // Descend further. The target is nested below this statement, but
+    // we don't know WHICH of this stmt's buckets contains the next
+    // parent in the chain (an `if-else` has two). Search every bucket
+    // for `rest[0]`; the matching branch recurses, the others pass
+    // through unchanged. Avoids forcing callers to encode per-level
+    // bucket discriminators in the BodyPath.
+    const nextId = rest[0];
     switch (s.kind) {
       case "if":
-        return bucket === "thenBody" ? { ...s, thenBody: mapDeep(s.thenBody, rest, bucket, fn) } : s;
-      case "if-else":
-        if (bucket === "thenBody") return { ...s, thenBody: mapDeep(s.thenBody, rest, bucket, fn) };
-        if (bucket === "elseBody") return { ...s, elseBody: mapDeep(s.elseBody, rest, bucket, fn) };
+        if (containsId(s.thenBody, nextId)) {
+          return { ...s, thenBody: mapDeep(s.thenBody, rest, bucket, fn) };
+        }
         return s;
+      case "if-else": {
+        if (containsId(s.thenBody, nextId)) {
+          return { ...s, thenBody: mapDeep(s.thenBody, rest, bucket, fn) };
+        }
+        if (containsId(s.elseBody, nextId)) {
+          return { ...s, elseBody: mapDeep(s.elseBody, rest, bucket, fn) };
+        }
+        return s;
+      }
       case "repeat-n":
       case "forever":
       case "repeat-until":
-        return { ...s, body: mapDeep(s.body, rest, bucket, fn) };
+        if (containsId(s.body, nextId)) {
+          return { ...s, body: mapDeep(s.body, rest, bucket, fn) };
+        }
+        return s;
       default:
         return s;
     }
   });
+}
+
+function containsId(body: BlockStmt[], id: string): boolean {
+  for (const s of body) {
+    if (s.id === id) return true;
+  }
+  return false;
 }
 
 function walkAndPatch(

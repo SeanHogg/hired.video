@@ -2397,6 +2397,12 @@ export default function StudioEditorV2() {
           onSave={handleSave}
           saving={saving}
           playback={playback}
+          onApplyLayoutBindings={(bindings) => {
+            if (bindings.leftTab === "widgets" || bindings.leftTab === "actions") {
+              setLeftTab(bindings.leftTab);
+            }
+            setAdvancedTimelineOpen(bindings.advancedTimelineOpen);
+          }}
           persistedProjectId={persistedProjectId}
           persistedProject={persistedProject}
           onProjectChange={setPersistedProject}
@@ -3393,6 +3399,7 @@ function EditorHeader({
   onSave,
   saving,
   playback,
+  onApplyLayoutBindings,
   persistedProjectId,
   persistedProject,
   onProjectChange,
@@ -3420,6 +3427,11 @@ function EditorHeader({
   onSave: () => void;
   saving: boolean;
   playback: ReturnType<typeof usePreviewPlayback>;
+  /** Workspace-layout dropdown handler (#349). The header mounts the
+   *  LayoutPresetMenu but defers the actual state flip to the parent
+   *  so setLeftTab + setAdvancedTimelineOpen stay co-located with the
+   *  rest of the editor's state. */
+  onApplyLayoutBindings: (bindings: LayoutBindings) => void;
   persistedProjectId: string | null;
   persistedProject: StudioProject | null;
   onProjectChange: (next: StudioProject) => void;
@@ -3636,20 +3648,10 @@ function EditorHeader({
           project={persistedProject}
           getVideoScript={getVideoScript}
         />
-        {/* Workspace layout presets (#349) — flips leftTab +
-            advancedTimelineOpen between named presets ("Editing",
-            "Color", "Audio", "Preview"). Each value is the consumer's
-            responsibility to map to its own setters; unknown leftTab
-            values are ignored so adding LEFT_TABS entries doesn't
-            require updating the hook. */}
-        <LayoutPresetMenu
-          onApply={(bindings: LayoutBindings) => {
-            if (bindings.leftTab === "widgets" || bindings.leftTab === "actions") {
-              setLeftTab(bindings.leftTab);
-            }
-            setAdvancedTimelineOpen(bindings.advancedTimelineOpen);
-          }}
-        />
+        {/* Workspace layout presets (#349) — the menu is presentational;
+            the parent applies the chosen bindings to its leftTab +
+            advancedTimelineOpen setters. */}
+        <LayoutPresetMenu onApply={onApplyLayoutBindings} />
         {/* Single split-button for the whole project: Save (primary —
             persists draft) + chevron-dropdown with Export MP4, Copy
             link, and Publish (YouTube / LinkedIn / Profile). Replaces

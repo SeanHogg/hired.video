@@ -17,7 +17,9 @@
  * Sprite-swap goes through `assignSpriteAsset` so the new sprite's
  * asset is copied into `state.assets` once (idempotent).
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { ScriptProgram } from "@shared/game-blocks";
+import BlockWorkspace from "@/components/studio/game/blocks/BlockWorkspace";
 import { Gamepad2, Plus, Trash2 } from "lucide-react";
 import {
   PanelShell,
@@ -561,12 +563,11 @@ function SpriteInspector({
       )}
 
       <Section label="Block scripts">
-        <ScriptsEditor
+        <ScriptsTabbed
           gameState={gameState}
           onChange={onChange}
           levelId={levelId}
-          spriteId={sprite.id}
-          rules={sprite.scripts ?? []}
+          sprite={sprite}
         />
       </Section>
 
@@ -786,7 +787,78 @@ function SpritePhysicsForm({
   );
 }
 
-// ─── Block scripts editor ───────────────────────────────────────────────────
+// ─── Block scripts editor — tabbed: Visual blocks (#1007) | Form (#973) ─────
+
+/** Tabbed wrapper that swaps the visual block editor (Scratch-shaped
+ *  block canvas) with the flat-form trigger+actions table (#973).
+ *
+ *  Per the user's spec on #1007: non-coders get the visual block
+ *  surface; advanced authors keep the form view. Both edit the same
+ *  sprite but write to different fields — `scriptProgram` (extended
+ *  AST) vs `scripts` (flat BlockRule[]) — so a sprite can carry both
+ *  and the runtime fires them side-by-side.
+ */
+function ScriptsTabbed({
+  gameState,
+  onChange,
+  levelId,
+  sprite,
+}: {
+  gameState: GameState;
+  onChange: (next: GameState) => void;
+  levelId: string;
+  sprite: GameSprite;
+}) {
+  // Default to "visual" when the sprite already has a scriptProgram, else
+  // "form" to preserve the existing UX for legacy authoring.
+  const [tab, setTab] = useState<"visual" | "form">(
+    sprite.scriptProgram && sprite.scriptProgram.events.length > 0 ? "visual" : "form",
+  );
+  return (
+    <div className="space-y-2">
+      <div className="inline-flex rounded-md border bg-muted/30 p-0.5 text-xs">
+        <button
+          type="button"
+          onClick={() => setTab("visual")}
+          className={cn(
+            "px-2 py-1 rounded transition-colors",
+            tab === "visual" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Visual blocks
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("form")}
+          className={cn(
+            "px-2 py-1 rounded transition-colors",
+            tab === "form" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Form
+        </button>
+      </div>
+      {tab === "visual" ? (
+        <BlockWorkspace
+          program={sprite.scriptProgram}
+          activeLevelId={levelId}
+          gameState={gameState}
+          onChange={(program: ScriptProgram) =>
+            onChange(updateSprite(gameState, levelId, sprite.id, { scriptProgram: program }))
+          }
+        />
+      ) : (
+        <ScriptsEditor
+          gameState={gameState}
+          onChange={onChange}
+          levelId={levelId}
+          spriteId={sprite.id}
+          rules={sprite.scripts ?? []}
+        />
+      )}
+    </div>
+  );
+}
 
 function ScriptsEditor({
   gameState,

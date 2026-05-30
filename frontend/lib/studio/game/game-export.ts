@@ -26,9 +26,14 @@
 
 import JSZip from "jszip";
 import type { GameState } from "@shared/game-state";
-// Vite's `?raw` returns the file source as a string. The file is plain JS
+// Vite's `?raw` returns the file source as a string. Both files are plain JS
 // (no TS-only syntax) precisely so this raw text is browser-runnable.
 import runtimeCoreSource from "./runtime-core.js?raw";
+// Block-interpreter source (gap #1007 — Snap!/Scratch visual-block runtime).
+// runtime-core.js imports from block-interp.js for the editor playtest path;
+// for the exported bundle the import line is stripped and the two files are
+// concatenated into the same IIFE so the exports share closure scope.
+import blockInterpSource from "./block-interp.js?raw";
 
 /** Build a ZIP Blob containing a self-contained playable game. The
  *  caller hands the Blob to the existing download / R2-upload paths
@@ -59,10 +64,19 @@ export function buildStandaloneRuntimeJs(): string {
   // Strip the leading `export ` keywords — the IIFE body lifts each
   // exported declaration into IIFE scope. Source has no re-exports or
   // wildcard exports, so the simple regex is sufficient.
-  const stripped = runtimeCoreSource.replace(/^export\s+/gm, "");
+  const strippedInterp = blockInterpSource.replace(/^export\s+/gm, "");
+  // runtime-core also strips the `import { ... } from "./block-interp.js";`
+  // line — the interp's exports already live in this closure thanks to
+  // the concat above. Multi-line import statements are matched too.
+  const stripped = runtimeCoreSource
+    .replace(/^import\s+[\s\S]*?from\s+["']\.\/block-interp\.js["'];?\s*$/m, "")
+    .replace(/^export\s+/gm, "");
   return (
     "(function(){\n" +
     '"use strict";\n' +
+    // Block interpreter FIRST so runtime-core's calls resolve at parse time.
+    strippedInterp +
+    "\n" +
     stripped +
     "\nwindow.__hiredVideoGame = { runGame: runGame };\n" +
     "})();\n"

@@ -542,6 +542,9 @@ export function runGame(canvas, state, opts) {
   const assetCache = createAssetCache(state.assets || []);
 
   let sprites = mountLevel(level);
+  // Initial seed of the visual-block variable scopes (#1007).
+  seedGlobalVars(state.globalVariables, blockVars);
+  seedScriptVars(sprites, blockVars);
 
   function mountLevel(lvl) {
     const ts = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
@@ -574,6 +577,12 @@ export function runGame(canvas, state, opts) {
     if (!next) return;
     level = next;
     sprites = mountLevel(level);
+    // Reset the block interpreter's `timer` sensing baseline + re-seed
+    // sprite-local variables for the new level's sprites. Globals
+    // survive level changes (Scratch convention).
+    levelMountTs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+    blockVars.spriteVars = new Map();
+    seedScriptVars(sprites, blockVars);
   }
 
   // Per-frame input state.
@@ -620,10 +629,19 @@ export function runGame(canvas, state, opts) {
     }
   };
 
+  // Pointer-move tracking feeds the block interpreter's mouse-x/y sensors
+  // (#1007). Bound on canvas so coords are canvas-relative.
+  const onPointerMove = function (e) {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  };
+
   if (opts.mode === "play") {
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     canvas.addEventListener("click", onClick);
+    canvas.addEventListener("pointermove", onPointerMove);
   }
 
   let rafId = 0;
@@ -635,26 +653,46 @@ export function runGame(canvas, state, opts) {
     if (opts.mode === "play") {
       // 1. Block-script triggers — fire in this order so on-mount
       //    actions land before the first tick's on-tick / every-N.
-      const scriptCtx = { gotoLevel: gotoLevel, now: ts };
+      // The block interpreter (gap #1007) gets a richer ctx than the
+      // flat-rule runtime — mouse, heldKeys, sprite-id map, variable
+      // scopes, and a broadcast queue. The flat-rule runtime ignores
+      // these extra fields safely so the same object serves both.
+      const spritesById = new Map();
+      for (let i = 0; i < sprites.length; i++) spritesById.set(sprites[i].source.id, sprites[i]);
+      const scriptCtx = {
+        gotoLevel: gotoLevel,
+        now: ts,
+        levelMountTs: levelMountTs,
+        mouse: mouse,
+        heldKeys: keys,
+        spritesById: spritesById,
+        spriteVars: blockVars.spriteVars,
+        globalVars: blockVars.globalVars,
+        broadcast: function (name) { pendingBroadcasts.push(name); },
+      };
       for (let i = 0; i < sprites.length; i++) {
         const s = sprites[i];
         // on-level-mount: once per sprite per mount.
         if (!s.hasFiredOnMount) {
           fireRules(s, "on-level-mount", null, scriptCtx);
+          fireProgramEvents(s, "on-level-mount", null, scriptCtx);
           s.hasFiredOnMount = true;
         }
         // on-tick: every frame.
         fireRules(s, "on-tick", null, scriptCtx);
+        fireProgramEvents(s, "on-tick", null, scriptCtx);
         // on-key-press: any keys that transitioned this frame.
         if (keyPressed.size > 0) {
           const keysArr = Array.from(keyPressed);
           for (let k = 0; k < keysArr.length; k++) {
             fireRules(s, "on-key-press", { key: keysArr[k] }, scriptCtx);
+            fireProgramEvents(s, "on-key-press", { key: keysArr[k] }, scriptCtx);
           }
         }
         // on-click: sprite was clicked this frame.
         if (clickedSpriteIds.has(s.source.id)) {
           fireRules(s, "on-click", null, scriptCtx);
+          fireProgramEvents(s, "on-click", null, scriptCtx);
         }
         // every-seconds: per-rule interval timer.
         const scripts = s.source.scripts;
@@ -669,6 +707,36 @@ export function runGame(canvas, state, opts) {
               executeActions(s, rule.actions, scriptCtx);
               s.everySecondsLastFiredTs[rule.id] = ts;
             }
+          }
+        }
+        // Program-side every-seconds — interval handler. Track lastFiredTs
+        // on the sprite keyed by event-handler id so each handler ticks
+        // independently.
+        const program = s.source.scriptProgram;
+        if (program && program.events) {
+          for (let h = 0; h < program.events.length; h++) {
+            const handler = program.events[h];
+            if (handler.event.kind !== "every-seconds") continue;
+            if (!s.programEverySecondsLastFiredTs) s.programEverySecondsLastFiredTs = {};
+            const last = s.programEverySecondsLastFiredTs[handler.id] != null
+              ? s.programEverySecondsLastFiredTs[handler.id]
+              : s.mountTs;
+            if ((ts - last) / 1000 >= handler.event.interval) {
+              executeStmts(s, handler.body, scriptCtx);
+              s.programEverySecondsLastFiredTs[handler.id] = ts;
+            }
+          }
+        }
+      }
+      // Drain broadcasts collected during this tick → fire on-receive
+      // handlers across every sprite. Reset the queue immediately so a
+      // broadcast from an on-receive handler doesn't recurse-loop within
+      // the same tick (next tick picks it up).
+      if (pendingBroadcasts.length > 0) {
+        const drained = pendingBroadcasts.splice(0, pendingBroadcasts.length);
+        for (let b = 0; b < drained.length; b++) {
+          for (let i = 0; i < sprites.length; i++) {
+            fireProgramEvents(sprites[i], "on-receive", { name: drained[b] }, scriptCtx);
           }
         }
       }
