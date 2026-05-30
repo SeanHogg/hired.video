@@ -62,9 +62,19 @@ ALTER TABLE placements
   ALTER COLUMN fee_mode SET DEFAULT 'percent',
   ALTER COLUMN fee_mode SET NOT NULL;
 
-ALTER TABLE placements
-  ADD CONSTRAINT placements_fee_mode_chk
-  CHECK (fee_mode IN ('flat', 'percent'));
+-- ADD CONSTRAINT gated by pg_constraint per TEMPLATE.md rule #2;
+-- NOT VALID per rule #5 so existing rows aren't validated mid-migration
+-- (the UPDATE above + the SET DEFAULT/NOT NULL above guarantee every
+-- row is already in the allowed set, but the runner's idempotency
+-- contract is what the rule protects).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'placements_fee_mode_chk') THEN
+    ALTER TABLE placements
+      ADD CONSTRAINT placements_fee_mode_chk
+      CHECK (fee_mode IN ('flat', 'percent')) NOT VALID;
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- #809 — paid extra inbox slots above the 3 included with Pro
