@@ -21,7 +21,7 @@ import { getDb, schema } from "../db/index.js";
 import { success, error } from "../types/index.js";
 import type { AppEnv } from "../types/index.js";
 import { generateCourse, CourseGenInputSchema } from "../services/courses/course-generator.js";
-import { createLLMClient } from "../services/adapters/llm-client.js";
+import { createLLMClient, toClientUsage } from "../services/adapters/llm-client.js";
 import { connectorFor } from "../services/lms/index.js";
 import { LMS_PROVIDERS } from "../db/schema/courses.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
@@ -48,7 +48,7 @@ courseAuthoringRoutes.post("/generate", async (c) => {
   const llm = createLLMClient(env, c.var.user ?? null);
   try {
     const result = await generateCourse({ llm, input: parsed.data });
-    return c.json(success({ course: result.data, usage: result.usage }), 200);
+    return c.json(success({ course: result.data, usage: toClientUsage(result.usage) }), 200);
   } catch (e) {
     return c.json(error("GENERATOR_FAILED", e instanceof Error ? e.message : String(e)), 500);
   }

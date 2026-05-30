@@ -130,8 +130,43 @@ export interface LLMUsage {
   totalTokens: number;
   /** Model that actually answered. Surfaced via
    *  `_builderforce.resolvedModel`; may differ from the requested
-   *  model when the gateway substituted on cooldown / outage. */
+   *  model when the gateway substituted on cooldown / outage.
+   *  SA-only telemetry — never echo to consumers (use `toClientUsage`). */
   model: string;
+  /** Gateway trace id (`llm-…`) for this call — `_builderforce.traceId`
+   *  (Builderforce SDK ≥0.8.1). The ONLY diagnostic identifier safe to
+   *  surface to consumers: quoting it to Builderforce support pulls up
+   *  full server-side diagnostics (every model attempt, every exception,
+   *  request/response bodies) while the detail itself stays builder-side.
+   *  Undefined for the no-key mock path and older gateway responses. */
+  traceId?: string;
+}
+
+/** Consumer-facing projection of {@link LLMUsage}. Token counts plus the
+ *  gateway `traceId` — and deliberately NOT `model`/vendor, which is
+ *  SuperAdmin-only telemetry that must never leak to end users. Single
+ *  source of truth for "what usage fields an API response may echo back",
+ *  so every route applies the same privacy rule and the same traceId
+ *  field instead of hand-spreading `usage` (which leaks `model`). */
+export interface ClientUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Gateway trace id (`llm-…`). Quote to support for full diagnostics. */
+  traceId?: string;
+}
+
+/** Map an internal {@link LLMUsage} to the consumer-safe {@link ClientUsage}
+ *  shape. Strips `model` (SA-only) and carries `traceId` through. Use this
+ *  at every route that returns usage to a client — never spread `usage`
+ *  directly. */
+export function toClientUsage(usage: LLMUsage): ClientUsage {
+  return {
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    ...(usage.traceId ? { traceId: usage.traceId } : {}),
+  };
 }
 
 export interface LLMResult {
@@ -505,12 +540,14 @@ function normalizeUsage(
   raw: ChatCompletionResponse["usage"],
   requestedModel: string,
   resolvedModel: string | undefined,
+  traceId: string | undefined,
 ): LLMUsage {
   return {
     promptTokens: raw?.prompt_tokens ?? 0,
     completionTokens: raw?.completion_tokens ?? 0,
     totalTokens: raw?.total_tokens ?? 0,
     model: resolvedModel ?? requestedModel,
+    ...(traceId ? { traceId } : {}),
   };
 }
 
@@ -736,6 +773,7 @@ export function createLLMClient(
           res.usage,
           profile.model,
           res._builderforce?.resolvedModel ?? res.model,
+          res._builderforce?.traceId,
         );
         // #515 — silent substitution alarm. The gateway docs (SDK 0.4.0)
         // treat `model` as a hint and reserve the right to substitute on

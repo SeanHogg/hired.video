@@ -17,7 +17,7 @@
 import { z } from "zod";
 import { STUDIO_PURPOSES } from "../../../../shared/studio-purposes.js";
 import { SCENE_TYPES } from "../../../../shared/scene-types.js";
-import type { LLMClient } from "../adapters/llm-client.js";
+import type { LLMClient, LLMUsage } from "../adapters/llm-client.js";
 
 export const CourseGenInputSchema = z.object({
   topic: z.string().min(4).max(280),
@@ -96,7 +96,7 @@ function buildUserMessage(input: CourseGenInput): string {
 export async function generateCourse(args: {
   llm: LLMClient;
   input: CourseGenInput;
-}): Promise<{ data: GeneratedCourse; usage: { promptTokens?: number; completionTokens?: number } }> {
+}): Promise<{ data: GeneratedCourse; usage: LLMUsage }> {
   if (!STUDIO_PURPOSES.includes("course_lesson")) {
     // Defensive: if someone removes the purpose enum entry without
     // updating this file, the storyboard generator won't have a system-

@@ -229,6 +229,10 @@ aiRoutes.post("/chat", async (c) => {
   let responseToolCalls: ToolCall[] = [];
   let promptTokens = 0;
   let completionTokens = 0;
+  // Gateway trace id (`llm-…`) for this completion — echoed back so the
+  // client/support can quote it for server-side diagnostics. Undefined on
+  // the mock fallback path (no gateway call was made).
+  let traceId: string | undefined;
 
   if (hasAnyLLMProviderKey(c.env as any)) {
     try {
@@ -268,6 +272,7 @@ aiRoutes.post("/chat", async (c) => {
       responseToolCalls = result.toolCalls;
       promptTokens = result.usage.promptTokens;
       completionTokens = result.usage.completionTokens;
+      traceId = result.usage.traceId;
     } catch {
       const mock = generateMockResponse(userMessage || "");
       responseMessage = mock.message;
@@ -304,7 +309,7 @@ aiRoutes.post("/chat", async (c) => {
       message: responseMessage,
       sessionId,
       toolCalls: responseToolCalls.length > 0 ? responseToolCalls : undefined,
-      usage: { promptTokens, completionTokens, totalTokens },
+      usage: { promptTokens, completionTokens, totalTokens, ...(traceId ? { traceId } : {}) },
     }),
     200,
   );

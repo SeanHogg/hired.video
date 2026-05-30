@@ -68,7 +68,12 @@ const STATIC_PAGES = [
 ];
 
 sitemapRoutes.get("/sitemap.xml", async (c) => {
-  const db = getDb(c.env as any);
+  // getDb() takes a connection-string, not the Hono env object. Passing
+  // `c.env` made neon() receive `[object Object]` and 500 the public
+  // sitemap in every runtime (Workers `c.env` is always an object). Call
+  // with no arg so it resolves DATABASE_URL the same way every other route
+  // does (process.env → globalThis.__ENV).
+  const db = getDb();
   const now = new Date().toISOString();
 
   // Fetch dynamic content (limit to recent 500 of each to keep sitemap manageable)
