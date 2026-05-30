@@ -4,6 +4,7 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import { eq, and, desc, inArray, sum, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { enrichAndAudit } from "../services/enrichment/index.js";
 
 export const advertisingRoutes = new Hono<AppEnv>();
 
@@ -547,21 +548,24 @@ advertisingRoutes.post("/enrichment/enrich", async (c) => {
     description: `Contact enrichment: ${email ?? name}`,
   } as any);
 
-  // TODO: Call PeopleDataLabs/Hunter.io API when ENRICHMENT_API_KEY is configured
-  // For now return a stub response indicating enrichment was requested
-  const enriched = {
-    email: email ?? null,
-    name: name ?? null,
-    company: company ?? null,
-    linkedInUrl: null,
-    phone: null,
-    title: null,
-    enriched: false, // will be true when API key is configured
+  // #96 — dispatch to the active provider behind the EnrichmentProvider
+  // interface. The default NullEnrichmentProvider keeps the existing
+  // behaviour (stub response) but every call is now audited to
+  // enrichment_provider_calls regardless of upstream choice, so SA can
+  // see provider drift before it becomes a billing leak.
+  const enrichedResult = await enrichAndAudit(userId, {
+    email,
+    name,
+    company,
+    domain: company,
+  }, 1);
+  return c.json(ok({
+    ...enrichedResult,
     creditsRemaining: newBalance,
-    message: "Enrichment API key not yet configured. Data will populate once ENRICHMENT_API_KEY is set.",
-  };
-
-  return c.json(ok(enriched));
+    message: enrichedResult.enriched
+      ? null
+      : "Enrichment provider not yet configured. Data will populate once ENRICHMENT_PROVIDER is set to a real provider implementation.",
+  }));
 });
 
 // ─── Advertising Analytics Dashboard (gap #111) ───────────────────────────────

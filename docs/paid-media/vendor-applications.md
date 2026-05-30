@@ -264,3 +264,36 @@ These come up across multiple platforms — answer once, reuse:
 **"Do you charge customers for ad spend?"**
 > No. Customers pay each platform directly using their own billing setup. We
 > never proxy spend.
+
+---
+
+## Submission Status Tracker (gap-register #984)
+
+This is the live tracker for the five Standard / Advanced access reviews. Each
+submission's review SLA is set by the platform (typically 1–6 weeks) and
+CANNOT be sped up by code; the only work here is keeping reviewers in front
+of accurate materials and answering follow-up questions promptly.
+
+Update the rows below as submissions land. Once all five reach `approved` the
+register entry can flip to ✅ Done.
+
+| Code | Platform | Submitted | Status | Reviewer / Ticket | Notes |
+|------|----------|-----------|--------|-------------------|-------|
+| PM-VENDOR-META    | Meta Marketing API (Standard Access)         | _pending_ | `unsubmitted` | — | Business Verification must complete first. |
+| PM-VENDOR-GOOGLE  | Google Ads Developer Token                   | _pending_ | `unsubmitted` | — | Test account credentials prepared. |
+| PM-VENDOR-LINKEDIN| LinkedIn Marketing Developer Platform        | _pending_ | `unsubmitted` | — | Internal Marketing Developer Platform application. |
+| PM-VENDOR-TIKTOK  | TikTok Marketing API                          | _pending_ | `unsubmitted` | — | Awaiting TikTok For Business app review enrolment. |
+| PM-VENDOR-BING    | Microsoft Advertising Developer Token        | _pending_ | `unsubmitted` | — | One developer token per app; submit after Google. |
+
+Per-submission worksheet — fill in as we go:
+
+- **Date submitted:** ISO 8601
+- **Reviewer SLA:** value pulled from each platform's docs at submission time
+- **Outcome:** `approved` | `denied` | `additional_info_requested`
+- **Date resolved:** ISO 8601
+- **Notes / follow-ups:** free text
+
+When a submission is denied or asks for additional information, capture the
+verbatim reviewer message + our response here so the next person doesn't have
+to re-derive context.
+

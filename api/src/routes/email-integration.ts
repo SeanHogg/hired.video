@@ -47,6 +47,7 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { loadConsumed } from "../domains/services-processing/services-processor.js";
 import { getEntitlement } from "../domains/services-processing/entitlement-catalog.js";
+import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
 
 function getEnv(key: string): string {
   return process.env[key] || (globalThis as any).__ENV?.[key] || "";
@@ -117,11 +118,12 @@ async function checkInboxSyncEntitlement(
   if (!sub.isPro) {
     return { ok: false, redirect: "/pricing?upgrade=inbox-sync" };
   }
-  // Cap + consumed count both come from the catalog dispatcher — same
-  // seam `gate()` uses for every other entitlement, so the included-3
-  // value lives in exactly one place (`shared/pricing.ts` →
-  // entitlement-catalog → here).
-  const cap = getEntitlement("email_account").monthlyCap.pro;
+  // Cap = catalog default (INBOX_SYNC_INCLUDED_ACCOUNTS) + any extra
+  // inbox-seat addons the user has purchased (#809). Consumed count
+  // comes from the same catalog dispatcher `gate()` uses.
+  const baseCap = getEntitlement("email_account").monthlyCap.pro;
+  const addonState = await inboxSeatAddonService.getState(userId);
+  const cap = baseCap + addonState.quantity;
   const consumed = await loadConsumed(userId, "email_account");
   if (consumed < cap) return { ok: true };
   if (skipIfExisting) {

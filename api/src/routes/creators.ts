@@ -44,6 +44,7 @@ import { isCreatorVisible } from "../services/creators/visibility.js";
 import { hasAcceptedCurrentLegalDoc } from "./legal.js";
 import { encryptTaxId } from "../services/payout/encryption.js";
 import { payoutLedgerService } from "../services/payout/PayoutLedgerService.js";
+import { getESignConnector } from "../services/workforce/connectors/index.js";
 import {
   CREATOR_PROGRAMS,
   PROGRAM_TERMS_KIND,
@@ -522,6 +523,98 @@ creatorRoutes.patch("/me/payout-profile", async (c) => {
     .returning();
 
   return c.json(success(payoutRowToDTO(updated)), 200);
+});
+
+// ---------------------------------------------------------------------------
+// #310 — Hosted W-9 / W-8 e-signature envelope.
+//
+//   POST /api/creators/me/payout-profile/tax-form-envelope
+//     body: { recipientName?, recipientEmail? }   (defaults from row)
+//
+// Routes through the same workforce ESignConnector registry used for
+// I-9 / contractor envelopes — flipping providers (DocuSign / Anvil /
+// Dropbox Sign) is a one-file edit. On success, persists envelope_id
+// to `tax_form_document_ref` and stamps `tax_form_submitted_at` so the
+// dashboard can render "W-9 on file (DocuSign)" without re-querying
+// the provider.
+//
+// The current `tax_form_type` is required — derived from
+// (entityType × residency) at PATCH time. Without a derived form type
+// the route returns 400 instead of guessing.
+// ---------------------------------------------------------------------------
+creatorRoutes.post("/me/payout-profile/tax-form-envelope", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+
+  const db = getDb();
+  const [profile] = await db
+    .select()
+    .from(payoutProfiles)
+    .where(eq(payoutProfiles.userId, userId))
+    .limit(1);
+  if (!profile) {
+    return c.json(error("VALIDATION_ERROR", "Create your payout profile before requesting the tax-form envelope"), 400);
+  }
+  if (!profile.taxFormType) {
+    return c.json(error("VALIDATION_ERROR", "Save entity type + residency first so we know which form (W-9 / W-8BEN / etc.) to send"), 400);
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as { recipientEmail?: string; recipientName?: string };
+  const recipientName =
+    body.recipientName?.trim() ||
+    profile.legalName?.trim() ||
+    profile.businessLegalName?.trim() ||
+    null;
+  if (!recipientName) {
+    return c.json(error("VALIDATION_ERROR", "recipientName is required (or save legalName on the payout profile)"), 400);
+  }
+
+  const [meUser] = await db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const recipientEmail = body.recipientEmail?.trim() || meUser?.email || null;
+  if (!recipientEmail) {
+    return c.json(error("VALIDATION_ERROR", "recipientEmail is required"), 400);
+  }
+
+  const env = getEnv(c);
+  const connector = getESignConnector(env.ESIGN_PROVIDER ?? null);
+  const envelope = await connector.createEnvelope({
+    documentId: `payout-profile:${profile.id}:${profile.taxFormType}`,
+    documentKind: profile.taxFormType, // 'w9' | 'w8ben' | 'w8eci' | 'w8imy' …
+    recipientEmail,
+    recipientName,
+    templateRef: env[`ESIGN_TEMPLATE_${profile.taxFormType.toUpperCase()}`] ?? undefined,
+  });
+
+  if (!envelope.ok || !envelope.envelopeId) {
+    return c.json(error("ESIGN_FAILED", envelope.error ?? "E-signature provider rejected envelope"), 502);
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(payoutProfiles)
+    .set({
+      taxFormDocumentRef: envelope.envelopeId,
+      taxFormSubmittedAt: profile.taxFormSubmittedAt ?? now,
+      updatedAt: now,
+    })
+    .where(eq(payoutProfiles.userId, userId))
+    .returning();
+
+  return c.json(
+    success({
+      envelopeId: envelope.envelopeId,
+      signingUrl: envelope.signingUrl ?? null,
+      provider: connector.name,
+      taxFormType: updated.taxFormType,
+      taxFormDocumentRef: updated.taxFormDocumentRef,
+      taxFormSubmittedAt: updated.taxFormSubmittedAt?.toISOString() ?? null,
+    }),
+    201,
+  );
 });
 
 // GET /browse — public discovery list

@@ -34,6 +34,7 @@ export type LedgerSourceKind =
   | "service_order"
   | "course_enrollment"
   | "article_pool_distribution"
+  | "article"                     // #896 Article engagement payout (per-article)
   | "timesheet";                  // Workforce contractor pay (#1349 Phase 3)
 
 export interface RecordAccrualInput {

@@ -129,6 +129,12 @@ export const placements = pgTable("placements", {
   status: varchar("status", { length: 50 }).default("active").notNull(),
   commissionPercentage: numeric("commission_percentage").default("0").notNull(),
   commissionAmount: numeric("commission_amount").default("0").notNull(),
+  /** #227 — explicit fee-mode discriminator. 'flat' reads `feeFlatCents`;
+   *  'percent' reads `feePercentBps` × `annualSalary`. Backfilled from
+   *  legacy commission_amount/commission_percentage in migration 0178. */
+  feeMode: varchar("fee_mode", { length: 8 }).default("percent").notNull(),
+  feeFlatCents: integer("fee_flat_cents"),
+  feePercentBps: integer("fee_percent_bps"),
   commissionStatus: varchar("commission_status", { length: 50 }).default("Pending").notNull(),
   commissionPaidDate: timestamp("commission_paid_date", { withTimezone: true }),
   paymentReference: varchar("payment_reference", { length: 255 }),

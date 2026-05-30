@@ -74,3 +74,4 @@ export * from "./liveScreening.js";
 export * from "./compliance.js";
 export * from "./workforce.js";
 export * from "./companyIntegrations.js";
+export * from "./gapExtensions.js";

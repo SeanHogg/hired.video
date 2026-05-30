@@ -15,6 +15,10 @@ import {
 	FOLLOWUP_DEFAULTS,
 	type AgentCriteria,
 } from "../services/recruiter/agent-intake.js";
+import {
+	resolvePlacementFeeCents,
+	deriveLegacyCommissionFields,
+} from "../services/recruiter/placement-fee.js";
 
 export const recruiterRoutes = new Hono<AppEnv>();
 
@@ -73,6 +77,17 @@ function rowToInteraction(row: InteractionRow) {
 }
 
 function rowToPlacement(row: PlacementRow) {
+	const annualSalaryDollars = row.annualSalary != null
+		? Number(row.annualSalary)
+		: (row.salary != null ? Number(row.salary) : 0);
+	const resolved = resolvePlacementFeeCents({
+		feeMode: row.feeMode,
+		feeFlatCents: row.feeFlatCents,
+		feePercentBps: row.feePercentBps,
+		annualSalaryDollars,
+		legacyCommissionAmountDollars: row.commissionAmount,
+		legacyCommissionPercentage: row.commissionPercentage,
+	});
 	return {
 		id: row.id,
 		submissionId: row.submissionId ?? null,
@@ -84,7 +99,11 @@ function rowToPlacement(row: PlacementRow) {
 		jobTitle: row.jobTitle ?? "",
 		companyName: row.companyName ?? "",
 		startDate: row.startDate?.toISOString() ?? null,
-		annualSalary: row.annualSalary != null ? Number(row.annualSalary) : (row.salary != null ? Number(row.salary) : 0),
+		annualSalary: annualSalaryDollars,
+		feeMode: resolved.mode,
+		feeCents: resolved.cents,
+		feeFlatCents: row.feeFlatCents ?? null,
+		feePercentBps: row.feePercentBps ?? null,
 		commissionPercentage: Number(row.commissionPercentage) || 0,
 		commissionAmount: Number(row.commissionAmount) || 0,
 		commissionStatus: row.commissionStatus,
@@ -96,6 +115,44 @@ function rowToPlacement(row: PlacementRow) {
 		notes: row.notes ?? null,
 		placedAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
+	};
+}
+
+interface IncomingPlacementFee {
+	feeMode?: "flat" | "percent" | string | null;
+	feeFlatCents?: number | string | null;
+	feePercentBps?: number | string | null;
+	commissionPercentage?: number | string | null;
+	annualSalary?: number | string | null;
+}
+
+function deriveFeeFieldsFromBody(body: IncomingPlacementFee) {
+	const annualSalary = Number(body.annualSalary ?? 0) || 0;
+	const incomingMode: "flat" | "percent" = body.feeMode === "flat" ? "flat" : "percent";
+	const resolved = resolvePlacementFeeCents({
+		feeMode: incomingMode,
+		feeFlatCents: body.feeFlatCents != null ? Number(body.feeFlatCents) : null,
+		feePercentBps: body.feePercentBps != null ? Number(body.feePercentBps) : null,
+		annualSalaryDollars: annualSalary,
+		legacyCommissionAmountDollars: null,
+		// Legacy: if a client still sends commissionPercentage, treat it as
+		// a percent input so old integrations keep working unchanged.
+		legacyCommissionPercentage: body.commissionPercentage,
+	});
+	const legacy = deriveLegacyCommissionFields(resolved, annualSalary);
+	return {
+		feeMode: resolved.mode,
+		feeFlatCents: resolved.mode === "flat" ? resolved.cents : null,
+		feePercentBps:
+			resolved.mode === "percent"
+				? (body.feePercentBps != null
+					? Math.max(0, Math.round(Number(body.feePercentBps)))
+					: (annualSalary > 0
+						? Math.round((resolved.cents / (annualSalary * 100)) * 10_000)
+						: 0))
+				: null,
+		commissionPercentage: legacy.commissionPercentage,
+		commissionAmount: legacy.commissionAmount,
 	};
 }
 
@@ -425,9 +482,8 @@ recruiterRoutes.post("/placements", async (c) => {
 		}
 	}
 
-	const commissionPct = Number(body.commissionPercentage ?? 0);
 	const annualSalary = Number(body.annualSalary ?? 0);
-	const commissionAmount = Number(((annualSalary * commissionPct) / 100).toFixed(2));
+	const feeFields = deriveFeeFieldsFromBody(body);
 
 	let guaranteeEndDate: Date | null = null;
 	if (body.startDate && body.guaranteePeriodDays) {
@@ -446,8 +502,11 @@ recruiterRoutes.post("/placements", async (c) => {
 		submissionId: body.submissionId ?? null,
 		startDate: body.startDate ? new Date(body.startDate) : null,
 		annualSalary: annualSalary || null,
-		commissionPercentage: String(commissionPct),
-		commissionAmount: String(commissionAmount),
+		feeMode: feeFields.feeMode,
+		feeFlatCents: feeFields.feeFlatCents,
+		feePercentBps: feeFields.feePercentBps,
+		commissionPercentage: feeFields.commissionPercentage,
+		commissionAmount: feeFields.commissionAmount,
 		commissionStatus: "Pending",
 		guaranteePeriodDays: body.guaranteePeriodDays ?? null,
 		guaranteeEndDate,
@@ -487,9 +546,8 @@ recruiterRoutes.post("/placements/bulk", async (c) => {
 		.limit(1);
 
 	const rows = body.placements.map((p: any) => {
-		const commissionPct = Number(p.commissionPercentage ?? 0);
 		const annualSalary = Number(p.annualSalary ?? 0);
-		const commissionAmount = Number(((annualSalary * commissionPct) / 100).toFixed(2));
+		const feeFields = deriveFeeFieldsFromBody(p);
 		let guaranteeEndDate: Date | null = null;
 		if (p.startDate && p.guaranteePeriodDays) {
 			guaranteeEndDate = new Date(p.startDate);
@@ -506,8 +564,11 @@ recruiterRoutes.post("/placements/bulk", async (c) => {
 			submissionId: p.submissionId ?? null,
 			startDate: p.startDate ? new Date(p.startDate) : null,
 			annualSalary: annualSalary || null,
-			commissionPercentage: String(commissionPct),
-			commissionAmount: String(commissionAmount),
+			feeMode: feeFields.feeMode,
+			feeFlatCents: feeFields.feeFlatCents,
+			feePercentBps: feeFields.feePercentBps,
+			commissionPercentage: feeFields.commissionPercentage,
+			commissionAmount: feeFields.commissionAmount,
 			commissionStatus: "Pending",
 			guaranteePeriodDays: p.guaranteePeriodDays ?? null,
 			guaranteeEndDate,

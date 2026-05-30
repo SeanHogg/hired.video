@@ -86,6 +86,20 @@ function helcimBillingAddress(addr: BillingAddress) {
 // Helcim API helpers
 // ---------------------------------------------------------------------------
 
+/** Shape returned by `GET /v2/customers/{code}/cards`. Helcim's docs are
+ *  light here — fields are accepted optionally so the parser doesn't
+ *  fight a future schema tweak. Only used inside `lookupCardExpiry`. */
+interface HelcimStoredCard {
+  cardToken?: string;
+  cardType?: string;        // "VISA" | "MC" | …
+  brand?: string;
+  cardNumberLast4?: string;
+  last4?: string;
+  cardExpiry?: string;      // "MM/YY" or "MM/YYYY"
+  cardExpiryMonth?: number | string;
+  cardExpiryYear?: number | string;
+}
+
 const HELCIM_API_BASE = "https://api.helcim.com/v2";
 const HELCIM_PAY_JS = "https://secure.helcim.app/helcim-pay/services/start.js";
 const HELCIM_JS_SCRIPT = "https://secure.myhelcim.com/js/version2.js";
@@ -320,25 +334,107 @@ export class HelcimPaymentProvider implements PaymentProvider {
   }
 
   async savePaymentMethod(
-    _customerId: string,
+    customerId: string,
     providerPaymentMethodId: string,
     _setDefault = false,
     hint?: CollectedPaymentMethodHint,
   ): Promise<SavedPaymentMethod> {
-    // In Helcim the "payment method ID" is a cardToken returned via
-    // HelcimPay's success postMessage. Helcim has no public /cards/{token}
-    // lookup, so we trust the masked metadata HelcimPay reported (cardType,
-    // last4 of cardNumber, expiry). The route layer is responsible for
-    // forwarding those fields as `hint` so the saved row has enough info
-    // to render in Settings → Payment Methods.
+    // #386 — Capture expiry. Source priority:
+    //   1. `hint.expiryMonth/Year` from HelcimPay's success postMessage
+    //      (preferred — already in-flight, no extra call).
+    //   2. Per-customer card listing fallback: `GET /v2/customers/{code}/cards`
+    //      and find the row matching this cardToken or last4. This is the
+    //      "ask Helcim what they know" path the gap entry suggested.
+    // The fallback is best-effort; if Helcim still doesn't return expiry
+    // we land with "Expires —/—" as before instead of failing the save.
+    let expiryMonth = hint?.expiryMonth;
+    let expiryYear = hint?.expiryYear;
+    let brand = hint?.brand;
+    let last4 = hint?.last4;
+
+    const needsLookup = !expiryMonth || !expiryYear;
+    if (needsLookup && customerId.startsWith("CST")) {
+      const fallback = await this.lookupCardExpiry(customerId, providerPaymentMethodId, last4);
+      if (fallback) {
+        expiryMonth = expiryMonth ?? fallback.expiryMonth;
+        expiryYear = expiryYear ?? fallback.expiryYear;
+        brand = brand ?? fallback.brand;
+        last4 = last4 ?? fallback.last4;
+      }
+    }
+
     return {
       providerPaymentMethodId,
       type: hint?.type ?? "card",
-      brand: hint?.brand,
-      last4: hint?.last4,
-      expiryMonth: hint?.expiryMonth,
-      expiryYear: hint?.expiryYear,
+      brand,
+      last4,
+      expiryMonth,
+      expiryYear,
     };
+  }
+
+  /** #386 — ask Helcim for the customer's stored cards and return the
+   *  one that matches our cardToken or the supplied last-4. Returns
+   *  null on any provider error so the save flow keeps working. */
+  private async lookupCardExpiry(
+    customerCode: string,
+    cardToken: string,
+    last4?: string,
+  ): Promise<
+    | { expiryMonth?: number; expiryYear?: number; brand?: string; last4?: string }
+    | null
+  > {
+    try {
+      // Helcim's customer-cards endpoint returns either a `cards` array or
+      // a paged `{ data: [...] }` shape. We tolerate both.
+      const raw = await helcimRequest<
+        | Array<HelcimStoredCard>
+        | { data?: Array<HelcimStoredCard>; cards?: Array<HelcimStoredCard> }
+      >(this.config, "GET", `/customers/${customerCode}/cards`);
+      const cards: Array<HelcimStoredCard> = Array.isArray(raw)
+        ? raw
+        : raw?.cards ?? raw?.data ?? [];
+      if (cards.length === 0) return null;
+
+      // Best match: cardToken; fallback: last4.
+      const byToken = cards.find((c) => c.cardToken === cardToken);
+      const byLast4 =
+        !byToken && last4 ? cards.find((c) => c.cardNumberLast4 === last4 || c.last4 === last4) : undefined;
+      const card = byToken ?? byLast4 ?? cards[cards.length - 1]; // most recently added is usually last
+      if (!card) return null;
+
+      let expiryMonth: number | undefined;
+      let expiryYear: number | undefined;
+      const expRaw =
+        card.cardExpiry ??
+        (card.cardExpiryMonth && card.cardExpiryYear
+          ? `${String(card.cardExpiryMonth).padStart(2, "0")}/${String(card.cardExpiryYear).slice(-2)}`
+          : undefined);
+      if (expRaw && /^\d{2}\/\d{2,4}$/.test(expRaw)) {
+        const [mm, yy] = expRaw.split("/");
+        const mn = Number.parseInt(mm, 10);
+        const yn = Number.parseInt(yy.length === 2 ? `20${yy}` : yy, 10);
+        if (Number.isInteger(mn)) expiryMonth = mn;
+        if (Number.isInteger(yn)) expiryYear = yn;
+      } else if (card.cardExpiryMonth && card.cardExpiryYear) {
+        const mn = typeof card.cardExpiryMonth === "number"
+          ? card.cardExpiryMonth
+          : Number.parseInt(String(card.cardExpiryMonth), 10);
+        const yyStr = String(card.cardExpiryYear);
+        const yn = Number.parseInt(yyStr.length === 2 ? `20${yyStr}` : yyStr, 10);
+        if (Number.isInteger(mn)) expiryMonth = mn;
+        if (Number.isInteger(yn)) expiryYear = yn;
+      }
+      return {
+        expiryMonth,
+        expiryYear,
+        brand: card.cardType ?? card.brand,
+        last4: card.cardNumberLast4 ?? card.last4,
+      };
+    } catch (err) {
+      console.warn(`[helcim] card-expiry lookup for ${customerCode}/${cardToken} failed:`, err);
+      return null;
+    }
   }
 
   async detachPaymentMethod(_providerPaymentMethodId: string): Promise<void> {

@@ -32,6 +32,8 @@ import { TremendousClient } from "./services/tremendous/client.js";
 import { seedSuperAdminAndCompany } from "./seed.js";
 import { runRetentionSweep } from "./services/maintenance/retention-sweep.js";
 import { runCounterRecompute } from "./services/maintenance/counter-recompute.js";
+import { payoutReleaseWorker } from "./services/payout/ReleaseWorker.js";
+import { engagementPayoutService } from "./services/articles/EngagementPayoutService.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -570,6 +572,56 @@ export function isPartnerPoolCloseWindow(d: Date): boolean {
   return d.getUTCDate() === 1 && d.getUTCHours() === 2 && d.getUTCMinutes() < 5;
 }
 
+/** True inside the weekly payout-release window: Tuesday 09:00–09:05 UTC.
+ *  #773 — converts ledger balance ≥ minPayoutThresholdCents into actual
+ *  `payouts` rows + provider calls. The /5 jitter window means the worker
+ *  fires exactly once per Tuesday. */
+export function isPayoutReleaseWindow(d: Date): boolean {
+  return d.getUTCDay() === 2 && d.getUTCHours() === 9 && d.getUTCMinutes() < 5;
+}
+
+/** True inside the monthly article-engagement payout window: 1st of month,
+ *  03:00–03:05 UTC. #896 — credits article authors based on the prior
+ *  period's read-minutes. */
+export function isArticleEngagementPayoutWindow(d: Date): boolean {
+  return d.getUTCDate() === 1 && d.getUTCHours() === 3 && d.getUTCMinutes() < 5;
+}
+
+// ---------------------------------------------------------------------------
+// #773 payout release worker
+// ---------------------------------------------------------------------------
+async function processPayoutRelease(): Promise<void> {
+  if (!isPayoutReleaseWindow(new Date())) return;
+  try {
+    const env = (globalThis as any).__ENV ?? {};
+    const result = await payoutReleaseWorker.tick({ env });
+    console.log("[scheduled] payout release", result);
+  } catch (err) {
+    console.error("[scheduled] payout release failed:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// #896 article engagement payout
+// ---------------------------------------------------------------------------
+async function processArticleEngagementPayout(): Promise<void> {
+  const now = new Date();
+  if (!isArticleEngagementPayoutWindow(now)) return;
+  try {
+    const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodStart = new Date(Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth() - 1, 1));
+    const result = await engagementPayoutService.runForPeriod({
+      periodStart,
+      periodEnd,
+      centsPer1kReadMinutes: 250,
+      resumeExisting: true,
+    });
+    console.log("[scheduled] article engagement payout", result);
+  } catch (err) {
+    console.error("[scheduled] article engagement payout failed:", err);
+  }
+}
+
 /** Tick rotation — distributes the always-running sweeps across the /5
  *  cron cadence so a single invocation doesn't blow the Cloudflare
  *  Worker CPU budget. The old behaviour ran all nine sweeps every
@@ -610,6 +662,8 @@ export async function runScheduled(): Promise<void> {
     processSeedSuperAdmin(),
     processRetentionSweep(),
     processCounterRecompute(),
+    processPayoutRelease(),
+    processArticleEngagementPayout(),
   ];
   if (isQuarterTick(now)) sweeps.push(processRegisteredWorkers());
   if (isHalfTick(now))    sweeps.push(scrapeAllActiveSources());

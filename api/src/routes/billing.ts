@@ -9,6 +9,7 @@ import { getPricingConfig } from "../services/platform/PricingConfigService.js";
 import { TIER_COPY } from "../../../shared/tier-copy.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import type { UsageInvoice } from "../../../shared/usage-statement.js";
+import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
 
 export const billingRoutes = new Hono<AppEnv>();
 
@@ -698,6 +699,38 @@ billingRoutes.patch("/company/:companyId/seats", async (c) => {
     ...result,
     totalMonthly: (result.seatCount * result.pricePerSeatCents) / 100,
   }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// #809 — Inbox-seat addons (extra connected mailboxes above the 3 included).
+//
+//   GET   /api/billing/inbox-seats             current quantity + monthly $
+//   PATCH /api/billing/inbox-seats { quantity } set new quantity (0-50)
+// ---------------------------------------------------------------------------
+billingRoutes.get("/inbox-seats", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  return c.json(ok(await inboxSeatAddonService.getState(userId)), 200);
+});
+
+const inboxSeatsPatchSchema = z.object({
+  quantity: z.number().int().min(0).max(50),
+});
+
+billingRoutes.patch("/inbox-seats", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = inboxSeatsPatchSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "quantity must be an integer 0-50"), 400);
+  }
+  try {
+    const state = await inboxSeatAddonService.setQuantity(userId, parsed.data.quantity);
+    return c.json(ok(state), 200);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to update inbox seats";
+    return c.json(error("INVALID_QUANTITY", msg), 400);
+  }
 });
 
 billingRoutes.all("*", (c) =>

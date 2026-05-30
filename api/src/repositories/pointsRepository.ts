@@ -188,6 +188,14 @@ export interface IPointsRepository {
   findCampaignDollarsBalance(userId: string): Promise<unknown>;
   /** Latest N Campaign $ transactions for the user, newest first. */
   listCampaignDollarsTransactions(userId: string, limit: number): Promise<unknown[]>;
+  /** Debit Campaign $ atomically; idempotent on (referenceId, referenceType). */
+  spendCampaignDollars(args: {
+    userId: string;
+    maxCents: number;
+    referenceId: string;
+    referenceType: "boost_checkout" | "ad_spend";
+    description: string;
+  }): Promise<{ spentCents: number; balanceAfterCents: number }>;
 
   // ── stats (superadmin) ──────────────────────────────────────────────
   globalStats(): Promise<{
@@ -744,6 +752,76 @@ export class PointsRepository implements IPointsRepository {
       .where(eq(campaignDollarsBalance.userId, userId))
       .limit(1);
     return row ?? null;
+  }
+
+  /** #177 — Debit Campaign $ to pay (part of) a boost or ad order. Caller
+   *  passes the maximum it'd like to draw; returns the amount actually
+   *  spent (≤ requested). Atomicity: a single conditional UPDATE with
+   *  RETURNING means the spend never goes negative even under concurrent
+   *  calls. The transaction row is written only if balance moved. */
+  async spendCampaignDollars(args: {
+    userId: string;
+    maxCents: number;
+    referenceId: string;
+    referenceType: "boost_checkout" | "ad_spend";
+    description: string;
+  }): Promise<{ spentCents: number; balanceAfterCents: number }> {
+    if (args.maxCents <= 0) return { spentCents: 0, balanceAfterCents: 0 };
+
+    const existing = await this.db
+      .select({ id: campaignDollarsTransactions.id })
+      .from(campaignDollarsTransactions)
+      .where(
+        and(
+          eq(campaignDollarsTransactions.referenceId, args.referenceId),
+          eq(campaignDollarsTransactions.referenceType, args.referenceType),
+        ),
+      )
+      .limit(1);
+    if (existing.length > 0) {
+      const [bal] = await this.db
+        .select({ balanceCents: campaignDollarsBalance.balanceCents })
+        .from(campaignDollarsBalance)
+        .where(eq(campaignDollarsBalance.userId, args.userId))
+        .limit(1);
+      return { spentCents: 0, balanceAfterCents: bal?.balanceCents ?? 0 };
+    }
+
+    const [current] = await this.db
+      .select({ balanceCents: campaignDollarsBalance.balanceCents })
+      .from(campaignDollarsBalance)
+      .where(eq(campaignDollarsBalance.userId, args.userId))
+      .limit(1);
+    const have = current?.balanceCents ?? 0;
+    const spend = Math.min(have, args.maxCents);
+    if (spend <= 0) return { spentCents: 0, balanceAfterCents: have };
+
+    const [bumped] = await this.db
+      .update(campaignDollarsBalance)
+      .set({
+        balanceCents: sql`${campaignDollarsBalance.balanceCents} - ${spend}`,
+        lifetimeSpentCents: sql`${campaignDollarsBalance.lifetimeSpentCents} + ${spend}`,
+        updatedAt: this.now(),
+      })
+      .where(
+        and(
+          eq(campaignDollarsBalance.userId, args.userId),
+          sql`${campaignDollarsBalance.balanceCents} >= ${spend}`,
+        ),
+      )
+      .returning();
+    if (!bumped) return { spentCents: 0, balanceAfterCents: have };
+
+    await this.db.insert(campaignDollarsTransactions).values({
+      userId: args.userId,
+      kind: args.referenceType === "boost_checkout" ? "boost_spend" : "ad_spend",
+      amountCents: -spend,
+      balanceAfterCents: bumped.balanceCents,
+      referenceId: args.referenceId,
+      referenceType: args.referenceType,
+      description: args.description,
+    });
+    return { spentCents: spend, balanceAfterCents: bumped.balanceCents };
   }
 
   async listCampaignDollarsTransactions(userId: string, limit: number) {
