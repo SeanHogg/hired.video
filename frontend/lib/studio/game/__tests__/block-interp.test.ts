@@ -18,6 +18,7 @@ import {
   seedGlobalVars,
   seedScriptVars,
 } from "../block-interp.js";
+import type { ScriptCtx } from "../block-interp.js";
 import type {
   BlockExpr,
   BlockStmt,
@@ -36,7 +37,11 @@ function makeSprite(id: string, program?: ScriptProgram) {
   };
 }
 
-function makeCtx(now = 0) {
+// Cast through `ScriptCtx` so optional fields (broadcast, gotoLevel,
+// playSound, stopForever) exist on the inferred type — tests assign
+// them after construction. Initialised with the always-on fields the
+// interpreter reads on every tick.
+function makeCtx(now = 0): ScriptCtx {
   return {
     now,
     levelMountTs: now,
