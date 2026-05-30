@@ -804,6 +804,31 @@ export default function DrawingStage({
             rotation ball). Only renders when (a) the Hand tool is the
             active tool AND (b) the active layer has pixels AND (c)
             the host wired an `onLayerTransform` callback. */}
+        {/* #1104 — Hand-tool selection chrome: thin dashed bounding box
+            around the active layer's pixel content. Sits BEHIND the
+            TransformHandles so the halo + resize ball remain the
+            interactive surface. Brand-purple matches the marquee + V2
+            widget selection ring. Renders only when handleRect resolves
+            (layer has pixels), so empty layers don't show phantom chrome. */}
+        {tool === "hand" && handleRect && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute"
+            style={{
+              left: handleRect.x * zoom,
+              top: handleRect.y * zoom,
+              width: handleRect.width * zoom,
+              height: handleRect.height * zoom,
+              transform: handleRect.rotation
+                ? `rotate(${handleRect.rotation}deg)`
+                : undefined,
+              transformOrigin: "center",
+              border: "1px dashed rgb(139 92 246)", // brand purple-500
+              boxSizing: "border-box",
+              zIndex: 1,
+            }}
+          />
+        )}
         {tool === "hand" && handleRect && onLayerTransform && (
           <TransformHandles
             rect={handleRect}

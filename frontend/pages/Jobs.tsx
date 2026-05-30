@@ -36,6 +36,7 @@ import {
   JOB_ALERT_FREQUENCY_LABELS,
 } from "@/lib/constants/enums";
 import JobCard from "@/components/JobCard";
+import JobAnalyticsDialog from "@/components/JobAnalyticsDialog";
 import QRCodeDialog from "@/components/QRCodeDialog";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ListsButton from "@/components/lists/ListsButton";
@@ -328,6 +329,9 @@ export default function Jobs() {
   const [deleteJobDialog, setDeleteJobDialog] = useState<{ id: string; title: string } | null>(null);
   const [qrJob, setQrJob] = useState<{ id: string; title: string } | null>(null);
   const [toolHistoryJob, setToolHistoryJob] = useState<{ id: string; title: string } | null>(null);
+  // #411 — Job analytics dialog mount target. Set by JobActionsMenu's
+  // Analytics entry; cleared on close.
+  const [analyticsJob, setAnalyticsJob] = useState<{ id: string; title: string } | null>(null);
   const [editAlert, setEditAlert] = useState<JobAlert | null>(null);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
 
@@ -653,6 +657,9 @@ export default function Jobs() {
       onShowQR: () => setQrJob({ id: job.id, title: job.title }),
       onViewToolHistory: canManageJobs
         ? () => setToolHistoryJob({ id: job.id, title: job.title })
+        : undefined,
+      onViewAnalytics: canManageJobs
+        ? () => setAnalyticsJob({ id: job.id, title: job.title })
         : undefined,
       onDelete: canManageJobs
         ? () => setDeleteJobDialog({ id: job.id, title: job.title })
@@ -1324,6 +1331,17 @@ export default function Jobs() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {/* #411 — Job analytics dialog, mounted by JobActionsMenu's
+                  Analytics entry. */}
+              {analyticsJob && (
+                <JobAnalyticsDialog
+                  isOpen={!!analyticsJob}
+                  onClose={() => setAnalyticsJob(null)}
+                  jobId={analyticsJob.id}
+                  jobTitle={analyticsJob.title}
+                />
+              )}
 
               {/* Delete Job confirmation — owner-only via the JobActionsMenu Delete entry. */}
               <AlertDialog open={!!deleteJobDialog} onOpenChange={(open) => !open && setDeleteJobDialog(null)}>

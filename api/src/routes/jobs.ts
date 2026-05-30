@@ -30,6 +30,8 @@ export const CreateJobSchema = z.object({
   description: z.string().min(1),
   location: z.string().optional(),
   heroImageUrl: OptionalUrlSchema,
+  /** #743 — Optional Studio Project attached to the job. */
+  videoProjectId: z.string().uuid().optional().nullable(),
   /** Required-skills list. Persisted to `job_items.skills_required` (jsonb).
    *  The wire field is `skills` to match the read shape (`rowToJob`
    *  exposes `row.skillsRequired` as `skills`). The 2026-05-04 fix:

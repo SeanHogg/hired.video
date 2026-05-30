@@ -11,6 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import {
+  applyBackgroundReplacement,
+  type BackgroundReplacement,
+} from "@/lib/studio/webcam/background-removal";
+import {
   Camera,
   Video,
   StopCircle,
@@ -211,6 +215,12 @@ export function WebcamRecorder({
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasAnimFrameRef = useRef<number | null>(null);
+  // #127 — Background-replacement state. Stored in a ref so the RAF
+  // draw loop sees updates without re-running the effect that owns
+  // the composite stream.
+  const [bgReplacement, setBgReplacement] = useState<BackgroundReplacement>({ kind: "none" });
+  const bgReplacementRef = useRef<BackgroundReplacement>(bgReplacement);
+  bgReplacementRef.current = bgReplacement;
 
   // Mirror of isMuted readable from non-reactive callbacks (acquire*).
   // Lets newly-acquired streams come up already-muted when the user
@@ -453,19 +463,41 @@ export function WebcamRecorder({
       const pipH = Math.round(canvas.height * 0.25);
       const margin = 16;
 
-      const draw = () => {
+      // #127 — Person-segment + background-replacement composition.
+      // When `bgReplacement` is set on the parent ref, the PiP webcam
+      // frame routes through `applyBackgroundReplacement` instead of
+      // a raw drawImage. Both code paths run inside the same RAF loop
+      // so the composite stream keeps a single tick.
+      const draw = async () => {
         ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
-        // PiP webcam in bottom-right
-        ctx.drawImage(
-          camVideo,
-          canvas.width - pipW - margin,
-          canvas.height - pipH - margin,
-          pipW,
-          pipH,
-        );
-        canvasAnimFrameRef.current = requestAnimationFrame(draw);
+        const replacement = bgReplacementRef.current;
+        const camX = canvas.width - pipW - margin;
+        const camY = canvas.height - pipH - margin;
+        if (replacement && replacement.kind !== "none") {
+          // Offscreen canvas for the masked PiP so the rest of the
+          // composite stays linear.
+          const pipCanvas = document.createElement("canvas");
+          pipCanvas.width = pipW;
+          pipCanvas.height = pipH;
+          const pipCtx = pipCanvas.getContext("2d");
+          if (pipCtx) {
+            await applyBackgroundReplacement({
+              ctx: pipCtx,
+              source: camVideo,
+              width: pipW,
+              height: pipH,
+              mode: replacement,
+            });
+            ctx.drawImage(pipCanvas, camX, camY);
+          } else {
+            ctx.drawImage(camVideo, camX, camY, pipW, pipH);
+          }
+        } else {
+          ctx.drawImage(camVideo, camX, camY, pipW, pipH);
+        }
+        canvasAnimFrameRef.current = requestAnimationFrame(() => { void draw(); });
       };
-      draw();
+      void draw();
 
       const canvasStream = canvas.captureStream(30);
 
@@ -869,6 +901,34 @@ export function WebcamRecorder({
               Max duration: {formatTime(maxDurationSec)}
             </div>
           )}
+
+          {/* #127 — Background replacement picker. Mode buttons let the
+              user toggle none / blur / colour. MediaPipe segmentation
+              loads lazily on first non-none selection. */}
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs font-medium text-muted-foreground">Background</span>
+            <div className="flex gap-1">
+              {([
+                { kind: "none" as const, label: "None" },
+                { kind: "blur" as const, label: "Blur", sigmaPx: 18 },
+                { kind: "color" as const, label: "Color", hex: "#0b1020" },
+              ]).map((opt) => (
+                <Button
+                  key={opt.kind}
+                  variant={bgReplacement.kind === opt.kind ? "default" : "outline"}
+                  size="sm"
+                  disabled={recordingState === "recording"}
+                  onClick={() => {
+                    if (opt.kind === "none") setBgReplacement({ kind: "none" });
+                    else if (opt.kind === "blur") setBgReplacement({ kind: "blur", sigmaPx: opt.sigmaPx });
+                    else setBgReplacement({ kind: "color", hex: opt.hex });
+                  }}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

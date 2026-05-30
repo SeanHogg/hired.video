@@ -46,6 +46,7 @@ import { useActiveFormBridge } from "@/lib/hooks/use-active-form-bridge";
 import { useAIFormSnapshot } from "@/hooks/use-ai-form-snapshot";
 import { JOB_CREATE_FORM_ID } from "@/lib/tools/registry";
 import MediaPicker from "@/components/shared/MediaPicker";
+import JobStudioVideoPickerField from "@/components/jobs/JobStudioVideoPickerField";
 import EntityEditShell from "@/components/EntityEditShell";
 import { LocationPicker } from "@/components/location/LocationPicker";
 import {
@@ -110,6 +111,9 @@ const jobCreateSchema = z.object({
   expirationDate: z.string().optional(),
   status: z.enum(["Draft", "Open", "Closed", "Hired"]).default("Open"),
   heroImageUrl: z.string().url().optional().or(z.literal("")),
+  // #743 — Optional Studio Project attached to the job (recruiter pitch
+  // / job-ad video). Stored as a UUID on `job_items.video_project_id`.
+  videoProjectId: z.string().uuid().optional().or(z.literal("")),
   sector: z.enum(SECTORS as readonly [string, ...string[]]).optional(),
 });
 
@@ -549,6 +553,7 @@ export default function JobCreatePage() {
         currency: data.currency,
         isPublic: data.isPublic,
         heroImageUrl: data.heroImageUrl || undefined,
+        videoProjectId: data.videoProjectId || undefined,
         sector: data.sector || undefined,
       };
 
@@ -945,6 +950,15 @@ export default function JobCreatePage() {
                           Shown above the job title. Upload your own, browse stock photography, or generate one with AI.
                         </p>
                       </div>
+
+                      {/* #743 — Studio video (recruiter pitch / job-ad). The
+                          studio surfaces the projects this employer owns
+                          with purpose: "job_ad" | "recruiter_brand" |
+                          "company_promo" so the picker self-filters. */}
+                      <JobStudioVideoPickerField
+                        value={watchedValues.videoProjectId ?? ""}
+                        onChange={(id) => setValue("videoProjectId", id ?? "")}
+                      />
 
                       {/* Company */}
                       <div className="space-y-2">

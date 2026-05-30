@@ -56,6 +56,11 @@ export const jobItems = pgTable("job_items", {
   /** Optional cover/hero image rendered on the job card + detail page.
    *  Populated by the shared MediaPicker (upload / stock / AI). */
   heroImageUrl: text("hero_image_url"),
+  /** #743 — Optional Studio video project attached to the job (recruiter
+   *  pitch / employer brand / job-ad video). Set-null on project delete
+   *  so jobs survive video cleanup. The job DTO exposes this id and the
+   *  detail page mounts `<StudioVideoSurface mode="lazy" videoId={...}/>`. */
+  videoProjectId: uuid("video_project_id"),
   /** Latest sentiment score from the Sentiment Analysis tool run
    *  against this job's description text. Null until the tool has been
    *  run against a SAVED job — pasted-text runs never write here, see

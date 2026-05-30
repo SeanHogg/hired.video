@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import JobScoreBadges from "@/components/tools/JobScoreBadges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -470,6 +471,16 @@ export default function JobDetail() {
                 )
               }
             />
+
+            {/* #743 — Attached Studio video (recruiter pitch / job-ad /
+                company-promo). Mounts the shared StudioVideoSurface
+                directly; the component self-gates on existence + plays
+                inline. */}
+            {(job as any).videoProjectId && (
+              <div className="mt-6">
+                <StudioVideoSurface mode="lazy" videoId={(job as any).videoProjectId} />
+              </div>
+            )}
               </>
             )}
           </div>

@@ -306,6 +306,49 @@ export const ReferenceSchema = z.object({
 });
 export type Reference = z.infer<typeof ReferenceSchema>;
 
+/**
+ * #820 — optional Actor/Director film-credit sub-schema. Lets a casting
+ * director run "actresses 25-35 with at least one lead theatre credit
+ * who can dance" against the resume DB. When `film` is absent the
+ * project keeps its existing freeform shape (the resume editor's
+ * default for non-entertainment users).
+ *
+ * Field semantics:
+ *   roleName     — character or role name (e.g. "Hamlet", "Lead Female")
+ *   roleType     — 'lead' | 'supporting' | 'background' | 'ensemble' | 'cameo'
+ *   production   — 'film' | 'tv' | 'theatre' | 'commercial' | 'voice' | 'short' | 'web'
+ *   director     — credited director name (when known)
+ *   network      — distributor / network / production company / theatre
+ *   year         — release / run year (yyyy)
+ *   episodes     — recurring TV credit episode count
+ *   billed       — 'top' | 'co-star' | 'guest' | 'recurring' | 'star' (TV billing tier)
+ *   stuntDouble  — booleans for niche search facets the gap text named
+ *   physical     — height/skills tags (dance / stunt / accent) for filtering
+ */
+export const FilmCreditSchema = z.object({
+  roleName: z.string().default(""),
+  roleType: z
+    .enum(["lead", "supporting", "background", "ensemble", "cameo"])
+    .optional(),
+  production: z
+    .enum(["film", "tv", "theatre", "commercial", "voice", "short", "web"])
+    .optional(),
+  director: z.string().default(""),
+  network: z.string().default(""),
+  year: z.string().default(""),
+  episodes: z.number().int().nonnegative().optional(),
+  billed: z.enum(["top", "co-star", "guest", "recurring", "star"]).optional(),
+  stuntDouble: z.boolean().optional(),
+  physical: z
+    .object({
+      heightCm: z.number().int().positive().optional(),
+      skills: z.array(z.string()).default([]),
+      accents: z.array(z.string()).default([]),
+    })
+    .optional(),
+});
+export type FilmCredit = z.infer<typeof FilmCreditSchema>;
+
 export const ProjectSchema = z.object({
   id: z.string().optional(),
   name: z.string().default(""),
@@ -319,6 +362,10 @@ export const ProjectSchema = z.object({
   keywords: z.array(z.string()).default([]),
   roles: z.array(z.string()).default([]),
   interactive: interactiveCanvasField,
+  /** #820 — Optional film credit shape for Actor/Director resumes.
+   *  Casting search reads from `film.*`; non-entertainment resumes
+   *  omit this and the project keeps its freeform behaviour. */
+  film: FilmCreditSchema.optional(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

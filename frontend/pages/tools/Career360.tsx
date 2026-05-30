@@ -202,9 +202,55 @@ function buildSuggestionsPrimer(suggestions: TargetSuggestion[]): string {
   ].join("\n");
 }
 
-/** Roll up gaps into per-segment health: highest severity wins. */
-function computeWheelHealth(gaps: Gap[]): Record<string, SegmentHealth> {
+/** #422 — Map a 0-100 measured score into the same `SegmentHealth`
+ *  enum the gap-severity branch already uses. Bands are intentionally
+ *  conservative — a "moderate" 60 is the seeker's signal to act, not
+ *  to celebrate. Returns "unknown" when no score has been measured yet
+ *  so the wheel honestly distinguishes "no data" from "low score". */
+function scoreToHealth(score: number | null | undefined): SegmentHealth {
+  if (typeof score !== "number" || !Number.isFinite(score)) return "unknown";
+  if (score >= 80) return "good";
+  if (score >= 50) return "moderate";
+  return "poor";
+}
+
+/** #422 — Tool IDs that contribute the latest measured score for each
+ *  segment. Multiple tools may write into the same segment; the
+ *  worst latest score wins so the wheel always reflects the floor
+ *  (consistent with the "highest severity" rule the gap branch uses).
+ *  Add a new tool ↔ segment mapping here, not inside the rollup. */
+const SEGMENT_SCORE_SOURCES: Record<string, string[]> = {
+  resume: ["ai-resume-scorer", "resume-optimizer"],
+  profile: ["profile-audit"],
+  salary: ["salary-calculator"],
+};
+
+interface ScoreHistorySeriesLike {
+  toolId?: string;
+  points?: Array<{ score?: number | null } | undefined>;
+}
+
+function latestScoreFor(history: ScoreHistorySeriesLike[], toolId: string): number | null {
+  const series = history.find((s) => s?.toolId === toolId);
+  const points = series?.points ?? [];
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    const score = points[i]?.score;
+    if (typeof score === "number" && Number.isFinite(score)) return score;
+  }
+  return null;
+}
+
+/** #422 — Roll up per-segment health by BLENDING gap severity and the
+ *  latest measured score. Worse-of-the-two wins so the wheel never
+ *  paints "good" while the user's measured score sits in the floor
+ *  band. Unknown × measured = measured; measured × gap = worst. */
+function computeWheelHealth(
+  gaps: Gap[],
+  history: ScoreHistorySeriesLike[] = [],
+): Record<string, SegmentHealth> {
   const health: Record<string, SegmentHealth> = {};
+
+  // First pass: gap severity (existing behaviour).
   for (const gap of gaps) {
     const segment = CATEGORY_TO_SEGMENT[gap.category];
     if (!segment) continue;
@@ -212,6 +258,23 @@ function computeWheelHealth(gaps: Gap[]): Record<string, SegmentHealth> {
     const cur = health[segment];
     if (!cur || rank(next) < rank(cur)) {
       health[segment] = next;
+    }
+  }
+
+  // Second pass: measured scores. Take the worst latest score across
+  // every tool wired to this segment, then merge against the gap-side
+  // value via the same `rank()` ordering.
+  for (const [segment, toolIds] of Object.entries(SEGMENT_SCORE_SOURCES)) {
+    let segmentScoreHealth: SegmentHealth = "unknown";
+    for (const toolId of toolIds) {
+      const latest = latestScoreFor(history, toolId);
+      const candidate = scoreToHealth(latest);
+      if (rank(candidate) < rank(segmentScoreHealth)) segmentScoreHealth = candidate;
+    }
+    if (segmentScoreHealth === "unknown") continue;
+    const cur = health[segment];
+    if (!cur || rank(segmentScoreHealth) < rank(cur)) {
+      health[segment] = segmentScoreHealth;
     }
   }
   return health;
@@ -284,7 +347,7 @@ export default function Career360() {
   const history = state?.history ?? [];
 
   const wheelHealth = useMemo(
-    () => (selected ? computeWheelHealth(selected.gaps) : {}),
+    () => (selected ? computeWheelHealth(selected.gaps, history) : {}),
     [selected],
   );
 

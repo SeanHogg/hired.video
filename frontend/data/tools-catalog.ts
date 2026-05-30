@@ -483,11 +483,14 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Positive tone detection", "Language improvements", "Impact scoring"],
     ctaLabel: "Analyze Sentiment",
-    appliesTo: ["resume"],
-    audienceRoles: [USER_ROLES.JOB_SEEKER],
+    // #412 — job descriptions also benefit from sentiment scoring (the
+    // hiring side wants to flag overly aggressive / cold JD wording),
+    // so this tool now accepts entityType="job" alongside "resume".
+    appliesTo: ["resume", "job"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER, USER_ROLES.EMPLOYER, USER_ROLES.RECRUITER],
     // #432 — sentiment chip on the candidate card uses this tool; if
     // it's stripped from the recruiter menu the chip click breaks.
-    recruiterUseOnEntity: ["resume"],
+    recruiterUseOnEntity: ["resume", "job"],
   },
   {
     id: "pdf-to-json",

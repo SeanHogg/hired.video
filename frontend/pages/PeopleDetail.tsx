@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 
 import SkillNetwork from "@/components/SkillNetwork";
+import MutualConnectionsRow from "@/components/graph/MutualConnectionsRow";
 import { JobMatchesCard, SeekerAnalyticsCard, UpcomingInterviewsCard } from "@/components/dashboard/shared";
 
 // Profile domain — shared section components and edit dialogs. Composed
@@ -582,6 +583,14 @@ function PeopleDetailContent() {
                 targetName={[profile.firstName, profile.lastName].filter(Boolean).join(" ") || null}
                 isSelf={isOwner}
               />
+            </div>
+          )}
+
+          {/* #1262 — Mutuals row + warm-intro path CTA. Self-gates to null
+              for the profile owner and for empty mutuals lists. */}
+          {profile.id && !isOwner && (
+            <div className="mt-3">
+              <MutualConnectionsRow targetUserId={profile.id} />
             </div>
           )}
 

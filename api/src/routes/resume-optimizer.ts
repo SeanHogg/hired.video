@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
@@ -21,6 +22,7 @@ import {
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import {
   rewriteHighlightsAsXyz,
+  rewriteSkillsAsAts,
   rewriteTextAsXyz,
 } from "../services/resume/rewrite-xyz.js";
 import { getPrompt } from "../../../shared/ai-prompts/index.js";
@@ -278,6 +280,52 @@ resumeOptimizerRoutes.post("/rewrite-xyz-text", requireTokenBudget(), async (c) 
   } catch (err) {
     console.error("[resume/rewrite-xyz-text] LLM error:", err);
     return c.json(success({ improved: original }));
+  }
+});
+
+/**
+ * #989 — Skills wand. Normalises casing, expands ambiguous abbreviations,
+ * dedupes near-synonyms across a single resume section's skills list. The
+ * shape mirrors `consolidate-highlights` + `rewrite-xyz-highlights` so
+ * the frontend can reuse the existing review dialog.
+ *
+ *   POST /rewrite-skills { skills: string[] }  →  { items: [{ text, sources, note? }] }
+ */
+const RewriteSkillsRequestSchema = z.object({
+  skills: z.array(z.string().min(1).max(120)).min(1).max(200),
+});
+
+resumeOptimizerRoutes.post("/rewrite-skills", requireTokenBudget(), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = RewriteSkillsRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid rewrite-skills request",
+          details: parsed.error.flatten(),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      400,
+    );
+  }
+
+  const { skills } = parsed.data;
+  const echoItems = skills.map((s, i) => ({ text: s, sources: [i + 1] }));
+  if (!hasAnyLLMProviderKey(c.env)) {
+    return c.json(success({ items: echoItems }));
+  }
+
+  try {
+    const llm = createLLMClient(c.env, c.var.user);
+    const { items } = await rewriteSkillsAsAts(skills, llm);
+    return c.json(success({ items }));
+  } catch (err) {
+    console.error("[resume/rewrite-skills] LLM error:", err);
+    return c.json(success({ items: echoItems }));
   }
 });
 

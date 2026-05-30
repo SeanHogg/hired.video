@@ -145,6 +145,79 @@ export async function rewriteHighlightsAsXyz(
  * editorial lens. Position rewrites stay factual (no seniority drift);
  * summary rewrites reframe scope+outcome to foreshadow XYZ bullets.
  */
+/**
+ * #989 — Normalize + dedupe a skills list for ATS clarity. NOT XYZ
+ * format (skills aren't accomplishments). Output is a clean, deduped
+ * list of canonical skill names with optional merge notes the UI can
+ * show in the review dialog ("merged 'aws' + 'AWS' + 'Aws' → AWS").
+ */
+const SKILLS_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+          sources: { type: "array", items: { type: "number" } },
+          note: { type: "string" },
+        },
+        required: ["text", "sources"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["items"],
+  additionalProperties: false,
+} as const;
+
+const REWRITE_SKILLS_SYSTEM_PROMPT = `You are an expert resume editor. The user gives you a numbered list of skills from one section of their resume. Your job: normalise casing (\"aws\" → \"AWS\", \"javascript\" → \"JavaScript\"), expand ambiguous abbreviations the first time they appear (\"ML\" → \"Machine Learning\"), and dedupe near-synonyms by merging them under one canonical name.
+
+Rules:
+- Return a coherent ATS-friendly skill list.
+- Preserve domain-correct casing (Kubernetes, PostgreSQL, GraphQL, TypeScript).
+- Merge "JS" + "JavaScript" → "JavaScript". Merge "React.js" + "ReactJS" + "React" → "React".
+- Do NOT add new skills the user didn't list.
+- Do NOT translate or rephrase actual skill names; only normalise casing + expand abbreviations.
+- Output STRICT JSON only:
+  { "items": [ { "text": "<canonical skill>", "sources": [<index numbers from input>], "note": "<optional human-readable merge note>" } ] }
+- Indexes in \`sources\` are 1-based from the numbered input list.`;
+
+export async function rewriteSkillsAsAts(
+  skills: string[],
+  llm: LLMClient,
+  featureKey = "resume_rewrite_skills_ats",
+): Promise<{ items: Array<ConsolidateHighlightsItem & { note?: string }> }> {
+  if (!Array.isArray(skills) || skills.length === 0) {
+    return { items: [] };
+  }
+
+  const userMessage = `Current skills:\n${skills.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\nNormalise + dedupe. Return JSON.`;
+
+  try {
+    const { data } = await llm.callJson(
+      featureKey,
+      {
+        useCase: "resume_consolidate_highlights",
+        systemPrompt: REWRITE_SKILLS_SYSTEM_PROMPT,
+        userMessage,
+        responseFormat: "json_object",
+      },
+      SKILLS_RESPONSE_SCHEMA as any,
+    );
+    const items = Array.isArray((data as any).items) ? (data as any).items : [];
+    if (items.length === 0) {
+      return { items: skills.map((s, i) => ({ text: s, sources: [i + 1] })) };
+    }
+    return { items };
+  } catch {
+    // LLM unavailable / errored — echo input 1:1 so the caller has a
+    // safe fallback.
+    return { items: skills.map((s, i) => ({ text: s, sources: [i + 1] })) };
+  }
+}
+
 export async function rewriteTextAsXyz(
   kind: "summary" | "position",
   original: string,

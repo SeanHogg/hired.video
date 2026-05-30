@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Award,
@@ -573,27 +574,7 @@ function LessonBody({
   // prop-drilling capability flags through the parent.
   switch (lesson.sourceType) {
     case "text_md":
-      return (
-        <div className="p-6 space-y-4">
-          {/* Audio modality (#1519). Self-gates: returns null when
-              Web Speech is unavailable or the lesson has no body, so
-              we don't need a canPlay branch here. */}
-          {lesson.bodyMd ? (
-            <TextNarrator
-              text={lesson.bodyMd}
-              preferenceKey="learn.lesson-narration"
-              variant="inline"
-            />
-          ) : null}
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            {lesson.bodyMd ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{lesson.bodyMd}</ReactMarkdown>
-            ) : (
-              <p className="text-muted-foreground italic">This lesson has no content yet.</p>
-            )}
-          </div>
-        </div>
-      );
+      return <TextMdLesson lesson={lesson} />;
 
     case "scorm_package":
       if (!lesson.scormEntryUrl || !lesson.scormVersion) {
@@ -675,4 +656,62 @@ function LessonBody({
     default:
       return null;
   }
+}
+
+/**
+ * #1520 — text_md lesson with optional companion video. Renders a
+ * Read / Watch tab toggle when `companionStudioProjectId` is set; falls
+ * back to the prose-only view otherwise. Self-gates per the DRY rule —
+ * no `hasCompanion` boolean drilled into parents.
+ */
+function TextMdLesson({ lesson }: { lesson: LessonRow }) {
+  const companionId = (lesson as any).companionStudioProjectId as string | undefined;
+  const [tab, setTab] = useState<"read" | "watch">("read");
+
+  const readView = (
+    <div className="p-6 space-y-4">
+      {lesson.bodyMd ? (
+        <TextNarrator
+          text={lesson.bodyMd}
+          preferenceKey="learn.lesson-narration"
+          variant="inline"
+        />
+      ) : null}
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+        {lesson.bodyMd ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{lesson.bodyMd}</ReactMarkdown>
+        ) : (
+          <p className="text-muted-foreground italic">This lesson has no content yet.</p>
+        )}
+      </div>
+    </div>
+  );
+
+  if (!companionId) return readView;
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="inline-flex rounded-md border p-0.5 text-sm">
+        <button
+          type="button"
+          className={`px-3 py-1 rounded ${tab === "read" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+          onClick={() => setTab("read")}
+        >
+          Read
+        </button>
+        <button
+          type="button"
+          className={`px-3 py-1 rounded ${tab === "watch" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+          onClick={() => setTab("watch")}
+        >
+          Watch
+        </button>
+      </div>
+      {tab === "read" ? (
+        readView
+      ) : (
+        <StudioVideoSurface mode="lazy" videoId={companionId} />
+      )}
+    </div>
+  );
 }

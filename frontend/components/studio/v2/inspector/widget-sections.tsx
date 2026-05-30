@@ -31,6 +31,7 @@ import type {
   AvatarWidgetParams,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { STOCK_PRESENTERS } from "@/lib/studio/avatar/presenters";
+import MediaPicker from "@/components/shared/MediaPicker";
 import { TTS_ENGINES, type TtsEngineId } from "@/lib/services/tts-engines";
 const AvatarPreview = lazy(
   () => import("@/components/studio/avatar/AvatarPreview"),
@@ -1462,6 +1463,39 @@ const AVATAR_CONTENT_SECTION: WidgetInspectorSection = {
             options={STOCK_PRESENTERS.map((p) => ({ value: p.id, label: p.label }))}
             onChange={(presenterId) => set({ presenterId })}
           />
+        </Field>
+        {/* #1559 — BYO portrait upload. Mounts the shared MediaPicker
+            (image only), persists the chosen URL into portraitSourceId
+            on the widget params. The painter consumes the field when
+            present; otherwise stylized stock presenter is used. */}
+        <Field label="Portrait (optional BYO)">
+          <div className="space-y-2">
+            {data.portraitSourceId ? (
+              <div className="flex items-start gap-2">
+                <img
+                  src={data.portraitSourceId}
+                  alt="Portrait"
+                  className="h-16 w-16 rounded object-cover border"
+                />
+                <button
+                  type="button"
+                  className="text-xs text-destructive underline"
+                  onClick={() => set({ portraitSourceId: undefined, portraitFaceBbox: undefined, portraitMouthRegion: undefined })}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : null}
+            <MediaPicker
+              accept="image"
+              title="Upload portrait"
+              triggerLabel={data.portraitSourceId ? "Replace portrait" : "Upload portrait"}
+              onPick={(asset) => set({ portraitSourceId: asset.url })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Photorealistic mouth swap requires the painter upgrade (#1785) — for now the portrait is stored on the widget.
+            </p>
+          </div>
         </Field>
         <Field label="Script (what the avatar says)">
           <AutoSizeTextarea

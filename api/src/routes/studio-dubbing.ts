@@ -26,6 +26,7 @@ import {
   createLLMClient,
   hasAnyLLMProviderKey,
 } from "../services/adapters/llm-client.js";
+import { transcribeAudio } from "../services/adapters/transcription.js";
 
 export const studioDubbingRoutes = new Hono<AppEnv>();
 
@@ -78,6 +79,102 @@ export const SUPPORTED_DUBBING_LANGUAGES = [
 
 studioDubbingRoutes.get("/dubbing/languages", (c) => {
   return c.json(success(SUPPORTED_DUBBING_LANGUAGES), 200);
+});
+
+// #1561 — Transcribe a voiceover audio track into caption cues, then
+// translate. Closes the dub-from-voiceover-only flow that the FAQ
+// advertised but didn't implement.
+//
+//   POST /dubbing/transcribe { audioUrl, sourceLanguage?, targetLanguage,
+//                              chunkLengthSec? }
+//     → fetches the audio, calls Whisper, groups words into ~chunkLengthSec
+//       cues with start/end times, then calls the existing translate flow
+//       so the caller gets dub-ready cues in a single round-trip.
+const TranscribeRequestSchema = z.object({
+  audioUrl: z.string().url(),
+  targetLanguage: z.string().min(2).max(16),
+  sourceLanguage: z.string().min(2).max(16).optional(),
+  chunkLengthSec: z.number().min(1).max(20).default(6),
+  context: z.string().max(500).optional(),
+});
+
+studioDubbingRoutes.post("/dubbing/transcribe", async (c) => {
+  if (!c.var.user) return c.json(error("AUTH_REQUIRED", "Auth required"), 401);
+  const env = c.env as Record<string, string | undefined>;
+  const apiKey = env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return c.json(error("PROVIDER_UNAVAILABLE", "Whisper transcription not configured (OPENAI_API_KEY)"), 503);
+  }
+  const parsed = TranscribeRequestSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("INVALID_REQUEST", "Invalid request", parsed.error.issues), 400);
+  }
+  const { audioUrl, targetLanguage, sourceLanguage, chunkLengthSec, context } = parsed.data;
+
+  let transcription;
+  try {
+    const audioRes = await fetch(audioUrl);
+    if (!audioRes.ok) {
+      return c.json(error("FETCH_FAILED", `Could not fetch audioUrl (${audioRes.status})`), 502);
+    }
+    const buf = await audioRes.arrayBuffer();
+    const filename = new URL(audioUrl).pathname.split("/").pop() || "audio.wav";
+    transcription = await transcribeAudio(apiKey, buf, filename, { language: sourceLanguage });
+  } catch (err) {
+    return c.json(
+      error("TRANSCRIPTION_FAILED", err instanceof Error ? err.message : "Whisper call failed"),
+      502,
+    );
+  }
+
+  // Group words into cues of ~chunkLengthSec each. Closes a cue when
+  // the running duration crosses the threshold OR when a sentence
+  // terminator lands on a word boundary.
+  interface Cue { text: string; start: number; end: number }
+  const cues: Cue[] = [];
+  let current: { words: string[]; start: number; end: number } | null = null;
+  for (const w of transcription.words) {
+    if (!current) {
+      current = { words: [w.word], start: w.start, end: w.end };
+      continue;
+    }
+    current.words.push(w.word);
+    current.end = w.end;
+    const duration = current.end - current.start;
+    const endsSentence = /[.!?]$/.test(w.word);
+    if (duration >= chunkLengthSec || endsSentence) {
+      cues.push({ text: current.words.join(" "), start: current.start, end: current.end });
+      current = null;
+    }
+  }
+  if (current) cues.push({ text: current.words.join(" "), start: current.start, end: current.end });
+
+  if (cues.length === 0) {
+    return c.json(error("TRANSCRIPTION_EMPTY", "Whisper returned no usable words"), 502);
+  }
+
+  // Hand off to the existing translator. We round-trip through the
+  // same code path the in-memory caption flow uses, so a future
+  // translator improvement automatically lifts both surfaces.
+  const translatePayload = {
+    targetLanguage,
+    sourceLanguage: sourceLanguage ?? transcription.language,
+    cues,
+    context,
+  };
+  const translateReq = new Request(
+    new URL("./dubbing/translate", c.req.url).toString(),
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", ...Object.fromEntries(c.req.raw.headers.entries()) },
+      body: JSON.stringify(translatePayload),
+    },
+  );
+  const translateRes = await studioDubbingRoutes.fetch(translateReq, c.env as any);
+  return new Response(await translateRes.text(), {
+    status: translateRes.status,
+    headers: translateRes.headers,
+  });
 });
 
 studioDubbingRoutes.post("/dubbing/translate", async (c) => {

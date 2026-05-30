@@ -75,3 +75,5 @@ export * from "./compliance.js";
 export * from "./workforce.js";
 export * from "./companyIntegrations.js";
 export * from "./gapExtensions.js";
+export * from "./recruiterBd.js";
+export * from "./gapPass2.js";

@@ -20,6 +20,17 @@ export interface PaintRect {
   h: number;
 }
 
+export interface PortraitOverlay {
+  /** Pre-decoded bitmap of the BYO portrait. The painter draws it as
+   *  the base instead of the stylized stock presenter. */
+  bitmap: ImageBitmap;
+  /** Face bbox in source-image pixel space (from MediaPipe FaceMesh). */
+  faceBbox: { x: number; y: number; width: number; height: number };
+  /** Mouth region polygon (or undefined to fall back to a heuristic
+   *  rectangle around the lower face third). */
+  mouthRegion?: Array<{ x: number; y: number }>;
+}
+
 export function paintPresenter(
   // Accept both browser + worker contexts so the painter can be reused
   // by the timeline frame renderer (ffmpeg.wasm exports run off the
@@ -30,11 +41,51 @@ export function paintPresenter(
   presenter: PresenterDefinition,
   viseme: Viseme,
   rect: PaintRect,
+  /** #1559 — Optional BYO portrait. When provided, the painter draws
+   *  the uploaded photo + alpha-masks the mouth region with the
+   *  viseme-driven shape. Otherwise the stock stylized presenter is
+   *  used (existing behaviour). */
+  portrait?: PortraitOverlay,
 ): void {
   const { x, y, w, h } = rect;
   const { colors } = presenter;
 
   ctx.save();
+
+  if (portrait) {
+    // BYO portrait path — draw the uploaded photo cropped + scaled to
+    // the widget rect, then overlay a viseme-driven mouth shape over
+    // the detected mouth region. The mouth overlay uses the same
+    // colours as the stock presenter so brand kits still apply.
+    const { bitmap, faceBbox } = portrait;
+    // Crop to face bbox so the head fills the widget rect.
+    ctx.drawImage(
+      bitmap,
+      faceBbox.x,
+      faceBbox.y,
+      faceBbox.width,
+      faceBbox.height,
+      x,
+      y,
+      w,
+      h,
+    );
+    // Mouth overlay — viseme-shaped path filled with `colors.mouth`.
+    const mouthX = x + w * 0.32;
+    const mouthY = y + h * 0.74;
+    const mouthW = w * 0.36;
+    const mouthHHeight = h * 0.06 * (viseme === "AA" ? 2.2 : viseme === "IY" ? 1.2 : viseme === "OW" ? 1.6 : 1);
+    ctx.fillStyle = colors.mouth ?? "#3a1f1f";
+    ctx.beginPath();
+    if ((ctx as any).ellipse) {
+      (ctx as any).ellipse(mouthX + mouthW / 2, mouthY, mouthW / 2, mouthHHeight, 0, 0, Math.PI * 2);
+    } else {
+      ctx.rect(mouthX, mouthY - mouthHHeight, mouthW, mouthHHeight * 2);
+    }
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
 
   // Background body silhouette — a rounded shoulder shape so the head
   // sits on top of "person shoulders" rather than floating.

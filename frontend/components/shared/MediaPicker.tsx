@@ -32,6 +32,7 @@ import {
   type MyImageEntry,
 } from "@/lib/services/upload-service";
 import { generateImage } from "@/lib/services/image-gen-engine";
+import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
 
 export interface PickedMedia {
   url: string;
@@ -97,6 +98,43 @@ export default function MediaPicker({
     [onPick],
   );
 
+  // #585 — Drag-from-result onto canvas. Captures `dragstart` from any
+  // child element carrying `data-media-url` (set by per-tab thumb code as
+  // it lands), stamps the studio drag-protocol payload, and closes the
+  // dialog on `dragend` so the user can see the canvas drop in real time.
+  // Per-tab thumbnails opt in by attaching the attribute — no other
+  // changes needed in StockMediaPanel / LibraryTab.
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const el = dialogContentRef.current;
+    if (!el) return;
+    const handleDragStart = (e: DragEvent) => {
+      const target = e.target as HTMLElement | null;
+      const node = target?.closest?.("[data-media-url]") as HTMLElement | null;
+      if (!node || !e.dataTransfer) return;
+      const url = node.getAttribute("data-media-url");
+      if (!url) return;
+      const mediaType = (node.getAttribute("data-media-type") === "video"
+        ? "video"
+        : "image") as "image" | "video";
+      writeDragPayload(e.dataTransfer, { kind: "media-url", data: url, mediaType });
+      e.dataTransfer.effectAllowed = "copy";
+    };
+    const handleDragEnd = () => {
+      // The canvas drop handler in CanvasDropOverlay processes the drop
+      // by the time `dragend` fires, so closing here lands the user back
+      // on the canvas with the new widget visible.
+      setOpen(false);
+    };
+    el.addEventListener("dragstart", handleDragStart, true);
+    document.addEventListener("dragend", handleDragEnd, true);
+    return () => {
+      el.removeEventListener("dragstart", handleDragStart, true);
+      document.removeEventListener("dragend", handleDragEnd, true);
+    };
+  }, [open]);
+
   const showStock = !STOCK_HIDDEN_FOR.includes(accept);
   const showAI = accept !== "video"; // AI image gen produces images only
   // Library = user's prior R2 image uploads — surfaced for accept modes
@@ -120,7 +158,7 @@ export default function MediaPicker({
         )}
       </DialogTrigger>
 
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl" ref={dialogContentRef}>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>

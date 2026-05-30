@@ -235,6 +235,10 @@ const JobDetail = lazy(() => import("./pages/JobDetail"));
 const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
 const JobEditPage = lazy(() => import("./pages/JobEditPage"));
 const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
+const JobEmbed = lazy(() => import("./pages/JobEmbed"));
+const LiveScreenInvite = lazy(() => import("./pages/LiveScreenInvite"));
+const TemplatesReview = lazy(() => import("./pages/admin/TemplatesReview"));
+const BdPipeline = lazy(() => import("./pages/recruiter/BdPipeline"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
 const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
@@ -725,7 +729,15 @@ const App = () => (
                       />
                       <Route path="/jobs/edit/:id" element={<JobEditPage />} />
                       <Route path="/jobs/:id/apply" element={<JobApplicationPage />} />
+                      {/* #412 — public job embed renderer (iframe-friendly). */}
+                      <Route path="/jobs/embed/:id" element={<JobEmbed />} />
                       <Route path="/jobs/:id" element={<JobDetail />} />
+                      {/* #1209 — public live-screen candidate accept/decline page. */}
+                      <Route path="/live-screen/invite/:token" element={<LiveScreenInvite />} />
+                      {/* #188 — SuperAdmin templates review queue. */}
+                      <Route path="/admin/templates/review" element={<TemplatesReview />} />
+                      {/* #99/#222/#223 — Recruiter BD pipeline Kanban. */}
+                      <Route path="/recruiter/pipeline" element={<BdPipeline />} />
                       {/* Redirect old upload route to unified create page */}
                       <Route
                         path="/jobs/upload"

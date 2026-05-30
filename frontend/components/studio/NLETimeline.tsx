@@ -112,16 +112,34 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
   const dragRef = useRef<DragMode>(null);
   const [dragHoverIndex, setDragHoverIndex] = useState<number | null>(null);
 
-  const totalDuration = useMemo(
+  // #480 — Timeline width = max(scenes total, max audio-clip endSec) so a
+  // music clip that extends past the video's last scene grows the lane
+  // visually instead of being clipped offscreen. Playhead is still capped
+  // at `scenesDuration` so the video stops at the scenes' end while audio
+  // continues to render (fade-out semantics on the renderer side).
+  const scenesDuration = useMemo(
     () => script.scenes.reduce((a, s) => a + s.duration, 0),
     [script.scenes],
   );
+  const maxAudioEnd = useMemo(() => {
+    const clips = script.video?.audio?.clips ?? [];
+    let max = 0;
+    for (const c of clips) {
+      const end = typeof (c as any).endSec === "number" ? (c as any).endSec : 0;
+      if (end > max) max = end;
+    }
+    return max;
+  }, [script.video?.audio?.clips]);
+  const totalDuration = Math.max(scenesDuration, maxAudioEnd);
 
   // ── Playhead seek on ruler click ───────────────────────────────────────────
   function handleRulerClick(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left + (containerRef.current?.scrollLeft ?? 0);
-    onSeek(Math.max(0, Math.min(totalDuration, x / pixelsPerSecond)));
+    // Playhead seeks only through the video portion — audio that
+    // extends past scenes continues to play but the cursor stops at
+    // the video's end.
+    onSeek(Math.max(0, Math.min(scenesDuration, x / pixelsPerSecond)));
   }
 
   // ── Drag handlers ──────────────────────────────────────────────────────────

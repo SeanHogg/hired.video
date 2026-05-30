@@ -154,6 +154,11 @@ export const courseLessons = pgTable(
     summary: text("summary"),
     sourceType: varchar("source_type", { length: 32 }).notNull(),
     studioProjectId: text("studio_project_id"),
+    /** #1520 — Optional companion Studio video for `source_type='text_md'`
+     *  lessons. When present, the lesson renderer offers a Read/Watch tab
+     *  toggle so learners can switch between the article-style body and a
+     *  60-90s explainer video without leaving the lesson view. */
+    companionStudioProjectId: uuid("companion_studio_project_id"),
     scormManifestUrl: text("scorm_manifest_url"),
     scormEntryUrl: text("scorm_entry_url"),
     scormVersion: varchar("scorm_version", { length: 16 }),

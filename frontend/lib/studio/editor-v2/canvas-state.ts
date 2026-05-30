@@ -383,6 +383,24 @@ export interface AvatarWidgetParams {
    *  avatar's accent to a campaign palette without forking the stock
    *  preset. `null` / undefined means use the preset's default. */
   accentColor?: string | null;
+  /** #1559 — BYO portrait upload. When set, the avatar painter uses
+   *  the uploaded portrait (a still photo + alpha-masked mouth region)
+   *  as the source for viseme overlay instead of one of the stylized
+   *  STOCK_PRESENTERS. Resolved via the existing media-source
+   *  abstraction so the URL + face-detect bounding-box are derived
+   *  once and cached. `presenterId` still drives style fallbacks when
+   *  the portrait is missing (e.g. background colour). */
+  portraitSourceId?: string;
+  /** #1559 — Cached face-detect bounding box for the uploaded portrait.
+   *  Computed client-side via MediaPipe FaceMesh on upload + persisted
+   *  to the widget params so the painter doesn't re-run detection on
+   *  every render. Coordinates in source-image pixel space; the painter
+   *  scales them into the widget viewport. */
+  portraitFaceBbox?: { x: number; y: number; width: number; height: number };
+  /** #1559 — Mouth-region polygon for the alpha-masked mouth swap.
+   *  Optional — when omitted the painter falls back to a heuristic
+   *  mouth rectangle derived from the face bbox. */
+  portraitMouthRegion?: Array<{ x: number; y: number }>;
 }
 
 /** Engagement asset widget — embeds a per-project authored engagement
