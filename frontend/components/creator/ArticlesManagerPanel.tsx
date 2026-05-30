@@ -39,6 +39,7 @@ import {
 import { SectorPicker } from "@/components/sector/SectorPicker";
 import { AudiencePicker } from "@/components/landing/AudiencePicker";
 import { contentAudiencesService } from "@/lib/services/content-audiences-service";
+import { confirmDialog } from "@/lib/dialogs";
 import type { AudienceKey } from "@shared/audiences";
 import {
   ARTICLE_AUDIENCES,
@@ -297,7 +298,7 @@ export default function ArticlesManagerPanel() {
   };
 
   const remove = async (a: Article) => {
-    if (!confirm(`Delete "${a.title}"? This cannot be undone.`)) return;
+    if (!(await confirmDialog({ title: "Delete article", description: `Delete "${a.title}"? This cannot be undone.`, confirmText: "Delete", destructive: true }))) return;
     const previous = articles;
     setArticles((cur) => cur.filter((x) => x.id !== a.id));
     try {

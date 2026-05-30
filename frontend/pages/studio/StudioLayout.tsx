@@ -50,6 +50,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
+import { confirmDialog } from "@/lib/dialogs";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
 import { publishExportProgress } from "@/lib/hooks/useExportProgress";
@@ -1367,13 +1368,20 @@ export default function StudioLayout() {
     setTab(script ? "storyboard" : "prompt");
   }
 
-  function handleTemplateLoad(script: VideoScript) {
+  async function handleTemplateLoad(script: VideoScript) {
     if (state.script && state.script.scenes.length > 0) {
       const hasCustomTheme = JSON.stringify(state.script.video.theme) !== JSON.stringify(state.activeTemplate?.video.theme);
-      const msg = hasCustomTheme
+      const description = hasCustomTheme
         ? "Apply this template's theme? Your scene content will be kept, but your current theme customisations will be replaced."
         : "Apply this template's theme to your current scenes?";
-      if (!window.confirm(msg)) return;
+      if (
+        !(await confirmDialog({
+          title: "Apply template theme",
+          description,
+          confirmText: "Apply",
+        }))
+      )
+        return;
 
       const merged: VideoScript = {
         ...state.script,

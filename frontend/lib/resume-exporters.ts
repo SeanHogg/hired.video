@@ -14,6 +14,7 @@
 
 import type { Resume, ResumeContent } from "@/types/resume";
 import { slugify } from "@shared/slugify";
+import { alertDialog } from "@/lib/dialogs";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -299,9 +300,12 @@ export function exportResumeWord(resume: Resume): void {
 // ?print=1 which the viewer page uses to auto-trigger window.print().
 // -----------------------------------------------------------------------------
 
-export function exportResumePdf(printUrl: string): void {
+export async function exportResumePdf(printUrl: string): Promise<void> {
   const w = window.open(printUrl, "_blank", "noopener,noreferrer");
   if (!w) {
-    alert("Your browser blocked the print window. Allow pop-ups for this site, then try again.");
+    await alertDialog({
+      title: "Pop-up blocked",
+      description: "Your browser blocked the print window. Allow pop-ups for this site, then try again.",
+    });
   }
 }

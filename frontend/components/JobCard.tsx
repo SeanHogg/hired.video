@@ -18,6 +18,7 @@ import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
+import { promptDialog } from "@/lib/dialogs";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { useTrackedJobs } from "@/hooks/use-tracked-jobs";
@@ -208,7 +209,7 @@ export default function JobCard({
       await navigator.clipboard.writeText(url);
       toast.success(t("messages.jobLinkCopied"));
     } catch {
-      prompt(t("prompts.copyThisLink"), url);
+      await promptDialog({ title: "Copy link", label: t("prompts.copyThisLink"), defaultValue: url });
     }
   };
 

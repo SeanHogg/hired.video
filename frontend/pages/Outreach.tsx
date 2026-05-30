@@ -78,6 +78,7 @@ import { PerformanceTab } from "@/components/outreach/tabs/PerformanceTab";
 import { TemplatesTab } from "@/components/outreach/tabs/TemplatesTab";
 import { TrackingTab } from "@/components/outreach/tabs/TrackingTab";
 import { useAuth } from "@/lib/auth";
+import { alertDialog } from "@/lib/dialogs";
 import { toast } from "@/hooks/use-toast";
 import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
@@ -1420,7 +1421,7 @@ export default function Outreach() {
             <Button
               onClick={async () => {
                 if (!selectedJobId || selectedBoardIds.length === 0) {
-                  alert(t("errors.selectJobBoard"));
+                  await alertDialog({ title: "Error", description: t("errors.selectJobBoard") });
                   return;
                 }
 
@@ -1442,7 +1443,7 @@ export default function Outreach() {
                   setJobBoardStats(stats);
                 } catch (err) {
                   console.error("Failed to post job to boards:", err);
-                  alert(t("errors.postToBoardsFailed"));
+                  await alertDialog({ title: "Error", description: t("errors.postToBoardsFailed") });
                 }
               }}
               disabled={!selectedJobId || selectedBoardIds.length === 0}

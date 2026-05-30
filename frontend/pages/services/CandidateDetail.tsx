@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import { confirmDialog } from "@/lib/dialogs";
 import { AppShell } from "@/components/AppShell";
 import ServicesNav from "@/components/services/ServicesNav";
 import ShareCreationDialog from "@/components/services/ShareCreationDialog";
@@ -239,7 +240,14 @@ export default function CandidateDetail() {
 
   const handleDelete = async () => {
     if (!row) return;
-    if (!window.confirm("Delete this candidate resume? Variants and share links will also be removed.")) {
+    if (
+      !(await confirmDialog({
+        title: "Delete candidate",
+        description: "Delete this candidate resume? Variants and share links will also be removed.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    ) {
       return;
     }
     try {

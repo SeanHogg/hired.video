@@ -19,6 +19,7 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import { alertDialog } from "@/lib/dialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -126,9 +127,10 @@ export function TakeHomeInviteManager({
       // scorecard form. The form opens on the existing scorecards surface
       // keyed by application; the link here is informative.
       if (typeof window !== "undefined") {
-        window.alert(
-          `Scorecard submission ${scorecardSubmissionId} ready to fill on the candidate's debrief page.`,
-        );
+        await alertDialog({
+          title: "Review ready",
+          description: `Scorecard submission ${scorecardSubmissionId} ready to fill on the candidate's debrief page.`,
+        });
       }
     } finally {
       setReviewing(null);

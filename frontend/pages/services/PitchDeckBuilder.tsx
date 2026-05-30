@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import { confirmDialog } from "@/lib/dialogs";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -356,7 +357,7 @@ export default function PitchDeckBuilder() {
 
   const handleDeleteDeck = async () => {
     if (!deck) return;
-    if (!window.confirm("Delete this deck? Slides and shares will also be removed.")) return;
+    if (!(await confirmDialog({ title: "Delete deck", description: "Delete this deck? Slides and shares will also be removed.", confirmText: "Delete", destructive: true }))) return;
     try {
       await recruitService.deletePitchDeck(deck.id);
       toast({ title: "Deck deleted" });

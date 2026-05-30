@@ -18,6 +18,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { confirmDialog } from "@/lib/dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -213,8 +214,8 @@ export function AdvertiseTab({
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
                           disabled={busyBoostId === boost.id}
-                          onClick={() => {
-                            if (!confirm("Cancel this boost?")) return;
+                          onClick={async () => {
+                            if (!(await confirmDialog({ title: "Cancel boost", description: "Cancel this boost?", confirmText: "Cancel boost", destructive: true }))) return;
                             runBoostAction(boost.id, onCancelBoost);
                           }}
                         >

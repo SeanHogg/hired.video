@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { confirmDialog } from "@/lib/dialogs";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -126,7 +127,7 @@ export default function EventManage() {
 
   async function cancelEvent() {
     if (!event) return;
-    if (!confirm("Cancel this event? Attendees will be notified.")) return;
+    if (!(await confirmDialog({ title: "Cancel event", description: "Cancel this event? Attendees will be notified.", confirmText: "Cancel event", destructive: true }))) return;
     await eventsService.cancel(event.id);
     void reload();
   }

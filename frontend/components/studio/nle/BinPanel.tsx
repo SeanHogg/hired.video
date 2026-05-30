@@ -38,6 +38,7 @@ import {
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import { nleApi, type NleMediaSourceWithBin } from "@/lib/timeline/api";
+import { promptDialog } from "@/lib/dialogs";
 import { NLE_SOURCE_DRAG_MIME } from "@/lib/timeline/dnd";
 import { probeSource } from "@/lib/timeline/source-probe";
 import { generateProxy, isProxyGenerationAvailable } from "@/lib/timeline/proxy-generator";
@@ -282,7 +283,12 @@ export default function BinPanel({ initial, onPickSource }: Props) {
               activeFolder={activeFolder}
               onSelect={(path) => setActiveFolder(path)}
               onRename={async (from) => {
-                const to = window.prompt(`Move "${from}" to:`, from);
+                const to = await promptDialog({
+                  title: "Move folder",
+                  label: `Move "${from}" to:`,
+                  defaultValue: from,
+                  confirmText: "Move",
+                });
                 if (to === null || to === from) return;
                 try {
                   await nleApi.renameFolder(from, to);

@@ -357,9 +357,16 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
       setInbox((prev) => ({ ...prev, pendingRequests: updater(prev.pendingRequests) })),
     [setInbox],
   );
-  const setExternalEmails = useCallback(
-    (updater: (es: PersistedExternalEmail[]) => PersistedExternalEmail[]) =>
-      setInbox((prev) => ({ ...prev, externalEmails: updater(prev.externalEmails) })),
+  // Apply one transform to BOTH the polled page-1 emails (inside the gated
+  // cache) and the appended pages (`extraEmails`). Every per-email mutation —
+  // mark read/unread, archive, junk, restore, mark-all — must hit both stores
+  // or a row the user paged in via "Load more" would silently ignore the
+  // action: that row lives ONLY in `extraEmails`, which `setInbox` never sees.
+  const updateEmailsEverywhere = useCallback(
+    (updater: (es: PersistedExternalEmail[]) => PersistedExternalEmail[]) => {
+      setInbox((prev) => ({ ...prev, externalEmails: updater(prev.externalEmails) }));
+      setExtraEmails((prev) => updater(prev));
+    },
     [setInbox],
   );
 
@@ -482,18 +489,26 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
   const markAllRead = useCallback(async () => {
     setPersistedNotifs((ns) => ns.map((n) => ({ ...n, isRead: true })));
     setConversations((cs) => cs.map((c) => ({ ...c, unreadCount: 0 })));
-    setExternalEmails((es) => es.map((e) => ({ ...e, isRead: true })));
+    updateEmailsEverywhere((es) => es.map((e) => ({ ...e, isRead: true })));
+    // Live SignalR notifications live in their own state and are merged into
+    // `items` FIRST (authoritative over the persisted copy). The persisted
+    // update above is therefore shadowed for any pushed notification, so we
+    // must mark the live ones read too — otherwise "Mark all read" leaves
+    // freshly-pushed notifications bold and the badge non-zero.
+    liveNotifs.forEach((n) => {
+      if (!n.isRead) markLiveNotifRead(n.id);
+    });
     // Notifications + external emails have separate mark-all endpoints —
     // fan out so neither blocks the other on partial failure.
     await Promise.allSettled([
       apiClient.post("/api/notifications/mark-all-read"),
       apiClient.post("/api/inbox/external-emails/mark-all-read"),
     ]);
-  }, [setConversations, setPersistedNotifs, setExternalEmails]);
+  }, [setConversations, setPersistedNotifs, updateEmailsEverywhere, liveNotifs, markLiveNotifRead]);
 
   const markExternalEmailRead = useCallback(
     async (externalEmailId: string) => {
-      setExternalEmails((es) =>
+      updateEmailsEverywhere((es) =>
         es.map((e) => (e.id === externalEmailId ? { ...e, isRead: true } : e)),
       );
       try {
@@ -502,12 +517,12 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         // Best-effort: refresh on next poll will reconcile.
       }
     },
-    [setExternalEmails],
+    [updateEmailsEverywhere],
   );
 
   const markExternalEmailUnread = useCallback(
     async (externalEmailId: string) => {
-      setExternalEmails((es) =>
+      updateEmailsEverywhere((es) =>
         es.map((e) => (e.id === externalEmailId ? { ...e, isRead: false } : e)),
       );
       try {
@@ -516,13 +531,13 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         // Best-effort.
       }
     },
-    [setExternalEmails],
+    [updateEmailsEverywhere],
   );
 
   const dismissExternalEmail = useCallback(
     async (externalEmailId: string) => {
       // Optimistic: drop from the local stream so the row disappears.
-      setExternalEmails((es) => es.filter((e) => e.id !== externalEmailId));
+      updateEmailsEverywhere((es) => es.filter((e) => e.id !== externalEmailId));
       try {
         await apiClient.post(
           `/api/inbox/external-emails/${externalEmailId}/archive`,
@@ -532,14 +547,14 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         refresh();
       }
     },
-    [refresh, setExternalEmails],
+    [refresh, updateEmailsEverywhere],
   );
 
   const bulkDismissExternalEmails = useCallback(
     async (ids: string[]) => {
       if (ids.length === 0) return;
       const idSet = new Set(ids);
-      setExternalEmails((es) => es.filter((e) => !idSet.has(e.id)));
+      updateEmailsEverywhere((es) => es.filter((e) => !idSet.has(e.id)));
       try {
         await apiClient.post("/api/inbox/external-emails/bulk-archive", {
           ids,
@@ -549,7 +564,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         refresh();
       }
     },
-    [refresh, setExternalEmails],
+    [refresh, updateEmailsEverywhere],
   );
 
   const junkExternalEmail = useCallback(
@@ -559,7 +574,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
     ) => {
       // Optimistic remove — the row goes to the junk view + future
       // matches stop reaching the inbox.
-      setExternalEmails((es) => es.filter((e) => e.id !== externalEmailId));
+      updateEmailsEverywhere((es) => es.filter((e) => e.id !== externalEmailId));
       try {
         await apiClient.post(
           `/api/inbox/external-emails/${externalEmailId}/junk`,
@@ -569,7 +584,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         refresh();
       }
     },
-    [refresh, setExternalEmails],
+    [refresh, updateEmailsEverywhere],
   );
 
   const restoreExternalEmail = useCallback(
@@ -577,7 +592,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
       // Best-effort optimistic remove from the current view (the
       // junk filter); the regular inbox will pick it up on next
       // refresh.
-      setExternalEmails((es) => es.filter((e) => e.id !== externalEmailId));
+      updateEmailsEverywhere((es) => es.filter((e) => e.id !== externalEmailId));
       try {
         await apiClient.post(
           `/api/inbox/external-emails/${externalEmailId}/archive`,
@@ -587,7 +602,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         refresh();
       }
     },
-    [refresh, setExternalEmails],
+    [refresh, updateEmailsEverywhere],
   );
 
   const dismissNotification = useCallback(

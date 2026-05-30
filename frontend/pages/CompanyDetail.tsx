@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddToListMenu from "@/components/lists/AddToListMenu";
+import { promptDialog } from "@/lib/dialogs";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
@@ -366,9 +367,9 @@ export default function CompanyDetail() {
                                     description: "Company link has been copied to your clipboard.",
                                   });
                                 })
-                                .catch(() => {
+                                .catch(async () => {
                                   // Fallback for older browsers
-                                  prompt("Copy this link:", url);
+                                  await promptDialog({ title: "Copy link", label: "Copy this link:", defaultValue: url });
                                 });
                             }}
                           >

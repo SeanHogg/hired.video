@@ -32,6 +32,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Button } from "@/components/ui/button";
+import { promptDialog } from "@/lib/dialogs";
 import {
   Bold,
   Italic,
@@ -185,8 +186,8 @@ export default function ArticleEditor({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => {
-              const url = window.prompt("URL");
+            onClick={async () => {
+              const url = await promptDialog({ title: "Insert link", label: "URL", placeholder: "https://…" });
               if (url) editor.chain().focus().setLink({ href: url }).run();
               else editor.chain().focus().unsetLink().run();
             }}

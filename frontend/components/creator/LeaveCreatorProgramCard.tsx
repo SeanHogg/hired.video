@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
+import { confirmDialog } from "@/lib/dialogs";
 
 interface Props {
   onProfileChange?: (next: CreatorProfile | null) => void;
@@ -32,7 +33,7 @@ export default function LeaveCreatorProgramCard({ onProfileChange }: Props = {})
   }, []);
 
   const cancel = async () => {
-    if (!confirm("Leave the Creator Program entirely? Your enrollment will end. You can re-enroll later — this starts a new enrollment row.")) return;
+    if (!(await confirmDialog({ title: "Leave program", description: "Leave the Creator Program entirely? Your enrollment will end. You can re-enroll later — this starts a new enrollment row.", confirmText: "Leave", destructive: true }))) return;
     setCancelling(true);
     try {
       await creatorService.cancel();

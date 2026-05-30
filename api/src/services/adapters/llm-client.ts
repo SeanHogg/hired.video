@@ -341,6 +341,26 @@ export class LLMDispatchError extends Error {
   }
 }
 
+/** A 429 `cascade_exhausted` whose underlying upstream error is actually
+ *  a vendor schema rejection (most commonly Gemini's `400: The specified
+ *  schema produces a constraint that has too many states for serving`)
+ *  is NOT a transient rate-limit — retrying never helps. The gateway
+ *  surfaces the wrapped upstream message inside the 429's `message`, so
+ *  we sniff for the schema signal there and reclassify as `schema`. That
+ *  routes the user to an honest `502 AI_INVALID_RESPONSE` ("the AI
+ *  couldn't produce a complete response") instead of "providers are at
+ *  capacity, retry in a minute" — which is false and sends them down a
+ *  dead-end retry loop. See gap #1802 (and #1801 for the root cause that
+ *  produces these in the tailor flow). */
+export function looksLikeSchemaRejection(message: string): boolean {
+  return (
+    /too many states/i.test(message) ||
+    /schema produces a constraint/i.test(message) ||
+    /invalid\s+schema/i.test(message) ||
+    /response[_ ]?schema/i.test(message)
+  );
+}
+
 /** Classify a single attempt's error so the dispatch chain can roll up
  *  to a single classification. Centralised so the JSON-schema vs
  *  rate-limit vs timeout branching never drifts between dispatch and
@@ -363,6 +383,12 @@ function classifyAttemptError(
     else if (status === 401 || status === 403) kind = "auth";
     else if (status === 429 || err.code === "rate_limit" || err.code === "plan_token_limit_exceeded") kind = "rate_limit";
     else if (status >= 500) kind = "network";
+    // #1802 — a 429-wrapped cascade (or an opaque error) can be hiding a
+    // permanent vendor schema rejection. Reclassify so the rollup +
+    // route UX are honest (502 schema, not 503 retry-in-a-minute).
+    if ((kind === "rate_limit" || kind === "unknown") && looksLikeSchemaRejection(err.message)) {
+      kind = "schema";
+    }
     const failovers = err.failovers?.map((f) => ({
       model: f.model,
       vendor: f.vendor,
@@ -508,25 +534,77 @@ function buildMetadata(
   return md;
 }
 
+/** Rough upper bound on the number of constrained-decoding "states" a
+ *  vendor (notably Google AI / Gemini) must compile a strict
+ *  `responseSchema` into. Gemini hard-rejects schemas past its internal
+ *  ceiling with `400: The specified schema produces a constraint that
+ *  has too many states for serving` — a PERMANENT failure, not a
+ *  transient one (gap #1801). We approximate the cost by counting every
+ *  declared property + enum member across the whole (recursively walked)
+ *  schema, including `$defs`, `items`, `additionalProperties`, and
+ *  `anyOf`/`oneOf`/`allOf` branches. Cheaper than modelling Gemini's
+ *  exact grammar and monotonic in the things that actually blow it up
+ *  (lots of properties, long enums, deep nesting). */
+export function estimateSchemaStates(node: unknown, depth = 0): number {
+  if (depth > 12 || node === null || typeof node !== "object") return 0;
+  const obj = node as Record<string, unknown>;
+  let count = 0;
+  if (Array.isArray(obj.enum)) count += obj.enum.length;
+  for (const bagKey of ["properties", "$defs", "definitions"] as const) {
+    const bag = obj[bagKey];
+    if (bag && typeof bag === "object") {
+      for (const child of Object.values(bag as Record<string, unknown>)) {
+        count += 1 + estimateSchemaStates(child, depth + 1);
+      }
+    }
+  }
+  if (obj.items) count += estimateSchemaStates(obj.items, depth + 1);
+  if (obj.additionalProperties && typeof obj.additionalProperties === "object") {
+    count += estimateSchemaStates(obj.additionalProperties, depth + 1);
+  }
+  for (const branchKey of ["anyOf", "oneOf", "allOf"] as const) {
+    const branch = obj[branchKey];
+    if (Array.isArray(branch)) {
+      for (const b of branch) count += estimateSchemaStates(b, depth + 1);
+    }
+  }
+  return count;
+}
+
+/** Above this estimated state count we DON'T register the schema as a
+ *  strict vendor-side `responseSchema` — we fall back to plain
+ *  `json_object` mode and rely on our own post-hoc Zod validation +
+ *  retry. Tuned so the full JSON-Resume `ResumeContentSchema` (~170
+ *  states — the resume-tailor pipeline) falls back, while the small
+ *  enum-bearing schemas that genuinely benefit from vendor conformance
+ *  retry (Career360 plan, match insights — under ~20 states) stay
+ *  strict. See gap #1801. */
+const MAX_STRICT_SCHEMA_STATES = 100;
+
 /** Try to derive a Builderforce-shaped `JsonSchemaSpec` from a Zod
  *  schema so the gateway can run vendor-side `strict: true` conformance
- *  retries. Returns `null` when the schema can't be translated cleanly
- *  (transforms, refinements, top-level non-object unions) — caller
- *  falls back to plain `json_object` mode in that case. The featureKey
- *  doubles as the schema's `name` for SA's `_builderforce.schemaRetries`
- *  telemetry. */
-function deriveJsonSchema(
+ *  retries. Returns `null` (caller falls back to plain `json_object`
+ *  mode) when EITHER:
+ *    • the schema can't be translated cleanly (transforms, refinements,
+ *      top-level non-object unions) — the gateway only accepts
+ *      object-rooted schemas for strict mode; or
+ *    • the schema is too complex for vendor constrained-decoding —
+ *      Gemini returns a permanent `400 too many states` (gap #1801) that
+ *      no fallback model in the chain can absorb once the gateway
+ *      cascades into Gemini.
+ *  `name` doubles as the schema's id for SA's
+ *  `_builderforce.schemaRetries` telemetry. Single source of truth for
+ *  both `callJson` and `callJsonLenient` so the two paths can't drift on
+ *  whether/when strict mode is safe. */
+export function deriveStrictJsonSchema(
   schema: z.ZodType<unknown>,
-  featureKey: string,
+  name: string,
 ): JsonSchemaSpec | null {
   try {
     const derived = toJSONSchema(schema) as Record<string, unknown>;
-    // The gateway only accepts object-rooted schemas for strict mode.
-    // Anything else (top-level union, intersection, primitive) should
-    // fall through to json_object so we don't 4xx the request before
-    // the model even runs.
     if (derived?.type !== "object") return null;
-    return { name: featureKey, strict: true, schema: derived };
+    if (estimateSchemaStates(derived) > MAX_STRICT_SCHEMA_STATES) return null;
+    return { name, strict: true, schema: derived };
   } catch {
     return null;
   }
@@ -739,7 +817,7 @@ export function createLLMClient(
       // refines, top-level z.union with non-object branches, etc.) just
       // fall back to plain `json_object` mode — caller behaviour is
       // unchanged in that case.
-      const jsonSchema = safe.jsonSchema ?? deriveJsonSchema(schema, featureKey);
+      const jsonSchema = safe.jsonSchema ?? deriveStrictJsonSchema(schema, featureKey);
 
       let parsedData: T | undefined;
       const result = await dispatch({
@@ -784,15 +862,14 @@ export function createLLMClient(
       // (Builderforce SDK ≥0.6) on every field EXCEPT the wide-typed
       // ones the lenient schema deliberately allows. We don't pass an
       // explicit `jsonSchema` from the caller — it's derived once here
-      // so the wire schema and the gateway's enforcement schema can
-      // never drift. The cast to Record<string, unknown> matches the
-      // SDK's structural type for `JsonSchemaSpec.schema`.
-      const derived = toJSONSchema(spec.ingest) as Record<string, unknown>;
-      const jsonSchema: JsonSchemaSpec = {
-        name: spec.name,
-        strict: true,
-        schema: derived,
-      };
+      // (via the shared guard) so the wire schema and the gateway's
+      // enforcement schema can never drift, AND so a schema too complex
+      // for vendor constrained-decoding (e.g. the full resume document
+      // in `match_tailor`) falls back to plain `json_object` mode
+      // instead of triggering Gemini's permanent `400 too many states`
+      // (gap #1801). Our post-hoc lenient parse + coerce + retry still
+      // guarantees the canonical shape either way.
+      const jsonSchema = deriveStrictJsonSchema(spec.ingest, spec.name);
 
       let coerced: Canonical | undefined;
       const result = await dispatch({
@@ -802,7 +879,11 @@ export function createLLMClient(
           { role: "system", content: safe.systemPrompt },
           { role: "user", content: safe.userMessage },
         ],
-        responseFormat: pickResponseFormat({ ...safe, jsonSchema }),
+        responseFormat: pickResponseFormat(
+          jsonSchema
+            ? { ...safe, jsonSchema }
+            : { ...safe, responseFormat: "json_object" },
+        ),
         metadata: buildMetadata(user, featureKey, opts),
         callOpts: opts,
         validateContent: (content) => {

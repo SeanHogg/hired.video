@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiClient } from "@/lib/api-client";
+import { confirmDialog, promptDialog } from "@/lib/dialogs";
 
 interface Lesson {
   id: string;
@@ -89,7 +90,7 @@ export default function CourseModulesEditor({ courseId, canEdit }: CourseModules
 
   const addModule = async () => {
     try {
-      const title = prompt("Module title?")?.trim();
+      const title = (await promptDialog({ title: "Add module", label: "Module title?" }))?.trim();
       if (!title) return;
       await apiClient.post(`/api/courses/${encodeURIComponent(courseId)}/modules`, {
         title,
@@ -102,7 +103,7 @@ export default function CourseModulesEditor({ courseId, canEdit }: CourseModules
   };
 
   const addLesson = async (moduleId: string) => {
-    const title = prompt("Lesson title?")?.trim();
+    const title = (await promptDialog({ title: "Add lesson", label: "Lesson title?" }))?.trim();
     if (!title) return;
     try {
       await apiClient.post(`/api/courses/${encodeURIComponent(courseId)}/lessons`, {
@@ -117,7 +118,7 @@ export default function CourseModulesEditor({ courseId, canEdit }: CourseModules
   };
 
   const deleteLesson = async (lessonId: string) => {
-    if (!confirm("Delete this lesson?")) return;
+    if (!(await confirmDialog({ title: "Delete lesson", description: "Delete this lesson?", confirmText: "Delete", destructive: true }))) return;
     try {
       await apiClient.delete(`/api/courses/lessons/${encodeURIComponent(lessonId)}`);
       await refresh();

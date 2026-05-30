@@ -16,6 +16,7 @@ import CourseContentEditor from "@/components/creator/CourseContentEditor";
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 import { studioTemplatesService, type StudioTemplate } from "@/lib/services/studio-templates-service";
 import { generateAndUploadCover } from "@/lib/courses/cover-generator";
+import { confirmDialog } from "@/lib/dialogs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Mode = "list" | "edit";
@@ -268,7 +269,7 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
   };
 
   const remove = async (c: Course) => {
-    if (!confirm(`Delete "${c.title}"? This cannot be undone.`)) return;
+    if (!(await confirmDialog({ title: "Delete course", description: `Delete "${c.title}"? This cannot be undone.`, confirmText: "Delete", destructive: true }))) return;
     const previous = courses;
     setCourses((cur) => cur.filter((x) => x.id !== c.id));
     try {

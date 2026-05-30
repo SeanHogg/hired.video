@@ -13,7 +13,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { MetricsPanel, type ArtifactMetrics, type ArtifactKind } from "@/components/analytics";
+// Import the panel + types directly from their modules rather than from
+// the "@/components/analytics" barrel: the barrel re-exports THIS file
+// (`export { default as ArtifactAnalyticsDashboard } from "./ArtifactAnalyticsDashboard"`),
+// so importing a *value* (MetricsPanel) back through it forms a runtime
+// import cycle — the canonical trigger for a Rollup "Cannot access X
+// before initialization" TDZ in production. External consumers still use
+// the barrel; a file living inside the barrel must not.
+import MetricsPanel from "@/components/analytics/MetricsPanel";
+import type { ArtifactMetrics, ArtifactKind } from "@/components/analytics/types";
 import type { ArtifactKind as ArtifactKindKey } from "@shared/artifact-views";
 import { fetchArtifactAnalytics } from "@/lib/services/artifact-view-service";
 

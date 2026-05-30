@@ -54,7 +54,7 @@ export async function downloadResume({
         // sessionStorage disabled/unavailable — print window falls back to defaults
       }
     }
-    exportResumePdf(`/resumes/${id}?print=1`);
+    await exportResumePdf(`/resumes/${id}?print=1`);
     return;
   }
 

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 
 import { accountService } from "@/lib/services/account-service";
+import { confirmDialog } from "@/lib/dialogs";
 import { AccountUser } from "@/types/account";
 import { InviteUserModal } from "@/components/account/InviteUserModal";
 import { BulkInviteModal } from "@/components/account/BulkInviteModal";
@@ -81,9 +82,11 @@ export function AccountManagementPanel() {
       // re-send with explicit authorization.
       if (result.requiresSeatConfirmation) {
         const price = ((result.seatInfo?.pricePerSeatCents ?? 0) / 100).toFixed(2);
-        const confirmed = window.confirm(
-          `${result.message} This adds a seat at $${price}/mo to your bill. Add it?`,
-        );
+        const confirmed = await confirmDialog({
+          title: "Add paid seat",
+          description: `${result.message} This adds a seat at $${price}/mo to your bill. Add it?`,
+          confirmText: "Add seat",
+        });
         if (!confirmed) {
           setInviteModalOpen(false);
           return;

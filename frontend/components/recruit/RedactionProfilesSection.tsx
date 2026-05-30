@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { Check, Plus, ShieldCheck, Star, Trash2 } from "lucide-react";
+import { confirmDialog } from "@/lib/dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -164,9 +165,13 @@ export default function RedactionProfilesSection({
 
   const deleteProfile = async (id: string) => {
     if (
-      !window.confirm(
-        "Delete this redaction profile? Shares using it will fall back to defaults.",
-      )
+      !(await confirmDialog({
+        title: "Delete profile",
+        description:
+          "Delete this redaction profile? Shares using it will fall back to defaults.",
+        confirmText: "Delete",
+        destructive: true,
+      }))
     ) {
       return;
     }

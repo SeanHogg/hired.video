@@ -24,6 +24,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { confirmDialog } from "@/lib/dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -221,7 +222,7 @@ export default function ListsButton({
 
   async function handleDelete() {
     if (!editingList) return;
-    if (!window.confirm(`Delete list "${editingList.title}"? This cannot be undone.`)) {
+    if (!(await confirmDialog({ title: "Delete list", description: `Delete list "${editingList.title}"? This cannot be undone.`, confirmText: "Delete", destructive: true }))) {
       return;
     }
     try {

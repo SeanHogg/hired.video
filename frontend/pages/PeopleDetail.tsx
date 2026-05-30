@@ -69,6 +69,7 @@ import {
   type CreatorProgram,
 } from "@/lib/services/creator-service";
 import { userService } from "@/lib/services/user-service";
+import { confirmDialog } from "@/lib/dialogs";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { useProfileView, type ProfileViewTarget } from "@/hooks/useProfileView";
 import {
@@ -292,7 +293,7 @@ function PeopleDetailContent() {
 
   const handleDisconnect = async () => {
     if (!connection.id || connectionBusy) return;
-    if (!window.confirm(t("messages.confirmRemoveConnection", { name: firstName || t("messages.thisUserFallback") }))) return;
+    if (!(await confirmDialog({ title: "Remove connection", description: t("messages.confirmRemoveConnection", { name: firstName || t("messages.thisUserFallback") }), confirmText: "Remove", destructive: true }))) return;
     setConnectionBusy(true);
     try {
       await userService.rejectConnectionRequest(connection.id);

@@ -10,7 +10,8 @@
  *   - mobile    → full-height left Sheet (same a11y pattern as the Studio drawer)
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSharedCommHub } from "@/providers/CommHubProvider";
 import { InboxPanel } from "@/components/communication/InboxPanel";
+import type { HubItem } from "@/hooks/use-comm-hub";
 
 export default function CommunicationHub() {
   const { isAuthenticated } = useAuth();
@@ -41,10 +43,32 @@ export default function CommunicationHub() {
 
 function AuthenticatedCommunicationHub() {
   const hub = useSharedCommHub();
+  const navigate = useNavigate();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const { unreadCount } = hub;
+
+  // Clicking a row in the header overlay must DO something — before this the
+  // popover passed no `onItemSelect`, so the only effect of a click was a
+  // silent mark-read (and only when already unread). Messages open the chat
+  // widget in place; everything else (synced emails, notifications, requests)
+  // deep-links into the full /outreach Inbox tab — that surface owns the
+  // detail sheet + inline render — and closes the overlay. The InboxRow's own
+  // onSelect path still marks the clicked notification/email read on the way.
+  const handleItemSelect = useCallback(
+    (item: HubItem) => {
+      if (item.kind === "message" && item.conversationId) {
+        hub.openMessage(item.conversationId);
+      } else {
+        const params = new URLSearchParams({ tab: "inbox", item: item.id });
+        navigate(`/outreach?${params.toString()}`);
+      }
+      setPopoverOpen(false);
+      setSheetOpen(false);
+    },
+    [hub, navigate],
+  );
 
   const triggerButton = (
     <Button
@@ -74,7 +98,11 @@ function AuthenticatedCommunicationHub() {
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
           <PopoverContent className="w-96 p-0" align="end">
-            <InboxPanel hub={hub} onClose={() => setPopoverOpen(false)} />
+            <InboxPanel
+              hub={hub}
+              onClose={() => setPopoverOpen(false)}
+              onItemSelect={handleItemSelect}
+            />
           </PopoverContent>
         </Popover>
       </div>
@@ -109,7 +137,11 @@ function AuthenticatedCommunicationHub() {
                 Messages, notifications, and connection requests in one place.
               </SheetDescription>
             </SheetHeader>
-            <InboxPanel hub={hub} onClose={() => setSheetOpen(false)} />
+            <InboxPanel
+              hub={hub}
+              onClose={() => setSheetOpen(false)}
+              onItemSelect={handleItemSelect}
+            />
           </SheetContent>
         </Sheet>
       </div>

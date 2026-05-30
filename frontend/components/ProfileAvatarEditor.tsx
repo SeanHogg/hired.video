@@ -3,6 +3,7 @@ import { Upload, X, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { alertDialog } from "@/lib/dialogs";
 
 interface ProfileAvatarEditorProps {
   currentAvatarUrl?: string;
@@ -29,18 +30,16 @@ export function ProfileAvatarEditor({
   );
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      // eslint-disable-next-line no-alert
-      alert("Please select an image file");
+      await alertDialog({ title: "Invalid file", description: "Please select an image file" });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      // eslint-disable-next-line no-alert
-      alert("File size must be less than 5MB");
+      await alertDialog({ title: "Invalid file", description: "File size must be less than 5MB" });
       return;
     }
 

@@ -49,6 +49,7 @@ import {
   type CreateServiceInput,
   type ServiceOffering,
 } from "@/lib/services/services-service";
+import { confirmDialog } from "@/lib/dialogs";
 import { userService } from "@/lib/services/user-service";
 import type { CreatorProfile } from "@/lib/services/creator-service";
 
@@ -195,7 +196,7 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this service?")) return;
+    if (!(await confirmDialog({ title: "Delete service", description: "Delete this service?", confirmText: "Delete", destructive: true }))) return;
     try {
       await servicesService.deleteService(id);
       setServices((prev) => prev.filter((s) => s.id !== id));

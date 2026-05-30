@@ -48,6 +48,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { apiClient } from "@/lib/api-client";
+import { confirmDialog } from "@/lib/dialogs";
 import {
   setPlanOverride,
   clearPlanOverride,
@@ -265,7 +266,7 @@ export default function UserManagement() {
   };
 
   const handleSendPasswordReset = async (user: ApiUser) => {
-    if (!window.confirm(t("messages.confirmPasswordReset", { name: user.name, email: user.email }))) return;
+    if (!(await confirmDialog({ title: "Send password reset", description: t("messages.confirmPasswordReset", { name: user.name, email: user.email }), confirmText: "Send" }))) return;
     try {
       await apiClient.post(`/api/admin/impersonate/users/${user.id}/password-reset`, {});
       toast({ title: t("messages.passwordResetSent", { email: user.email }) });
@@ -280,7 +281,7 @@ export default function UserManagement() {
 
   const handleHealResumes = async (user: ApiUser) => {
     if (user.resumeCount === 0) return;
-    if (!window.confirm(t("messages.confirmHealResumes", { count: user.resumeCount, name: user.name }))) return;
+    if (!(await confirmDialog({ title: "Heal resumes", description: t("messages.confirmHealResumes", { count: user.resumeCount, name: user.name }), confirmText: "Heal" }))) return;
     try {
       setHealingUserId(user.id);
       const res = await apiClient.post<{
@@ -311,7 +312,7 @@ export default function UserManagement() {
   };
 
   const handleResetTokens = async (user: ApiUser) => {
-    if (!window.confirm(t("messages.confirmResetTokens", { name: user.name }))) return;
+    if (!(await confirmDialog({ title: "Reset tokens", description: t("messages.confirmResetTokens", { name: user.name }), confirmText: "Reset" }))) return;
     try {
       const res = await apiClient.post<{ tokensReset: number }>(
         `/api/admin/impersonate/users/${user.id}/tokens/reset`,
@@ -437,7 +438,7 @@ export default function UserManagement() {
 
   const handleClearOverride = async (user: ApiUser) => {
     const original = user.planOverride?.originalPlanName ?? "their subscription plan";
-    if (!window.confirm(t("messages.confirmClearOverride", { name: user.name, plan: original }))) return;
+    if (!(await confirmDialog({ title: "Clear override", description: t("messages.confirmClearOverride", { name: user.name, plan: original }), confirmText: "Clear" }))) return;
     try {
       await clearPlanOverride(user.id);
       toast({ title: t("messages.userResetTo", { name: user.name, plan: original }) });

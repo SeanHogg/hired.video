@@ -44,6 +44,7 @@ import type {
   JobBoardPostingDTO,
   JobBoardStatsDTO,
 } from "@/lib/services/job-board-service";
+import { confirmDialog } from "@/lib/dialogs";
 import type { JobSummary } from "@/lib/services/job-service";
 
 export interface PostingFilters {
@@ -290,9 +291,13 @@ export function JobBoardsTab({
                           variant="outline"
                           onClick={async () => {
                             if (
-                              confirm(
-                                "Are you sure you want to remove this posting?",
-                              )
+                              await confirmDialog({
+                                title: "Remove posting",
+                                description:
+                                  "Are you sure you want to remove this posting?",
+                                confirmText: "Remove",
+                                destructive: true,
+                              })
                             ) {
                               await onRemovePosting(posting.id);
                             }

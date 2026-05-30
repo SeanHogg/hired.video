@@ -18,6 +18,7 @@ import { buildScormZipForLesson, downloadScormZip } from "@/lib/courses/scorm-ex
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 import CourseGeneratorDialog, { type GeneratedCourse } from "@/components/creator/CourseGeneratorDialog";
 import { importPptx } from "@/lib/courses/pptx-import";
+import { confirmDialog } from "@/lib/dialogs";
 import {
   commitCourseSkeleton,
   generatedCourseToSkeleton,
@@ -258,7 +259,7 @@ export default function CourseContentEditor({ courseId }: Props) {
   };
 
   const removeModule = async (m: CourseModule) => {
-    if (!confirm(`Delete module "${m.title}"? Lessons inside it will also be deleted.`)) return;
+    if (!(await confirmDialog({ title: "Delete module", description: `Delete module "${m.title}"? Lessons inside it will also be deleted.`, confirmText: "Delete", destructive: true }))) return;
     const previousModules = modules;
     const previousLessons = lessons;
     setModules((cur) => cur.filter((x) => x.id !== m.id));
@@ -370,7 +371,7 @@ export default function CourseContentEditor({ courseId }: Props) {
   };
 
   const removeLesson = async (l: CourseLesson) => {
-    if (!confirm(`Delete lesson "${l.title}"?`)) return;
+    if (!(await confirmDialog({ title: "Delete lesson", description: `Delete lesson "${l.title}"?`, confirmText: "Delete", destructive: true }))) return;
     const previous = lessons;
     setLessons((cur) => cur.filter((x) => x.id !== l.id));
     try {

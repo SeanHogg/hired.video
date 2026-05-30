@@ -41,6 +41,7 @@ import { preloadStudioFonts } from "@/lib/studio/font-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+import { promptDialog } from "@/lib/dialogs";
 import {
   VISUAL_THEMES,
   BG_PRESETS,
@@ -700,12 +701,17 @@ export default function StudioEditorV2() {
   // AI inpaint (#1103) — when a selection is active, prompts the user
   // for a description, generates an image (img→img if the active
   // layer has pixels), composites the result MASKED to the selection.
-  // The rest of the active layer's pixels are preserved. Uses the
-  // browser's `prompt()` for now — a richer inline UI is logged as a
-  // follow-on.
+  // The rest of the active layer's pixels are preserved.
   const handleImageMarqueeInpaint = useCallback(async () => {
     if (!imageMarquee) return;
-    const promptText = window.prompt("Describe what should fill the selection:");
+    const promptText = await promptDialog({
+      title: "AI fill",
+      description: "Describe what should fill the selection.",
+      placeholder: "e.g. a clear blue sky with soft clouds",
+      multiline: true,
+      required: true,
+      confirmText: "Generate",
+    });
     if (!promptText || promptText.trim().length < 3) return;
     const layer = findImageLayer(imageState, imageState.activeLayerId);
     if (!layer || layer.locked) return;

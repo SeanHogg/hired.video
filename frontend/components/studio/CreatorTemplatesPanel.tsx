@@ -29,6 +29,7 @@ import {
   studioTemplatesService,
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
+import { confirmDialog } from "@/lib/dialogs";
 import MediaPicker from "@/components/shared/MediaPicker";
 import ArtifactDetailsSheet from "@/components/shared/ArtifactDetailsSheet";
 
@@ -102,7 +103,15 @@ export default function CreatorTemplatesPanel({ open, onOpenChange, onEditTempla
   }
 
   async function archive(t: StudioTemplate) {
-    if (!window.confirm(`Delete "${t.name}"? This removes it from the marketplace permanently.`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete template",
+        description: `Delete "${t.name}"? This removes it from the marketplace permanently.`,
+        confirmText: "Delete",
+        destructive: true,
+      }))
+    )
+      return;
     setBusyId(t.id);
     try {
       await studioTemplatesService.deleteById(t.id);

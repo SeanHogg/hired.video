@@ -19,6 +19,7 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { promptDialog } from "@/lib/dialogs";
 import {
   pointsAdminService,
   type PointsAdminDashboard,
@@ -483,8 +484,8 @@ function RedemptionsTab() {
                       size="sm"
                       variant="outline"
                       disabled={cancelMut.isPending}
-                      onClick={() => {
-                        const reason = prompt("Cancel reason?");
+                      onClick={async () => {
+                        const reason = await promptDialog({ title: "Cancel reason", label: "Cancel reason?", required: false });
                         if (reason) cancelMut.mutate({ id: r.id, reason });
                       }}
                     >

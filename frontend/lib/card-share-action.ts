@@ -11,6 +11,7 @@
 
 import { Share } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { promptDialog } from "@/lib/dialogs";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface ShareActionOptions {
@@ -56,8 +57,8 @@ export function buildShareAction({
             description: copySuccessDescription,
           });
         })
-        .catch(() => {
-          prompt("Copy this link:", url);
+        .catch(async () => {
+          await promptDialog({ title: "Copy link", label: "Copy this link:", defaultValue: url });
         });
     },
   };

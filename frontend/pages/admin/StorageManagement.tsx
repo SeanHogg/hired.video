@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { confirmDialog } from "@/lib/dialogs";
 import {
   adminStorageService,
   type Usage,
@@ -78,7 +79,7 @@ export default function StorageManagement() {
       ? orphans.orphans.filter((o) => keys.includes(o.key)).reduce((a, o) => a + o.size, 0)
       : 0;
     const noun = keys.length === 1 ? "this object" : `${keys.length} objects`;
-    if (!window.confirm(`Delete ${noun}? It frees ${formatBytes(sizeBytes)} and cannot be undone.`)) return;
+    if (!(await confirmDialog({ title: "Delete objects", description: `Delete ${noun}? It frees ${formatBytes(sizeBytes)} and cannot be undone.`, confirmText: "Delete", destructive: true }))) return;
     setBulkBusy(true);
     try {
       const res = await adminStorageService.bulkDeleteObjects(keys);

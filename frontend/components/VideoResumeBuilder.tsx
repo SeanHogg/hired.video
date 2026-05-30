@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { alertDialog } from "@/lib/dialogs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Video, Wand2, Save, Eye, Plus, X, Info } from "lucide-react";
 import { VideoUpload } from "./VideoUpload";
@@ -137,9 +138,9 @@ export function VideoResumeBuilder({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!uploadedVideo) {
-      alert("Please upload or generate a video first");
+      await alertDialog({ title: "No video", description: "Please upload or generate a video first" });
       return;
     }
 

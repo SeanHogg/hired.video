@@ -14,6 +14,7 @@ import GlobalAIUsageBanner from "@/components/GlobalAIUsageBanner";
 import { BadgeUnlockToaster } from "@/components/badges/BadgeUnlockToaster";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
+import { DialogHost } from "@/components/ui/DialogHost";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -591,6 +592,7 @@ const App = () => (
                       router context — mounting above caused a crash on
                       the first AI_USAGE_LIMIT_REACHED event. */}
                   <Toaster />
+                  <DialogHost />
                   <Sonner />
                   <GlobalErrorHandler />
                   <GlobalAIUsageBanner />

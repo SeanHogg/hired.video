@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { ConnectMailboxButtons } from "@/components/email/ConnectMailboxButtons";
 import { ReconnectMailboxButton } from "@/components/email/ReconnectMailbox";
 import { useAuth } from "@/lib/auth";
+import { confirmDialog } from "@/lib/dialogs";
 import { useToast } from "@/components/ui/use-toast";
 import {
   emailIntegrationService,
@@ -111,7 +112,7 @@ export function EmailInboxesPanel() {
   }, [refreshAccounts, refreshRuns]);
 
   const handleDisconnect = async (id: string) => {
-    if (!confirm("Disconnect this mailbox? Synced messages stay; new emails will stop arriving.")) return;
+    if (!(await confirmDialog({ title: "Disconnect mailbox", description: "Disconnect this mailbox? Synced messages stay; new emails will stop arriving.", confirmText: "Disconnect", destructive: true }))) return;
     await emailIntegrationService.disconnect(id);
     setAccounts((prev) => prev.filter((a) => a.id !== id));
     setSelected((prev) => {

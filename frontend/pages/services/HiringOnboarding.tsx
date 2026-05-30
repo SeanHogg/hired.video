@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
+import { confirmDialog } from "@/lib/dialogs";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -228,7 +229,7 @@ export default function HiringOnboarding() {
   }
 
   async function deleteOffer(id: string) {
-    if (!window.confirm(t("hiring.confirm.deleteOffer"))) return;
+    if (!(await confirmDialog({ title: "Delete offer", description: t("hiring.confirm.deleteOffer"), confirmText: "Delete", destructive: true }))) return;
     try {
       setBusyOfferId(id);
       await hiringService.deleteOffer(id);

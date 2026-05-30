@@ -11,7 +11,8 @@
  * The popover surface (CommunicationHub header dropdown) reuses the
  * same InboxPanel without any of these affordances.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import {
   Card,
@@ -118,6 +119,40 @@ export function InboxTab() {
     setDetailOpen(true);
   }, []);
 
+  // Deep-link from the header inbox overlay: `?tab=inbox&item=e-<id>` should
+  // land here AND auto-open that row's detail sheet. The header popover only
+  // marks-read + navigates; the detail UI lives on this tab, so we re-open it
+  // here once the matching row is present in the feed. Only synced emails have
+  // a detail view today (notifications/requests render inline), so other kinds
+  // simply consume the param without opening anything. The param is stripped
+  // after handling so a refresh / back-button doesn't re-pop the sheet.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkItemId = searchParams.get("item");
+  useEffect(() => {
+    if (!deepLinkItemId) return;
+    // Wait until the feed has loaded before deciding the row is missing —
+    // otherwise we'd strip the param before the row arrives from the fetch.
+    if (hub.isLoading && hub.items.length === 0) return;
+    const target = hub.items.find((i) => i.id === deepLinkItemId);
+    if (target && target.kind === "external_email") {
+      handleItemSelect(target);
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("item");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [
+    deepLinkItemId,
+    hub.items,
+    hub.isLoading,
+    handleItemSelect,
+    setSearchParams,
+  ]);
+
   const handleDetailMarkUnread = useCallback(
     (id: string) => {
       hub.markExternalEmailUnread(id);
@@ -214,8 +249,15 @@ export function InboxTab() {
           heightClassName="h-[70vh] min-h-[32rem]"
           onItemSelect={
             selectionMode ? undefined : (item) => {
-              // Only synced emails have a useful detail view today.
-              if (item.kind === "external_email") handleItemSelect(item);
+              // Messages open the chat widget; synced emails open the detail
+              // sheet (the only stream with a body to show). Notifications /
+              // requests render everything inline on the row, so a click on
+              // them is a no-op beyond the mark-read InboxRow already does.
+              if (item.kind === "message" && item.conversationId) {
+                hub.openMessage(item.conversationId);
+              } else if (item.kind === "external_email") {
+                handleItemSelect(item);
+              }
             }
           }
           selectionMode={selectionMode}
