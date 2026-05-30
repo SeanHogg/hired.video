@@ -14,9 +14,10 @@
 import { Hono } from "hono";
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
+import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
+import { requireCompanyOwner } from "../services/company/companyOwnership.js";
 
 export const artifactMetricsRoutes = new Hono<AppEnv>();
 
@@ -166,20 +167,16 @@ artifactMetricsRoutes.get("/job/:id", async (c) => {
 });
 
 artifactMetricsRoutes.get("/company/:id", async (c) => {
-  const u = uid(c);
-  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [company] = await db
-    .select({ id: schema.companyProfiles.id, ownerId: schema.companyProfiles.ownerId })
-    .from(schema.companyProfiles)
-    .where(eq(schema.companyProfiles.id, c.req.param("id")))
-    .limit(1);
-  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  if (company.ownerId !== u) return c.json(error("FORBIDDEN", "Owner only"), 403);
+  // DRY parity with the job branch above — the company-team-member rule
+  // belongs in one place. The previous inline check only honoured the
+  // bare `ownerId`, silently denying every active member who should be
+  // able to read metrics on a shared workspace.
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const metrics = await aggregateViews({
     table: schema.companyViewEvents,
     entityCol: schema.companyViewEvents.companyId,
-    entityId: company.id,
+    entityId: access!.companyId,
   });
   return c.json(success(metrics), 200);
 });
