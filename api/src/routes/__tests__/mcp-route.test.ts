@@ -94,8 +94,16 @@ describe("MCP route — prompts/get", () => {
   });
 });
 
-describe("MCP route — execution stubs", () => {
-  it("tools/call returns a spec-shaped isError result pointing at the REST endpoint", async () => {
+describe("MCP route — execution fallback when app reference is missing", () => {
+  // The real execution path goes through `app.request()` re-entry — the
+  // parent app's `app.use("/api/mcp/*")` middleware stows the app on
+  // c.var.app, then `executeToolCall` builds a dispatch + re-enters.
+  // This test hits the sub-app DIRECTLY (no parent middleware) so the
+  // app reference is absent; the route's fallback envelope should make
+  // that visible rather than silently 500-ing. The positive-path
+  // dispatch contract is exercised by shared/__tests__/mcp.test.ts
+  // ("MCP dispatch builder" suite) which tests the pure helper.
+  it("tools/call without app context returns a clear isError envelope", async () => {
     const { json } = await rpc({
       jsonrpc: "2.0",
       id: 9,
@@ -103,18 +111,41 @@ describe("MCP route — execution stubs", () => {
       params: { name: "resume-optimize", arguments: {} },
     });
     assert.strictEqual(json.result.isError, true);
-    assert.ok(json.result.content[0].text.includes("/api/resumeoptimizer/optimize"));
+    assert.ok(
+      json.result.content[0].text.includes("MCP dispatch unavailable"),
+      `unexpected envelope: ${json.result.content[0].text}`,
+    );
+  });
+
+  it("tools/call with a missing name returns an INVALID_PARAMS error", async () => {
+    const { json } = await rpc({
+      jsonrpc: "2.0",
+      id: 10,
+      method: "tools/call",
+      params: {},
+    });
+    assert.strictEqual(json.error.code, -32602);
+  });
+
+  it("resources/read with a non-hired:// uri returns INVALID_PARAMS", async () => {
+    const { json } = await rpc({
+      jsonrpc: "2.0",
+      id: 11,
+      method: "resources/read",
+      params: { uri: "https://example.com/foo" },
+    });
+    assert.strictEqual(json.error.code, -32602);
   });
 });
 
 describe("MCP route — protocol errors", () => {
   it("unknown method → METHOD_NOT_FOUND", async () => {
-    const { json } = await rpc({ jsonrpc: "2.0", id: 10, method: "does/not/exist" });
+    const { json } = await rpc({ jsonrpc: "2.0", id: 12, method: "does/not/exist" });
     assert.strictEqual(json.error.code, -32601);
   });
 
   it("non-2.0 envelope → INVALID_REQUEST (400)", async () => {
-    const { status, json } = await rpc({ jsonrpc: "1.0", id: 11, method: "ping" });
+    const { status, json } = await rpc({ jsonrpc: "1.0", id: 13, method: "ping" });
     assert.strictEqual(status, 400);
     assert.strictEqual(json.error.code, -32600);
   });
