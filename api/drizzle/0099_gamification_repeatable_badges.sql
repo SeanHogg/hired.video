@@ -28,11 +28,21 @@ DELETE FROM "badges"
    AND EXISTS (SELECT 1 FROM "badges" b2 WHERE b2.slug='on_fire');
 
 -- Rename `first_task` → `get_it_done` per product language.
+--
+-- #1163 — Both renames here race against a re-seed that re-inserts the
+-- target slugs (`get_it_done` / `on_fire`). The pre-DELETE above clears
+-- the rare "both old + new exist" state, but only when the EXISTS
+-- check matches. On a partial-prior-deploy environment the target row
+-- can already exist independently, so the UPDATE collides with the
+-- `badges_slug_key` unique index. Gate both UPDATEs on the absence of
+-- the target slug so re-running this migration is a no-op rather than
+-- a constraint violation.
 UPDATE "badges"
    SET slug='get_it_done',
        name='Get It Done',
        description='Completed your first task.'
- WHERE slug='first_task';
+ WHERE slug='first_task'
+   AND NOT EXISTS (SELECT 1 FROM "badges" WHERE slug='get_it_done');
 
 -- Rename `streak_7` → `on_fire` per product language; mark repeatable.
 UPDATE "badges"
@@ -40,7 +50,8 @@ UPDATE "badges"
        name='On Fire',
        description='Stayed active 7 days in a row.',
        is_repeatable=true
- WHERE slug='streak_7';
+ WHERE slug='streak_7'
+   AND NOT EXISTS (SELECT 1 FROM "badges" WHERE slug='on_fire');
 
 -- Mark streak_30 repeatable.
 UPDATE "badges"

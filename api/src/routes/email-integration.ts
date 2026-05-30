@@ -41,6 +41,7 @@ import {
   exchangeCode,
   encryptToken,
   refreshAccessToken,
+  RefreshAccessTokenError,
 } from "../services/email-integration/oauth.js";
 import { requirePro } from "../middleware/auth-gates.js";
 import { getSubscription } from "../services/billing/BillingService.js";
@@ -48,6 +49,7 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
 import { loadConsumed } from "../domains/services-processing/services-processor.js";
 import { getEntitlement } from "../domains/services-processing/entitlement-catalog.js";
 import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
+import { pricingUpgradeUrl } from "../../../shared/upgrade-slugs.js";
 
 function getEnv(key: string): string {
   return process.env[key] || (globalThis as any).__ENV?.[key] || "";
@@ -116,7 +118,7 @@ async function checkInboxSyncEntitlement(
   }
   const sub = await getSubscription(userId);
   if (!sub.isPro) {
-    return { ok: false, redirect: "/pricing?upgrade=inbox-sync" };
+    return { ok: false, redirect: pricingUpgradeUrl("inbox-sync") };
   }
   // Cap = catalog default (INBOX_SYNC_INCLUDED_ACCOUNTS) + any extra
   // inbox-seat addons the user has purchased (#809). Consumed count
@@ -134,7 +136,7 @@ async function checkInboxSyncEntitlement(
     );
     if (existing) return { ok: true };
   }
-  return { ok: false, redirect: "/pricing?upgrade=inbox-extra" };
+  return { ok: false, redirect: pricingUpgradeUrl("inbox-extra") };
 }
 
 export const emailIntegrationRoutes = new Hono<AppEnv>();
@@ -178,7 +180,19 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
   }
   const redirect = safeRedirect(c.req.query("redirect"), "/settings?tab=email");
   const nonce = crypto.randomUUID();
-  const state = await createState({ userId: uid, ts: Date.now(), nonce, redirect });
+  // #916 — When the request is a Reconnect for a specific mailbox,
+  // thread the expected email through the state JWT so the callback can
+  // detect a mismatch + bounce back without upserting a new row. Also
+  // forward as `login_hint` so the provider's account picker defaults to
+  // the right account.
+  const reconnectAccountEmail = c.req.query("reconnectAccountEmail")?.trim() || undefined;
+  const state = await createState({
+    userId: uid,
+    ts: Date.now(),
+    nonce,
+    redirect,
+    reconnectAccountEmail,
+  });
 
   const params = new URLSearchParams({
     client_id: cfg.clientId(),
@@ -187,6 +201,7 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
     scope: cfg.scopes.join(" "),
     state,
     ...cfg.authParams,
+    ...(reconnectAccountEmail ? { login_hint: reconnectAccountEmail } : {}),
   });
   return c.redirect(`${cfg.authUrl}?${params.toString()}`);
 });
@@ -218,6 +233,19 @@ emailIntegrationRoutes.get("/:provider/callback", async (c) => {
     // Without a refresh token we can't sync — bounce so the user
     // re-consents (Google sometimes skips refresh on repeat consent).
     return c.redirect(`${base}/settings?tab=email&error=no_refresh_token`);
+  }
+
+  // #916 — Reconnect happy-path account-mismatch guard. When the
+  // connect step pinned `reconnectAccountEmail`, the consented mailbox
+  // MUST match — otherwise we'd silently create a duplicate row for the
+  // wrong account and leave the broken row in `status: "error"`.
+  if (
+    state.reconnectAccountEmail &&
+    state.reconnectAccountEmail.toLowerCase() !== mailboxEmail.toLowerCase()
+  ) {
+    return c.redirect(
+      `${base}/settings?tab=email&error=reconnect_account_mismatch&expected=${encodeURIComponent(state.reconnectAccountEmail)}&picked=${encodeURIComponent(mailboxEmail)}`,
+    );
   }
 
   const repos = buildRepos(getDb());
@@ -341,19 +369,22 @@ emailIntegrationRoutes.get("/accounts/:id/access-token", requirePro("Inbox Sync"
     } catch {
       // Diagnostic write failure shouldn't mask the underlying refresh error.
     }
-    // `invalid_grant` from Google / Microsoft means the stored refresh token
-    // is no longer accepted (user revoked, password change, 7-day Testing-app
-    // expiry, 6-month inactivity). That's user state, not a server fault, so
-    // return 400 with a dedicated code the frontend can silently catch and
-    // surface as a "Reconnect this mailbox" affordance instead of a red
-    // 502 toast. The account row is already flipped to `status: "error"`
-    // above so the inbox surfaces can decide their own visibility.
-    if (/invalid_grant/i.test(message)) {
+    // #918 — Branch on the typed RefreshFailure.kind instead of a regex
+    // over Google's `invalid_grant` substring. Microsoft Graph emits
+    // additional re-auth codes (AADSTS70000 / interaction_required /
+    // consent_required) that the classifier in oauth.ts maps to
+    // kind === "reauth" so they reach the same Reconnect banner.
+    const isReauth =
+      err instanceof RefreshAccessTokenError
+        ? err.failure.kind === "reauth"
+        : /invalid_grant/i.test(message);
+    if (isReauth) {
       return c.json(
         error("MAILBOX_REAUTH_REQUIRED", message, {
           accountId: account.id,
           provider: account.provider,
           accountEmail: account.accountEmail,
+          failureCode: err instanceof RefreshAccessTokenError ? err.failure.code : null,
         }),
         400,
       );

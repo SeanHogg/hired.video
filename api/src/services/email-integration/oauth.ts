@@ -77,7 +77,19 @@ export const EMAIL_PROVIDER_CONFIG: Record<EmailProviderId, ProviderCfg> = {
   },
 };
 
-interface StatePayload { userId: string; ts: number; nonce: string; redirect: string }
+interface StatePayload {
+  userId: string;
+  ts: number;
+  nonce: string;
+  redirect: string;
+  /** #916 — When set, the OAuth callback enforces that the consented
+   *  account matches this address. Picking a different account at the
+   *  provider's account-picker bounces back with
+   *  `?error=reconnect_account_mismatch` instead of upserting a fresh
+   *  row (which would orphan the original error row + double-count
+   *  against the connected-inbox cap). */
+  reconnectAccountEmail?: string;
+}
 
 function getJwtSecret(): string { return getEnv("JWT_SECRET"); }
 
@@ -143,8 +155,110 @@ export async function exchangeCode(
   return res.json() as Promise<TokenResp>;
 }
 
+/** #918 — Refresh-token classifier. Centralised so the route layer
+ *  doesn't have to regex provider response bodies. */
+export type RefreshFailureKind =
+  /** User-state — the user must re-consent. Surfaces the
+   *  ReconnectMailboxBanner instead of the generic 502 toast. */
+  | "reauth"
+  /** Transient — network blip or provider outage. Caller retries. */
+  | "transient"
+  /** Configuration — our client id/secret/scopes are wrong. Surface to ops. */
+  | "config";
+
+export interface RefreshFailure {
+  kind: RefreshFailureKind;
+  message: string;
+  provider: EmailProviderId;
+  /** Provider's own error code or substring that triggered the
+   *  classification — useful for the support-ticket payload. */
+  code: string | null;
+  httpStatus: number;
+}
+
+export class RefreshAccessTokenError extends Error {
+  readonly failure: RefreshFailure;
+  constructor(failure: RefreshFailure) {
+    super(failure.message);
+    this.name = "RefreshAccessTokenError";
+    this.failure = failure;
+  }
+}
+
+const REAUTH_GOOGLE = ["invalid_grant"];
+const REAUTH_MICROSOFT = [
+  "invalid_grant",
+  "AADSTS70000", // refresh token rejected (revoked / expired)
+  "AADSTS50173", // recent password change — fresh sign-in required
+  "AADSTS50076", // MFA required
+  "interaction_required",
+  "consent_required",
+  "login_required",
+];
+const CONFIG_PATTERNS = [
+  "invalid_client",
+  "unauthorized_client",
+  "invalid_scope",
+  "unsupported_grant_type",
+];
+
+function classifyRefreshFailure(args: {
+  provider: EmailProviderId;
+  httpStatus: number;
+  rawBody: string;
+}): RefreshFailure {
+  const reauthCodes = args.provider === "outlook" ? REAUTH_MICROSOFT : REAUTH_GOOGLE;
+  let parsed: { error?: string; error_description?: string } | null = null;
+  try {
+    parsed = JSON.parse(args.rawBody);
+  } catch {
+    parsed = null;
+  }
+  const errorCode = parsed?.error ?? null;
+  const haystack = `${args.rawBody}\n${parsed?.error ?? ""}\n${parsed?.error_description ?? ""}`;
+
+  const matchesAny = (codes: string[]): string | null => {
+    for (const code of codes) {
+      const re = new RegExp(`\\b${code}\\b`, "i");
+      if (re.test(haystack)) return code;
+    }
+    return null;
+  };
+
+  const reauthMatch = matchesAny(reauthCodes);
+  if (reauthMatch) {
+    return {
+      kind: "reauth",
+      provider: args.provider,
+      message: parsed?.error_description ?? `${args.provider} requires re-consent (${reauthMatch})`,
+      code: reauthMatch,
+      httpStatus: args.httpStatus,
+    };
+  }
+  const configMatch = matchesAny(CONFIG_PATTERNS);
+  if (configMatch) {
+    return {
+      kind: "config",
+      provider: args.provider,
+      message: parsed?.error_description ?? `${args.provider} client configuration error (${configMatch})`,
+      code: configMatch,
+      httpStatus: args.httpStatus,
+    };
+  }
+  return {
+    kind: "transient",
+    provider: args.provider,
+    message: parsed?.error_description ?? args.rawBody.slice(0, 400),
+    code: errorCode,
+    httpStatus: args.httpStatus,
+  };
+}
+
 /** Refresh path used by the sync worker on every run. We never persist
- *  access tokens — the encrypted refresh token is the source of truth. */
+ *  access tokens — the encrypted refresh token is the source of truth.
+ *  Throws `RefreshAccessTokenError` (with a typed `RefreshFailure`) so
+ *  the route layer can branch on `failure.kind === "reauth"` without
+ *  re-running a regex against the message string. */
 export async function refreshAccessToken(
   provider: EmailProviderId,
   encryptedRefreshToken: string,
@@ -163,8 +277,10 @@ export async function refreshAccessToken(
     body: params.toString(),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`${provider} token refresh failed: ${res.status} ${body.slice(0, 400)}`);
+    const rawBody = await res.text().catch(() => "");
+    throw new RefreshAccessTokenError(
+      classifyRefreshFailure({ provider, httpStatus: res.status, rawBody }),
+    );
   }
   const j = await res.json() as TokenResp;
   return { accessToken: j.access_token, expiresIn: j.expires_in ?? 3600 };

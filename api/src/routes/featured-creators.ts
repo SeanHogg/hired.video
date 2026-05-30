@@ -70,7 +70,7 @@ featuredCreatorsRoutes.get("/", async (c) => {
       name: schema.users.name,
       avatarUrl: (schema as any).userProfiles?.avatarUrl ?? sql<string | null>`NULL`,
       averageRating: schema.creatorProfiles.averageRating,
-      reviewCount: schema.creatorProfiles.reviewCount,
+      reviewCount: schema.creatorProfiles.ratingCount,
       completedProjectsCount: schema.creatorProfiles.completedProjectsCount,
       totalEarnedCents: schema.creatorProfiles.totalEarnedCents,
     })

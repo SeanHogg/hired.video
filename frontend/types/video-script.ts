@@ -477,6 +477,16 @@ export type VideoCodec = "h264" | "h265" | "prores" | "dnxhd" | "vp9";
 export type VideoContainer = "mp4" | "mov" | "webm";
 export type AudioCodec = "aac" | "pcm" | "opus";
 
+/** #301 — Voiceover per-scene mapping persisted on the script (lifted
+ *  out of the legacy `StudioProjectState.voiceover.scenes` UI-side
+ *  bag so the NLE timeline can read it directly and so collaborators
+ *  see the same data the local editor sees). Keyed by scene id; the
+ *  value carries the audio URL + duration so the timeline renderer
+ *  can show a clip on the voiceover lane without re-fetching state. */
+export interface ScriptVoiceoverMap {
+  scenes: Record<string, { audioUrl: string; durationSec: number; voiceId?: string }>;
+}
+
 export interface VideoScript {
   video: {
     duration: number;           // total seconds
@@ -485,6 +495,11 @@ export interface VideoScript {
     aspect: VideoAspect;
     theme: VideoTheme;
     audio?: VideoAudio;
+    /** #301 — Per-scene voiceover slots lifted onto the script so the
+     *  NLE timeline voiceover lane is non-empty + voiceover slot data
+     *  persists across collaborators. Empty / undefined keeps existing
+     *  behaviour for scripts that never used voiceover. */
+    voiceover?: ScriptVoiceoverMap;
     /** Optional purpose stored on AI-generated scripts for backward compat.
      *  Typed as `StudioPurpose` (#493) so unknown values are caught at
      *  compile time across every script consumer. */

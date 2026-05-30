@@ -64,20 +64,74 @@ const CATEGORY_SYNONYMS: Record<string, string> = {
   certification: "certifications",
   cv: "resume",
   cv_resume: "resume",
+  resumes: "resume",
+  resume_quality: "resume",
   skill: "skills",
+  technical_skills: "skills",
   story: "narrative",
+  positioning: "narrative",
   branding: "narrative",
+  personal_branding: "narrative",
   network: "outreach",
   networking: "outreach",
+  outbound: "outreach",
+  applications: "outreach",
   compensation: "salary",
   pay: "salary",
+  comp: "salary",
   bio: "profile",
+  profile_quality: "profile",
+  social_proof: "profile",
+  work_experience: "experience",
+  yoe: "experience",
 };
+/** #527 — Substring fallback bucket. When the LLM invents a brand-new
+ *  category name we can't fully synonym-map, we still try to recover by
+ *  matching a token from the offending value against a canonical key.
+ *  Picks the FIRST canonical match in the substring order below so the
+ *  result is deterministic. */
+const CATEGORY_SUBSTRING_FALLBACK: Array<{ token: string; canonical: string }> = [
+  { token: "resume", canonical: "resume" },
+  { token: "cv", canonical: "resume" },
+  { token: "skill", canonical: "skills" },
+  { token: "experience", canonical: "experience" },
+  { token: "cert", canonical: "certifications" },
+  { token: "salary", canonical: "salary" },
+  { token: "compensation", canonical: "salary" },
+  { token: "outreach", canonical: "outreach" },
+  { token: "network", canonical: "outreach" },
+  { token: "narrative", canonical: "narrative" },
+  { token: "story", canonical: "narrative" },
+  { token: "brand", canonical: "narrative" },
+  { token: "profile", canonical: "profile" },
+  { token: "linkedin", canonical: "profile" },
+  { token: "bio", canonical: "profile" },
+];
 function normalizeGapCategory(value: unknown): unknown {
   if (typeof value !== "string") return value;
-  const lower = value.trim().toLowerCase().replace(/\s+/g, "_");
+  const lower = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (CATEGORY_CANONICAL.has(lower)) return lower;
-  return CATEGORY_SYNONYMS[lower] ?? value;
+  const synonym = CATEGORY_SYNONYMS[lower];
+  if (synonym) return synonym;
+  // #527 — Last-resort substring match for inventive LLM output. The
+  // alternative (Zod throws → whole roadmap response rejected → user
+  // sees a 502 toast after retries) is worse than picking a sensible
+  // bucket. Logs the unmapped value so SuperAdmin can spot patterns.
+  for (const fallback of CATEGORY_SUBSTRING_FALLBACK) {
+    if (lower.includes(fallback.token)) {
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn(`[career360] gap category "${value}" → "${fallback.canonical}" via substring fallback`);
+      }
+      return fallback.canonical;
+    }
+  }
+  // Final fallback — default to "narrative" so the response validates.
+  // Narrative is the broadest non-technical bucket; a misclassified
+  // gap there is the least misleading default.
+  if (typeof console !== "undefined" && typeof console.warn === "function") {
+    console.warn(`[career360] gap category "${value}" unmappable; defaulting to "narrative"`);
+  }
+  return "narrative";
 }
 
 export const GapSchema = z.object({

@@ -12,16 +12,13 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
-import { success, error } from "../types/index.js";
+import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { requireJobOwner } from "../services/jobs/jobOwnership.js";
 
 export const jobAnalyticsRoutes = new Hono<AppEnv>();
-
-function uid(c: any): string | null {
-  return (c.var.user?.sub as string | undefined) ?? null;
-}
 
 interface JobAnalytics {
   jobId: string;
@@ -35,21 +32,10 @@ interface JobAnalytics {
 }
 
 jobAnalyticsRoutes.get("/:id", async (c) => {
-  const u = uid(c);
-  if (!u) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const jobId = c.req.param("id");
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
   const db = getDb();
-
-  const [job] = await db
-    .select({ id: schema.jobItems.id, userId: schema.jobItems.userId })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, jobId))
-    .limit(1);
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-  if (job.userId !== u) {
-    // Public visibility — analytics is owner-only.
-    return c.json(error("FORBIDDEN", "Only the job owner can view analytics"), 403);
-  }
 
   const since = new Date(Date.now() - 30 * 86_400_000);
 

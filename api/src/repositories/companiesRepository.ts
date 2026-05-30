@@ -12,6 +12,7 @@
 
 import { and, count, desc, eq, gte, ilike, inArray, or } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 
 const {
   companyProfiles,
@@ -20,6 +21,7 @@ const {
   candidateResumeShares,
   candidateInteractions,
   recruiterMatchScores,
+  users,
   talentPoolCandidates,
 } = schema;
 
@@ -160,6 +162,21 @@ export class CompaniesRepository implements ICompaniesRepository {
   }
 
   async insertCandidateResume(input: CandidateResumeInsert): Promise<CandidateResumeRow> {
+    // #1407 — Reject inserts when the linked user has a workforce role.
+    // Employees are scoped to one employer and never surface in
+    // pitch-deck candidate selection. The schema's `linkedUserId` is
+    // nullable, so unlinked rows pass through unchanged.
+    const linkedUserId = (input as { linkedUserId?: string | null }).linkedUserId;
+    if (linkedUserId) {
+      const [u] = await this.db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, linkedUserId))
+        .limit(1);
+      if (u && (NON_CANDIDATE_ROLES as readonly string[]).includes(u.role)) {
+        throw new Error(`User ${linkedUserId} has a non-candidate role (${u.role}) and cannot be added to a candidate resume`);
+      }
+    }
     const [row] = await this.db.insert(candidateResumes).values(input as any).returning();
     return row as CandidateResumeRow;
   }

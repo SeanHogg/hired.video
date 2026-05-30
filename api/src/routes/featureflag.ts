@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { TIER_COPY } from "../../../shared/tier-copy.js";
+import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
 
 export const featureFlagRoutes = new Hono<AppEnv>();
 
@@ -20,48 +21,62 @@ const DEFAULT_FLAGS = [
   { key: "smart_notifications", name: "Smart Notification Ranking", description: TIER_COPY.proUserDescription("AI-ranked notification feed"), enabled: true, rolloutPercentage: 100 },
 ];
 
-// Seed-once guard: flags are seeded the first time the table is read in this
-// isolate; subsequent reads are served from the in-memory cache (gap #1361).
-// Previously every request fired two SELECTs against Neon (~10–20ms each) for
-// a mostly-static table. Cache is per-isolate so admin flag flips take effect
-// when the isolate recycles (~30 min). Admin write endpoints should invalidate.
-let cachedFlags: typeof schema.featureFlags.$inferSelect[] | null = null;
-let cachedAt = 0;
-const FLAGS_TTL_MS = 60_000;
+// Two-layer cache key — L1 in-process Map + L2 Cloudflare Workers KV — so
+// admin flag flips propagate across every isolate (gap #1361). The KV layer
+// is best-effort; missing binding falls through to the in-process cache.
+const FLAGS_CACHE_KEY = "featureflag:all";
+const FLAGS_TTL_SECONDS = 60;
+
+type FlagRow = typeof schema.featureFlags.$inferSelect;
+
+/** Coerce KV's ISO-string Date fields back to Date so downstream consumers
+ *  that expect `f.updatedAt instanceof Date` (admin UI, audit logs) work. */
+function reviveFlags(raw: unknown): FlagRow[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.map((r: any) => ({
+    ...r,
+    createdAt: r.createdAt ? new Date(r.createdAt) : new Date(),
+    updatedAt: r.updatedAt ? new Date(r.updatedAt) : new Date(),
+  }));
+}
 
 export function invalidateFeatureFlagCache(): void {
-  cachedFlags = null;
-  cachedAt = 0;
+  // Drops the entry from both the in-process Map and KV so every isolate
+  // gets a fresh load on next read instead of waiting for the TTL.
+  invalidateCachedKey(FLAGS_CACHE_KEY);
 }
 
 // Exported so the /api/bootstrap aggregate (gap #1367) can include flags
 // in the same response that returns the user + billing + verification — the
 // cache + invalidator are shared so admin flips still propagate correctly.
-export async function loadFlags(): Promise<typeof schema.featureFlags.$inferSelect[]> {
-  if (cachedFlags && Date.now() - cachedAt < FLAGS_TTL_MS) return cachedFlags;
-  const db = getDb();
-  let flags: typeof schema.featureFlags.$inferSelect[] = [];
-  try {
-    flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
-    const existingKeys = new Set(flags.map((f) => f.key));
-    const toInsert = DEFAULT_FLAGS.filter((f) => !existingKeys.has(f.key));
-    if (toInsert.length) {
-      await db.insert(schema.featureFlags).values(toInsert as any[]);
-      flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
-    }
-  } catch {
-    // Table may not exist yet (pre-migration) — synthesise from defaults
-    flags = DEFAULT_FLAGS.map((f) => ({
-      ...f,
-      id: crypto.randomUUID(),
-      conditions: {},
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
-  }
-  cachedFlags = flags;
-  cachedAt = Date.now();
-  return flags;
+export async function loadFlags(): Promise<FlagRow[]> {
+  return getOrSetCached<FlagRow[]>({
+    key: FLAGS_CACHE_KEY,
+    ttlSeconds: FLAGS_TTL_SECONDS,
+    revive: reviveFlags,
+    loader: async () => {
+      const db = getDb();
+      try {
+        let flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
+        const existingKeys = new Set(flags.map((f) => f.key));
+        const toInsert = DEFAULT_FLAGS.filter((f) => !existingKeys.has(f.key));
+        if (toInsert.length) {
+          await db.insert(schema.featureFlags).values(toInsert as any[]);
+          flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
+        }
+        return flags;
+      } catch {
+        // Table may not exist yet (pre-migration) — synthesise from defaults.
+        return DEFAULT_FLAGS.map((f) => ({
+          ...f,
+          id: crypto.randomUUID(),
+          conditions: {},
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })) as unknown as FlagRow[];
+      }
+    },
+  });
 }
 
 // Evaluate whether a flag is active for a given user.

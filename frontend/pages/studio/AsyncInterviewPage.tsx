@@ -58,6 +58,7 @@ import {
   type GeneratedQuestion,
   type InvitePreview,
 } from "@/lib/services/interview-assignments-service";
+import { uploadRecording } from "@/lib/services/studio-features-service";
 
 const WebcamRecorder = lazy(() =>
   import("@/components/studio/WebcamRecorder").then((m) => ({ default: m.WebcamRecorder })),
@@ -312,21 +313,51 @@ function ActiveInterview({
   const canRetake = answers[currentQuestion?.id ?? ""] && retakesUsed < retakesAllowed;
 
   // ─── Save handlers ────────────────────────────────────────────────────────
-  async function saveAnswer(mode: ResponseMode, params: { text?: string; videoDurationMs?: number }) {
+  async function saveAnswer(
+    mode: ResponseMode,
+    params: { text?: string; videoBlob?: Blob; videoDurationMs?: number },
+  ) {
     if (!currentQuestion) return;
     const attempt = (answers[currentQuestion.id]?.attempt ?? 0) + 1;
+    let videoUrl: string | null | undefined;
+    let recordingId: string | undefined;
+    // #967 — Video answers now actually upload the Blob. The previous
+    // path persisted only `durationMs`; the recruiter side saw no video
+    // even after the candidate "submitted". Route through the same
+    // `uploadRecording` helper the studio recorder uses, then forward
+    // the resulting `videoUrl` + `recordingId` to /respond.
+    if (mode === "video" && params.videoBlob) {
+      try {
+        const file = new File([params.videoBlob], `interview-${currentQuestion.id}-${attempt}.webm`, {
+          type: params.videoBlob.type || "video/webm",
+        });
+        const uploaded = await uploadRecording(file, "webcam", undefined, params.videoDurationMs);
+        videoUrl = uploaded.videoUrl;
+        recordingId = uploaded.id;
+      } catch (err) {
+        onError(err instanceof Error ? err.message : "Could not upload video answer");
+        return;
+      }
+    }
     try {
       await submitInterviewResponse(preview.id, {
         questionId: currentQuestion.id,
         responseMode: mode,
         textAnswer: params.text,
         durationMs: params.videoDurationMs,
+        videoUrl: videoUrl ?? undefined,
+        recordingId,
         proctoringFlags: proctoring.snapshot(),
         attempt,
-      });
+      } as never);
       setAnswers((prev) => ({
         ...prev,
-        [currentQuestion.id]: { mode, text: params.text, videoDurationMs: params.videoDurationMs, attempt },
+        [currentQuestion.id]: {
+          mode,
+          text: params.text,
+          videoDurationMs: params.videoDurationMs,
+          attempt,
+        },
       }));
     } catch (err) {
       onError(err instanceof Error ? err.message : "Could not save answer");
@@ -480,8 +511,10 @@ function ActiveInterview({
                     <Suspense fallback={<Loader2 className="h-6 w-6 animate-spin mx-auto" />}>
                       <WebcamRecorder
                         key={`${currentQuestion.id}-${retakesUsed}`}
-                        onRecordingComplete={(_blob, durationMs) =>
-                          saveAnswer("video", { videoDurationMs: durationMs })
+                        onRecordingComplete={(blob, durationMs) =>
+                          // #967 — pass the Blob through so saveAnswer
+                          // can upload it via uploadRecording.
+                          saveAnswer("video", { videoBlob: blob, videoDurationMs: durationMs })
                         }
                         mode="webcam"
                         maxDurationSec={currentQuestion.maxDurationSec}

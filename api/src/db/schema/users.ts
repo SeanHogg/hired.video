@@ -32,6 +32,12 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   role: varchar("role", { length: 50 }).default("job_seeker").notNull(),
+  /** #104 — Persona axis orthogonal to USER_ROLES. Drives the UI label
+   *  set ("Prospect Pipeline" vs "Talent Pool", "Deal Stages" vs
+   *  "Submission Status", "Target Accounts" vs "Job Postings") + the
+   *  pricing-page section the user sees. Feature-flagged at the UI
+   *  level so the same backend serves both flavours. */
+  persona: varchar("persona", { length: 32 }).default("recruiting").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   isSuspended: boolean("is_suspended").default(false).notNull(),
   // Banned = account blocked AND hidden from the product. Stronger than

@@ -93,8 +93,8 @@ export const pipelineStages = pgTable(
   ],
 );
 
-export type PipelineStage = typeof pipelineStages.$inferSelect;
-export type NewPipelineStage = typeof pipelineStages.$inferInsert;
+export type BdPipelineStage = typeof pipelineStages.$inferSelect;
+export type NewBdPipelineStage = typeof pipelineStages.$inferInsert;
 
 export const recruiterDeals = pgTable(
   "recruiter_deals",

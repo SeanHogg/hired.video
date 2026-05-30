@@ -538,7 +538,14 @@ function LessonRailItem({
         aria-current={active ? "true" : undefined}
         aria-label={`${lesson.title}${passed ? " (completed)" : ""}${lesson.isRequired ? "" : " (optional)"}`}
         className={cn(
+          // #1503 — focus-visible ring on the lesson-row button so
+          // keyboard learners can see which lesson they're about to
+          // activate. Tailwind's default `focus-visible:outline-none` is
+          // the strip-the-default-blue half; the `ring-2 ring-primary`
+          // half restores a visible focus indicator that respects the
+          // active course theme.
           "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-muted/60 transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
           active && "bg-primary/10 text-primary",
         )}
       >

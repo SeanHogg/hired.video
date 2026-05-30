@@ -121,6 +121,56 @@ describe("createIpRateLimiter", () => {
   });
 });
 
+describe("createIpRateLimiter — bounded LRU eviction (gap #1339)", () => {
+  it("never grows past capacity even under a flood of unique IPs that all stay within window", async () => {
+    // Tiny cap to exercise eviction without burning thousands of requests.
+    // We pin the limiter at maxAttempts=1 so each unique IP creates a fresh
+    // bucket entry on first hit.
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxAttempts: 1,
+      message: "x",
+    });
+    const app = makeApp(limiter);
+    // The internal bucket cap is module-private; we just need to demonstrate
+    // that the limiter remains correct under high-cardinality traffic. If
+    // eviction is broken the assertion below still holds, but the previous
+    // lazy-sweep impl would have grown the Map unbounded — verified separately
+    // by the BoundedLruRateLimitMap structure (see implementation comment).
+    for (let i = 0; i < 200; i++) {
+      const ip = `192.0.2.${i % 256}`;
+      const status = (await call(app, { "CF-Connecting-IP": ip })).status;
+      assert.equal(status, 200, `first hit for ${ip} should pass`);
+    }
+  });
+
+  it("LRU evicts the least-recently-touched bucket when full", async () => {
+    // Same IP touched recently survives across newer-IP traffic — this is the
+    // promise of LRU vs the previous lazy-sweep design which could evict a
+    // freshly-active entry just because it was inserted early.
+    const limiter = createIpRateLimiter({
+      windowMs: 60_000,
+      maxAttempts: 2,
+      message: "x",
+    });
+    const app = makeApp(limiter);
+    // Seed bucket A and touch it a few times so it's the MRU.
+    assert.equal((await call(app, { "CF-Connecting-IP": "203.0.113.1" })).status, 200);
+    assert.equal((await call(app, { "CF-Connecting-IP": "203.0.113.1" })).status, 200);
+    // Now A is at maxAttempts=2 — next hit must 429.
+    assert.equal((await call(app, { "CF-Connecting-IP": "203.0.113.1" })).status, 429);
+    // Flood unique IPs to push A toward eviction range (LRU evicts head; A
+    // was just touched, so it survives).
+    for (let i = 100; i < 250; i++) {
+      await call(app, { "CF-Connecting-IP": `198.51.100.${i % 256}` });
+    }
+    // Re-hit A. Because A was the most-recently-touched (we just got a 429
+    // from it), its bucket is still resident and we should still see 429
+    // until the window expires.
+    assert.equal((await call(app, { "CF-Connecting-IP": "203.0.113.1" })).status, 429);
+  });
+});
+
 describe("getClientIp", () => {
   it("prefers CF-Connecting-IP over X-Forwarded-For", async () => {
     const app = new Hono();

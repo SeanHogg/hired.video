@@ -27,6 +27,7 @@ import {
   Mail,
 } from "lucide-react";
 import { InboxEmptyState } from "@/components/email/InboxEmptyState";
+import { ReconnectMailboxBanner } from "@/components/email/ReconnectMailbox";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -396,6 +397,13 @@ export function InboxPanel({
     // the scroll area unable to constrain its children. Heights come
     // from `heightClassName` instead.
     <div className={cn("flex flex-col overflow-hidden", heightClassName)}>
+      {/* #915 — Self-gating mailbox reconnect banner. Returns null when
+          no accounts are in `error` state, so the popover + page-tab
+          surfaces both mount it unconditionally per the DRY rule. */}
+      <ReconnectMailboxBanner
+        accounts={hub.accounts ?? []}
+        redirect={typeof window !== "undefined" ? window.location.pathname + window.location.search : "/settings?tab=email"}
+      />
       {!hideHeader && (
         <div className="flex items-center justify-between px-3 py-3 border-b shrink-0">
           <div className="flex items-center gap-2">

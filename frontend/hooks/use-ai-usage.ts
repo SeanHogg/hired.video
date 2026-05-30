@@ -53,6 +53,9 @@ function deriveState(raw: AIUsageMonth, loading: boolean): AIUsageState {
  */
 export function useAIUsage() {
   const { data, isLoading, refresh } = useGatedResource<AIUsageMonth>({
+    // Shared across Settings → Billing + the admin Users panel + any future
+    // dashboard widget — one cached value across all consumers (gap #1692).
+    cacheKey: "billing:ai-usage",
     fetcher: () => billingService.getMonthlyAIUsage(),
     defaults: RAW_DEFAULTS,
   });

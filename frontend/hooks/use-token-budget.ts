@@ -114,6 +114,11 @@ function deriveState(raw: TokenBudget, loading: boolean): TokenBudgetState {
 export function useTokenBudget() {
   const { tierPreview } = usePersonaPreview();
   const { data, isLoading, isReady, refresh, setData } = useGatedResource<TokenBudget>({
+    // Shared across the sidebar pill, AI panel, studio chrome — any number
+    // of mounted consumers share one cached value, one in-flight fetch, and
+    // one optimistic-update channel (gap #1692). The `token-budget:update`
+    // event below now propagates to every consumer via the shared store.
+    cacheKey: "billing:token-budget",
     fetcher: () => billingService.getTokenBudget(),
     defaults: RAW_DEFAULTS,
   });

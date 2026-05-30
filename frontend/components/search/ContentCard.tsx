@@ -6,6 +6,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import { CardActions } from "@/components/ui/CardActions";
 import { buildShareAction } from "@/lib/card-share-action";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import EntityMedia from "@/components/studio/EntityMedia";
 
 // Unified search surfaces three static content types (articles, guides, FAQs)
 // alongside dynamic DB cards. They share this presentation so the search
@@ -21,6 +22,10 @@ interface ContentItem {
   category?: string;
   tier?: "free" | "pro";
   readingTime?: number;
+  /** Author user id for `type === "article"` rows so the EntityMedia rail
+   *  can mount the author's studio projects + the create chip self-gates
+   *  via `useEntityOwnership` (gap #325). */
+  userId?: string;
 }
 
 const TYPE_META = {
@@ -80,6 +85,18 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           {item.category && <span>{item.category}</span>}
           {item.readingTime && <span>{item.readingTime} min read</span>}
         </div>
+        {/* Articles get the EntityMedia rail so the author's video promos
+         *  / podcast episodes / linked studio projects surface inline (gap
+         *  #325). The component is collapsed-by-default so it costs nothing
+         *  until the viewer expands; the create chip self-gates against the
+         *  authenticated viewer = article author check via useEntityOwnership. */}
+        {item.type === "article" && (
+          <EntityMedia
+            subject={{ kind: "article", id: item.id }}
+            ownerUserId={item.userId ?? null}
+            className="mt-2"
+          />
+        )}
       </CardContent>
       <CardActions actions={cardActions} />
     </BaseCard>

@@ -554,6 +554,32 @@ export default function Career360() {
             <Career360Marketing outer={outer} inner={inner} />
           ) : (
             <div className="space-y-6 mt-4">
+              {/* #442 — Inline notice for zero-resume seekers. Self-gates
+                  on `!masterResume && !loading`. The wheel + target
+                  picker stay interactive (target gap analysis works
+                  without a resume); the notice gives the seeker an
+                  on-ramp to build one before clicking a segment, instead
+                  of the segment-click hitting an LLM that says "paste
+                  your resume". Per the DRY rule we don't drill a
+                  `hasMasterResume` boolean — the page-level component
+                  decides its own visibility from the same state. */}
+              {!masterResume && (
+                <Card className="border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20">
+                  <CardContent className="p-4 flex items-start gap-3 text-sm">
+                    <div className="flex-1">
+                      <div className="font-medium">Build a resume first to unlock the coach</div>
+                      <p className="text-muted-foreground mt-1">
+                        Career 360's wheel + target picker work without a resume, but the per-segment
+                        AI coach needs your background to give useful answers. Build a master resume in
+                        a minute and the coach will surface tool actions automatically.
+                      </p>
+                    </div>
+                    <Button asChild size="sm" variant="default" className="shrink-0">
+                      <Link to="/resume-builder">Start your resume</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
                 <Card>
                   <CardContent className="p-6 space-y-6">

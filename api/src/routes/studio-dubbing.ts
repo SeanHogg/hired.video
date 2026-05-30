@@ -100,8 +100,7 @@ const TranscribeRequestSchema = z.object({
 
 studioDubbingRoutes.post("/dubbing/transcribe", async (c) => {
   if (!c.var.user) return c.json(error("AUTH_REQUIRED", "Auth required"), 401);
-  const env = c.env as Record<string, string | undefined>;
-  const apiKey = env.OPENAI_API_KEY;
+  const apiKey = c.env.OPENAI_API_KEY;
   if (!apiKey) {
     return c.json(error("PROVIDER_UNAVAILABLE", "Whisper transcription not configured (OPENAI_API_KEY)"), 503);
   }

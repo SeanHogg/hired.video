@@ -436,6 +436,10 @@ async function fetchArticles(
       author: a.author.name,
       authorAvatarUrl: a.author.avatarUrl,
       authorSlug: a.author.slug,
+      // Author user id so the search ContentCard's EntityMedia rail can
+      // mount with the correct owner + the create chip self-gates against
+      // the authed viewer (gap #325).
+      userId: a.author.id,
       readingTime: `${a.readMinutes} min`,
       createdAt: a.publishedAt ?? new Date().toISOString(),
       updatedAt: a.publishedAt ?? new Date().toISOString(),

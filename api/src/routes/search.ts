@@ -172,6 +172,9 @@ function toArticleItem(a: typeof articles.$inferSelect) {
     category: a.category ?? undefined,
     kind: a.kind,
     readMinutes: a.readMinutes,
+    // Author id so the search card can self-gate the create-EntityMedia
+    // chip + show the EntityMedia rail with the correct owner (gap #325).
+    userId: a.userId ?? undefined,
     createdAt: (a.publishedAt ?? a.createdAt).toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     isFeatured: false,

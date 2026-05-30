@@ -52,9 +52,13 @@ function startReconnect(account: ReconnectableAccount, redirect?: string): void 
   // Reuses the same `/connect` route the initial setup hits; the OAuth
   // callback's upsert keys on (userId, provider, accountEmail) so a
   // re-consent of the same mailbox refreshes the existing row in place.
+  // #916 — Pin the account email so the provider's picker defaults to
+  // the broken mailbox AND the callback rejects a different pick rather
+  // than silently creating an orphan row.
   window.location.href = emailIntegrationService.connectUrl(
     account.provider as EmailProviderId,
     redirect,
+    account.accountEmail,
   );
 }
 

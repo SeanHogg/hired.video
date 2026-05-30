@@ -16,6 +16,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
+import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,6 @@ import { useAuth } from "@/lib/auth";
 import {
   recruitService,
   type PitchDeckRow,
-  type RecruitScope,
 } from "@/lib/services/recruit-service";
 
 const STATUS_ICON: Record<PitchDeckRow["status"], React.ComponentType<any>> = {
@@ -56,37 +56,17 @@ export default function PitchDecksList() {
   const { toast } = useToast();
   const peopleTabs = usePeopleTabs();
 
-  const [scope, setScope] = useState<RecruitScope | null>(null);
+  // #905 — One scope fetch per surface. The hook owns getMyScope() +
+  // selected-company state so the page-level + tabs hook share the
+  // round-trip instead of each firing its own.
+  const { scope, companyId: selectedCompanyId, setCompanyId: setSelectedCompanyId } = useCurrentCompanyScope();
   const [decks, setDecks] = useState<PitchDeckRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newBusy, setNewBusy] = useState(false);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let isMounted = true;
-    (async () => {
-      try {
-        const s = await recruitService.getMyScope();
-        if (!isMounted) return;
-        setScope(s);
-        setSelectedCompanyId(s.primaryCompanyId ?? s.companies[0]?.id ?? null);
-      } catch {
-        if (!isMounted) return;
-        toast({
-          title: "Failed to load scope",
-          variant: "destructive",
-        });
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, toast]);
 
   useEffect(() => {
     let isMounted = true;

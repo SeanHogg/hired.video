@@ -31,6 +31,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
+import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,7 +92,9 @@ export default function PitchDeckBuilder() {
   const [slides, setSlides] = useState<PitchDeckSlideRow[]>([]);
   const [candidatesById, setCandidatesById] = useState<Record<string, CandidateResumeRow>>({});
   const [shares, setShares] = useState<PitchDeckShareRow[]>([]);
-  const [scope, setScope] = useState<RecruitScope | null>(null);
+  // #905 — Shared scope hook so the builder + the tabs hook + the list
+  // page all hit getMyScope() once per surface instead of fanning out.
+  const { scope } = useCurrentCompanyScope();
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -117,15 +120,13 @@ export default function PitchDeckBuilder() {
     let isMounted = true;
     (async () => {
       try {
-        const [full, s, allShares] = await Promise.all([
+        const [full, allShares] = await Promise.all([
           recruitService.getPitchDeck(id),
-          recruitService.getMyScope(),
           recruitService.listDeckShares(id),
         ]);
         if (!isMounted) return;
         setDeck(full);
         setSlides(full.slides);
-        setScope(s);
         setShares(allShares);
         setName(full.name);
         setDescription(full.description ?? "");

@@ -34,6 +34,7 @@ import {
 } from "@shared/animation-state";
 import type { OutputProfile } from "@shared/media-kinds";
 import { encodeGif, type GifFrameInput } from "./gif89a-encoder";
+import { encodeApng, type ApngFrame } from "./apng-encoder";
 import { toBlobPart } from "../bytes/to-blob-part";
 
 /** Resolve each frame's pixel buffer at the project's dimensions.
@@ -117,16 +118,31 @@ export async function renderAnimation(
         durationSec: totalDurationSec(state),
       };
     }
-    case "animation-apng":
+    case "animation-apng": {
+      // #1004 — Real in-tree APNG encoder. Outputs a valid APNG byte
+      // stream; decodes everywhere a normal PNG does (with animation
+      // in modern browsers + image viewers). 1000ms delay-den keeps
+      // the math straightforward: delay_num = milliseconds.
+      const apngFrames: ApngFrame[] = state.frames.map((f, i) => ({
+        pixels: frames[i],
+        width: state.width,
+        height: state.height,
+        delayMs: Math.max(1, Math.round((1000 / Math.max(1, state.fps)) * Math.max(1, f.hold ?? 1))),
+      }));
+      const bytes = encodeApng(apngFrames, { loopCount: state.loopCount ?? 0 });
+      return {
+        blob: new Blob([toBlobPart(bytes)], { type: "image/apng" }),
+        durationSec: totalDurationSec(state),
+      };
+    }
     case "animation-webp":
     case "animation-mp4-alpha": {
       // Browser-native animated-WebP / animated-alpha-video encoders
       // aren't reliably available client-side. We fall back to a WebM
       // recording of the canvas via MediaRecorder, which works in
-      // every modern browser. The profile's stated container/codec
-      // is what the user PICKED — the encoder swap is logged as a
-      // gap-register follow-on (#1004 note). The blob still carries
-      // the requested mime so consumers tag the file extension correctly.
+      // every modern browser. Animated-WebP encoder logged as a
+      // follow-on; transparent-MP4 is fundamentally not supported by
+      // Safari today so VP9-alpha-in-WebM is the practical answer.
       const bytes = await encodeViaMediaRecorder(state, frameInputs, profile);
       return {
         blob: new Blob([toBlobPart(bytes)], { type: profile.mime }),

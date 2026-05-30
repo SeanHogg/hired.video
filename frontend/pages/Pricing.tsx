@@ -51,6 +51,11 @@ import {
   INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
 } from "@shared/pricing";
 import { TIER_COPY } from "@shared/tier-copy";
+import {
+  UPGRADE_REGISTRY,
+  parseUpgradeSlug,
+  type UpgradeSlug,
+} from "@shared/upgrade-slugs";
 import { pricingConfigService } from "@/lib/services/pricing-config-service";
 import { TRUST_SIGNALS } from "@/lib/constants";
 import { listShippableKindPitches } from "@/lib/studio/kind-marketing";
@@ -353,21 +358,35 @@ export default function Pricing() {
   // `/pricing?upgrade=<slug>` deep-links from gated features land here with
   // a slug identifying which feature the user hit. Server-side gates that
   // can't render a 402 envelope (top-level browser navigations like the
-  // email-integration OAuth `/connect`) redirect through this. Registry
-  // is intentionally local — there are only a few slugs in scope today;
-  // hoist to a shared module if it crosses ~5 entries.
-  const upgradeSlug = new URLSearchParams(location.search).get("upgrade");
-  const upgradeCopy: Record<string, { title: string; description: string }> = {
-    "inbox-sync": {
-      title: "Inbox Sync is a Pro feature",
-      description: `Pro plans include ${INBOX_SYNC_INCLUDED_ACCOUNTS} connected Gmail / Outlook mailboxes — classify every recruiter pitch, ATS reply, interview invite, and offer into your unified inbox.`,
-    },
-    "inbox-extra": {
-      title: "You've connected the included mailboxes",
-      description: `Pro plans include ${INBOX_SYNC_INCLUDED_ACCOUNTS} mailboxes. Extra inboxes are $${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo each — contact support to add more while the add-on checkout ships.`,
-    },
-  };
-  const upgradeBanner = upgradeSlug ? upgradeCopy[upgradeSlug] ?? null : null;
+  // email-integration OAuth `/connect`) redirect through this. The registry
+  // now lives in `shared/upgrade-slugs.ts` so every gate, the API redirects,
+  // and the Pricing page agree on the slug set and copy (gap #810).
+  const upgradeSlug: UpgradeSlug | null = parseUpgradeSlug(
+    new URLSearchParams(location.search).get("upgrade"),
+  );
+  const upgradeBanner = upgradeSlug ? UPGRADE_REGISTRY[upgradeSlug] : null;
+
+  // Smooth-scroll the matching comparison-table row into view + highlight
+  // it for ~3s so the user sees the exact line item that gates the feature
+  // they were trying to use. Idempotent on slug change (multiple ?upgrade=
+  // navigations within the same SPA mount re-fire). Pure DOM — no state.
+  useEffect(() => {
+    if (!upgradeBanner?.comparisonRowId) return;
+    const id = upgradeBanner.comparisonRowId;
+    // Defer one frame so the comparison table has mounted.
+    const t = window.setTimeout(() => {
+      const row = document.querySelector<HTMLElement>(
+        `[data-upgrade-id="${id}"]`,
+      );
+      if (!row) return;
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.setAttribute("data-upgrade-active", "true");
+      // Strip the highlight after the animation completes so a later
+      // navigation can re-trigger it.
+      window.setTimeout(() => row.removeAttribute("data-upgrade-active"), 3000);
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [upgradeBanner?.comparisonRowId]);
 
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
@@ -1071,6 +1090,7 @@ export default function Pricing() {
                         label="Brand Kits — colors, logo, fonts"
                         free={false}
                         pro
+                        upgradeId="brand-kit"
                       />
                       <FeatureRow icon={Download} label="720p video export" free pro />
                       <FeatureRow icon={Download} label="1080p video export" free pro />
@@ -1097,6 +1117,7 @@ export default function Pricing() {
                         label="AI voice cloning (your own voice)"
                         free={false}
                         pro
+                        upgradeId="voice-clone"
                       />
                       <FeatureRow
                         icon={Mic}
@@ -1200,7 +1221,10 @@ export default function Pricing() {
                           AI-Powered Tools
                         </td>
                       </tr>
-                      <tr>
+                      <tr
+                        data-upgrade-id="ai-tokens"
+                        className="data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
+                      >
                         <td className="p-4 flex items-center gap-2">
                           <Brain className="h-4 w-4 text-muted-foreground" />
                           AI Assistance
@@ -2009,7 +2033,10 @@ export default function Pricing() {
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                       </tr>
-                      <tr>
+                      <tr
+                        data-upgrade-id="inbox-sync"
+                        className="data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
+                      >
                         <td className="p-4 flex items-center gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground" />
                           Inbox Sync (Gmail / Outlook)
@@ -2024,7 +2051,10 @@ export default function Pricing() {
                           </div>
                         </td>
                       </tr>
-                      <tr>
+                      <tr
+                        data-upgrade-id="smart-notifications"
+                        className="data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
+                      >
                         <td className="p-4 flex items-center gap-2">
                           <Bell className="h-4 w-4 text-muted-foreground" />
                           Smart Notifications
@@ -2395,11 +2425,22 @@ interface FeatureRowProps {
   label: ReactNode;
   free: ReactNode | boolean;
   pro: ReactNode | boolean;
+  /** Optional `data-upgrade-id` for `/pricing?upgrade=<slug>` deep links
+   *  (gap #810). Matching `UpgradeSlug` values smooth-scroll this row into
+   *  view + apply the highlight ring. */
+  upgradeId?: UpgradeSlug;
 }
 
-function FeatureRow({ icon: Icon, label, free, pro }: FeatureRowProps) {
+function FeatureRow({ icon: Icon, label, free, pro, upgradeId }: FeatureRowProps) {
   return (
-    <tr>
+    <tr
+      data-upgrade-id={upgradeId}
+      className={
+        upgradeId
+          ? "data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
+          : undefined
+      }
+    >
       <td className="p-4 flex items-center gap-2">
         <Icon className="h-4 w-4 text-muted-foreground" />
         {label}

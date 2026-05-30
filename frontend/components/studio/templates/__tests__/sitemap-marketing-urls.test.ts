@@ -26,10 +26,14 @@ const SITEMAP_PATH = resolve(__dirname, "../../../../public/sitemap.xml");
 const sitemap = readFileSync(SITEMAP_PATH, "utf8");
 
 function extractPaths(prefix: string): string[] {
-  // Cheap regex over the static XML — we don't need a real parser since
-  // every entry is a single `<url><loc>…</loc>…</url>` block.
+  // Scope to canonical `<loc>...</loc>` URLs only — `<xhtml:link>`
+  // hreflang annotations (gap #1471) embed `?lang=X` variants of the
+  // same URLs and would otherwise double-match. The original looser
+  // pattern was `[^<]+` across the whole file, which pulled in the
+  // trailing `" />` fragment of the xhtml:link tag once hreflang
+  // annotations existed.
   const re = new RegExp(
-    `https://hired\\.video${prefix.replace(/\//g, "\\/")}([^<]+)`,
+    `<loc>https://hired\\.video${prefix.replace(/\//g, "\\/")}([^<]+)</loc>`,
     "g",
   );
   const out: string[] = [];
@@ -102,6 +106,37 @@ describe("sitemap.xml marketing URLs", () => {
       expect(
         slugs.has(t.id),
         `template "${t.id}" is in TEMPLATE_CATALOG but has no /templates/${t.id} entry in sitemap.xml`,
+      ).toBe(true);
+    }
+  });
+
+  // gap #1471: every <url> block must carry hreflang annotations so the
+  // Mexican / Quebec / Spanish-locale crawlers see the localized variants
+  // of every URL — not just the marketing-funnel subset. The regenerator
+  // at frontend/scripts/regenerate-sitemap-hreflang.mjs keeps this rule
+  // satisfied; this test pins the invariant so a hand-added <url> block
+  // without hreflang fails fast in CI instead of silently dropping the
+  // long-tail URL from non-English crawls.
+  it("every <url> block carries hreflang annotations for x-default + en + es + fr-CA", () => {
+    const urlBlocks = sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? [];
+    expect(urlBlocks.length).toBeGreaterThan(50);
+    for (const block of urlBlocks) {
+      const loc = block.match(/<loc>([^<]+)<\/loc>/)?.[1] ?? "(unknown)";
+      expect(
+        /hreflang="x-default"/.test(block),
+        `<url> for ${loc} is missing hreflang="x-default" — run scripts/regenerate-sitemap-hreflang.mjs`,
+      ).toBe(true);
+      expect(
+        /hreflang="en"/.test(block),
+        `<url> for ${loc} is missing hreflang="en"`,
+      ).toBe(true);
+      expect(
+        /hreflang="es"/.test(block),
+        `<url> for ${loc} is missing hreflang="es"`,
+      ).toBe(true);
+      expect(
+        /hreflang="fr-CA"/.test(block),
+        `<url> for ${loc} is missing hreflang="fr-CA"`,
       ).toBe(true);
     }
   });

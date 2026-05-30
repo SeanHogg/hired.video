@@ -7,6 +7,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { TALENT_POOL_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
+import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
 import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/company/recruiter-match.js";
 import {
@@ -190,6 +191,22 @@ recruiterRoutes.post("/talent-pool", async (c) => {
 	const user = c.get("user");
 	const body = await c.req.json();
 	const db = getDb();
+	// #1407 — reject workforce members (USER_ROLES.EMPLOYEE) from
+	// recruiter talent pools. Employees are scoped to one employer and
+	// must not appear as hireable candidates to recruiters at large.
+	if (body.candidateUserId) {
+		const [u] = await db
+			.select({ role: schema.users.role })
+			.from(schema.users)
+			.where(eq(schema.users.id, body.candidateUserId))
+			.limit(1);
+		if (u && (NON_CANDIDATE_ROLES as readonly string[]).includes(u.role)) {
+			return c.json(
+				{ success: false, error: { code: "NON_CANDIDATE_ROLE", message: "This user's role is not eligible for talent-pool inclusion" } },
+				400,
+			);
+		}
+	}
 	const [entry] = await db.insert(schema.talentPoolCandidates).values({
 		recruiterId: user.sub,
 		candidateId: body.candidateUserId,

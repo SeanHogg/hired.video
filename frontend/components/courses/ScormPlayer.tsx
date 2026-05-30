@@ -89,8 +89,15 @@ export default function ScormPlayer({
   themeTokens,
 }: ScormPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const skipTargetRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // #1503 / #168 — announcement region for completion / pass / fail
+  // transitions. Screen-reader users otherwise have no idea the SCO
+  // signalled completion since the runtime fires the commit in JS without
+  // any DOM change visible to AT. The announcement is polite so it doesn't
+  // interrupt mid-lesson narration.
+  const [statusAnnouncement, setStatusAnnouncement] = useState<string>("");
 
   useEffect(() => {
     let runtime: ScormAgainRuntime | null = null;
@@ -144,6 +151,24 @@ export default function ScormPlayer({
             scoreMax,
             suspendData: readSuspendData(cmi, scormVersion),
           }).catch(() => undefined);
+
+          // Announce completion to screen-reader users — they otherwise
+          // get no DOM signal that the SCO finished (gap #1503).
+          if (completionStatus === "completed") {
+            setStatusAnnouncement("Lesson marked complete.");
+          } else if (completionStatus === "passed") {
+            setStatusAnnouncement(
+              scoreRaw != null
+                ? `Lesson passed with a score of ${scoreRaw}.`
+                : "Lesson passed.",
+            );
+          } else if (completionStatus === "failed") {
+            setStatusAnnouncement(
+              scoreRaw != null
+                ? `Lesson failed with a score of ${scoreRaw}. You can retry.`
+                : "Lesson failed. You can retry.",
+            );
+          }
 
           // Mirror "completed"/"passed" as an xAPI statement so the
           // analytics dashboard sees SCORM lessons in the same stream
@@ -217,6 +242,22 @@ export default function ScormPlayer({
         color: "var(--scorm-chrome-text, undefined)",
       }}
     >
+      {/* #1503 — skip link for keyboard learners. The SCO iframe captures
+       *  Tab navigation once focused (a known SCORM-runtime limitation —
+       *  the package's internal focus order overrides the page's), so we
+       *  give learners a single-keypress escape hatch back to the host
+       *  page chrome (next lesson, exit button, etc.). Visible only while
+       *  focused. */}
+      <a
+        href="#scorm-skip-target"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-primary focus:text-primary-foreground focus:px-3 focus:py-2 focus:text-sm focus:shadow"
+        onClick={(e) => {
+          e.preventDefault();
+          skipTargetRef.current?.focus();
+        }}
+      >
+        Skip past lesson player
+      </a>
       {!loaded && (
         // #1503 — polite live region so AT learners hear the load
         // transition instead of silently staring at an empty iframe.
@@ -229,10 +270,22 @@ export default function ScormPlayer({
         src={scormEntryUrl}
         title="SCORM lesson content"
         aria-label="Interactive SCORM lesson — controls live inside the lesson frame"
-        className="w-full h-full min-h-[600px] border-0"
+        className="w-full h-full min-h-[600px] border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         allow="autoplay; fullscreen; camera; microphone"
         style={{ borderColor: "var(--scorm-chrome-accent, undefined)" }}
       />
+      {/* Polite SR announcer for completion / pass / fail transitions
+       *  (gap #1503). Visually hidden — the value flips at most once per
+       *  Commit so JAWS / NVDA / VoiceOver read it without interrupting
+       *  the SCO's own narration. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {statusAnnouncement}
+      </div>
+      {/* Skip-link landing target. tabIndex=-1 so it's focusable
+       *  programmatically but stays out of the natural tab order. */}
+      <div ref={skipTargetRef} id="scorm-skip-target" tabIndex={-1} className="sr-only">
+        End of lesson player. Focus continues to the next page element.
+      </div>
     </div>
   );
 }

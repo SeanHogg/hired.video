@@ -67,7 +67,14 @@ class EmailIntegrationService {
    *  callback. Top-level navigation can't carry an Authorization header,
    *  so we pass the user's session JWT as a `link_token` query param —
    *  same pattern as the existing /api/auth/oauth/:provider flow. */
-  connectUrl(provider: EmailProviderId, redirect = "/settings?tab=email"): string {
+  connectUrl(
+    provider: EmailProviderId,
+    redirect = "/settings?tab=email",
+    /** #916 — When set, the connect flow pins this account email into
+     *  the state JWT + forwards `login_hint` so the provider's picker
+     *  defaults to (and the callback enforces) the same mailbox. */
+    reconnectAccountEmail?: string,
+  ): string {
     const apiBase = (
       import.meta.env.VITE_API_BASE_URL ||
       import.meta.env.VITE_API_URL ||
@@ -76,6 +83,7 @@ class EmailIntegrationService {
     const params = new URLSearchParams({ redirect });
     const token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
     if (token) params.set("link_token", token);
+    if (reconnectAccountEmail) params.set("reconnectAccountEmail", reconnectAccountEmail);
     return `${apiBase}/api/integrations/email/${provider}/connect?${params.toString()}`;
   }
 

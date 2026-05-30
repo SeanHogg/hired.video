@@ -238,6 +238,7 @@ const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const JobEmbed = lazy(() => import("./pages/JobEmbed"));
 const TemplatesReview = lazy(() => import("./pages/admin/TemplatesReview"));
 const BdPipeline = lazy(() => import("./pages/recruiter/BdPipeline"));
+const TakeHomeAssignment = lazy(() => import("./pages/TakeHomeAssignment"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
 const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
@@ -737,6 +738,8 @@ const App = () => (
                       <Route path="/admin/templates/review" element={<TemplatesReview />} />
                       {/* #99/#222/#223 — Recruiter BD pipeline Kanban. */}
                       <Route path="/recruiter/pipeline" element={<BdPipeline />} />
+                      {/* #1386 — Candidate-facing take-home magic-link page. */}
+                      <Route path="/take-home/:token" element={<TakeHomeAssignment />} />
                       {/* Redirect old upload route to unified create page */}
                       <Route
                         path="/jobs/upload"
