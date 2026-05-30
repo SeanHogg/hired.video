@@ -5,6 +5,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getOnboardingTasksForUser } from "../lib/onboarding.js";
+import { getProfileStats } from "../services/profile/profileStats.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, checkAIUsage } from "../middleware/tierEnforcement.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
@@ -52,10 +53,8 @@ dashboardRoutes.get("/", async (c) => {
 dashboardRoutes.get("/jobseeker", async (c) => {
   const userId = c.var.user.sub;
   const db = getDb();
-  const weekAgo = daysAgo(7);
-  const monthAgo = daysAgo(30);
 
-  const [base, applications, weekViews, monthViews, recentViewers, conversations, unreadCount] = await Promise.all([
+  const [base, applications, profileStats, conversations, unreadCount] = await Promise.all([
     buildBase(userId, c.var.user.roles?.[0] ?? "job_seeker"),
 
     // All applications grouped by status
@@ -65,28 +64,10 @@ dashboardRoutes.get("/jobseeker", async (c) => {
       .where(eq(schema.jobApplications.userId, userId))
       .groupBy(schema.jobApplications.status),
 
-    // Profile views this week
-    db
-      .select({ total: count() })
-      .from(schema.profileViews)
-      .where(and(eq(schema.profileViews.viewedUserId, userId), gte(schema.profileViews.createdAt, weekAgo))),
-
-    // Profile views this month
-    db
-      .select({ total: count() })
-      .from(schema.profileViews)
-      .where(and(eq(schema.profileViews.viewedUserId, userId), gte(schema.profileViews.createdAt, monthAgo))),
-
-    // Recent viewers (last 5 distinct)
-    db
-      .select({
-        viewerUserId: schema.profileViews.viewerUserId,
-        viewedAt: schema.profileViews.createdAt,
-      })
-      .from(schema.profileViews)
-      .where(eq(schema.profileViews.viewedUserId, userId))
-      .orderBy(desc(schema.profileViews.createdAt))
-      .limit(5),
+    // Profile-view metrics — delegated to the SSoT so the dashboard,
+    // /api/users/:id/stats, and the profile page stay in lockstep and
+    // read from the unified artifact_views table (gap #1021).
+    getProfileStats(db, userId),
 
     // Conversations this user participates in
     db
@@ -112,11 +93,11 @@ dashboardRoutes.get("/jobseeker", async (c) => {
     success({
       ...base,
       profileStats: {
-        totalViews: monthViews[0]?.total ?? 0,
-        viewsThisWeek: weekViews[0]?.total ?? 0,
-        viewsThisMonth: monthViews[0]?.total ?? 0,
-        viewsChangePercentage: 0,
-        recentViewers,
+        totalViews: profileStats.totalViews,
+        viewsThisWeek: profileStats.viewsThisWeek,
+        viewsThisMonth: profileStats.viewsThisMonth,
+        viewsChangePercentage: profileStats.viewsChangePercentage,
+        recentViewers: profileStats.recentViewers,
       },
       applicationStats: {
         totalApplications,

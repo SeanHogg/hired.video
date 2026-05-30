@@ -38,6 +38,15 @@ export async function getProfileStats(db: Db, userId: string): Promise<ProfileSt
   const monthStart = daysAgo(30);
   const priorMonthStart = daysAgo(60);
 
+  // Profile views now live in the unified `artifact_views` table
+  // (artifactKind='profile', artifactId = the viewed user's id — see
+  // lookupArtifactOwner). The legacy per-entity `profile_views` table has
+  // no insert path, so reading it returned zero forever.
+  const isProfileView = and(
+    eq(schema.artifactViews.artifactKind, "profile"),
+    eq(schema.artifactViews.artifactId, userId),
+  );
+
   const [
     resumeRow,
     connectionRow,
@@ -70,34 +79,24 @@ export async function getProfileStats(db: Db, userId: string): Promise<ProfileSt
       .where(eq(schema.jobApplications.userId, userId)),
     db
       .select({ n: count() })
-      .from(schema.profileViews)
-      .where(eq(schema.profileViews.viewedUserId, userId)),
+      .from(schema.artifactViews)
+      .where(isProfileView),
     db
       .select({ n: count() })
-      .from(schema.profileViews)
-      .where(
-        and(
-          eq(schema.profileViews.viewedUserId, userId),
-          gte(schema.profileViews.createdAt, weekStart),
-        ),
-      ),
+      .from(schema.artifactViews)
+      .where(and(isProfileView, gte(schema.artifactViews.viewedAt, weekStart))),
     db
       .select({ n: count() })
-      .from(schema.profileViews)
-      .where(
-        and(
-          eq(schema.profileViews.viewedUserId, userId),
-          gte(schema.profileViews.createdAt, monthStart),
-        ),
-      ),
+      .from(schema.artifactViews)
+      .where(and(isProfileView, gte(schema.artifactViews.viewedAt, monthStart))),
     db
       .select({ n: count() })
-      .from(schema.profileViews)
+      .from(schema.artifactViews)
       .where(
         and(
-          eq(schema.profileViews.viewedUserId, userId),
-          gte(schema.profileViews.createdAt, priorMonthStart),
-          lt(schema.profileViews.createdAt, monthStart),
+          isProfileView,
+          gte(schema.artifactViews.viewedAt, priorMonthStart),
+          lt(schema.artifactViews.viewedAt, monthStart),
         ),
       ),
     // Pull a recent window so we can dedupe by viewer in app code without a
@@ -106,19 +105,19 @@ export async function getProfileStats(db: Db, userId: string): Promise<ProfileSt
     // separate person).
     db
       .select({
-        viewerUserId: schema.profileViews.viewerUserId,
-        viewedAt: schema.profileViews.createdAt,
+        viewerUserId: schema.artifactViews.viewerId,
+        viewedAt: schema.artifactViews.viewedAt,
         viewerName: schema.users.name,
         viewerCompany: schema.userProfiles.currentCompany,
       })
-      .from(schema.profileViews)
-      .leftJoin(schema.users, eq(schema.users.id, schema.profileViews.viewerUserId))
+      .from(schema.artifactViews)
+      .leftJoin(schema.users, eq(schema.users.id, schema.artifactViews.viewerId))
       .leftJoin(
         schema.userProfiles,
-        eq(schema.userProfiles.userId, schema.profileViews.viewerUserId),
+        eq(schema.userProfiles.userId, schema.artifactViews.viewerId),
       )
-      .where(eq(schema.profileViews.viewedUserId, userId))
-      .orderBy(desc(schema.profileViews.createdAt))
+      .where(isProfileView)
+      .orderBy(desc(schema.artifactViews.viewedAt))
       .limit(50),
   ]);
 
