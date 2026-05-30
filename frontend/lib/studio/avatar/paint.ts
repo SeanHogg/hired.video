@@ -70,12 +70,17 @@ export function paintPresenter(
       w,
       h,
     );
-    // Mouth overlay — viseme-shaped path filled with `colors.mouth`.
+    // Mouth overlay — viseme-shaped path filled with the presenter's
+    // lip colour. Viseme axis: rest = neutral, ah = wide, oh = round,
+    // ee = stretched, mm = closed. Heights tuned so the mouth never
+    // dominates the chin.
     const mouthX = x + w * 0.32;
     const mouthY = y + h * 0.74;
     const mouthW = w * 0.36;
-    const mouthHHeight = h * 0.06 * (viseme === "AA" ? 2.2 : viseme === "IY" ? 1.2 : viseme === "OW" ? 1.6 : 1);
-    ctx.fillStyle = colors.mouth ?? "#3a1f1f";
+    const mouthHHeight =
+      h * 0.06 *
+      (viseme === "ah" ? 2.2 : viseme === "ee" ? 1.2 : viseme === "oh" ? 1.6 : viseme === "mm" ? 0.4 : 1);
+    ctx.fillStyle = colors.lips;
     ctx.beginPath();
     if ((ctx as any).ellipse) {
       (ctx as any).ellipse(mouthX + mouthW / 2, mouthY, mouthW / 2, mouthHHeight, 0, 0, Math.PI * 2);

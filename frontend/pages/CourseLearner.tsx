@@ -664,7 +664,7 @@ function LessonBody({
  * back to the prose-only view otherwise. Self-gates per the DRY rule —
  * no `hasCompanion` boolean drilled into parents.
  */
-function TextMdLesson({ lesson }: { lesson: LessonRow }) {
+function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
   const companionId = (lesson as any).companionStudioProjectId as string | undefined;
   const [tab, setTab] = useState<"read" | "watch">("read");
 

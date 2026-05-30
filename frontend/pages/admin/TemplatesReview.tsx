@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import AppShell from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";

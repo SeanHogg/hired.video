@@ -236,7 +236,6 @@ const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
 const JobEditPage = lazy(() => import("./pages/JobEditPage"));
 const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const JobEmbed = lazy(() => import("./pages/JobEmbed"));
-const LiveScreenInvite = lazy(() => import("./pages/LiveScreenInvite"));
 const TemplatesReview = lazy(() => import("./pages/admin/TemplatesReview"));
 const BdPipeline = lazy(() => import("./pages/recruiter/BdPipeline"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));

@@ -48,11 +48,11 @@ export default function XyzSkillsWand({ skills, onApply }: XyzSkillsWandProps) {
     if (!canRun) return;
     setRunning(true);
     try {
-      const response = await apiClient.post(
+      const response = (await apiClient.post(
         "/api/resumeoptimizer/rewrite-skills",
         { skills: trimmed },
-      );
-      const items = (response.data?.items ?? []) as SkillsResponseItem[];
+      )) as { data?: { items?: SkillsResponseItem[] } };
+      const items = response.data?.items ?? [];
       if (!items.length) {
         toast.error("AI couldn't normalise these — try again in a moment.");
         return;
