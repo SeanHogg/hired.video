@@ -126,6 +126,29 @@ export class CertificateService {
     return { certificate: created, newlyIssued: true };
   }
 
+  /** Admin revocation. Stamps `revoked_at` + `revoked_reason`; the next
+   *  public verify against the cert number returns `{valid:false, reason:"revoked"}`.
+   *  Idempotent — re-running with the same cert number is a no-op when
+   *  the cert is already revoked. Caller is responsible for authorising
+   *  (SuperAdmin middleware on the admin route is the SSoT).
+   *  Returns the post-update row, or null when the cert number isn't found. */
+  async revokeByCertNumber(
+    certNumber: string,
+    reason: string,
+  ): Promise<typeof courseCertificates.$inferSelect | null> {
+    const [cert] = await this.db.select()
+      .from(courseCertificates)
+      .where(eq(courseCertificates.certNumber, certNumber))
+      .limit(1);
+    if (!cert) return null;
+    if (cert.revokedAt) return cert;
+    const [updated] = await this.db.update(courseCertificates)
+      .set({ revokedAt: new Date(), revokedReason: reason } as never)
+      .where(eq(courseCertificates.id, cert.id))
+      .returning();
+    return updated ?? cert;
+  }
+
   /** Public verify entry. Reads the cert, re-derives the HMAC, returns
    *  `valid: true` only when the stored signature matches the canonical
    *  payload AND the cert isn't revoked / expired. */

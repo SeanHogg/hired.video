@@ -55,6 +55,7 @@ import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
+import { forwardStatementForUser } from "../services/learning/lrs-forwarder.js";
 import { evaluateCourseCompletion } from "../services/learning/course-completion.js";
 import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
 import { getJwtSecret } from "../utils/jwt.js";
@@ -1107,14 +1108,18 @@ courseRoutes.post("/:id/enroll", async (c) => {
     );
   }
 
-  // Free courses only for now — paid enrolment goes through the existing cart
-  // checkout flow, which posts the payment_ref + paid_at on success. Returns
-  // 402 to signal frontend to route to checkout instead.
+  // Free courses only for the direct /enroll path — paid enrolment routes
+  // through /api/course-checkout/start (which mints a course_checkouts row,
+  // then hands off to the existing Stripe/Helcim flow). Frontend catches
+  // the 402 and switches to the checkout page; the response carries the
+  // checkout-start URL so a future "deep-link to checkout" surface
+  // doesn't need to re-derive it.
   if (course.priceCents > 0) {
     return c.json(
       error(
         "PAYMENT_REQUIRED",
-        `This course costs ${(course.priceCents / 100).toFixed(2)} ${course.priceVisible ? "USD" : ""}. Use the cart checkout flow to enroll.`,
+        `This course costs ${(course.priceCents / 100).toFixed(2)} ${course.priceVisible ? "USD" : ""}. POST /api/course-checkout/start to begin checkout.`,
+        { courseId: course.id, priceCents: course.priceCents },
       ),
       402,
     );
@@ -1619,5 +1624,98 @@ courseRoutes.post("/xapi/statements", async (c) => {
     );
   }
 
+  // External LRS forwarding (#1400 build-strategy follow-on). Fire-and-
+  // forget — every active `external_lrs_targets` row for this user gets
+  // the statement mirrored. Errors per target are persisted on the row
+  // and never bubble back to the API path so a slow/down customer LRS
+  // can't take down the internal write path.
+  void forwardStatementForUser(db, userId, parsed.data as never).catch(() => undefined);
+
   return c.json(success({ id: created!.id }), 201);
+});
+
+// ---------------------------------------------------------------------------
+// External LRS targets — CRUD for the per-user xAPI forwarding config.
+// Enterprise customers configure one or more endpoints; every statement
+// written via /xapi/statements gets POSTed to each `active` row.
+// ---------------------------------------------------------------------------
+
+const ExternalLrsTargetSchema = z.object({
+  endpoint: z.string().url(),
+  authMode: z.enum(["basic", "bearer", "none"]).default("none"),
+  authToken: z.string().min(1).max(2000).optional(),
+  customHeaders: z.record(z.string().max(64), z.string().max(1024)).optional(),
+  active: z.boolean().default(true),
+});
+
+courseRoutes.get("/xapi/lrs-targets", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const rows = await db.select({
+    id: schema.externalLrsTargets.id,
+    endpoint: schema.externalLrsTargets.endpoint,
+    authMode: schema.externalLrsTargets.authMode,
+    customHeaders: schema.externalLrsTargets.customHeaders,
+    active: schema.externalLrsTargets.active,
+    lastSuccessAt: schema.externalLrsTargets.lastSuccessAt,
+    lastErrorAt: schema.externalLrsTargets.lastErrorAt,
+    lastError: schema.externalLrsTargets.lastError,
+    createdAt: schema.externalLrsTargets.createdAt,
+  })
+    .from(schema.externalLrsTargets)
+    .where(eq(schema.externalLrsTargets.userId, userId));
+  return c.json(success({ targets: rows }), 200);
+});
+
+courseRoutes.post("/xapi/lrs-targets", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = ExternalLrsTargetSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const db = getDb();
+  const [created] = await db.insert(schema.externalLrsTargets).values({
+    userId,
+    endpoint: parsed.data.endpoint,
+    authMode: parsed.data.authMode,
+    authToken: parsed.data.authToken ?? null,
+    customHeaders: parsed.data.customHeaders ?? null,
+    active: parsed.data.active,
+  } as never).returning();
+  return c.json(success(created), 201);
+});
+
+courseRoutes.patch("/xapi/lrs-targets/:id", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const parsed = ExternalLrsTargetSchema.partial().safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const db = getDb();
+  const [updated] = await db.update(schema.externalLrsTargets)
+    .set({ ...parsed.data, updatedAt: new Date() } as never)
+    .where(and(
+      eq(schema.externalLrsTargets.id, c.req.param("id")),
+      eq(schema.externalLrsTargets.userId, userId),
+    ))
+    .returning();
+  if (!updated) return c.json(error("NOT_FOUND", "Target not found"), 404);
+  return c.json(success(updated), 200);
+});
+
+courseRoutes.delete("/xapi/lrs-targets/:id", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const deleted = await db.delete(schema.externalLrsTargets)
+    .where(and(
+      eq(schema.externalLrsTargets.id, c.req.param("id")),
+      eq(schema.externalLrsTargets.userId, userId),
+    ))
+    .returning({ id: schema.externalLrsTargets.id });
+  if (deleted.length === 0) return c.json(error("NOT_FOUND", "Target not found"), 404);
+  return c.json(success({ deleted: deleted[0]!.id }), 200);
 });

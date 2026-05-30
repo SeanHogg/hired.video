@@ -147,3 +147,89 @@ describe("mcp/descriptors", () => {
     assert.ok(!templates.some((t) => t.name === "resume-list-mine"));
   });
 });
+
+// gap #1620 execution layer — pure dispatch builder
+describe("MCP dispatch builder", () => {
+  it("substitutes path params + drops them from query/body", async () => {
+    const { buildDispatchRequest } = await import("../mcp/dispatch.js");
+    const out = buildDispatchRequest({
+      endpoint: "/api/resumes/:id",
+      method: "GET",
+      args: { id: "abc-123" },
+    });
+    assert.match(out.url, /\/api\/resumes\/abc-123/);
+    // No leftover ?id= in query.
+    assert.ok(!out.url.includes("?id="));
+    assert.strictEqual(out.init.method, "GET");
+  });
+
+  it("URL-encodes path params with special chars", async () => {
+    const { buildDispatchRequest } = await import("../mcp/dispatch.js");
+    const out = buildDispatchRequest({
+      endpoint: "/api/users/:userId/posts",
+      method: "GET",
+      args: { userId: "alice+ops@team" },
+    });
+    assert.match(out.url, /alice%2Bops%40team/);
+  });
+
+  it("throws when a required path param is missing", async () => {
+    const { buildDispatchRequest } = await import("../mcp/dispatch.js");
+    assert.throws(
+      () =>
+        buildDispatchRequest({
+          endpoint: "/api/resumes/:id",
+          method: "GET",
+          args: {},
+        }),
+      /missing required path parameter "id"/,
+    );
+  });
+
+  it("folds remaining args into the query string for GET", async () => {
+    const { buildDispatchRequest } = await import("../mcp/dispatch.js");
+    const out = buildDispatchRequest({
+      endpoint: "/api/jobs",
+      method: "GET",
+      args: { search: "remote", limit: 10 },
+    });
+    assert.match(out.url, /search=remote/);
+    assert.match(out.url, /limit=10/);
+    assert.strictEqual(out.init.body, undefined);
+  });
+
+  it("folds remaining args into JSON body for POST", async () => {
+    const { buildDispatchRequest } = await import("../mcp/dispatch.js");
+    const out = buildDispatchRequest({
+      endpoint: "/api/resumes/:id",
+      method: "POST",
+      args: { id: "abc", title: "Senior" },
+    });
+    assert.match(out.url, /\/api\/resumes\/abc/);
+    assert.strictEqual(out.init.method, "POST");
+    const headers = out.init.headers as Record<string, string>;
+    assert.strictEqual(headers["Content-Type"], "application/json");
+    const body = JSON.parse(out.init.body as string);
+    assert.deepStrictEqual(body, { title: "Senior" });
+  });
+
+  it("forwards the Authorization header verbatim when provided", async () => {
+    const { buildDispatchRequest } = await import("../mcp/dispatch.js");
+    const out = buildDispatchRequest({
+      endpoint: "/api/users/me",
+      method: "GET",
+      args: {},
+      authorization: "Bearer test-token-xyz",
+    });
+    const headers = out.init.headers as Record<string, string>;
+    assert.strictEqual(headers["Authorization"], "Bearer test-token-xyz");
+  });
+
+  it("parseHiredResourceUri extracts tool id + path params", async () => {
+    const { parseHiredResourceUri } = await import("../mcp/dispatch.js");
+    const out = parseHiredResourceUri("hired://resume-get/abc-123");
+    assert.deepStrictEqual(out, { toolId: "resume-get", pathParams: ["abc-123"] });
+    assert.strictEqual(parseHiredResourceUri("https://example.com"), null);
+    assert.strictEqual(parseHiredResourceUri("hired://"), null);
+  });
+});

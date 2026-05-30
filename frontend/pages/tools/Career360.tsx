@@ -16,7 +16,7 @@
 //   - DELETE /api/career360/target   → clear (keeps suggestions)
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Compass, Loader2 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";

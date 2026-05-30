@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { AppEnv } from "../types/index.js";
 import {
   JSON_RPC_ERRORS,
@@ -17,6 +18,10 @@ import {
   buildMcpTools,
   renderMcpPrompt,
 } from "../../../shared/mcp/descriptors.js";
+import {
+  buildDispatchRequest,
+  parseHiredResourceUri,
+} from "../../../shared/mcp/dispatch.js";
 
 /**
  * Model Context Protocol server (gap #1620) — exposes the hired.video AI
@@ -29,20 +34,109 @@ import {
  * Settings → AI Integrations (revocable like a passkey) is the next
  * step — see the #1620 remainder in the gap register.
  *
- * Implemented this pass (discovery + prompt rendering, all derived from
- * the shared registries so there is zero drift from the in-app brain):
+ * Implemented this pass (discovery + prompt rendering + execution, all
+ * derived from the shared registries so there is zero drift from the
+ * in-app brain):
  *   initialize · ping · notifications/initialized
  *   tools/list · prompts/list · prompts/get · resources/templates/list
+ *   tools/call · resources/read
  *
- * `tools/call` + `resources/read` (execution) return a spec-shaped
- * isError result directing the caller to the REST endpoint that
- * `tools/list` already advertises — wiring real execution needs the
- * per-tool request context (auth, token ledger, DB) and is tracked as
- * the #1620 remainder.
+ * Execution dispatches via Hono `app.request()` re-entry — the route
+ * mount in app.ts stows the app instance on c.var, then `executeToolCall`
+ * builds a `{url,init}` pair from the tool's endpoint + the caller's
+ * arguments (path params consumed first, remainder fold into query string
+ * for GET/DELETE or JSON body for POST/PUT/PATCH) and re-enters the same
+ * router. The caller's Authorization header is forwarded verbatim so
+ * token-ledger billing + workspace scope stay correct.
+ *
+ * SSE streaming mode is the next remainder — today this only ships the
+ * JSON response transport.
  */
 export const mcpRoutes = new Hono<AppEnv>();
 
-function handleMethod(
+/** Execute a tool via Hono in-process re-entry. The app instance was
+ *  stowed on c.var by the middleware in app.ts so we don't take a
+ *  circular dep on createApp() here. Auth header is forwarded so the
+ *  tool runs scoped to the caller's identity (token-ledger bills
+ *  against the same user). */
+async function executeToolCall(
+  c: Context,
+  toolName: string,
+  args: Record<string, unknown>,
+) {
+  const tool = buildMcpTools().find((t) => t.name === toolName);
+  if (!tool) {
+    return {
+      content: [{ type: "text" as const, text: `Unknown tool: ${toolName}` }],
+      isError: true,
+    };
+  }
+  // The middleware that mounts this route block stores `app` on c.var.
+  // Without it we have no way to re-enter the router.
+  const app = (c.get as (key: string) => unknown)("app") as
+    | { request: (url: string, init?: RequestInit) => Promise<Response> }
+    | undefined;
+  if (!app || typeof app.request !== "function") {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: "MCP dispatch unavailable in this isolate (app reference missing).",
+        },
+      ],
+      isError: true,
+    };
+  }
+  let dispatch;
+  try {
+    dispatch = buildDispatchRequest({
+      endpoint: tool._meta.endpoint,
+      method: tool._meta.method,
+      args,
+      authorization: c.req.header("Authorization") ?? undefined,
+    });
+  } catch (err) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: err instanceof Error ? err.message : String(err),
+        },
+      ],
+      isError: true,
+    };
+  }
+  let response: Response;
+  try {
+    response = await app.request(dispatch.url, dispatch.init);
+  } catch (err) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text:
+            "Tool dispatch failed: " +
+            (err instanceof Error ? err.message : String(err)),
+        },
+      ],
+      isError: true,
+    };
+  }
+  const text = await response.text();
+  // Surface non-2xx as isError so the caller knows the route refused
+  // even though we returned a content payload they can inspect.
+  return {
+    content: [{ type: "text" as const, text }],
+    isError: !response.ok,
+    _meta: {
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+    },
+  };
+}
+
+async function handleMethod(
+  c: Context,
   id: JsonRpcId,
   method: string,
   params: Record<string, unknown> | undefined,
@@ -99,24 +193,72 @@ function handleMethod(
       });
 
     case "tools/call": {
-      const name = typeof params?.name === "string" ? params.name : "(unknown)";
-      const tool = buildMcpTools().find((t) => t.name === name);
-      const guidance = tool
-        ? `Tool execution over MCP is not enabled yet. Call ${tool._meta.method} ${tool._meta.endpoint} directly with your bearer token.`
-        : `Unknown tool: ${name}`;
-      return jsonRpcResult(id, {
-        content: [{ type: "text", text: guidance }],
-        isError: true,
-      });
+      const name = typeof params?.name === "string" ? params.name : "";
+      if (!name) {
+        return jsonRpcError(
+          id,
+          JSON_RPC_ERRORS.INVALID_PARAMS,
+          'tools/call requires a "name" param',
+        );
+      }
+      const toolArgs =
+        params?.arguments && typeof params.arguments === "object"
+          ? (params.arguments as Record<string, unknown>)
+          : {};
+      const result = await executeToolCall(c, name, toolArgs);
+      return jsonRpcResult(id, result);
     }
 
-    case "resources/read":
-      return jsonRpcResult(id, {
-        contents: [],
-        _meta: {
-          note: "Resource reads over MCP are not enabled yet; fetch the REST endpoint from tools/list with your bearer token.",
-        },
+    case "resources/read": {
+      const uri = typeof params?.uri === "string" ? params.uri : "";
+      if (!uri) {
+        return jsonRpcError(
+          id,
+          JSON_RPC_ERRORS.INVALID_PARAMS,
+          'resources/read requires a "uri" param',
+        );
+      }
+      const parsed = parseHiredResourceUri(uri);
+      if (!parsed) {
+        return jsonRpcError(
+          id,
+          JSON_RPC_ERRORS.INVALID_PARAMS,
+          `Unsupported resource URI scheme: ${uri}`,
+        );
+      }
+      // Resource URIs project to GET tools with `:param` placeholders.
+      // The template's path params come in URI order; we name them via
+      // the matching tool's endpoint pattern.
+      const tool = buildMcpTools().find((t) => t.name === parsed.toolId);
+      if (!tool) {
+        return jsonRpcError(
+          id,
+          JSON_RPC_ERRORS.INVALID_PARAMS,
+          `Unknown resource tool: ${parsed.toolId}`,
+        );
+      }
+      const paramNames = [...tool._meta.endpoint.matchAll(/:([a-zA-Z][a-zA-Z0-9_]*)/g)].map(
+        (m) => m[1],
+      );
+      const args: Record<string, unknown> = {};
+      paramNames.forEach((n, i) => {
+        if (parsed.pathParams[i] !== undefined) args[n] = parsed.pathParams[i];
       });
+      const result = await executeToolCall(c, parsed.toolId, args);
+      // Resource shape — return the raw text as a single resource entry
+      // so MCP clients render it as the entity body. Status code drift
+      // surfaces via `isError` from executeToolCall.
+      return jsonRpcResult(id, {
+        contents: [
+          {
+            uri,
+            mimeType: result._meta?.contentType ?? "application/json",
+            text: result.content[0]?.text ?? "",
+          },
+        ],
+        isError: result.isError,
+      });
+    }
 
     default:
       return jsonRpcError(
@@ -156,7 +298,12 @@ mcpRoutes.post("/", async (c) => {
     return c.body(null, 202);
   }
 
-  const response = handleMethod(request.id ?? null, request.method, request.params);
+  const response = await handleMethod(
+    c,
+    request.id ?? null,
+    request.method,
+    request.params,
+  );
   return c.json(response);
 });
 

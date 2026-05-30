@@ -1318,6 +1318,8 @@ function toProjectDto(
     // CAD runtime state for mediaKind='cad' projects (#930). Same
     // parallel-column pattern. See `shared/cad-state.ts`.
     cadState: project.cadState ?? null,
+    // 3D CAD runtime state for mediaKind='cad_3d' projects (#930 Phase 2).
+    cad3dState: project.cad3dState ?? null,
     // Comic runtime state for mediaKind='comic' projects (#929 / #1217).
     // Comic authoring currently rides the CanvasState path (panels =
     // widgets) so this column is dormant today, but exposing it on
@@ -1496,6 +1498,9 @@ studioRoutes.post("/save-draft", async (c) => {
     // CAD state JSON for mediaKind='cad' projects (#930). Same
     // parallel-column pattern. See `shared/cad-state.ts`.
     cadState:       z.any().optional(),
+    // 3D CAD state JSON for mediaKind='cad_3d' projects (#930 Phase 2).
+    // Same parallel-column pattern. See `shared/cad-3d-state.ts`.
+    cad3dState:     z.any().optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics
@@ -1523,7 +1528,7 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, animationState, cadState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, mediaKind, timelineSpec, gameState, imageState, animationState, cadState, cad3dState, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
   // mediaKind is orthogonal (output axis) — patched separately when the
@@ -1532,7 +1537,7 @@ studioRoutes.post("/save-draft", async (c) => {
   // (#927 / #932); each lives on its own JSONB column per the canvas-
   // runtime extensibility model (PRD §1.2).
   const editorKindPatch =
-    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined || animationState !== undefined || cadState !== undefined
+    kind !== undefined || mediaKind !== undefined || timelineSpec !== undefined || gameState !== undefined || imageState !== undefined || animationState !== undefined || cadState !== undefined || cad3dState !== undefined
       ? {
           kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
           ...(mediaKind !== undefined ? { mediaKind } : {}),
@@ -1541,6 +1546,7 @@ studioRoutes.post("/save-draft", async (c) => {
           ...(imageState !== undefined ? { imageState } : {}),
           ...(animationState !== undefined ? { animationState } : {}),
           ...(cadState !== undefined ? { cadState } : {}),
+          ...(cad3dState !== undefined ? { cad3dState } : {}),
         }
       : {};
   const db = getDb();
@@ -2849,6 +2855,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
       imageState: studioProjects.imageState,
       animationState: studioProjects.animationState,
       cadState: studioProjects.cadState,
+      cad3dState: studioProjects.cad3dState,
       comicState: studioProjects.comicState,
       createdAt: studioProjects.createdAt,
       // LEFT-joined optional baked artifacts.

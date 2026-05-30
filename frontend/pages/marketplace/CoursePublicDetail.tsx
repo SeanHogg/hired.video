@@ -223,6 +223,14 @@ export default function CoursePublicDetail() {
       });
       navigate(`/learn/${created.id}`);
     } catch (err) {
+      // Paid course → backend signals 402 PAYMENT_REQUIRED; route to the
+      // course-checkout page which mints the course_checkouts row + hands
+      // off to the existing payment provider.
+      const code = (err as { code?: string } | null)?.code;
+      if (code === "PAYMENT_REQUIRED") {
+        navigate(`/checkout/course/${course.id}`);
+        return;
+      }
       toast({
         title: "Couldn't enroll",
         description: (err as Error).message || "Try again in a moment.",

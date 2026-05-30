@@ -74,7 +74,12 @@ export const webcodecsStrategy: RenderStrategy = {
     // Render the audio mix on the main thread (uses OfflineAudioContext;
     // workers can run it too, but decodeAudioData of the source URLs is
     // simpler to drive from main where we already hold the source refs).
-    const audioBuffer = await renderTimelineAudio(timeline, sources).catch((err) => {
+    // Pass the nested-timeline resolver through so compound clips' audio
+    // mixes recursively (#356); without it nested clips would render
+    // silent.
+    const audioBuffer = await renderTimelineAudio(timeline, sources, {
+      resolveNestedTimeline: opts.resolveNestedTimeline,
+    }).catch((err) => {
       // eslint-disable-next-line no-console
       console.warn("[nle] audio mix failed; rendering silent video", err);
       return null;

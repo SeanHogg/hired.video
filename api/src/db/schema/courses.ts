@@ -323,3 +323,49 @@ export const lmsCoursePublishes = pgTable(
 
 export type LmsCoursePublish = typeof lmsCoursePublishes.$inferSelect;
 export type NewLmsCoursePublish = typeof lmsCoursePublishes.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// course_checkouts — paid-enrolment ledger (build-strategy "Course payment /
+// cart wiring"). Models boost-checkout: a pre-create row holds the total +
+// status, the existing /api/payment provider (Stripe / Helcim) collects USD
+// out-of-band and posts the providerPaymentId via /confirm-payment. On
+// confirmation we create the matching course_enrollments row + flip the
+// checkout to `paid`.
+//
+// Idempotency: the partial unique index on (userId, courseId, status='pending')
+// keeps a refresh from minting two pending checkouts for the same course.
+// Once paid or expired, the constraint releases so a future re-purchase
+// (refund + re-enrol) can mint a new row.
+// ---------------------------------------------------------------------------
+export const COURSE_CHECKOUT_STATUSES = ["pending", "paid", "expired", "refunded"] as const;
+export type CourseCheckoutStatus = (typeof COURSE_CHECKOUT_STATUSES)[number];
+
+export const courseCheckouts = pgTable(
+  "course_checkouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+    enrollmentId: uuid("enrollment_id").references(() => courseEnrollments.id, { onDelete: "set null" }),
+    totalCents: integer("total_cents").notNull(),
+    platformFeeCents: integer("platform_fee_cents").default(0).notNull(),
+    creatorCutCents: integer("creator_cut_cents").default(0).notNull(),
+    providerPaymentId: text("provider_payment_id"),
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_course_checkouts_user").on(t.userId, t.createdAt),
+    index("idx_course_checkouts_course").on(t.courseId, t.createdAt),
+    uniqueIndex("uq_course_checkouts_pending_user_course")
+      .on(t.userId, t.courseId)
+      .where(sql`${t.status} = 'pending'`),
+  ],
+);
+
+export type CourseCheckout = typeof courseCheckouts.$inferSelect;
+export type NewCourseCheckout = typeof courseCheckouts.$inferInsert;

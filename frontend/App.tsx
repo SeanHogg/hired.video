@@ -173,6 +173,7 @@ const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplat
 const VoicePublicDetail = lazy(() => import("./pages/marketplace/VoicePublicDetail"));
 const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDetail"));
 const CourseLearner = lazy(() => import("./pages/CourseLearner"));
+const CourseCheckout = lazy(() => import("./pages/CourseCheckout"));
 const CourseReviewQueue = lazy(() => import("./pages/CourseReviewQueue"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 
@@ -981,6 +982,12 @@ const App = () => (
                           self-gates on the requester owning the
                           enrollment row (API 404s otherwise). */}
                       <Route path="/learn/:enrollmentId" element={<CourseLearner />} />
+                      {/* Paid-course checkout. The public course detail
+                          page catches a 402 PAYMENT_REQUIRED from
+                          POST /enroll and navigates here; the checkout
+                          page mints a course_checkouts row + drives the
+                          existing payment provider. */}
+                      <Route path="/checkout/course/:courseId" element={<CourseCheckout />} />
                       {/* #1502 — Reviewer inbox. Lists every course
                           status='in_review' assigned to the calling
                           user; SuperAdmin sees the full queue. */}

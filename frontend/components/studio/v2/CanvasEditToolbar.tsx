@@ -10,15 +10,24 @@
  * regardless of whether this toolbar is visible — the buttons are an
  * affordance, not the only path.
  */
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ClipboardPaste,
   Copy,
+  Keyboard,
   Redo2,
   Scissors,
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import ShortcutSettings from "@/components/studio/nle/ShortcutSettings";
 
 interface CanvasEditToolbarProps {
   /** History slice from `useCanvasHistory` — the toolbar reads canUndo /
@@ -45,6 +54,7 @@ export default function CanvasEditToolbar({
   clipboard,
   className,
 }: CanvasEditToolbarProps) {
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const modKey =
     typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent)
       ? "⌘"
@@ -114,6 +124,25 @@ export default function CanvasEditToolbar({
       >
         <ClipboardPaste className="h-3.5 w-3.5" />
       </Button>
+      <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setShortcutsOpen(true)}
+        aria-label="Keyboard shortcuts"
+        title="Keyboard shortcuts"
+        className="h-7 w-7 p-0"
+      >
+        <Keyboard className="h-3.5 w-3.5" />
+      </Button>
+      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+        <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editor shortcuts</DialogTitle>
+          </DialogHeader>
+          <ShortcutSettings />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -28,6 +28,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
+import { sendPushToUser } from "../services/push/web-push.js";
 
 const {
   serviceOfferings,
@@ -35,7 +36,6 @@ const {
   userProfiles,
   users,
   notifications,
-  pushSubscriptions,
 } = schema;
 
 export const serviceRoutes = new Hono<AppEnv>();
@@ -59,186 +59,6 @@ async function notify(
     .insert(notifications)
     .values({ userId, type, title, message, data: data ?? null } as any)
     .catch(() => undefined);
-}
-
-// ---------------------------------------------------------------------------
-// Helper: send Web Push to all subscriptions for a user
-// ---------------------------------------------------------------------------
-async function sendPush(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-  payload: { title: string; body: string; url?: string },
-) {
-  // VAPID keys are required.  Skip silently if not configured.
-  const vapidPublic = process.env.VAPID_PUBLIC_KEY ?? (globalThis as any).__ENV?.VAPID_PUBLIC_KEY;
-  const vapidPrivate = process.env.VAPID_PRIVATE_KEY ?? (globalThis as any).__ENV?.VAPID_PRIVATE_KEY;
-  const vapidSubject = process.env.VAPID_SUBJECT ?? (globalThis as any).__ENV?.VAPID_SUBJECT ?? "mailto:noreply@hired.video";
-
-  if (!vapidPublic || !vapidPrivate) return;
-
-  const subs = await db
-    .select()
-    .from(pushSubscriptions)
-    .where(eq(pushSubscriptions.userId, userId));
-
-  for (const sub of subs) {
-    try {
-      await deliverWebPush(
-        { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
-        payload,
-        { publicKey: vapidPublic, privateKey: vapidPrivate, subject: vapidSubject },
-      );
-    } catch {
-      // Remove stale subscription (410 Gone) silently
-      await db
-        .delete(pushSubscriptions)
-        .where(eq(pushSubscriptions.endpoint, sub.endpoint))
-        .catch(() => undefined);
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Minimal Web Push delivery using Web Crypto API (Cloudflare Workers compatible)
-// Implements RFC 8030 + RFC 8291 (ECDH payload encryption) + RFC 8292 (VAPID)
-// ---------------------------------------------------------------------------
-async function deliverWebPush(
-  subscription: { endpoint: string; p256dh: string; auth: string },
-  payload: { title: string; body: string; url?: string },
-  vapid: { publicKey: string; privateKey: string; subject: string },
-) {
-  const crypto = (globalThis as any).crypto as Crypto;
-
-  // 1. Generate salt
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-
-  // 2. Import receiver's public key (p256dh)
-  const receiverPubKey = await crypto.subtle.importKey(
-    "raw",
-    base64UrlDecode(subscription.p256dh),
-    { name: "ECDH", namedCurve: "P-256" },
-    false,
-    [],
-  );
-
-  // 3. Generate ephemeral ECDH key pair
-  const senderKeys = await crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
-    true,
-    ["deriveKey"],
-  ) as CryptoKeyPair;
-
-  // 4. Derive shared secret
-  const sharedSecret = await crypto.subtle.deriveKey(
-    { name: "ECDH", public: receiverPubKey } as any,
-    senderKeys.privateKey,
-    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new Uint8Array(0) } as any,
-    false,
-    ["deriveBits"],
-  );
-  const ikm = new Uint8Array(
-    await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: base64UrlDecode(subscription.auth), info: utf8Encode("Content-Encoding: auth\0") } as any, sharedSecret as any, 256),
-  );
-
-  const senderPubKeyRaw = new Uint8Array(
-    await (crypto.subtle.exportKey as any)("raw", senderKeys.publicKey),
-  );
-
-  // PRK
-  const prkKey = await crypto.subtle.importKey("raw", ikm, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-
-  function buildInfo(type: string, clientKey: Uint8Array, serverKey: Uint8Array) {
-    const enc = new TextEncoder();
-    const prefix = enc.encode("Content-Encoding: " + type + "\0P-256\0");
-    const buf = new Uint8Array(prefix.length + 2 + clientKey.length + 2 + serverKey.length);
-    buf.set(prefix);
-    buf[prefix.length] = (clientKey.length >> 8) & 0xff;
-    buf[prefix.length + 1] = clientKey.length & 0xff;
-    buf.set(clientKey, prefix.length + 2);
-    buf[prefix.length + 2 + clientKey.length] = (serverKey.length >> 8) & 0xff;
-    buf[prefix.length + 2 + clientKey.length + 1] = serverKey.length & 0xff;
-    buf.set(serverKey, prefix.length + 2 + clientKey.length + 2);
-    return buf;
-  }
-
-  const receiverPubKeyRaw = new Uint8Array(base64UrlDecode(subscription.p256dh));
-
-  const cekInfo = buildInfo("aesgcm", receiverPubKeyRaw, senderPubKeyRaw);
-  const nonceInfo = buildInfo("nonce", receiverPubKeyRaw, senderPubKeyRaw);
-
-  const cekBits = new Uint8Array(await crypto.subtle.sign("HMAC", prkKey, concat(hkdfExpand(salt, cekInfo))));
-  const nonceBits = new Uint8Array(await crypto.subtle.sign("HMAC", prkKey, concat(hkdfExpand(salt, nonceInfo))));
-  const cek = cekBits.slice(0, 16);
-  const nonce = nonceBits.slice(0, 12);
-
-  // 5. Encrypt payload
-  const plaintext = utf8Encode(JSON.stringify(payload));
-  const padded = new Uint8Array(plaintext.length + 2);
-  padded.set(plaintext, 2); // 2-byte padding length prefix = 0
-  const cekKey = await crypto.subtle.importKey("raw", cek, { name: "AES-GCM" }, false, ["encrypt"]);
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, cekKey, padded),
-  );
-
-  // 6. Build VAPID JWT
-  const audience = new URL(subscription.endpoint).origin;
-  const now = Math.floor(Date.now() / 1000);
-  const header = base64UrlEncode(utf8Encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
-  const claims = base64UrlEncode(utf8Encode(JSON.stringify({ aud: audience, exp: now + 3600, sub: vapid.subject })));
-  const jwtUnsigned = `${header}.${claims}`;
-  const vapidPrivKey = await crypto.subtle.importKey(
-    "pkcs8",
-    base64UrlDecode(vapid.privateKey),
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"],
-  );
-  const jwtSig = base64UrlEncode(
-    new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, vapidPrivKey, utf8Encode(jwtUnsigned))),
-  );
-  const jwt = `${jwtUnsigned}.${jwtSig}`;
-
-  // 7. POST to push endpoint
-  const encryptionHeader = `salt=${base64UrlEncode(salt)}; rs=4096; keyid=p256dh; dh=${base64UrlEncode(senderPubKeyRaw)}`;
-  await fetch(subscription.endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Encoding": "aesgcm",
-      Encryption: encryptionHeader,
-      "Crypto-Key": `dh=${base64UrlEncode(senderPubKeyRaw)};vapid="public-key=${vapid.publicKey}"`,
-      Authorization: `vapid t=${jwt},k=${vapid.publicKey}`,
-      TTL: "86400",
-    },
-    body: ciphertext,
-  });
-}
-
-// tiny helpers
-function utf8Encode(s: string): Uint8Array { return new TextEncoder().encode(s); }
-function base64UrlDecode(s: string): ArrayBuffer {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/").padEnd(s.length + (4 - s.length % 4) % 4, "=");
-  const bin = atob(b64);
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0)).buffer;
-}
-function base64UrlEncode(buf: Uint8Array): string {
-  let bin = "";
-  for (const b of buf) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-}
-function hkdfExpand(salt: Uint8Array, info: Uint8Array): Uint8Array {
-  const merged = new Uint8Array(salt.length + info.length + 1);
-  merged.set(salt);
-  merged.set(info, salt.length);
-  merged[merged.length - 1] = 1;
-  return merged;
-}
-function concat(...arrays: Uint8Array[]): Uint8Array {
-  const len = arrays.reduce((s, a) => s + a.length, 0);
-  const out = new Uint8Array(len);
-  let i = 0;
-  for (const a of arrays) { out.set(a, i); i += a.length; }
-  return out;
 }
 
 // ===========================================================================
@@ -583,7 +403,7 @@ serviceRoutes.post("/:serviceId/inquire", async (c) => {
     inquiryId: row.id,
     serviceId: service.id,
   });
-  await sendPush(db, service.userId, { title: notifTitle, body: notifMsg, url: "/services/inquiries" });
+  await sendPushToUser(service.userId, { title: notifTitle, body: notifMsg, url: "/services/inquiries" });
 
   return c.json(success(row), 201);
 });
@@ -630,7 +450,7 @@ serviceRoutes.patch("/inquiries/:id", async (c) => {
   await notify(db, inquiry.fromUserId, "service_inquiry", notifTitle, notifMsg, {
     inquiryId: inquiry.id,
   });
-  await sendPush(db, inquiry.fromUserId, { title: notifTitle, body: notifMsg, url: "/services/my-requests" });
+  await sendPushToUser(inquiry.fromUserId, { title: notifTitle, body: notifMsg, url: "/services/my-requests" });
 
   return c.json(success(updated), 200);
 });

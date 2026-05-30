@@ -225,6 +225,11 @@ export const studioProjects = pgTable("studio_projects", {
   // drawing extents + unit + grid). Null for non-cad projects.
   // Migration 0107 / #930.
   cadState: jsonb("cad_state"),
+  // 3D CAD state JSON for mediaKind='cad_3d' projects. Same parallel-column
+  // pattern as cadState. Shape in `shared/cad-3d-state.ts` (primitives +
+  // boolean ops + materials + build-volume). Null for non-cad_3d projects.
+  // Migration 0184 / #930 Phase 2.
+  cad3dState: jsonb("cad_3d_state"),
   // Public-URL slug. Promoted from `storyboard._slug` to a real column
   // in migration 0141 because the JSONB extraction made the per-save
   // uniqueness check sequentially scan studio_projects and blow the

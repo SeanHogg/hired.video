@@ -40,8 +40,19 @@ import {
 import { nleApi, type NleMediaSourceWithBin } from "@/lib/timeline/api";
 import { NLE_SOURCE_DRAG_MIME } from "@/lib/timeline/dnd";
 import { probeSource } from "@/lib/timeline/source-probe";
+import { generateProxy, isProxyGenerationAvailable } from "@/lib/timeline/proxy-generator";
+import {
+  buildBinFolderTree,
+  folderMatches,
+  normaliseBinFolder,
+  type BinFolderNode,
+} from "@/lib/timeline/bin-folder-tree";
 import { useToast } from "@/hooks/use-toast";
 import RelinkSourceDialog from "./RelinkSourceDialog";
+
+/** Heights above this trigger automatic proxy generation on upload (#355).
+ *  Below this, scrubbing the master is already fast enough. */
+const AUTO_PROXY_HEIGHT_THRESHOLD = 1080;
 
 interface Props {
   /** Optional pre-fetched list — when present, the panel skips the
@@ -92,16 +103,21 @@ export default function BinPanel({ initial, onPickSource }: Props) {
     return Array.from(s).sort();
   }, [sources]);
 
-  const allFolders = useMemo(() => {
-    const s = new Set<string>();
-    for (const src of sources) if (src.binFolder) s.add(src.binFolder);
-    return Array.from(s).sort();
-  }, [sources]);
+  // Folder tree (#358) — `binFolder` is now a `/`-delimited path; the
+  // tree builder normalises and groups by prefix so the picker can show
+  // nested folders. Source-of-truth for "what folders exist" lives in
+  // [bin-folder-tree.ts](../../../lib/timeline/bin-folder-tree.ts).
+  const folderTree = useMemo(
+    () => buildBinFolderTree(sources.map((s) => s.binFolder)),
+    [sources],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sources.filter((s) => {
-      if (activeFolder !== null && (s.binFolder ?? "") !== activeFolder) return false;
+      if (activeFolder !== null && !folderMatches(s.binFolder, activeFolder)) {
+        return false;
+      }
       if (activeTags.size > 0) {
         for (const tag of activeTags) {
           if (!s.tags.includes(tag)) return false;
@@ -164,6 +180,33 @@ export default function BinPanel({ initial, onPickSource }: Props) {
               description: file.name,
             });
           }
+          // Auto-generate proxy in the background for tall masters that
+          // would scrub poorly. Skip when the row already carries a
+          // proxyUrl (server dedupe), when the source isn't video, or
+          // when WebCodecs is unavailable. Errors are swallowed —
+          // proxies are an optimisation, not a correctness gate.
+          if (
+            probed.kind === "video" &&
+            (probed.height ?? 0) > AUTO_PROXY_HEIGHT_THRESHOLD &&
+            !(upload.source as { proxyUrl?: string | null }).proxyUrl &&
+            isProxyGenerationAvailable()
+          ) {
+            void (async () => {
+              try {
+                const proxy = await generateProxy(file);
+                const updated = await nleApi.uploadProxy(upload.source.id, proxy.blob);
+                setSources((prev) =>
+                  prev.map((s) =>
+                    s.id === updated.source.id
+                      ? { ...updated.source, binFolder: s.binFolder, tags: s.tags }
+                      : s,
+                  ),
+                );
+              } catch (proxyErr) {
+                console.warn("[nle] auto-proxy generation failed:", proxyErr);
+              }
+            })();
+          }
         } catch (err) {
           toast({
             title: `Couldn't add ${file.name}`,
@@ -217,19 +260,62 @@ export default function BinPanel({ initial, onPickSource }: Props) {
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
               <Folder className="h-3 w-3 mr-1" />
-              {activeFolder ?? "All folders"}
+              {activeFolder == null
+                ? "All folders"
+                : activeFolder === ""
+                  ? "(root)"
+                  : activeFolder.split("/").pop()}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-[14rem]">
             <DropdownMenuLabel className="text-[10px] uppercase">Folder</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => setActiveFolder(null)}>All folders</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setActiveFolder("")}>(root)</DropdownMenuItem>
-            {allFolders.length > 0 && <DropdownMenuSeparator />}
-            {allFolders.map((f) => (
-              <DropdownMenuItem key={f} onSelect={() => setActiveFolder(f)}>
-                {f}
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuItem onSelect={() => setActiveFolder(null)}>
+              All folders
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setActiveFolder("")}>
+              (root)
+            </DropdownMenuItem>
+            {folderTree.children.length > 0 && <DropdownMenuSeparator />}
+            <FolderTreeMenu
+              node={folderTree}
+              depth={0}
+              activeFolder={activeFolder}
+              onSelect={(path) => setActiveFolder(path)}
+              onRename={async (from) => {
+                const to = window.prompt(`Move "${from}" to:`, from);
+                if (to === null || to === from) return;
+                try {
+                  await nleApi.renameFolder(from, to);
+                  // Update local list — apply the same prefix substitution
+                  // so the UI doesn't have to re-fetch.
+                  const newTo = normaliseBinFolder(to);
+                  const fromLen = from.length;
+                  setSources((prev) =>
+                    prev.map((s) => {
+                      const norm = normaliseBinFolder(s.binFolder);
+                      if (!norm) return s;
+                      if (norm === from) return { ...s, binFolder: newTo };
+                      if (norm.startsWith(`${from}/`)) {
+                        const tail = norm.slice(fromLen + 1);
+                        return {
+                          ...s,
+                          binFolder: newTo ? `${newTo}/${tail}` : tail,
+                        };
+                      }
+                      return s;
+                    }),
+                  );
+                  if (activeFolder === from) setActiveFolder(newTo);
+                  toast({ title: `Moved "${from}" → ${newTo ?? "(root)"}` });
+                } catch (err) {
+                  toast({
+                    title: "Couldn't rename folder",
+                    description: err instanceof Error ? err.message : "Move failed",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
@@ -340,6 +426,74 @@ export default function BinPanel({ initial, onPickSource }: Props) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Recursive folder tree inside the BinPanel's folder dropdown (#358).
+ * Each row shows the folder name (indented per depth), the direct-count
+ * badge, and a small rename button. Clicking the name filters the bin
+ * to that subtree (folderMatches handles "this folder or below").
+ */
+function FolderTreeMenu({
+  node,
+  depth,
+  activeFolder,
+  onSelect,
+  onRename,
+}: {
+  node: BinFolderNode;
+  depth: number;
+  activeFolder: string | null;
+  onSelect: (path: string) => void;
+  onRename: (path: string) => void;
+}) {
+  return (
+    <>
+      {node.children.map((child) => {
+        const active = activeFolder === child.path;
+        return (
+          <div key={child.path}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                onSelect(child.path);
+              }}
+              className={active ? "bg-accent" : ""}
+              style={{ paddingLeft: 8 + depth * 12 }}
+            >
+              <Folder className="h-3 w-3 mr-1.5 shrink-0" />
+              <span className="flex-1 truncate">{child.name}</span>
+              {child.directCount > 0 && (
+                <span className="text-[9px] text-muted-foreground ml-1">
+                  {child.directCount}
+                </span>
+              )}
+              <button
+                type="button"
+                className="ml-1 text-muted-foreground hover:text-foreground"
+                title={`Rename "${child.path}"`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRename(child.path);
+                }}
+              >
+                <Pencil className="h-2.5 w-2.5" />
+              </button>
+            </DropdownMenuItem>
+            {child.children.length > 0 && (
+              <FolderTreeMenu
+                node={child}
+                depth={depth + 1}
+                activeFolder={activeFolder}
+                onSelect={onSelect}
+                onRename={onRename}
+              />
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }
 

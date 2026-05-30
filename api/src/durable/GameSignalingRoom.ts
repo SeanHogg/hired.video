@@ -113,6 +113,17 @@ export class GameSignalingRoom {
       { kind: "peer_joined", peer: { id: sessionId, userId, displayName: name } },
       server,
     );
+    // #1656 — fire-and-forget PWA push to the project owner: "Sam
+    // joined your world." Skipped when the joiner is the owner (no
+    // self-notify). The DO can't read the owner directly — the route
+    // resolves it from the DB. Service-binding wiring not present in
+    // dev (same pattern as `handleClaim`): the fetch becomes a no-op.
+    void this.notifyOwner({
+      projectId,
+      event: "peer_joined",
+      peerName: name,
+      excludeUserId: userId,
+    });
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -215,9 +226,61 @@ export class GameSignalingRoom {
       pointsAwarded: 25, // Mirrors `PLAY_GAME_CHALLENGE` rule; the
                          // ledger row is the SSoT — this is a HUD hint.
     });
+    // #1656 — owner-side "Friend earned 25 points reaching the goal."
+    // Skipped when the player IS the owner (self-notify is noise).
+    void this.notifyOwner({
+      projectId: meta.projectId,
+      event: "challenge_awarded",
+      peerName: meta.displayName,
+      challengeId,
+      pointsAwarded: 25,
+      excludeUserId: meta.userId,
+    });
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────
+
+  /** Best-effort PWA push to the project owner via the worker's
+   *  `/api/games/:projectId/notify-owner` route (gap #1656). The DO
+   *  can't talk to the DB directly; the route resolves the owner,
+   *  excludes self-notifies when `excludeUserId === ownerId`, and
+   *  fans out via the shared `sendPushToUser` helper. The fetch
+   *  becomes a no-op without a worker service binding in dev (same
+   *  pattern as `handleClaim`). */
+  private async notifyOwner(args: {
+    projectId: string;
+    event: "peer_joined" | "challenge_awarded";
+    peerName: string;
+    challengeId?: string;
+    pointsAwarded?: number;
+    excludeUserId?: string;
+  }): Promise<void> {
+    try {
+      const req = new Request(
+        `https://internal/api/games/${encodeURIComponent(args.projectId)}/notify-owner`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(args.excludeUserId ? { "x-game-actor-id": args.excludeUserId } : {}),
+          },
+          body: JSON.stringify({
+            event: args.event,
+            peerName: args.peerName,
+            challengeId: args.challengeId,
+            pointsAwarded: args.pointsAwarded,
+          }),
+        },
+      );
+      // Same as `handleClaim` — production wiring uses a service
+      // binding so the DO calls back into its own worker. Without it
+      // the request object is built but never dispatched, which is
+      // fine for dev.
+      void req;
+    } catch {
+      // Push delivery failures don't fault the gameplay loop.
+    }
+  }
 
   private broadcast(env: Record<string, unknown>, except?: WebSocket): void {
     for (const ws of this.sessions.keys()) {

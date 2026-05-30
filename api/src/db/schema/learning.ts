@@ -223,3 +223,44 @@ export const XAPI_VERBS = {
   SCORED: { id: "http://adlnet.gov/expapi/verbs/scored", display: "scored" },
   TERMINATED: { id: "http://adlnet.gov/expapi/verbs/terminated", display: "terminated" },
 } as const;
+
+// ---------------------------------------------------------------------------
+// external_lrs_targets — enterprise xAPI forwarding (#1400 / build-strategy
+// "External LRS forwarding"). Every statement written to the internal LRS
+// is mirrored into each `active=true` row for that user, fire-and-forget.
+//
+// Auth modes mirror what Learning-Locker / Yet / SCORM Cloud accept:
+//   • basic — header carries `Authorization: Basic base64(user:pass)`.
+//   • bearer — header carries `Authorization: Bearer <token>` (rotates
+//              outside our control; we just hold the latest known good).
+//   • none — for self-hosted local LRSs behind a firewall.
+//
+// `customHeaders` is a free-form JSONB bag so an enterprise customer can
+// stamp tenant ids without us shipping a new column per integration.
+// ---------------------------------------------------------------------------
+export const EXTERNAL_LRS_AUTH_MODES = ["basic", "bearer", "none"] as const;
+export type ExternalLrsAuthMode = (typeof EXTERNAL_LRS_AUTH_MODES)[number];
+
+export const externalLrsTargets = pgTable(
+  "external_lrs_targets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    authMode: varchar("auth_mode", { length: 16 }).default("none").notNull(),
+    authToken: text("auth_token"),
+    customHeaders: jsonb("custom_headers"),
+    active: boolean("active").default(true).notNull(),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_external_lrs_user_active").on(t.userId, t.active),
+  ],
+);
+
+export type ExternalLrsTarget = typeof externalLrsTargets.$inferSelect;
+export type NewExternalLrsTarget = typeof externalLrsTargets.$inferInsert;

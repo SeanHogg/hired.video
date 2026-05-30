@@ -112,6 +112,8 @@ import Game3DPropertiesPanel from "@/components/studio/game/world-3d/Game3DPrope
 import ChallengesPanel from "@/components/studio/game/world-3d/ChallengesPanel";
 import AIAgentPanel from "@/components/studio/game/world-3d/AIAgentPanel";
 import InviteDialog from "@/components/studio/game/world-3d/InviteDialog";
+import LayoutPresetMenu from "@/components/studio/nle/LayoutPresetMenu";
+import type { LayoutBindings } from "@/lib/studio/editor-v2/use-layout-preset";
 import { downloadRobloxFile } from "@/lib/studio/game/roblox-export";
 import GamePropertiesPanel, {
   type GameSelection,
@@ -124,6 +126,7 @@ import {
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
 import CadStage from "@/components/studio/cad/CadStage";
+import Cad3DStage from "@/components/studio/cad-3d/Cad3DStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer, makeVectorLayer, makeTextLayer } from "@shared/image-state";
@@ -134,6 +137,7 @@ import {
   updateFramePixels,
 } from "@shared/animation-state";
 import { type CadState, createBlankCadState } from "@shared/cad-state";
+import { type Cad3DState, createBlankCad3DState } from "@shared/cad-3d-state";
 import { seedImageFromTemplate } from "@/lib/studio/image/image-seeds";
 import { seedAnimationFromTemplate } from "@/lib/studio/animation/animation-seeds";
 import FloatingImageLayersPanel from "@/components/studio/drawing/FloatingImageLayersPanel";
@@ -300,9 +304,32 @@ export default function StudioEditorV2() {
   // call participates in undo/redo. The (state, setState) pair is the
   // same shape useState would give us, so the rest of the editor
   // doesn't need to know history is in play.
-  const history = useCanvasHistory<CanvasState>(() =>
-    hydrateInitialState(projectId, templateHint),
-  );
+  //
+  // Selection + activeSceneId sidecar (#592): pro NLEs restore selection
+  // alongside content on undo/redo so the user doesn't have to re-click
+  // the widget they were editing. The refs below are populated by the
+  // useState declarations further down — capture/restore close over the
+  // refs (not the values) so the wiring stays valid through the
+  // top-down render order.
+  const selectionRef = useRef<Selection | null>(null);
+  const activeSceneIdRef = useRef<string | null>(null);
+  const setSelectionRef = useRef<((s: Selection) => void) | null>(null);
+  const setActiveSceneIdRef = useRef<((id: string) => void) | null>(null);
+  const history = useCanvasHistory<
+    CanvasState,
+    { selection: Selection | null; activeSceneId: string | null }
+  >(() => hydrateInitialState(projectId, templateHint), {
+    sidecar: {
+      capture: () => ({
+        selection: selectionRef.current,
+        activeSceneId: activeSceneIdRef.current,
+      }),
+      restore: (s) => {
+        if (s.selection !== null) setSelectionRef.current?.(s.selection);
+        if (s.activeSceneId !== null) setActiveSceneIdRef.current?.(s.activeSceneId);
+      },
+    },
+  });
   const { state, setState, undo, redo, canUndo, canRedo, reset: resetHistory, commit: commitHistory } = history;
   const [title, setTitle] = useState<string>("Untitled video");
   const [persistedProjectId, setPersistedProjectId] = useState<string | null>(
@@ -395,6 +422,17 @@ export default function StudioEditorV2() {
     reset: resetCadHistory,
   } = cadHistory;
   const [cadStateHydrated, setCadStateHydrated] = useState(false);
+  // 3D CAD runtime state (#930 Phase 2) — same parallel-history pattern
+  // as the 2D CAD runtime. Rides the same Three.js + R3F stack as the
+  // 3D World game studio (per [[project_3d_world_game_studio]]).
+  const cad3DHistory = useCanvasHistory<Cad3DState>(() => createBlankCad3DState());
+  const {
+    state: cad3DState,
+    setState: setCad3DState,
+    commit: cad3DCommit,
+    reset: resetCad3DHistory,
+  } = cad3DHistory;
+  const [cad3DStateHydrated, setCad3DStateHydrated] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -894,6 +932,13 @@ export default function StudioEditorV2() {
     kind: "scene",
     sceneId: state.scenes[0].id,
   });
+  // Mirror the latest selection state into the history hook's sidecar
+  // refs (#592). Done at render time, not in an effect, so the refs are
+  // current before the next commit timer fires.
+  selectionRef.current = selection;
+  activeSceneIdRef.current = activeSceneId;
+  setSelectionRef.current = setSelection;
+  setActiveSceneIdRef.current = setActiveSceneId;
   const [zoom, setZoom] = useState<number>(0.56);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(
@@ -1021,6 +1066,21 @@ export default function StudioEditorV2() {
       setCadStateHydrated(true);
     },
     unhydrate: () => setCadStateHydrated(false),
+  });
+
+  // 3D CAD hydration (#930 Phase 2). The persisted column is `cad3dState`
+  // (kebab → camel in the runtime payload), parsed once on first render
+  // for cad_3d-kind projects.
+  useKindHydration<Cad3DState>({
+    active: currentMediaKind === "cad_3d",
+    hydrated: cad3DStateHydrated,
+    serverState: persistedProject?.cad3dState as Cad3DState | null | undefined,
+    seed: () => createBlankCad3DState(),
+    hydrate: (next) => {
+      resetCad3DHistory(next);
+      setCad3DStateHydrated(true);
+    },
+    unhydrate: () => setCad3DStateHydrated(false),
   });
 
   // Game uses the null-sentinel hydration pattern instead of a
@@ -1974,6 +2034,7 @@ export default function StudioEditorV2() {
           animationState,
           gameState,
           cadState,
+          cad3dState: cad3DState,
           canvasState: state,
           flattenImage: imageCanvas
             ? async () => flattenCanvasToBlob(imageCanvas, "image/png")
@@ -2217,6 +2278,7 @@ export default function StudioEditorV2() {
         animationState,
         gameState,
         cadState,
+        cad3dState: cad3DState,
       });
       const res = await studioService.saveDraft({
         name: title,
@@ -2770,6 +2832,15 @@ export default function StudioEditorV2() {
                           tool="select"
                           drawColor="#0f172a"
                           drawStrokeWidthMm={0.25}
+                        />
+                      ) : null,
+                      cad_3d: cad3DStateHydrated ? (
+                        <Cad3DStage
+                          state={cad3DState}
+                          setState={setCad3DState}
+                          commit={cad3DCommit}
+                          mode="edit"
+                          className="absolute inset-0"
                         />
                       ) : null,
                       timeline: (
@@ -3564,6 +3635,20 @@ function EditorHeader({
         <ProjectChromeMenu
           project={persistedProject}
           getVideoScript={getVideoScript}
+        />
+        {/* Workspace layout presets (#349) — flips leftTab +
+            advancedTimelineOpen between named presets ("Editing",
+            "Color", "Audio", "Preview"). Each value is the consumer's
+            responsibility to map to its own setters; unknown leftTab
+            values are ignored so adding LEFT_TABS entries doesn't
+            require updating the hook. */}
+        <LayoutPresetMenu
+          onApply={(bindings: LayoutBindings) => {
+            if (bindings.leftTab === "widgets" || bindings.leftTab === "actions") {
+              setLeftTab(bindings.leftTab);
+            }
+            setAdvancedTimelineOpen(bindings.advancedTimelineOpen);
+          }}
         />
         {/* Single split-button for the whole project: Save (primary —
             persists draft) + chevron-dropdown with Export MP4, Copy

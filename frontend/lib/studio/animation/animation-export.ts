@@ -8,12 +8,11 @@
  *
  *   - `animation-gif`       → GIF89a via in-tree `gif89a-encoder.ts`
  *                              (full implementation — palette quantizer
- *                              + LZW compression, no third-party deps)
- *   - `animation-apng`      → MediaRecorder/WebM fallback (proper APNG
- *                              encoder logged as #1004 follow-on; the
- *                              file extension stays `.apng` but the
- *                              container is WebM until the encoder
- *                              ships)
+ *                              + LZW compression, no third-party deps);
+ *                              rasterise + encode runs in a Worker
+ *                              (#1025).
+ *   - `animation-apng`      → in-tree `apng-encoder.ts`; rasterise +
+ *                              encode runs in a Worker (#1025).
  *   - `animation-webp`      → MediaRecorder/WebM fallback (animated
  *                              WebP encoder logged as #1004 follow-on)
  *   - `animation-mp4-alpha` → WebM/VP9 alpha via MediaRecorder (the
@@ -21,6 +20,13 @@
  *                              container is misleading — see #1004
  *                              note; we emit WebM with alpha which is
  *                              what browsers actually support today)
+ *
+ * Worker offload (#1025): the GIF89a + APNG paths post the frame inputs
+ * + per-frame timing to `workers/animation-encode.worker.ts`. The
+ * worker rasterises each frame's pixelsDataUrl via OffscreenCanvas +
+ * createImageBitmap, runs the encoder, and transfers the byte stream
+ * back. Main-thread fallback path remains for environments that lack
+ * Worker / OffscreenCanvas (SSR, headless test runners).
  *
  * Frame compositing: each frame's `pixelsDataUrl` is decoded onto an
  * OffscreenCanvas at the project's dimensions; the project background
@@ -36,6 +42,50 @@ import type { OutputProfile } from "@shared/media-kinds";
 import { encodeGif, type GifFrameInput } from "./gif89a-encoder";
 import { encodeApng, type ApngFrame } from "./apng-encoder";
 import { toBlobPart } from "../bytes/to-blob-part";
+
+interface WorkerEncodeRequest {
+  type: "encode";
+  profileId: "animation-gif" | "animation-apng";
+  width: number;
+  height: number;
+  fps: number;
+  loopCount?: number;
+  background: AnimationState["background"];
+  frames: Array<{ pixelsDataUrl: string | null; delayHundredths: number; delayMs: number }>;
+}
+interface WorkerDoneMessage  { type: "done";  bytes: ArrayBuffer; mime: string }
+interface WorkerErrorMessage { type: "error"; message: string }
+type WorkerOut = WorkerDoneMessage | WorkerErrorMessage;
+
+function canUseEncoderWorker(): boolean {
+  return (
+    typeof Worker !== "undefined" &&
+    typeof OffscreenCanvas !== "undefined" &&
+    typeof createImageBitmap === "function"
+  );
+}
+
+async function encodeViaWorker(req: WorkerEncodeRequest): Promise<{ bytes: Uint8Array; mime: string }> {
+  const worker = new Worker(
+    new URL("../../../workers/animation-encode.worker.ts", import.meta.url),
+    { type: "module" },
+  );
+  try {
+    return await new Promise<{ bytes: Uint8Array; mime: string }>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent<WorkerOut>) => {
+        if (e.data.type === "done") {
+          resolve({ bytes: new Uint8Array(e.data.bytes), mime: e.data.mime });
+        } else if (e.data.type === "error") {
+          reject(new Error(e.data.message));
+        }
+      };
+      worker.onerror = (err) => reject(new Error(err.message || "animation worker error"));
+      worker.postMessage(req);
+    });
+  } finally {
+    worker.terminate();
+  }
+}
 
 /** Resolve each frame's pixel buffer at the project's dimensions.
  *  Frames carry their pixels as PNG dataURLs; we decode each via an
@@ -98,6 +148,37 @@ export async function renderAnimation(
   if (profile.mediaKind !== "animation") {
     throw new Error(`renderAnimation: profile is not animation-kind: ${profile.id}`);
   }
+
+  if (profile.id === "animation-gif" || profile.id === "animation-apng") {
+    // #1025 — GIF + APNG paths offload rasterise + encode to a Worker
+    // so the UI stays responsive during long renders. Falls back to
+    // the in-process path when Worker / OffscreenCanvas aren't
+    // available (SSR, headless test runners).
+    if (canUseEncoderWorker()) {
+      const { bytes, mime } = await encodeViaWorker({
+        type: "encode",
+        profileId: profile.id,
+        width: state.width,
+        height: state.height,
+        fps: state.fps,
+        loopCount: state.loopCount,
+        background: state.background,
+        frames: state.frames.map((f) => ({
+          pixelsDataUrl: f.pixelsDataUrl ?? null,
+          delayHundredths: frameDelayHundredths(state.fps, f.hold),
+          delayMs: Math.max(
+            1,
+            Math.round((1000 / Math.max(1, state.fps)) * Math.max(1, f.hold ?? 1)),
+          ),
+        })),
+      });
+      return {
+        blob: new Blob([toBlobPart(bytes)], { type: mime }),
+        durationSec: totalDurationSec(state),
+      };
+    }
+  }
+
   const frames = await rasteriseFrames(state);
   const frameInputs: GifFrameInput[] = state.frames.map((f, i) => ({
     pixels: frames[i],
@@ -119,10 +200,6 @@ export async function renderAnimation(
       };
     }
     case "animation-apng": {
-      // #1004 — Real in-tree APNG encoder. Outputs a valid APNG byte
-      // stream; decodes everywhere a normal PNG does (with animation
-      // in modern browsers + image viewers). 1000ms delay-den keeps
-      // the math straightforward: delay_num = milliseconds.
       const apngFrames: ApngFrame[] = state.frames.map((f, i) => ({
         pixels: frames[i],
         width: state.width,
@@ -140,9 +217,8 @@ export async function renderAnimation(
       // Browser-native animated-WebP / animated-alpha-video encoders
       // aren't reliably available client-side. We fall back to a WebM
       // recording of the canvas via MediaRecorder, which works in
-      // every modern browser. Animated-WebP encoder logged as a
-      // follow-on; transparent-MP4 is fundamentally not supported by
-      // Safari today so VP9-alpha-in-WebM is the practical answer.
+      // every modern browser. MediaRecorder needs a DOM canvas +
+      // captureStream, so this path stays on the main thread.
       const bytes = await encodeViaMediaRecorder(state, frameInputs, profile);
       return {
         blob: new Blob([toBlobPart(bytes)], { type: profile.mime }),

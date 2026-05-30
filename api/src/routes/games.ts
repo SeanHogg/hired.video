@@ -27,6 +27,7 @@ import { getDb } from "../db/index.js";
 import { studioProjects } from "../db/schema/resumes.js";
 import { gamePlayInvites } from "../db/schema/games.js";
 import { canActFor } from "../services/studio/workspace.js";
+import { sendPushToUser } from "../services/push/web-push.js";
 
 export const gamesRoutes = new Hono<AppEnv>();
 
@@ -136,6 +137,66 @@ gamesRoutes.post("/:projectId/challenge-complete", async (c) => {
   );
 
   return c.json(ok({ projectId, challengeId: parsed.data.challengeId }));
+});
+
+// ─── #1656 — Game-event PWA push to the project owner ────────────────────
+//
+// POST /api/games/:projectId/notify-owner
+// Body: { event: "peer_joined" | "challenge_awarded", peerName?, challengeId? }
+//
+// Called by the GameSignalingRoom Durable Object via internal fetch
+// (same pattern as the existing challenge-complete forwarder). Resolves
+// the project's owner, builds a stable headline + body per event kind,
+// and fans out via the shared `sendPushToUser` helper. Auth model:
+// trust the `x-internal-user-id` header (signaling DO is part of the
+// same worker bundle — no external caller can spoof it because the
+// route is mounted under the auth-required `/api/games` prefix unless
+// the worker chooses to allow service-binding traffic). Best-effort —
+// failure returns 200 so the DO doesn't block the gameplay loop on
+// push delivery.
+
+const NotifyOwnerSchema = z.object({
+  event: z.enum(["peer_joined", "challenge_awarded"]),
+  peerName: z.string().max(120).optional(),
+  challengeId: z.string().max(120).optional(),
+  pointsAwarded: z.number().int().optional(),
+});
+
+gamesRoutes.post("/:projectId/notify-owner", async (c) => {
+  const projectId = c.req.param("projectId");
+  if (!UuidLikeSchema.safeParse(projectId).success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid projectId"), 400);
+  }
+  const body = await c.req.json().catch(() => null);
+  const parsed = NotifyOwnerSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const [row] = await db
+    .select({ userId: studioProjects.userId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+
+  const peer = parsed.data.peerName?.trim() || "Someone";
+  const payload =
+    parsed.data.event === "peer_joined"
+      ? {
+          title: `${peer} joined your world`,
+          body: "Tap to jump back in.",
+          url: `/studio/${projectId}/play`,
+        }
+      : {
+          title: "Challenge completed",
+          body: parsed.data.pointsAwarded
+            ? `${peer} earned ${parsed.data.pointsAwarded} points in your world.`
+            : `${peer} completed a challenge in your world.`,
+          url: `/studio/${projectId}/play`,
+        };
+
+  await sendPushToUser(row.userId, payload).catch(() => undefined);
+  return c.json(ok({ delivered: true }));
 });
 
 // ─── Phase 4 — friend-invite share-links (gap #1637) ─────────────────────

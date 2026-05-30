@@ -21,9 +21,18 @@
  * so TS consumers (runtime.ts, GameStage.tsx, ProjectPlayer.tsx) still get
  * full type-checking when they import this module.
  *
- * No top-level imports — `?raw` would inline them as broken `import` lines
- * inside the IIFE. The module is self-contained.
+ * EDITOR-PATH import: block-interp.js (gap #1007 — Snap!/Scratch
+ * visual-block interpreter) is imported normally for the editor playtest
+ * path. The exported bundle path concatenates block-interp.js source
+ * BEFORE this file inside one IIFE (see game-export.ts) and strips this
+ * import line — both files' exports then share the same closure scope.
  */
+import {
+  executeStmts,
+  fireProgramEvents,
+  seedScriptVars,
+  seedGlobalVars,
+} from "./block-interp.js";
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────
 
@@ -571,6 +580,21 @@ export function runGame(canvas, state, opts) {
   const keys = new Set();
   const keyPressed = new Set();      // keys that transitioned up→down this frame
   const clickedSpriteIds = new Set(); // sprites clicked this frame
+  // Pointer position in canvas-relative coordinates — fed to the block
+  // interpreter's `mouse-x` / `mouse-y` sensing blocks (#1007). Initialised
+  // to canvas centre so a sensing-read before the first pointer event
+  // returns a sensible value.
+  const mouse = { x: state.width / 2, y: state.height / 2 };
+  // Broadcast queue — `broadcast X` statements push here during a tick;
+  // we drain it at the end of the tick by firing on-receive handlers on
+  // every sprite. Drained per-tick so a chained broadcast doesn't recurse.
+  const pendingBroadcasts = [];
+  // Sprite-local + global variable scopes for the visual-block interpreter
+  // (#1007). Seeded on mount; mutated through the interp's writeVar.
+  const blockVars = { spriteVars: new Map(), globalVars: Object.create(null) };
+  // Level mount timestamp — feeds the `timer` sensing expression so it
+  // resets on every gotoLevel.
+  let levelMountTs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
   const onKeyDown = function (e) {
     if (!keys.has(e.key)) keyPressed.add(e.key);

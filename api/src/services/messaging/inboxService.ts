@@ -66,6 +66,12 @@ export interface InboxNotificationDto {
   message: string;
   isRead: boolean;
   createdAt: string;
+  /** Free-form per-notification payload — used by typed rows (e.g. a
+   *  `contact_inquiry` row carries `{ leadId, email, inquiryType, page }`
+   *  so the inbox row can render status-transition buttons that PATCH
+   *  `/api/marketing/leads/:id/status`). Null when the row was inserted
+   *  without a JSONB payload. */
+  data: Record<string, unknown> | null;
 }
 
 export interface InboxConnectionRequestDto {
@@ -325,6 +331,7 @@ function toNotificationDto(row: NotificationRow): InboxNotificationDto {
     message: row.message,
     isRead: row.isRead,
     createdAt: new Date(row.createdAt).toISOString(),
+    data: (row.data as Record<string, unknown> | null) ?? null,
   };
 }
 

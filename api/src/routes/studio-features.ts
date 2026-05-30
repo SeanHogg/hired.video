@@ -2888,6 +2888,21 @@ studioFeaturesRoutes.patch("/forms/:id", async (c) => {
   return c.json(ok(updated));
 });
 
+// GET /api/studio/forms/:id — owner only. Returns the form with the
+// answer key so authoring surfaces (VideoFormsDialog edit mode, SCORM
+// export #1400) can hydrate without re-fetching the parent project.
+studioFeaturesRoutes.get("/forms/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [form] = await db.select()
+    .from(studioVideoForms)
+    .where(and(eq(studioVideoForms.id, id), eq(studioVideoForms.userId, user.sub)))
+    .limit(1);
+  if (!form) return c.json(fail("NOT_FOUND", "Form not found"), 404);
+  return c.json(ok(form));
+});
+
 // DELETE /api/studio/forms/:id
 studioFeaturesRoutes.delete("/forms/:id", async (c) => {
   const user = c.var.user;

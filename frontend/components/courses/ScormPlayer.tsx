@@ -92,6 +92,10 @@ export default function ScormPlayer({
   const skipTargetRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // #1572 — track iframe load state so the theme postMessage waits until
+  // the SCO is mounted. Posting before load is a no-op (no listener); we
+  // re-post on every theme-tokens change after the SCO is ready.
+  const [iframeReady, setIframeReady] = useState(false);
   // #1503 / #168 — announcement region for completion / pass / fail
   // transitions. Screen-reader users otherwise have no idea the SCO
   // signalled completion since the runtime fires the commit in JS without
@@ -219,6 +223,37 @@ export default function ScormPlayer({
 
   const chromeStyle = tokensToStyle(themeTokens);
 
+  // #1572 — SCO iframe theming hand-shake. The chrome around the iframe
+  // already maps themeTokens to CSS custom properties on the wrapping
+  // div (via tokensToStyle above), but the SCO itself lives inside an
+  // iframe loaded from R2 and never sees those styles. We post the
+  // whitelisted tokens to the iframe's window after load — SCOs that
+  // opt-in (the exported SCORM packages from #1400 wire the listener by
+  // default) re-apply them as :root CSS variables so the SCO renders
+  // with the same chrome colors as the parent course.
+  //
+  // Security: we only post the four keys named in CHROME_TOKEN_MAP, and
+  // the receiver shim re-validates the key set + value length before
+  // applying. A hostile parent can't poke arbitrary styles via this seam.
+  useEffect(() => {
+    if (!iframeReady) return;
+    if (!themeTokens) return;
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    const whitelisted: Record<string, string> = {};
+    for (const key of Object.keys(CHROME_TOKEN_MAP)) {
+      const v = themeTokens[key];
+      if (typeof v === "string" && v.length <= 64) whitelisted[key] = v;
+    }
+    if (Object.keys(whitelisted).length === 0) return;
+    try {
+      iframe.contentWindow.postMessage({ type: "hv:theme", tokens: whitelisted }, "*");
+    } catch {
+      // Cross-origin can throw on inspection; the post itself is safe
+      // because the receiver self-validates.
+    }
+  }, [iframeReady, themeTokens]);
+
   if (error) {
     return (
       <div className={className} style={chromeStyle}>
@@ -261,18 +296,34 @@ export default function ScormPlayer({
       {!loaded && (
         // #1503 — polite live region so AT learners hear the load
         // transition instead of silently staring at an empty iframe.
-        <div role="status" aria-live="polite" className="p-4 text-sm text-muted-foreground">
+        // `aria-busy` on the wrapper communicates the same in-progress
+        // state to screen-readers that prefer state attributes.
+        <div role="status" aria-live="polite" aria-busy="true" className="p-4 text-sm text-muted-foreground">
           Loading SCORM runtime…
         </div>
       )}
+      {/* #1503 — keyboard-help hint visible only to screen-reader
+       *  users, surfaced because the SCO traps Tab once focused. The
+       *  skip-link above is the visual escape hatch; this text lets AT
+       *  users discover it before they get trapped. */}
+      <div className="sr-only">
+        Use the &quot;Skip past lesson player&quot; link above to exit the
+        interactive lesson frame and return to the course chrome.
+      </div>
       <iframe
         ref={iframeRef}
         src={scormEntryUrl}
         title="SCORM lesson content"
         aria-label="Interactive SCORM lesson — controls live inside the lesson frame"
-        className="w-full h-full min-h-[600px] border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        // #1503 — `role="application"` tells AT that the iframe owns its
+        // own keyboard handling, so JAWS / NVDA stop intercepting arrow
+        // keys + Tab and let the SCO drive. The skip-link above is how
+        // learners get out without relying on the SCO's own quit affordance.
+        role="application"
+        className="w-full h-full min-h-[600px] border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         allow="autoplay; fullscreen; camera; microphone"
         style={{ borderColor: "var(--scorm-chrome-accent, undefined)" }}
+        onLoad={() => setIframeReady(true)}
       />
       {/* Polite SR announcer for completion / pass / fail transitions
        *  (gap #1503). Visually hidden — the value flips at most once per

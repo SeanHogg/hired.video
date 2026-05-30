@@ -77,11 +77,13 @@ import { adminRoutes } from "./routes/admin.js";
 import { adminR2Routes } from "./routes/admin-r2.js";
 import { adminWorkerRoutes } from "./routes/admin-workers.js";
 import { adminCourseRoutes } from "./routes/admin-courses.js";
+import { lmsOauthRoutes } from "./routes/lms-oauth.js";
 import { superadminRoutes } from "./routes/superadmin/index.js";
 import { paymentRoutes } from "./routes/payment.js";
 import { payoutRoutes } from "./routes/payouts.js";
 import { outplacementRoutes } from "./routes/outplacement.js";
 import { boostCheckoutRoutes } from "./routes/boost-checkout.js";
+import { courseCheckoutRoutes } from "./routes/course-checkout.js";
 import { taxReportingRoutes } from "./routes/tax-reporting.js";
 import { recruiterBdRoutes } from "./routes/recruiter-bd.js";
 import { gigsRoutes } from "./routes/gigs.js";
@@ -610,6 +612,7 @@ export function createApp() {
   app.route("/api/payouts", payoutRoutes);
   app.route("/api/outplacement", outplacementRoutes);
   app.route("/api/boost-checkout", boostCheckoutRoutes);
+  app.route("/api/course-checkout", courseCheckoutRoutes);
   app.route("/api/admin/tax-reporting", taxReportingRoutes);
   app.route("/api/recruiter-bd", recruiterBdRoutes);
   app.route("/api/gigs", gigsRoutes);
@@ -633,6 +636,15 @@ export function createApp() {
   app.route("/api/upload", uploadRoutes);
   app.route("/api/communication", communicationRoutes);
   app.route("/api/ai", aiRoutes);
+  // MCP tools/call execution (gap #1620) dispatches via Hono's `app.request()`
+  // to re-enter the same router without going through fetch / consuming a
+  // subrequest. Make the app instance available to the MCP route via c.var.
+  // The Variables type doesn't list "app" (MCP is the only consumer) so we
+  // cast at the set + get sites.
+  app.use("/api/mcp/*", (c, next) => {
+    (c.set as (key: string, value: unknown) => void)("app", app);
+    return next();
+  });
   app.route("/api/mcp", mcpRoutes);
   app.route("/api/profile-audit", profileAuditRoutes);
   app.route("/api/career360", career360Routes);
@@ -650,6 +662,7 @@ export function createApp() {
   app.route("/api/admin/r2", adminR2Routes);
   app.route("/api/admin/workers", adminWorkerRoutes);
   app.route("/api/admin/courses", adminCourseRoutes);
+  app.route("/api/lms-oauth", lmsOauthRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);

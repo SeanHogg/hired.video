@@ -76,6 +76,10 @@ export interface HubItem {
   conversationId?: string;
   /** kind === "notification" */
   notificationId?: string;
+  /** kind === "notification" — free-form JSONB payload from the row
+   *  (`{ leadId, email, inquiryType, page }` for `contact_inquiry`,
+   *  etc.). Consumers branch on `iconType` to know the shape. */
+  data?: Record<string, unknown> | null;
   /** kind === "request" */
   connectionId?: string;
   requesterName?: string;
@@ -103,6 +107,7 @@ interface PersistedNotification {
   message: string;
   isRead: boolean;
   createdAt: string;
+  data: Record<string, unknown> | null;
 }
 
 /** Mirrors `InboxExternalEmailDto` on the backend
@@ -392,6 +397,7 @@ export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
         isRead: n.isRead,
         iconType: n.type,
         notificationId: n.id,
+        data: n.data,
       });
     }
 
@@ -656,5 +662,6 @@ function notificationToHubItem(n: LiveNotification): HubItem {
     isRead: n.isRead,
     iconType: n.type,
     notificationId: n.id,
+    data: (n.data as Record<string, unknown> | null) ?? null,
   };
 }

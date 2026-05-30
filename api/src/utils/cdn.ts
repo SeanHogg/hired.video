@@ -21,3 +21,33 @@ export function cdnUrl(key: string): string {
   const cleanKey = key.replace(/^\/+/, "");
   return `${cleanBase}/${cleanKey}`;
 }
+
+/**
+ * Inverse of cdnUrl — strips the CDN base from a URL so the bare R2 key
+ * can be passed to deleteR2Keys() during cascading deletes. Returns null
+ * if the input is empty or doesn't look like an R2-backed CDN URL on a
+ * domain we recognise; the caller skips R2 deletion in that case.
+ *
+ * Recognises both the configured CDN base and the production fallback
+ * (cdn.hired.video) so dev/staging callers still work when CDN_BASE_URL
+ * is unset.
+ */
+export function r2KeyFromCdnUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    // Already a key — return as-is.
+    return url.replace(/^\/+/, "") || null;
+  }
+  const candidates = [
+    (globalThis as any).__ENV?.CDN_BASE_URL,
+    process?.env?.CDN_BASE_URL,
+    "https://cdn.hired.video",
+  ].filter(Boolean) as string[];
+  for (const base of candidates) {
+    const cleanBase = base.replace(/\/+$/, "");
+    if (url.startsWith(cleanBase + "/")) {
+      return url.slice(cleanBase.length + 1) || null;
+    }
+  }
+  return null;
+}

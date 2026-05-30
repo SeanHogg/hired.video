@@ -32,7 +32,11 @@ import {
   type Track,
 } from "@shared/timeline";
 import { connectAudioEffectChain, processAudioBuffer } from "./effects";
-import { resolveClipSource } from "./frame-renderer";
+import { resolveClipSource, type NestedTimelineResolver } from "./frame-renderer";
+
+/** Maximum nesting depth before the mixer bails. Same guard as the
+ *  frame renderer — protects against cycles in user-authored projects. */
+const MAX_NEST_DEPTH = 8;
 
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
@@ -44,14 +48,29 @@ export function isTrackAudible(track: Track, anySolo: boolean): boolean {
   return true;
 }
 
+export interface RenderAudioOptions {
+  /** Resolver for nested-timeline (compound) clips. When omitted, nested
+   *  clips render silent — same fallback the visual side uses. */
+  resolveNestedTimeline?: NestedTimelineResolver;
+}
+
 /**
  * Render every audio track in the timeline down to a single stereo
  * 48 kHz AudioBuffer. Returns null when there are no audible audio
  * clips (the strategy then skips audio encoding entirely).
+ *
+ * Nested-timeline clips (#356): when `resolveNestedTimeline` is wired,
+ * the mixer recursively mixes each child timeline down to a buffer and
+ * overlays it at the parent clip's startFrame. Recursion is depth-bounded
+ * (MAX_NEST_DEPTH) and cycle-guarded so a project that points a nested
+ * clip back at itself fails soft instead of spinning forever.
  */
 export async function renderTimelineAudio(
   timeline: Timeline,
   sources: Record<string, MediaSource>,
+  options: RenderAudioOptions = {},
+  _depth = 0,
+  _inFlight: Set<string> = new Set(),
 ): Promise<AudioBuffer | null> {
   const totalFrames = timelineDurationFrames(timeline);
   if (totalFrames <= 0) return null;
@@ -125,10 +144,10 @@ export async function renderTimelineAudio(
     };
 
     for (const clip of track.clips) {
-      // Nested-timeline clips don't expose a single decoded buffer —
-      // their audio is whatever their child timeline mixes down to.
-      // Recursive audio mix is tracked as a follow-up gap; for now
-      // the mixer skips them so the visual side still composes.
+      // Nested-timeline clips recurse into their child timeline (#356).
+      // We pre-resolve them after this loop so we can await the async
+      // child render without blocking the synchronous scheduling pass.
+      // Hand off to scheduleNestedClip() below.
       if (clip.nestedTimelineId) continue;
       // Resolve via the shared helper so multicam clips pick the
       // active angle's source + sync offset.
@@ -157,6 +176,59 @@ export async function renderTimelineAudio(
         node.start(startSec, sourceInSec, durationSec);
       } catch {
         // start() throws if values are out-of-range; skip silently.
+      }
+    }
+  }
+
+  // ── Nested-timeline mix-down (#356) ─────────────────────────────────
+  // Recursively mix each nested clip's child timeline and overlay the
+  // resulting buffer onto the parent context at the clip's startFrame.
+  // Cycle-guard via _inFlight; depth-guard via _depth.
+  if (options.resolveNestedTimeline && _depth < MAX_NEST_DEPTH) {
+    for (const track of audioTracks) {
+      const trackGain = track.gain ?? 1;
+      for (const clip of track.clips) {
+        if (!clip.nestedTimelineId) continue;
+        if (_inFlight.has(clip.nestedTimelineId)) {
+          console.warn(
+            `[audio-mixer] cycle detected on nested timeline ${clip.nestedTimelineId}; skipping`,
+          );
+          continue;
+        }
+        const resolved = await options.resolveNestedTimeline(clip.nestedTimelineId);
+        if (!resolved) continue;
+        const nextInFlight = new Set(_inFlight);
+        nextInFlight.add(clip.nestedTimelineId);
+        const childBuffer = await renderTimelineAudio(
+          resolved.timeline,
+          resolved.sources,
+          options,
+          _depth + 1,
+          nextInFlight,
+        );
+        if (!childBuffer) continue;
+        // Insert the child buffer as a single decoded source at the
+        // parent clip's startFrame. The buffer is already at the parent's
+        // sampleRate because OfflineAudioContext resamples on decode;
+        // re-decoding through the parent ctx would be redundant.
+        const node = ctx.createBufferSource();
+        node.buffer = childBuffer;
+        const gainNode = ctx.createGain();
+        const clipGain = clip.gain ?? 1;
+        gainNode.gain.value = Math.max(0, trackGain * clipGain);
+        node.connect(gainNode);
+        const trackOutput = connectAudioEffectChain(track.effects, gainNode, ctx);
+        trackOutput.connect(ctx.destination);
+        const startSec = framesToSeconds(clip.startFrame, timeline.fps);
+        const sourceInSec = framesToSeconds(clip.sourceInFrame, timeline.fps);
+        const durationSec = framesToSeconds(clip.durationFrames, timeline.fps);
+        try {
+          node.start(startSec, sourceInSec, durationSec);
+        } catch {
+          // Out-of-range — child clip extends past the parent's duration
+          // or the source-in offset is past the buffer's length. Skip
+          // silently rather than aborting the whole mix.
+        }
       }
     }
   }

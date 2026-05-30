@@ -260,6 +260,10 @@ export const StudioProjectSchema = z.object({
   // parallel-column pattern. Validated client-side by <CadStage>;
   // server stores verbatim. See shared/cad-state.ts.
   cadState: z.unknown().nullish(),
+  // 3D CAD runtime state for mediaKind='cad_3d' projects (#930 Phase 2).
+  // Validated client-side by <Cad3DStage>; server stores verbatim. See
+  // shared/cad-3d-state.ts.
+  cad3dState: z.unknown().nullish(),
   // Comic runtime state for mediaKind='comic' projects (#929 / #1217).
   // Dormant today (comic authoring rides the CanvasState path) but
   // mirrored on the DTO + schema so the per-kind parallel-column
@@ -657,6 +661,10 @@ export const studioService = {
        *  by `<CadStage>` on save; same parallel-column pattern. See
        *  `shared/cad-state.ts`. */
       cadState?: unknown;
+      /** 3D CAD runtime state for mediaKind='cad_3d' projects (#930
+       *  Phase 2). Sent by `<Cad3DStage>` on save; same parallel-column
+       *  pattern. See `shared/cad-3d-state.ts`. */
+      cad3dState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -681,6 +689,7 @@ export const studioService = {
       ...(args.imageState !== undefined ? { imageState: args.imageState } : {}),
       ...(args.animationState !== undefined ? { animationState: args.animationState } : {}),
       ...(args.cadState !== undefined ? { cadState: args.cadState } : {}),
+      ...(args.cad3dState !== undefined ? { cad3dState: args.cad3dState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),

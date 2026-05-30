@@ -31,6 +31,7 @@ import {
   type MediaSource,
 } from "../../../shared/timeline.js";
 import type { NestedTimelineResolver } from "./frame-renderer";
+import type { PlatformExportProfile } from "./export-profiles";
 
 export interface RenderOptions {
   /** Called periodically with progress 0..1. Render runs to completion regardless. */
@@ -52,6 +53,12 @@ export interface RenderOptions {
    *  Defaulting to false would mean a free-user export skips branding,
    *  so callers MUST pass the resolved boolean explicitly. */
   includeBranding?: boolean;
+  /** Optional platform / social export profile override (#342, #343).
+   *  When provided, the strategy uses the profile's resolution / fps /
+   *  codec / bitrate instead of the Timeline's native shape. Used by
+   *  the batch facade so the same Timeline can produce a YouTube
+   *  1080p60 master AND a TikTok 9:16 vertical from one click. */
+  platformProfile?: PlatformExportProfile;
 }
 
 export interface RenderResult {
@@ -124,6 +131,89 @@ export async function renderTimeline(
     throw new Error(`Render engine '${engineId}' is not available in this browser.`);
   }
   return strategy.render(timeline, sources, opts);
+}
+
+export interface BatchRenderOptions extends RenderOptions {
+  /** Called when a single profile completes (success or failure). The
+   *  facade keeps going on failures so the caller still gets partial
+   *  results. */
+  onProfileComplete?: (
+    index: number,
+    result: { ok: true; result: RenderResult } | { ok: false; error: Error },
+  ) => void;
+}
+
+export interface BatchRenderResult {
+  /** One entry per input profile, in the same order. */
+  results: Array<
+    | { ok: true; profile: PlatformExportProfile; result: RenderResult }
+    | { ok: false; profile: PlatformExportProfile; error: Error }
+  >;
+}
+
+/**
+ * Render a Timeline to N output profiles in one call (#343). Each
+ * profile is a different (resolution, codec, bitrate, fps) bundle, so
+ * the caller can ship the same project as a YouTube 1080p master, a
+ * TikTok 9:16 vertical, and an Instagram square in one click instead
+ * of running renderTimeline three times.
+ *
+ * Failures of one profile do NOT abort the batch — the caller still
+ * gets results for every other profile and per-result `ok: false`
+ * error entries for what failed. Overall onProgress reports the
+ * weighted average across all profiles.
+ *
+ * The actual format-specific override (overriding codec/width/height/
+ * fps from the Timeline shape) lives in the strategy — the strategy
+ * sees the profile in opts.platformProfile and adapts. Older strategies
+ * that don't know the field render at the Timeline's native shape;
+ * the batch facade is forward-compatible.
+ */
+export async function renderTimelineBatch(
+  timeline: Timeline,
+  sources: Record<string, MediaSource>,
+  profiles: PlatformExportProfile[],
+  opts: BatchRenderOptions = {},
+): Promise<BatchRenderResult> {
+  if (profiles.length === 0) {
+    throw new Error("renderTimelineBatch needs at least one profile");
+  }
+  if (!isRenderable(timeline)) {
+    throw new Error(
+      "Timeline is not renderable — empty, or has overlapping clips on a track.",
+    );
+  }
+  const results: BatchRenderResult["results"] = [];
+  const perProfileProgress = new Array<number>(profiles.length).fill(0);
+  const aggregateProgress = () => {
+    if (!opts.onProgress) return;
+    const sum = perProfileProgress.reduce((a, b) => a + b, 0);
+    opts.onProgress(sum / profiles.length);
+  };
+  for (let i = 0; i < profiles.length; i++) {
+    const profile = profiles[i];
+    try {
+      const result = await renderTimeline(timeline, sources, {
+        ...opts,
+        platformProfile: profile,
+        onProgress: (p) => {
+          perProfileProgress[i] = p;
+          aggregateProgress();
+        },
+      });
+      results.push({ ok: true, profile, result });
+      opts.onProfileComplete?.(i, { ok: true, result });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      results.push({ ok: false, profile, error });
+      opts.onProfileComplete?.(i, { ok: false, error });
+    }
+    // Force per-profile progress to 1 in case the strategy didn't tick
+    // it (graceful pause-on-error path).
+    perProfileProgress[i] = 1;
+    aggregateProgress();
+  }
+  return { results };
 }
 
 /**

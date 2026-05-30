@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Loader2, Plus, GraduationCap, Eye, EyeOff, Trash2, Lock, DollarSign } from "lucide-react";
+import { Loader2, Plus, GraduationCap, Eye, EyeOff, Trash2, Lock, DollarSign, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import MediaPicker from "@/components/shared/MediaPicker";
 import CourseContentEditor from "@/components/creator/CourseContentEditor";
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 import { studioTemplatesService, type StudioTemplate } from "@/lib/services/studio-templates-service";
+import { generateAndUploadCover } from "@/lib/courses/cover-generator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Mode = "list" | "edit";
@@ -59,6 +60,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
   // tokens. Loaded once on mount via studioTemplatesService.
   const [themeId, setThemeId] = useState<string | null>(null);
   const [availableThemes, setAvailableThemes] = useState<StudioTemplate[]>([]);
+  // #1400 — auto-cover generator in flight indicator.
+  const [coverGenerating, setCoverGenerating] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) { setLoading(false); return; }
@@ -84,6 +87,34 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [isAuthenticated, profileProp]);
+
+  // #1400 — Generate a deterministic SVG cover from the course title +
+  // category + difficulty. Uploads to R2 via the existing single-file
+  // route and writes the public URL into the cover field. Needs a saved
+  // course (we use its id in the upload key); when the user is mid-
+  // create we just write to the local field and the gradient regenerates
+  // once the course is saved.
+  const autoGenerateCover = async () => {
+    if (!title.trim()) {
+      toast({ title: "Add a title first", description: "The cover renders the title — give it something to render.", variant: "destructive" });
+      return;
+    }
+    setCoverGenerating(true);
+    try {
+      const url = await generateAndUploadCover({
+        courseId: editing?.id ?? "draft",
+        title: title.trim(),
+        category: category.trim() || null,
+        difficulty: null,
+      });
+      setCoverImageUrl(url);
+      toast({ title: "Cover generated", description: "A deterministic SVG cover landed; save the course to attach it." });
+    } catch (e: unknown) {
+      toast({ title: "Cover generation failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
+    } finally {
+      setCoverGenerating(false);
+    }
+  };
 
   const beginCreate = () => {
     setEditing(null);
@@ -370,12 +401,29 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
                 </div>
               </div>
             ) : (
-              <MediaPicker
-                accept="image"
-                title="Choose course cover"
-                triggerLabel="Add cover image"
-                onPick={(asset) => setCoverImageUrl(asset.url)}
-              />
+              <div className="flex items-center gap-2">
+                <MediaPicker
+                  accept="image"
+                  title="Choose course cover"
+                  triggerLabel="Add cover image"
+                  onPick={(asset) => setCoverImageUrl(asset.url)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={autoGenerateCover}
+                  disabled={coverGenerating || !title.trim()}
+                  title="Generate a deterministic SVG cover from the title"
+                >
+                  {coverGenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Auto-generate
+                </Button>
+              </div>
             )}
           </div>
           <div>

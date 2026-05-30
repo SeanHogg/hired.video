@@ -85,6 +85,13 @@ export const RECORDING_MODES: ReadonlyArray<{
 ];
 
 interface WebcamRecorderProps {
+  /**
+   * Hands the produced clip blob to the host. The recorder deliberately
+   * has no trim / split / delete affordances (#1499): timing-model
+   * operations belong on the timeline. The host turns the blob into a
+   * video widget (V2) or scene (V1 NLE) where the existing edge-drag
+   * trim handles and split/delete shortcuts already act on it.
+   */
   onRecordingComplete: (blob: Blob, durationMs: number) => void;
   teleprompterText?: string;
   mode?: RecordingMode;

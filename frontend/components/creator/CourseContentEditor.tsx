@@ -10,9 +10,11 @@ import {
   Package,
   Pencil,
   Upload,
+  Download,
 } from "lucide-react";
 import { SortableList, SortableDragHandle } from "@/components/resume-sections/SortableList";
 import { extractAndUploadScormZip, type ScormUploadProgress } from "@/lib/courses/scorm-upload";
+import { buildScormZipForLesson, downloadScormZip } from "@/lib/courses/scorm-export";
 import LessonAuthoringCTAs from "@/components/creator/LessonAuthoringCTAs";
 import CourseGeneratorDialog, { type GeneratedCourse } from "@/components/creator/CourseGeneratorDialog";
 import { importPptx } from "@/lib/courses/pptx-import";
@@ -45,6 +47,7 @@ import ArticleEditor from "@/components/articles/ArticleEditor";
 import { useToast } from "@/hooks/use-toast";
 import {
   courseService,
+  type Course,
   type CourseLesson,
   type CourseLessonSourceType,
   type CourseModule,
@@ -159,6 +162,7 @@ interface Props {
 export default function CourseContentEditor({ courseId }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [lessons, setLessons] = useState<CourseLesson[]>([]);
 
@@ -188,8 +192,9 @@ export default function CourseContentEditor({ courseId }: Props) {
     setLoading(true);
     courseService
       .getDetails(courseId)
-      .then(({ modules: m, lessons: l }) => {
+      .then(({ course: c, modules: m, lessons: l }) => {
         if (cancelled) return;
+        setCourse(c);
         setModules(m);
         setLessons(l);
       })
@@ -376,6 +381,50 @@ export default function CourseContentEditor({ courseId }: Props) {
     }
   };
 
+  // #1400 — Export a text_md lesson as a portable SCORM 1.2 zip the
+  // employer can re-host in Cornerstone / Workday / Docebo / etc. The
+  // launcher HTML carries the lesson body + an optional knowledge check
+  // (when the lesson has a knowledgeCheckFormId) — both branches drive
+  // `cmi.score.raw` and `cmi.core.lesson_status` so a third-party LMS
+  // gets the same passed/completed signal we use internally.
+  const exportLessonAsScorm = async (l: CourseLesson) => {
+    if (!course) return;
+    if (l.sourceType !== "text_md") {
+      toast({
+        title: "Export not supported",
+        description: "SCORM export today covers text_md lessons. SCORM-package lessons are already SCORM zips; studio_video export is tracked as a follow-up.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      // The knowledgeCheckFormId on a course_lesson points at a
+      // studio_video_form row; the SCORM export reads the answer key so
+      // the third-party LMS can score the check identically to the
+      // hired.video player. When the lesson has no knowledge check, the
+      // exporter emits a body-only SCO that completes on pagehide.
+      const knowledgeCheck = l.knowledgeCheckFormId
+        ? await courseService.loadKnowledgeCheck(l.knowledgeCheckFormId).catch(() => null)
+        : null;
+      const result = await buildScormZipForLesson({
+        lesson: l,
+        courseTitle: course.title,
+        knowledgeCheck: knowledgeCheck ?? undefined,
+      });
+      downloadScormZip(result);
+      toast({
+        title: "SCORM zip ready",
+        description: `${result.filename} downloaded.`,
+      });
+    } catch (e: unknown) {
+      toast({
+        title: "Export failed",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
+    }
+  };
+
   // ── Bulk-import handlers — #1497 + #1498. Both route through the
   //    shared commitCourseSkeleton walker so module + lesson row creation
   //    is identical regardless of source. ──
@@ -537,6 +586,7 @@ export default function CourseContentEditor({ courseId }: Props) {
                     lessons={moduleLessons}
                     onEdit={openEditLesson}
                     onDelete={removeLesson}
+                    onExportScorm={exportLessonAsScorm}
                     onReorder={(next) => reorderLessons(next)}
                   />
 
@@ -559,7 +609,7 @@ export default function CourseContentEditor({ courseId }: Props) {
                   <div className="text-xs text-muted-foreground">Lessons not yet grouped into a module.</div>
                 </div>
               </div>
-              <LessonList lessons={unsorted} onEdit={openEditLesson} onDelete={removeLesson} onReorder={(next) => reorderLessons(next)} />
+              <LessonList lessons={unsorted} onEdit={openEditLesson} onDelete={removeLesson} onExportScorm={exportLessonAsScorm} onReorder={(next) => reorderLessons(next)} />
             </div>
           )}
         </div>
@@ -845,11 +895,16 @@ function LessonList({
   lessons,
   onEdit,
   onDelete,
+  onExportScorm,
   onReorder,
 }: {
   lessons: CourseLesson[];
   onEdit: (l: CourseLesson) => void;
   onDelete: (l: CourseLesson) => void;
+  /** #1400 — Export a text_md lesson as a SCORM 1.2 zip. Self-gates per
+   *  row (the button only renders for text_md lessons), so the parent
+   *  doesn't have to thread an exportable flag down. */
+  onExportScorm?: (l: CourseLesson) => void;
   /** Optional drag-handle reorder via SortableList. Omit to render a
    *  plain static list (no handles, no DndContext). */
   onReorder?: (next: CourseLesson[]) => void;
@@ -881,6 +936,17 @@ function LessonList({
               <Button size="sm" variant="ghost" onClick={() => onEdit(l)} aria-label="Edit lesson">
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
+              {onExportScorm && l.sourceType === "text_md" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onExportScorm(l)}
+                  aria-label="Export lesson as SCORM 1.2 zip"
+                  title="Export as SCORM 1.2 zip"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={() => onDelete(l)} aria-label="Delete lesson">
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>

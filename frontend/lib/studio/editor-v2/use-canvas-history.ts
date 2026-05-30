@@ -47,8 +47,30 @@ export interface CanvasHistory<T> {
   canRedo: boolean;
 }
 
-export function useCanvasHistory<T>(
+/**
+ * Sidecar lets a consumer attach ephemeral per-snapshot state
+ * (selection, activeSceneId, scroll position…) to each history entry
+ * without baking it into T. Pro NLEs restore selection alongside content
+ * on undo/redo; the consumer wires `capture` to read the current
+ * ephemeral values at commit time and `restore` to replay them when the
+ * user navigates back. Closes gap #592.
+ *
+ * The sidecar is purely informational — changing it does NOT push a new
+ * history entry; only T mutations do. That keeps the user-visible undo
+ * semantics ("undo my edits, not my clicks") intact.
+ */
+export interface CanvasHistorySidecar<S> {
+  capture: () => S;
+  restore: (next: S) => void;
+}
+
+export interface CanvasHistoryOptions<S> {
+  sidecar?: CanvasHistorySidecar<S>;
+}
+
+export function useCanvasHistory<T, S = void>(
   initial: T | (() => T),
+  options?: CanvasHistoryOptions<S>,
 ): CanvasHistory<T> {
   // Resolve the (possibly lazy) initializer exactly once so we can
   // share the seed value between useState + the checkpoint ref
@@ -61,9 +83,17 @@ export function useCanvasHistory<T>(
     };
   }
   const [present, setPresent] = useState<T>(initRef.current.value);
-  const pastRef = useRef<T[]>([]);
-  const futureRef = useRef<T[]>([]);
+  // Past/future stacks hold (state, sidecar) pairs so undo/redo can
+  // restore both. The sidecar slot is `undefined` when no options.sidecar
+  // is wired — paired tuples cost one extra allocation per commit and
+  // keep the API uniform.
+  type Entry = { state: T; sidecar: S | undefined };
+  const pastRef = useRef<Entry[]>([]);
+  const futureRef = useRef<Entry[]>([]);
   const checkpointRef = useRef<T>(initRef.current.value);
+  const checkpointSidecarRef = useRef<S | undefined>(undefined);
+  const sidecarRef = useRef(options?.sidecar);
+  sidecarRef.current = options?.sidecar;
   const commitTimerRef = useRef<number | null>(null);
   // canUndo/canRedo derive from refs, so we need a manual bump to
   // re-render the toolbar when the stacks change.
@@ -81,9 +111,15 @@ export function useCanvasHistory<T>(
     setPresent((curr) => {
       if (Object.is(curr, checkpointRef.current)) return curr;
       const trimmed = pastRef.current.slice(-(MAX_HISTORY - 1));
-      pastRef.current = [...trimmed, checkpointRef.current];
+      pastRef.current = [
+        ...trimmed,
+        { state: checkpointRef.current, sidecar: checkpointSidecarRef.current },
+      ];
       futureRef.current = [];
       checkpointRef.current = curr;
+      // Snapshot the ephemeral sidecar at the moment of commit so undo
+      // restores the selection that existed when the user made the edit.
+      checkpointSidecarRef.current = sidecarRef.current?.capture();
       bump();
       return curr;
     });
@@ -111,18 +147,27 @@ export function useCanvasHistory<T>(
       // Uncommitted edits land first — undoing them restores the last
       // checkpoint without consuming a past entry.
       if (!Object.is(curr, checkpointRef.current)) {
-        futureRef.current = [curr, ...futureRef.current];
+        futureRef.current = [
+          { state: curr, sidecar: sidecarRef.current?.capture() },
+          ...futureRef.current,
+        ];
         const restored = checkpointRef.current;
+        if (checkpointSidecarRef.current !== undefined) sidecarRef.current?.restore(checkpointSidecarRef.current as S);
         bump();
         return restored;
       }
       if (pastRef.current.length === 0) return curr;
       const prev = pastRef.current[pastRef.current.length - 1];
       pastRef.current = pastRef.current.slice(0, -1);
-      futureRef.current = [curr, ...futureRef.current];
-      checkpointRef.current = prev;
+      futureRef.current = [
+        { state: curr, sidecar: checkpointSidecarRef.current },
+        ...futureRef.current,
+      ];
+      checkpointRef.current = prev.state;
+      checkpointSidecarRef.current = prev.sidecar;
+      if (prev.sidecar !== undefined) sidecarRef.current?.restore(prev.sidecar as S);
       bump();
-      return prev;
+      return prev.state;
     });
   }, [cancelPending]);
 
@@ -133,10 +178,15 @@ export function useCanvasHistory<T>(
       const next = futureRef.current[0];
       futureRef.current = futureRef.current.slice(1);
       const trimmed = pastRef.current.slice(-(MAX_HISTORY - 1));
-      pastRef.current = [...trimmed, curr];
-      checkpointRef.current = next;
+      pastRef.current = [
+        ...trimmed,
+        { state: curr, sidecar: checkpointSidecarRef.current },
+      ];
+      checkpointRef.current = next.state;
+      checkpointSidecarRef.current = next.sidecar;
+      if (next.sidecar !== undefined) sidecarRef.current?.restore(next.sidecar as S);
       bump();
-      return next;
+      return next.state;
     });
   }, [cancelPending]);
 
@@ -146,6 +196,7 @@ export function useCanvasHistory<T>(
       pastRef.current = [];
       futureRef.current = [];
       checkpointRef.current = next;
+      checkpointSidecarRef.current = sidecarRef.current?.capture();
       setPresent(next);
       bump();
     },

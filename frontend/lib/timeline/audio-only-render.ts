@@ -42,7 +42,9 @@ export const audioOnlyStrategy: RenderStrategy = {
   async render(timeline, sources, opts) {
     opts.onProgress?.(0);
 
-    const audioBuffer = await renderTimelineAudio(timeline, sources);
+    const audioBuffer = await renderTimelineAudio(timeline, sources, {
+      resolveNestedTimeline: opts.resolveNestedTimeline,
+    });
     if (!audioBuffer) {
       throw new Error(
         "Audio-only render needs at least one audible audio clip — " +

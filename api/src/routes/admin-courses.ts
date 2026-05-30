@@ -12,10 +12,12 @@
 
 import { Hono } from "hono";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
+import { error } from "../types/index.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
 import { getJwtSecret } from "../utils/jwt.js";
 
@@ -99,4 +101,35 @@ adminCourseRoutes.post("/issue-backfill-certs", async (c) => {
     alreadyIssued,
     failed,
   }));
+});
+
+/**
+ * POST /api/admin/courses/certificates/:certNumber/revoke
+ *
+ * Revoke an issued certificate by cert number. Sets `revoked_at` + the
+ * supplied `reason` so the public verify path (`GET /api/verify/:certNumber`)
+ * starts returning `{ valid: false, reason: "revoked" }`. Idempotent —
+ * re-revoking a revoked cert is a no-op and returns the existing row.
+ *
+ * Reason text is recorded as-is so a future admin reviewing the
+ * revocation has the original justification (fraud, plagiarism,
+ * mistaken issuance, etc.). The schema's existing
+ * `uq_course_certificates_active_enrollment` partial unique index
+ * already lets a re-grant insert a fresh active cert against the same
+ * enrollment once this row is revoked.
+ */
+const RevokeSchema = z.object({
+  reason: z.string().min(1).max(1000),
+});
+
+adminCourseRoutes.post("/certificates/:certNumber/revoke", async (c) => {
+  const parsed = RevokeSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
+  }
+  const db = getDb();
+  const certService = new CertificateService(db, getJwtSecret());
+  const result = await certService.revokeByCertNumber(c.req.param("certNumber"), parsed.data.reason);
+  if (!result) return c.json(error("NOT_FOUND", "Certificate not found"), 404);
+  return c.json(ok({ certificate: result }), 200);
 });

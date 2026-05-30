@@ -28,6 +28,16 @@ export default defineConfig(({ mode }) => {
         allow: ["./", "../shared"],
         deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**"],
       },
+      // Cross-origin isolation for ffmpeg.wasm SharedArrayBuffer in the
+      // studio NLE export path (gap #302). `credentialless` lets normal
+      // cross-origin GETs (R2 assets, CDN videos, YouTube embeds) load
+      // without requiring each resource to carry a CORP header, which
+      // `require-corp` would force.
+      headers: {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "credentialless",
+        "Cross-Origin-Resource-Policy": "cross-origin",
+      },
     },
     build: {
       outDir: "dist",

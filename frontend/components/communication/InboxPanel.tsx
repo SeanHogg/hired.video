@@ -35,6 +35,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { HubItem, HubItemKind, UseCommHubReturn } from "@/hooks/use-comm-hub";
+import {
+  updateLeadStatus,
+  type MarketingLeadStatus,
+} from "@/lib/services/marketing-leads-service";
 
 const KIND_LABEL: Record<HubItemKind, string> = {
   message: "Message",
@@ -86,6 +90,116 @@ function safeRelativeTime(iso: string): string {
   } catch {
     return "";
   }
+}
+
+/** Status transitions for a `marketing_leads` row, in canonical order.
+ *  The inbox row renders a button for the NEXT logical status given
+ *  the row's current status — once "closed" lands the row is terminal
+ *  and the action bar collapses (the row keeps showing "Closed" badge
+ *  for context). */
+const CONTACT_INQUIRY_NEXT: Record<MarketingLeadStatus, MarketingLeadStatus | null> = {
+  new: "contacted",
+  contacted: "converted",
+  converted: "closed",
+  closed: null,
+};
+
+const CONTACT_INQUIRY_LABEL: Record<MarketingLeadStatus, string> = {
+  new: "New",
+  contacted: "Contacted",
+  converted: "Converted",
+  closed: "Closed",
+};
+
+const CONTACT_INQUIRY_BADGE_CLASS: Record<MarketingLeadStatus, string> = {
+  new: "bg-amber-50 text-amber-700 border-amber-200",
+  contacted: "bg-blue-50 text-blue-700 border-blue-200",
+  converted: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  closed: "bg-muted text-muted-foreground border-muted-foreground/30",
+};
+
+/** Self-gating row-action strip for `contact_inquiry` notifications.
+ *  Returns null for every other row kind (DRY: consumer renders this
+ *  unconditionally; the component decides its own visibility per
+ *  `[[feedback_extract_on_duplication]]`). Status defaults to "new"
+ *  because the marketing_leads row starts there at insert time, and
+ *  the inbox row has no other current-status signal until the user
+ *  clicks something. */
+function ContactInquiryStatusActions({ item }: { item: HubItem }) {
+  const leadId =
+    item.iconType === "contact_inquiry" && item.data && typeof item.data.leadId === "string"
+      ? item.data.leadId
+      : null;
+  const [status, setStatus] = useState<MarketingLeadStatus>("new");
+  const [busy, setBusy] = useState<MarketingLeadStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!leadId) return null;
+
+  const next = CONTACT_INQUIRY_NEXT[status];
+  const advance = async (target: MarketingLeadStatus) => {
+    setBusy(target);
+    setError(null);
+    try {
+      const updated = await updateLeadStatus(leadId, target);
+      const normalised = (CONTACT_INQUIRY_NEXT[updated.status as MarketingLeadStatus] !== undefined
+        ? (updated.status as MarketingLeadStatus)
+        : target);
+      setStatus(normalised);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+      <span
+        className={cn(
+          "text-[10px] uppercase tracking-wide font-semibold border rounded px-1.5 py-0.5",
+          CONTACT_INQUIRY_BADGE_CLASS[status],
+        )}
+      >
+        {CONTACT_INQUIRY_LABEL[status]}
+      </span>
+      {next && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          disabled={busy !== null}
+          onClick={(e) => {
+            e.stopPropagation();
+            void advance(next);
+          }}
+        >
+          {busy === next ? (
+            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+          ) : null}
+          Mark {CONTACT_INQUIRY_LABEL[next].toLowerCase()}
+        </Button>
+      )}
+      {status !== "closed" && status !== "converted" && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs text-muted-foreground"
+          disabled={busy !== null}
+          onClick={(e) => {
+            e.stopPropagation();
+            void advance("closed");
+          }}
+        >
+          {busy === "closed" ? (
+            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+          ) : null}
+          Close
+        </Button>
+      )}
+      {error && <span className="text-[11px] text-destructive">{error}</span>}
+    </div>
+  );
 }
 
 interface RowProps {
@@ -304,6 +418,12 @@ function InboxRow({
             </Button>
           </div>
         )}
+
+        {/* #1526 — Per-row triage actions for contact-inquiry rows.
+            Self-gates on `iconType === "contact_inquiry"` + a `leadId`
+            in the notification's JSONB payload, so other notification
+            kinds render unchanged. */}
+        <ContactInquiryStatusActions item={item} />
       </div>
 
       {canDismiss && (

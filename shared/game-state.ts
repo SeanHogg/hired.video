@@ -81,6 +81,12 @@ export interface GameState {
    *  startLevelId) is shared so persistence + save chrome don't fork
    *  per engine. The 3D runtime is the SSoT for what `world` means. */
   world?: World3DState;
+  /** Global variables (gap #1007 — Snap!/Scratch visual block editor).
+   *  Sprite-local variables live on each sprite's `scriptProgram.variables`;
+   *  these are project-wide and survive level changes. The runtime stores
+   *  current values in a parallel map at execution time — this list is the
+   *  authored declaration + initial values. */
+  globalVariables?: import("./game-blocks.js").BlockVariable[];
 }
 
 // ─── 3D world ───────────────────────────────────────────────────────────────
@@ -323,6 +329,15 @@ export interface GameSprite {
    *  the sprite uses its `behavior` alone (or is decorative if both
    *  are absent). The same runtime interprets both kinds. */
   scripts?: BlockRule[];
+  /** Extended visual-programming AST — the full Snap!/Scratch block
+   *  editor's output (gap #1007). When set, the runtime walks the
+   *  program via `executeStmts` on the matching event triggers; the
+   *  legacy flat `scripts` field above coexists for back-compat (a
+   *  sprite can have both — events fire both side-by-side). Built by
+   *  the BlockWorkspace component; shape in `shared/game-blocks.ts`.
+   *  Lazy import to avoid forcing every game-state consumer to pull
+   *  the block AST. */
+  scriptProgram?: import("./game-blocks.js").ScriptProgram;
   /** Mount-time animation — fade in / slide in / scale up with a
    *  duration + easing. Reuses the Video editor's motion-preset
    *  vocabulary so a polish pass on Timeline animations ripples into

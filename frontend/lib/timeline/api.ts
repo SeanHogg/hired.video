@@ -160,4 +160,20 @@ export const nleApi = {
     );
     return res.data;
   },
+  /**
+   * Rename / move a bin folder (#358). Bulk-updates every source whose
+   * `binFolder` equals `from` or starts with `from/`. Pass `to=""` to
+   * flatten the subtree to root.
+   */
+  async renameFolder(
+    from: string,
+    to: string,
+  ): Promise<{ updatedCount: number; from: string; to: string | null }> {
+    const res = await apiClient.post<{
+      updatedCount: number;
+      from: string;
+      to: string | null;
+    }>("/api/nle/sources/folders/rename", { from, to });
+    return res.data;
+  },
 };

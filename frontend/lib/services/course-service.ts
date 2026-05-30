@@ -363,4 +363,50 @@ export const courseService = {
     );
     return res.data;
   },
+
+  /** #1400 — Fetch the studio_video_form that backs a lesson's
+   *  knowledge_check_form_id and reshape it into the SCORM-exporter
+   *  shape. The form uses `select`-typed fields whose `options` are the
+   *  choice strings and whose `answerKey[fieldKey].correctAnswer` is the
+   *  literal value of the correct choice. We map that into the
+   *  `{prompt, options, correctIndex}` shape the SCORM launcher reads.
+   *  Returns null on 404 so callers can branch to a body-only export. */
+  async loadKnowledgeCheck(formId: string): Promise<{
+    questions: Array<{ prompt: string; options: string[]; correctIndex: number }>;
+    passingScorePct?: number;
+    maxAttempts?: number;
+  } | null> {
+    const res = await apiClient.get<{
+      id: string;
+      title: string;
+      fields: Array<{ key: string; label: string; type: string; options?: string[] }>;
+      answerKey: Record<string, { correctAnswer: string; points: number; rationale?: string }> | null;
+      passingScorePct: number | null;
+      maxAttempts: number | null;
+      formType: string;
+    }>(`/api/studio/forms/${formId}`);
+    const form = res.data;
+    if (!form || form.formType !== "knowledge_check" || !form.answerKey) return null;
+    const questions = form.fields
+      .filter((f) => f.type === "select" && Array.isArray(f.options) && f.options.length > 0)
+      .map((f) => {
+        const correctAnswer = form.answerKey?.[f.key]?.correctAnswer ?? "";
+        const correctIndex = (f.options ?? []).indexOf(correctAnswer);
+        return {
+          prompt: f.label,
+          options: f.options ?? [],
+          // Default to -1 (no correct answer) when the answer key
+          // references a non-option — the SCORM grader marks that
+          // question wrong rather than throwing.
+          correctIndex: correctIndex >= 0 ? correctIndex : 0,
+        };
+      })
+      .filter((q) => q.options.length > 0);
+    if (questions.length === 0) return null;
+    return {
+      questions,
+      passingScorePct: form.passingScorePct ?? undefined,
+      maxAttempts: form.maxAttempts ?? undefined,
+    };
+  },
 };

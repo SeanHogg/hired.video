@@ -16,7 +16,7 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, like, or, sql as drizzleSql } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Env, Variables, AppEnv } from "../types/index.js";
@@ -30,7 +30,8 @@ import {
   type WorkspaceSelection,
 } from "../services/studio/workspace.js";
 import { emptyTimeline } from "../../../shared/timeline.js";
-import { cdnUrl } from "../utils/cdn.js";
+import { cdnUrl, r2KeyFromCdnUrl } from "../utils/cdn.js";
+import { deleteR2Keys } from "../services/storage/r2-delete.js";
 
 const { studioProjects, nleMediaSources, nleMediaTags } = schema;
 
@@ -426,6 +427,82 @@ nleRoutes.get("/sources/tags", async (c) => {
 });
 
 /**
+ * POST /api/nle/sources/folders/rename — bulk-rename a bin folder
+ * across all rows the caller can write (#358). Adopts a `/`-delimited
+ * path convention: renaming "brolll/interviews" to "broll/interviews"
+ * updates the folder itself AND any deeper folders nested under it
+ * ("brolll/interviews/2024" → "broll/interviews/2024"). Pass an empty
+ * `to` to flatten the entire subtree to root.
+ *
+ * Single source of truth for "what folder is a source in?" stays on
+ * the `bin_folder` column — we just normalise it. No separate folder
+ * table; the path strings drive the bin tree client-side.
+ */
+const RenameFolderSchema = z.object({
+  from: z.string().min(1).max(500),
+  to: z.string().max(500),
+});
+
+nleRoutes.post("/sources/folders/rename", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = RenameFolderSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  }
+  const { from, to } = parsed.data;
+  // Normalise — strip leading/trailing slashes and collapse doubles so
+  // the rename is idempotent against user input variations.
+  const normFrom = from.replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
+  const normTo = to.replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
+  if (!normFrom) {
+    return c.json(fail("VALIDATION_ERROR", "Source folder cannot be empty"), 400);
+  }
+
+  const db = getDb();
+  const accessible = await listAccessibleWorkspaces(user.sub);
+  const ownership = buildOwnershipFilter({
+    userIdColumn: nleMediaSources.userId,
+    companyIdColumn: nleMediaSources.companyId,
+    actorUserId: user.sub,
+    ...accessible,
+  });
+
+  // Match `from` exactly OR any descendant under `from/...`. Using LIKE
+  // because the bin_folder column is plain text; the index on
+  // (user_id, bin_folder) still narrows the workspace scope.
+  const folderMatch = or(
+    eq(nleMediaSources.binFolder, normFrom),
+    like(nleMediaSources.binFolder, `${normFrom}/%`),
+  );
+  // Compute the new folder per row via a CASE in SQL so we replace the
+  // prefix without round-tripping each row to JS. Empty `to` rewrites
+  // exact matches to NULL (root) and descendants to the substring after
+  // "from/".
+  const replacement = normTo
+    ? drizzleSql`CASE
+        WHEN ${nleMediaSources.binFolder} = ${normFrom}
+          THEN ${normTo}
+        ELSE ${normTo} || SUBSTRING(${nleMediaSources.binFolder} FROM ${normFrom.length + 1})
+      END`
+    : drizzleSql`CASE
+        WHEN ${nleMediaSources.binFolder} = ${normFrom}
+          THEN NULL
+        ELSE SUBSTRING(${nleMediaSources.binFolder} FROM ${normFrom.length + 2})
+      END`;
+
+  const updated = await db
+    .update(nleMediaSources)
+    .set({ binFolder: replacement })
+    .where(and(ownership, folderMatch))
+    .returning({ id: nleMediaSources.id, binFolder: nleMediaSources.binFolder });
+
+  return c.json(ok({ updatedCount: updated.length, from: normFrom, to: normTo || null }));
+});
+
+/**
  * PATCH /api/nle/sources/:id — update bin metadata (folder, tags) or
  * relink the underlying URL when the original R2 object went stale
  * (closes #346). Tag list, when supplied, is replaced atomically — the
@@ -682,6 +759,12 @@ nleRoutes.post("/sources/:id/proxy", async (c) => {
  * DELETE /api/nle/sources/:id — remove a source the caller owns. Caller
  * is responsible for ensuring no Timeline still references it; the DB
  * layer doesn't enforce that for us (clips are inside jsonb).
+ *
+ * Cascades to R2: drops both the master (`nle-sources/{uid}/{hash}`) and
+ * proxy (`nle-proxies/{uid}/{sourceId}-{hash}.mp4`) blobs. Each
+ * nle_media_sources row owns its own R2 keys (the upload path dedupes
+ * on workspace + hash, so a re-upload returns the existing row rather
+ * than sharing a key across rows) — safe to delete on row removal.
  */
 nleRoutes.delete("/sources/:id", async (c) => {
   const user = c.var.user;
@@ -691,7 +774,12 @@ nleRoutes.delete("/sources/:id", async (c) => {
   const db = getDb();
 
   const [existing] = await db
-    .select({ userId: nleMediaSources.userId, companyId: nleMediaSources.companyId })
+    .select({
+      userId: nleMediaSources.userId,
+      companyId: nleMediaSources.companyId,
+      url: nleMediaSources.url,
+      proxyUrl: nleMediaSources.proxyUrl,
+    })
     .from(nleMediaSources)
     .where(eq(nleMediaSources.id, id))
     .limit(1);
@@ -707,6 +795,10 @@ nleRoutes.delete("/sources/:id", async (c) => {
   }
 
   await db.delete(nleMediaSources).where(eq(nleMediaSources.id, id));
+  await deleteR2Keys([
+    r2KeyFromCdnUrl(existing.url),
+    r2KeyFromCdnUrl(existing.proxyUrl),
+  ]);
   return c.json(ok({ id }));
 });
 

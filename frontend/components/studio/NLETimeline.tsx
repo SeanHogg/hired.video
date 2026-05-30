@@ -51,6 +51,7 @@ import {
 } from "@/lib/compiler/scene-ops";
 import { useAudioMix, LANE_KEYS, type LaneKey } from "@/lib/hooks/useAudioMix";
 import { normalizeAudioClips } from "@/lib/audio/normalize-clips";
+import { useShortcutMap } from "@/lib/timeline/use-shortcut-map";
 import { Slider } from "@/components/ui/slider";
 import { Volume2, VolumeX, Music, Mic, Disc3, X as XIcon } from "lucide-react";
 
@@ -87,6 +88,7 @@ const TRANSITION_OPTIONS: TransitionStyle[] = ["cut", "fade", "slide", "cinemati
 
 export default function NLETimeline({ script, onScriptChange, currentTime, onSeek }: Props) {
   const { t } = useTranslation();
+  const shortcuts = useShortcutMap();
   const [pixelsPerSecond, setPixelsPerSecond] = useState(60);
   // Audio-lane mix controls share the dialog's source of truth via the
   // useAudioMix hook. The inline lane row writes lane gain + mute; the
@@ -204,27 +206,32 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
   }, [onMouseMove, onMouseUp]);
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+  // Bindings live in `useShortcutMap` (#348) so the settings panel can
+  // remap them per user / per profile. Backspace stays hardcoded as an
+  // alias for Delete because the editor pre-dates the remap surface and
+  // some keyboards lack a forward-Delete; the profile system handles
+  // the rest.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       // Ignore when focus is in an input
       const target = e.target as HTMLElement;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
 
-      if (e.key === "s" || e.key === "S") {
+      if (shortcuts.matches(e, "split-at-playhead")) {
         e.preventDefault();
         onScriptChange(splitSceneAtTime(script, currentTime));
-      } else if (e.key === "Delete" || e.key === "Backspace") {
+      } else if (shortcuts.matches(e, "delete-scene") || e.key === "Backspace") {
         if (selectedIndex != null) {
           e.preventDefault();
           onScriptChange(deleteScene(script, selectedIndex));
           setSelectedIndex(null);
         }
-      } else if (e.key === "m" || e.key === "M") {
+      } else if (shortcuts.matches(e, "merge-with-next")) {
         if (selectedIndex != null && selectedIndex < script.scenes.length - 1) {
           e.preventDefault();
           onScriptChange(mergeWithNext(script, selectedIndex));
         }
-      } else if (e.key === "d" || e.key === "D") {
+      } else if (shortcuts.matches(e, "duplicate-scene")) {
         if (selectedIndex != null) {
           e.preventDefault();
           onScriptChange(duplicateScene(script, selectedIndex));
@@ -233,7 +240,7 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [script, currentTime, selectedIndex, onScriptChange]);
+  }, [script, currentTime, selectedIndex, onScriptChange, shortcuts]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const playheadX = currentTime * pixelsPerSecond;
