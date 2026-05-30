@@ -37,7 +37,6 @@ import {
   Download,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
-import { preloadStudioFonts } from "@/lib/studio/font-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
 import { useSubscription } from "@/lib/hooks/useSubscription";
@@ -216,13 +215,6 @@ export default function StudioEditorV2() {
   // SAME pill the editor + /v/<id> show.
   const subscription = useSubscription();
   const { removeBranding } = useRemoveBrandingFlag();
-
-  // Preload Google Fonts referenced by FONT_PRESETS (#581) so text widgets
-  // render with their preset typography from first paint instead of falling
-  // back to system stacks until the stylesheet lands. Idempotent.
-  useEffect(() => {
-    preloadStudioFonts();
-  }, []);
 
   const projectId = routeId ?? "new";
   // `?contentTemplate=` matches the chooser's emit + classic editor convention.

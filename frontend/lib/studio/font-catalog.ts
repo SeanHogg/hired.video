@@ -2,64 +2,49 @@
  * Font catalog — single source of truth for "what fonts can the studio
  * use?". Used by both editors and by the render facade.
  *
- * The `family` field is the CSS font-family stack written into the
- * widget's `style.fontFamily`. Adding a font requires (a) entry here +
- * (b) Google-Fonts preload in the page head so the render-time canvas
- * can paint it. The preload happens once at the editor shell mount.
+ * Fonts are SELF-HOSTED (bundled via `@fontsource/*`) rather than
+ * runtime-loaded from `fonts.googleapis.com`. The studio enforces
+ * `Cross-Origin-Embedder-Policy: credentialless` (for ffmpeg.wasm's
+ * SharedArrayBuffer in the export path), and runtime cross-origin font
+ * loading is incompatible with that + the Workbox CacheFirst service
+ * worker — the opaque cross-origin response made `caches.match` throw
+ * and the `<link>` fetches failed with `net::ERR_FAILED` on every
+ * editor mount. Importing the `@fontsource` CSS here makes the faces
+ * same-origin, available from first paint, offline-safe, and free of
+ * any third-party dependency. The latin 400/700 subsets mirror the
+ * weights the old Google Fonts URLs requested (`wght@400;700`).
+ *
+ * Because this module sits in the studio dependency graph only, the
+ * font assets code-split into the studio chunks — non-studio routes
+ * don't pay for them. Adding a font is one `@fontsource` install + its
+ * two CSS imports + one `FONT_PRESETS` entry; there is no page-head
+ * preload step to remember anymore.
  */
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/roboto/latin-400.css";
+import "@fontsource/roboto/latin-700.css";
+import "@fontsource/montserrat/latin-400.css";
+import "@fontsource/montserrat/latin-700.css";
+import "@fontsource/playfair-display/latin-400.css";
+import "@fontsource/playfair-display/latin-700.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-700.css";
 
 export interface FontPreset {
   id: string;
   label: string;
-  /** CSS font-family stack. */
+  /** CSS font-family stack written into the widget's `style.fontFamily`. */
   family: string;
-  /** Google Fonts URL (preconnect path) when applicable. `null` for
-   *  system stacks that don't need a network load. */
-  googleFontUrl: string | null;
 }
 
 export const FONT_PRESETS: FontPreset[] = [
-  {
-    id: "inter",
-    label: "Inter",
-    family: "'Inter', sans-serif",
-    googleFontUrl:
-      "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap",
-  },
-  {
-    id: "roboto",
-    label: "Roboto",
-    family: "'Roboto', sans-serif",
-    googleFontUrl:
-      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap",
-  },
-  {
-    id: "montserrat",
-    label: "Montserrat",
-    family: "'Montserrat', sans-serif",
-    googleFontUrl:
-      "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap",
-  },
-  {
-    id: "playfair",
-    label: "Playfair Display",
-    family: "'Playfair Display', serif",
-    googleFontUrl:
-      "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap",
-  },
-  {
-    id: "jetbrains",
-    label: "JetBrains Mono",
-    family: "'JetBrains Mono', monospace",
-    googleFontUrl:
-      "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap",
-  },
-  {
-    id: "system",
-    label: "System default",
-    family: "system-ui, sans-serif",
-    googleFontUrl: null,
-  },
+  { id: "inter", label: "Inter", family: "'Inter', sans-serif" },
+  { id: "roboto", label: "Roboto", family: "'Roboto', sans-serif" },
+  { id: "montserrat", label: "Montserrat", family: "'Montserrat', sans-serif" },
+  { id: "playfair", label: "Playfair Display", family: "'Playfair Display', serif" },
+  { id: "jetbrains", label: "JetBrains Mono", family: "'JetBrains Mono', monospace" },
+  { id: "system", label: "System default", family: "system-ui, sans-serif" },
 ];
 
 export function findFontPreset(id: string | null | undefined): FontPreset | null {
@@ -71,26 +56,4 @@ export function findFontPreset(id: string | null | undefined): FontPreset | null
  *  system stack for unknown ids so missing fonts never crash. */
 export function fontFamilyFor(id: string | null | undefined): string {
   return findFontPreset(id)?.family ?? "system-ui, sans-serif";
-}
-
-/**
- * Inject `<link rel="stylesheet" href={googleFontUrl}>` tags for every
- * non-system font preset, idempotent across mounts (#581). Call once at
- * the editor shell so text widgets paint with their preset typography
- * instead of falling back to system stacks until the network catches up.
- */
-export function preloadStudioFonts(): void {
-  if (typeof document === "undefined") return;
-  for (const preset of FONT_PRESETS) {
-    if (!preset.googleFontUrl) continue;
-    const existing = document.head.querySelector(
-      `link[data-studio-font="${preset.id}"]`,
-    );
-    if (existing) continue;
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = preset.googleFontUrl;
-    link.dataset.studioFont = preset.id;
-    document.head.appendChild(link);
-  }
 }

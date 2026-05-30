@@ -216,23 +216,16 @@ export default defineConfig(({ mode }) => {
                 },
               },
             },
+            // NOTE: no `fonts.googleapis.com` / `fonts.gstatic.com` rule.
+            // Studio fonts are self-hosted (`@fontsource/*`, bundled via
+            // lib/studio/font-catalog.ts) so they're same-origin and fall
+            // under the static-asset woff2 rule below. A cross-origin
+            // CacheFirst rule here previously made the SW throw
+            // `Failed to execute 'match' on 'CacheStorage'` on the opaque
+            // response under this app's COEP `credentialless` header,
+            // failing every studio font load with `net::ERR_FAILED`.
             {
-              // Google Fonts and external CDN assets — CacheFirst
-              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-              handler: "CacheFirst",
-              options: {
-                cacheName: "google-fonts-cache",
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              // Static assets (images, videos in R2) — CacheFirst
+              // Static assets (images, videos in R2, self-hosted fonts) — CacheFirst
               urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff2?|ttf|otf)$/i,
               handler: "CacheFirst",
               options: {
