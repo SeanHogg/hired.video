@@ -541,6 +541,13 @@ export function runGame(canvas, state, opts) {
   // don't re-decode on every gotoLevel().
   const assetCache = createAssetCache(state.assets || []);
 
+  // Sprite-local + global variable scopes for the visual-block interpreter
+  // (#1007). Declared up here because the initial seed below runs on mount
+  // (a `const` referenced before its declaration is a TDZ — it threw
+  // "Cannot access 'blockVars' before initialization" and crashed every
+  // 2D game on open). Seeded on mount; mutated through the interp's writeVar.
+  const blockVars = { spriteVars: new Map(), globalVars: Object.create(null) };
+
   let sprites = mountLevel(level);
   // Initial seed of the visual-block variable scopes (#1007).
   seedGlobalVars(state.globalVariables, blockVars);
@@ -598,9 +605,8 @@ export function runGame(canvas, state, opts) {
   // we drain it at the end of the tick by firing on-receive handlers on
   // every sprite. Drained per-tick so a chained broadcast doesn't recurse.
   const pendingBroadcasts = [];
-  // Sprite-local + global variable scopes for the visual-block interpreter
-  // (#1007). Seeded on mount; mutated through the interp's writeVar.
-  const blockVars = { spriteVars: new Map(), globalVars: Object.create(null) };
+  // (`blockVars` is declared near the top of `runGame` — it's seeded on
+  // mount, before this point, so it can't live down here.)
   // Level mount timestamp — feeds the `timer` sensing expression so it
   // resets on every gotoLevel.
   let levelMountTs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
