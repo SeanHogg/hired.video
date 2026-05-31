@@ -61,6 +61,12 @@ export function evaluateBadges(input: BadgeEvaluationInput): string[] {
     }
 
     // ─── Social feed ──────────────────────────────────────────────────
+    case "resource.submitted": {
+      considerBadge("resource_first", input.totalEarnsForAction >= 1);
+      considerBadge("resources_10", input.totalEarnsForAction >= 10);
+      break;
+    }
+
     case "feed.post.created": {
       considerBadge("first_post", input.totalEarnsForAction >= 1);
       break;

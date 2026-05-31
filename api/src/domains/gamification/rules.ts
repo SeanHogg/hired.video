@@ -99,6 +99,10 @@ export const ACTIONS = {
   // Social feed
   FEED_POST_CREATED: "feed.post.created",
 
+  // Community contributions (location resource directory). Eligible for
+  // every scoring role — anyone can surface a helpful local resource.
+  RESOURCE_SUBMITTED: "resource.submitted",
+
   // Learning loop (courses + paths + certificates). Eligible for all
   // three scoring roles so a recruiter watching compliance training and
   // an employer completing onboarding both earn alongside job_seekers.
@@ -233,6 +237,15 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     category: "earn",
     dailyCapPoints: 30,
     source: "feed",
+  },
+  [ACTIONS.RESOURCE_SUBMITTED]: {
+    key: ACTIONS.RESOURCE_SUBMITTED,
+    label: "Submitted a community resource",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 25,
+    category: "earn",
+    dailyCapPoints: 100, // keep low-effort link spam from farming points
+    source: "resource",
   },
 
   // ── Learning loop ──────────────────────────────────────────────────
@@ -409,6 +422,7 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.PURCHASE_SUBSCRIPTION,
   ACTIONS.PURCHASE_ANY,
   ACTIONS.FEED_POST_CREATED,
+  ACTIONS.RESOURCE_SUBMITTED,
   // learning loop — daily course activity counts as an active day
   ACTIONS.LESSON_COMPLETED,
   ACTIONS.COURSE_PASSED,

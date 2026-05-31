@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ResourceMap } from "@/components/landing/ResourceMap";
+import LocationResources from "@/components/resources/LocationResources";
 import { useSEO } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
 
@@ -154,6 +155,13 @@ export default function LocationLandingPage(): JSX.Element {
         kinds={["job", "article", "template", "video", "learning_path"]}
         heading={`In ${headerTitle}`}
         subheading="Jobs, articles, templates, and learning paths tagged to this location."
+      />
+
+      <LocationResources
+        countryCode={(params.country ?? "").toLowerCase()}
+        stateCode={params.state ? params.state.toLowerCase() : null}
+        citySlug={params.city ? params.city.toLowerCase() : null}
+        locationLabel={headerTitle}
       />
 
       <MarketingFAQ

@@ -1,4 +1,4 @@
-import { FileText, Film, Mic, Newspaper, ShoppingBag, Sparkles, Store } from "lucide-react";
+import { FileText, Film, Mic, Newspaper, ShoppingBag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import CreatorPromoCard from "@/components/marketing/CreatorPromoCard";
 
 interface Category {
   id: string;
@@ -76,58 +77,43 @@ const CATEGORIES: Category[] = [
 export default function MarketplaceHero() {
   return (
     <>
-      <section className="border-b bg-muted/30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-          <div className="flex items-center gap-2 mb-3">
-            <Store className="w-5 h-5 text-primary" />
-            <Badge variant="secondary">Marketplace</Badge>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3">Generate & Get Paid</h1>
-          <p className="text-muted-foreground max-w-2xl">
-            Browse templates, voices, and services from creators on hired.video — or publish your own and earn. Every asset plugs into the resume and studio tools you already use.
-          </p>
-          <div className="flex flex-wrap gap-2 mt-6">
-            <Link to="/studio">
-              <Button>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Become a Creator
-              </Button>
-            </Link>
-            <Link to="/pricing">
-              <Button variant="outline">See Creator Split</Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <CreatorPromoCard variant="hero" />
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            return (
-              <Card key={cat.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-md bg-primary/10 p-2">
-                        <Icon className="w-5 h-5 text-primary" />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <Card key={cat.id} className="flex flex-col">
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-md bg-primary/10 p-2">
+                          <Icon className="w-5 h-5 text-primary" />
+                        </div>
+                        <CardTitle>{cat.title}</CardTitle>
                       </div>
-                      <CardTitle>{cat.title}</CardTitle>
+                      {cat.badge && <Badge variant="outline">{cat.badge}</Badge>}
                     </div>
-                    {cat.badge && <Badge variant="outline">{cat.badge}</Badge>}
-                  </div>
-                  <CardDescription className="pt-2">{cat.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="mt-auto">
-                  <Link to={cat.href}>
-                    <Button variant="secondary" className="w-full">
-                      {cat.cta}
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            );
-          })}
+                    <CardDescription className="pt-2">{cat.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="mt-auto">
+                    <Link to={cat.href}>
+                      <Button variant="secondary" className="w-full">
+                        {cat.cta}
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Side column — the reusable creator promo as a sticky banner ad. */}
+          <aside className="lg:sticky lg:top-20 self-start">
+            <CreatorPromoCard variant="banner" />
+          </aside>
         </div>
       </section>
     </>

@@ -19,6 +19,7 @@ export const REPORT_ENTITY_TYPES = [
   "user_profile",
   "studio_template",
   "studio_project",
+  "community_resource",
 ] as const;
 export type ReportEntityType = (typeof REPORT_ENTITY_TYPES)[number];
 
@@ -54,6 +55,7 @@ export const REPORT_ENTITY_LABEL: Record<ReportEntityType, string> = {
   user_profile: "User profile",
   studio_template: "Studio template",
   studio_project: "Studio video",
+  community_resource: "Community resource",
 };
 
 export const REPORT_REASON_LABEL: Record<ReportReason, string> = {

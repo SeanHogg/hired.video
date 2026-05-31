@@ -28,6 +28,7 @@ import {
   resolveActor,
 } from "../notifications/notificationService.js";
 import { findOrCreateDirectConversation, sendMessage } from "../messaging/messagingService.js";
+import { sendModerationFlagEmail } from "../../services/adapters/email.js";
 
 export type ModerationServiceDeps = {
   repos: Pick<Repos, "users" | "notifications" | "conversations">;
@@ -43,6 +44,7 @@ const {
   jobItems,
   feedPosts,
   studioVoiceClones,
+  communityResources,
 } = schema;
 
 // ── Errors ──────────────────────────────────────────────────────────────────
@@ -141,6 +143,14 @@ export async function resolveEntityOwner(
         .select({ userId: studioVoiceClones.userId })
         .from(studioVoiceClones)
         .where(eq(studioVoiceClones.id, entityId))
+        .limit(1);
+      return row?.userId ?? null;
+    }
+    case "community_resource": {
+      const [row] = await db
+        .select({ userId: communityResources.submittedBy })
+        .from(communityResources)
+        .where(eq(communityResources.id, entityId))
         .limit(1);
       return row?.userId ?? null;
     }
@@ -247,6 +257,7 @@ export async function fileReport(
       entityType: input.entityType,
       entityId: input.entityId,
       reason: input.reason,
+      notes: input.notes ?? null,
     });
   } catch (err) {
     console.error("[moderation] fan-out failed:", err);
@@ -275,6 +286,7 @@ async function fanOutNewReport(
     entityType: ReportEntityType;
     entityId: string;
     reason: ReportReason;
+    notes?: string | null;
   },
 ): Promise<void> {
   const adminIds = await deps.repos.users.findSuperAdminIds();
@@ -299,6 +311,30 @@ async function fanOutNewReport(
       reason: payload.reason,
     },
   });
+
+  // Email fan-out — every super-admin gets an email heads-up so flags
+  // don't sit unseen until they next open /inbox. Best-effort: an email
+  // failure must not bubble up and make the report look unfiled.
+  try {
+    const admins = await deps.repos.users.findManyByIds(adminIds);
+    await Promise.all(
+      admins
+        .filter((a) => Boolean(a.email))
+        .map((a) =>
+          sendModerationFlagEmail(a.email as string, {
+            reporterName: actorName,
+            entityLabel: prettyEntityType(payload.entityType),
+            reasonLabel: prettyReason(payload.reason),
+            entityId: payload.entityId,
+            notes: payload.notes ?? null,
+          }).catch((err) =>
+            console.error("[moderation] flag email failed for admin", a.id, err),
+          ),
+        ),
+    );
+  } catch (err) {
+    console.error("[moderation] flag email fan-out failed:", err);
+  }
 
   // Inbox thread fan-out — each admin gets a direct conversation with
   // the reporter seeded with the report context. Find-or-create so a
@@ -449,6 +485,7 @@ const ENTITY_LABEL: Record<ReportEntityType, string> = {
   user_profile: "user profile",
   studio_template: "studio template",
   studio_project: "studio video",
+  community_resource: "community resource",
 };
 
 function prettyEntityType(t: ReportEntityType): string {

@@ -159,6 +159,10 @@ import { creatorRoutes } from "./routes/creators.js";
 import { articleRoutes } from "./routes/articles.js";
 import { adminArticleRoutes } from "./routes/admin-articles.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
+import {
+  communityResourceRoutes,
+  adminCommunityResourceRoutes,
+} from "./routes/community-resources.js";
 import { courseRoutes } from "./routes/courses.js";
 import { courseAuthoringRoutes } from "./routes/course-authoring.js";
 import { campaignDollarsRoutes } from "./routes/campaign-dollars.js";
@@ -683,6 +687,7 @@ export function createApp() {
   app.route("/api/admin/job-sources", jobScraperAdminRoutes);
   app.route("/api/admin/articles", adminArticleRoutes);
   app.route("/api/admin/reports", adminReportRoutes);
+  app.route("/api/admin/community-resources", adminCommunityResourceRoutes);
   app.route("/api/lms-oauth", lmsOauthRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
@@ -747,6 +752,7 @@ export function createApp() {
   app.route("/api/creators", creatorRoutes);
   app.route("/api/articles", articleRoutes);
   app.route("/api/reports", reportRoutes);
+  app.route("/api/community-resources", communityResourceRoutes);
   app.route("/api/courses", courseRoutes);
   // Authoring helpers (#162 AI generator, #200 LMS connectors, etc.)
   // mount under the same prefix so the client never has to learn a

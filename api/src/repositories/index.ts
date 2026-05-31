@@ -68,6 +68,10 @@ import {
   CoffeeRequestsRepository,
   type ICoffeeRequestsRepository,
 } from "./coffeeRequestsRepository.js";
+import {
+  CommunityResourcesRepository,
+  type ICommunityResourcesRepository,
+} from "./communityResourcesRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -119,6 +123,8 @@ export interface Repos {
   events: IEventsRepository;
   // "Grab a coffee" proposal/accept flow + shared task participants
   coffeeRequests: ICoffeeRequestsRepository;
+  // location-scoped user-submitted resource directory (migration 0191)
+  communityResources: ICommunityResourcesRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -153,6 +159,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     geocoderCache: new GeocoderCacheRepository(db, now),
     events: new EventsRepository(db, now),
     coffeeRequests: new CoffeeRequestsRepository(db, now),
+    communityResources: new CommunityResourcesRepository(db, now),
   };
 }
 
@@ -190,6 +197,7 @@ export type {
   IGeocoderCacheRepository,
   IEventsRepository,
   ICoffeeRequestsRepository,
+  ICommunityResourcesRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
@@ -256,3 +264,7 @@ export type {
   SharedTaskParticipantRow,
   SharedTaskParticipantInsert,
 } from "./coffeeRequestsRepository.js";
+export type {
+  CommunityResourceDirectoryFilter,
+  ReviewResourcePatch,
+} from "./communityResourcesRepository.js";

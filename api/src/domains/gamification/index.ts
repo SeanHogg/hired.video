@@ -198,6 +198,16 @@ export class GamificationService {
     });
   }
 
+  /** Award when a user submits a community resource for review. Deduped on
+   *  the resource id so a re-submit of the same row doesn't double-pay. */
+  async onResourceSubmitted(args: AwardArgs & { resourceId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.RESOURCE_SUBMITTED, {
+      ...args,
+      refId: args.resourceId,
+      refType: "community_resource",
+    });
+  }
+
   async onDailySession(args: AwardArgs): Promise<AwardOutcome> {
     // RefId synthesizes "one per UTC day" so a fresh-session call any
     // time of day collapses to a single ledger row.

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/tabs";
 import AbuseReportsPanel from "@/components/admin/moderation/AbuseReportsPanel";
 import ContentReviewPanel from "@/components/admin/moderation/ContentReviewPanel";
+import ResourceReviewPanel from "@/components/admin/moderation/ResourceReviewPanel";
 
 export default function ModerationQueue() {
   return (
@@ -37,10 +38,14 @@ export default function ModerationQueue() {
       <Tabs defaultValue="review">
         <TabsList>
           <TabsTrigger value="review">Pending Review</TabsTrigger>
+          <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="reports">Abuse Reports</TabsTrigger>
         </TabsList>
         <TabsContent value="review" className="pt-4">
           <ContentReviewPanel />
+        </TabsContent>
+        <TabsContent value="resources" className="pt-4">
+          <ResourceReviewPanel />
         </TabsContent>
         <TabsContent value="reports" className="pt-4">
           <AbuseReportsPanel />

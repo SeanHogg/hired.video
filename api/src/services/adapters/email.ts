@@ -117,6 +117,57 @@ function getEnv(key: string): string {
   return process.env[key] || (globalThis as any).__ENV?.[key] || "";
 }
 
+export interface ScreeningInvitationEmailInput {
+  to: string;
+  candidateName?: string | null;
+  token: string;
+  message?: string | null;
+}
+
+/**
+ * Candidate screening invitation — a magic link to the screening portal where
+ * the candidate completes the outstanding items (résumé, contact confirmation,
+ * validated assessments, competency tests, …). Best-effort: the calling route
+ * never rolls back the request row on a send failure (the recruiter can resend).
+ */
+export async function sendScreeningInvitationEmail(
+  input: ScreeningInvitationEmailInput,
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const frontendUrl = getEnv("FRONTEND_URL");
+  const link = `${frontendUrl}/screening/${input.token}`;
+  const greeting = input.candidateName
+    ? `Hi ${escapeHtml(input.candidateName)},`
+    : "Hi,";
+  const note = input.message
+    ? `<p style="margin:0 0 16px;color:#374151;">${escapeHtml(input.message)}</p>`
+    : "";
+  const body = `
+    <h1 style="font-size:20px;margin:0 0 16px;color:#111827;">Complete your application screening</h1>
+    <p style="margin:0 0 16px;color:#374151;">${greeting}</p>
+    <p style="margin:0 0 16px;color:#374151;">
+      To move your application forward, please complete the short screening below.
+      It only asks for what we don't already have on file.
+    </p>
+    ${note}
+    <p style="margin:24px 0;">
+      <a href="${link}" style="background:#2563eb;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+        Continue your application
+      </a>
+    </p>
+    <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">
+      Or paste this link into your browser:<br />
+      <a href="${link}" style="color:#2563eb;">${link}</a>
+    </p>`;
+  const html = LAYOUT_HEADER + body + LAYOUT_FOOTER;
+  await provider.send({
+    to: input.to,
+    subject: "Complete your application screening",
+    html,
+  });
+}
+
 let _provider: EmailProvider | null = null;
 
 export function getEmailProvider(): EmailProvider | null {
@@ -488,6 +539,39 @@ export async function sendVerificationEmail(
   if (!provider) return;
   const html = render(VERIFY_EMAIL_BODY, { RecipientName: recipientName, VerifyUrl: buildVerifyUrl(token) });
   await provider.send({ to, subject: "Verify your email – hired.video", html });
+}
+
+/** Notify a SuperAdmin that a user flagged content for review. Best-effort;
+ *  the inbox fan-out remains the source of truth, this is the heads-up. */
+export async function sendModerationFlagEmail(
+  to: string,
+  params: {
+    reporterName: string;
+    entityLabel: string;
+    reasonLabel: string;
+    entityId: string;
+    notes?: string | null;
+  },
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const queueUrl = `${getBaseUrl()}/admin/moderation`;
+  const notesBlock = params.notes
+    ? `<p style="margin:8px 0;"><strong>Notes:</strong> ${escapeHtml(params.notes)}</p>`
+    : "";
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="font-size:18px;">New content flag — review needed</h2>
+      <p><strong>${escapeHtml(params.reporterName)}</strong> flagged a
+        <strong>${escapeHtml(params.entityLabel)}</strong>.</p>
+      <p style="margin:8px 0;"><strong>Reason:</strong> ${escapeHtml(params.reasonLabel)}</p>
+      ${notesBlock}
+      <p style="margin:8px 0;color:#666;font-size:13px;">Entity id: ${escapeHtml(params.entityId)}</p>
+      <p style="margin:20px 0;">
+        <a href="${queueUrl}" style="background:#7c3aed;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Open moderation queue</a>
+      </p>
+    </div>`;
+  await provider.send({ to, subject: `[Moderation] ${params.entityLabel} flagged — ${params.reasonLabel}`, html });
 }
 
 export async function sendResendVerificationEmail(
