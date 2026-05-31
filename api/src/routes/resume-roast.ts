@@ -40,7 +40,7 @@ function buildMockRoast(resumeText: string): RoastResponse {
   const lines = resumeText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
 
-  const bulletLines = lines.filter((l) => /^[\-•▪▸►◦‣\*\d\.]+\s+/.test(l));
+  const bulletLines = lines.filter((l) => /^[-•▪▸►◦‣*\d.]+\s+/.test(l));
   const hasBullets = bulletLines.length > 0;
 
   // Extract metrics but avoid treating phone numbers as metrics
@@ -65,7 +65,7 @@ function buildMockRoast(resumeText: string): RoastResponse {
   const candidateLines = bulletLines.length > 0 ? bulletLines : [];
   if (candidateLines.length === 0) {
     const sentences = resumeText
-      .split(/[\.\?!]\s+/)
+      .split(/[.?!]\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
     candidateLines.push(...sentences.slice(0, 2));

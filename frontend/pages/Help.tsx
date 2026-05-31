@@ -177,7 +177,7 @@ export default function Help() {  const location = useLocation();
                 </span>
               </div>
               <h1 className="text-4xl font-bold mb-4">How can we help you?</h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-xl text-muted-foreground">
                 Find answers to common questions, browse our guides, or get in
                 touch with our support team.
               </p>

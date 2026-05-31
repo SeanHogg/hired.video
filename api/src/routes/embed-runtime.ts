@@ -29,6 +29,7 @@ import {
   type RosterEmployee,
 } from "../domains/people-ops/peopleOpsService.js";
 import { EMBED_VIEW_KEYS } from "../../../shared/embed.js";
+import { computeTeamHealth } from "../domains/people-ops/teamHealth.js";
 
 function readKey(c: { req: { header: (n: string) => string | undefined; query: (n: string) => string | undefined } }): string {
   return c.req.header("x-hired-embed-key") || c.req.query("key") || "";
@@ -94,6 +95,10 @@ embedApiRoutes.get("/v1/:view", async (c) => {
           hierarchy: hierarchy.map(mapNode),
         }),
       );
+    }
+    if (view === "team-health") {
+      const health = await computeTeamHealth(scope);
+      return c.json(success({ displayName: scope.displayName, ...health }));
     }
     if (view === "goals") {
       const [goals, employees] = await Promise.all([svc.listGoals(scope), svc.listEmployees(scope)]);
@@ -249,6 +254,15 @@ function FRAME_HTML(view: string, key: string): string {
           '<div style="margin-bottom:12px"><span class=stat><b>'+d.metrics.totalHeadcount+'</b> <span class=muted>total</span></span>'+
           '<span class=stat><b>'+d.metrics.activeHeadcount+'</b> <span class=muted>active</span></span></div>'+
           (rows?'<table><thead><tr><th>Name</th><th>Position</th><th>Department</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>':'<p class=muted>No team members yet.</p>');
+      } else if(view==='team-health'){
+        var dims=d.dimensions||{};
+        var rowsH=Object.keys(dims).map(function(k){
+          return '<tr><td>'+esc(k)+'</td><td><div style="background:#e5e7eb;border-radius:9999px;height:6px;width:160px;overflow:hidden"><div style="background:#4f46e5;height:6px;width:'+dims[k]+'%"></div></div></td><td class=muted>'+dims[k]+'</td></tr>';
+        }).join('');
+        root.className='';
+        root.innerHTML='<h2>'+esc(d.displayName)+' · Team Health</h2>'+
+          '<div style="font-size:40px;font-weight:700;margin-bottom:8px">'+d.score+'<span style="font-size:16px;color:#6b7280">/100</span></div>'+
+          '<table><tbody>'+rowsH+'</tbody></table>';
       } else if(view==='goals'){
         var rows=(d.goals||[]).map(function(g){
           var bar='<div style="background:#e5e7eb;border-radius:9999px;height:6px;width:120px;overflow:hidden"><div style="background:'+(g.atRisk?'#dc2626':'#4f46e5')+';height:6px;width:'+g.progress+'%"></div></div>';

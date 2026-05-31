@@ -161,7 +161,7 @@ function HomeMarketingPage() {
               <h1 className="text-5xl font-bold mb-6">
                 {t("marketing.home.heroTitle")}
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-8">
                 {t("marketing.home.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -207,7 +207,7 @@ function HomeMarketingPage() {
               <h2 className="text-3xl font-bold text-center mb-4">
                 {t("marketing.home.featuresTitle")}
               </h2>
-              <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+              <p className="text-center text-muted-foreground mb-12">
                 {t("marketing.home.featuresSubtitle")}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -263,7 +263,7 @@ function HomeMarketingPage() {
               <h2 className="text-3xl font-bold text-center mb-4">
                 {t("marketing.home.toolsTitle")}
               </h2>
-              <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+              <p className="text-center text-muted-foreground mb-12">
                 {t("marketing.home.toolsSubtitle")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -351,7 +351,7 @@ function HomeMarketingPage() {
               <h3 className="text-3xl font-bold mb-4">
                 {t("marketing.home.ctaTitle")}
               </h3>
-              <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-muted-foreground mb-8">
                 {t("marketing.home.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -682,7 +682,7 @@ function MarketingTemplateStrip() {
       <h2 className="text-3xl font-bold text-center mb-4">
         {t("marketing.home.templatesTitle")}
       </h2>
-      <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+      <p className="text-center text-muted-foreground mb-12">
         {t("marketing.home.templatesSubtitle")}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">

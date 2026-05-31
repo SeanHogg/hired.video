@@ -62,7 +62,7 @@ export function slugifyForSalary(input: string): string {
 export function normaliseTitle(title: string): string {
   const cleaned = title
     .toLowerCase()
-    .replace(/[\(\)\[\]\{\}]/g, " ")
+    .replace(/[()[\]{}]/g, " ")
     .replace(/[^a-z0-9\s\-/]+/g, " ")
     .split(/\s+/)
     .filter((w) => w && !STOPWORDS.has(w))

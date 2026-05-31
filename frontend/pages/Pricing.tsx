@@ -399,7 +399,7 @@ export default function Pricing() {
               <h1 className="text-3xl md:text-4xl font-bold mb-2">
                 Simple, Transparent Pricing
               </h1>
-              <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-sm text-muted-foreground">
                 All-in-one HR platform — social, referrals, ATS, CRM,
                 crowdsourcing, and recruitment marketing.
               </p>

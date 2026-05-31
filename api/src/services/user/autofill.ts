@@ -217,7 +217,7 @@ function humanizeFieldName(name: string): string {
   const bracketMatch = name.match(/\[([^\]]+)\]$/);
   const raw = bracketMatch ? bracketMatch[1] : name;
   return raw
-    .replace(/[_\-]/g, " ")
+    .replace(/[_-]/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\b\w/g, (c) => c.toUpperCase())
     .trim() || "Unknown Field";

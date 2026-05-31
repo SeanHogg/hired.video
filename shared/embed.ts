@@ -59,6 +59,13 @@ export const EMBED_SURFACES: EmbedSurface[] = [
     description: "Team OKRs with key-result progress rollup.",
     status: "available",
   },
+  {
+    key: "team-health",
+    label: "Team Health",
+    scope: "people:team-health",
+    description: "Composite team-health score across five dimensions.",
+    status: "available",
+  },
 
   // ── Reuse existing hired.video capability (no rebuild) ─────────────────────
   {

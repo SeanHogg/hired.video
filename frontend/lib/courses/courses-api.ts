@@ -8,6 +8,20 @@
 
 const API = ((import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? "/api").replace(/\/$/, "");
 
+// Every backend route this client targets (`/courses`, `/learning-paths`,
+// `/verify`) is mounted under `/api`. The paths below are written WITHOUT
+// the `/api` prefix, so we must add it whenever the configured base origin
+// doesn't already end in `/api`. In dev `VITE_API_URL` is unset → `API` is
+// the relative `/api` (prefix present); in production it's the bare API
+// origin (e.g. `https://api.hired.video`, prefix absent). Without this the
+// prod URL collapses to `https://api.hired.video/courses/...` and 404s —
+// the bug that left passed courses without an issued certificate. Mirrors
+// the `/api` reconciliation the shared api-client already performs.
+function apiUrl(path: string): string {
+  const baseHasApi = /\/api$/i.test(API);
+  return `${API}${baseHasApi ? "" : "/api"}${path}`;
+}
+
 async function call<T>(
   path: string,
   init: RequestInit & { auth?: string | null } = {},
@@ -15,7 +29,7 @@ async function call<T>(
   const headers = new Headers(init.headers ?? {});
   headers.set("Content-Type", "application/json");
   if (init.auth) headers.set("Authorization", `Bearer ${init.auth}`);
-  const res = await fetch(`${API}${path}`, { ...init, headers, credentials: "include" });
+  const res = await fetch(apiUrl(path), { ...init, headers, credentials: "include" });
   const json = await res.json().catch(() => ({})) as { data?: T; error?: { message?: string } };
   if (!res.ok) throw new Error(json.error?.message ?? `Request failed: ${res.status}`);
   return (json.data ?? null) as T;

@@ -38,7 +38,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { companyProfiles } from "./companies.js";
 import { users, accountInvitations } from "./users.js";
-import type { OneOnOneAgendaItem, KeyResult } from "../../../../shared/people-ops.js";
+import type { OneOnOneAgendaItem, KeyResult, PulseQuestionDef } from "../../../../shared/people-ops.js";
 
 // ── Tenancy ──────────────────────────────────────────────────────────────
 export const peopleTenants = pgTable(

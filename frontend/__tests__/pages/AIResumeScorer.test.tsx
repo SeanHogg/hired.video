@@ -163,6 +163,10 @@ function setAuth(isAuthenticated: boolean) {
     isAuthenticated,
     isLoading: false,
     isEmailVerified: isAuthenticated,
+    // AppShell mounts <EmailVerificationBanner>, which probes the gate on
+    // mount — stub it so the banner's effect doesn't crash the page render.
+    getVerificationStatus: vi.fn().mockResolvedValue({ emailConfirmed: true }),
+    resendEmailVerification: vi.fn().mockResolvedValue(undefined),
   });
 }
 

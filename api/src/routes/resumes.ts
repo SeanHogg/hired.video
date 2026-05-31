@@ -991,7 +991,7 @@ resumeRoutes.post("/createfromfile", async (c) => {
     content = structured;
   } else if (resumeText) {
     // Reject anything still looking like raw binary before it reaches JSONB.
-    if (resumeText.includes("\u0000") || /^PK\u0003\u0004/.test(resumeText)) {
+    if (resumeText.includes("\u0000") || resumeText.startsWith("PK\u0003\u0004")) {
       return c.json(
         fail(
           "INVALID_RESUME_TEXT",
@@ -1000,6 +1000,9 @@ resumeRoutes.post("/createfromfile", async (c) => {
         422,
       );
     }
+    // Strip the C0 control range (minus tabs/newlines) before the text reaches
+    // JSONB; there is no non-control way to express this character class.
+    // eslint-disable-next-line no-control-regex
     const cleaned = resumeText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     const jsonFromText = tryParseJsonResume(cleaned);
     if (jsonFromText) {
@@ -1078,7 +1081,7 @@ resumeRoutes.post("/createfromtext", async (c) => {
   // string — Postgres JSONB rejects any embedded \u0000 with a cryptic
   // "unsupported Unicode escape sequence" error. Catch that here with a
   // clear message so the user knows to re-upload a different format.
-  if (rawText.includes("\u0000") || /^%PDF/.test(rawText) || /^PK\u0003\u0004/.test(rawText)) {
+  if (rawText.includes("\u0000") || rawText.startsWith("%PDF") || rawText.startsWith("PK\u0003\u0004")) {
     return c.json(
       fail(
         "INVALID_RESUME_TEXT",
@@ -1091,6 +1094,7 @@ resumeRoutes.post("/createfromtext", async (c) => {
 
   // Strip any remaining control characters other than tabs/newlines — they
   // survive JSON transport but break the JSONB column.
+  // eslint-disable-next-line no-control-regex
   const text = rawText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
 
   if (!text || text.trim().length < 10) {

@@ -309,13 +309,6 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
     });
   }
 
-  function buildOrderKey(rows: Row[], ob: unknown): Row[] {
-    // We don't implement actual ordering — just return stable order.
-    // Tests that care about order should seed in the expected order.
-    void ob;
-    return rows;
-  }
-
   function buildCount(rows: Row[], groupBy: unknown, columns: unknown): Row[] {
     if (!groupBy) return [{ c: rows.length }];
     if (isColumn(groupBy)) {
@@ -347,7 +340,6 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
         from(table: unknown) {
           const rows = tableRows(table);
           let filtered = rows;
-          let projected = applySelect(filtered, columns);
           let limited: Row[] | null = null;
           let ordered = false;
           let cond: Predicate | null = null;
@@ -457,10 +449,6 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
             },
           };
           return fromChain;
-
-          // dead code ref below just to silence TS about unused helpers
-          void projected;
-          void buildOrderKey(rows, null);
         },
       };
     },

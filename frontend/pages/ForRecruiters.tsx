@@ -147,7 +147,7 @@ export default function ForRecruiters() {
               <h1 className="text-5xl font-bold mb-6">
                 {t("marketing.recruiters.heroTitle")}
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-8">
                 {t("marketing.recruiters.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -342,7 +342,7 @@ export default function ForRecruiters() {
               <h3 className="text-3xl font-bold mb-4">
                 {t("marketing.recruiters.ctaTitle")}
               </h3>
-              <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-muted-foreground mb-8">
                 {t("marketing.recruiters.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

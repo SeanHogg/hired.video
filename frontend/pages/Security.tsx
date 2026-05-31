@@ -431,7 +431,7 @@ export default function Security() {
                   every control we claim.
                 </span>
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-8">
                 NIST 800-63B identity assurance. OWASP ASVS Level 2. RFC-grade token handling.
                 Phishing-resistant passkeys. Per-device sessions with hard revocation. No mocked
                 claims — every "Implemented" badge below points to code shipping today.

@@ -377,7 +377,21 @@ export default function CourseLearner() {
           </nav>
 
           {/* Active lesson */}
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-4">
+            {/* Persistent course-completion banner. Unlike the one-shot
+                celebration dialog (which only fires on the in-session
+                false→true transition), this stays visible for the whole
+                time the enrollment is passed — so a learner who finishes
+                the last lesson, or returns to a completed course, always
+                has a clear "course complete + certificate" surface in the
+                main column instead of only the small header text.
+                Self-gates on `passed` (DRY rule) — safe to leave mounted. */}
+            <CourseCompletePanel
+              passed={enrollment.passed}
+              courseTitle={course.title}
+              issuesCertificate={course.issuesCertificate}
+              certNumber={data.certificate?.certNumber ?? null}
+            />
             {activeLesson ? (
               <Card>
                 <CardContent className="p-0">
@@ -467,6 +481,63 @@ export default function CourseLearner() {
         certNumber={data.certificate?.certNumber ?? null}
       />
     </AppShell>
+  );
+}
+
+/**
+ * Persistent course-completion panel for the lesson surface. Renders a
+ * prominent "Course complete" card whenever the enrollment is passed,
+ * regardless of which lesson is selected. This is the always-on
+ * counterpart to {@link CourseCompletionDialog} (which only fires once
+ * per session on the false→true flip): it closes the "I finished
+ * everything but there's no way to see it's complete" gap by giving
+ * returning learners a stable completion + certificate affordance.
+ *
+ * Self-gates on `passed` — returns null when the course isn't complete,
+ * so the consumer leaves it mounted unconditionally (DRY rule).
+ */
+function CourseCompletePanel({
+  passed,
+  courseTitle,
+  issuesCertificate,
+  certNumber,
+}: {
+  passed: boolean;
+  courseTitle: string;
+  issuesCertificate: boolean;
+  certNumber: string | null;
+}) {
+  if (!passed) return null;
+  return (
+    <Card className="border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-900">
+      <CardContent className="p-4 flex items-center gap-4 flex-wrap">
+        <div className="h-11 w-11 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+          <Award className="h-6 w-6 text-emerald-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-emerald-900 dark:text-emerald-200">
+            Course complete
+          </p>
+          <p className="text-sm text-emerald-800/80 dark:text-emerald-300/80">
+            You've finished every lesson in {courseTitle}. Your progress is
+            saved{issuesCertificate ? " and your certificate is ready" : ""}.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {certNumber && (
+            <Button asChild size="sm">
+              <a href={`/verify/${certNumber}`} target="_blank" rel="noreferrer">
+                <Award className="h-4 w-4 mr-2" />
+                View certificate
+              </a>
+            </Button>
+          )}
+          <Button asChild size="sm" variant="outline">
+            <a href="/tools?tab=learning">Browse more courses</a>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

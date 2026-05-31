@@ -128,7 +128,7 @@ export default function About() {
                   {t("marketing.about.heroTitle2")}
                 </span>
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-8">
                 {t("marketing.about.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -221,7 +221,7 @@ export default function About() {
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
                   {t("marketing.about.valuesTitle")}
                 </h2>
-                <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                <p className="text-xl text-muted-foreground">
                   {t("marketing.about.valuesSubtitle")}
                 </p>
               </div>
@@ -252,7 +252,7 @@ export default function About() {
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
                   {t("marketing.about.teamTitle")}
                 </h2>
-                <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+                <p className="text-xl text-muted-foreground">
                   {t("marketing.about.teamSubtitle")}
                 </p>
               </div>
@@ -270,7 +270,7 @@ export default function About() {
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
                 {t("marketing.about.techTitle")}
               </h2>
-              <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-12">
                 {t("marketing.about.techSubtitle")}
               </p>
 

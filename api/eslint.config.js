@@ -59,6 +59,10 @@ export default [
       // anti-pattern guard, not a wholesale code-quality pass.
       "no-unused-vars": "off",
       "no-undef": "off",
+      // TypeScript function overloads (multiple signatures before the impl)
+      // read as redeclarations to the base JS rule. tsc already rejects a
+      // genuine duplicate declaration, so disable the false-positive here.
+      "no-redeclare": "off",
     },
   },
 

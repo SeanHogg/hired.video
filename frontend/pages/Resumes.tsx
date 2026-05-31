@@ -896,7 +896,7 @@ export default function Resumes() {
                 <h1 className="text-5xl font-bold mb-6">
                   Transform Your Resume into a Powerful Video Story
                 </h1>
-                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                <p className="text-xl text-muted-foreground mb-8">
                   Stand out from the crowd with AI-powered video resumes that
                   showcase your personality, skills, and experience in ways
                   traditional resumes never could.
@@ -1246,7 +1246,7 @@ export default function Resumes() {
                 <h3 className="text-3xl font-bold mb-4">
                   Ready to Create Your Video Resume?
                 </h3>
-                <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+                <p className="text-muted-foreground mb-8">
                   Join thousands of professionals who have transformed their
                   careers with video resumes. Free to start.
                 </p>

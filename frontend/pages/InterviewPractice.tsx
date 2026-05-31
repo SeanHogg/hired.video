@@ -751,7 +751,7 @@ function Landing() {
           <h1 className="text-5xl font-bold mb-6">
             Practice Interviews. Get Hired Faster.
           </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+          <p className="text-xl text-muted-foreground mb-8">
             Paste any job description and get AI-generated interview questions tailored to the role.
             Record your video answers and receive instant feedback on clarity, confidence, structure, and impact.
           </p>

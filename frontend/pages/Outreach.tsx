@@ -492,7 +492,7 @@ export default function Outreach() {
                 <h1 className="text-5xl font-bold mb-6">
                   {t("messages.connectEngageFollowUp")}
                 </h1>
-                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                <p className="text-xl text-muted-foreground mb-8">
                   {t("messages.outreachValueProp")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">

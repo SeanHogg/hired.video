@@ -97,7 +97,7 @@ async function createMentionNotifications(
   const mentionedUsers = await db
     .select({ id: users.id })
     .from(users)
-    .where(sql`lower(${users.name}) = ANY(ARRAY[${sql.join(mentionedNames.map((n) => sql`${n}`), sql`, `)}])`);
+    .where(inArray(sql`lower(${users.name})`, mentionedNames));
 
   const recipientIds = mentionedUsers.map((u) => u.id);
   if (recipientIds.length === 0) return;

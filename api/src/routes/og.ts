@@ -3,6 +3,8 @@ import { eq, and, sql } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { isUuid } from "../../../shared/value-types.js";
+import { renderCourseCoverSvg } from "../../../shared/course-cover.js";
+import { getCourseDiagram } from "../../../shared/course-diagrams.js";
 
 const {
   videos,
@@ -637,6 +639,39 @@ ogRoutes.get("/articles", async (c) => {
 </svg>`;
 
   return svgResponse(svg, true);
+});
+
+// ─── GET /courses ───────────────────────────────────────────────────────────
+// Deterministic cover card for a course. The seeded Learning Content Library
+// (migration 0131) ships every course with `cover_image_url = NULL`, so the
+// marketplace + /tools Learning grid fell back to a bare GraduationCap icon —
+// the client-side "Auto-generate cover" CTA (#1400) never fires for the
+// system-owned seed library. Migration 0190 backfills `cover_image_url` to
+// this endpoint. Driven by query params (title / category / difficulty) so the
+// URL is stable per course and edge-cacheable for a day. The SVG body is the
+// shared [@shared/course-cover] renderer, so a server-rendered cover is
+// byte-identical to one the creator generates + uploads client-side.
+ogRoutes.get("/courses", async (c) => {
+  const title = (c.req.query("title") || "Course").slice(0, 120);
+  const category = c.req.query("category") || null;
+  const difficulty = c.req.query("difficulty") || null;
+  return svgResponse(renderCourseCoverSvg({ title, category, difficulty }), true);
+});
+
+// ─── GET /lesson-diagram ──────────────────────────────────────────────────────
+// Schematic concept diagram for a seeded course lesson. Embedded into each
+// lesson's `body_md` as a markdown image by migration 0190, so it renders
+// through the existing ReactMarkdown path in CourseLearner with no new renderer
+// wiring (and no XSS surface — SVG inside an <img> can't execute script). The
+// `d` key mirrors the seed lesson slug (`ai-fund-l1`). Unknown keys 404 rather
+// than render a blank card so a typo surfaces in the lesson body immediately.
+ogRoutes.get("/lesson-diagram", async (c) => {
+  const key = c.req.query("d") || "";
+  const diagram = getCourseDiagram(key);
+  if (!diagram) {
+    return c.json({ error: "unknown_diagram" }, 404);
+  }
+  return svgResponse(diagram.svg, true);
 });
 
 function genericCard(line1: string, line2: string): string {

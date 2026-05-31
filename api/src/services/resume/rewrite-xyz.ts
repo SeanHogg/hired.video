@@ -172,7 +172,7 @@ const SKILLS_RESPONSE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const REWRITE_SKILLS_SYSTEM_PROMPT = `You are an expert resume editor. The user gives you a numbered list of skills from one section of their resume. Your job: normalise casing (\"aws\" → \"AWS\", \"javascript\" → \"JavaScript\"), expand ambiguous abbreviations the first time they appear (\"ML\" → \"Machine Learning\"), and dedupe near-synonyms by merging them under one canonical name.
+const REWRITE_SKILLS_SYSTEM_PROMPT = `You are an expert resume editor. The user gives you a numbered list of skills from one section of their resume. Your job: normalise casing ("aws" → "AWS", "javascript" → "JavaScript"), expand ambiguous abbreviations the first time they appear ("ML" → "Machine Learning"), and dedupe near-synonyms by merging them under one canonical name.
 
 Rules:
 - Return a coherent ATS-friendly skill list.

@@ -22,10 +22,11 @@ import type { StudioTemplate } from "@/lib/services/studio-templates-service";
 
 // Service mocks — vi.mock is hoisted, so the spies have to be created via
 // vi.hoisted so the factory below can reference them without a TDZ error.
-const { listMine, updateMock, deleteMock } = vi.hoisted(() => ({
+const { listMine, updateMock, deleteMock, confirmMock } = vi.hoisted(() => ({
   listMine: vi.fn(),
   updateMock: vi.fn(),
   deleteMock: vi.fn(),
+  confirmMock: vi.fn(),
 }));
 vi.mock("@/lib/services/studio-templates-service", async (orig) => {
   const real = await orig<typeof import("@/lib/services/studio-templates-service")>();
@@ -42,6 +43,20 @@ vi.mock("@/lib/services/studio-templates-service", async (orig) => {
 
 vi.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
+}));
+
+// Delete routes through the app's imperative confirmDialog (not window.confirm).
+vi.mock("@/lib/dialogs", async (orig) => {
+  const real = await orig<typeof import("@/lib/dialogs")>();
+  return { ...real, confirmDialog: confirmMock };
+});
+
+// Each template row mounts <ArtifactDetailsSheet>, whose only data dependency
+// is the owner-only permission seam (useEntityDetailsPermission → useAuth).
+// This panel test renders without an <AuthProvider>, so stub the seam — the
+// drawer's gating is exercised by its own tests, not here.
+vi.mock("@/hooks/use-entity-details-permission", () => ({
+  useEntityDetailsPermission: () => ({ canViewStats: false }),
 }));
 
 function makeTemplate(overrides: Partial<StudioTemplate> = {}): StudioTemplate {
@@ -154,15 +169,14 @@ describe("CreatorTemplatesPanel — actions", () => {
     const user = userEvent.setup();
     listMine.mockResolvedValue([makeTemplate()]);
     deleteMock.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    confirmMock.mockResolvedValue(false);
     render(<CreatorTemplatesPanel open={true} onOpenChange={vi.fn()} />);
     const trash = await screen.findByTitle(/Delete this template permanently/i);
     await user.click(trash);
-    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
     expect(deleteMock).not.toHaveBeenCalled();
-    confirmSpy.mockReturnValue(true);
+    confirmMock.mockResolvedValue(true);
     await user.click(trash);
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith("t1"));
-    confirmSpy.mockRestore();
   });
 });

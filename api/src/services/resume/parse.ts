@@ -410,7 +410,7 @@ export function parseResumeWithRegex(
   if (skills.length === 0) {
     for (const line of lines) {
       const techMatch = line.match(
-        /^[⦁•▪\-*]?\s*(?:technologies|tech stack|tools|technical skills)\s*[:\-]\s*(.+)/i,
+        /^[⦁•▪\-*]?\s*(?:technologies|tech stack|tools|technical skills)\s*[:-]\s*(.+)/i,
       );
       if (techMatch) {
         const items = techMatch[1]

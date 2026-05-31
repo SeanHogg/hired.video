@@ -240,3 +240,43 @@ export const peopleApi = {
 export function employeeName(e: Pick<Employee, "firstName" | "lastName">): string {
   return `${e.firstName} ${e.lastName}`.trim();
 }
+
+// ── Generic segment-scoped resource client (DRY) ─────────────────────────────
+// Covers the remaining People-Ops surfaces (objectives, milestones, reviews,
+// pulse, check-ins, syncs, scorecards, meeting-intel, workflows, headcount,
+// pto) without a bespoke client each. Rows are loose records — the
+// ResourceManager descriptor names the columns/fields.
+export type PeopleRecord = Record<string, any>;
+
+export function peopleResource(path: string) {
+  const base = `/api/people/${path}`;
+  return {
+    list: () => apiClient.get<PeopleRecord[]>(base).then((r) => r.data),
+    get: (id: string) => apiClient.get<PeopleRecord>(`${base}/${id}`).then((r) => r.data),
+    create: (body: PeopleRecord) => apiClient.post<PeopleRecord>(base, body).then((r) => r.data),
+    update: (id: string, body: PeopleRecord) => apiClient.put<PeopleRecord>(`${base}/${id}`, body).then((r) => r.data),
+    remove: (id: string) => apiClient.delete<{ deleted: boolean }>(`${base}/${id}`).then((r) => r.data),
+  };
+}
+
+export interface TeamHealth {
+  score: number;
+  dimensions: Record<string, number>;
+  weights: Record<string, number>;
+  headcount: number;
+  sampleSizes: Record<string, number>;
+}
+export const teamHealthApi = {
+  get: () => apiClient.get<TeamHealth>(`/api/people/team-health`).then((r) => r.data),
+};
+
+export interface TcoBreakdown {
+  annualSalary: number; payrollTaxes: number; benefits: number; perks: number;
+  overhead: number; recruiting: number; training: number;
+  totalLoadedCost: number; monthlyLoadedCost: number;
+}
+export const tcoApi = {
+  assumptions: () => apiClient.get<Record<string, number>>(`/api/people/tco/assumptions`).then((r) => r.data),
+  saveAssumptions: (b: Record<string, number>) => apiClient.put<Record<string, number>>(`/api/people/tco/assumptions`, b).then((r) => r.data),
+  calculate: (annualSalary: number) => apiClient.post<TcoBreakdown>(`/api/people/tco/calculate`, { annualSalary }).then((r) => r.data),
+};

@@ -73,7 +73,7 @@ export default function ChromeExtension() {
               <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Work Smarter on Every Job Board
               </h1>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
+              <p className="text-xl text-muted-foreground mb-8">
                 Two purpose-built Chrome extensions — one for job seekers, one for recruiters and companies.
                 Capture jobs, candidates, and companies from LinkedIn, Indeed, Glassdoor, Workday and more without
                 leaving the page you're on.
@@ -190,7 +190,7 @@ export default function ChromeExtension() {
                   <Briefcase className="h-3 w-3 mr-1" /> Job Seeker Extension
                 </Badge>
                 <h2 className="text-3xl font-bold">Find a Job, Score It, Tailor Your Resume</h2>
-                <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
+                <p className="text-muted-foreground mt-3">
                   The side panel watches the page you're on. When it detects a job posting, you're one click away
                   from tracking it, scoring it against your resume, and generating a tailored variation.
                 </p>
@@ -246,7 +246,7 @@ export default function ChromeExtension() {
                   <Users className="h-3 w-3 mr-1" /> Recruiter Extension
                 </Badge>
                 <h2 className="text-3xl font-bold">Source, Track, Reach Out, and Place Candidates Without Leaving the Browser</h2>
-                <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
+                <p className="text-muted-foreground mt-3">
                   Six tabs in one side panel: Now (active page), Pipeline (kanban), 🔖 Tracked jobs, Candidates
                   (searchable pool), Companies, and Settings. Everything syncs to your hired.video recruiter
                   workspace — and to your teammates if you're on a multi-seat plan.
@@ -329,7 +329,7 @@ export default function ChromeExtension() {
           <section className="py-16 px-6 bg-gray-50">
             <div className="text-center">
               <h2 className="text-3xl font-bold mb-4">Works Everywhere Your Workflow Lives</h2>
-              <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-muted-foreground mb-8">
                 Both extensions auto-detect jobs, profiles, and companies across 16+ major sites — and fall back to
                 generic detection for everything else.
               </p>

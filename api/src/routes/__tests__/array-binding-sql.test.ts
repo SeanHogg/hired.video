@@ -70,6 +70,9 @@ describe("inArray() vs raw `= ANY(${array})` — SQL-shape contract", () => {
     // tuple wrapper. This test pins the structural difference so a future
     // Drizzle upgrade can't silently restore the broken shape.
     const { sql } = await import("drizzle-orm");
+    // Deliberately reproduces the banned `= ANY(${array})` form to document why
+    // it's broken; this is the regression counter-example, not production SQL.
+    // eslint-disable-next-line no-restricted-syntax
     const buggy = sql`${schema.users.id} = ANY(${[UUID_A, UUID_B]})`;
     const compiled = dialect.sqlToQuery(buggy);
     assert.match(compiled.sql, /= ANY\(\(\$\d+, \$\d+\)\)/i);

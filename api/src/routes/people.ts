@@ -25,6 +25,19 @@ import {
   defaultPeopleOpsServiceDeps,
   type RosterEmployee,
 } from "../domains/people-ops/peopleOpsService.js";
+import {
+  objectivesRouter,
+  companyMilestonesRouter,
+  performanceReviewsRouter,
+} from "./people-strategy.js";
+import { pulseChecksRouter, checkInsRouter, teamHealthRouter } from "./people-engagement.js";
+import {
+  weeklySyncsRouter,
+  scorecardsRouter,
+  meetingIntelRouter,
+  workflowsRouter,
+} from "./people-cadence.js";
+import { tcoRouter, rolesRouter, headcountPlansRouter, ptoRouter } from "./people-cost.js";
 
 const buildService = () => new PeopleOpsService(defaultPeopleOpsServiceDeps());
 
@@ -431,5 +444,23 @@ peopleRoutes.get("/action-items", async (c) => {
     return mapError(c, e);
   }
 });
+
+// ── Cluster sub-routers (PO-3, PO-5..PO-11, TA-4..6) ─────────────────────────
+// Mounted after peopleOpsContext (applied via use("*") above), so each inherits
+// the resolved segment + paid gate and reads c.var.peopleCtx.
+peopleRoutes.route("/strategic-objectives", objectivesRouter);
+peopleRoutes.route("/milestones", companyMilestonesRouter);
+peopleRoutes.route("/performance-reviews", performanceReviewsRouter);
+peopleRoutes.route("/pulse-checks", pulseChecksRouter);
+peopleRoutes.route("/scheduled-check-ins", checkInsRouter);
+peopleRoutes.route("/team-health", teamHealthRouter);
+peopleRoutes.route("/weekly-syncs", weeklySyncsRouter);
+peopleRoutes.route("/scorecards", scorecardsRouter);
+peopleRoutes.route("/meeting-intelligence", meetingIntelRouter);
+peopleRoutes.route("/workflows", workflowsRouter);
+peopleRoutes.route("/tco", tcoRouter);
+peopleRoutes.route("/headcount/roles", rolesRouter);
+peopleRoutes.route("/headcount/plans", headcountPlansRouter);
+peopleRoutes.route("/pto", ptoRouter);
 
 export default peopleRoutes;

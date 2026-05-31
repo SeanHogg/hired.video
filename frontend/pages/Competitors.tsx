@@ -132,7 +132,7 @@ export default function Competitors() {
             <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
               Hired.Video vs Competition
             </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
+            <p className="text-xl text-muted-foreground mb-8">
               How Hired.Video stacks up across three categories at once —
               recruiting platforms (LOXO, LinkedIn Recruiter, Greenhouse,
               Bullhorn, HireVue, VidCruiter), AI studios (Synthesia, HeyGen,

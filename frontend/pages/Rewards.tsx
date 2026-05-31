@@ -104,7 +104,7 @@ export default function RewardsPage() {
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
           Earn points. Win badges. Cash out.
         </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-lg text-muted-foreground">
           Every meaningful step on hired.video earns you points — applications,
           tailored resumes, daily streaks, posts to the feed. Trade them for AI credits,
           a free month of Pro, or a real-world gift card.
@@ -288,7 +288,7 @@ export default function RewardsPage() {
       <Card className="p-8 mt-12 text-center bg-gradient-to-br from-primary/10 via-primary/5 to-background">
         <Trophy className="h-10 w-10 mx-auto text-primary mb-3" />
         <h2 className="text-2xl font-bold mb-2">Start earning today</h2>
-        <p className="text-muted-foreground mb-5 max-w-xl mx-auto">
+        <p className="text-muted-foreground mb-5">
           Sign in to track your balance, see your badges, and cash out the moment you hit
           a redemption tier.
         </p>

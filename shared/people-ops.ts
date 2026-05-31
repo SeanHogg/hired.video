@@ -125,3 +125,70 @@ export interface KeyResult {
   currentValue?: number;
   unit?: string;
 }
+
+// ── Strategic Objectives & Milestones (PO-5) ─────────────────────────────────
+export const OBJECTIVE_CATEGORIES = [
+  "strategic", "operational", "financial", "talent", "customer", "product", "market", "revenue", "team", "fundraising",
+] as const;
+export type ObjectiveCategory = (typeof OBJECTIVE_CATEGORIES)[number];
+export const OBJECTIVE_TIMEFRAMES = ["quarterly", "annual", "multi_year"] as const;
+export type ObjectiveTimeframe = (typeof OBJECTIVE_TIMEFRAMES)[number];
+export const OBJECTIVE_STATUSES = ["active", "completed", "archived", "cancelled", "on_hold"] as const;
+export type ObjectiveStatus = (typeof OBJECTIVE_STATUSES)[number];
+export const OUTCOME_STATUSES = ["not_started", "in_progress", "at_risk", "completed"] as const;
+export type OutcomeStatus = (typeof OUTCOME_STATUSES)[number];
+export const MILESTONE_STATUSES = ["pending", "in_progress", "completed", "missed"] as const;
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
+export const COMPANY_MILESTONE_CATEGORIES = [
+  "product", "revenue", "funding", "team", "customer", "operational", "partnership", "compliance",
+] as const;
+export type CompanyMilestoneCategory = (typeof COMPANY_MILESTONE_CATEGORIES)[number];
+export const COMPANY_MILESTONE_STATUSES = [
+  "not_started", "in_progress", "completed", "missed", "at_risk", "cancelled",
+] as const;
+export type CompanyMilestoneStatus = (typeof COMPANY_MILESTONE_STATUSES)[number];
+
+// ── Pulse Checks & Scheduled Check-ins (PO-6) ────────────────────────────────
+export const PULSE_FREQUENCIES = ["daily", "weekly", "biweekly", "monthly"] as const;
+export type PulseFrequency = (typeof PULSE_FREQUENCIES)[number];
+export const PULSE_QUESTION_TYPES = ["text", "rating", "multiple_choice", "yes_no"] as const;
+export type PulseQuestionType = (typeof PULSE_QUESTION_TYPES)[number];
+export interface PulseQuestionDef {
+  id: string;
+  question: string;
+  type: PulseQuestionType;
+  options?: string[];
+  required?: boolean;
+}
+
+// ── Weekly Syncs & Scorecards (PO-7) ─────────────────────────────────────────
+export const SYNC_STATUSES = ["scheduled", "in_progress", "completed", "cancelled"] as const;
+export type SyncStatus = (typeof SYNC_STATUSES)[number];
+export const SCORECARD_CATEGORIES = [
+  "okr", "kpi", "health", "team", "product", "financial", "operations", "sales", "pmf", "engineering", "customer", "growth",
+] as const;
+export type ScorecardCategory = (typeof SCORECARD_CATEGORIES)[number];
+
+// ── Workflow Automation (PO-10) ──────────────────────────────────────────────
+export const WORKFLOW_TRIGGER_TYPES = ["schedule", "event", "condition", "milestone", "metric", "manual"] as const;
+export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
+export const WORKFLOW_ACTION_TYPES = [
+  "notify", "create_task", "escalate", "send_email", "send_notification", "slack_message", "create_meeting",
+] as const;
+export type WorkflowActionType = (typeof WORKFLOW_ACTION_TYPES)[number];
+export const WORKFLOW_EXECUTION_STATUSES = ["pending", "running", "succeeded", "failed", "cancelled"] as const;
+export type WorkflowExecutionStatus = (typeof WORKFLOW_EXECUTION_STATUSES)[number];
+
+// ── Talent-cost: TCO / Headcount / PTO (TA-4/5/6) ────────────────────────────
+export const PTO_TYPES = ["vacation", "sick", "parental", "bereavement", "unpaid"] as const;
+export type PtoType = (typeof PTO_TYPES)[number];
+export const PTO_STATUSES = ["pending", "approved", "rejected"] as const;
+export type PtoStatus = (typeof PTO_STATUSES)[number];
+
+/** Default per-segment TCO assumptions (TA-4) — match the source's 8/25/7/7%. */
+export const DEFAULT_TCO_ASSUMPTIONS = {
+  payrollTaxesPct: 0.08,
+  benefitsPct: 0.25,
+  perksPct: 0.07,
+  overheadPct: 0.07,
+} as const;

@@ -120,7 +120,7 @@ export default function Careers() {
                 </span>
               </h1>
 
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
+              <p className="text-xl text-muted-foreground mb-8">
                 {t("marketing.careers.heroSubtitle")}
               </p>
 
@@ -186,7 +186,7 @@ export default function Careers() {
             <section id="company-culture" className="mb-12">
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold mb-4">{t("marketing.careers.whyTitle")}</h2>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                <p className="text-lg text-muted-foreground">
                   {t("marketing.careers.whySubtitle")}
                 </p>
               </div>
@@ -438,7 +438,7 @@ export default function Careers() {
                   <h2 className="text-2xl font-bold mb-4">
                     Don't See the Perfect Role?
                   </h2>
-                  <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
+                  <p className="text-muted-foreground mb-6">
                     We're always looking for talented individuals who share our
                     passion for innovation. Send us your resume and let us know
                     how you'd like to contribute to our mission.

@@ -520,7 +520,7 @@ export default function Companies() {
               <h1 className="text-5xl font-bold mb-6">
                 Discover Your Next Opportunity
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground mb-8">
                 Explore company cultures, values, and job opportunities. Follow
                 companies you're interested in and get notified about new
                 openings.
@@ -575,7 +575,7 @@ export default function Companies() {
               <div className="text-center mb-8">
                 <span className="text-sm font-semibold text-primary uppercase tracking-wide">For employers</span>
                 <h2 className="text-3xl font-bold mt-2">Run your whole team with People Operations</h2>
-                <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
+                <p className="text-muted-foreground mt-2">
                   hired.video isn't just where you hire — it's where you run the team. Roster &amp; org chart,
                   1:1s, performance, goals, and team health, plus the video-first hiring you already know.
                   Multi-tenant and <strong>embeddable</strong> into your own tools.

@@ -399,7 +399,7 @@ describe("resume-roast: mock roast heuristics", () => {
   function scoreMockResume(resumeText: string) {
     const lines = resumeText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
-    const bulletLines = lines.filter((l) => /^[\-\u2022\u25AA\u25B8\u25BA\u25E6\u2023\*\d\.]+\s+/.test(l));
+    const bulletLines = lines.filter((l) => /^[-\u2022\u25AA\u25B8\u25BA\u25E6\u2023*\d.]+\s+/.test(l));
     const hasBullets = bulletLines.length > 0;
     const rawMetrics = Array.from(resumeText.matchAll(/\b\d+(?:\.\d+)?(?:%|k|m|b|x)?\b/gi)).map((m) => m[0]);
     const metrics = rawMetrics.filter((m) => m.replace(/\D/g, "").length < 10);

@@ -237,6 +237,24 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Track company, team, and individual OKRs with key-result progress that rolls up automatically and flags at-risk goals.",
     keywords: "OKR software, goals tracking, key results, objectives, people operations, at-risk goals",
   },
+  "/people": {
+    title: "People Operations — the CHRO workspace — hired.video",
+    description:
+      "Run your whole team from one workspace: roster & org chart, 1:1s, goals/OKRs, performance reviews, team health, pulse checks, weekly syncs, scorecards, workflow automation, headcount planning, TCO, and PTO.",
+    keywords: "people operations, CHRO workspace, HRIS, performance, OKRs, team health, headcount planning, PTO",
+  },
+  "/people/team-health": {
+    title: "Team Health — hired.video People Operations",
+    description:
+      "A composite team-health score across engagement, performance, goal alignment, review health, and communication — recomputed from live data.",
+    keywords: "team health score, employee engagement, people analytics, attrition risk",
+  },
+  "/people/tco": {
+    title: "Employee TCO Calculator — hired.video People Operations",
+    description:
+      "Turn a salary into fully-loaded cost with your company's payroll-tax, benefits, perks, and overhead assumptions plus recruiting and training factors.",
+    keywords: "employee total cost of ownership, fully loaded cost, TCO calculator, headcount cost",
+  },
   // Bullhorn-class agency back-office (#1349). Pitches the workforce
   // module — placements, timesheets, invoice + payout derivation, doc
   // vault, desk margin reporting — to staffing-agency operators.
