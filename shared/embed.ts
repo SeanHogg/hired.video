@@ -52,6 +52,13 @@ export const EMBED_SURFACES: EmbedSurface[] = [
     description: "1:1 cadence with shared agendas and action items.",
     status: "available",
   },
+  {
+    key: "goals",
+    label: "Goals & OKRs",
+    scope: "people:goals",
+    description: "Team OKRs with key-result progress rollup.",
+    status: "available",
+  },
 
   // ── Reuse existing hired.video capability (no rebuild) ─────────────────────
   {

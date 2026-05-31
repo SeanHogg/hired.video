@@ -15,6 +15,8 @@ import {
   EMPLOYEE_STATUSES,
   ONE_ON_ONE_STATUSES,
   MEETING_TYPES,
+  GOAL_STATUSES,
+  GOAL_PRIORITIES,
 } from "../../../shared/people-ops.js";
 import { peopleOpsContext, type PeopleEnv } from "../middleware/peopleOps.js";
 import {
@@ -107,6 +109,28 @@ const ActionItemsSchema = z.object({
     .min(1)
     .max(50),
 });
+
+const KeyResultSchema = z.object({
+  id: z.string().min(1),
+  description: z.string().min(1).max(500),
+  progress: z.number().min(0).max(100),
+  targetValue: z.number().optional(),
+  currentValue: z.number().optional(),
+  unit: z.string().max(40).optional(),
+});
+const GoalWriteSchema = z.object({
+  employeeId: z.string().uuid(),
+  title: z.string().min(1).max(300),
+  description: z.string().max(5000).nullish(),
+  status: z.enum(GOAL_STATUSES).optional(),
+  priority: z.enum(GOAL_PRIORITIES).optional(),
+  dueDate: z.coerce.date().nullish(),
+  progress: z.number().int().min(0).max(100).optional(),
+  category: z.string().max(120).nullish(),
+  keyResults: z.array(KeyResultSchema).max(20).optional(),
+  milestoneId: z.string().uuid().nullish(),
+});
+const GoalUpdateSchema = GoalWriteSchema.partial();
 
 function salaryToCents(salary: number | null | undefined): number | null | undefined {
   if (salary === undefined) return undefined;
@@ -333,6 +357,61 @@ peopleRoutes.post("/one-on-ones/:id/action-items", async (c) => {
       parsed.data.items,
     );
     return c.json(success(rows), 201);
+  } catch (e) {
+    return mapError(c, e);
+  }
+});
+
+// ── Goals / OKRs (PO-4) ──────────────────────────────────────────────────────
+peopleRoutes.get("/goals", async (c) => {
+  try {
+    const rows = await buildService().listGoals(c.var.peopleCtx, {
+      employeeId: c.req.query("employeeId") || undefined,
+      status: (c.req.query("status") as any) || undefined,
+      category: c.req.query("category") || undefined,
+    });
+    return c.json(success(rows));
+  } catch (e) {
+    return mapError(c, e);
+  }
+});
+
+peopleRoutes.post("/goals", async (c) => {
+  const parsed = GoalWriteSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+  }
+  try {
+    return c.json(success(await buildService().createGoal(c.var.peopleCtx, parsed.data)), 201);
+  } catch (e) {
+    return mapError(c, e);
+  }
+});
+
+peopleRoutes.get("/goals/:id", async (c) => {
+  try {
+    return c.json(success(await buildService().getGoal(c.var.peopleCtx, c.req.param("id"))));
+  } catch (e) {
+    return mapError(c, e);
+  }
+});
+
+peopleRoutes.put("/goals/:id", async (c) => {
+  const parsed = GoalUpdateSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+  }
+  try {
+    return c.json(success(await buildService().updateGoal(c.var.peopleCtx, c.req.param("id"), parsed.data)));
+  } catch (e) {
+    return mapError(c, e);
+  }
+});
+
+peopleRoutes.delete("/goals/:id", async (c) => {
+  try {
+    await buildService().deleteGoal(c.var.peopleCtx, c.req.param("id"));
+    return c.json(success({ deleted: true }));
   } catch (e) {
     return mapError(c, e);
   }

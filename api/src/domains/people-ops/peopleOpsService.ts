@@ -39,7 +39,15 @@ import {
   type ActionItemFilters,
   type NewActionItemInput,
 } from "../../repositories/peopleActionItemsRepository.js";
-import type { OneOnOneAgendaItem } from "../../../../shared/people-ops.js";
+import {
+  PeopleGoalsRepository,
+  type IPeopleGoalsRepository,
+  type GoalRow,
+  type GoalFilters,
+  type NewGoalInput,
+  type UpdateGoalInput,
+} from "../../repositories/peopleGoalsRepository.js";
+import type { OneOnOneAgendaItem, KeyResult } from "../../../../shared/people-ops.js";
 import type { PeopleSegmentScope } from "../../services/people-ops/segment.js";
 
 export type ServiceErrorCode =
@@ -61,6 +69,7 @@ export interface PeopleOpsServiceDeps {
   employees: IPeopleEmployeesRepository;
   oneOnOnes: IPeopleOneOnOnesRepository;
   actionItems: IPeopleActionItemsRepository;
+  goals: IPeopleGoalsRepository;
   /** Active company members (the billable-seat set) for the segment's
    *  company — drives roster materialization + billability. */
   getActiveCompanyMembers: (companyId: string) => Promise<MemberIdentity[]>;
@@ -106,9 +115,21 @@ export function defaultPeopleOpsServiceDeps(): PeopleOpsServiceDeps {
     employees: new PeopleEmployeesRepository(db),
     oneOnOnes: new PeopleOneOnOnesRepository(db),
     actionItems: new PeopleActionItemsRepository(db),
+    goals: new PeopleGoalsRepository(db),
     getActiveCompanyMembers: fetchActiveCompanyMembers,
     now: () => new Date(),
   };
+}
+
+/** Goal progress rolls up from its key results (avg of their progress) when
+ *  any exist; otherwise the goal's own progress stands. Pure + deterministic. */
+export function rollupGoalProgress(keyResults: KeyResult[] | null | undefined, fallback: number): number {
+  if (!keyResults || keyResults.length === 0) return clampPct(fallback);
+  const avg = keyResults.reduce((sum, kr) => sum + clampPct(kr.progress ?? 0), 0) / keyResults.length;
+  return Math.round(avg);
+}
+function clampPct(n: number): number {
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 // ── DTOs ─────────────────────────────────────────────────────────────────────
@@ -135,6 +156,8 @@ export interface OneOnOneTemplate {
   name: string;
   agenda: OneOnOneAgendaItem[];
 }
+
+export type GoalWithRisk = GoalRow & { atRisk: boolean };
 
 const ONE_ON_ONE_TEMPLATES: OneOnOneTemplate[] = [
   {
@@ -470,6 +493,61 @@ export class PeopleOpsService {
       oneOnOneId,
     }));
     return this.deps.actionItems.insertMany(scope, inputs);
+  }
+
+  // ── Goals / OKRs (PO-4) ─────────────────────────────────────────────────────
+  async listGoals(s: PeopleSegmentScope, filters?: GoalFilters): Promise<GoalWithRisk[]> {
+    const rows = await this.deps.goals.list(this.scope(s), filters);
+    return rows.map((g) => this.withRisk(g));
+  }
+
+  async getGoal(s: PeopleSegmentScope, id: string): Promise<GoalWithRisk> {
+    const row = await this.deps.goals.findById(this.scope(s), id);
+    if (!row) throw new PeopleOpsServiceError("NOT_FOUND", "Goal not found.");
+    return this.withRisk(row);
+  }
+
+  async createGoal(s: PeopleSegmentScope, input: NewGoalInput): Promise<GoalWithRisk> {
+    const scope = this.scope(s);
+    await this.assertEmployeeInSegment(scope, input.employeeId, "goal owner");
+    const progress = rollupGoalProgress(input.keyResults, input.progress ?? 0);
+    const row = await this.deps.goals.insert(scope, { ...input, progress });
+    return this.withRisk(row);
+  }
+
+  async updateGoal(s: PeopleSegmentScope, id: string, input: UpdateGoalInput): Promise<GoalWithRisk> {
+    const scope = this.scope(s);
+    const current = await this.deps.goals.findById(scope, id);
+    if (!current) throw new PeopleOpsServiceError("NOT_FOUND", "Goal not found.");
+    if (input.employeeId) await this.assertEmployeeInSegment(scope, input.employeeId, "goal owner");
+    // Recompute rollup whenever key results change (or progress is given).
+    const patch: UpdateGoalInput = { ...input };
+    if (input.keyResults !== undefined || input.progress !== undefined) {
+      const krs = input.keyResults ?? (current.keyResults as KeyResult[]);
+      patch.progress = rollupGoalProgress(krs, input.progress ?? current.progress);
+    }
+    const row = await this.deps.goals.update(scope, id, patch);
+    if (!row) throw new PeopleOpsServiceError("NOT_FOUND", "Goal not found.");
+    return this.withRisk(row);
+  }
+
+  async deleteGoal(s: PeopleSegmentScope, id: string): Promise<void> {
+    const scope = this.scope(s);
+    await this.getGoal(s, id);
+    await this.deps.goals.remove(scope, id);
+  }
+
+  /** At-risk = explicitly flagged, blocked, or past due and not yet complete.
+   *  Deterministic (PO-4 acceptance: surfaced, not just claimed). */
+  private withRisk(g: GoalRow): GoalWithRisk {
+    const now = this.now();
+    const pastDue =
+      g.dueDate != null &&
+      new Date(g.dueDate).getTime() < now.getTime() &&
+      g.status !== "completed" &&
+      g.status !== "cancelled";
+    const atRisk = g.status === "at_risk" || g.status === "blocked" || pastDue;
+    return { ...g, atRisk };
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────

@@ -231,6 +231,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "A recurring 1:1 cadence with shared agendas and follow-up action items so a manager never drops a 1:1.",
     keywords: "1 on 1 meetings, 1:1 software, manager cadence, action items, people operations",
   },
+  "/people/goals": {
+    title: "Goals & OKRs — hired.video People Operations",
+    description:
+      "Track company, team, and individual OKRs with key-result progress that rolls up automatically and flags at-risk goals.",
+    keywords: "OKR software, goals tracking, key results, objectives, people operations, at-risk goals",
+  },
   // Bullhorn-class agency back-office (#1349). Pitches the workforce
   // module — placements, timesheets, invoice + payout derivation, doc
   // vault, desk margin reporting — to staffing-agency operators.

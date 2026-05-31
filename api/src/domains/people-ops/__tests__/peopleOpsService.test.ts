@@ -36,6 +36,13 @@ import type {
   ActionItemFilters,
   NewActionItemInput,
 } from "../../../repositories/peopleActionItemsRepository.js";
+import type {
+  IPeopleGoalsRepository,
+  GoalRow,
+  GoalFilters,
+  NewGoalInput,
+  UpdateGoalInput,
+} from "../../../repositories/peopleGoalsRepository.js";
 import type { PeopleSegmentScope } from "../../../services/people-ops/segment.js";
 
 let _id = 0;
@@ -208,18 +215,65 @@ class FakeActionItems implements IPeopleActionItemsRepository {
 
 type Member = { userId: string; firstName: string; lastName: string; email: string | null };
 
+class FakeGoals implements IPeopleGoalsRepository {
+  rows: GoalRow[] = [];
+  async list(s: SegmentScope, f: GoalFilters = {}) {
+    let out = this.rows.filter((r) => inScope(r, s));
+    if (f.employeeId) out = out.filter((r) => r.employeeId === f.employeeId);
+    if (f.status) out = out.filter((r) => r.status === f.status);
+    return out;
+  }
+  async findById(s: SegmentScope, id: string) {
+    return this.rows.find((r) => r.id === id && inScope(r, s)) ?? null;
+  }
+  async insert(s: SegmentScope, input: NewGoalInput) {
+    const row = {
+      id: uid(),
+      tenantId: s.tenantId,
+      segmentId: s.segmentId,
+      employeeId: input.employeeId,
+      milestoneId: input.milestoneId ?? null,
+      title: input.title,
+      description: input.description ?? null,
+      status: input.status ?? "not_started",
+      priority: input.priority ?? "medium",
+      dueDate: input.dueDate ?? null,
+      progress: input.progress ?? 0,
+      category: input.category ?? null,
+      keyResults: input.keyResults ?? [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as GoalRow;
+    this.rows.push(row);
+    return row;
+  }
+  async update(s: SegmentScope, id: string, input: UpdateGoalInput) {
+    const idx = this.rows.findIndex((r) => r.id === id && inScope(r, s));
+    if (idx < 0) return null;
+    this.rows[idx] = { ...this.rows[idx], ...input } as GoalRow;
+    return this.rows[idx];
+  }
+  async remove(s: SegmentScope, id: string) {
+    const before = this.rows.length;
+    this.rows = this.rows.filter((r) => !(r.id === id && inScope(r, s)));
+    return this.rows.length < before;
+  }
+}
+
 function build(members: Member[] = []) {
   const employees = new FakeEmployees();
   const oneOnOnes = new FakeOneOnOnes();
   const actionItems = new FakeActionItems();
+  const goals = new FakeGoals();
   const svc = new PeopleOpsService({
     employees,
     oneOnOnes,
     actionItems,
+    goals,
     getActiveCompanyMembers: async () => members,
     now: () => new Date("2026-06-01T00:00:00Z"),
   });
-  return { svc, employees, oneOnOnes, actionItems };
+  return { svc, employees, oneOnOnes, actionItems, goals };
 }
 
 const scopeA: PeopleSegmentScope = {
@@ -450,5 +504,75 @@ describe("PeopleOpsService — 1:1s (PO-2)", () => {
 
     await ctx.svc.deleteOneOnOne(scopeA, s.id);
     assert.equal((await ctx.svc.listActionItems(scopeA, { oneOnOneId: s.id })).length, 0);
+  });
+});
+
+describe("PeopleOpsService — Goals / OKRs (PO-4)", () => {
+  let ctx: ReturnType<typeof build>;
+  let empId: string;
+
+  beforeEach(async () => {
+    ctx = build();
+    empId = (await ctx.svc.createEmployee(scopeA, baseEmp({ email: "ic@a.com" }))).id;
+  });
+
+  it("rolls up goal progress from the average of key-result progress", async () => {
+    const goal = await ctx.svc.createGoal(scopeA, {
+      employeeId: empId,
+      title: "Ship v2",
+      keyResults: [
+        { id: "kr1", description: "A", progress: 100 },
+        { id: "kr2", description: "B", progress: 0 },
+        { id: "kr3", description: "C", progress: 50 },
+      ],
+    });
+    assert.equal(goal.progress, 50); // (100+0+50)/3
+  });
+
+  it("recomputes rollup on key-result update", async () => {
+    const goal = await ctx.svc.createGoal(scopeA, {
+      employeeId: empId,
+      title: "Hire 2",
+      keyResults: [{ id: "kr1", description: "A", progress: 20 }],
+    });
+    const updated = await ctx.svc.updateGoal(scopeA, goal.id, {
+      keyResults: [
+        { id: "kr1", description: "A", progress: 80 },
+        { id: "kr2", description: "B", progress: 100 },
+      ],
+    });
+    assert.equal(updated.progress, 90);
+  });
+
+  it("flags a past-due, incomplete goal as at-risk (deterministic)", async () => {
+    const overdue = await ctx.svc.createGoal(scopeA, {
+      employeeId: empId,
+      title: "Late",
+      dueDate: new Date("2026-01-01T00:00:00Z"), // before the fixed now (2026-06-01)
+      status: "in_progress",
+    });
+    assert.equal(overdue.atRisk, true);
+    const future = await ctx.svc.createGoal(scopeA, {
+      employeeId: empId,
+      title: "On track",
+      dueDate: new Date("2026-12-01T00:00:00Z"),
+      status: "in_progress",
+    });
+    assert.equal(future.atRisk, false);
+  });
+
+  it("rejects a goal owner from another segment (VALIDATION_ERROR)", async () => {
+    await assert.rejects(
+      () => ctx.svc.createGoal(scopeB, { employeeId: empId, title: "Cross" }),
+      (e) => e instanceof PeopleOpsServiceError && e.code === "VALIDATION_ERROR",
+    );
+  });
+
+  it("cannot read another segment's goal", async () => {
+    const goal = await ctx.svc.createGoal(scopeA, { employeeId: empId, title: "Secret" });
+    await assert.rejects(
+      () => ctx.svc.getGoal(scopeB, goal.id),
+      (e) => e instanceof PeopleOpsServiceError && e.code === "NOT_FOUND",
+    );
   });
 });

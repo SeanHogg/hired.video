@@ -90,3 +90,38 @@ export const ACTION_ITEM_SOURCES = [
   "manual",
 ] as const;
 export type ActionItemSource = (typeof ACTION_ITEM_SOURCES)[number];
+
+// ── Goals / OKRs (PO-4) ──────────────────────────────────────────────────────
+export const GOAL_STATUSES = [
+  "not_started",
+  "in_progress",
+  "completed",
+  "on_hold",
+  "blocked",
+  "cancelled",
+  "at_risk",
+] as const;
+export type GoalStatus = (typeof GOAL_STATUSES)[number];
+
+export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  completed: "Completed",
+  on_hold: "On hold",
+  blocked: "Blocked",
+  cancelled: "Cancelled",
+  at_risk: "At risk",
+};
+
+export const GOAL_PRIORITIES = ["low", "medium", "high", "critical"] as const;
+export type GoalPriority = (typeof GOAL_PRIORITIES)[number];
+
+/** A single key result on a goal (stored as an ordered JSON array). */
+export interface KeyResult {
+  id: string;
+  description: string;
+  progress: number; // 0–100
+  targetValue?: number;
+  currentValue?: number;
+  unit?: string;
+}

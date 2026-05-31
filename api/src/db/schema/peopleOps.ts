@@ -38,7 +38,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { companyProfiles } from "./companies.js";
 import { users, accountInvitations } from "./users.js";
-import type { OneOnOneAgendaItem } from "../../../../shared/people-ops.js";
+import type { OneOnOneAgendaItem, KeyResult } from "../../../../shared/people-ops.js";
 
 // ── Tenancy ──────────────────────────────────────────────────────────────
 export const peopleTenants = pgTable(
@@ -256,3 +256,44 @@ export type NewPeopleOneOnOne = typeof peopleOneOnOnes.$inferInsert;
 // (tenant_id, segment_id, assignee_employee_id, source_type, one_on_one_id)
 // in migration 0186 so a CHRO action item and a personal to-do live in one
 // inbox. See schema/productivity.ts + repositories/peopleActionItemsRepository.ts.
+
+// ── Goals / OKRs (PO-4) ──────────────────────────────────────────────────────
+// An OKR owned by a roster employee. key_results is an ordered JSON array; the
+// goal's progress rolls up from them (computed in the service). Optional
+// milestone_id links into the Strategy surface (objectives/milestones, #1814).
+export const peopleGoals = pgTable(
+  "people_goals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => peopleTenants.id, { onDelete: "cascade" }),
+    segmentId: uuid("segment_id")
+      .notNull()
+      .references(() => peopleSegments.id, { onDelete: "cascade" }),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => peopleEmployees.id, { onDelete: "cascade" }),
+    // → people_company_milestones (lands with the Strategy surface, #1814).
+    milestoneId: uuid("milestone_id"),
+    title: varchar("title", { length: 300 }).notNull(),
+    description: text("description"),
+    // not_started | in_progress | completed | on_hold | blocked | cancelled | at_risk
+    status: varchar("status", { length: 16 }).notNull().default("not_started"),
+    // low | medium | high | critical
+    priority: varchar("priority", { length: 16 }).notNull().default("medium"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    progress: integer("progress").notNull().default(0), // 0–100 (rolled up from key results)
+    category: varchar("category", { length: 120 }),
+    keyResults: jsonb("key_results").$type<KeyResult[]>().default([]).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    byEmployee: index("idx_people_goals_employee").on(t.tenantId, t.segmentId, t.employeeId),
+    byStatus: index("idx_people_goals_status").on(t.tenantId, t.segmentId, t.status),
+  }),
+);
+
+export type PeopleGoal = typeof peopleGoals.$inferSelect;
+export type NewPeopleGoal = typeof peopleGoals.$inferInsert;

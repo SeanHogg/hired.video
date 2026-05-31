@@ -95,6 +95,25 @@ embedApiRoutes.get("/v1/:view", async (c) => {
         }),
       );
     }
+    if (view === "goals") {
+      const [goals, employees] = await Promise.all([svc.listGoals(scope), svc.listEmployees(scope)]);
+      const nameOf = new Map(employees.map((e) => [e.id, `${e.firstName} ${e.lastName}`.trim()]));
+      return c.json(
+        success({
+          displayName: scope.displayName,
+          goals: goals.map((g) => ({
+            id: g.id,
+            title: g.title,
+            ownerName: nameOf.get(g.employeeId) ?? "—",
+            status: g.status,
+            priority: g.priority,
+            progress: g.progress,
+            atRisk: g.atRisk,
+            dueDate: g.dueDate,
+          })),
+        }),
+      );
+    }
     // one-on-ones
     const [sessions, employees] = await Promise.all([
       svc.listOneOnOnes(scope),
@@ -230,6 +249,14 @@ function FRAME_HTML(view: string, key: string): string {
           '<div style="margin-bottom:12px"><span class=stat><b>'+d.metrics.totalHeadcount+'</b> <span class=muted>total</span></span>'+
           '<span class=stat><b>'+d.metrics.activeHeadcount+'</b> <span class=muted>active</span></span></div>'+
           (rows?'<table><thead><tr><th>Name</th><th>Position</th><th>Department</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>':'<p class=muted>No team members yet.</p>');
+      } else if(view==='goals'){
+        var rows=(d.goals||[]).map(function(g){
+          var bar='<div style="background:#e5e7eb;border-radius:9999px;height:6px;width:120px;overflow:hidden"><div style="background:'+(g.atRisk?'#dc2626':'#4f46e5')+';height:6px;width:'+g.progress+'%"></div></div>';
+          return '<tr><td>'+esc(g.title)+(g.atRisk?' <span class=badge style="background:#fee2e2;color:#991b1b">At risk</span>':'')+'</td><td class=muted>'+esc(g.ownerName)+'</td><td>'+bar+'</td><td class=muted>'+g.progress+'%</td></tr>';
+        }).join('');
+        root.className='';
+        root.innerHTML='<h2>'+esc(d.displayName)+' · Goals & OKRs</h2>'+
+          (rows?'<table><thead><tr><th>Goal</th><th>Owner</th><th>Progress</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>':'<p class=muted>No goals yet.</p>');
       } else {
         var rows=(d.sessions||[]).map(function(s){
           return '<tr><td>'+esc(s.supervisorName)+' ↔ '+esc(s.participantName)+'</td><td class=muted>'+new Date(s.scheduledDate).toLocaleString()+'</td><td class=muted>'+esc(s.status)+'</td></tr>';

@@ -154,6 +154,7 @@ const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const PeopleOperations = lazy(() => import("./pages/PeopleOperations"));
 const PeopleRoster = lazy(() => import("./pages/people/PeopleRoster"));
 const PeopleOneOnOnes = lazy(() => import("./pages/people/PeopleOneOnOnes"));
+const PeopleGoals = lazy(() => import("./pages/people/PeopleGoals"));
 // `/events` (discovery index) and `/map` were consolidated into
 // `/tasks` (see Tasks.tsx Discover surface). Sub-pages stay on their
 // own URLs because they're per-event detail surfaces, not the
@@ -764,6 +765,7 @@ const App = () => (
                       <Route path="/people-operations" element={<PeopleOperations />} />
                       <Route path="/people/roster" element={<RequireVerified><PeopleRoster /></RequireVerified>} />
                       <Route path="/people/one-on-ones" element={<RequireVerified><PeopleOneOnOnes /></RequireVerified>} />
+                      <Route path="/people/goals" element={<RequireVerified><PeopleGoals /></RequireVerified>} />
                       <Route path="/affiliate/dashboard" element={<Navigate to="/services" replace />} />
 
                       {/* Public events + coffee networking (gap #1240).

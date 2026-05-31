@@ -14,6 +14,9 @@ import type {
   ActionItemStatus,
   ActionItemPriority,
   ActionItemSource,
+  GoalStatus,
+  GoalPriority,
+  KeyResult,
 } from "@shared/people-ops";
 
 export interface Employee {
@@ -132,6 +135,35 @@ export type EmployeeWrite = {
   isFounder?: boolean;
 };
 
+export interface Goal {
+  id: string;
+  employeeId: string;
+  milestoneId: string | null;
+  title: string;
+  description: string | null;
+  status: GoalStatus;
+  priority: GoalPriority;
+  dueDate: string | null;
+  progress: number;
+  category: string | null;
+  keyResults: KeyResult[];
+  atRisk: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type GoalWrite = {
+  employeeId: string;
+  title: string;
+  description?: string | null;
+  status?: GoalStatus;
+  priority?: GoalPriority;
+  dueDate?: string | null;
+  progress?: number;
+  category?: string | null;
+  keyResults?: KeyResult[];
+};
+
 export type OneOnOneWrite = {
   supervisorId: string;
   participantId: string;
@@ -193,6 +225,16 @@ export const peopleApi = {
   // Action items
   listActionItems: (filters: Partial<Record<"status" | "sourceType" | "oneOnOneId" | "assigneeEmployeeId", string>> = {}) =>
     apiClient.get<ActionItem[]>(`/api/people/action-items${qs(filters)}`).then((r) => r.data),
+
+  // Goals / OKRs (PO-4)
+  listGoals: (filters: Partial<Record<"employeeId" | "status" | "category", string>> = {}) =>
+    apiClient.get<Goal[]>(`/api/people/goals${qs(filters)}`).then((r) => r.data),
+  createGoal: (body: GoalWrite) =>
+    apiClient.post<Goal>(`/api/people/goals`, body).then((r) => r.data),
+  updateGoal: (id: string, body: Partial<GoalWrite>) =>
+    apiClient.put<Goal>(`/api/people/goals/${id}`, body).then((r) => r.data),
+  deleteGoal: (id: string) =>
+    apiClient.delete<{ deleted: boolean }>(`/api/people/goals/${id}`).then((r) => r.data),
 };
 
 export function employeeName(e: Pick<Employee, "firstName" | "lastName">): string {
