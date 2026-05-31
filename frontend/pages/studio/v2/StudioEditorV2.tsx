@@ -122,7 +122,9 @@ import {
   updateSprite as gameUpdateSprite,
   addSprite as gameAddSprite,
   addCustomSpriteAsset as gameAddCustomSpriteAsset,
+  normalizeStartLevelId as gameNormalizeStartLevelId,
 } from "@/lib/studio/game/game-state-edit";
+import { findStartLevel } from "@/lib/studio/game/runtime";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
 import CadStage from "@/components/studio/cad/CadStage";
@@ -909,7 +911,7 @@ export default function StudioEditorV2() {
       // can't reload across sessions, but at least the user sees the
       // sprite in this session.
       const url = result.resultUrl ?? result.previewUrl;
-      const levelId = activeLevelId ?? gameState.startLevelId ?? gameState.levels[0]?.id;
+      const levelId = activeLevelId ?? findStartLevel(gameState)?.id;
       if (!levelId) return;
       const assetId = `ai-${Math.random().toString(36).slice(2, 10)}`;
       let next = gameAddCustomSpriteAsset(gameState, { id: assetId, url });
@@ -1093,7 +1095,9 @@ export default function StudioEditorV2() {
       | import("@shared/game-state").GameState
       | null
       | undefined,
-    hydrate: (next) => setGameState(next),
+    // Self-heal a dangling startLevelId on load (legacy projects) so the
+    // selection + dropdown resolve and a valid id persists on next save.
+    hydrate: (next) => setGameState(gameNormalizeStartLevelId(next)),
     unhydrate: () => setGameState(null),
   });
 
@@ -1103,7 +1107,12 @@ export default function StudioEditorV2() {
   // wherever the user puts it during the session).
   useEffect(() => {
     if (!gameState || gameSelection.kind !== "canvas") return;
-    const startId = gameState.startLevelId ?? gameState.levels[0]?.id;
+    // Resolve through `findStartLevel` (find-by-id, fall back to
+    // levels[0]) — NOT raw `startLevelId`, which can dangle (e.g. a seed
+    // that overwrote levels[0] without updating startLevelId). Selecting
+    // a non-existent level made GamePropertiesPanel reset to canvas
+    // mid-render, re-firing this effect forever (infinite flash).
+    const startId = findStartLevel(gameState)?.id;
     if (startId) setGameSelection({ kind: "level", levelId: startId });
   }, [gameState, gameSelection.kind]);
 

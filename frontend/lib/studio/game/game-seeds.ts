@@ -183,6 +183,10 @@ const GAME_SEEDS: Partial<Record<ContentTemplate, () => GameState>> = {
   memory_match: () => {
     const base = emptyGameState({ width: 1280, height: 720, fps: 30 });
     base.assets = assetsFor(["builtin:card-back"]);
+    // Overwriting levels[0] (id "level-1" → "board") means the default
+    // startLevelId no longer resolves — point it at the level we keep,
+    // else the editor's start-level selection dangles.
+    base.startLevelId = "board";
     base.levels[0] = {
       id: "board",
       label: "Memory board",

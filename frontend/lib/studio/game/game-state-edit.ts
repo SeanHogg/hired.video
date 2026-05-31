@@ -80,6 +80,18 @@ export function setStartLevel(state: GameState, levelId: string): GameState {
   return { ...state, startLevelId: levelId };
 }
 
+/** Self-heal a `startLevelId` that doesn't resolve to any level — snap it
+ *  to `levels[0]`. Applied on load so legacy projects persisted with a
+ *  dangling startLevelId (e.g. seeds that overwrote levels[0] without
+ *  updating it) write a valid id back on next save, and the editor's
+ *  start-level dropdown stops showing a no-match fallback. No-op when the
+ *  id already resolves or the project has no levels (world-3d worlds). */
+export function normalizeStartLevelId(state: GameState): GameState {
+  if (!state.levels.length) return state;
+  if (state.levels.some((l) => l.id === state.startLevelId)) return state;
+  return { ...state, startLevelId: state.levels[0].id };
+}
+
 // `reorderLevels` was drafted here but removed per the standing dead-
 // code rule — no caller today (the editor uses select / delete, not
 // drag-to-reorder). Will land alongside the drag-handle UI in #939.

@@ -19,6 +19,7 @@ import {
   addSprite,
   deleteLevel,
   deleteSprite,
+  normalizeStartLevelId,
   setStartLevel,
   updateGameSettings,
   updateLevel,
@@ -249,5 +250,26 @@ describe("BEHAVIOR_PARAM_DEFAULTS", () => {
         expect(spec.default).toBeDefined();
       }
     }
+  });
+
+  describe("normalizeStartLevelId", () => {
+    it("snaps a dangling startLevelId to levels[0]", () => {
+      const state: GameState = {
+        ...emptyGameState(),
+        startLevelId: "does-not-exist",
+        levels: [{ id: "board", label: "Board", backgroundColor: "#000", sprites: [] }],
+      };
+      expect(normalizeStartLevelId(state).startLevelId).toBe("board");
+    });
+
+    it("is a no-op when the startLevelId already resolves", () => {
+      const state = emptyGameState();
+      expect(normalizeStartLevelId(state)).toBe(state);
+    });
+
+    it("is a no-op when there are no levels (world-3d worlds)", () => {
+      const state: GameState = { ...emptyGameState(), levels: [], startLevelId: "x" };
+      expect(normalizeStartLevelId(state)).toBe(state);
+    });
   });
 });

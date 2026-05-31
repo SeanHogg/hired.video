@@ -20,6 +20,7 @@
  */
 
 import type { GameState } from "@shared/game-state";
+import { findStartLevel } from "@/lib/studio/game/runtime";
 
 interface GameStateThumbnailProps {
   /** May be null when the project row pre-dates the gameState column,
@@ -39,9 +40,10 @@ export default function GameStateThumbnail({
   // backdrop + sprite positions. When no level exists yet we still
   // paint the kind-palette gradient so the tile reads as "game" rather
   // than a blank rectangle.
-  const startLevel = gameState
-    ? (gameState.levels.find((l) => l.id === gameState.startLevelId) ?? gameState.levels[0])
-    : null;
+  // Shared resolver (find-by-startLevelId, fall back to levels[0]) — same
+  // one the runtime + editor use, so a dangling startLevelId can't make
+  // the thumbnail disagree with what actually mounts.
+  const startLevel = gameState ? findStartLevel(gameState) : null;
   const backgroundColor = startLevel?.backgroundColor ?? FALLBACK_BACKGROUND;
   const width = gameState?.width ?? 1280;
   const height = gameState?.height ?? 720;
