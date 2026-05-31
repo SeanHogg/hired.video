@@ -33,7 +33,10 @@ export const tasks = pgTable(
   "tasks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    boardId: uuid("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+    // Nullable since migration 0186 — CHRO action items (segment-scoped) have
+    // no personal board. Personal kanban tasks still always have a board.
+    boardId: uuid("board_id").references(() => boards.id, { onDelete: "cascade" }),
+    // The OWNER for personal tasks; the CREATOR (host user) for CHRO rows.
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     title: varchar("title", { length: 500 }).notNull(),
     description: text("description"),
@@ -48,6 +51,18 @@ export const tasks = pgTable(
     // acceptance creates one). Cascading SET NULL on event delete so the
     // task survives an event cancellation as a manual follow-up.
     sourceEventId: uuid("source_event_id"),
+    // ── CHRO People-Ops action items (migration 0186) ──────────────────────
+    // When segmentId IS NOT NULL this row is a segment-scoped CHRO action item,
+    // NOT a personal task. Personal-task queries MUST filter `segment_id IS
+    // NULL` (and these reads filter on segment) so the two never bleed. FKs to
+    // people_* are added in the migration to keep this file decoupled from the
+    // people-ops schema.
+    tenantId: uuid("tenant_id"),
+    segmentId: uuid("segment_id"),
+    assigneeEmployeeId: uuid("assignee_employee_id"), // → people_employees.id
+    oneOnOneId: uuid("one_on_one_id"), // → people_one_on_ones.id
+    // one_on_one | meeting | sync | milestone | review | interview | manual
+    sourceType: varchar("source_type", { length: 16 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -56,6 +71,9 @@ export const tasks = pgTable(
     index("idx_tasks_user_status").on(t.userId, t.status, t.dueDate),
     // Board kanban view — reads ordered slices per (board, status) column.
     index("idx_tasks_board_status_position").on(t.boardId, t.status, t.position),
+    // CHRO action-item inbox per segment.
+    index("idx_tasks_segment_status").on(t.segmentId, t.status),
+    index("idx_tasks_one_on_one").on(t.oneOnOneId),
   ],
 );
 

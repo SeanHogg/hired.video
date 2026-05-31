@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
 const { boards, tasks } = schema;
@@ -127,7 +127,7 @@ export async function seedOnboardingTasks(userId: string, role: string): Promise
   const allTasks = await db
     .select({ id: tasks.id, metadata: tasks.metadata })
     .from(tasks)
-    .where(eq(tasks.userId, userId));
+    .where(and(eq(tasks.userId, userId), isNull(tasks.segmentId)));
 
   const hasOnboarding = allTasks.some((t) => {
     const meta = (t.metadata ?? {}) as Record<string, unknown>;

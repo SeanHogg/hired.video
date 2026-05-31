@@ -209,6 +209,28 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // CHRO People Operations (hired-video extraction). Marketing surface +
+  // the in-app roster / 1:1s pages. Pitches the paid employer suite:
+  // roster, org chart, 1:1s, performance, team health — embeddable + multi-tenant.
+  "/people-operations": {
+    title: "People Operations: the CHRO suite for employers — hired.video",
+    description:
+      "Run your whole team from one place — roster & org chart, 1:1s with shared agendas and action items, performance, goals, and team health, plus video-first hiring. Multi-tenant and embeddable; a paid employer plan unlocks the full CHRO suite.",
+    keywords:
+      "people operations, CHRO software, HRIS, org chart software, 1 on 1 software, performance management, team health, OKR tracking, employer HR platform, embeddable HR, headcount planning",
+  },
+  "/people/roster": {
+    title: "Corporate Roster & Org Chart — hired.video People Operations",
+    description:
+      "Your team directory and org chart — the single source of truth for headcount, departments, managers, and team metrics.",
+    keywords: "employee roster, org chart, team directory, headcount, people operations",
+  },
+  "/people/one-on-ones": {
+    title: "1-on-1s — hired.video People Operations",
+    description:
+      "A recurring 1:1 cadence with shared agendas and follow-up action items so a manager never drops a 1:1.",
+    keywords: "1 on 1 meetings, 1:1 software, manager cadence, action items, people operations",
+  },
   // Bullhorn-class agency back-office (#1349). Pitches the workforce
   // module — placements, timesheets, invoice + payout derivation, doc
   // vault, desk margin reporting — to staffing-agency operators.

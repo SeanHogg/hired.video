@@ -26,6 +26,7 @@ export const MODULE_ROUTE_REGISTRY: Record<string, string> = {
   "/api/followups": "followups",
   "/api/hubs": "hubs",
   "/api/interview": "interview",
+  "/api/people": "people-ops",
   "/api/resumescorer": "resume-scorer",
   "/api/resumeoptimizer": "resume-optimizer",
   "/api/studio": "video-studio",

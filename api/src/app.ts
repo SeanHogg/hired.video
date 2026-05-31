@@ -125,6 +125,7 @@ import { listsRoutes } from "./routes/lists.js";
 import { followUpRoutes } from "./routes/followups.js";
 import { hiringOnboardingRoutes } from "./routes/onboarding-hiring.js";
 import { performanceRoutes } from "./routes/performance.js";
+import { peopleRoutes } from "./routes/people.js";
 import { calendarRoutes } from "./routes/calendar.js";
 import { eventRoutes } from "./routes/events.js";
 import { coffeeRoutes } from "./routes/coffee.js";
@@ -701,6 +702,10 @@ export function createApp() {
   app.route("/api/followups", followUpRoutes);
   app.route("/api/hiring", hiringOnboardingRoutes);
   app.route("/api/performance", performanceRoutes);
+  // CHRO People Operations (#hired-video-extraction). Every route runs
+  // behind peopleOpsContext (segment resolution + paid gate); see
+  // routes/people.ts + specs/hired-video.
+  app.route("/api/people", peopleRoutes);
   app.route("/api/calendar", calendarRoutes);
   app.route("/api/events", eventRoutes);
   app.route("/api/coffee", coffeeRoutes);

@@ -149,6 +149,11 @@ const SecuritySessions = lazy(() => import("./pages/SecuritySessions"));
 const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
+// CHRO People Operations (hired-video extraction): marketing landing +
+// the paid in-app roster / 1:1s surfaces.
+const PeopleOperations = lazy(() => import("./pages/PeopleOperations"));
+const PeopleRoster = lazy(() => import("./pages/people/PeopleRoster"));
+const PeopleOneOnOnes = lazy(() => import("./pages/people/PeopleOneOnOnes"));
 // `/events` (discovery index) and `/map` were consolidated into
 // `/tasks` (see Tasks.tsx Discover surface). Sub-pages stay on their
 // own URLs because they're per-event detail surfaces, not the
@@ -754,6 +759,10 @@ const App = () => (
                         element={<CompanyCreatePage />}
                       />
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
+                      {/* CHRO People Operations — public marketing + paid in-app surfaces */}
+                      <Route path="/people-operations" element={<PeopleOperations />} />
+                      <Route path="/people/roster" element={<RequireVerified><PeopleRoster /></RequireVerified>} />
+                      <Route path="/people/one-on-ones" element={<RequireVerified><PeopleOneOnOnes /></RequireVerified>} />
                       <Route path="/affiliate/dashboard" element={<Navigate to="/services" replace />} />
 
                       {/* Public events + coffee networking (gap #1240).

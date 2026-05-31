@@ -78,3 +78,4 @@ export * from "./gapExtensions.js";
 export * from "./recruiterBd.js";
 export * from "./gapPass2.js";
 export * from "./gapPass4.js";
+export * from "./peopleOps.js";

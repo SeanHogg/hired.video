@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -84,7 +84,9 @@ taskRoutes.get("/", async (c) => {
   const rows = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.userId, userId))
+    // segment_id IS NULL → personal kanban only; CHRO action items
+    // (segment-scoped) live in /api/people/* and must not leak here.
+    .where(and(eq(tasks.userId, userId), isNull(tasks.segmentId)))
     .orderBy(desc(tasks.createdAt));
   return c.json(ok(rows.map(toTaskDto)), 200);
 });
@@ -97,7 +99,7 @@ taskRoutes.get("/:id", async (c) => {
   const [row] = await db
     .select()
     .from(tasks)
-    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId), isNull(tasks.segmentId)))
     .limit(1);
 
   if (!row) return c.json(error("NOT_FOUND", "Task not found"), 404);
@@ -134,7 +136,7 @@ taskRoutes.post("/save", async (c) => {
     const [existing] = await db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.id, existingId), eq(tasks.userId, userId)))
+      .where(and(eq(tasks.id, existingId), eq(tasks.userId, userId), isNull(tasks.segmentId)))
       .limit(1);
 
     if (existing) {
@@ -196,7 +198,7 @@ taskRoutes.delete("/:id", async (c) => {
   const userId = c.var.user.sub;
   const db = getDb();
 
-  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
+  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId), isNull(tasks.segmentId)));
   return c.json(ok(true), 200);
 });
 
@@ -208,14 +210,14 @@ taskRoutes.post("/:id", async (c) => {
   const db = getDb();
 
   if (!body) {
-    await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
+    await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId), isNull(tasks.segmentId)));
     return c.json(ok(true), 200);
   }
 
   const [existing] = await db
     .select()
     .from(tasks)
-    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId), isNull(tasks.segmentId)))
     .limit(1);
 
   // Same `metadata` passthrough as POST /save — keeps the Career 360

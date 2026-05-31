@@ -589,7 +589,7 @@ const handleUpdateProfile = async (c: any) => {
     c.executionCtx.waitUntil(
       (async () => {
         try {
-          const existingTasks = await db.select({ id: tasks.id, metadata: tasks.metadata }).from(tasks).where(eq(tasks.userId, user.sub));
+          const existingTasks = await db.select({ id: tasks.id, metadata: tasks.metadata }).from(tasks).where(and(eq(tasks.userId, user.sub), isNull(tasks.segmentId)));
           const onboardingIds = existingTasks
             .filter((t) => {
               const meta = (t.metadata ?? {}) as Record<string, unknown>;
