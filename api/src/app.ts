@@ -39,6 +39,7 @@ import {
 } from "./routes/sourcing-bids.js";
 import { companyRoutes } from "./routes/companies.js";
 import { companyEmbedRoutes } from "./routes/company-embed.js";
+import { embedApiRoutes, embedAssetRoutes } from "./routes/embed-runtime.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { boostRoutes } from "./routes/boosts.js";
 import { taxonomyRoutes } from "./routes/taxonomies.js";
@@ -313,6 +314,10 @@ export function createApp() {
     "/api/security/geo",
     "/api/security/region-waitlist",
     "/api/phone/webhook",
+    // Embed runtime data API — authenticated by a company embed key
+    // (validated in the handler), not a user session. The loader + iframe
+    // frame live under /embed/* (outside /api, so no auth gate).
+    "/api/embed/v1",
     "/api/whitelabel/portal",
     "/api/whitelabel/demo-request",
     "/api/whitelabel/roi-calculator",
@@ -595,6 +600,10 @@ export function createApp() {
   // /api/companies catch-all so the :companyId/embed sub-routes match.
   app.route("/api/companies/:companyId/embed", companyEmbedRoutes);
   app.route("/api/companies", companyRoutes);
+  // Embed runtime: key-authed data API (/api/embed/v1/*) + public loader +
+  // iframe frame assets (/embed/v1/*). Makes a pasted snippet actually render.
+  app.route("/api/embed", embedApiRoutes);
+  app.route("/embed", embedAssetRoutes);
   app.route("/api/reviews", reviewRoutes);
   app.route("/api/boosts", boostRoutes);
   app.route("/api/taxonomies", taxonomyRoutes);

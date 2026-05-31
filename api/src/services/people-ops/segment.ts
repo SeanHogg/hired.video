@@ -124,10 +124,23 @@ export async function resolveSegment(
     );
   }
 
-  // 2. Self tenant.
+  // 2 + 3. Self tenant + find/create the segment for (tenant, company).
+  return resolveSegmentForCompany(companyId, deps);
+}
+
+/**
+ * Resolve (tenantId, segmentId) for a company directly — no user. This is the
+ * path used by the EMBED runtime, where a validated embed key (not a user
+ * session) is the authorization. Ensures the native tenant + lazy-creates the
+ * segment, identical to the user path.
+ */
+export async function resolveSegmentForCompany(
+  companyId: string,
+  deps: ResolveSegmentDeps = defaultResolveSegmentDeps(),
+): Promise<PeopleSegmentScope> {
+  const { db, now } = deps;
   const tenantId = await ensureNativeTenant(db);
 
-  // 3. Find or lazy-create the segment for (tenant, company).
   const [existing] = await db
     .select()
     .from(schema.peopleSegments)

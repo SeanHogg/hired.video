@@ -215,7 +215,7 @@ export default function Tools() {
                 <h1 className="text-5xl font-bold mb-6">
                   Smart Tools and Built-in Courses to Supercharge Your Career
                 </h1>
-                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                <p className="text-xl text-muted-foreground mb-8">
                   Free AI career tools — resume scoring, ATS optimization,
                   salary benchmarks, interview practice — paired with a
                   built-in learning library covering AI, RAG, prompt
@@ -279,7 +279,7 @@ export default function Tools() {
                 <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
                   AI-Powered Career Tools
                 </h2>
-                <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-2xl mx-auto">
+                <p className="text-center text-muted-foreground mb-8 sm:mb-12">
                   Free, single-purpose tools you can use without an account.
                   Need structured learning instead? Scroll past the grid for
                   the built-in course library.
@@ -355,7 +355,7 @@ export default function Tools() {
                 <h2 className="text-3xl font-bold mb-4">
                   New: Resume Sentiment Analysis
                 </h2>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                <p className="text-xl text-muted-foreground">
                   Discover how positive your resume sounds to employers with our
                   AI-powered sentiment analysis tool
                 </p>

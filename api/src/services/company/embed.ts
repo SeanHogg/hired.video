@@ -10,9 +10,18 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { EMBED_KEY_PLACEHOLDER } from "../../../../shared/embed.js";
+import { EMBED_KEY_PLACEHOLDER, EMBED_SURFACES } from "../../../../shared/embed.js";
+import { resolveSegmentForCompany } from "../people-ops/segment.js";
+import type { PeopleSegmentScope } from "../people-ops/segment.js";
 
 const { companyEmbedKeys } = schema;
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 /** Public base URL of the app (the embed loader origin). */
 function appBaseUrl(): string {
@@ -122,6 +131,97 @@ export async function revokeEmbedKey(
     .where(and(eq(companyEmbedKeys.id, keyId), eq(companyEmbedKeys.companyId, companyId)))
     .returning({ id: companyEmbedKeys.id });
   return rows.length > 0;
+}
+
+// ── Embed runtime validation (#1826/#1828) ──────────────────────────────────
+export class EmbedAuthError extends Error {
+  constructor(
+    public readonly code:
+      | "INVALID_KEY"
+      | "EXPIRED"
+      | "FORBIDDEN_ORIGIN"
+      | "FORBIDDEN_SCOPE"
+      | "NOT_ENABLED",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export interface EmbedAuthResult {
+  scope: PeopleSegmentScope;
+  companyId: string;
+  scopes: string[];
+  allowedOrigins: string[];
+}
+
+export interface ResolveEmbedOpts {
+  origin?: string | null;
+  /** When true, reject if `origin` isn't in the key's allowlist. Off by
+   *  default: the cross-site gate is the frame's `frame-ancestors` CSP, and
+   *  the data API is fetched same-origin from that trusted frame. */
+  enforceOrigin?: boolean;
+}
+
+export function originAllowed(origin: string | null, allowed: string[]): boolean {
+  if (allowed.length === 0) return true; // no allowlist configured → unrestricted
+  if (!origin) return false;
+  const norm = (u: string) => u.replace(/\/$/, "").toLowerCase();
+  return allowed.map(norm).includes(norm(origin));
+}
+
+/**
+ * Validate an embed key for a view + caller origin, then resolve the company's
+ * People-Ops segment. The single chokepoint the embed data API runs behind:
+ * enforces key active + not expired + scope granted + origin allowlisted +
+ * company embedding still enabled. Bumps last_used_at (best-effort).
+ */
+export async function resolveEmbedRequest(
+  rawKey: string,
+  viewKey: string,
+  opts: ResolveEmbedOpts = {},
+  db = getDb(),
+): Promise<EmbedAuthResult> {
+  if (!rawKey) throw new EmbedAuthError("INVALID_KEY", "Missing embed key.");
+  const hash = await sha256Hex(rawKey);
+  const [row] = await db
+    .select()
+    .from(companyEmbedKeys)
+    .where(and(eq(companyEmbedKeys.keyHash, hash), eq(companyEmbedKeys.isActive, true)))
+    .limit(1);
+  if (!row) throw new EmbedAuthError("INVALID_KEY", "Invalid or revoked embed key.");
+  if (row.expiresAt && new Date(row.expiresAt).getTime() < Date.now()) {
+    throw new EmbedAuthError("EXPIRED", "Embed key has expired.");
+  }
+
+  const surface = EMBED_SURFACES.find((s) => s.key === viewKey);
+  if (!surface) throw new EmbedAuthError("FORBIDDEN_SCOPE", "Unknown embed view.");
+  const scopes = row.scopes as string[];
+  if (!scopes.includes(surface.scope)) {
+    throw new EmbedAuthError("FORBIDDEN_SCOPE", "This key may not render that view.");
+  }
+  const allowedOrigins = row.allowedOrigins as string[];
+  if (opts.enforceOrigin && !originAllowed(opts.origin ?? null, allowedOrigins)) {
+    throw new EmbedAuthError("FORBIDDEN_ORIGIN", "This origin is not allowed for this embed key.");
+  }
+
+  const [company] = await db
+    .select({ embedEnabled: schema.companyProfiles.embedEnabled })
+    .from(schema.companyProfiles)
+    .where(eq(schema.companyProfiles.id, row.companyId))
+    .limit(1);
+  if (!company?.embedEnabled) {
+    throw new EmbedAuthError("NOT_ENABLED", "Embedding is disabled for this company.");
+  }
+
+  await db
+    .update(companyEmbedKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(companyEmbedKeys.id, row.id))
+    .catch(() => undefined);
+
+  const scope = await resolveSegmentForCompany(row.companyId);
+  return { scope, companyId: row.companyId, scopes, allowedOrigins };
 }
 
 /**
