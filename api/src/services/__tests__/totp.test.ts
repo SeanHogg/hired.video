@@ -9,7 +9,8 @@
  * Run: node --import tsx --test src/services/__tests__/totp.test.ts
  */
 
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
+import { mock } from "node:test";
 import assert from "node:assert/strict";
 
 import { verifyTotp } from "../auth/totp.js";
@@ -58,7 +59,22 @@ async function totpAt(secret: string, counter: number): Promise<string> {
 
 const SECRET = "JBSWY3DPEHPK3PXP"; // Google Authenticator's canonical test vector
 
+// Freeze the clock at a mid-step instant. Each test computes its `counter`
+// from Date.now() and then verifyTotp() reads Date.now() again internally;
+// without a frozen clock a TOTP step rollover landing between those two reads
+// shifts the verification window and intermittently reds the build (e.g. a
+// counter+2 code falls within verifyTotp's ±1 window). 1_700_000_000_000ms is
+// ~0.67 of the way through its 30s step, far from either boundary.
+const FROZEN_NOW_MS = 1_700_000_000_000;
+
 describe("verifyTotp", () => {
+  before(() => {
+    mock.timers.enable({ apis: ["Date"], now: FROZEN_NOW_MS });
+  });
+  after(() => {
+    mock.timers.reset();
+  });
+
   it("accepts the code for the current step", async () => {
     const counter = Math.floor(Date.now() / 1000 / 30);
     const code = await totpAt(SECRET, counter);

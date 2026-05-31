@@ -47,6 +47,9 @@ export interface FeedPost {
   userName: string;
   userAvatar?: string;
   content: string;
+  // Post kind (gap #1828): 'text' | 'video' | 'article'. Drives long-form
+  // rendering for articles and per-kind feed filtering.
+  kind: 'text' | 'video' | 'article';
   linkUrl?: string;
   linkTitle?: string;
   linkDescription?: string;
@@ -71,6 +74,7 @@ export interface FeedPost {
 
 export interface CreateFeedPostRequest {
   content: string;
+  kind?: 'text' | 'video' | 'article';
   linkUrl?: string;
   privacy: 'Public' | 'recruiter' | 'Connections' | 'Private';
   media: CreateFeedPostMediaRequest[];
@@ -86,6 +90,7 @@ export interface CreateFeedPostMediaRequest {
 
 export interface UpdateFeedPostRequest {
   content: string;
+  kind?: 'text' | 'video' | 'article';
   privacy: 'Public' | 'recruiter' | 'Connections' | 'Private';
   media: CreateFeedPostMediaRequest[];
 }
@@ -103,12 +108,20 @@ export interface GetFeedPostsRequest {
   searchTerm?: string;
   filter?: 'all' | 'connections' | 'following';
   privacy?: 'public' | 'connections';
+  // Hashtag discovery (gap #1829): filter the feed to a single hashtag.
+  tag?: string;
   fromDate?: string;
   toDate?: string;
   pageNumber?: number;
   pageSize?: number;
   sortBy?: string;
   sortDirection?: 'asc' | 'desc';
+}
+
+// Trending hashtag (gap #1829) — top hashtags by recent post frequency.
+export interface TrendingTag {
+  tag: string;
+  postCount: number;
 }
 
 export interface FeedPostsResponse {

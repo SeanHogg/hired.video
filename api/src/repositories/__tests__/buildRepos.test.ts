@@ -62,6 +62,7 @@ describe("buildRepos — dependency-injection wiring", () => {
       "geocoderCache",
       "events",
       "coffeeRequests",
+      "communityResources",
     ];
 
     for (const key of expected) {

@@ -124,6 +124,7 @@ function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
             fontPx: 84,
             color: palette.text,
             bold: true,
+            heading: true,
           }),
         );
         if (scene.subhead) {
@@ -140,6 +141,7 @@ function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
             fontPx: 96,
             color: palette.text,
             bold: true,
+            heading: true,
           }),
         );
         if (scene.subhead) {
@@ -169,6 +171,7 @@ function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
           fontPx: 180,
           color: palette.accent,
           bold: true,
+          heading: true,
         }),
       );
       if (scene.statCaption) {
@@ -196,6 +199,7 @@ function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
           color: palette.text,
           align: "left",
           bold: true,
+          heading: true,
         }),
       );
       const bulletsY = scene.imageUrl ? 0.62 : 0.3;

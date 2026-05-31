@@ -27,6 +27,21 @@ function normalizePrivacy(value: unknown, fallback: FeedPrivacy = "Public"): Fee
     : fallback;
 }
 
+// Post kind discriminator (gap #1828): text | video | article.
+const FEED_KIND_VALUES = ["text", "video", "article"] as const;
+type FeedKind = (typeof FEED_KIND_VALUES)[number];
+
+// Resolve the post kind. An explicit body value wins; otherwise infer 'video'
+// when the post carries video media so callers that don't send `kind` still
+// get the right type for reels.
+function resolveKind(value: unknown, media: Array<{ mediaType?: string }>, fallback: FeedKind = "text"): FeedKind {
+  if ((FEED_KIND_VALUES as readonly string[]).includes(String(value))) {
+    return String(value) as FeedKind;
+  }
+  if (media.some((m) => m.mediaType === "Video")) return "video";
+  return fallback;
+}
+
 function isRecruiterLike(user: JwtPayload | undefined): boolean {
   if (!user) return false;
   const roles = user.roles ?? [];
@@ -145,6 +160,7 @@ function toPostDto(
     userName: authorName,
     userAvatar: authorAvatar ?? undefined,
     content: post.content,
+    kind: (post.kind as FeedKind) ?? "text",
     linkUrl: post.linkUrl ?? undefined,
     linkTitle: post.linkTitle ?? undefined,
     linkDescription: post.linkDescription ?? undefined,
@@ -287,24 +303,26 @@ feedRoutes.post("/posts", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const db = getDb();
   const content = typeof body.content === "string" ? body.content : "";
+  const mediaItems = Array.isArray(body.media)
+    ? (body.media as any[]).map((m: any, idx: number) => ({
+        id: crypto.randomUUID(),
+        mediaType: m.mediaType === "Video" ? "Video" : "Image",
+        mediaUrl: m.mediaUrl ?? "",
+        thumbnailUrl: m.thumbnailUrl ?? undefined,
+        altText: m.altText ?? undefined,
+        displayOrder: typeof m.displayOrder === "number" ? m.displayOrder : idx,
+      }))
+    : [];
 
   const [post] = await db
     .insert(feedPosts)
     .values({
       userId,
       content,
+      kind: resolveKind(body.kind, mediaItems),
       linkUrl: typeof body.linkUrl === "string" ? body.linkUrl : null,
       privacy: normalizePrivacy(body.privacy, "Public"),
-      media: Array.isArray(body.media)
-        ? (body.media as any[]).map((m: any, idx: number) => ({
-            id: crypto.randomUUID(),
-            mediaType: m.mediaType === "Video" ? "Video" : "Image",
-            mediaUrl: m.mediaUrl ?? "",
-            thumbnailUrl: m.thumbnailUrl ?? undefined,
-            altText: m.altText ?? undefined,
-            displayOrder: typeof m.displayOrder === "number" ? m.displayOrder : idx,
-          }))
-        : [],
+      media: mediaItems,
       tags: buildTagsField(content),
     } as any)
     .returning();
@@ -341,6 +359,9 @@ feedRoutes.put("/posts/:postId", async (c) => {
     .update(feedPosts)
     .set({
       content: newContent,
+      kind: body.kind !== undefined
+        ? resolveKind(body.kind, (existing.media ?? []) as Array<{ mediaType?: string }>, existing.kind as FeedKind)
+        : existing.kind,
       privacy: body.privacy !== undefined
         ? normalizePrivacy(body.privacy, existing.privacy as FeedPrivacy)
         : existing.privacy,

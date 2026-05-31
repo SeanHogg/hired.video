@@ -73,6 +73,7 @@ export function PageEmbedDialog({
     try {
       const { data } = await studioService.setPageEmbed({ pathname: path, projectId, placement });
       await queryClient.invalidateQueries({ queryKey: ["page-embed", data.pathname] });
+      await queryClient.invalidateQueries({ queryKey: ["page-embed-paths"] });
       toast({
         title: "Published to page",
         description: `This video now renders on ${data.pathname}.`,

@@ -573,6 +573,15 @@ export const studioService = {
     ) as Promise<ApiSuccessResponse<{ embed: ResolvedPageEmbed | null }>>;
   },
 
+  /** PUBLIC: the set of routes that currently carry an embed. Fetched once
+   *  + cached so <MarketingPageVideo> only runs the full resolve on a hit
+   *  (#1863). */
+  async listActivePageEmbedPaths(): Promise<ApiSuccessResponse<{ paths: string[] }>> {
+    return apiClient.get("/api/studio/page-embeds/paths") as Promise<
+      ApiSuccessResponse<{ paths: string[] }>
+    >;
+  },
+
   /** SuperAdmin: publish a Studio project onto a page route (upsert). */
   async setPageEmbed(args: {
     pathname: string;

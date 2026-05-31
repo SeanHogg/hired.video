@@ -18,10 +18,22 @@ import { cn } from "@/lib/utils";
 export function MarketingPageVideo(): JSX.Element | null {
   const { pathname } = useLocation();
 
+  // One cheap, app-wide cached membership query (#1863) — so pages WITHOUT
+  // an embed never trigger a per-route resolve. Marketing placements change
+  // rarely, so a long staleTime is safe.
+  const { data: pathsRes } = useQuery({
+    queryKey: ["page-embed-paths"],
+    queryFn: () => studioService.listActivePageEmbedPaths(),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  const hasEmbed = (pathsRes?.data?.paths ?? []).includes(pathname);
+
+  // Full resolve runs ONLY when this route is in the set.
   const { data } = useQuery({
     queryKey: ["page-embed", pathname],
     queryFn: () => studioService.resolvePageEmbed(pathname),
-    // Marketing placements change rarely; keep it cheap across navigation.
+    enabled: hasEmbed,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });

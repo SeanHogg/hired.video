@@ -19,6 +19,7 @@ import {
   Workflow,
   Mail,
   Puzzle,
+  MonitorPlay,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
@@ -32,6 +33,8 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "roles",     label: "Roles",     href: "/admin/roles",     icon: Shield     },
   { resource: "jobs",      label: "Jobs",      href: "/admin/jobs",      icon: Briefcase  },
   { resource: "studio",   label: "Studio",    href: "/admin/studio",    icon: Video      },
+  // Page → video embed placements (#1866) — gated on the studio resource.
+  { resource: "studio",   label: "Page Videos", href: "/admin/page-embeds", icon: MonitorPlay },
   { resource: "storage",   label: "Storage",   href: "/admin/storage",   icon: HardDrive  },
   { resource: "billing",   label: "Billing",   href: "/admin/billing",   icon: CreditCard },
   { resource: "modules",   label: "Modules",   href: "/admin/modules",   icon: Package    },

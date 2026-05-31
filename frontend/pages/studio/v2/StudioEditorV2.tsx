@@ -1,4 +1,8 @@
 /**
+ * eslint-page-chrome: skip — full-screen editor surface; the marketing
+ * chrome (AppShell / useSEO / useBreadcrumbs) the rule enforces does not
+ * apply to the Studio editor. (Opt-out surfaced once #1868 un-hid the rule.)
+ *
  * v2 Studio editor shell at `/studio/:id`.
  *
  * Layout:
@@ -3338,6 +3342,7 @@ export default function StudioEditorV2() {
           onOpenChange={setEmbedDialogOpen}
           projectId={persistedProjectId}
           rendered={!!persistedProject?.videoUrl}
+          defaultPathname={searchParams.get("embedPath") ?? undefined}
         />
       )}
       {previewOpen && (

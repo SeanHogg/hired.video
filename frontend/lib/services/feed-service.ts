@@ -18,6 +18,7 @@ import type {
   FeedPostComment,
   LinkPreviewRequest,
   LinkPreviewResponse,
+  TrendingTag,
 } from "../../types/feed";
 
 // ============================================================================
@@ -71,6 +72,7 @@ export const FeedPostSchema = z.object({
   userName: z.string(),
   userAvatar: z.string().optional(),
   content: z.string(),
+  kind: z.enum(["text", "video", "article"]).default("text"),
   linkUrl: z.string().optional(),
   linkTitle: z.string().optional(),
   linkDescription: z.string().optional(),
@@ -103,6 +105,7 @@ export const FeedPostsResponseSchema = z.object({
 
 export const CreateFeedPostRequestSchema = z.object({
   content: z.string(),
+  kind: z.enum(["text", "video", "article"]).optional(),
   linkUrl: z.string().url().optional(),
   privacy: z.enum(["Public", "recruiter", "Connections", "Private"]),
   media: z.array(z.object({
@@ -119,6 +122,7 @@ export const CreateFeedPostRequestSchema = z.object({
 
 export const UpdateFeedPostRequestSchema = z.object({
   content: z.string().min(1, "Content is required"),
+  kind: z.enum(["text", "video", "article"]).optional(),
   privacy: z.enum(["Public", "recruiter", "Connections", "Private"]),
   media: z.array(z.object({
     mediaType: z.enum(["Image", "Video"]),
@@ -142,6 +146,7 @@ export const GetFeedPostsRequestSchema = z.object({
   searchTerm: z.string().optional(),
   filter: z.enum(["all", "connections", "following"]).optional(),
   privacy: z.enum(["public", "connections"]).optional(),
+  tag: z.string().optional(),
   fromDate: z.string().optional(),
   toDate: z.string().optional(),
   pageNumber: z.number().min(1).optional(),
@@ -175,6 +180,7 @@ export async function getFeedPosts(request: GetFeedPostsRequest = {}): Promise<F
   if (request.searchTerm) params.append("searchTerm", request.searchTerm);
   if (request.filter) params.append("filter", request.filter);
   if (request.privacy) params.append("privacy", request.privacy);
+  if (request.tag) params.append("tag", request.tag);
   if (request.fromDate) params.append("fromDate", request.fromDate);
   if (request.toDate) params.append("toDate", request.toDate);
   if (request.pageNumber) params.append("pageNumber", request.pageNumber.toString());
@@ -324,6 +330,29 @@ export async function searchFeedPosts(
     return response.data as unknown as FeedPostsResponse;
   }
   return parsed.data;
+}
+
+/**
+ * Get trending hashtags (gap #1829) — top hashtags from public posts over the
+ * last 30 days. Powers the clickable "Trending topics" sidebar; selecting one
+ * filters the feed via `getFeedPosts({ tag })`.
+ */
+export const TrendingTagSchema = z.object({
+  tag: z.string(),
+  // Backend returns `post_count` (raw SQL aggregate); normalise to camelCase.
+  post_count: z.number(),
+});
+
+export async function getTrendingTags(limit = 8): Promise<TrendingTag[]> {
+  const response = await apiClient.get<ApiSuccessResponse<Array<{ tag: string; post_count: number }>>>(
+    `/api/feed/trending-tags?limit=${limit}`,
+  );
+  const parsed = z.array(TrendingTagSchema).safeParse(response.data);
+  if (!parsed.success) {
+    console.warn("[feed] Trending-tags validation warning:", parsed.error.issues);
+    return [];
+  }
+  return parsed.data.map((r) => ({ tag: r.tag, postCount: r.post_count }));
 }
 
 /**

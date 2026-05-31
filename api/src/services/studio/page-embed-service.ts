@@ -94,6 +94,17 @@ export class PageEmbedService {
     };
   }
 
+  /** Just the active embed pathnames — a cheap, cacheable membership set
+   *  so the client only runs the full per-page resolve when the current
+   *  route actually has an embed (#1863). */
+  async listActivePaths(): Promise<string[]> {
+    const rows = await this.db
+      .select({ pathname: pageEmbedVideos.pathname })
+      .from(pageEmbedVideos)
+      .where(eq(pageEmbedVideos.isActive, true));
+    return rows.map((r) => r.pathname);
+  }
+
   /** Publish a project to a path (upsert-by-path). Denormalises the
    *  project's current videoId so the snippet runtime can read it without
    *  a join. Re-activates a previously unpublished path. */

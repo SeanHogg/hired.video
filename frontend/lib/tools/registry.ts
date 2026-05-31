@@ -771,11 +771,16 @@ export async function commitMutation(
       const projectId = created.data?.id;
       if (!projectId) throw new Error("Studio draft created but no id returned");
       await queryClient?.invalidateQueries({ queryKey: ["studio", "projects"] });
+      // Carry the source page through to the editor so the Embed dialog
+      // pre-fills "Publish to page" with the page this video was built
+      // from (no draft column needed — survives the redirect; #1862).
+      const sourcePath = typeof raw.sourcePath === "string" ? raw.sourcePath : "";
+      const embedQuery = sourcePath ? `?embedPath=${encodeURIComponent(sourcePath)}` : "";
       return {
         ...result,
         summary: `Created "${name}" — review it in Studio, then publish & embed.`,
         mutation: { status: "applied", location: `studio:${projectId}` },
-        redirectUrl: `/studio/${encodeURIComponent(projectId)}`,
+        redirectUrl: `/studio/${encodeURIComponent(projectId)}${embedQuery}`,
       };
     }
 

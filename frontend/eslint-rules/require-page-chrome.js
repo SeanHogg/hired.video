@@ -21,13 +21,15 @@
  *   // eslint-page-chrome: skip — <reason>
  */
 
-"use strict";
-
 const PAGE_GLOB = /[\\/]pages[\\/][^\\/]+\.tsx$/;
 const SUBDIR_PAGE_GLOB = /[\\/]pages[\\/].+\.tsx$/;
 const OPT_OUT_RE = /eslint-page-chrome:\s*skip/i;
 
-module.exports = {
+// ESM default export — eslint.config.js is ESM (`import requirePageChrome
+// from "./eslint-rules/require-page-chrome.js"`) and the frontend package
+// is `"type": "module"`, so a CommonJS `module.exports` here resolves to
+// no default export and crashes config load (#1868).
+export default {
   meta: {
     type: "problem",
     docs: {

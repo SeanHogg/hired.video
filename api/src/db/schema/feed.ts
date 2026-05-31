@@ -19,6 +19,10 @@ export const feedPosts = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
+    // Post kind discriminator (gap #1828): 'text' | 'video' | 'article'.
+    // "article" posts render long-form; the composer's mode now persists here
+    // instead of being a throwaway UI label.
+    kind: varchar("kind", { length: 16 }).default("text").notNull(),
     linkUrl: varchar("link_url", { length: 2000 }),
     linkTitle: varchar("link_title", { length: 500 }),
     linkDescription: text("link_description"),

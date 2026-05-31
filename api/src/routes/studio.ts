@@ -9,6 +9,15 @@ import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { PageEmbedService } from "../services/studio/page-embed-service.js";
+import {
+  PRO_MONTHLY_PRICE,
+  PRO_YEARLY_PRICE,
+  PRO_AI_MONTHLY_TOKENS,
+  FREE_AI_MONTHLY_TOKENS,
+  FREE_PUBLISHED_VIDEOS_LIMIT,
+  FREE_INTERVIEW_SESSIONS_PER_MONTH,
+  TOKEN_PACKS,
+} from "../../../shared/pricing.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -1246,14 +1255,30 @@ const HarvestedPageSchema = z.object({
 });
 
 /** Server-known facts for a route, appended to the scaffolder's prompt as
- *  authoritative signal (preferred over possibly-stale DOM text). Kept
- *  intentionally small for now — richer per-route enrichment (live
- *  pricing-config plan prices on /pricing, published-video counts on the
- *  homepage) is tracked as a gap (#1861). */
-function buildPageVideoServerFacts(_pathname: string): string[] {
-  return [
+ *  authoritative signal (preferred over possibly-stale DOM text). Sourced
+ *  from the canonical [shared/pricing.ts](../../../shared/pricing.ts)
+ *  constants so a promo video never quotes a stale price scraped from the
+ *  DOM. Add a route arm here as new marketing surfaces gain authoritative
+ *  server facts. */
+function buildPageVideoServerFacts(pathname: string): string[] {
+  const facts: string[] = [
     "Brand: hired.video — an AI-native hiring + creator platform where people make video resumes, employers post video jobs, and a built-in Studio renders video client-side at $0 infra cost.",
   ];
+
+  const p = pathname.toLowerCase();
+  // Pricing facts ground hook/stat/cta scenes for the pricing + homepage
+  // surfaces (where price/value claims are the whole point).
+  if (p === "/" || p.startsWith("/pricing")) {
+    const cheapestPack = TOKEN_PACKS.reduce((lo, t) => (t.price < lo.price ? t : lo), TOKEN_PACKS[0]);
+    facts.push(
+      `Pricing: Pro is $${PRO_MONTHLY_PRICE.toFixed(2)}/month (or $${PRO_YEARLY_PRICE.toFixed(2)}/year — 20% off).`,
+      `AI tokens: Free includes ${FREE_AI_MONTHLY_TOKENS.toLocaleString("en-US")}/month; Pro includes ${PRO_AI_MONTHLY_TOKENS.toLocaleString("en-US")}/month.`,
+      `Free tier also includes ${FREE_PUBLISHED_VIDEOS_LIMIT} published video and ${FREE_INTERVIEW_SESSIONS_PER_MONTH} interview-practice sessions per month.`,
+      `One-off token packs start at $${cheapestPack.price.toFixed(2)} (${(cheapestPack.tokens / 1000).toLocaleString("en-US")}K tokens).`,
+    );
+  }
+
+  return facts;
 }
 
 studioRoutes.post("/generate-from-page", async (c) => {
@@ -1320,7 +1345,15 @@ const PublishEmbedSchema = z.object({
   placement: z.enum(["hero", "inline"]).default("hero"),
 });
 
-// Public resolver — anonymous visitors hit this on every marketing page.
+// Public membership set — the client fetches this once (cached) and only
+// runs the full resolve below when the current route is in the set (#1863).
+studioRoutes.get("/page-embeds/paths", async (c) => {
+  const svc = new PageEmbedService(getDb());
+  return c.json(ok({ paths: await svc.listActivePaths() }));
+});
+
+// Public resolver — anonymous visitors hit this only on routes that the
+// /paths set says actually carry an embed.
 studioRoutes.get("/page-embeds/resolve", async (c) => {
   const path = normalisePathname(c.req.query("path") ?? "");
   const svc = new PageEmbedService(getDb());
