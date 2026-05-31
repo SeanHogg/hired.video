@@ -276,7 +276,7 @@ async function runGenerateVideoFromTemplate(
 }
 
 // ── Studio: generate a video from the CURRENT PAGE (SuperAdmin) ──────────────
-// #1830. The Brain harvests the live marketing page (DOM headings, body
+// #1860. The Brain harvests the live marketing page (DOM headings, body
 // copy, content images, CTAs, the route's PAGE_SEO positioning), posts it
 // to the SuperAdmin-gated scaffolder, and stages the returned
 // `PageVideoSpec` as a pending mutation. commitMutation hydrates the spec

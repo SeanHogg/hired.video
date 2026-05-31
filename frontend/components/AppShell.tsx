@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { EmailVerificationBanner } from "@/components/auth/EmailVerificationBanner";
 import { GeoLocaleSuggestionBanner } from "@/components/i18n/GeoLocaleSuggestionBanner";
+import { MarketingPageVideo } from "@/components/MarketingPageVideo";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, useVerificationBlocked } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -83,6 +84,7 @@ function MinimalShell({
       <div className="pt-16 flex-1">
         <GeoLocaleSuggestionBanner />
         <EmailVerificationBanner />
+        <MarketingPageVideo />
         {children}
       </div>
       <Footer />
@@ -120,6 +122,7 @@ export function AppShell({
         <div className="pt-16 min-h-screen">
           <GeoLocaleSuggestionBanner />
           <EmailVerificationBanner />
+          <MarketingPageVideo />
           {children}
         </div>
         <Footer />

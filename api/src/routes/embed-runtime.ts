@@ -17,12 +17,16 @@
  */
 
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import {
   resolveEmbedRequest,
   EmbedAuthError,
 } from "../services/company/embed.js";
+import { getDb } from "../db/index.js";
+import { studioProjects, videos } from "../db/schema/index.js";
+import { cdnUrl } from "../utils/cdn.js";
 import {
   PeopleOpsService,
   defaultPeopleOpsServiceDeps,
@@ -285,4 +289,113 @@ function FRAME_HTML(view: string, key: string): string {
   window.addEventListener('resize', postHeight);
 })();
 </script></body></html>`;
+}
+
+// ── Video embed (#1860) ───────────────────────────────────────────────────────
+// Public, KEYLESS embedding of a published Studio video on any site.
+//   /embed/video/loader.js — reads data-hired-video, injects the iframe.
+//   /embed/video/frame     — self-contained player; resolves the video
+//                            server-side and bakes the CDN URL into the
+//                            markup (no SPA bundle, no second fetch).
+// Unlike the company-data surfaces above, a published video is public
+// marketing content, so no key is required. Private projects are refused.
+
+interface EmbeddableVideo {
+  title: string;
+  videoUrl: string | null;
+  youtubeVideoId: string | null;
+  thumbnailUrl: string | null;
+}
+
+/** Resolve a Studio project id to its rendered, publicly-embeddable
+ *  video. Returns null when the project is missing, private, or not yet
+ *  rendered (an external iframe can't run the live canvas renderer). */
+async function resolveEmbeddableVideo(id: string): Promise<EmbeddableVideo | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({
+      title: videos.title,
+      r2Key: videos.r2Key,
+      youtubeVideoId: videos.youtubeVideoId,
+      thumbnailUrl: videos.thumbnailUrl,
+      privacyStatus: videos.privacyStatus,
+    })
+    .from(studioProjects)
+    .leftJoin(videos, eq(videos.id, studioProjects.videoId))
+    .where(eq(studioProjects.id, id))
+    .limit(1);
+  if (!row) return null;
+  if (row.privacyStatus === "private") return null;
+  const videoUrl = row.r2Key ? cdnUrl(row.r2Key) : null;
+  if (!videoUrl && !row.youtubeVideoId) return null; // not rendered yet
+  return {
+    title: row.title ?? "Video",
+    videoUrl,
+    youtubeVideoId: row.youtubeVideoId ?? null,
+    thumbnailUrl: row.thumbnailUrl ?? null,
+  };
+}
+
+const VIDEO_LOADER_JS = `(function(){
+  var s = document.currentScript;
+  if (!s) return;
+  var base = new URL(s.src).origin;
+  var id = s.getAttribute('data-hired-video');
+  if (!id) { console.error('[hired.video embed] missing data-hired-video'); return; }
+  var mount = s.previousElementSibling;
+  if (!mount || !mount.hasAttribute('data-hired-video-embed')) {
+    mount = document.querySelector('[data-hired-video-embed]');
+  }
+  if (!mount) { mount = document.createElement('div'); s.parentNode.insertBefore(mount, s); }
+  var iframe = document.createElement('iframe');
+  iframe.src = base + '/embed/video/frame?v=' + encodeURIComponent(id);
+  iframe.style.width = '100%';
+  iframe.style.border = '0';
+  iframe.style.aspectRatio = '9 / 16';
+  iframe.style.maxHeight = '90vh';
+  iframe.setAttribute('title', 'hired.video');
+  iframe.setAttribute('loading', 'lazy');
+  iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+  iframe.setAttribute('allowfullscreen', '');
+  mount.innerHTML = '';
+  mount.appendChild(iframe);
+})();`;
+
+embedAssetRoutes.get("/video/loader.js", (c) => {
+  c.header("Content-Type", "application/javascript; charset=utf-8");
+  c.header("Cache-Control", "public, max-age=300");
+  return c.body(VIDEO_LOADER_JS);
+});
+
+embedAssetRoutes.get("/video/frame", async (c) => {
+  const id = c.req.query("v") || "";
+  c.header("Content-Type", "text/html; charset=utf-8");
+  // Public marketing content — embeddable anywhere.
+  c.header("Content-Security-Policy", "frame-ancestors *");
+  if (!id) return c.body(VIDEO_FRAME_ERROR("Missing video id"));
+  let video: EmbeddableVideo | null = null;
+  try {
+    video = await resolveEmbeddableVideo(id);
+  } catch {
+    return c.body(VIDEO_FRAME_ERROR("This video is unavailable."));
+  }
+  if (!video) return c.body(VIDEO_FRAME_ERROR("This video is unavailable."));
+  return c.body(VIDEO_FRAME_HTML(video));
+});
+
+function VIDEO_FRAME_ERROR(msg: string): string {
+  return `<!doctype html><meta charset=utf-8><body style="margin:0;display:grid;place-items:center;height:100vh;font:14px system-ui;color:#9ca3af;background:#0f172a">${escapeAttr(msg)}</body>`;
+}
+
+/** Self-contained player document — flat CDN `<video>` or a YouTube
+ *  iframe. No SPA bundle. */
+function VIDEO_FRAME_HTML(video: EmbeddableVideo): string {
+  const poster = video.thumbnailUrl ? ` poster="${escapeAttr(video.thumbnailUrl)}"` : "";
+  const player = video.videoUrl
+    ? `<video controls playsinline${poster} style="width:100%;height:100%;object-fit:contain;background:#000" src="${escapeAttr(video.videoUrl)}"></video>`
+    : `<iframe style="width:100%;height:100%;border:0" src="https://www.youtube.com/embed/${escapeAttr(video.youtubeVideoId ?? "")}" title="${escapeAttr(video.title)}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{margin:0;height:100%;background:#000}</style></head>
+<body>${player}</body></html>`;
 }

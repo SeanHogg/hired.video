@@ -368,6 +368,25 @@ export const PublicVideoSchema = z.object({
 });
 export type PublicVideo = z.infer<typeof PublicVideoSchema>;
 
+/** A page→video embed resolved for a route (#1860). The server projects
+ *  the published Studio project into the `PublicVideo` shape the player
+ *  renders directly. */
+export interface ResolvedPageEmbed {
+  placement: "hero" | "inline" | string;
+  video: PublicVideo;
+}
+
+/** One row in the SuperAdmin page-embed management list. */
+export interface PageEmbedListItem {
+  pathname: string;
+  placement: string;
+  isActive: boolean;
+  projectId: string;
+  rendered: boolean;
+  title: string;
+  updatedAt: string;
+}
+
 export const UserVideoSchema = z.object({
   id: z.string(),
   title: z.string().nullish(),
@@ -526,7 +545,7 @@ export const studioService = {
   },
 
   /**
-   * SuperAdmin page → video scaffolder (#1830). Posts a harvested page
+   * SuperAdmin page → video scaffolder (#1860). Posts a harvested page
    * (DOM text + images + CTAs + the route's PAGE_SEO copy) and gets back
    * a `PageVideoSpec` the editor hydrates into a CanvasState. Gated to
    * SuperAdmin server-side; the calling tool is hidden from non-SA users.
@@ -536,6 +555,48 @@ export const studioService = {
   ): Promise<ApiSuccessResponse<import("@shared/page-video-spec").GeneratePageVideoResponse>> {
     return apiClient.post("/api/studio/generate-from-page", { page }) as Promise<
       ApiSuccessResponse<import("@shared/page-video-spec").GeneratePageVideoResponse>
+    >;
+  },
+
+  // ── Page → video embed registry (#1860) ──────────────────────────────────
+
+  /**
+   * Resolve the video a SuperAdmin published to a marketing-page route, or
+   * null. PUBLIC — the shared <MarketingPageVideo> component calls this on
+   * every page for anonymous visitors too.
+   */
+  async resolvePageEmbed(
+    pathname: string,
+  ): Promise<ApiSuccessResponse<{ embed: ResolvedPageEmbed | null }>> {
+    return apiClient.get(
+      `/api/studio/page-embeds/resolve?path=${encodeURIComponent(pathname)}`,
+    ) as Promise<ApiSuccessResponse<{ embed: ResolvedPageEmbed | null }>>;
+  },
+
+  /** SuperAdmin: publish a Studio project onto a page route (upsert). */
+  async setPageEmbed(args: {
+    pathname: string;
+    projectId: string;
+    placement?: "hero" | "inline";
+  }): Promise<ApiSuccessResponse<{ pathname: string; placement: string }>> {
+    return apiClient.post("/api/studio/page-embeds", args) as Promise<
+      ApiSuccessResponse<{ pathname: string; placement: string }>
+    >;
+  },
+
+  /** SuperAdmin: unpublish a page route's video. */
+  async removePageEmbed(
+    pathname: string,
+  ): Promise<ApiSuccessResponse<{ pathname: string; removed: boolean }>> {
+    return apiClient.delete(
+      `/api/studio/page-embeds?path=${encodeURIComponent(pathname)}`,
+    ) as Promise<ApiSuccessResponse<{ pathname: string; removed: boolean }>>;
+  },
+
+  /** SuperAdmin: list every active page→video mapping. */
+  async listPageEmbeds(): Promise<ApiSuccessResponse<{ embeds: PageEmbedListItem[] }>> {
+    return apiClient.get("/api/studio/page-embeds") as Promise<
+      ApiSuccessResponse<{ embeds: PageEmbedListItem[] }>
     >;
   },
 

@@ -1,5 +1,5 @@
 /**
- * Page → video embed registry (#1830).
+ * Page → video embed registry (#1860).
  *
  * Maps a marketing-page route (pathname) to the Studio video a SuperAdmin
  * published onto it. The public resolver reads the active row for a path;

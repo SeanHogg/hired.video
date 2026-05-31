@@ -1,6 +1,6 @@
 /**
  * Wire shape for the **page → video** scaffolder (SuperAdmin "turn this
- * marketing page into a Studio video" flow, #1830).
+ * marketing page into a Studio video" flow, #1860).
  *
  * Lives in `shared/` so both the API route + scaffolder service AND the
  * frontend page-harvester + `pageVideoSpecToCanvas()` consume the same

@@ -8,6 +8,7 @@ import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
+import { PageEmbedService } from "../services/studio/page-embed-service.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -1200,7 +1201,7 @@ studioRoutes.post("/generate-comic", async (c) => {
 
 // ─── POST /api/studio/generate-from-page ─────────────────────────────────────
 // SuperAdmin "turn this marketing page into a Studio video" scaffolder
-// (#1830). The client's AI Brain harvests the live page (DOM text +
+// (#1860). The client's AI Brain harvests the live page (DOM text +
 // images + CTAs + the matched PAGE_SEO entry) and posts it here. We gate
 // to SuperAdmin, enrich with server-known route facts, run the LLM via
 // `scaffoldPageVideo()`, and return a PageVideoSpec the frontend hydrates
@@ -1248,7 +1249,7 @@ const HarvestedPageSchema = z.object({
  *  authoritative signal (preferred over possibly-stale DOM text). Kept
  *  intentionally small for now — richer per-route enrichment (live
  *  pricing-config plan prices on /pricing, published-video counts on the
- *  homepage) is tracked as a gap (#1831). */
+ *  homepage) is tracked as a gap (#1861). */
 function buildPageVideoServerFacts(_pathname: string): string[] {
   return [
     "Brand: hired.video — an AI-native hiring + creator platform where people make video resumes, employers post video jobs, and a built-in Studio renders video client-side at $0 infra cost.",
@@ -1296,6 +1297,86 @@ studioRoutes.post("/generate-from-page", async (c) => {
       500,
     );
   }
+});
+
+// ─── Page → video embed registry (#1860) ─────────────────────────────────────
+// SuperAdmin publishes a Studio video onto a marketing-page route; the
+// shared <MarketingPageVideo> component resolves + renders it. The resolve
+// GET is PUBLIC (anonymous marketing-page visitors); the mutations are
+// SuperAdmin-gated.
+
+/** Normalise a route to the canonical key the registry stores: leading
+ *  slash, no trailing slash (except root), no query/hash. */
+function normalisePathname(raw: string): string {
+  let p = (raw || "").trim().split("?")[0].split("#")[0];
+  if (!p.startsWith("/")) p = `/${p}`;
+  if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+  return p.slice(0, 512);
+}
+
+const PublishEmbedSchema = z.object({
+  pathname: z.string().min(1).max(512),
+  projectId: UuidLikeSchema,
+  placement: z.enum(["hero", "inline"]).default("hero"),
+});
+
+// Public resolver — anonymous visitors hit this on every marketing page.
+studioRoutes.get("/page-embeds/resolve", async (c) => {
+  const path = normalisePathname(c.req.query("path") ?? "");
+  const svc = new PageEmbedService(getDb());
+  const resolved = await svc.resolveForPath(path);
+  // 200 with `{ embed: null }` (not 404) so the client can cache "no embed
+  // here" cheaply without treating it as an error.
+  return c.json(ok({ embed: resolved }));
+});
+
+// SuperAdmin: list all active mappings (management surface).
+studioRoutes.get("/page-embeds", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  if (!isSuperAdmin(user)) return c.json(fail("FORBIDDEN", "SuperAdmin access required"), 403);
+  const svc = new PageEmbedService(getDb());
+  return c.json(ok({ embeds: await svc.listActive() }));
+});
+
+// SuperAdmin: publish a project to a path (upsert).
+studioRoutes.post("/page-embeds", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  if (!isSuperAdmin(user)) return c.json(fail("FORBIDDEN", "SuperAdmin access required"), 403);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = PublishEmbedSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  }
+  const pathname = normalisePathname(parsed.data.pathname);
+  const svc = new PageEmbedService(getDb());
+  try {
+    await svc.publish({
+      pathname,
+      projectId: parsed.data.projectId,
+      placement: parsed.data.placement,
+      userId: user.sub,
+    });
+  } catch (err) {
+    return c.json(
+      fail("PUBLISH_FAILED", err instanceof Error ? err.message : "Publish failed"),
+      400,
+    );
+  }
+  return c.json(ok({ pathname, placement: parsed.data.placement }), 201);
+});
+
+// SuperAdmin: unpublish a path.
+studioRoutes.delete("/page-embeds", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  if (!isSuperAdmin(user)) return c.json(fail("FORBIDDEN", "SuperAdmin access required"), 403);
+  const pathname = normalisePathname(c.req.query("path") ?? "");
+  const svc = new PageEmbedService(getDb());
+  const removed = await svc.unpublish(pathname);
+  return c.json(ok({ pathname, removed }));
 });
 
 function getS3Client(): S3Client {

@@ -1,5 +1,5 @@
 /**
- * Page → video scaffolder (#1830).
+ * Page → video scaffolder (#1860).
  *
  * Single entry point: `scaffoldPageVideo()`. Takes a `HarvestedPage`
  * (the live DOM the SuperAdmin's Brain captured) plus any server-known

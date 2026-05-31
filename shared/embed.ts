@@ -180,3 +180,24 @@ export const EMBED_ROADMAP = EMBED_SURFACES.filter((s) => s.status !== "availabl
 /** The placeholder shown in the copyable snippet. The real key is injected at
  *  build/deploy time from an env var — never committed to source. */
 export const EMBED_KEY_PLACEHOLDER = "${HIRED_EMBED_KEY}";
+
+// ── Video embed snippet (#1860) ──────────────────────────────────────────────
+// Public video embeds are KEYLESS — a published Studio video is public
+// marketing content, unlike the company-data surfaces above (which need a
+// scoped key). Single source of truth for the snippet so the Studio
+// "Embed" dialog and any docs/tests render identical markup.
+
+/**
+ * Build the copy-paste snippet that renders a published Studio video on
+ * any third-party site. `videoId` is the Studio project id; the loader
+ * resolves it to the rendered CDN video server-side.
+ */
+export function buildVideoEmbedSnippet(opts: {
+  origin: string;
+  videoId: string;
+}): string {
+  return [
+    `<div data-hired-video-embed></div>`,
+    `<script async src="${opts.origin}/embed/video/loader.js" data-hired-video="${opts.videoId}"></script>`,
+  ].join("\n");
+}

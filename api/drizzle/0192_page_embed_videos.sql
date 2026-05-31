@@ -1,4 +1,4 @@
--- Migration 0192 — page → video embed registry (#1830).
+-- Migration 0192 — page → video embed registry (#1860).
 --
 -- A SuperAdmin can publish a generated Studio video onto a marketing page
 -- by route. The shared <MarketingPageVideo> component (mounted once in

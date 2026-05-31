@@ -1,5 +1,5 @@
 /**
- * Page harvester (#1830) — the client half of the SuperAdmin "turn this
+ * Page harvester (#1860) — the client half of the SuperAdmin "turn this
  * page into a Studio video" flow.
  *
  * The AI Brain runs inside the page as an overlay, so `document` IS the

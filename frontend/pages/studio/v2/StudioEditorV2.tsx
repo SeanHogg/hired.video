@@ -35,6 +35,7 @@ import {
   Pencil,
   UserPlus,
   Download,
+  Code2,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -189,6 +190,8 @@ import CanvasEditToolbar from "@/components/studio/v2/CanvasEditToolbar";
 import SubjectSeedBanner from "@/components/studio/v2/SubjectSeedBanner";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
+import { PageEmbedDialog } from "@/components/studio/PageEmbedDialog";
+import { isSuperAdminFromToken } from "@/lib/auth-claims";
 import AudioEmptyHint from "@/components/studio/v2/AudioEmptyHint";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveMenuV2 from "@/components/studio/v2/StudioSaveMenuV2";
@@ -1979,6 +1982,8 @@ export default function StudioEditorV2() {
   // sourceType: studio_video. Closes the Studio→Course authoring loop
   // (parity with the Save menu's other publish destinations).
   const [attachToCourseOpen, setAttachToCourseOpen] = useState(false);
+  // SuperAdmin page→video embed dialog (#1860).
+  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
 
   async function renderToBlob(): Promise<Blob | null> {
     if (state.scenes.length === 0) return null;
@@ -2452,6 +2457,11 @@ export default function StudioEditorV2() {
           }
           onPublishAsCourseLesson={
             persistedProjectId ? () => setAttachToCourseOpen(true) : undefined
+          }
+          onEmbedOnPage={
+            persistedProjectId && isSuperAdminFromToken()
+              ? () => setEmbedDialogOpen(true)
+              : undefined
           }
           usesTimelineChrome={usesTimelineChrome}
         />
@@ -3319,6 +3329,17 @@ export default function StudioEditorV2() {
         studioProjectId={persistedProjectId}
         defaultTitle={persistedProject?.title ?? undefined}
       />
+      {/* SuperAdmin page→video embed (#1860) — publish onto a marketing
+          page and/or copy an external snippet. Only reachable via the
+          SuperAdmin-gated Embed button in the header. */}
+      {embedDialogOpen && persistedProjectId && (
+        <PageEmbedDialog
+          open={embedDialogOpen}
+          onOpenChange={setEmbedDialogOpen}
+          projectId={persistedProjectId}
+          rendered={!!persistedProject?.videoUrl}
+        />
+      )}
       {previewOpen && (
         <PreviewOverlay
           state={state}
@@ -3420,6 +3441,7 @@ function EditorHeader({
   onPublishToProfile,
   onSaveImageToLibrary,
   onPublishAsCourseLesson,
+  onEmbedOnPage,
   usesTimelineChrome,
   mediaKind,
   gameEngine,
@@ -3471,6 +3493,11 @@ function EditorHeader({
   /** Opens the AttachToCourseDialog (Save as Course Lesson). Pass undefined
    *  when no project id is persisted yet — the SaveMenu row self-disables. */
   onPublishAsCourseLesson?: () => void;
+  /** SuperAdmin "Embed" (#1860) — opens the PageEmbedDialog to publish the
+   *  video onto a marketing page and/or copy an external snippet. Passed
+   *  only for SuperAdmins on a persisted project; the button self-gates on
+   *  the callback being defined. */
+  onEmbedOnPage?: () => void;
   /** Drives whether the playback scrubber + Preview button render — the
    *  shared gate (#936) so non-Timeline kinds (game / image) don't see
    *  scene-shaped controls that don't apply to their runtime. */
@@ -3659,6 +3686,20 @@ function EditorHeader({
             the parent applies the chosen bindings to its leftTab +
             advancedTimelineOpen setters. */}
         <LayoutPresetMenu onApply={onApplyLayoutBindings} />
+        {/* SuperAdmin "Embed" (#1860) — self-gates on the optional handler,
+            which the parent only binds for SuperAdmins on a saved project. */}
+        {onEmbedOnPage && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={onEmbedOnPage}
+            title="Embed this video on a page"
+          >
+            <Code2 className="h-4 w-4" />
+            Embed
+          </Button>
+        )}
         {/* Single split-button for the whole project: Save (primary —
             persists draft) + chevron-dropdown with Export MP4, Copy
             link, and Publish (YouTube / LinkedIn / Profile). Replaces
