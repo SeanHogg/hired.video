@@ -37,6 +37,7 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { generateStructuredData, useSEO, type SEOData } from "./seo";
+import { buildImageUrl } from "./utils";
 
 // ---------------------------------------------------------------------------
 // Registry
@@ -220,12 +221,18 @@ export interface ArticleRecord {
  * card + on-page hero without the editor having to upload one.
  */
 export function articleCoverImageUrl(article: Pick<ArticleRecord, "title" | "category" | "publishedAt" | "coverImageUrl" | "author">): string {
-  if (article.coverImageUrl) return article.coverImageUrl;
+  // Resolve through buildImageUrl so a relative API path (the seeded
+  // `/api/og/articles?…` cover or the generated fallback below) becomes an
+  // absolute URL on the API origin. The SPA is served from a static host
+  // (Cloudflare Pages, hired.video) that does NOT proxy `/api` to the
+  // worker (api.hired.video), so an unresolved relative `/api/og/…` src
+  // 404s — the broken-image bug. Absolute upload URLs pass through as-is.
+  if (article.coverImageUrl) return buildImageUrl(article.coverImageUrl)!;
   const params = new URLSearchParams({ title: article.title });
   if (article.category) params.set("category", article.category);
   if (article.publishedAt) params.set("date", article.publishedAt.slice(0, 10));
   if (article.author?.name) params.set("author", article.author.name);
-  return `/api/og/articles?${params.toString()}`;
+  return buildImageUrl(`/api/og/articles?${params.toString()}`)!;
 }
 
 export interface BlogPostRecord {
@@ -355,7 +362,7 @@ registerUgcSeo<CompanyRecord>("company", (company, pathname) => {
     title,
     description,
     ...mirrorOg(title, description),
-    ogImage: `/api/og/companies/${company.id}`,
+    ogImage: buildImageUrl(`/api/og/companies/${company.id}`),
     structuredData: generateStructuredData.organization({
       name: company.data.name,
       description: company.data.description,
@@ -386,7 +393,7 @@ registerUgcSeo<CompanyRecord>("companyReviews", (company, pathname) => {
     title,
     description,
     ...mirrorOg(title, description),
-    ogImage: `/api/og/companies/${company.id}`,
+    ogImage: buildImageUrl(`/api/og/companies/${company.id}`),
     structuredData: generateStructuredData.organization({
       name: company.data.name,
       description: company.data.description,
@@ -609,12 +616,12 @@ registerUgcSeo<CourseRecord>("course", (course, pathname) => {
     title,
     description,
     ...mirrorOg(title, description),
-    ...(course.coverImageUrl ? { ogImage: course.coverImageUrl } : {}),
+    ...(course.coverImageUrl ? { ogImage: buildImageUrl(course.coverImageUrl) } : {}),
     ...(keywords ? { keywords } : {}),
     structuredData: generateStructuredData.course({
       name: course.title,
       description: clip(course.summary ?? course.description, 200),
-      image: course.coverImageUrl ?? undefined,
+      image: buildImageUrl(course.coverImageUrl) ?? undefined,
       instructorName: course.author.name,
       instructorUrl: course.author.slug ? `${ORIGIN}/people/${course.author.slug}` : undefined,
       url: absUrl(pathname),

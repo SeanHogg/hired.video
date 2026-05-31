@@ -43,8 +43,7 @@ import {
   Pencil,
   Video,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import Markdown from "@/components/Markdown";
 
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
@@ -755,13 +754,16 @@ function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
           variant="inline"
         />
       ) : null}
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        {lesson.bodyMd ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{lesson.bodyMd}</ReactMarkdown>
-        ) : (
+      {lesson.bodyMd ? (
+        // Shared <Markdown> resolves API-relative image srcs (e.g. the
+        // /api/og/lesson-diagram diagrams embedded by migration 0190) and
+        // owns the prose wrapper — no duplicate ReactMarkdown setup here.
+        <Markdown>{lesson.bodyMd}</Markdown>
+      ) : (
+        <div className="prose prose-sm dark:prose-invert max-w-none">
           <p className="text-muted-foreground italic">This lesson has no content yet.</p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 

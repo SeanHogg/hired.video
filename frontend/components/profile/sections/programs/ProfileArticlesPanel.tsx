@@ -8,6 +8,7 @@ import { Clock, Eye, FileText, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { articleService, type PublicArticleCard } from "@/lib/services/article-service";
+import { buildImageUrl } from "@/lib/utils";
 import EmptyProgramState from "./EmptyProgramState";
 
 interface Props {
@@ -71,7 +72,7 @@ function ArticleRow({ article }: { article: PublicArticleCard }) {
       {article.coverImageUrl ? (
         <div className="aspect-video bg-muted">
           <img
-            src={article.coverImageUrl}
+            src={buildImageUrl(article.coverImageUrl)}
             alt={article.title}
             className="w-full h-full object-cover"
           />

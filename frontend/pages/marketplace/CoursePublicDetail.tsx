@@ -30,6 +30,7 @@ import { UnenrollButton } from "@/components/courses/UnenrollButton";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { buildShareAction } from "@/lib/card-share-action";
+import { buildImageUrl } from "@/lib/utils";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { toast } from "@/components/ui/use-toast";
 import { courseService, type CourseEnrollment } from "@/lib/services/course-service";
@@ -312,7 +313,7 @@ export default function CoursePublicDetail() {
           {course.coverImageUrl && (
             <div className="aspect-video overflow-hidden rounded-xl border bg-muted">
               <img
-                src={course.coverImageUrl}
+                src={buildImageUrl(course.coverImageUrl)}
                 alt={course.title}
                 className="w-full h-full object-cover"
               />

@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import Markdown from "@/components/Markdown";
 import { articleService, type Article } from "@/lib/services/article-service";
+import { buildImageUrl } from "@/lib/utils";
 import ScaledTemplateFrame from "./ScaledTemplateFrame";
 import { InlineBodyMessage } from "./InlineBodyMessage";
 
@@ -59,7 +60,7 @@ export default function ArticleInlineBody({ id }: ArticleInlineBodyProps) {
       <article className="bg-white px-8 py-6 text-slate-900">
         {article.coverImageUrl && (
           <img
-            src={article.coverImageUrl}
+            src={buildImageUrl(article.coverImageUrl)}
             alt=""
             className="mb-4 h-48 w-full rounded-md object-cover"
           />

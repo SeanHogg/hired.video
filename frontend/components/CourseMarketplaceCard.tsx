@@ -5,6 +5,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buildShareAction } from "@/lib/card-share-action";
+import { buildImageUrl } from "@/lib/utils";
 
 export interface CourseMarketplaceItem {
   id: string;
@@ -50,7 +51,7 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
     <BaseCard className="h-full flex flex-col">
       <div className="aspect-video bg-muted relative">
         {item.coverImageUrl ? (
-          <img src={item.coverImageUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img src={buildImageUrl(item.coverImageUrl)} alt={item.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <GraduationCap className="h-10 w-10 text-muted-foreground" />

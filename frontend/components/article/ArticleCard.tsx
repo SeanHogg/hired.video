@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PublicArticleCard } from "@/lib/services/article-service";
+import { buildImageUrl } from "@/lib/utils";
 import {
   ARTICLE_AUDIENCES,
   ARTICLE_AUDIENCE_LABELS,
@@ -41,7 +42,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
         {article.coverImageUrl && (
           <div
             className="h-32 w-full rounded-t-lg bg-cover bg-center"
-            style={{ backgroundImage: `url(${article.coverImageUrl})` }}
+            style={{ backgroundImage: `url(${buildImageUrl(article.coverImageUrl)})` }}
           />
         )}
         <CardHeader>

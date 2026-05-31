@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2, Clock, Eye } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import Markdown from "@/components/Markdown";
 import { articleCoverImageUrl, useUgcSeo } from "@/lib/seo-ugc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -138,9 +137,9 @@ export default function ArticleView() {
               />
             </div>
 
-            <div className="prose prose-neutral dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.bodyMd}</ReactMarkdown>
-            </div>
+            <Markdown className="prose prose-neutral dark:prose-invert max-w-none">
+              {article.bodyMd}
+            </Markdown>
 
             {article.tags && article.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-8 pt-6 border-t">
