@@ -38,6 +38,7 @@ import {
   sourcingBidActionRoutes,
 } from "./routes/sourcing-bids.js";
 import { companyRoutes } from "./routes/companies.js";
+import { companyEmbedRoutes } from "./routes/company-embed.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { boostRoutes } from "./routes/boosts.js";
 import { taxonomyRoutes } from "./routes/taxonomies.js";
@@ -590,6 +591,9 @@ export function createApp() {
   app.route("/api/sourcing-bids", sourcingBidActionRoutes);
   app.route("/api/jobs", jobRoutes);
   app.route("/api/job", jobRoutes); // legacy singular endpoints (e.g., /api/Job)
+  // Company embedding (toggle + keys + snippet) — mounted BEFORE the
+  // /api/companies catch-all so the :companyId/embed sub-routes match.
+  app.route("/api/companies/:companyId/embed", companyEmbedRoutes);
   app.route("/api/companies", companyRoutes);
   app.route("/api/reviews", reviewRoutes);
   app.route("/api/boosts", boostRoutes);

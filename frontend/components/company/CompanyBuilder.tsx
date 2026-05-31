@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, Save, Loader2, AlertCircle } from "lucide-react";
+import EmbedSettings from "@/components/company/EmbedSettings";
 
 interface CompanyBuilderProps {
   /** When null, the builder is in create mode and POSTs on save. */
@@ -281,6 +282,7 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
             </TabsTrigger>
             <TabsTrigger value="benefits">Benefits</TabsTrigger>
             <TabsTrigger value="mission">Mission & Values</TabsTrigger>
+            {company?.id && <TabsTrigger value="embed">Embed</TabsTrigger>}
           </TabsList>
         </div>
 
@@ -641,6 +643,15 @@ export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBui
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Embed — only for saved companies (needs an id to mint keys). Self-
+            contained: manages its own state + API calls, independent of the
+            company form's autosave. */}
+        {company?.id && (
+          <TabsContent value="embed" className="space-y-4">
+            <EmbedSettings companyId={company.id} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Form Actions */}

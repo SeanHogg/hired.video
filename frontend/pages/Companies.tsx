@@ -568,6 +568,52 @@ export default function Companies() {
               </div>
             </div>
 
+            {/* For employers — People Operations (CHRO) + embeddable.
+                Shown on the unauthenticated /companies landing to pitch the
+                paid employer product. */}
+            <div className="mb-16 rounded-2xl border bg-card p-8">
+              <div className="text-center mb-8">
+                <span className="text-sm font-semibold text-primary uppercase tracking-wide">For employers</span>
+                <h2 className="text-3xl font-bold mt-2">Run your whole team with People Operations</h2>
+                <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
+                  hired.video isn't just where you hire — it's where you run the team. Roster &amp; org chart,
+                  1:1s, performance, goals, and team health, plus the video-first hiring you already know.
+                  Multi-tenant and <strong>embeddable</strong> into your own tools.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-lg"><Users className="h-5 w-5 mr-2" /> Roster &amp; org chart</CardTitle>
+                    <CardDescription>One source of truth for your team — directory, manager hierarchy, headcount, and billable seats.</CardDescription>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-lg"><TrendingUp className="h-5 w-5 mr-2" /> Performance &amp; 1:1s</CardTitle>
+                    <CardDescription>A never-miss 1:1 cadence with shared agendas and action items, plus goals and team health.</CardDescription>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-lg"><Building2 className="h-5 w-5 mr-2" /> Embed it anywhere</CardTitle>
+                    <CardDescription>Render your hired.video surfaces inside your own app with a copyable snippet — segment-isolated per company.</CardDescription>
+                  </CardHeader>
+                </Card>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+                <Link to="/people-operations">
+                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                    Explore People Operations
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link to="/pricing">
+                  <Button size="lg" variant="outline">See pricing</Button>
+                </Link>
+              </div>
+            </div>
+
             {/* Featured Companies using CompanyCard */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">

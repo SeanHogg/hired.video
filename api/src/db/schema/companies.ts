@@ -106,12 +106,38 @@ export const companyProfiles = pgTable("company_profiles", {
   // table on every directory / card / OG render. See migration 0035.
   reviewCount: integer("review_count").notNull().default(0),
   reviewAvgOverall: numeric("review_avg_overall", { precision: 3, scale: 2 }),
+  // Employer-controlled toggle (company settings → Embed). When true the
+  // company may mint embed keys and render its hired.video surfaces on its
+  // own site. Migration 0187.
+  embedEnabled: boolean("embed_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CompanyProfile = typeof companyProfiles.$inferSelect;
 export type NewCompanyProfile = typeof companyProfiles.$inferInsert;
+
+// Company-scoped embed keys — authorize rendering this company's hired.video
+// surfaces on an external origin. Mirrors api_keys (prefix + SHA-256 hash,
+// full key shown once) but company-scoped with an origin allowlist. Migration
+// 0187.
+export const companyEmbedKeys = pgTable("company_embed_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
+  label: varchar("label", { length: 255 }).notNull(),
+  keyPrefix: varchar("key_prefix", { length: 16 }).notNull(),
+  keyHash: text("key_hash").notNull(),
+  scopes: jsonb("scopes").$type<string[]>().default([]).notNull(),
+  allowedOrigins: jsonb("allowed_origins").$type<string[]>().default([]).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CompanyEmbedKey = typeof companyEmbedKeys.$inferSelect;
+export type NewCompanyEmbedKey = typeof companyEmbedKeys.$inferInsert;
 
 export const userCompanyRoleAssociations = pgTable("user_company_role_associations", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -10,6 +10,7 @@ import { securityRoutes } from "./security.js";
 import { aiVendorRoutes } from "./ai-vendors.js";
 import { extensionTelemetryRoutes } from "./extension.js";
 import { superadminPointsRoutes } from "./points.js";
+import { superadminCompanyRoutes } from "./companies.js";
 
 /**
  * SuperAdmin management router.
@@ -36,3 +37,4 @@ superadminRoutes.route("/security", securityRoutes);
 superadminRoutes.route("/ai", aiVendorRoutes);
 superadminRoutes.route("/extension", extensionTelemetryRoutes);
 superadminRoutes.route("/points", superadminPointsRoutes);
+superadminRoutes.route("/companies", superadminCompanyRoutes);

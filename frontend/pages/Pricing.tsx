@@ -273,6 +273,8 @@ export default function Pricing() {
       proFeatures: [
         "Unlimited users + multi-tenant org structure",
         "Employee community (Engage / Inform / Inspire) + company-wide feed",
+        "People Operations (CHRO) — roster & org chart, 1:1s with action items, team health",
+        "Embeddable — render your roster, 1:1s & hiring surfaces inside your own app (segment-isolated)",
         "Hiring & onboarding — offer letters via Dropbox Sign, onboarding checklists",
         "Performance management — OKRs, review cycles, employee sign-off",
         "Company video promos via AI Studio + Brand Kits + company-wide templates",
@@ -2367,6 +2369,10 @@ export default function Pricing() {
                 {
                   question: "Do you offer team or recruiter pricing?",
                   answer: "Yes — Pro supports multi-seat teams with per-seat pricing. Recruiters get access to AI candidate sourcing, match scoring, and a visual hiring pipeline. Contact us for volume discounts on 10+ seats.",
+                },
+                {
+                  question: "What is People Operations, and can I embed it?",
+                  answer: "People Operations is the CHRO suite for employers — roster & org chart, 1:1s with shared agendas and action items, performance, goals, and team health, on top of the video-first hiring you already use. It's a paid employer feature, multi-tenant and segment-isolated per company. You can also embed your hired.video surfaces (roster, 1:1s, hiring) directly into your own app with a copyable JavaScript snippet — turn it on under your company's Embed settings and inject the embed key from an environment variable (never hardcode it).",
                 },
                 {
                   question: "Can I cancel my subscription anytime?",
