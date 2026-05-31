@@ -526,6 +526,20 @@ export const studioService = {
   },
 
   /**
+   * SuperAdmin page → video scaffolder (#1830). Posts a harvested page
+   * (DOM text + images + CTAs + the route's PAGE_SEO copy) and gets back
+   * a `PageVideoSpec` the editor hydrates into a CanvasState. Gated to
+   * SuperAdmin server-side; the calling tool is hidden from non-SA users.
+   */
+  async generatePageVideo(
+    page: import("@shared/page-video-spec").HarvestedPage,
+  ): Promise<ApiSuccessResponse<import("@shared/page-video-spec").GeneratePageVideoResponse>> {
+    return apiClient.post("/api/studio/generate-from-page", { page }) as Promise<
+      ApiSuccessResponse<import("@shared/page-video-spec").GeneratePageVideoResponse>
+    >;
+  },
+
+  /**
    * Upload a recorded video blob (multipart/form-data).
    * Returns the newly created studio project.
    */

@@ -7,6 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -1191,6 +1192,106 @@ studioRoutes.post("/generate-comic", async (c) => {
       fail(
         "GENERATION_FAILED",
         err instanceof Error ? err.message : "Comic generation failed",
+      ),
+      500,
+    );
+  }
+});
+
+// ─── POST /api/studio/generate-from-page ─────────────────────────────────────
+// SuperAdmin "turn this marketing page into a Studio video" scaffolder
+// (#1830). The client's AI Brain harvests the live page (DOM text +
+// images + CTAs + the matched PAGE_SEO entry) and posts it here. We gate
+// to SuperAdmin, enrich with server-known route facts, run the LLM via
+// `scaffoldPageVideo()`, and return a PageVideoSpec the frontend hydrates
+// into a CanvasState. Token metering happens inside `LLMClient.callJson`.
+const HarvestedPageSchema = z.object({
+  url: z.string().max(2048).default(""),
+  pathname: z.string().max(512).default("/"),
+  title: z.string().max(300).default(""),
+  metaDescription: z.string().max(1000).default(""),
+  headings: z
+    .array(z.object({ level: z.number().int().min(1).max(6), text: z.string().max(300) }))
+    .max(60)
+    .default([]),
+  sections: z
+    .array(
+      z.object({
+        level: z.number().int().min(1).max(6),
+        heading: z.string().max(300),
+        text: z.string().max(4000).default(""),
+      }),
+    )
+    .max(40)
+    .default([]),
+  images: z
+    .array(
+      z.object({
+        url: z.string().max(2048),
+        alt: z.string().max(500).default(""),
+        width: z.number().int().positive().optional(),
+        height: z.number().int().positive().optional(),
+      }),
+    )
+    .max(50)
+    .default([]),
+  ctas: z
+    .array(z.object({ text: z.string().max(200), href: z.string().max(2048) }))
+    .max(20)
+    .default([]),
+  seoTitle: z.string().max(300).optional(),
+  seoDescription: z.string().max(1000).optional(),
+  bodyText: z.string().max(20000).default(""),
+});
+
+/** Server-known facts for a route, appended to the scaffolder's prompt as
+ *  authoritative signal (preferred over possibly-stale DOM text). Kept
+ *  intentionally small for now — richer per-route enrichment (live
+ *  pricing-config plan prices on /pricing, published-video counts on the
+ *  homepage) is tracked as a gap (#1831). */
+function buildPageVideoServerFacts(_pathname: string): string[] {
+  return [
+    "Brand: hired.video — an AI-native hiring + creator platform where people make video resumes, employers post video jobs, and a built-in Studio renders video client-side at $0 infra cost.",
+  ];
+}
+
+studioRoutes.post("/generate-from-page", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) {
+    return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  }
+  // SuperAdmin-only: this turns marketing pages into embeddable promo
+  // videos — an operator capability, not an end-user one.
+  if (!isSuperAdmin(user)) {
+    return c.json(fail("FORBIDDEN", "SuperAdmin access required"), 403);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = HarvestedPageSchema.safeParse(body?.page ?? body);
+  if (!parsed.success) {
+    return c.json(
+      fail("VALIDATION_ERROR", "Invalid harvested page", parsed.error.flatten()),
+      400,
+    );
+  }
+  const page = parsed.data;
+
+  const llm = createLLMClient(c.env, c.var.user);
+  try {
+    const { scaffoldPageVideo } = await import(
+      "../services/studio/page-video-scaffolder.js"
+    );
+    const { spec } = await scaffoldPageVideo(llm, {
+      page,
+      serverFacts: buildPageVideoServerFacts(page.pathname),
+    });
+    return c.json(ok({ spec, sourcePath: page.pathname }), 201);
+  } catch (err) {
+    console.error("[studio/generate-from-page] scaffolder failed:", err);
+    return c.json(
+      fail(
+        "GENERATION_FAILED",
+        err instanceof Error ? err.message : "Page-to-video generation failed",
       ),
       500,
     );

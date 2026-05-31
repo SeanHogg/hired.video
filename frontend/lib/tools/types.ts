@@ -112,6 +112,15 @@ export interface ToolDefinition {
    */
   requiresPro?: boolean;
   /**
+   * If true, this tool is a SuperAdmin-only operator capability. It is
+   * filtered out of `getCoachToolSpecs()` for non-SA users so the model
+   * never sees it, AND the backend route enforces the same gate. Used by
+   * `generate_video_from_page` (turning marketing pages into embeddable
+   * promo videos). Presentation + exposure gate only — never the sole
+   * line of defence; the API route checks `isSuperAdmin` too.
+   */
+  requiresSuperAdmin?: boolean;
+  /**
    * If true, this tool MUTATES user data (resume content, profile fields).
    * The AI coach's ToolCallCard renders a preview + Apply button rather
    * than auto-applying — unless the user has opted into auto-apply via

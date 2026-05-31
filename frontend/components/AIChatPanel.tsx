@@ -27,6 +27,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useAI } from "@/lib/ai-context";
+import { isSuperAdminFromToken } from "@/lib/auth-claims";
 import { type ChatMessage } from "@/lib/services/ai-service";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -473,8 +474,9 @@ export default function AIChatPanel() {
 
       // Expose the AI-coach tool catalog to the model. The registry is
       // the single source: adding/removing tools there flows here for
-      // free, no parallel allowlist.
-      const toolSpecs = getCoachToolSpecs();
+      // free, no parallel allowlist. SuperAdmin-only tools (e.g. the
+      // page→video scaffolder) surface only for SuperAdmins.
+      const toolSpecs = getCoachToolSpecs({ superAdmin: isSuperAdminFromToken() });
 
       let sessionForTurn: string | undefined = currentSessionId ?? undefined;
       const accumulatedRuns: Message["toolRuns"] = [];

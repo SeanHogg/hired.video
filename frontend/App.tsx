@@ -261,6 +261,8 @@ const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
 const CandidateDetail = lazy(() => import("./pages/services/CandidateDetail"));
 const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
 const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
+const ScreeningTemplates = lazy(() => import("./pages/services/ScreeningTemplates"));
+const CandidateScreening = lazy(() => import("./pages/CandidateScreening"));
 const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"));
 const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
@@ -1121,6 +1123,10 @@ const App = () => (
 
                       {/* Async video interview — candidate view */}
                       <Route path="/interview/:token" element={<AsyncInterviewPage />} />
+
+                      {/* Candidate screening portal (magic link) + recruiter authoring */}
+                      <Route path="/screening/:token" element={<CandidateScreening />} />
+                      <Route path="/services/screening" element={<ScreeningTemplates />} />
 
                       {/* Take-home assignment — candidate delivery surface (#1438) */}
                       <Route path="/take-home/:token" element={<TakeHomeDeliveryPage />} />

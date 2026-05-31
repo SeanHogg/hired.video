@@ -37,6 +37,9 @@ import {
 } from "@/components/studio/templates/catalog";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { hydrateCanvasState } from "@/lib/studio/editor-v2/hydrate-canvas-state";
+import { harvestCurrentPage } from "@/lib/studio/page-harvest";
+import { pageVideoSpecToCanvas } from "@/lib/studio/editor-v2/page-spec-to-canvas";
+import type { PageVideoSpec } from "@shared/page-video-spec";
 import { resolveUserContent } from "@/lib/studio/editor-v2/resolve-user-content";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
 import {
@@ -268,6 +271,45 @@ async function runGenerateVideoFromTemplate(
       prompt,
       purpose: template.purpose,
       hydrated,
+    },
+  };
+}
+
+// ── Studio: generate a video from the CURRENT PAGE (SuperAdmin) ──────────────
+// #1830. The Brain harvests the live marketing page (DOM headings, body
+// copy, content images, CTAs, the route's PAGE_SEO positioning), posts it
+// to the SuperAdmin-gated scaffolder, and stages the returned
+// `PageVideoSpec` as a pending mutation. commitMutation hydrates the spec
+// into a CanvasState and persists it as an `nle` video draft, then the
+// ToolCallCard surfaces an Open link to the Studio editor for review.
+async function runGenerateVideoFromPage(
+  ctx: ToolRunContext,
+): Promise<NormalizedToolRunResult> {
+  const page = harvestCurrentPage();
+  if (!page) {
+    throw new Error("Can't read the current page — open this on a rendered page and try again.");
+  }
+  const { data } = await studioService.generatePageVideo(page);
+  const spec = data.spec;
+  const name = asString(ctx.args.name) ?? spec.title ?? `Video — ${page.title || page.pathname}`;
+
+  const previewLines: string[] = [
+    `Source: ${page.pathname}`,
+    `Scenes: ${spec.scenes.length} (${spec.scenes.map((s) => s.kind).join(" → ")})`,
+    `Format: ${spec.aspect}`,
+  ];
+  const firstHook = spec.scenes.find((s) => s.kind === "hook");
+  if (firstHook) previewLines.push(`Hook: "${firstHook.headline}"`);
+
+  return {
+    summary: `Drafted a ${spec.scenes.length}-scene video from ${page.pathname}. Apply to open it in Studio for review.`,
+    previewText: previewLines.join("\n"),
+    mutation: { status: "pending", location: "studio" },
+    raw: {
+      kind: "generate_video_from_page",
+      name,
+      sourcePath: page.pathname,
+      spec,
     },
   };
 }
@@ -717,6 +759,26 @@ export async function commitMutation(
       };
     }
 
+    if (raw.kind === "generate_video_from_page") {
+      const name = String(raw.name ?? "Page video");
+      const spec = raw.spec as PageVideoSpec;
+      const created = await studioService.saveDraft({
+        name,
+        kind: "nle",
+        mediaKind: "video",
+        timelineSpec: canvasStateToTimeline(pageVideoSpecToCanvas(spec)),
+      });
+      const projectId = created.data?.id;
+      if (!projectId) throw new Error("Studio draft created but no id returned");
+      await queryClient?.invalidateQueries({ queryKey: ["studio", "projects"] });
+      return {
+        ...result,
+        summary: `Created "${name}" — review it in Studio, then publish & embed.`,
+        mutation: { status: "applied", location: `studio:${projectId}` },
+        redirectUrl: `/studio/${encodeURIComponent(projectId)}`,
+      };
+    }
+
     if (raw.kind === "apply_job_draft") {
       const formId = String(raw.formId ?? "");
       const fields = (raw.fields ?? {}) as JobDraftFields;
@@ -910,6 +972,33 @@ export const toolRegistry: ToolDefinition[] = [
       additionalProperties: false,
     },
     run: runGenerateVideoFromTemplate,
+  },
+
+  // ── Studio: turn the CURRENT PAGE into a video (SuperAdmin only) ─────────
+
+  {
+    id: "generate_video_from_page",
+    label: "Video from this page",
+    description:
+      "Turn the marketing page the user is currently viewing into a short, social-ready Studio video. Reads the live page's headings, copy, images, and call-to-action, then drafts a hook → value points → CTA video. Use when a SuperAdmin asks to 'make a video from this page', 'turn this page into a video', or 'create a promo video for what's on screen'. Takes NO arguments — it always reads the current page automatically. The Apply step persists the draft and opens the Studio editor for review; from there the operator publishes and embeds it back on the page.",
+    icon: Film,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/studio",
+    inputs: [],
+    mutates: true,
+    requiresSuperAdmin: true,
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Optional project name for the Studio library. Omit to use the AI-generated title.",
+        },
+      },
+      additionalProperties: false,
+    },
+    run: runGenerateVideoFromPage,
   },
 
   // ── Studio: generate an image (text→img OR img→img) ─────────────────────
@@ -1150,7 +1239,7 @@ export const toolRegistry: ToolDefinition[] = [
  * Single source of truth: the chat panel calls this on every request so
  * adding a tool to the registry automatically exposes it to the model.
  */
-export function getCoachToolSpecs(): Array<{
+export function getCoachToolSpecs(opts?: { superAdmin?: boolean }): Array<{
   type: "function";
   function: {
     name: string;
@@ -1158,8 +1247,12 @@ export function getCoachToolSpecs(): Array<{
     parameters: NonNullable<ToolDefinition["parameters"]>;
   };
 }> {
+  const superAdmin = opts?.superAdmin === true;
   return toolRegistry
     .filter((t) => t.parameters)
+    // SuperAdmin-only tools are never exposed to the model for other
+    // users — the backend route enforces the same gate as a backstop.
+    .filter((t) => (t.requiresSuperAdmin ? superAdmin : true))
     .map((t) => ({
       type: "function",
       function: {

@@ -209,6 +209,22 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // Candidate screening — recruiter authoring surface + the candidate-facing
+  // magic-link portal (the dynamic /screening/:token route resolves to this
+  // base key, same pattern as /interview).
+  "/services/screening": {
+    title: "Candidate Screening — hired.video",
+    description:
+      "Build a per-role screening checklist once — résumé, contact confirmation, validated AI assessments, competency tests, references, and application questions — then send it to candidates by magic link.",
+    keywords:
+      "candidate screening, hiring assessments, pre-employment screening, validated assessments, application questions, recruiter tools",
+  },
+  "/screening": {
+    title: "Complete your application screening — hired.video",
+    description:
+      "Finish your application screening — confirm your details and complete any assessments the employer requested.",
+    keywords: "application screening, candidate portal, hiring assessment",
+  },
   // CHRO People Operations (hired-video extraction). Marketing surface +
   // the in-app roster / 1:1s pages. Pitches the paid employer suite:
   // roster, org chart, 1:1s, performance, team health — embeddable + multi-tenant.
