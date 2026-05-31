@@ -770,7 +770,7 @@ const App = () => (
                       <Route path="/people/roster" element={<RequireVerified><PeopleRoster /></RequireVerified>} />
                       <Route path="/people/one-on-ones" element={<RequireVerified><PeopleOneOnOnes /></RequireVerified>} />
                       <Route path="/people/goals" element={<RequireVerified><PeopleGoals /></RequireVerified>} />
-                      <Route path="/people" element={<RequireVerified><PeopleOpsHub /></RequireVerified>} />
+                      <Route path="/people-ops" element={<RequireVerified><PeopleOpsHub /></RequireVerified>} />
                       <Route path="/people/team-health" element={<RequireVerified><PeopleTeamHealth /></RequireVerified>} />
                       <Route path="/people/tco" element={<RequireVerified><PeopleTco /></RequireVerified>} />
                       <Route path="/people/s/*" element={<RequireVerified><PeopleSurface /></RequireVerified>} />

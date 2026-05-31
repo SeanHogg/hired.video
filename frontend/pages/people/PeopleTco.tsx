@@ -20,7 +20,7 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString()}`;
 export default function PeopleTco() {
   useSEO("/people/tco");
   useBreadcrumbs([
-    { name: "People Operations", url: "/people" },
+    { name: "People Operations", url: "/people-ops" },
     { name: "Employee TCO", url: "/people/tco" },
   ]);
   const [assumptions, setAssumptions] = useState<Record<string, number>>({});
@@ -55,7 +55,7 @@ export default function PeopleTco() {
     <AppShell bgClassName="bg-background">
       <main className="px-6 py-8 space-y-6 max-w-3xl">
         <div>
-          <Link to="/people" className="text-sm text-muted-foreground hover:underline">← People Operations</Link>
+          <Link to="/people-ops" className="text-sm text-muted-foreground hover:underline">← People Operations</Link>
           <h1 className="text-3xl font-bold tracking-tight">Employee TCO</h1>
           <p className="text-muted-foreground">Turn a salary into fully-loaded cost using your company's cost assumptions.</p>
         </div>

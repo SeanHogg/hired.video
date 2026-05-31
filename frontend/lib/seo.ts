@@ -238,10 +238,26 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords: "OKR software, goals tracking, key results, objectives, people operations, at-risk goals",
   },
   "/people": {
-    title: "People Operations — the CHRO workspace — hired.video",
+    // `/people` serves two audiences off one route: the consumer
+    // Professional Network (warm intros, coffee chats, free DMs) and the
+    // employer-side CHRO People Operations workspace. The two former
+    // PAGE_SEO entries were merged here so the route ranks for both
+    // networking and HRIS intent.
+    title: "People — Professional Network & People Operations — hired.video",
     description:
-      "Run your whole team from one workspace: roster & org chart, 1:1s, goals/OKRs, performance reviews, team health, pulse checks, weekly syncs, scorecards, workflow automation, headcount planning, TCO, and PTO.",
-    keywords: "people operations, CHRO workspace, HRIS, performance, OKRs, team health, headcount planning, PTO",
+      "Connect and run your team from one place. Ask any mutual connection for a warm intro, grab coffee, and DM anyone — no InMail credits, no paywall — plus an employer-side CHRO workspace: roster & org chart, 1:1s, goals/OKRs, performance reviews, team health, headcount planning, TCO, and PTO.",
+    keywords:
+      "professional networking, warm introductions, ask for an intro, coffee chats, free direct messaging, LinkedIn InMail alternative, career connections, people operations, CHRO workspace, HRIS, performance, OKRs, team health, headcount planning, PTO",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "People — hired.video",
+      url: "https://hired.video/people",
+      dateModified: "2026-05-31",
+      description:
+        "Professional networking — warm intros through mutual connections, coffee meetups, and free messaging — plus an employer People Operations workspace.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
   },
   "/people/team-health": {
     title: "Team Health — hired.video People Operations",
@@ -658,23 +674,6 @@ export const PAGE_SEO: Record<string, SEOData> = {
       dateModified: "2026-05-26",
       description:
         "Structured-hiring scorecards, multi-evaluator debriefs, interview kits, calibration sessions, blind review, bias linter, take-home assignments, and AI question generation.",
-      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
-    },
-  },
-  "/people": {
-    title: "Professional Network — Warm Intros, Coffee Chats & Direct Messaging — hired.video",
-    description:
-      "Connect with professionals, recruiters, and industry leaders. Ask any mutual connection for a warm intro, grab coffee with someone open to it, and DM anyone — no InMail credits, no paywall. Build your network and advance your career.",
-    keywords:
-      "professional networking, warm introductions, ask for an intro, coffee chats, networking events, free direct messaging, LinkedIn InMail alternative, career connections, industry professionals, networking platform",
-    structuredData: {
-      "@context": "https://schema.org",
-      "@type": "CollectionPage",
-      name: "Professional Network — hired.video",
-      url: "https://hired.video/people",
-      dateModified: "2026-05-26",
-      description:
-        "Connect with professionals on hired.video — request warm intros through mutual connections, schedule coffee meetups, and message any user for free.",
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },

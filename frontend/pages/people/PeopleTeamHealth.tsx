@@ -13,7 +13,7 @@ const LABELS: Record<string, string> = {
 export default function PeopleTeamHealth() {
   useSEO("/people/team-health");
   useBreadcrumbs([
-    { name: "People Operations", url: "/people" },
+    { name: "People Operations", url: "/people-ops" },
     { name: "Team Health", url: "/people/team-health" },
   ]);
   const [h, setH] = useState<TeamHealth | null>(null);
@@ -31,7 +31,7 @@ export default function PeopleTeamHealth() {
     <AppShell bgClassName="bg-background">
       <main className="px-6 py-8 space-y-6 max-w-3xl">
         <div>
-          <Link to="/people" className="text-sm text-muted-foreground hover:underline">← People Operations</Link>
+          <Link to="/people-ops" className="text-sm text-muted-foreground hover:underline">← People Operations</Link>
           <h1 className="text-3xl font-bold tracking-tight">Team Health</h1>
           <p className="text-muted-foreground">A composite score recomputed from live roster, performance, goals, reviews, and engagement data.</p>
         </div>

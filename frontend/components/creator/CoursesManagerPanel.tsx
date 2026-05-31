@@ -164,9 +164,8 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
         if (cancelled) return;
         const next = new URLSearchParams(searchParams);
         next.delete("courseId");
-        // lessonId is read below and forwarded to CourseContentEditor as
-        // the scroll-to target; leave it in the URL for that one hop so
-        // the editor's post-load effect can find the row, then it's stale.
+        // lessonId is consumed by CourseContentEditor (scroll-to);
+        // leave it in place for that hop, then it's stale.
         setSearchParams(next, { replace: true });
       });
     return () => { cancelled = true; };
@@ -535,7 +534,7 @@ export default function CoursesManagerPanel({ profile: profileProp, onEnrollClic
           curling the API. */}
       {mode === "edit" ? (
         editing ? (
-          <CourseContentEditor courseId={editing.id} scrollToLessonId={searchParams.get("lessonId")} />
+          <CourseContentEditor courseId={editing.id} />
         ) : (
           <Card>
             <CardContent className="p-6 space-y-4">

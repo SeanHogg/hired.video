@@ -1,19 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import CoursesManagerPanel from "@/components/creator/CoursesManagerPanel";
 
-// #1521 — deep-link from /learn Edit button. The panel reads ?courseId=,
-// loads the course, and drops into edit mode.
+// #1521 — deep-link from the /learn "Edit" button. The panel reads
+// ?courseId=, loads the course, and drops into edit mode.
 //
 // We mock the *apiClient* (not courseService) so the real CourseService
 // unwrapping logic runs against the real wire shape. The single-course
 // endpoint GET /api/courses/:id ONLY ever returns the detail envelope
 // ({course, modules, lessons}) — there is no bare-course variant. An
-// earlier version of getMine returned that envelope as-is, so every
-// `course.title`/`course.id` came back undefined and the editor crashed
-// on a render-time `title.trim()`. Mocking the service with a fake bare
-// `{ id, title }` masked that — this test uses the real shape instead.
+// earlier getMine returned that envelope as-is, so every `course.title`/
+// `course.id` came back undefined and the editor crashed on a render-time
+// `title.trim()`. Mocking the service with a fake bare `{ id, title }`
+// masked that (per feedback_tests_with_real_fixtures) — this uses the
+// real shape instead.
 
 const getMock = vi.fn();
 
@@ -74,16 +75,16 @@ const COURSE = {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
   getMock.mockReset();
-  // /api/courses/me → the creator's own (empty) list.
+  // apiClient.get resolves to an ApiResponse-shaped wrapper; the services
+  // read `.data`. /api/courses/me → the (empty) own-course list.
   // /api/courses/:id → the detail ENVELOPE (the only real shape).
   getMock.mockImplementation((path: string) => {
-    if (path === "/api/courses/me") return Promise.resolve([]);
+    if (path === "/api/courses/me") return Promise.resolve({ data: [] });
     if (path.startsWith("/api/courses/")) {
-      return Promise.resolve({ course: COURSE, modules: [], lessons: [] });
+      return Promise.resolve({ data: { course: COURSE, modules: [], lessons: [] } });
     }
-    return Promise.resolve(null);
+    return Promise.resolve({ data: null });
   });
 });
 

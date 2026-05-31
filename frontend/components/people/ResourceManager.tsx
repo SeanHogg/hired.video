@@ -109,7 +109,7 @@ export default function ResourceManager({ def }: { def: SurfaceDef }) {
     <main className="px-6 py-8 space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <Link to="/people" className="text-sm text-muted-foreground hover:underline">← People Operations</Link>
+          <Link to="/people-ops" className="text-sm text-muted-foreground hover:underline">← People Operations</Link>
           <h1 className="text-3xl font-bold tracking-tight">{def.title}</h1>
           <p className="text-muted-foreground">{def.subtitle}</p>
         </div>

@@ -14,9 +14,9 @@ export default function PeopleSurface() {
   const params = useParams();
   const key = (params["*"] ?? "").replace(/\/$/, "");
   const def = SURFACES[key];
-  useSEO("/people");
+  useSEO("/people-ops");
   useBreadcrumbs([
-    { name: "People Operations", url: "/people" },
+    { name: "People Operations", url: "/people-ops" },
     { name: def?.title ?? "Surface", url: `/people/s/${key}` },
   ]);
 

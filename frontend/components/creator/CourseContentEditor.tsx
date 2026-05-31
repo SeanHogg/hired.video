@@ -158,16 +158,9 @@ function lessonToForm(l: CourseLesson): LessonFormState {
 
 interface Props {
   courseId: string;
-  /**
-   * #1521 — lesson the /learn "Edit" deep-link wants the author to land
-   * on. After the module/lesson tree loads we scroll its row into view
-   * and flash a highlight. Optional: the in-list "Edit" path passes
-   * nothing and the editor just renders from the top.
-   */
-  scrollToLessonId?: string | null;
 }
 
-export default function CourseContentEditor({ courseId, scrollToLessonId }: Props) {
+export default function CourseContentEditor({ courseId }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<Course | null>(null);
@@ -232,22 +225,6 @@ export default function CourseContentEditor({ courseId, scrollToLessonId }: Prop
     for (const arr of map.values()) arr.sort((a, b) => a.sortOrder - b.sortOrder);
     return map;
   }, [lessons]);
-
-  // #1521 — deep-link scroll-to. Once the tree is loaded and the target
-  // row is in the DOM, scroll it into view and flash a ring so the author
-  // sees which lesson the /learn Edit button sent them to. Self-clears so a
-  // later reorder/edit doesn't keep the highlight stuck on.
-  const [highlightLessonId, setHighlightLessonId] = useState<string | null>(null);
-  useEffect(() => {
-    if (loading || !scrollToLessonId) return;
-    if (!lessons.some((l) => l.id === scrollToLessonId)) return;
-    const el = document.getElementById(`lesson-row-${scrollToLessonId}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    setHighlightLessonId(scrollToLessonId);
-    const timer = setTimeout(() => setHighlightLessonId(null), 2500);
-    return () => clearTimeout(timer);
-  }, [loading, lessons, scrollToLessonId]);
 
   // ── Module handlers ──
   const addModule = async () => {
@@ -612,7 +589,6 @@ export default function CourseContentEditor({ courseId, scrollToLessonId }: Prop
                     onDelete={removeLesson}
                     onExportScorm={exportLessonAsScorm}
                     onReorder={(next) => reorderLessons(next)}
-                    highlightLessonId={highlightLessonId}
                   />
 
                   <div className="p-2 border-t bg-muted/20">
@@ -634,7 +610,7 @@ export default function CourseContentEditor({ courseId, scrollToLessonId }: Prop
                   <div className="text-xs text-muted-foreground">Lessons not yet grouped into a module.</div>
                 </div>
               </div>
-              <LessonList lessons={unsorted} onEdit={openEditLesson} onDelete={removeLesson} onExportScorm={exportLessonAsScorm} onReorder={(next) => reorderLessons(next)} highlightLessonId={highlightLessonId} />
+              <LessonList lessons={unsorted} onEdit={openEditLesson} onDelete={removeLesson} onExportScorm={exportLessonAsScorm} onReorder={(next) => reorderLessons(next)} />
             </div>
           )}
         </div>
@@ -922,7 +898,6 @@ function LessonList({
   onDelete,
   onExportScorm,
   onReorder,
-  highlightLessonId,
 }: {
   lessons: CourseLesson[];
   onEdit: (l: CourseLesson) => void;
@@ -934,9 +909,6 @@ function LessonList({
   /** Optional drag-handle reorder via SortableList. Omit to render a
    *  plain static list (no handles, no DndContext). */
   onReorder?: (next: CourseLesson[]) => void;
-  /** #1521 — when set, the matching row gets `id="lesson-row-<id>"` (the
-   *  deep-link scroll target) and a temporary highlight ring. */
-  highlightLessonId?: string | null;
 }) {
   if (lessons.length === 0) {
     return (
@@ -950,14 +922,8 @@ function LessonList({
       <SortableList items={lessons} getId={(l) => l.id} onReorder={onReorder}>
         {(l) => {
           const Icon = SOURCE_ICON[l.sourceType];
-          const isHighlighted = highlightLessonId === l.id;
           return (
-            <div
-              id={`lesson-row-${l.id}`}
-              className={`flex items-center gap-2 p-3 hover:bg-muted/30 transition-colors ${
-                isHighlighted ? "ring-2 ring-primary ring-inset bg-primary/5" : ""
-              }`}
-            >
+            <div className="flex items-center gap-2 p-3 hover:bg-muted/30">
               <SortableDragHandle className="!h-6 !w-6 shrink-0" />
               <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">

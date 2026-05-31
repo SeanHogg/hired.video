@@ -8,8 +8,8 @@ import { HUB_LINKS } from "@/lib/people-ops/surfaces";
 import { Users } from "lucide-react";
 
 export default function PeopleOpsHub() {
-  useSEO("/people");
-  useBreadcrumbs([{ name: "People Operations", url: "/people" }]);
+  useSEO("/people-ops");
+  useBreadcrumbs([{ name: "People Operations", url: "/people-ops" }]);
   const [health, setHealth] = useState<TeamHealth | null>(null);
   const [upgrade, setUpgrade] = useState(false);
 
