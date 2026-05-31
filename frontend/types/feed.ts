@@ -150,6 +150,8 @@ export interface FeedFilters {
   searchTerm: string;
   filter: 'all' | 'connections' | 'following';
   privacy: 'public' | 'connections';
+  // Active hashtag filter (gap #1829) — set when a trending tag is clicked.
+  tag?: string;
   dateRange?: {
     from?: Date;
     to?: Date;

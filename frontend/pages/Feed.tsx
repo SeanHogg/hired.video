@@ -36,12 +36,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 import { useAuth } from "@/lib/auth";
-import { getFeedPosts, searchFeedPosts } from "@/lib/services/feed-service";
+import { getFeedPosts, searchFeedPosts, getTrendingTags } from "@/lib/services/feed-service";
 import type {
   FeedPost,
   FeedPostsResponse,
   GetFeedPostsRequest,
   FeedFilters,
+  TrendingTag,
 } from "@/types/feed";
 
 import FeedPostCard from "@/components/feed/FeedPostCard";
@@ -185,7 +186,30 @@ export function PostComposerBar({
 }
 
 // ─── Right sidebar — suggestions & trending ───────────────────────────────────
-export function FeedRightPanel() {
+export function FeedRightPanel({
+  activeTag,
+  onSelectTag,
+}: {
+  activeTag?: string | null;
+  onSelectTag?: (tag: string) => void;
+} = {}) {
+  // Real trending hashtags (gap #1829) — fetched from the backend's
+  // /api/feed/trending-tags endpoint and clickable to filter the feed.
+  const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getTrendingTags(8)
+      .then((tags) => {
+        if (!cancelled) setTrendingTags(tags);
+      })
+      .catch(() => {
+        if (!cancelled) setTrendingTags([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Sharpen Your Edge with Tools */}
@@ -237,21 +261,33 @@ export function FeedRightPanel() {
         </CardContent>
       </Card>
 
-      {/* Hashtag suggestions */}
-      <Card>
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-sm font-semibold">Trending topics</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          <div className="flex flex-wrap gap-2">
-            {["#hiring", "#remotework", "#ai", "#career", "#jobs", "#leadership", "#networking"].map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Trending hashtags (gap #1829) — real data, click to filter the feed.
+          Self-gates: renders nothing until there are tags to show. */}
+      {trendingTags.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold">Trending topics</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="flex flex-wrap gap-2">
+              {trendingTags.map(({ tag, postCount }) => {
+                const isActive = activeTag === tag;
+                return (
+                  <Badge
+                    key={tag}
+                    variant={isActive ? "default" : "secondary"}
+                    onClick={() => onSelectTag?.(tag)}
+                    title={`${postCount} post${postCount === 1 ? "" : "s"}`}
+                    className="text-xs cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    #{tag}
+                  </Badge>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -314,12 +350,17 @@ export default function Feed() {
         searchTerm: filters.searchTerm || undefined,
         filter: filters.filter === "all" ? undefined : filters.filter,
         privacy: filters.privacy,
+        tag: filters.tag || undefined,
         pageNumber: page,
         pageSize: 20,
       };
 
       let response: FeedPostsResponse;
-      if (filters.searchTerm) {
+      if (filters.tag) {
+        // Hashtag filter (gap #1829) wins over free-text search — clicking a
+        // trending tag scopes the feed to that hashtag via the `?tag=` filter.
+        response = await getFeedPosts(request);
+      } else if (filters.searchTerm) {
         response = await searchFeedPosts(filters.searchTerm, page, 20);
       } else {
         response = await getFeedPosts(request);
@@ -387,6 +428,14 @@ export default function Feed() {
     setCreatePostOpen(true);
   }, []);
 
+  // Hashtag discovery (gap #1829): clicking a trending tag scopes the feed to
+  // it (toggling off when the same tag is clicked again) and clears any active
+  // text search so the two filters don't fight.
+  const handleSelectTag = useCallback((tag: string) => {
+    setFilters((prev) => ({ ...prev, tag: prev.tag === tag ? undefined : tag, searchTerm: "" }));
+    setSearchInput("");
+  }, []);
+
   if (isLoading) {
     return (
       <AppShell>
@@ -440,6 +489,22 @@ export default function Feed() {
                     onChange={(v) => setFilters((prev) => ({ ...prev, filter: v }))}
                   />
                 </div>
+
+                {/* Active hashtag filter banner (gap #1829) */}
+                {filters.tag && (
+                  <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-2">
+                    <span className="text-sm">
+                      Showing posts tagged <span className="font-semibold text-primary">#{filters.tag}</span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFilters((prev) => ({ ...prev, tag: undefined }))}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
 
                 {/* Error */}
                 {error && (
@@ -518,7 +583,7 @@ export default function Feed() {
 
               {/* RIGHT — Suggestions */}
               <div className="hidden lg:block sticky top-28">
-                <FeedRightPanel />
+                <FeedRightPanel activeTag={filters.tag} onSelectTag={handleSelectTag} />
               </div>
             </div>
           </div>
