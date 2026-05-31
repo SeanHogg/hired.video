@@ -755,30 +755,33 @@ export default function CompetitorComparison({
 }: CompetitorComparisonProps = {}) {
   return (
     <>
-      {showSectionHeader && (
-        <div className="text-center mb-12 max-w-3xl mx-auto">
-          {eyebrow && (
-            <Badge className="mb-3" variant="outline">
-              <Trophy className="h-4 w-4 mr-1" /> {eyebrow}
-            </Badge>
-          )}
-          <h2 className="text-3xl md:text-4xl font-bold mb-3">
-            How Hired.Video compares
-          </h2>
-          <p className="text-muted-foreground">
-            Side-by-side against LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn,
-            HireVue, and VidCruiter — pricing, ATS/CRM, AI video resumes, voice
-            cloning, async interviews, gamification, and learning pathways.
-          </p>
-        </div>
-      )}
-
-      {/* Pricing-at-a-glance */}
+      {/* Pricing-at-a-glance — the optional section header shares this same
+          max-w-6xl centered container so its heading centers and its sub-copy
+          spans the full table width (no separate narrower block that drifts
+          left of the table). */}
       <section className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
+          {showSectionHeader && (
+            <div className="text-center mb-12">
+              {eyebrow && (
+                <Badge className="mb-3" variant="outline">
+                  <Trophy className="h-4 w-4 mr-1" /> {eyebrow}
+                </Badge>
+              )}
+              <h2 className="text-3xl md:text-4xl font-bold mb-3">
+                How Hired.Video compares
+              </h2>
+              <p className="text-muted-foreground">
+                Side-by-side against LOXO, LinkedIn Recruiter, Greenhouse,
+                Bullhorn, HireVue, and VidCruiter — pricing, ATS/CRM, AI video
+                resumes, voice cloning, async interviews, gamification, and
+                learning pathways.
+              </p>
+            </div>
+          )}
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold mb-3">Pricing at a glance</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground">
               Starting prices for the lowest-tier paid plan most teams actually
               buy. Free tiers and per-seat costs noted where published;
               enterprise plans are typically custom-quoted.
