@@ -662,6 +662,13 @@ export function createApp() {
   app.route("/api/admin/r2", adminR2Routes);
   app.route("/api/admin/workers", adminWorkerRoutes);
   app.route("/api/admin/courses", adminCourseRoutes);
+  // Same rule as above: every "/api/admin/<sub>" router must be mounted BEFORE
+  // the "/api/admin" catch-all (adminRoutes ends with `.all("*")` returning
+  // "Admin route not found"), or Hono's registration-order matching lets that
+  // catch-all intercept the sub-route. (#1701 — admin article queue 404.)
+  app.route("/api/admin/job-sources", jobScraperAdminRoutes);
+  app.route("/api/admin/articles", adminArticleRoutes);
+  app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/lms-oauth", lmsOauthRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
@@ -701,7 +708,6 @@ export function createApp() {
   app.route("/api/boards", exclusiveBoardRoutes);
   app.route("/api/community", communityRoutes);
   app.route("/api/analytics", analyticsRoutes);
-  app.route("/api/admin/job-sources", jobScraperAdminRoutes);
   app.route("/api/job-sources", jobScraperUserRoutes);
   app.route("/api/ats", atsRoutes);
   app.route("/api/recruit", candidatesRoutes);
@@ -722,9 +728,7 @@ export function createApp() {
   app.route("/api/services", serviceRoutes);
   app.route("/api/creators", creatorRoutes);
   app.route("/api/articles", articleRoutes);
-  app.route("/api/admin/articles", adminArticleRoutes);
   app.route("/api/reports", reportRoutes);
-  app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/courses", courseRoutes);
   // Authoring helpers (#162 AI generator, #200 LMS connectors, etc.)
   // mount under the same prefix so the client never has to learn a
