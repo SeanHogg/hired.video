@@ -111,14 +111,6 @@ export const EMBED_SURFACES: EmbedSurface[] = [
     note: "#1814 — segment-scope the existing performance_cycles/reviews.",
   },
   {
-    key: "team-health",
-    label: "Team Health",
-    scope: "people:team-health",
-    description: "Composite engagement / performance / alignment score.",
-    status: "planned",
-    note: "#1815.",
-  },
-  {
     key: "check-ins",
     label: "Check-ins",
     scope: "people:check-ins",

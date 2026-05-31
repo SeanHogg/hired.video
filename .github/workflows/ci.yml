@@ -83,13 +83,12 @@ jobs:
         run: cd frontend && npm test
         continue-on-error: true
 
-      - name: Run ESLint (api, advisory)
-        # 27 pre-existing errors (gap #1619) including a real
-        # `sql\`= ANY(${array})\`` ban that the worker pg driver can't
-        # bind. Kept advisory until #1596 closes — failures visible on
-        # every run so they can't grow unnoticed.
+      - name: Run ESLint (api)
+        # All 27 errors from gap #1619 are fixed (2026-05-31) — including the
+        # real `sql\`= ANY(${array})\`` ban the worker pg driver can't bind,
+        # now on `inArray()`. `eslint src` is clean (warnings-only on unused
+        # disable directives), so this is a required gate that stays green.
         run: cd api && npm run lint
-        continue-on-error: true
 
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV
