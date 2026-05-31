@@ -244,8 +244,14 @@ export const courseService = {
   },
 
   async getMine(id: string): Promise<Course> {
-    const res = await apiClient.get<Course>(`/api/courses/${id}`);
-    return res.data;
+    // #1521 — GET /api/courses/:id only ever returns the full detail
+    // envelope ({course, modules, lessons}); there is no bare-course
+    // variant. Unwrap `.course` so the /learn "Edit" deep link gets a
+    // real Course. Returning the raw envelope made every field (title,
+    // id, …) undefined and crashed the editor on a render-time
+    // `title.trim()`.
+    const res = await apiClient.get<CourseDetailsResponse>(`/api/courses/${id}`);
+    return res.data.course;
   },
 
   async create(input: CreateCourseInput): Promise<Course> {
