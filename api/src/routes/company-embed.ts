@@ -23,7 +23,7 @@ import {
   revokeEmbedKey,
   buildEmbedSnippet,
 } from "../services/company/embed.js";
-import { EMBED_VIEWS, EMBED_VIEW_KEYS } from "../../../shared/embed.js";
+import { EMBED_VIEWS, EMBED_VIEW_KEYS, EMBED_ROADMAP } from "../../../shared/embed.js";
 import { eq } from "drizzle-orm";
 
 export const companyEmbedRoutes = new Hono<AppEnv>();
@@ -58,6 +58,9 @@ companyEmbedRoutes.get("/", async (c) => {
         ...v,
         snippet: buildEmbedSnippet(slugOrId, v.key),
       })),
+      // Operational Cadence surfaces rolling out (reuse-existing + planned) —
+      // the full CHRO embed set from the BurnRateOS extraction inventory.
+      roadmap: EMBED_ROADMAP.map((s) => ({ key: s.key, label: s.label, status: s.status })),
     }),
   );
 });

@@ -26,10 +26,16 @@ interface EmbedViewWithSnippet {
   description: string;
   snippet: string;
 }
+interface RoadmapSurface {
+  key: string;
+  label: string;
+  status: "reuse-existing" | "planned";
+}
 interface EmbedSettingsPayload {
   enabled: boolean;
   keys: EmbedKeyView[];
   views: EmbedViewWithSnippet[];
+  roadmap: RoadmapSurface[];
 }
 
 /**
@@ -243,6 +249,11 @@ export default function EmbedSettings({ companyId }: { companyId: string }) {
                   <li>Add your site's origin to the key's <strong>Allowed origin</strong> so the embed only renders on domains you control.</li>
                 </ol>
               </div>
+              {data.roadmap.length > 0 && (
+                <p className="text-xs text-muted-foreground pt-2 border-t">
+                  More surfaces rolling out: {data.roadmap.map((r) => r.label).join(" · ")}.
+                </p>
+              )}
             </CardContent>
           </Card>
         </>
