@@ -2,23 +2,34 @@
  * CreatorPromoCard — the reusable "Generate & Get Paid" creator promo.
  *
  * One component, two shapes:
- *   • variant="hero"   — full-width marketplace header (the /search top block).
- *   • variant="banner" — compact, graphic-led card for a side column / sticky
- *                        rail. Use as a "banner ad" anywhere a sidebar exists.
+ *   • variant="hero"   — full-width marketplace header (the MarketplaceHero block).
+ *   • variant="result" — a single grid cell that wears the SAME chrome as the
+ *                        real search-result cards (BaseCard + header/icon/badge,
+ *                        the promo art as media, and a CardActions footer). Drop
+ *                        it into the /search results grid and it reads as one of
+ *                        the cards instead of an out-of-place sidebar ad.
  *
- * Extracted from MarketplaceHero so the hero block and the sidebar ad share
+ * Extracted from MarketplaceHero so the hero block and the in-grid promo share
  * one source of truth (copy, CTAs, links) instead of drifting (DRY).
  */
 import { Sparkles, Store } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
+import { CardActions } from "@/components/ui/CardActions";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import { cn } from "@/lib/utils";
 import CreatorPromoArt from "./CreatorPromoArt";
 
 interface Props {
-  variant?: "hero" | "banner";
+  variant?: "hero" | "result";
   className?: string;
 }
 
@@ -26,34 +37,52 @@ const PRIMARY = { to: "/studio", label: "Become a Creator" };
 const SECONDARY = { to: "/pricing", label: "See Creator Split" };
 
 export default function CreatorPromoCard({ variant = "hero", className }: Props) {
-  if (variant === "banner") {
+  const navigate = useNavigate();
+
+  if (variant === "result") {
+    // Mirrors ContentCard's structure so the promo sits flush in the results
+    // grid: primary CTA is the visible footer button, the split link folds into
+    // the ⋯ overflow exactly like every other card's secondary actions.
+    const cardActions: DynamicCardAction[] = [
+      {
+        id: "become-creator",
+        label: PRIMARY.label,
+        icon: Sparkles,
+        onClick: () => navigate(PRIMARY.to),
+      },
+      {
+        id: "creator-split",
+        label: SECONDARY.label,
+        variant: "secondary",
+        onClick: () => navigate(SECONDARY.to),
+      },
+    ];
+
     return (
-      <Card className={cn("overflow-hidden", className)}>
-        <CreatorPromoArt className="w-full" />
-        <CardContent className="space-y-3 pt-4">
-          <div className="flex items-center gap-2">
-            <Store className="h-4 w-4 text-primary" />
-            <Badge variant="secondary">Marketplace</Badge>
+      <BaseCard className={cn("flex flex-col h-full", className)}>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-primary/10 p-2 flex-shrink-0">
+              <Store className="w-5 h-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <Badge variant="outline" className="mb-1">
+                Marketplace
+              </Badge>
+              <CardTitle className="text-base leading-snug line-clamp-2">
+                Generate &amp; Get Paid
+              </CardTitle>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-bold leading-tight">Generate &amp; Get Paid</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Publish templates, voices, and services — and keep 95% of every sale.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button asChild className="w-full">
-              <Link to={PRIMARY.to}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                {PRIMARY.label}
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link to={SECONDARY.to}>{SECONDARY.label}</Link>
-            </Button>
-          </div>
+          <CardDescription className="pt-2 line-clamp-3">
+            Publish templates, voices, and services — and keep 95% of every sale.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="mt-auto">
+          <CreatorPromoArt className="w-full rounded-lg" />
         </CardContent>
-      </Card>
+        <CardActions actions={cardActions} />
+      </BaseCard>
     );
   }
 

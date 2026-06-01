@@ -55,11 +55,11 @@ interface UnifiedSearchProps {
    */
   stickySearch?: boolean;
   /**
-   * Optional content rendered in a sticky right-hand rail beside the
-   * results grid on large screens (e.g. a marketplace promo banner).
+   * Optional promo cell injected into the results grid (first page only) so it
+   * reads as one of the result cards rather than an out-of-place sidebar ad.
    * Kept as a prop so UnifiedSearch stays generic — only /search opts in.
    */
-  sidebar?: React.ReactNode;
+  promoCard?: React.ReactNode;
 }
 
 const CATEGORIES = [
@@ -141,7 +141,7 @@ const categoryToTypes = (category: string): CardFeedType[] => {
 
 export default function UnifiedSearch({
   stickySearch = false,
-  sidebar,
+  promoCard,
 }: UnifiedSearchProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -574,8 +574,7 @@ export default function UnifiedSearch({
 
       {/* Results */}
       <section className="pt-8 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
-        <div className={`max-w-7xl mx-auto${sidebar ? " lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 lg:items-start" : ""}`}>
-          <div className="min-w-0">
+        <div className="max-w-7xl mx-auto">
           <div className="mb-4 sm:mb-6">
             <p className="text-xs sm:text-sm text-muted-foreground">
               {totalFound} items found
@@ -612,7 +611,8 @@ export default function UnifiedSearch({
             <>
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {paginatedItems.map((item, index) => {
+                  {(() => {
+                  const cards = paginatedItems.map((item, index) => {
                     if ((item as any).type === "voice") {
                       return (
                         <VoiceMarketplaceCard
@@ -663,7 +663,18 @@ export default function UnifiedSearch({
                       return <ContentCard key={item.id} item={item as any} />;
                     }
                     return allSectionRenderer(item, index);
-                  })}
+                  });
+                  // Slot the marketplace promo into the first row (page 1) so
+                  // it presents as a result card, not a sidebar ad.
+                  if (promoCard && currentPage === 1) {
+                    cards.splice(
+                      Math.min(2, cards.length),
+                      0,
+                      <React.Fragment key="creator-promo">{promoCard}</React.Fragment>,
+                    );
+                  }
+                  return cards;
+                  })()}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -766,12 +777,6 @@ export default function UnifiedSearch({
                 Try adjusting your search or filters.
               </p>
             </div>
-          )}
-          </div>
-          {sidebar && (
-            <aside className="hidden lg:block">
-              <div className="lg:sticky lg:top-20">{sidebar}</div>
-            </aside>
           )}
         </div>
       </section>

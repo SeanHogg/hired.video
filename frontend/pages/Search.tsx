@@ -15,7 +15,7 @@ export default function SearchPage() {
   return (
     <AppShell bgClassName="bg-background">
       <h1 className="sr-only">{t("headings.marketplaceAndSearch")}</h1>
-      <UnifiedSearch stickySearch sidebar={<CreatorPromoCard variant="banner" />} />
+      <UnifiedSearch stickySearch promoCard={<CreatorPromoCard variant="result" />} />
       <MarketplaceHero />
     </AppShell>
   );
