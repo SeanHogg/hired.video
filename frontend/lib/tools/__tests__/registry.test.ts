@@ -67,8 +67,12 @@ import type { NormalizedToolRunResult } from "../types";
 describe("getCoachToolSpecs", () => {
   it("emits one entry per tool that declares a `parameters` schema", () => {
     const specs = getCoachToolSpecs();
+    // Default view is non-SuperAdmin, so SuperAdmin-only tools
+    // (`requiresSuperAdmin`) are gated out — mirror that gate here or the
+    // expectation drifts the moment a SuperAdmin tool is added.
     const expectedNames = toolRegistry
       .filter((t) => t.parameters)
+      .filter((t) => !t.requiresSuperAdmin)
       .map((t) => t.id)
       .sort();
     const actualNames = specs.map((s) => s.function.name).sort();
@@ -76,6 +80,21 @@ describe("getCoachToolSpecs", () => {
     // Sanity: at least the read-only scorer + a mutation tool are present.
     expect(actualNames).toContain("ai-resume-scorer");
     expect(actualNames).toContain("apply_resume_rewrite");
+  });
+
+  it("gates SuperAdmin-only tools out of the default view but exposes them under { superAdmin: true }", () => {
+    const saTools = toolRegistry
+      .filter((t) => t.parameters && t.requiresSuperAdmin)
+      .map((t) => t.id);
+    // Precondition: there is at least one SA-gated tool to assert against.
+    expect(saTools.length).toBeGreaterThan(0);
+
+    const defaultNames = getCoachToolSpecs().map((s) => s.function.name);
+    const saNames = getCoachToolSpecs({ superAdmin: true }).map((s) => s.function.name);
+    for (const id of saTools) {
+      expect(defaultNames).not.toContain(id);
+      expect(saNames).toContain(id);
+    }
   });
 
   it("excludes tools without a `parameters` schema (page-only / wizard tools)", () => {

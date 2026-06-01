@@ -19,6 +19,7 @@ import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
 import { studioService } from "@/lib/services/studio-service";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
+import { eventsService } from "@/lib/services/events-service";
 import { getStaticTemplates } from "@/lib/templates/registry";
 import { BLOG_POSTS } from "@/data/blog-posts";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
@@ -599,25 +600,20 @@ async function fetchEvents(
   page: number,
   geo?: CardFeedOptions["geo"],
 ): Promise<TypedFetchResult> {
-  // Pulls upcoming public events from /api/events. Inherits the same
-  // geo + radius filter the rest of unified search uses; sort key is
-  // startAt (events that have already happened don't surface here).
+  // Pulls upcoming public events via the events service (apiClient — same
+  // auth/retry/error-suppression path as the other domain fetchers, and
+  // mockable in tests). Inherits the same geo + radius filter the rest of
+  // unified search uses; sort key is startAt (past events don't surface).
   try {
-    const params = new URLSearchParams({
+    const list = await eventsService.search({
       scope: "upcoming",
-      limit: String(limit),
-      offset: String(Math.max(0, (page - 1) * limit)),
+      limit,
+      offset: Math.max(0, (page - 1) * limit),
+      countryId: geo?.countryId,
+      stateId: geo?.stateId,
+      cityId: geo?.cityId,
+      radiusKm: geo?.radiusKm,
     });
-    if (geo?.countryId) params.set("countryId", String(geo.countryId));
-    if (geo?.stateId) params.set("stateId", geo.stateId);
-    if (geo?.cityId) params.set("cityId", geo.cityId);
-    if (geo?.radiusKm) params.set("radiusKm", String(geo.radiusKm));
-    const res = await fetch(`/api/events?${params.toString()}`, {
-      credentials: "include",
-    });
-    if (!res.ok) return { items: [], total: 0 };
-    const data: any = await res.json();
-    const list: any[] = data?.data ?? data?.events ?? [];
     const items = list.map((e: any) => {
       const item: RawApiItem = {
         type: "event",

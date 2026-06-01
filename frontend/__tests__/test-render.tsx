@@ -21,6 +21,7 @@ import { render, type RenderOptions } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
+import { AuthProvider } from "@/lib/auth";
 
 /** Fresh client per render so query caches never bleed across tests, and
  *  retries are off so error-path assertions resolve on the first reject. */
@@ -37,6 +38,36 @@ export function renderWithProviders(
       <PersonaPreviewProvider>
         <BrowserRouter>{ui}</BrowserRouter>
       </PersonaPreviewProvider>
+    </QueryClientProvider>,
+    options,
+  );
+}
+
+/**
+ * Like `renderWithProviders` but also mounts the real `<AuthProvider>`.
+ *
+ * Use this for COMPONENT tests whose tree reaches `useAuth` / `useApiReady`
+ * through a deep, non-mockable child (e.g. EntityMedia's `useApiReady`,
+ * EffectStackEditor's `useSubscription`). Those call the module-internal
+ * `useAuth`, so mocking the `useAuth` *export* doesn't intercept them — they
+ * throw "useAuth must be used within an AuthProvider" without a real context.
+ *
+ * NOT for the page tests: those do a full `vi.mock("../../lib/auth")`
+ * auto-mock, which would turn this AuthProvider into a no-op that renders
+ * nothing. They use `renderWithProviders` (auth-free) and drive `useAuth`
+ * via `mockAuthValue` instead.
+ */
+export function renderWithAppProviders(
+  ui: ReactElement,
+  options?: Omit<RenderOptions, "wrapper">,
+) {
+  return render(
+    <QueryClientProvider client={makeClient()}>
+      <AuthProvider>
+        <PersonaPreviewProvider>
+          <BrowserRouter>{ui}</BrowserRouter>
+        </PersonaPreviewProvider>
+      </AuthProvider>
     </QueryClientProvider>,
     options,
   );

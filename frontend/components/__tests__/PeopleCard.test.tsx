@@ -10,8 +10,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen } from "@testing-library/react";
+import { renderWithAppProviders } from "../../__tests__/test-render";
 import React from "react";
 
 // vi.mock is hoisted — can't reference closure variables. Use vi.hoisted so
@@ -50,11 +50,7 @@ const basePerson: any = {
 };
 
 const renderCard = (props: any = {}) =>
-  render(
-    <MemoryRouter>
-      <PeopleCard person={basePerson} {...props} />
-    </MemoryRouter>,
-  );
+  renderWithAppProviders(<PeopleCard person={basePerson} {...props} />);
 
 // Tight regexes that target the Active/Joined row specifically ("Active "
 // followed by a date) — avoids false positives from the "active" status badge.

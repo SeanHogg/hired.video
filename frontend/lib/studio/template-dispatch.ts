@@ -39,6 +39,8 @@ import { type CadState } from "@shared/cad-state";
 import type { GameState } from "@shared/game-state";
 import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
+import { createBlankCad3DState } from "@shared/cad-3d-state";
+import { createBlankInteractiveComicState } from "@shared/interactive-comic-state";
 
 /** Discriminated payload — exactly ONE state-shaped field is set per
  *  result; the shape mirrors what `saveDraft` accepts on the wire.
@@ -91,14 +93,12 @@ export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
     case "cad_3d": {
       // 3D CAD runtime stub (#930 follow-on). Blank scene; the editor's
       // primitive palette is the entry path.
-      const { createBlankCad3DState } = require("@shared/cad-3d-state") as typeof import("@shared/cad-3d-state");
       return { name, cad3dState: createBlankCad3DState() };
     }
     case "interactive_comic": {
       // Interactive comic (#929) — branching graph. Ride the existing
       // linear-comic canvas seed for the pages, and seed a blank branch
       // graph on top.
-      const { createBlankInteractiveComicState } = require("@shared/interactive-comic-state") as typeof import("@shared/interactive-comic-state");
       return {
         name,
         timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),

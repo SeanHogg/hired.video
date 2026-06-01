@@ -16,7 +16,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
+import { renderWithAppProviders as render } from "../../__tests__/test-render";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import StoryboardEditor from "@/components/StoryboardEditor";

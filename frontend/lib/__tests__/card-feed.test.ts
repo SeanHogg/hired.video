@@ -22,11 +22,28 @@ vi.mock("@/lib/services/job-service", () => ({
 vi.mock("@/lib/services/company-service", () => ({
   companyService: { getPublicCompanies: vi.fn() },
 }));
-vi.mock("@/lib/services/user-service", () => ({
+// Spread the real module so non-service exports the import graph needs at
+// eval time (e.g. `PublicUserSchema`, consumed by card-feed's mappers) keep
+// their real values — only `userService` is replaced with the fanout spy.
+vi.mock("@/lib/services/user-service", async (orig) => ({
+  ...(await orig<typeof import("@/lib/services/user-service")>()),
   userService: { getPublicUsers: vi.fn() },
 }));
 vi.mock("@/lib/services/studio-service", () => ({
   studioService: { getPublicVideos: vi.fn() },
+}));
+// Networked fetchers added to DEFAULT_TYPES after the original 5 — each
+// hits a real apiClient GET (→ localhost retry-with-backoff → 5s timeout)
+// unless mocked. studio-templates (templates), article-service (articles,
+// dynamically imported inside fetchArticles), events-service (events).
+vi.mock("@/lib/services/studio-templates-service", () => ({
+  studioTemplatesService: { listPublic: vi.fn() },
+}));
+vi.mock("@/lib/services/article-service", () => ({
+  articleService: { listPublished: vi.fn() },
+}));
+vi.mock("@/lib/services/events-service", () => ({
+  eventsService: { search: vi.fn() },
 }));
 
 import { fetchCardFeed, fetchCardFeedByType } from "@/lib/card-feed";
@@ -35,6 +52,9 @@ import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
 import { studioService } from "@/lib/services/studio-service";
+import { studioTemplatesService } from "@/lib/services/studio-templates-service";
+import { articleService } from "@/lib/services/article-service";
+import { eventsService } from "@/lib/services/events-service";
 
 const getPublicResumes = resumeService.getPublicResumes as ReturnType<typeof vi.fn>;
 const getPublicJobs = jobService.getPublicJobs as ReturnType<typeof vi.fn>;
@@ -43,6 +63,9 @@ const getPublicCompanies = companyService.getPublicCompanies as ReturnType<
 >;
 const getPublicUsers = userService.getPublicUsers as ReturnType<typeof vi.fn>;
 const getPublicVideos = studioService.getPublicVideos as ReturnType<typeof vi.fn>;
+const listPublicTemplates = studioTemplatesService.listPublic as ReturnType<typeof vi.fn>;
+const listPublishedArticles = articleService.listPublished as ReturnType<typeof vi.fn>;
+const searchEvents = eventsService.search as ReturnType<typeof vi.fn>;
 
 // Small factories for each domain DTO shape — only the fields the aggregator reads.
 const makeResume = (overrides: Record<string, unknown> = {}) => ({
@@ -144,6 +167,12 @@ beforeEach(() => {
     hasPreviousPage: false,
   });
   getPublicVideos.mockResolvedValue({ data: [] });
+  // Newer networked fetchers — default to empty so the merge is driven by
+  // the domain factories above. Each returns a bare array (not a paged
+  // envelope) per its service contract.
+  listPublicTemplates.mockResolvedValue([]);
+  listPublishedArticles.mockResolvedValue([]);
+  searchEvents.mockResolvedValue([]);
 });
 
 describe("fetchCardFeed — fanout", () => {
@@ -154,6 +183,9 @@ describe("fetchCardFeed — fanout", () => {
     expect(getPublicCompanies).toHaveBeenCalledTimes(1);
     expect(getPublicUsers).toHaveBeenCalledTimes(1);
     expect(getPublicVideos).toHaveBeenCalledTimes(1);
+    expect(listPublicTemplates).toHaveBeenCalledTimes(1);
+    expect(listPublishedArticles).toHaveBeenCalledTimes(1);
+    expect(searchEvents).toHaveBeenCalledTimes(1);
   });
 
   it("only calls the requested services when types is restricted", async () => {
@@ -163,6 +195,9 @@ describe("fetchCardFeed — fanout", () => {
     expect(getPublicCompanies).not.toHaveBeenCalled();
     expect(getPublicUsers).not.toHaveBeenCalled();
     expect(getPublicVideos).not.toHaveBeenCalled();
+    expect(listPublicTemplates).not.toHaveBeenCalled();
+    expect(listPublishedArticles).not.toHaveBeenCalled();
+    expect(searchEvents).not.toHaveBeenCalled();
   });
 
   it("returns a sortable card per item with the shared sortKey", async () => {

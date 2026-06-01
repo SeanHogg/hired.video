@@ -69,6 +69,7 @@ function makeCleanResume(overrides: Partial<z.infer<typeof ResumeSchema>> = {}) 
     viewCount: 0,
     isOwner: true,
     isWatched: false,
+    archivedAt: null,
     createdAt: "2026-04-19T00:00:00.000Z",
     updatedAt: "2026-04-19T00:00:00.000Z",
     ...overrides,
@@ -226,6 +227,7 @@ describe("ResumeSchema identity: service re-export === shared canonical", () => 
       viewCount: 0,
       isOwner: false,
       isWatched: false,
+      archivedAt: null,
       createdAt: "2026-04-20T05:17:01.272Z",
       updatedAt: "2026-04-20T05:17:01.272Z",
     };

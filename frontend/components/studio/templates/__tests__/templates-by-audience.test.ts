@@ -28,9 +28,15 @@ describe("templatesForAudience", () => {
     }
   });
 
-  it("game_dev audience surfaces all 3 game-kind templates", () => {
+  it("game_dev audience surfaces every game-kind template", () => {
+    // Derive from the catalog so adding a new game template (e.g.
+    // game_3d_world) doesn't require touching a hardcoded list — the
+    // contract is "game_dev sees all mediaKind:'game' templates".
     const games = templatesForAudience("game_dev");
-    expect(games.map((t) => t.id).sort()).toEqual(["endless_runner", "memory_match", "quiz_game"]);
+    const expectedGameIds = TEMPLATE_CATALOG.filter((t) => t.mediaKind === "game")
+      .map((t) => t.id)
+      .sort();
+    expect(games.map((t) => t.id).sort()).toEqual(expectedGameIds);
     for (const g of games) expect(g.mediaKind).toBe("game");
   });
 
