@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - auth / verification flow - ships its own minimal chrome (pre-existing; #1869).
 /**
  * CertificateVerify — public verification + display of a hired.video
  * learning certificate.

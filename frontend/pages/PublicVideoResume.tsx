@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageChrome } from "@/lib/seo";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
 import { AppShell } from "@/components/AppShell";
@@ -15,6 +16,7 @@ import { MEDIA_KIND_UI, type MediaKind } from "@shared/media-kinds";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function PublicVideoResume() {
+  usePageChrome();
   const { videoId } = useParams<{ videoId: string }>();
   const [video, setVideo] = useState<PublicVideo | null>(null);
   const [error, setError] = useState<string | null>(null);

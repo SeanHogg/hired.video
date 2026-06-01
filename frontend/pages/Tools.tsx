@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
@@ -89,6 +89,7 @@ export default function Tools() {
 
   // SEO for tools page
   useSEO(location.pathname);
+  useDefaultBreadcrumbs();
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Gate at 2 chars via the shared hook so single-keystroke ?q=A

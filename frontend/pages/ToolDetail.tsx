@@ -21,17 +21,21 @@ import { ToolAudienceBadge } from "@/components/ToolAudienceBadge";
 import { ToolPromoVideo } from "@/components/ToolPromoVideo";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
 import { cn } from "@/lib/utils";
+import { AppShell } from "@/components/AppShell";
+import { usePageChrome } from "@/lib/seo";
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
   const tool = useMemo(() => TOOLS_CATALOG.find((t) => t.id === id), [id]);
+  usePageChrome();
 
   if (!tool) return <Navigate to="/tools" replace />;
 
   const Icon = tool.icon;
 
   return (
-    <div className="px-4 py-8 space-y-8">
+    <AppShell variant="public">
+      <div className="px-4 py-8 space-y-8">
       <Link
         to="/tools"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -100,6 +104,7 @@ export default function ToolDetail() {
           <Link to={tool.href}>{tool.ctaLabel ?? `Open ${tool.title}`}</Link>
         </Button>
       </section>
-    </div>
+      </div>
+    </AppShell>
   );
 }

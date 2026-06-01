@@ -14,7 +14,7 @@
 import { useParams, Navigate, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { MEDIA_KIND_UI, MEDIA_KINDS } from "@shared/media-kinds";
 import { StudioTemplateLinkCard } from "@/components/studio/templates/StudioTemplateLinkCard";
 import { StudioOpenCTA } from "@/components/studio/templates/StudioOpenCTA";
@@ -48,6 +48,7 @@ function ProfessionAudienceLandingPage({ slug }: { slug: string }): JSX.Element 
   const location = useLocation();
   const audience = slug && slug in AUDIENCE_BY_ID ? AUDIENCE_BY_ID[slug as Audience] : null;
 
+  useDefaultBreadcrumbs();
   useSEO(
     location.pathname,
     audience

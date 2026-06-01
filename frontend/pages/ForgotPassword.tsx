@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - auth / verification flow - ships its own minimal chrome (pre-existing; #1869).
 import { ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";

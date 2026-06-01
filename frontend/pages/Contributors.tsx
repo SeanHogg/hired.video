@@ -14,6 +14,7 @@
 // being wrapped in `if (count > 0)` guards by the caller.
 
 import { useState } from "react";
+import { usePageChrome } from "@/lib/seo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, Trash2, UserPlus, UserCheck, Clock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -49,6 +50,7 @@ interface GrantRow {
 }
 
 export default function Contributors() {
+  usePageChrome();
   const { user } = useAuth();  if (!user) return null;
 
   return (

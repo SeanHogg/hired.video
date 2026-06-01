@@ -1,4 +1,5 @@
 import {
+import { usePageChrome } from "@/lib/seo";
   Cookie,
   Shield,
   Settings,
@@ -26,6 +27,7 @@ import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useAuth } from "@/lib/auth";
 
 export default function CookiePolicy() {
+  usePageChrome();
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const {

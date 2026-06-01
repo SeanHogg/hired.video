@@ -11,7 +11,7 @@ import { useParams, Navigate, Link, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { MEDIA_KIND_UI } from "@shared/media-kinds";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { OutputProfilePanel } from "@/components/studio/templates/OutputProfilePanel";
@@ -27,6 +27,7 @@ export default function TemplateLandingPage(): JSX.Element {
 
   // Hooks must run unconditionally — feed empty customSEO when template is
   // missing; the Navigate below will redirect before render anyway.
+  useDefaultBreadcrumbs();
   useSEO(
     location.pathname,
     template

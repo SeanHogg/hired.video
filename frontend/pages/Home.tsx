@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/card";
 
 import { useAuth } from "@/lib/auth";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
@@ -72,6 +72,7 @@ function HomeMarketingPage() {
   const location = useLocation();
   const { t } = useTranslation();
   useSEO(location.pathname);
+  useDefaultBreadcrumbs();
 
   const HOME_STATS = [
     { stat: "500K+", label: t("marketing.home.stats.tracking") },

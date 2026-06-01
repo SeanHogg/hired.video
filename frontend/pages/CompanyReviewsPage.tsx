@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { ReviewsSection } from "@/components/reviews/ReviewsSection";
 import { ReviewRatingBadge } from "@/components/reviews/ReviewRatingBadge";
-import { useBreadcrumbs } from "@/lib/seo";
+import { useBreadcrumbs, usePageChrome } from "@/lib/seo";
 import { useUgcSeo } from "@/lib/seo-ugc";
 
 import { useAuth } from "@/lib/auth";
@@ -34,6 +34,7 @@ import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { companyService, type CompanyProfile } from "@/lib/services/company-service";
 
 export default function CompanyReviewsPage() {
+  usePageChrome();
   const { slug } = useParams<{ slug: string }>();
   const location = useLocation();
   const { isAuthenticated } = useAuth();

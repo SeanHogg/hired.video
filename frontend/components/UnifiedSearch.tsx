@@ -54,6 +54,12 @@ interface UnifiedSearchProps {
    * (just under the fixed Navigation header) while the user scrolls.
    */
   stickySearch?: boolean;
+  /**
+   * Optional content rendered in a sticky right-hand rail beside the
+   * results grid on large screens (e.g. a marketplace promo banner).
+   * Kept as a prop so UnifiedSearch stays generic — only /search opts in.
+   */
+  sidebar?: React.ReactNode;
 }
 
 const CATEGORIES = [
@@ -135,6 +141,7 @@ const categoryToTypes = (category: string): CardFeedType[] => {
 
 export default function UnifiedSearch({
   stickySearch = false,
+  sidebar,
 }: UnifiedSearchProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -567,7 +574,8 @@ export default function UnifiedSearch({
 
       {/* Results */}
       <section className="pt-8 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+        <div className={`max-w-7xl mx-auto${sidebar ? " lg:grid lg:grid-cols-[1fr_18rem] lg:gap-8 lg:items-start" : ""}`}>
+          <div className="min-w-0">
           <div className="mb-4 sm:mb-6">
             <p className="text-xs sm:text-sm text-muted-foreground">
               {totalFound} items found
@@ -758,6 +766,12 @@ export default function UnifiedSearch({
                 Try adjusting your search or filters.
               </p>
             </div>
+          )}
+          </div>
+          {sidebar && (
+            <aside className="hidden lg:block">
+              <div className="lg:sticky lg:top-20">{sidebar}</div>
+            </aside>
           )}
         </div>
       </section>

@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - token-scoped share surface - no app chrome (pre-existing; #1869).
 /**
  * /references/shared/:token — recipient view of an NDA-gated reference
  * packet (#1677). Shows the label + an NDA gate; on accept, reveals the

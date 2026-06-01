@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * CourseLearner — the lesson-by-lesson playback surface for an enrolled
  * user. Closes the consumer side of the SCORM authoring loop (#166): a

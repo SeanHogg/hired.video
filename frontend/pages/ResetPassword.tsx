@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - auth / verification flow - ships its own minimal chrome (pre-existing; #1869).
 import { useState, useEffect } from "react";
 import { useSearchParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";

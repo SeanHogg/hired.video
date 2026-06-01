@@ -1,7 +1,7 @@
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock, Calendar, Grid, List } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,6 +54,7 @@ export default function BlogIndex() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   useSEO(location.pathname);
+  useDefaultBreadcrumbs();
 
   // DB-backed articles (kind in {article, guide}) — merged with the
   // static BLOG_POSTS registry into a single unified list. Failures are

@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * /network/warm-intros — find 1st/2nd-degree connections at a target
  * company who could introduce you (#1678). Authed surface.

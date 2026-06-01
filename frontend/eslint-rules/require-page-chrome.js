@@ -25,6 +25,26 @@ const PAGE_GLOB = /[\\/]pages[\\/][^\\/]+\.tsx$/;
 const SUBDIR_PAGE_GLOB = /[\\/]pages[\\/].+\.tsx$/;
 const OPT_OUT_RE = /eslint-page-chrome:\s*skip/i;
 
+// Wrapper components that, when a page renders one, provide the FULL page
+// chrome themselves — `<AppShell>` + `useSEO` + `useBreadcrumbs` — so the
+// page satisfies all three requirements by composition without repeating
+// the calls (DRY). Two forms:
+//   • explicit names (e.g. ToolShell — "owns the chrome the tools used to
+//     copy-paste 13 times"; ResumeAnalysisToolPage composes ToolShell), and
+//   • any `*Layout` wrapper (AdminLayout / StudioLayout / … render AppShell
+//     + own their surface's SEO).
+// NB `AppShell` itself is intentionally NOT here: it provides layout chrome
+// but NOT useSEO/useBreadcrumbs, so a bare `<AppShell>` page must still
+// declare its own SEO + breadcrumbs.
+const FULL_CHROME_PROVIDERS = new Set(["ToolShell", "ResumeAnalysisToolPage"]);
+const FULL_CHROME_SUFFIX = /Layout$/;
+
+// Route trees whose pages receive chrome from a layout wrapper applied at
+// the ROUTE (e.g. every pages/admin/* element is wrapped in <AdminLayout>
+// in App.tsx), so the page file itself legitimately renders bare content
+// and can't be detected by in-file composition.
+const CHROME_BY_ROUTE_WRAPPER = [/[\\/]pages[\\/]admin[\\/]/];
+
 // ESM default export — eslint.config.js is ESM (`import requirePageChrome
 // from "./eslint-rules/require-page-chrome.js"`) and the frontend package
 // is `"type": "module"`, so a CommonJS `module.exports` here resolves to
@@ -57,6 +77,10 @@ export default {
     // `/pages/` segment so we don't trip on `frontend/components/pages/`.
     if (!PAGE_GLOB.test(filename) && !SUBDIR_PAGE_GLOB.test(filename)) return {};
 
+    // Chromed by a layout wrapper applied at the route (admin/*) — the page
+    // file is bare by design; nothing to enforce in-file.
+    if (CHROME_BY_ROUTE_WRAPPER.some((re) => re.test(filename))) return {};
+
     // Honour the opt-out comment — the file's first leading block of
     // comments controls behaviour, so devs can disable per-file with a
     // documented reason.
@@ -67,19 +91,34 @@ export default {
     let foundAppShell = false;
     let foundUseSEO = false;
     let foundUseBreadcrumbs = false;
+    let foundFullChrome = false;
     let hasDefaultExport = false;
 
     return {
       JSXOpeningElement(node) {
-        if (node.name && node.name.type === "JSXIdentifier" && node.name.name === "AppShell") {
-          foundAppShell = true;
+        if (node.name && node.name.type === "JSXIdentifier") {
+          const n = node.name.name;
+          if (n === "AppShell") foundAppShell = true;
+          // A full-chrome wrapper satisfies AppShell + useSEO +
+          // useBreadcrumbs together (it owns all three).
+          if (FULL_CHROME_PROVIDERS.has(n) || FULL_CHROME_SUFFIX.test(n)) {
+            foundFullChrome = true;
+          }
         }
       },
       CallExpression(node) {
         const callee = node.callee;
         if (callee && callee.type === "Identifier") {
           if (callee.name === "useSEO") foundUseSEO = true;
-          else if (callee.name === "useBreadcrumbs") foundUseBreadcrumbs = true;
+          else if (callee.name === "useBreadcrumbs" || callee.name === "useDefaultBreadcrumbs") {
+            foundUseBreadcrumbs = true;
+          }
+          // `usePageChrome()` applies route-derived SEO + breadcrumbs in
+          // one call (lib/seo.ts) — satisfies both at once (DRY).
+          else if (callee.name === "usePageChrome") {
+            foundUseSEO = true;
+            foundUseBreadcrumbs = true;
+          }
         }
       },
       ExportDefaultDeclaration() {
@@ -90,6 +129,10 @@ export default {
           context.report({ node, messageId: "missingDefaultExport" });
           return; // a file with no default export isn't really a "page"; skip the rest
         }
+        // A page composing a full-chrome wrapper satisfies all three
+        // requirements at once — the wrapper renders AppShell + declares
+        // useSEO + useBreadcrumbs.
+        if (foundFullChrome) return;
         if (!foundAppShell) context.report({ node, messageId: "missingAppShell" });
         if (!foundUseSEO) context.report({ node, messageId: "missingUseSEO" });
         if (!foundUseBreadcrumbs)

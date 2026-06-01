@@ -12,13 +12,23 @@ import type {
   CommunityResource,
   NewCommunityResource,
 } from "../db/schema/communityResources.js";
+import { contentReports } from "../db/schema/reports.js";
 import type { ResourceStatus } from "../../../shared/community-resources.js";
 
 type DbLike = any;
 
+/** Approved resources with this many or more active (pending/reviewing)
+ *  community flags are auto-hidden from the public directory until a
+ *  SuperAdmin resolves them — UGC is lower-trust, so bad links/spam
+ *  self-suppress before manual review (gap #1836). */
+export const AUTO_HIDE_FLAG_THRESHOLD = 3;
+
 export interface CommunityResourceDirectoryFilter {
   countryCode: string;
   stateCode?: string | null;
+  /** When set, narrows to that city's resources PLUS state-wide ones
+   *  (city_slug IS NULL). When omitted, returns all rows for the state. */
+  citySlug?: string | null;
   audience?: string | null;
   category?: string | null;
 }
@@ -53,6 +63,13 @@ export class CommunityResourcesRepository implements ICommunityResourcesReposito
     ];
     if (filter.stateCode) clauses.push(eq(communityResources.stateCode, filter.stateCode));
     if (filter.category) clauses.push(eq(communityResources.category, filter.category));
+    // City pages show city-specific resources PLUS state-wide ones (no
+    // city). State pages (no citySlug) show everything in the state.
+    if (filter.citySlug) {
+      clauses.push(
+        sql`(${communityResources.citySlug} = ${filter.citySlug} OR ${communityResources.citySlug} IS NULL)`,
+      );
+    }
     // `both` resources surface to either audience, so an audience filter
     // matches the requested audience OR `both`.
     if (filter.audience && filter.audience !== "both") {
@@ -60,6 +77,14 @@ export class CommunityResourcesRepository implements ICommunityResourcesReposito
         sql`(${communityResources.audience} = ${filter.audience} OR ${communityResources.audience} = 'both')`,
       );
     }
+    // Auto-hide rows that have piled up active flags (gap #1836).
+    clauses.push(
+      sql`(SELECT COUNT(*) FROM ${contentReports}
+            WHERE ${contentReports.entityType} = 'community_resource'
+              AND ${contentReports.entityId} = ${communityResources.id}
+              AND ${contentReports.status} IN ('pending', 'reviewing')
+          ) < ${AUTO_HIDE_FLAG_THRESHOLD}`,
+    );
     return (await this.db
       .select()
       .from(communityResources)

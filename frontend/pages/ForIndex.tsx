@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import {
   LIFE_STAGE_AUDIENCE_REGISTRY,
   type LifeStageAudienceMeta,
@@ -24,6 +24,7 @@ const ROLE_KEYS: LifeStageAudienceMeta["key"][] = ["job_seekers", "employers", "
 
 export default function ForIndex(): JSX.Element {
   const location = useLocation();
+  useDefaultBreadcrumbs();
   useSEO(location.pathname, {
     title: "Resource maps — hired.video",
     description:

@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 /**
  * StudioProjectActions — action cluster for the active studio project.
  *

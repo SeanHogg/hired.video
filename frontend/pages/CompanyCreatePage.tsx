@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 import { Building2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect } from "react";

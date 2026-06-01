@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - utility page (pre-existing; #1869).
 /**
  * /privacy/opt-out — CCPA / CPRA "Do Not Sell or Share My Personal
  * Information" self-service page. Closes gap #1149.

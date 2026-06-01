@@ -10,7 +10,7 @@ import * as React from "react";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import FeaturedTools from "@/components/FeaturedTools";
 import LatestGuides from "@/components/LatestGuides";
 import UnifiedSearch from "@/components/UnifiedSearch";
@@ -29,6 +29,7 @@ export default function Index() {
   const { t } = useTranslation();
 
   useSEO(location.pathname);
+  useDefaultBreadcrumbs();
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
 
   // Hero shows only the SA-curated featured set; empty → skeleton.

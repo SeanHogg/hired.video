@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 import { useSEO } from "@/lib/seo";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";

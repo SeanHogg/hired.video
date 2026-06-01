@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - token-scoped share surface - no app chrome (pre-existing; #1869).
 // SharedCandidateResume — unauthenticated reviewer view for a candidate
 // resume share token. Renders the redacted resume content through the
 // existing DeclarativeResumeRenderer under a brand-kit header banner

@@ -96,7 +96,6 @@ import { jobAnalyticsRoutes } from "./routes/job-analytics.js";
 import { aiCostReconciliationRoutes } from "./routes/ai-cost-reconciliation.js";
 import { featuredCreatorsRoutes } from "./routes/featured-creators.js";
 import { artifactMetricsRoutes } from "./routes/artifact-metrics.js";
-import { contentReportsRoutes } from "./routes/content-reports.js";
 import { takeHomeInvitesRoutes } from "./routes/take-home-invites.js";
 import { youtubeRoutes } from "./routes/youtube.js";
 import { communicationRoutes } from "./routes/communication.js";
@@ -641,7 +640,6 @@ export function createApp() {
   app.route("/api/admin/ai-cost-reconciliation", aiCostReconciliationRoutes);
   app.route("/api/featured-creators", featuredCreatorsRoutes);
   app.route("/api/artifact-metrics", artifactMetricsRoutes);
-  app.route("/api/reports", contentReportsRoutes);
   app.route("/api/take-home-invites", takeHomeInvitesRoutes);
   app.route("/api/affiliates", affiliateRoutes);
   app.route("/api/marketing", marketingRoutes);

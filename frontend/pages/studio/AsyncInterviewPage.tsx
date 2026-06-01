@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 /**
  * AsyncInterviewPage — candidate-facing magic-link page at /interview/:token.
  *

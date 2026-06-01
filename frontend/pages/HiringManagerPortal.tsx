@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // HiringManagerPortal — public read-only kanban accessed via shareToken.
 // Hiring managers / clients view candidate progression without an account;
 // PII (email + phone) is redacted server-side.

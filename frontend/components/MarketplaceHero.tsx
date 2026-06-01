@@ -80,40 +80,33 @@ export default function MarketplaceHero() {
       <CreatorPromoCard variant="hero" />
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-6 sm:gap-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            {CATEGORIES.map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <Card key={cat.id} className="flex flex-col">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-md bg-primary/10 p-2">
-                          <Icon className="w-5 h-5 text-primary" />
-                        </div>
-                        <CardTitle>{cat.title}</CardTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <Card key={cat.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-md bg-primary/10 p-2">
+                        <Icon className="w-5 h-5 text-primary" />
                       </div>
-                      {cat.badge && <Badge variant="outline">{cat.badge}</Badge>}
+                      <CardTitle>{cat.title}</CardTitle>
                     </div>
-                    <CardDescription className="pt-2">{cat.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="mt-auto">
-                    <Link to={cat.href}>
-                      <Button variant="secondary" className="w-full">
-                        {cat.cta}
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Side column — the reusable creator promo as a sticky banner ad. */}
-          <aside className="lg:sticky lg:top-20 self-start">
-            <CreatorPromoCard variant="banner" />
-          </aside>
+                    {cat.badge && <Badge variant="outline">{cat.badge}</Badge>}
+                  </div>
+                  <CardDescription className="pt-2">{cat.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="mt-auto">
+                  <Link to={cat.href}>
+                    <Button variant="secondary" className="w-full">
+                      {cat.cta}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </section>
     </>

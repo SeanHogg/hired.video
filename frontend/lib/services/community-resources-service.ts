@@ -57,11 +57,13 @@ export const communityResourcesService = {
   async listDirectory(opts: {
     country: string;
     state?: string | null;
+    city?: string | null;
     audience?: ResourceAudience;
     category?: ResourceCategory;
   }): Promise<CommunityResource[]> {
     const params = new URLSearchParams({ country: opts.country });
     if (opts.state) params.set("state", opts.state);
+    if (opts.city) params.set("city", opts.city);
     if (opts.audience) params.set("audience", opts.audience);
     if (opts.category) params.set("category", opts.category);
     const res = await apiClient.get<{ items: CommunityResource[] }>(

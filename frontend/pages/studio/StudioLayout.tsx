@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioLayout.tsx — top-level state owner for the 3-panel Studio workspace.
 // Unauthenticated users see a marketing landing. Authenticated users get the
 // full workspace.

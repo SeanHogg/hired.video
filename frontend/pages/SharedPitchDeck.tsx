@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - token-scoped share surface - no app chrome (pre-existing; #1869).
 // SharedPitchDeck — unauthenticated reviewer view for a pitch-deck share
 // token. Slide-deck nav (prev/next + dots + keyboard arrows) over N
 // redacted candidate resumes. Each slide shows fit summary, match score,

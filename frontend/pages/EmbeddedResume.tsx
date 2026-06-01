@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - embed / iframe surface - host owns the framing (pre-existing; #1869).
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Share2, ExternalLink } from "lucide-react";

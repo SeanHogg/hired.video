@@ -1,4 +1,5 @@
 import {
+import { usePageChrome } from "@/lib/seo";
   Edit,
   Share,
   Bookmark,
@@ -50,6 +51,7 @@ import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromJobDescription } from "@/lib/audio/narrator-text";
 
 export default function JobDetail() {
+  usePageChrome();
   const { t } = useTranslation();
   const { id: slug } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();

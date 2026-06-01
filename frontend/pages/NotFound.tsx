@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - utility page (pre-existing; #1869).
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";

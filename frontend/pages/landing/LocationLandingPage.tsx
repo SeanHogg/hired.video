@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ResourceMap } from "@/components/landing/ResourceMap";
 import LocationResources from "@/components/resources/LocationResources";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
 
 interface ResolvedLocation {
@@ -76,6 +76,7 @@ export default function LocationLandingPage(): JSX.Element {
     return `Explore work and opportunities in ${resolved.country.name}.`;
   }, [resolved]);
 
+  useDefaultBreadcrumbs();
   useSEO(
     location.pathname,
     resolved

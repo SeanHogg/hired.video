@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 /**
  * Full-screen loading shell used by every entry point into the studio
  * editor — code-split Suspense fallback, auth bootstrap, and the

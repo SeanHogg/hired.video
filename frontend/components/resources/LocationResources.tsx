@@ -52,6 +52,7 @@ export default function LocationResources({
       const rows = await communityResourcesService.listDirectory({
         country: countryCode,
         state: stateCode ?? undefined,
+        city: citySlug ?? undefined,
       });
       setResources(rows);
     } catch {
@@ -64,7 +65,7 @@ export default function LocationResources({
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countryCode, stateCode]);
+  }, [countryCode, stateCode, citySlug]);
 
   function openSubmit() {
     if (!isAuthenticated) {

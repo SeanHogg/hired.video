@@ -40,7 +40,7 @@ function uid(c: any): string | null {
 /** Geo slugs are lowercased so /in/us/tx and ?country=US&state=Tx collapse. */
 const slug = (s: string) => s.trim().toLowerCase();
 
-const SubmitSchema = z
+export const SubmitSchema = z
   .object({
     title: z.string().trim().min(3).max(200),
     description: z.string().trim().min(10).max(2000),
@@ -64,6 +64,7 @@ communityResourceRoutes.get("/", async (c) => {
   const rows = await repos.communityResources.listApproved({
     countryCode: slug(country),
     stateCode: c.req.query("state") ? slug(c.req.query("state")!) : null,
+    citySlug: c.req.query("city") ? slug(c.req.query("city")!) : null,
     audience: c.req.query("audience") ?? null,
     category: c.req.query("category") ?? null,
   });

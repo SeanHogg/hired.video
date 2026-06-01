@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioPreview.tsx — right panel: unified <StudioPlayer/> + Save +
 // Publish-to-* menu + visibility chip. Save persists + (optionally)
 // generates the script; it does NOT render. Render happens lazily

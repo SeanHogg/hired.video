@@ -5,11 +5,12 @@
  */
 import { useLocation } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { LocationsSitemap } from "@/components/landing/LocationsSitemap";
 
 export default function SitemapLocations(): JSX.Element {
   const location = useLocation();
+  useDefaultBreadcrumbs();
   useSEO(location.pathname, {
     title: "All Locations — Jobs Worldwide · hired.video",
     description:

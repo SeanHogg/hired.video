@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioSettings.tsx — Video settings, styled to match the left sidebar
 // (collapsible accordion sections used inside StudioSidebar).
 //

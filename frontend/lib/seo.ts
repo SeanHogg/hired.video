@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { DEFAULT_LOCALE, PUBLIC_LOCALES, type Locale } from "@shared/i18n";
 import { resolvePageSeoKey } from "@/lib/config/page-meta-registry";
 
@@ -1560,6 +1561,55 @@ export function useBreadcrumbs(
       if (existing) existing.remove();
     };
   }, [items]);
+}
+
+/**
+ * Derive a sensible breadcrumb trail from a route path: Home → humanised
+ * path segments (id-like segments dropped). The single source for the
+ * "no custom trail needed" default so pages don't hand-roll the same
+ * Home→segments logic (DRY).
+ */
+export function defaultBreadcrumbs(pathname: string): { name: string; url: string }[] {
+  const items = [{ name: "Home", url: "/" }];
+  let acc = "";
+  for (const seg of pathname.split("/").filter(Boolean)) {
+    acc += `/${seg}`;
+    // Skip opaque id/slug-ish segments (uuids, long hex, pure numbers).
+    if (/^[0-9]+$/.test(seg) || /^[0-9a-f]{8,}$/i.test(seg) || /-[0-9a-f]{6,}$/i.test(seg)) {
+      continue;
+    }
+    items.push({
+      name: seg.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      url: acc,
+    });
+  }
+  return items;
+}
+
+/**
+ * One-call page chrome (#1869) — applies route-derived SEO + a default
+ * breadcrumb trail in a single hook. Pages that don't need bespoke SEO /
+ * breadcrumbs call `usePageChrome()` once instead of wiring `useSEO` +
+ * `useBreadcrumbs` separately; pass `customSEO` to override per entity
+ * (detail pages). Satisfies the `require-page-chrome` lint rule. Must be
+ * used inside a Router (reads `useLocation`).
+ */
+export function usePageChrome(customSEO?: Partial<SEOData>): void {
+  const { pathname } = useLocation();
+  useSEO(pathname, customSEO);
+  useBreadcrumbs(defaultBreadcrumbs(pathname));
+}
+
+/**
+ * Breadcrumbs-only convenience (#1869) — emits a route-derived
+ * BreadcrumbList for pages that already declare their own `useSEO` and
+ * just need the breadcrumb JSON-LD. Self-contained (reads `useLocation`)
+ * so callers add a single argument-free line. Satisfies the
+ * `require-page-chrome` lint rule's breadcrumb requirement.
+ */
+export function useDefaultBreadcrumbs(): void {
+  const { pathname } = useLocation();
+  useBreadcrumbs(defaultBreadcrumbs(pathname));
 }
 
 /**

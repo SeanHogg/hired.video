@@ -1,4 +1,5 @@
 import {
+import { usePageChrome } from "@/lib/seo";
   MapPin,
   Globe,
   Mail,
@@ -64,6 +65,7 @@ import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import { entityBreadcrumb } from "@/components/entity-breadcrumb";
 
 export default function CompanyDetail() {
+  usePageChrome();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();

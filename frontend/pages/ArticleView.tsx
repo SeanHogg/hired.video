@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageChrome } from "@/lib/seo";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2, Clock, Eye } from "lucide-react";
@@ -29,6 +30,7 @@ interface ArticleData {
 }
 
 export default function ArticleView() {
+  usePageChrome();
   const { t } = useTranslation();
   const { authorSlug, slug } = useParams<{ authorSlug: string; slug: string }>();
   const [article, setArticle] = useState<ArticleData | null>(null);

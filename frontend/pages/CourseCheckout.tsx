@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * CourseCheckout — paid-course enrolment landing page (#1400 build-strategy
  * "Course payment / cart wiring").

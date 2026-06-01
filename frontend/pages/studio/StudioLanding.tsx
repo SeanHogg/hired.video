@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 /**
  * Studio landing page — the PowerPoint-style chooser shown to every
  * authenticated user at /studio. Two sections: templates (start a new

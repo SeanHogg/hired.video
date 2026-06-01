@@ -7,7 +7,7 @@ import {
   Calendar,
   RefreshCw,
 } from "lucide-react";
-import { useBreadcrumbs } from "@/lib/seo";
+import { useBreadcrumbs, usePageChrome } from "@/lib/seo";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromFAQ } from "@/lib/audio/narrator-text";
 
 export default function BlogPost() {
+  usePageChrome();
   const { slug } = useParams<{ slug: string }>();
   const post = slug ? getBlogPost(slug) : undefined;
 

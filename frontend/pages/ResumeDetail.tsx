@@ -1,4 +1,5 @@
 import {
+import { usePageChrome } from "@/lib/seo";
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -163,6 +164,7 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
 }
 
 export default function ResumeDetail() {
+  usePageChrome();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

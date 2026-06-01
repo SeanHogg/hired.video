@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // /interview-assignments — shows both:
 //   • interviews assigned to me as a job seeker (with my answers)
 //   • interviews I created as a recruiter / employer (with candidate responses + resend)

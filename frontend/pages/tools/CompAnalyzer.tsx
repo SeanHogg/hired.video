@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { analyzeComp, basePercent, type CompInput } from "@shared/comp-analyzer";
 
 const fmt = (n: number) =>
@@ -24,6 +24,7 @@ function numField(v: string): number {
 
 export default function CompAnalyzer(): JSX.Element {
   const location = useLocation();
+  useDefaultBreadcrumbs();
   useSEO(location.pathname, {
     title: "Executive Compensation Analyzer · hired.video",
     description:
