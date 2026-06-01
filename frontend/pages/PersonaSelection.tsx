@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - full-screen onboarding flow (pre-existing; #1869).
 import { Users, Briefcase, Building2, ArrowRight, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";

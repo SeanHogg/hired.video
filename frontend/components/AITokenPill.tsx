@@ -23,6 +23,19 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
   const { isAuthenticated } = useAuth();
   const budget = useTokenBudget();
 
+  // Vendor plan exhaustion (AI_USAGE_LIMIT_REACHED) is global to the
+  // operator, not per-user. These hooks must run BEFORE the early returns
+  // below (logged-out teaser / loading) so hook order stays stable (#1870).
+  const [aiLimitHit, setAiLimitHit] = useState(false);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ApiErrorEvent>).detail;
+      if (detail?.code === "AI_USAGE_LIMIT_REACHED") setAiLimitHit(true);
+    };
+    window.addEventListener(API_ERROR_EVENT, handler);
+    return () => window.removeEventListener(API_ERROR_EVENT, handler);
+  }, []);
+
   // Logged-out teaser — same chrome as the free-tier pill so the sidebar
   // looks consistent for anonymous visitors. Click-through routes to the
   // /pricing marketing page (NOT /settings) so signed-out users land on
@@ -82,22 +95,6 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
     );
   }
 
-  // Vendor plan exhaustion (or any other AI_USAGE_LIMIT_REACHED hit)
-  // is global to the operator, not per-user — the pill's per-user
-  // budget DTO has no way to know about it. Subscribe to the same
-  // event the global upgrade banner uses so the pill reflects the
-  // "AI is locked, upgrade to keep using" state for unlimited/admin
-  // viewers too. Cleared on click-through (assumes the user navigates
-  // to /pricing to act on the prompt).
-  const [aiLimitHit, setAiLimitHit] = useState(false);
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<ApiErrorEvent>).detail;
-      if (detail?.code === "AI_USAGE_LIMIT_REACHED") setAiLimitHit(true);
-    };
-    window.addEventListener(API_ERROR_EVENT, handler);
-    return () => window.removeEventListener(API_ERROR_EVENT, handler);
-  }, []);
   const clearLimitOnClick = () => setAiLimitHit(false);
 
   if (budget.isLoading) return null;

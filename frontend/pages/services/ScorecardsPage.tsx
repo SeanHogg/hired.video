@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // ScorecardsPage — recruiter hub for managing scorecard templates and
 // interview kits. Lives at /people/scorecards alongside the rest of the
 // People surfaces.

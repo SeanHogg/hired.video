@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * `/points` route. Thin wrapper around `<PointsHub />` — the same hub
  * is mounted on `/settings?tab=points` so the canonical "cash out + see

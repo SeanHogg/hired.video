@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // PitchDecksList — grid of agency-authored pitch decks. Each deck bundles
 // multiple redacted candidates with fit summaries + match scores for a
 // hiring client. Clicking a deck opens the builder at /people/pitch-decks/:id.

@@ -105,40 +105,11 @@ export default function GameStage({
   onSelectEntity,
   className,
 }: GameStageProps) {
-  // 3D-runtime dispatch — projects authored with `engine === "world-3d"`
-  // mount the R3F + Rapier stage instead of the 2D Canvas loop. Single
-  // dispatch point per the canvas-runtime extensibility model in
-  // PRD §1.2; the host (`StudioEditorV2`) wires both paths through the
-  // same `setGameState` setter (DRY: one persistence pipeline).
-  if (gameState?.engine === "world-3d") {
-    return (
-      <Suspense
-        fallback={
-          <div
-            className={cn(
-              "flex aspect-video w-[640px] flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground",
-              className,
-            )}
-          >
-            <Gamepad2 className="h-10 w-10 text-fuchsia-500 animate-pulse" />
-            <p className="mt-2 text-xs">Loading 3D runtime…</p>
-          </div>
-        }
-      >
-        <GameStage3D
-          gameState={gameState}
-          mode={mode}
-          onChange={onChange ?? (() => {})}
-          projectId={projectId}
-          zoom={zoom}
-          selectedEntityId={selectedEntityId}
-          onSelectEntity={onSelectEntity}
-          hideRuntimeBanner={hideRuntimeBanner}
-          className={className}
-        />
-      </Suspense>
-    );
-  }
+  // 3D-runtime dispatch lives AFTER the 2D hooks below (#1870): React
+  // hooks must run unconditionally, so we can't early-return for the
+  // world-3d engine before them. See the dispatch just before the 2D
+  // render guards. (Single dispatch point per the canvas-runtime
+  // extensibility model, PRD §1.2.)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // Drag state — set on pointer-down on a sprite; cleared on
@@ -262,6 +233,41 @@ export default function GameStage({
     },
     [],
   );
+
+  // 3D-runtime dispatch — projects authored with `engine === "world-3d"`
+  // mount the R3F + Rapier stage instead of the 2D Canvas loop. Placed
+  // AFTER the 2D hooks (which no-op without a mounted canvas) so React
+  // sees a stable hook order regardless of engine (#1870). The host
+  // (`StudioEditorV2`) wires both paths through the same setter.
+  if (gameState?.engine === "world-3d") {
+    return (
+      <Suspense
+        fallback={
+          <div
+            className={cn(
+              "flex aspect-video w-[640px] flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground",
+              className,
+            )}
+          >
+            <Gamepad2 className="h-10 w-10 text-fuchsia-500 animate-pulse" />
+            <p className="mt-2 text-xs">Loading 3D runtime…</p>
+          </div>
+        }
+      >
+        <GameStage3D
+          gameState={gameState}
+          mode={mode}
+          onChange={onChange ?? (() => {})}
+          projectId={projectId}
+          zoom={zoom}
+          selectedEntityId={selectedEntityId}
+          onSelectEntity={onSelectEntity}
+          hideRuntimeBanner={hideRuntimeBanner}
+          className={className}
+        />
+      </Suspense>
+    );
+  }
 
   if (!gameState) {
     return (

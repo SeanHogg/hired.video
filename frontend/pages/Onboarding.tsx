@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - full-screen onboarding flow (pre-existing; #1869).
 import {
   CheckCircle2,
   Circle,

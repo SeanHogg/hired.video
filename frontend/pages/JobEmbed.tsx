@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - embed / iframe surface - host owns the framing (pre-existing; #1869).
 /**
  * #412 — Public job embed renderer. Mirrors the resume-embed page so
  * `JobActionsMenu`'s Embed entry can point at `/jobs/embed/:id` and

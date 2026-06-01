@@ -252,6 +252,15 @@ export function createApp() {
     "/api/studio/videos/user",
     "/api/studio/videos/featured",
     "/api/studio/public",
+    // Page → video embeds (#1860/#1863). <MarketingPageVideo> mounts
+    // app-wide in AppShell and fires `/paths` (cached membership set) on
+    // every route — incl. anonymous marketing/homepage visitors — then
+    // `/resolve` only on a hit. Both handlers read zero user-scoped data.
+    // The SuperAdmin management surface (GET/POST/DELETE on the bare
+    // `/api/studio/page-embeds`) is NOT matched by these longer prefixes,
+    // so it stays authenticated + SuperAdmin-gated.
+    "/api/studio/page-embeds/paths",
+    "/api/studio/page-embeds/resolve",
     // Per-entity public videos rail (#323). EntityVideos on Resume / Job /
     // Company / Profile / Article cards hits this for non-owners (incl.
     // anonymous viewers on public listing pages) so public videos linked

@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * /references — owner reference management (#1677). Add reference
  * contacts, then create NDA-gated, revocable share links granting a

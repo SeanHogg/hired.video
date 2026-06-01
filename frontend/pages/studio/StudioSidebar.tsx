@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useMemo } from "react";

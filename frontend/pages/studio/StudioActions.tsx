@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioActions.tsx — Actions tab content for the studio editor.
 //
 // Houses all gap-closing tools and advanced enhancements, organised into

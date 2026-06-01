@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // TakeHomeDeliveryPage — candidate-facing magic-link surface for #1438.
 //
 // Mounted at `/take-home/:token`. Resolves the invite via the public

@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // HiringOnboarding — Pro employer/recruiter surface for offer letters
 // and onboarding checklists. Lives at /people/hiring alongside the rest
 // of the People surfaces.

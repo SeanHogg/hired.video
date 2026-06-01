@@ -355,6 +355,14 @@ export default function ResumeDetail() {
     }
   }, [printMode, resume, loading]);
 
+  // SEO + permissions are HOOKS — they must run unconditionally, before
+  // the `printMode` early return below, or React sees a different hook
+  // order between print and normal renders (#1870 — was a latent crash).
+  // SEO builder: lib/seo-ugc.ts ("resume" kind) → ProfilePage JSON-LD.
+  useUgcSeo("resume", resume);
+  // Single source of truth for "what can this viewer do with this resume".
+  const perms = useResumePermissions(resume);
+
   if (printMode) {
     if (loading || !resume) {
       return <div className="p-8 text-center text-muted-foreground">Preparing resume for print…</div>;
@@ -399,16 +407,7 @@ export default function ResumeDetail() {
   // 2026-04-20 bug this local comparison caused.
   const isOwner = !!resume && resume.isOwner;
 
-  // SEO — single adapter call. Builder lives in lib/seo-ugc.ts
-  // ("resume" kind) and emits a ProfilePage JSON-LD with embedded
-  // Person mainEntity, plus title/description/keywords derived from
-  // the resume's basics + skills.
-  useUgcSeo("resume", resume);
   const isSample = id === "sample";
-  // Single source of truth for "what can this viewer do with this resume".
-  // Don't derive can* flags inline — let the hook decide so the rules
-  // stay consistent across Template / Export / Embed / Gaps gates.
-  const perms = useResumePermissions(resume);
 
   const refreshResume = async () => {
     if (!resume?.id || isSample) return;

@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // PitchDeckBuilder — recruiter-facing editor for a single pitch deck.
 // Three columns:
 //   • Deck metadata (name, description, brand kit, deck-wide redaction,

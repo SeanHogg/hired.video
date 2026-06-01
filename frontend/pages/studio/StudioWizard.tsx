@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioWizard.tsx — kind-aware "create your first project" modal.
 //
 // Step 1 (always): Pick a content template (drives the import mode +

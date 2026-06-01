@@ -25,6 +25,7 @@ import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   isValidSector,
+  SECTORS,
   sectorMeta,
   type AIResilience,
   type Sector,
@@ -87,23 +88,32 @@ function useSectorLiveData(sector: Sector, contentOnly: boolean): SectorLiveData
 
 export default function SectorLanding() {
   const { sector: rawSector } = useParams<{ sector: string }>();
+  const valid = !!rawSector && isValidSector(rawSector);
+  // Resolve meta BEFORE any hook / early return so the hooks below run
+  // unconditionally (#1870 — useSectorLiveData previously sat AFTER the
+  // invalid-sector Navigate, so hook order changed between renders). When
+  // the sector is invalid we Navigate away, so the fallback sector's data
+  // is fetched-then-discarded harmlessly.
+  const meta = valid ? sectorMeta(rawSector) : null;
   useSEO("/sectors");
   useBreadcrumbs(
-    rawSector && isValidSector(rawSector)
+    valid && meta
       ? [
           { name: "Sectors", url: "/sectors" },
-          { name: sectorMeta(rawSector).label, url: `/sectors/${rawSector}` },
+          { name: meta.label, url: `/sectors/${rawSector}` },
         ]
       : [{ name: "Sectors", url: "/sectors" }],
   );
+  const { jobs, articles, loading } = useSectorLiveData(
+    meta?.slug ?? SECTORS[0],
+    meta?.contentOnly ?? true,
+  );
 
-  if (!rawSector || !isValidSector(rawSector)) {
+  if (!valid || !meta) {
     return <Navigate to="/sectors" replace />;
   }
 
-  const meta = sectorMeta(rawSector);
-  const rec = sectorTemplateRec(rawSector);
-  const { jobs, articles, loading } = useSectorLiveData(meta.slug, meta.contentOnly);
+  const rec = sectorTemplateRec(meta.slug);
 
   return (
     <AppShell bgClassName="bg-background">

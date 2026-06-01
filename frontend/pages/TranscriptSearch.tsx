@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // TranscriptSearch — recruiter-facing search across video resume + async
 // interview response transcripts. Closes audit gap #6 (transcripts were
 // captured but unsearchable; the recruit screening UI never existed).

@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * #1386 — Public take-home assignment landing page (candidate-facing
  * magic-link delivery). Mirrors LiveScreenInvite — fetches the invite

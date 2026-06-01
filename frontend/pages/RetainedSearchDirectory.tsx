@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * /retained-search — public directory of retained executive-search firms
  * (#1675). Senior-exec audience surface: browse retained firms (distinct

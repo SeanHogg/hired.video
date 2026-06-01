@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - utility page (pre-existing; #1869).
 import { Construction, ArrowLeft, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";

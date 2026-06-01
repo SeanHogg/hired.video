@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 /**
  * #99 / #222 / #223 — BD Pipeline Kanban. Stages along the X axis,
  * deals stacked per stage. Drag a deal card across stages to fire

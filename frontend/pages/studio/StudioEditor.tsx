@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - full-screen studio surface - composes its own chrome (pre-existing; #1869).
 // StudioEditor.tsx — tab switcher that adapts per content template.
 //
 // First tab label and intake form are read from the template catalog so this

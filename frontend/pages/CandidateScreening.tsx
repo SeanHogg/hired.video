@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // CandidateScreening — candidate-facing magic-link screening portal mounted at
 // /screening/:token. Token is the bearer of authorization (the route is
 // optional-auth), so this works for anonymous candidates; a signed-in candidate

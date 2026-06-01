@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // SourcingBrowse — recruiter-side of the sourcing marketplace. Browse jobs
 // that are accepting sourcing bids, see the fee + deadline + terms, place a
 // bid with a proposal. See memory: project_bidding_marketplace.

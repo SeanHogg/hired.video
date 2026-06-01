@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 // CandidateDetail — recruiter view of a single candidate_resume. Shows
 // the full (un-redacted) resume through DeclarativeResumeRenderer in
 // print mode, plus a sidebar for variants + shares + notes.

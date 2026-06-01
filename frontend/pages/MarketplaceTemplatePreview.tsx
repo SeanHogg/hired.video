@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - token-scoped share surface - no app chrome (pre-existing; #1869).
 // Marketplace surface for previewing and applying any kind of template.
 // Resolves a slug (resume / studio-builtin / studio-creator) through the
 // unified template registry, then composes the kind-agnostic shell from

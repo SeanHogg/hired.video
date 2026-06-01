@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - token-scoped share surface - no app chrome (pre-existing; #1869).
 /**
  * PlayInvite — Phase 4 (gap #1637) public landing for `/play/:token`.
  *

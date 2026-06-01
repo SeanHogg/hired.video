@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - named landing component rendered by its route wrapper (AudienceLandingPage), not directly routed (#1869).
 /**
  * Life-stage variant of /for/[audience] — composes the Resource Map
  * stack for one of the 14 LIFE_STAGE_AUDIENCES (#1629). Renders ONLY

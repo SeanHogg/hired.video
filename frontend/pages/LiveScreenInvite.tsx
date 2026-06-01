@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - token-scoped share surface - no app chrome (pre-existing; #1869).
 /**
  * LiveScreenInvite — candidate-facing magic-link page for the back-to-back
  * live-screening flow (#1239). Mounted at /live-screen/:token.

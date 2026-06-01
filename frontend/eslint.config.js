@@ -178,7 +178,14 @@ export default [
       // <AppShell> and call useSEO + useBreadcrumbs. The rule self-
       // gates on filename so it's safe to enable globally. Opt out
       // per-file with `// eslint-page-chrome: skip — <reason>`.
-      "hiredvideo/require-page-chrome": "error",
+      //
+      // INTERIM `warn` (#1869): the rule was crash-looping until #1868, so
+      // ~99 pre-existing pages never adopted the AppShell+useSEO+useBreadcrumbs
+      // convention. Enforcing as `error` would block all lint on that legacy
+      // debt. Kept at `warn` so new violations stay visible (and `lint:ci
+      // --max-warnings 0` still catches them) while the page migration is
+      // done deliberately. Flip back to `error` once #1869 is cleared.
+      "hiredvideo/require-page-chrome": "warn",
     },
     settings: {
       react: {

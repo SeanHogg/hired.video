@@ -136,17 +136,19 @@ export default function Security() {
 
   useEffect(() => { loadRecent(); }, [loadRecent]);
 
-  if (selectedIp) {
-    return (
-      <IpDrillDown ip={selectedIp} onBack={() => setSelectedIp(null)} />
-    );
-  }
-
+  // Hooks must precede the early return below (#1870 — useMemo was after
+  // the `selectedIp` drill-down return, changing hook order).
   const groups = data?.groups ?? [];
   const totalSpammySignups = useMemo(
     () => groups.reduce((sum, g) => sum + g.count, 0),
     [groups],
   );
+
+  if (selectedIp) {
+    return (
+      <IpDrillDown ip={selectedIp} onBack={() => setSelectedIp(null)} />
+    );
+  }
 
   return (
     <div className="space-y-6">

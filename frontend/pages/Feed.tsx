@@ -1,4 +1,3 @@
-// eslint-page-chrome: skip - authed app surface - chrome via AppShell; no public SEO/breadcrumbs needed (pre-existing; #1869).
 import React, { useState, useEffect, useCallback } from "react";
 import { ZodError } from "zod";
 import {

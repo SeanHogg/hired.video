@@ -248,6 +248,13 @@ function OrphansTab({
   bulkBusy: boolean;
   onDelete: (keys: string[]) => void;
 }) {
+  // Hook must precede the early return below (#1870 — useMemo sat after the
+  // "no orphans" return, changing hook order). `orphans` is a non-null prop.
+  const selectedBytes = useMemo(
+    () => orphans.orphans.filter((o) => selectedKeys.has(o.key)).reduce((a, o) => a + o.size, 0),
+    [orphans.orphans, selectedKeys],
+  );
+
   if (orphans.orphanCount === 0) {
     return (
       <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-6 text-center">
@@ -267,11 +274,6 @@ function OrphansTab({
   // Per-row delete stays open so admins can still reclaim keys they've
   // sanity-checked individually.
   const bulkBlocked = !!(orphans.dbErrors && orphans.dbErrors.length > 0);
-
-  const selectedBytes = useMemo(
-    () => orphans.orphans.filter((o) => selectedKeys.has(o.key)).reduce((a, o) => a + o.size, 0),
-    [orphans.orphans, selectedKeys],
-  );
 
   const toggleAll = (next: boolean | "indeterminate") => {
     onSelectionChange(next === true ? new Set(allKeys) : new Set());
