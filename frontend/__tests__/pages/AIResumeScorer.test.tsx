@@ -146,27 +146,11 @@ function envelope<T>(data: T) {
 }
 
 function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <BrowserRouter>
-        <AIResumeScorer />
-      </BrowserRouter>
-    </QueryClientProvider>,
-  );
+  return renderWithProviders(<AIResumeScorer />);
 }
 
 function setAuth(isAuthenticated: boolean) {
-  (useAuth as unknown as Mock).mockReturnValue({
-    user: isAuthenticated ? { id: "u1", email: "x@y" } : null,
-    isAuthenticated,
-    isLoading: false,
-    isEmailVerified: isAuthenticated,
-    // AppShell mounts <EmailVerificationBanner>, which probes the gate on
-    // mount — stub it so the banner's effect doesn't crash the page render.
-    getVerificationStatus: vi.fn().mockResolvedValue({ emailConfirmed: true }),
-    resendEmailVerification: vi.fn().mockResolvedValue(undefined),
-  });
+  (useAuth as unknown as Mock).mockReturnValue(mockAuthValue(isAuthenticated));
 }
 
 /** Route `apiClient.post` by URL so each test only declares what it needs. */
