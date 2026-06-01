@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderWithProviders, mockAuthValue } from '../test-render';
 import Tasks from '../../pages/Tasks';
 import { useAuth } from '../../lib/auth';
@@ -142,21 +142,23 @@ describe('Tasks Page', () => {
       // Act
       renderTasksPage();
 
-      // Assert
+      // Assert — Kanban columns render. Query by testid: the status label
+      // ("To Do" etc.) also appears as a per-card status badge, so a bare
+      // getByText is ambiguous once the page renders fully.
       await waitFor(() => {
-        // Check for Kanban columns
-        expect(screen.getByText('To Do')).toBeInTheDocument();
-        expect(screen.getByText('In Progress')).toBeInTheDocument();
-        expect(screen.getByText('Completed')).toBeInTheDocument();
+        expect(screen.getByTestId('todo-column')).toBeInTheDocument();
+        expect(screen.getByTestId('inprogress-column')).toBeInTheDocument();
+        expect(screen.getByTestId('completed-column')).toBeInTheDocument();
       });
 
       // Check tasks are in correct columns
       await waitFor(() => {
-        const todoSection = screen.getByText('To Do').closest('[data-testid="todo-column"]');
-        const inProgressSection = screen.getByText('In Progress').closest('[data-testid="inprogress-column"]');
-        
-        expect(todoSection).toContainElement(screen.getByText('Complete resume'));
-        expect(inProgressSection).toContainElement(screen.getByText('Apply to jobs'));
+        expect(
+          within(screen.getByTestId('todo-column')).getByText('Complete resume'),
+        ).toBeInTheDocument();
+        expect(
+          within(screen.getByTestId('inprogress-column')).getByText('Apply to jobs'),
+        ).toBeInTheDocument();
       });
     });
 

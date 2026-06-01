@@ -451,6 +451,18 @@ export function createApp() {
   // enforces per-entity authorization.
   const LOCATIONS_REFERENCE_ROUTE = /^\/api\/locations(?:$|\/)/;
 
+  // Public events discovery (free product — see routes/events.ts). Anonymous
+  // visitors browse the events surface: GET / (search public events), GET
+  // /categories, GET /slug/:slug, GET /:id (single event, gated on visibility
+  // by the handler). All four use optional auth so the handler can resolve
+  // viewer-specific visibility / RSVP state when a JWT is present. Deeper
+  // GETs (/:id/attendees, /:id/matches, /:id/analytics, /:id/attendees/export.csv)
+  // and all writes stay authenticated via the default branch — they're not
+  // single-segment so this regex doesn't match them. /mine is single-segment
+  // and matches, but its handler 401s anonymous callers itself, which is the
+  // intended behavior.
+  const EVENTS_PUBLIC_ROUTE = /^\/api\/events(?:\/(?:slug\/[^/]+|[^/]+))?(?:$|\?)/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -485,7 +497,8 @@ export function createApp() {
         PUBLIC_LISTING_ROUTE.test(path) ||
         ADS_CONFIG_ROUTE.test(path) ||
         PUBLIC_RESUME_DETAIL_ROUTE.test(path) ||
-        LOCATIONS_REFERENCE_ROUTE.test(path))
+        LOCATIONS_REFERENCE_ROUTE.test(path) ||
+        EVENTS_PUBLIC_ROUTE.test(path))
     ) {
       return "optional-auth";
     }
