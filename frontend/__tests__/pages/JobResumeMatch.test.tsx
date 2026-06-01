@@ -19,8 +19,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { renderWithProviders, mockAuthValue } from "../test-render";
 import JobResumeMatch from "../../pages/tools/JobResumeMatch";
 import { useAuth } from "../../lib/auth";
 import { matchService } from "../../lib/services/match-service";
@@ -129,20 +129,11 @@ vi.mock("../../components/tools/MatchResultsStep", () => ({
 // ---------------------------------------------------------------------------
 
 function renderPage() {
-  return render(
-    <BrowserRouter>
-      <JobResumeMatch />
-    </BrowserRouter>,
-  );
+  return renderWithProviders(<JobResumeMatch />);
 }
 
 function setAuth(isAuthenticated: boolean) {
-  (useAuth as unknown as Mock).mockReturnValue({
-    user: isAuthenticated ? { id: "u1", email: "x@y" } : null,
-    isAuthenticated,
-    isLoading: false,
-    isEmailVerified: isAuthenticated,
-  });
+  (useAuth as unknown as Mock).mockReturnValue(mockAuthValue(isAuthenticated));
 }
 
 beforeEach(() => {
@@ -258,7 +249,9 @@ describe("JobResumeMatch — error paths", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("step-results")).not.toBeInTheDocument();
     });
-    expect(screen.getByText(/Failed to analyze job-resume match/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Failed to analyze the job and resume/i),
+    ).toBeInTheDocument();
   });
 
   it("does NOT advance to results when the API returns a rejection", async () => {

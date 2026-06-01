@@ -42,6 +42,13 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 } as any;
 
+// jsdom doesn't implement Element.prototype.scrollIntoView. Real chrome
+// rendered by page tests (PageHeader's tab strip, ChatPanel, ToolHistoryPanel,
+// ResumeViewer) calls it on mount/update — no-op it so those renders don't crash.
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}
+
 // Mock CanvasRenderingContext2D (#948 — DrawingStage canvas-pixel tests).
 // jsdom returns null for getContext("2d"); patch in a usable shim so the
 // drawing-engine pure helpers (stampBrushDab / floodFillAt / compositeLayers /

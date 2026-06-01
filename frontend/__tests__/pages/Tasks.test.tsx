@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { renderWithProviders, mockAuthValue } from '../test-render';
 import Tasks from '../../pages/Tasks';
 import { useAuth } from '../../lib/auth';
 import { taskService } from '../../lib/services/task-service';
@@ -84,23 +84,14 @@ describe('Tasks Page', () => {
     vi.clearAllMocks();
 
     // Default mock implementations
-    mockUseAuth.mockReturnValue({
-      user: mockUser,
-      isAuthenticated: true,
-      isLoading: false,
-      isEmailVerified: true,
-    });
+    mockUseAuth.mockReturnValue(mockAuthValue(true, { user: mockUser }));
 
     mockTaskService.getTasks.mockResolvedValue(mockTasks);
     mockTaskService.getAssignableUsers.mockResolvedValue([]);
   });
 
   const renderTasksPage = () => {
-    return render(
-      <BrowserRouter>
-        <Tasks />
-      </BrowserRouter>
-    );
+    return renderWithProviders(<Tasks />);
   };
 
   describe('Authentication and Loading', () => {

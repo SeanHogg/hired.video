@@ -12,9 +12,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { renderWithProviders, mockAuthValue } from "../test-render";
 import ResumeTailor from "../../pages/tools/ResumeTailor";
 import { useAuth } from "../../lib/auth";
 import { matchService } from "../../lib/services/match-service";
@@ -100,23 +99,11 @@ vi.mock("@shared/resume-markdown", () => ({
 // ---------------------------------------------------------------------------
 
 function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <BrowserRouter>
-        <ResumeTailor />
-      </BrowserRouter>
-    </QueryClientProvider>,
-  );
+  return renderWithProviders(<ResumeTailor />);
 }
 
 function setAuth(isAuthenticated: boolean) {
-  (useAuth as unknown as Mock).mockReturnValue({
-    user: isAuthenticated ? { id: "u1", email: "x@y" } : null,
-    isAuthenticated,
-    isLoading: false,
-    isEmailVerified: isAuthenticated,
-  });
+  (useAuth as unknown as Mock).mockReturnValue(mockAuthValue(isAuthenticated));
 }
 
 const sampleTailoredResume = {
