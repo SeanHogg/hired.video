@@ -36,7 +36,11 @@ const OPT_OUT_RE = /eslint-page-chrome:\s*skip/i;
 // NB `AppShell` itself is intentionally NOT here: it provides layout chrome
 // but NOT useSEO/useBreadcrumbs, so a bare `<AppShell>` page must still
 // declare its own SEO + breadcrumbs.
-const FULL_CHROME_PROVIDERS = new Set(["ToolShell", "ResumeAnalysisToolPage"]);
+const FULL_CHROME_PROVIDERS = new Set([
+  "ToolShell", // components/tools/ToolShell — AppShell + useSEO + useBreadcrumbs
+  "ResumeAnalysisToolPage", // composes ToolShell
+  "MarketplaceItemShell", // components/marketplace — renders AppShell + a `seo` node
+]);
 const FULL_CHROME_SUFFIX = /Layout$/;
 
 // Route trees whose pages receive chrome from a layout wrapper applied at

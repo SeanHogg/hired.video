@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - placeholder page - delegates to PlaceholderPage chrome (#1869).
 import PlaceholderPage from "./PlaceholderPage";
 
 export default function Features() {

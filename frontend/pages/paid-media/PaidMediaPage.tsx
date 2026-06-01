@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - authed workspace surface - embedded ad-management view (#1869).
 /**
  * Paid Media — connect ad accounts, build campaigns, push to platforms.
  *

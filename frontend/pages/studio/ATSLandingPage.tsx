@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - standalone /v/:slug share page - clean recruiter-facing layout by design (#1869).
 /**
  * ATS Landing Page — public shareable video resume page at /v/:slug
  *

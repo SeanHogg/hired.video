@@ -1,5 +1,5 @@
-import {
 import { usePageChrome } from "@/lib/seo";
+import {
   MapPin,
   Globe,
   Mail,

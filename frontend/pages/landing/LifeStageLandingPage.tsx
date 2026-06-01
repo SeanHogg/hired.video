@@ -1,3 +1,4 @@
+// eslint-page-chrome: skip - named landing component rendered by its route wrapper (AudienceLandingPage), not directly routed (#1869).
 /**
  * Life-stage variant of /for/[audience] — composes the Resource Map
  * stack for one of the 14 LIFE_STAGE_AUDIENCES (#1629). Renders ONLY
@@ -9,7 +10,7 @@
  */
 import { useLocation } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { AudienceHero } from "@/components/landing/AudienceHero";
 import { ResourceMap } from "@/components/landing/ResourceMap";
 import { ToolShowcase } from "@/components/landing/ToolShowcase";
@@ -32,6 +33,7 @@ export function LifeStageLandingPage({ meta }: LifeStageLandingPageProps): JSX.E
     ogTitle: `For ${meta.label} · hired.video`,
     ogDescription: meta.thesis,
   });
+  useDefaultBreadcrumbs();
 
   return (
     <AppShell bgClassName="bg-background">
