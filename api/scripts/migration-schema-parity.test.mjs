@@ -151,6 +151,11 @@ describe("schema ↔ migration parity (gap #1186 regression)", () => {
       // Privacy compliance surfaces — managed via raw SQL in services/user/account.ts.
       "data_subject_requests",
       "data_suppression_list",
+      // Superseded by canonical `content_reports` + ModerationService. The legacy
+      // pgTable + route were removed in the #1835 pass (it shadowed /api/reports);
+      // the physical table from 0182 is left orphaned pending a data-archive
+      // migration. See gapPass4.ts + Gap Register #1835.
+      "content_reports_v2",
     ]);
     const orphans = [...created]
       .filter((t) => !declared.has(t))
