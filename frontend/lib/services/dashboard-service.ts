@@ -55,12 +55,24 @@ export const OnboardingTaskSchema = z.object({
   priority: z.number().default(1),
 });
 
+// Next Best Action recommendation schema (gap #1825)
+export const RecommendationSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  actionLabel: z.string(),
+  url: z.string(),
+  icon: z.string(),
+  priority: z.number().default(0),
+});
+
 // Base dashboard schema
 export const BaseDashboardSchema = z.object({
   title: z.string(),
   description: z.string(),
   metrics: z.array(DashboardMetricSchema),
   recentActivity: z.array(ActivityItemSchema),
+  recommendations: z.array(RecommendationSchema).default([]),
   onboardingTasks: z.array(OnboardingTaskSchema),
   onboardingCompletionPercentage: z.number().default(0),
   lastUpdated: z.string().transform((val) => new Date(val)),
@@ -327,6 +339,7 @@ export type HomepageContent = z.infer<typeof HomepageContentSchema>;
 export type DashboardMetric = z.infer<typeof DashboardMetricSchema>;
 export type ActivityItem = z.infer<typeof ActivityItemSchema>;
 export type OnboardingTask = z.infer<typeof OnboardingTaskSchema>;
+export type Recommendation = z.infer<typeof RecommendationSchema>;
 export type BaseDashboard = z.infer<typeof BaseDashboardSchema>;
 export type ProfileStats = z.infer<typeof ProfileStatsSchema>;
 export type ApplicationStats = z.infer<typeof ApplicationStatsSchema>;

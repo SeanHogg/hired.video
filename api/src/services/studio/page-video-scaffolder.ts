@@ -22,6 +22,7 @@ import { z } from "zod";
 import {
   PAGE_VIDEO_DEFAULT_PALETTE,
   type HarvestedPage,
+  type PageVideoPalette,
   type PageVideoScene,
   type PageVideoSpec,
 } from "../../../../shared/page-video-spec.js";
@@ -182,6 +183,27 @@ function labelFor(kind: PageVideoScene["kind"], index: number): string {
   }
 }
 
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** Theme the video to the page's real brand colours when we harvested a
+ *  usable background+text pair; otherwise the generic dark default
+ *  (#1864). Validates each value is a 6-digit hex so a junk computed
+ *  style can't poison the canvas. */
+function paletteFromPage(page: HarvestedPage): PageVideoPalette {
+  const c = page.colors;
+  const bg = c?.background && HEX_RE.test(c.background) ? c.background : null;
+  const text = c?.text && HEX_RE.test(c.text) ? c.text : null;
+  const accent = c?.accent && HEX_RE.test(c.accent) ? c.accent : null;
+  // Need a legible bg+text pair to safely reskin; partial data falls back.
+  if (!bg || !text) return PAGE_VIDEO_DEFAULT_PALETTE;
+  return {
+    background: bg,
+    text,
+    accent: accent ?? PAGE_VIDEO_DEFAULT_PALETTE.accent,
+    muted: PAGE_VIDEO_DEFAULT_PALETTE.muted,
+  };
+}
+
 function assembleSpec(
   data: ScaffoldedPageVideo,
   page: HarvestedPage,
@@ -214,7 +236,7 @@ function assembleSpec(
 
   return {
     title: data.title,
-    palette: PAGE_VIDEO_DEFAULT_PALETTE,
+    palette: paletteFromPage(page),
     aspect: data.aspect,
     scenes,
   };

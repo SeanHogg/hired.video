@@ -18,7 +18,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
-import OnboardingProgress from "./shared/OnboardingProgress";
 
 import type { BaseDashboard } from "@/lib/services/dashboard-service";
 
@@ -96,12 +95,6 @@ export function AdminDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Onboarding Progress */}
-      <OnboardingProgress
-        tasks={dashboardData.onboardingTasks || []}
-        loading={loading}
-      />
-
       {/* Metrics Grid */}
       <MetricGrid
         metrics={dashboardData.metrics || []}

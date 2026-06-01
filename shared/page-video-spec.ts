@@ -75,6 +75,12 @@ export interface HarvestedPage {
   /** Capped plaintext of the whole page — fallback signal when the
    *  structured fields above are thin (e.g. a heavily-canvas page). */
   bodyText: string;
+  /** The page's actual brand colours, read from computed styles (body
+   *  background + text, primary CTA accent). Used to theme the generated
+   *  video so it matches the page instead of a generic dark default —
+   *  dependency-free visual grounding (#1864). Any field may be absent
+   *  when the value was transparent / unreadable. */
+  colors?: { background?: string; text?: string; accent?: string };
 }
 
 // ─── Server → client: the scaffolded spec ────────────────────────────────────

@@ -3343,6 +3343,10 @@ export default function StudioEditorV2() {
           projectId={persistedProjectId}
           rendered={!!persistedProject?.videoUrl}
           defaultPathname={searchParams.get("embedPath") ?? undefined}
+          onEnsureRendered={async () => {
+            const project = await ensureRendered();
+            return !!project?.videoUrl;
+          }}
         />
       )}
       {previewOpen && (

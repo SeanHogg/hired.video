@@ -141,4 +141,21 @@ describe("scaffoldPageVideo()", () => {
     const { spec } = await scaffoldPageVideo(llm, { page: fakePage(), serverFacts: [] });
     assert.equal(spec.aspect, "portrait");
   });
+
+  it("themes the palette to the page's harvested brand colours (#1864)", async () => {
+    const { llm } = makeStubLlm(fakeLlmResponse());
+    const page = fakePage({ colors: { background: "#101820", text: "#f5f5f5", accent: "#ff5a36" } });
+    const { spec } = await scaffoldPageVideo(llm, { page, serverFacts: [] });
+    assert.equal(spec.palette.background, "#101820");
+    assert.equal(spec.palette.text, "#f5f5f5");
+    assert.equal(spec.palette.accent, "#ff5a36");
+  });
+
+  it("falls back to the default palette when harvested colours are missing/invalid", async () => {
+    const { llm } = makeStubLlm(fakeLlmResponse());
+    // Missing the text colour + a non-hex accent → unsafe to reskin.
+    const page = fakePage({ colors: { background: "#101820", accent: "rgb(1,2,3)" } });
+    const { spec } = await scaffoldPageVideo(llm, { page, serverFacts: [] });
+    assert.equal(spec.palette.background, "#0f172a"); // PAGE_VIDEO_DEFAULT_PALETTE
+  });
 });

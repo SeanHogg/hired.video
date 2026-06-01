@@ -11,6 +11,7 @@ import {
   AtSign,
   ExternalLink,
   Calendar,
+  FileText,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -107,25 +108,38 @@ const FeedPostLinkPreview = ({
   );
 };
 
-const FeedPostTags = ({ tags }: { tags: FeedPost['tags'] }) => {
+const FeedPostTags = ({
+  tags,
+  onSelectTag,
+}: {
+  tags: FeedPost['tags'];
+  // Hashtag discovery (gap #1829): when provided, hashtag chips become
+  // clickable and filter the feed to that tag.
+  onSelectTag?: (tag: string) => void;
+}) => {
   if (!tags || tags.length === 0) return null;
 
   return (
     <div className="mt-3 flex flex-wrap gap-1">
-      {tags.map((tag) => (
-        <Badge
-          key={tag.id}
-          variant="secondary"
-          className="text-xs px-2 py-1"
-        >
-          {tag.tagType === 'Hashtag' ? (
-            <Hash className="h-3 w-3 mr-1" />
-          ) : (
-            <AtSign className="h-3 w-3 mr-1" />
-          )}
-          {tag.tagValue}
-        </Badge>
-      ))}
+      {tags.map((tag) => {
+        const clickable = tag.tagType === 'Hashtag' && Boolean(onSelectTag);
+        return (
+          <Badge
+            key={tag.id}
+            variant="secondary"
+            role={clickable ? 'button' : undefined}
+            onClick={clickable ? () => onSelectTag!(tag.tagValue.toLowerCase()) : undefined}
+            className={`text-xs px-2 py-1 ${clickable ? 'cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors' : ''}`}
+          >
+            {tag.tagType === 'Hashtag' ? (
+              <Hash className="h-3 w-3 mr-1" />
+            ) : (
+              <AtSign className="h-3 w-3 mr-1" />
+            )}
+            {tag.tagValue}
+          </Badge>
+        );
+      })}
     </div>
   );
 };
@@ -397,9 +411,11 @@ interface FeedPostCardProps {
   onDelete: (postId: string) => void;
   onEdit: (postId: string, updatedPost: FeedPost) => void;
   onHide: (postId: string) => void;
+  // Hashtag discovery (gap #1829): filter the feed to a clicked hashtag.
+  onSelectTag?: (tag: string) => void;
 }
 
-export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit, onHide }: FeedPostCardProps) {
+export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit, onHide, onSelectTag }: FeedPostCardProps) {
   const getPrivacyIcon = () => {
     switch (post.privacy) {
       case 'Public':
@@ -438,7 +454,14 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-semibold text-sm">{post.userName}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm">{post.userName}</p>
+                {post.kind === 'article' && (
+                  <Badge variant="secondary" className="text-[10px] gap-1 px-1.5 py-0">
+                    <FileText className="h-3 w-3" /> Article
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                 <span>{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
                 <span>•</span>
@@ -453,9 +476,12 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
       </CardHeader>
 
       <CardContent className="pt-0">
-        {/* Post Content */}
+        {/* Post Content — article posts (gap #1828) render long-form with
+            roomier type + line height; everything else stays compact. */}
         <div className="prose prose-sm max-w-none">
-          <p className="whitespace-pre-wrap">{post.content}</p>
+          <p className={`whitespace-pre-wrap ${post.kind === 'article' ? 'text-[15px] leading-7' : ''}`}>
+            {post.content}
+          </p>
         </div>
 
         {/* Polymorphic subject embed — when the post points at a
@@ -477,7 +503,7 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
 
             <FeedPostMedia media={post.media} />
 
-            <FeedPostTags tags={post.tags} />
+            <FeedPostTags tags={post.tags} onSelectTag={onSelectTag} />
           </>
         )}
 

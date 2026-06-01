@@ -111,12 +111,13 @@ function ctaWidget(
  *  are tuned for portrait (1080w); the renderer scales to other aspects. */
 function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
   const widgets: Widget[] = [];
-  const gradientHook = `gradient:${palette.background}:#1e293b`;
-  let backgroundEffect: string | null = null;
+  // Flat fill from the (possibly page-harvested) palette background. We
+  // deliberately avoid a hardcoded gradient stop — it assumed a dark theme
+  // and looked wrong once the video themes to a light brand page (#1864).
+  const backgroundEffect: string | null = null;
 
   switch (scene.kind) {
     case "hook": {
-      backgroundEffect = gradientHook;
       if (scene.imageUrl) {
         widgets.push(image(scene.imageUrl, scene.headline, pos(0.08, 0.1, 0.84, 0.44, 1)));
         widgets.push(
@@ -157,7 +158,6 @@ function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
     }
 
     case "stat": {
-      backgroundEffect = gradientHook;
       if (scene.headline) {
         widgets.push(
           text(scene.headline, pos(0.1, 0.16, 0.8, 0.1, 2), {
@@ -186,7 +186,6 @@ function buildScene(scene: PageVideoScene, palette: PageVideoPalette): Scene {
     }
 
     case "cta": {
-      backgroundEffect = gradientHook;
       widgets.push(ctaWidget(scene, palette, pos(0.1, 0.3, 0.8, 0.4, 10)));
       break;
     }

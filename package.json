@@ -7,6 +7,7 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:api": "node scripts/smoke.mjs --api-only",
     "smoke:web": "node scripts/smoke.mjs --web-only",
+    "smoke:browser": "node scripts/smoke-browser.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,5 +15,8 @@
   "license": "ISC",
   "dependencies": {
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
   }
 }

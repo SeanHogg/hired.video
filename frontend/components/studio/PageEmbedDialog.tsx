@@ -15,7 +15,7 @@
  */
 
 import { useState } from "react";
-import { Check, Copy, Globe, Code2 } from "lucide-react";
+import { Check, Copy, Globe, Code2, Clapperboard, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -42,6 +42,12 @@ interface PageEmbedDialogProps {
   rendered: boolean;
   /** Pre-fill for the page route (e.g. the page the video was built from). */
   defaultPathname?: string;
+  /** Render + upload the project, returning true once it has a baked
+   *  video. Supplied by the editor (its `ensureRendered()`); lets the
+   *  dialog auto-render on publish so the external snippet works
+   *  immediately (#1865). When omitted, the snippet stays gated on
+   *  `rendered`. */
+  onEnsureRendered?: () => Promise<boolean>;
 }
 
 export function PageEmbedDialog({
@@ -50,6 +56,7 @@ export function PageEmbedDialog({
   projectId,
   rendered,
   defaultPathname,
+  onEnsureRendered,
 }: PageEmbedDialogProps): JSX.Element {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -57,11 +64,38 @@ export function PageEmbedDialog({
   const [placement, setPlacement] = useState<"hero" | "inline">("hero");
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Tracks render state locally so an in-dialog render (auto on publish, or
+  // the explicit "Render now" button) immediately enables the snippet
+  // without closing + reopening.
+  const [localRendered, setLocalRendered] = useState(rendered);
+  const [rendering, setRendering] = useState(false);
 
   const snippet = buildVideoEmbedSnippet({
     origin: typeof window !== "undefined" ? window.location.origin : "",
     videoId: projectId,
   });
+
+  /** Best-effort render+upload. Returns true when the project ends up with
+   *  a baked video. No-op (false) when the editor didn't supply a hook. */
+  async function ensureRendered(): Promise<boolean> {
+    if (localRendered) return true;
+    if (!onEnsureRendered) return false;
+    setRendering(true);
+    try {
+      const ok = await onEnsureRendered();
+      setLocalRendered(ok);
+      return ok;
+    } catch (err) {
+      toast({
+        title: "Render failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setRendering(false);
+    }
+  }
 
   async function handlePublish() {
     const path = pathname.trim();
@@ -71,6 +105,11 @@ export function PageEmbedDialog({
     }
     setPublishing(true);
     try {
+      // Auto-render on publish (#1865) so the SAME video also works as an
+      // external snippet, not just the SPA lazy-render placement. Best
+      // effort — if it fails or no hook is wired, the managed placement
+      // still lazy-renders, so we proceed with the publish regardless.
+      await ensureRendered();
       const { data } = await studioService.setPageEmbed({ pathname: path, projectId, placement });
       await queryClient.invalidateQueries({ queryKey: ["page-embed", data.pathname] });
       await queryClient.invalidateQueries({ queryKey: ["page-embed-paths"] });
@@ -142,8 +181,8 @@ export function PageEmbedDialog({
               </Button>
             ))}
           </div>
-          <Button onClick={handlePublish} disabled={publishing} className="w-full">
-            {publishing ? "Publishing…" : "Publish to page"}
+          <Button onClick={handlePublish} disabled={publishing || rendering} className="w-full">
+            {publishing ? (rendering ? "Rendering…" : "Publishing…") : "Publish to page"}
           </Button>
         </section>
 
@@ -153,28 +192,36 @@ export function PageEmbedDialog({
             <Code2 className="h-4 w-4 text-brand-blue" />
             Embed anywhere
           </div>
-          {!rendered && (
+          {!localRendered && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              Export &amp; publish the video first — the external snippet needs a rendered file.
+              The external snippet needs a rendered file.{" "}
+              {onEnsureRendered ? "Render it now, or it renders automatically when you publish to a page." : "Export the video first."}
             </p>
           )}
           <pre
             className={cn(
               "overflow-x-auto rounded-md bg-muted p-3 text-xs",
-              !rendered && "opacity-50",
+              !localRendered && "opacity-50",
             )}
           >
             <code>{snippet}</code>
           </pre>
-          <Button
-            variant="outline"
-            onClick={handleCopy}
-            disabled={!rendered}
-            className="w-full gap-2"
-          >
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy snippet"}
-          </Button>
+          {localRendered ? (
+            <Button variant="outline" onClick={handleCopy} className="w-full gap-2">
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copied" : "Copy snippet"}
+            </Button>
+          ) : onEnsureRendered ? (
+            <Button variant="outline" onClick={ensureRendered} disabled={rendering} className="w-full gap-2">
+              {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
+              {rendering ? "Rendering…" : "Render now"}
+            </Button>
+          ) : (
+            <Button variant="outline" disabled className="w-full gap-2">
+              <Copy className="h-4 w-4" />
+              Copy snippet
+            </Button>
+          )}
         </section>
       </DialogContent>
     </Dialog>

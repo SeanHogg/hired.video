@@ -1252,6 +1252,13 @@ const HarvestedPageSchema = z.object({
   seoTitle: z.string().max(300).optional(),
   seoDescription: z.string().max(1000).optional(),
   bodyText: z.string().max(20000).default(""),
+  colors: z
+    .object({
+      background: z.string().max(32).optional(),
+      text: z.string().max(32).optional(),
+      accent: z.string().max(32).optional(),
+    })
+    .optional(),
 });
 
 /** Server-known facts for a route, appended to the scaffolder's prompt as

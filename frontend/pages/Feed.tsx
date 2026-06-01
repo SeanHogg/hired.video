@@ -198,13 +198,16 @@ export function FeedRightPanel({
   const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
   useEffect(() => {
     let cancelled = false;
-    getTrendingTags(8)
-      .then((tags) => {
-        if (!cancelled) setTrendingTags(tags);
-      })
-      .catch(() => {
+    // Wrapped in an async IIFE + try/catch so a throwing/absent service never
+    // surfaces as an unhandled rejection or crashes the panel.
+    (async () => {
+      try {
+        const tags = await getTrendingTags(8);
+        if (!cancelled) setTrendingTags(Array.isArray(tags) ? tags : []);
+      } catch {
         if (!cancelled) setTrendingTags([]);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -562,6 +565,7 @@ export default function Feed() {
                         onDelete={handlePostDelete}
                         onEdit={handlePostEdit}
                         onHide={handlePostHide}
+                        onSelectTag={handleSelectTag}
                       />
                     ))}
 

@@ -144,8 +144,13 @@ export default function CreatePostModal({
         displayOrder: index,
       }));
 
+      // Persist the composer mode as the post kind (gap #1828): "article"
+      // posts render long-form; a video attachment makes it a "video" post;
+      // everything else is "text" (photo posts are text + image media).
+      const kind = mode === "article" ? "article" : mode === "video" ? "video" : "text";
       const request: CreateFeedPostRequest = {
         content: content.trim(),
+        kind,
         privacy,
         media,
       };
@@ -165,7 +170,7 @@ export default function CreatePostModal({
     } finally {
       setLoading(false);
     }
-  }, [content, privacy, mediaItems, user, onPostCreated, onClose]);
+  }, [content, privacy, mediaItems, mode, user, onPostCreated, onClose]);
 
   const handleClose = useCallback(() => {
     if (!loading) {

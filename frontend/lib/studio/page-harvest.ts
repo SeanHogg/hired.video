@@ -149,6 +149,48 @@ function metaDescription(): string {
   return (el?.content ?? "").trim().slice(0, 1000);
 }
 
+/** Convert a CSS `rgb()/rgba()` string to `#rrggbb`. Returns null for
+ *  transparent / unparseable values so callers can fall back. */
+function rgbToHex(css: string | null | undefined): string | null {
+  if (!css) return null;
+  const m = css.match(/rgba?\(([^)]+)\)/i);
+  if (!m) return css.startsWith("#") ? css : null;
+  const parts = m[1].split(",").map((s) => parseFloat(s.trim()));
+  if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [r, g, b, a] = parts;
+  if (a !== undefined && a < 0.1) return null; // effectively transparent
+  const h = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/** The page's actual brand colours from computed styles — body bg + text,
+ *  and the primary CTA's accent. Dependency-free visual grounding (#1864):
+ *  the generated video themes to these instead of a generic default. */
+function harvestColors(root: HTMLElement): NonNullable<HarvestedPage["colors"]> | undefined {
+  if (typeof getComputedStyle === "undefined") return undefined;
+  const body = getComputedStyle(document.body);
+  const background = rgbToHex(body.backgroundColor);
+  const text = rgbToHex(body.color);
+
+  let accent: string | null = null;
+  const cta = root.querySelector<HTMLElement>(
+    "button, a[class*='button' i], a.btn, [role='button']",
+  );
+  if (cta && !isInChrome(cta)) {
+    const cs = getComputedStyle(cta);
+    // A filled button's background is the accent; an outline/text button's
+    // own colour stands in.
+    accent = rgbToHex(cs.backgroundColor) ?? rgbToHex(cs.color);
+  }
+
+  if (!background && !text && !accent) return undefined;
+  return {
+    ...(background ? { background } : {}),
+    ...(text ? { text } : {}),
+    ...(accent ? { accent } : {}),
+  };
+}
+
 /**
  * Read the live page into a `HarvestedPage`. Returns `null` only in a
  * non-DOM context (SSR / tests) — callers should treat that as "can't
@@ -166,6 +208,7 @@ export function harvestCurrentPage(): HarvestedPage | null {
   const seo = seoKey ? PAGE_SEO[seoKey] : undefined;
 
   const bodyText = (root.innerText ?? "").trim().replace(/\s+\n/g, "\n").slice(0, 20000);
+  const colors = harvestColors(root);
 
   return {
     url: document.location.href,
@@ -179,5 +222,6 @@ export function harvestCurrentPage(): HarvestedPage | null {
     ...(seo?.title ? { seoTitle: seo.title.slice(0, 300) } : {}),
     ...(seo?.description ? { seoDescription: seo.description.slice(0, 1000) } : {}),
     bodyText,
+    ...(colors ? { colors } : {}),
   };
 }
