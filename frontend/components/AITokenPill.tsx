@@ -25,7 +25,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
 
   // Vendor plan exhaustion (AI_USAGE_LIMIT_REACHED) is global to the
   // operator, not per-user. These hooks must run BEFORE the early returns
-  // below (logged-out teaser / loading) so hook order stays stable (#1870).
+  // below (logged-out teaser / loading) so hook order stays stable (#1871).
   const [aiLimitHit, setAiLimitHit] = useState(false);
   useEffect(() => {
     const handler = (e: Event) => {

@@ -136,7 +136,7 @@ export default function Security() {
 
   useEffect(() => { loadRecent(); }, [loadRecent]);
 
-  // Hooks must precede the early return below (#1870 — useMemo was after
+  // Hooks must precede the early return below (#1871 — useMemo was after
   // the `selectedIp` drill-down return, changing hook order).
   const groups = data?.groups ?? [];
   const totalSpammySignups = useMemo(

@@ -105,7 +105,7 @@ export default function GameStage({
   onSelectEntity,
   className,
 }: GameStageProps) {
-  // 3D-runtime dispatch lives AFTER the 2D hooks below (#1870): React
+  // 3D-runtime dispatch lives AFTER the 2D hooks below (#1871): React
   // hooks must run unconditionally, so we can't early-return for the
   // world-3d engine before them. See the dispatch just before the 2D
   // render guards. (Single dispatch point per the canvas-runtime
@@ -237,7 +237,7 @@ export default function GameStage({
   // 3D-runtime dispatch — projects authored with `engine === "world-3d"`
   // mount the R3F + Rapier stage instead of the 2D Canvas loop. Placed
   // AFTER the 2D hooks (which no-op without a mounted canvas) so React
-  // sees a stable hook order regardless of engine (#1870). The host
+  // sees a stable hook order regardless of engine (#1871). The host
   // (`StudioEditorV2`) wires both paths through the same setter.
   if (gameState?.engine === "world-3d") {
     return (

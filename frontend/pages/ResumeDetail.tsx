@@ -357,7 +357,7 @@ export default function ResumeDetail() {
 
   // SEO + permissions are HOOKS — they must run unconditionally, before
   // the `printMode` early return below, or React sees a different hook
-  // order between print and normal renders (#1870 — was a latent crash).
+  // order between print and normal renders (#1871 — was a latent crash).
   // SEO builder: lib/seo-ugc.ts ("resume" kind) → ProfilePage JSON-LD.
   useUgcSeo("resume", resume);
   // Single source of truth for "what can this viewer do with this resume".

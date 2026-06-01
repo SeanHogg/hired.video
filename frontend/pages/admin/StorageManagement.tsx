@@ -248,7 +248,7 @@ function OrphansTab({
   bulkBusy: boolean;
   onDelete: (keys: string[]) => void;
 }) {
-  // Hook must precede the early return below (#1870 — useMemo sat after the
+  // Hook must precede the early return below (#1871 — useMemo sat after the
   // "no orphans" return, changing hook order). `orphans` is a non-null prop.
   const selectedBytes = useMemo(
     () => orphans.orphans.filter((o) => selectedKeys.has(o.key)).reduce((a, o) => a + o.size, 0),

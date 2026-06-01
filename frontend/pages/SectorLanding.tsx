@@ -90,7 +90,7 @@ export default function SectorLanding() {
   const { sector: rawSector } = useParams<{ sector: string }>();
   const valid = !!rawSector && isValidSector(rawSector);
   // Resolve meta BEFORE any hook / early return so the hooks below run
-  // unconditionally (#1870 — useSectorLiveData previously sat AFTER the
+  // unconditionally (#1871 — useSectorLiveData previously sat AFTER the
   // invalid-sector Navigate, so hook order changed between renders). When
   // the sector is invalid we Navigate away, so the fallback sector's data
   // is fetched-then-discarded harmlessly.
