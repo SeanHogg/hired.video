@@ -16,6 +16,7 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
 import { OptionalUrlSchema, UuidLikeSchema } from "../../../shared/validation.js";
 import { JOB_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { requireJobOwner } from "../services/jobs/jobOwnership.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import {
   createScreeningInterviewFromApply,
   listApplicationsMissingScreening,
@@ -144,6 +145,7 @@ jobRoutes.post("/:id/archive", async (c) => {
     .set({ archivedAt: new Date(), updatedAt: new Date() } as any)
     .where(eq(schema.jobItems.id, id))
     .returning();
+  bumpSearchVersion();
   return c.json(success(updated), 200);
 });
 
@@ -164,6 +166,7 @@ jobRoutes.post("/:id/unarchive", async (c) => {
     .set({ archivedAt: null, updatedAt: new Date() } as any)
     .where(eq(schema.jobItems.id, id))
     .returning();
+  bumpSearchVersion();
   return c.json(success(updated), 200);
 });
 

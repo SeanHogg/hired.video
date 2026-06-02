@@ -5,6 +5,7 @@ import { classifyJobSector } from "../../../../shared/sectors.js";
 import { normalizeEmploymentType } from "../../../../shared/employment-types.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
+import { bumpSearchVersion } from "../../utils/search-cache.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -516,6 +517,7 @@ export async function createJob(job: CreateJobDTO, userId: string,
       isRemote: false,
     } as any)
     .returning();
+  bumpSearchVersion();
   return rowToJob(row!);
 }
 
@@ -1257,6 +1259,7 @@ export async function updateJob(id: string,
     .set(updates)
     .where(and(eq(jobItems.id, id), eq((jobItems as any).postedByUserId, userId)))
     .returning();
+  if (row) bumpSearchVersion();
   return row ? rowToJob(row) : null;
 }
 
@@ -1422,6 +1425,7 @@ export async function deleteJob(id: string, userId: string, isAdmin = false,
     ? eq(jobItems.id, id)
     : and(eq(jobItems.id, id), eq((jobItems as any).postedByUserId, userId));
   const deleted = await db.delete(jobItems).where(condition).returning({ id: jobItems.id });
+  if (deleted.length > 0) bumpSearchVersion();
   return deleted.length > 0;
 }
 

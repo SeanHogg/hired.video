@@ -14,6 +14,7 @@ import { AudienceService } from "../services/audience/AudienceService.js";
 import type { ContentLocationKind, LocationFilter } from "../../../shared/content-locations.js";
 import { AudienceKeySchema, type AudienceKey } from "../../../shared/audiences.js";
 import { NON_CANDIDATE_ROLES } from "../../../shared/user-roles.js";
+import { getCachedSearch } from "../utils/search-cache.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos, articles, scheduledEvents, courses } = schema;
 
@@ -260,6 +261,30 @@ searchRoutes.get("/public", async (c) => {
   const salaryMin = c.req.query("salaryMin") ? Number(c.req.query("salaryMin")) : undefined;
   const salaryMax = c.req.query("salaryMax") ? Number(c.req.query("salaryMax")) : undefined;
 
+  // Stable cache key over every parameter that affects the *dataset*.
+  // Pagination (page/limit) is deliberately excluded: the loader caches
+  // the full merged+sorted list, and we slice per request below — so one
+  // cache entry serves every page of the same query. Keep this in sync
+  // with every `c.req.query(...)` read inside the loader.
+  const paramKey = [
+    `q=${search.toLowerCase()}`,
+    `cat=${category}`,
+    `loc=${location.toLowerCase()}`,
+    `emp=${employmentType ?? ""}`,
+    `exp=${experienceLevel ?? ""}`,
+    `rem=${isRemote ?? ""}`,
+    `smin=${salaryMin ?? ""}`,
+    `smax=${salaryMax ?? ""}`,
+    `aud=${c.req.query("audience") ?? ""}`,
+    `co=${c.req.query("countryId") ?? ""}`,
+    `st=${c.req.query("stateId") ?? ""}`,
+    `ci=${c.req.query("cityId") ?? ""}`,
+    `lat=${c.req.query("lat") ?? ""}`,
+    `lng=${c.req.query("lng") ?? ""}`,
+    `rad=${c.req.query("radiusKm") ?? ""}`,
+    `fp=${c.req.query("firstParty") ?? ""}`,
+  ].join("|");
+
   const includeJobs = category === "all" || category === "jobs";
   const includeCompanies = category === "all" || category === "companies";
   const includePeople = category === "all" || category === "people";
@@ -307,6 +332,11 @@ searchRoutes.get("/public", async (c) => {
     geoFilter.stateId != null ||
     geoFilter.cityId != null ||
     (geoFilter.latitude != null && geoFilter.longitude != null);
+  // Read-through cache: the full merged+sorted result set is cached under
+  // a version-stamped key (see utils/search-cache.ts). All pagination
+  // happens AFTER the cache, so one entry serves every page of a query
+  // and stays warm until a searchable-content write bumps the version.
+  const items = await getCachedSearch(paramKey, async () => {
   const env = (c.env ?? {}) as Record<string, string | undefined>;
   const deps = buildApiDeps(env);
   const locationService = new LocationService(deps);
@@ -620,7 +650,7 @@ searchRoutes.get("/public", async (c) => {
   ]);
 
   // When searching "all", we merge and paginate by createdAt.
-  const items = [
+  return [
     ...jobs.items.map(toSearchItem),
     ...companies.map(toCompanyItem),
     ...people.map(({ user, profile }) => toPeopleItem(user, profile ?? null)),
@@ -633,6 +663,7 @@ searchRoutes.get("/public", async (c) => {
     ...learningPaths.map(toLearningPathItem),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));
+  });
 
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));

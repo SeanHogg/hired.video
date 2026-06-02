@@ -60,6 +60,7 @@ import { evaluateCourseCompletion } from "../services/learning/course-completion
 import { gamificationFromContext, withGamification } from "../domains/gamification/with-gamification.js";
 import { getJwtSecret } from "../utils/jwt.js";
 import { isSuperAdmin } from "../middleware/superAdmin.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 
 const {
   courses,
@@ -702,6 +703,8 @@ courseRoutes.patch("/:id", async (c) => {
   const [updated] = await db.update(courses).set(patch as any)
     .where(eq(courses.id, c.req.param("id")))
     .returning();
+  // Title/summary edits surface in unified search for published courses.
+  bumpSearchVersion();
   return c.json(success(updated), 200);
 });
 
@@ -738,6 +741,7 @@ courseRoutes.post("/:id/publish", async (c) => {
     publishedAt: new Date(),
     updatedAt: new Date(),
   } as any).where(eq(courses.id, existing.id)).returning();
+  bumpSearchVersion();
 
   if (wasUnpublished) {
     await withGamification(c, "course-published", (game, role, uid2) =>
@@ -766,6 +770,7 @@ courseRoutes.post("/:id/unpublish", async (c) => {
     .where(eq(courses.id, courseId))
     .returning();
   if (!updated) return c.json(error("NOT_FOUND", "Course not found"), 404);
+  bumpSearchVersion();
   return c.json(success(updated), 200);
 });
 
@@ -817,6 +822,7 @@ courseRoutes.delete("/:id", async (c) => {
     .where(eq(courses.id, courseId))
     .returning({ id: courses.id });
   if (!deleted) return c.json(error("NOT_FOUND", "Course not found"), 404);
+  bumpSearchVersion();
   return c.json(success({ deleted: deleted.id }), 200);
 });
 

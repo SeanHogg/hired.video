@@ -32,6 +32,7 @@ import { slugify } from "../../../shared/slugify.js";
 import { ARTICLE_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
 import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import { ARTICLE_KINDS } from "../db/schema/articles.js";
 
 const {
@@ -364,6 +365,8 @@ articleRoutes.patch("/:id", async (c) => {
 
   const [updated] = await db.update(articles).set(patch as any)
     .where(eq(articles.id, existing.id)).returning();
+  // Title/summary edits surface in unified search for published articles.
+  bumpSearchVersion();
   return c.json(success(updated), 200);
 });
 
@@ -460,6 +463,7 @@ articleRoutes.post("/:id/unpublish", async (c) => {
     .where(and(eq(articles.id, c.req.param("id")), eq(articles.userId, userId)))
     .returning();
   if (!updated) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  bumpSearchVersion();
   return c.json(success(updated), 200);
 });
 
@@ -471,6 +475,7 @@ articleRoutes.delete("/:id", async (c) => {
     .where(and(eq(articles.id, c.req.param("id")), eq(articles.userId, userId)))
     .returning({ id: articles.id });
   if (!deleted) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  bumpSearchVersion();
   return c.json(success({ deleted: deleted.id }), 200);
 });
 
@@ -586,6 +591,7 @@ articleRoutes.post("/:id/versions/:vid/restore", async (c) => {
     } as any)
     .where(eq(articles.id, id))
     .returning();
+  bumpSearchVersion();
   return c.json(success({ restoredVersion: version, article: updated }), 200);
 });
 
@@ -775,6 +781,8 @@ articleRoutes.post("/:id/classify", async (c) => {
       .set(update as any)
       .where(eq(articles.id, id))
       .returning();
+    // Moderation gate can flip status → published, adding the article to search.
+    bumpSearchVersion();
     return c.json(success({ article: updated, findings: result }), 200);
   } catch (e) {
     return c.json(error("CLASSIFIER_FAILED", e instanceof Error ? e.message : String(e)), 500);

@@ -10,6 +10,7 @@ import type { CompanyBenefits } from "../db/schema/companies.js";
 import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
 import { slugify } from "../../../shared/slugify.js";
 import { COMPANY_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { withCacheHeaders } from "../utils/cache-headers.js";
 import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
@@ -330,6 +331,7 @@ companyRoutes.post("/", async (c) => {
   const [row] = await db.insert(companyProfiles).values({ ownerId: uid, name: body.name, slug, ...buildWritableFields(body) } as any).returning();
 
   servicesProcessor.meterEvent(c, "company_db_write", { id: row?.id });
+  bumpSearchVersion();
 
   return c.json(success(rowToCompanyMeta(row)), 201);
 });
@@ -433,6 +435,7 @@ companyRoutes.put("/:id", async (c) => {
   const updates: Record<string, unknown> = { updatedAt: new Date(), ...buildWritableFields(body) };
   if ("name" in body) updates.name = body.name;
   const [row] = await db.update(companyProfiles).set(updates as any).where(eq(companyProfiles.id, access!.companyId)).returning();
+  bumpSearchVersion();
   return c.json(success(rowToCompanyMeta(row)), 200);
 });
 
@@ -580,6 +583,7 @@ companyRoutes.delete("/:id", async (c) => {
   if (denied) return denied;
   const db = getDb();
   await db.delete(companyProfiles).where(eq(companyProfiles.id, access!.companyId));
+  bumpSearchVersion();
   return c.json(success(null, "Company deleted"), 200);
 });
 

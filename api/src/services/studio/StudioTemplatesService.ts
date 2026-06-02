@@ -28,6 +28,7 @@ import type {
   LicensedStudioTemplateRow,
 } from "../../repositories/index.js";
 import { buildRepos } from "../../repositories/index.js";
+import { bumpSearchVersion } from "../../utils/search-cache.js";
 
 /** Snapshotted from the existing PLATFORM_FEE_BPS_DEFAULT in
  *  routes/studio-features.ts — duplicated as a constant here so this
@@ -263,6 +264,7 @@ export class StudioTemplatesService {
       source: "owner",
     } as any);
 
+    bumpSearchVersion();
     return inserted;
   }
 
@@ -323,6 +325,7 @@ export class StudioTemplatesService {
 
     const updated = await repos.studioTemplates.update(input.templateId, input.creatorUserId, patch as any);
     if (!updated) throw new StudioTemplatesError("NOT_FOUND", "Template not found.");
+    bumpSearchVersion();
     return updated;
   }
 
@@ -330,6 +333,7 @@ export class StudioTemplatesService {
     const { repos } = this.deps;
     const ok = await repos.studioTemplates.deleteById(templateId, creatorUserId);
     if (!ok) throw new StudioTemplatesError("NOT_FOUND", "Template not found.");
+    bumpSearchVersion();
   }
 
   // ── Reads ────────────────────────────────────────────────────────────────

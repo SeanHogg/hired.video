@@ -4,6 +4,7 @@ import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import {
@@ -1710,6 +1711,8 @@ resumeRoutes.post("/:id/setprivacy", async (c) => {
     c.req.param("id"),
     typeof body?.privacy === "string" ? body.privacy : undefined,
   );
+  // privacyLevel toggles whether the resume appears in public search.
+  if (result.status === 200) bumpSearchVersion();
   return c.json(result.body as any, result.status as any);
 });
 

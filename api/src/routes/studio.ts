@@ -4,6 +4,7 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
@@ -2457,6 +2458,8 @@ studioRoutes.post("/publish", async (c) => {
     } as any)
     .where(eq(videos.id, linkedVideo.id))
     .returning();
+  // Public video resumes surface in unified search under the `media` kind.
+  bumpSearchVersion();
 
   const [updatedProject] = await db
     .update(studioProjects)
@@ -2810,6 +2813,8 @@ studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
       .update(videos)
       .set({ privacyStatus, updatedAt: new Date() })
       .where(eq(videos.id, project.videoId));
+    // Visibility flip adds/removes the video from the public `media` search.
+    bumpSearchVersion();
   }
 
   const linkedVideo = project.videoId

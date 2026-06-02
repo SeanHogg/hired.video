@@ -23,6 +23,7 @@ import type {
 } from "../../../../shared/events.js";
 import { generateEventSlug } from "../../../../shared/events.js";
 import type { EventRow, EventInsert, EventPatch } from "../../repositories/eventsRepository.js";
+import { bumpSearchVersion } from "../../utils/search-cache.js";
 
 export type EventDeps = Pick<ApiDeps, "repos" | "geocoder" | "now" | "randomHex">;
 
@@ -85,6 +86,7 @@ export class EventService {
       });
     }
 
+    bumpSearchVersion();
     return row;
   }
 
@@ -119,14 +121,18 @@ export class EventService {
     if (input.publish) patch.publishedAt = this.deps.now();
     if (input.cancelled) patch.cancelledAt = this.deps.now();
 
-    return this.deps.repos.events.update(eventId, patch);
+    const updated = await this.deps.repos.events.update(eventId, patch);
+    bumpSearchVersion();
+    return updated;
   }
 
   async cancel(eventId: string, actingUserId: string): Promise<EventRow | null> {
     const existing = await this.deps.repos.events.findById(eventId);
     if (!existing) return null;
     if (!(await this.canEdit(existing, actingUserId))) return null;
-    return this.deps.repos.events.update(eventId, { cancelledAt: this.deps.now() });
+    const cancelled = await this.deps.repos.events.update(eventId, { cancelledAt: this.deps.now() });
+    bumpSearchVersion();
+    return cancelled;
   }
 
   /** Hydrate a row into the wire-shaped ResolvedEvent. */

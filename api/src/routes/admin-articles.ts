@@ -21,6 +21,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { scanContent } from "../services/moderation/contentScan.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 
 const { articles, users, userProfiles, adminAuditLog, feedPosts } = schema;
 
@@ -161,6 +162,7 @@ adminArticleRoutes.post("/approve", async (c) => {
     inArray(articles.id, ids),
     eq(articles.status, "submitted"),
   )).returning();
+  if (updatedRows.length > 0) bumpSearchVersion();
 
   // Emit one feed post per approved article (replaces the old per-article
   // emit that used to live in the creator-side publish route).

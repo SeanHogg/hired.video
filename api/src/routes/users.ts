@@ -5,6 +5,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { getDb, schema } from "../db/index.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import { buildRepos } from "../repositories/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -543,6 +544,9 @@ async function upsertProfile(userId: string, profileUpdates: Record<string, unkn
       set: profileUpdates as any,
     })
     .returning();
+  // Name/headline/skills + profileVisibility all funnel through here and
+  // feed the public `people` search bucket — invalidate the search index.
+  bumpSearchVersion();
   return profile;
 }
 

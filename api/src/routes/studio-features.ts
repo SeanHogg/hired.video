@@ -24,6 +24,7 @@ import { UuidLikeSchema } from "../../../shared/validation.js";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { bumpSearchVersion } from "../utils/search-cache.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
@@ -1459,6 +1460,7 @@ studioFeaturesRoutes.post("/voice-clones", requirePro("Voice Cloning"), async (c
     source: "owner",
   } as any).onConflictDoNothing();
 
+  bumpSearchVersion();
   return c.json(ok(clone), 201);
 });
 
@@ -1545,6 +1547,7 @@ studioFeaturesRoutes.patch("/voice-clones/:id", requirePro("Voice Cloning"), asy
     .set(patch as any)
     .where(and(eq(studioVoiceClones.id, id), eq(studioVoiceClones.userId, user.sub)))
     .returning();
+  bumpSearchVersion();
   return c.json(ok(updated));
 });
 
@@ -1625,6 +1628,7 @@ studioFeaturesRoutes.delete("/voice-clones/:id", async (c) => {
   // objects (sample + preview) into the bucket — the orphan sweep would
   // re-flag them but admins shouldn't have to manually reclaim per-row.
   await deleteR2Keys([deleted.sampleAudioKey, deleted.previewAudioKey]);
+  bumpSearchVersion();
   return c.json(ok({ id: cloneId }));
 });
 
