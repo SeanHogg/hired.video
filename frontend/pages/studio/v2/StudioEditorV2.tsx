@@ -132,6 +132,7 @@ import {
 import { findStartLevel } from "@/lib/studio/game/runtime";
 import DrawingStage from "@/components/studio/drawing/DrawingStage";
 import AnimationStage from "@/components/studio/animation/AnimationStage";
+import FramesRail from "@/components/studio/animation/FramesRail";
 import CadStage from "@/components/studio/cad/CadStage";
 import Cad3DStage from "@/components/studio/cad-3d/Cad3DStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
@@ -410,8 +411,34 @@ export default function StudioEditorV2() {
     setState: setAnimationState,
     commit: animationCommit,
     reset: resetAnimationHistory,
+    undo: animationUndo,
+    redo: animationRedo,
+    canUndo: animationCanUndo,
+    canRedo: animationCanRedo,
   } = animationHistory;
   const [animationStateHydrated, setAnimationStateHydrated] = useState(false);
+  // Animation playback — lifted out of `<AnimationStage>` so the
+  // Play/Pause control lives in the studio HEADER (where video's Play and
+  // game's Playtest live), not embedded in the canvas. The stage's rAF
+  // loop reads this flag via its `isPlaying` prop.
+  const [animationPlaying, setAnimationPlaying] = useState(false);
+  // Structural frame edit (add / duplicate / delete / reorder) — applies
+  // the new state AND pushes a history checkpoint so undo works. Selection
+  // changes go through `setAnimationState` directly (ephemeral, no
+  // checkpoint), matching how scene / level selection behaves.
+  const commitAnimationState = useCallback(
+    (next: AnimationState) => {
+      setAnimationState(next);
+      animationCommit();
+    },
+    [setAnimationState, animationCommit],
+  );
+  const selectAnimationFrame = useCallback(
+    (frameId: string) => {
+      setAnimationState((prev) => ({ ...prev, activeFrameId: frameId }));
+    },
+    [setAnimationState],
+  );
   // CAD runtime state (#930) — same parallel-history pattern as the
   // image + animation runtimes. The history wrapper is mounted
   // unconditionally so undo/redo participates without a per-kind
@@ -2443,6 +2470,8 @@ export default function StudioEditorV2() {
           gameEngine={gameState?.engine ?? null}
           gamePlaying={gamePlaying}
           onTogglePlaytest={() => setGamePlaying((p) => !p)}
+          animationPlaying={animationPlaying}
+          onToggleAnimationPlay={() => setAnimationPlaying((p) => !p)}
           onOpenInvite={() => setGameInviteOpen(true)}
           onExportRoblox={
             gameState && gameState.engine === "world-3d"
@@ -2568,6 +2597,43 @@ export default function StudioEditorV2() {
                     }}
                   />
                 </div>
+              </div>
+            </CollapsiblePanel>
+          )}
+          {/* Animation-kind left panel — Frames rail (top) + drawing tool
+              palette (bottom). Same `<CollapsiblePanel side="left">`
+              shell + the same "navigator on top, palette on bottom"
+              composition Game uses (LevelsRail + SpritePalette) and Video
+              uses (ScenesRail + WidgetPalette). Frames are the animation
+              analogue of scenes/levels, so they belong HERE — not at the
+              bottom of the canvas where they used to live. The tool
+              palette is the SAME `<DrawingToolPalette>` the image kind
+              uses, so animation finally has the brush / eraser / fill /
+              eyedropper + size / opacity / colour controls it was
+              missing (it shares `imageTool` / `imageBrush` state with the
+              stage). */}
+          {currentMediaKind === "animation" && (
+            <CollapsiblePanel
+              side="left"
+              label="Frames"
+              storageKey="studio.v2.panel.left"
+              expandedClassName="w-64"
+            >
+              <div className="min-h-0 flex-1 border-b border-border">
+                <FramesRail
+                  state={animationState}
+                  onChange={commitAnimationState}
+                  onSelect={selectAnimationFrame}
+                />
+              </div>
+              <div className="flex h-[55%] min-h-[200px] flex-col bg-card">
+                <DrawingToolPalette
+                  tool={imageTool}
+                  onToolChange={setImageTool}
+                  brush={imageBrush}
+                  onBrushChange={setImageBrush}
+                  recentColors={imageRecentColors}
+                />
               </div>
             </CollapsiblePanel>
           )}
@@ -2846,6 +2912,7 @@ export default function StudioEditorV2() {
                             brush={imageBrush}
                             onBrushChange={setImageBrush}
                             onRecentColor={pushImageRecentColor}
+                            isPlaying={animationPlaying}
                           />
                           {aiChipNode}
                         </div>
@@ -2990,17 +3057,29 @@ export default function StudioEditorV2() {
                           canUndo: imageCanUndo,
                           canRedo: imageCanRedo,
                         }
-                      : { undo, redo, canUndo, canRedo }
+                      : currentMediaKind === "animation"
+                        ? {
+                            undo: animationUndo,
+                            redo: animationRedo,
+                            canUndo: animationCanUndo,
+                            canRedo: animationCanRedo,
+                          }
+                        : { undo, redo, canUndo, canRedo }
                   }
                   clipboard={clipboard}
                 />
               </div>
-              {/* Layers panel — kind-aware mount per DRY: Timeline
-                  kinds (video/podcast/voice/animation/comic) render
-                  `<FloatingLayersPanel/>` over CanvasState widgets;
-                  image kind renders `<FloatingImageLayersPanel/>` over
-                  `imageState.layers`. Same `<FloatingCollapsiblePanel/>`
-                  chrome; different body. */}
+              {/* Layers panel — kind-aware mount per DRY:
+                    • image kind  → `<FloatingImageLayersPanel>` over
+                      `imageState.layers`.
+                    • Timeline kinds (video/podcast/voice/comic) →
+                      `<FloatingLayersPanel>` over CanvasState widgets.
+                    • everything else (animation/game/cad) → nothing.
+                      Their canvases have no CanvasState widget stack, so
+                      a widget-layers panel was misleading empty chrome.
+                  Same `<FloatingCollapsiblePanel>` chrome where it
+                  mounts; the component self-hides for kinds without a
+                  layer model. */}
               <div className="pointer-events-none absolute left-1/2 bottom-3 z-10 -translate-x-1/2">
                 {currentMediaKind === "image" ? (
                   <FloatingImageLayersPanel
@@ -3016,7 +3095,7 @@ export default function StudioEditorV2() {
                     onSetFilters={handleImageSetFilters}
                     onMoveLayer={handleImageMoveLayer}
                   />
-                ) : (
+                ) : usesTimelineChrome ? (
                   <FloatingLayersPanel
                     scene={activeScene}
                     selectedWidgetId={
@@ -3033,7 +3112,7 @@ export default function StudioEditorV2() {
                       reorderLayers(activeScene.id, widgetIds)
                     }
                   />
-                )}
+                ) : null}
               </div>
               <div className="pointer-events-none absolute right-3 bottom-3 z-10">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
@@ -3456,6 +3535,8 @@ function EditorHeader({
   gameEngine,
   gamePlaying,
   onTogglePlaytest,
+  animationPlaying,
+  onToggleAnimationPlay,
   onOpenInvite,
   onExportRoblox,
 }: {
@@ -3489,6 +3570,12 @@ function EditorHeader({
   gameEngine: import("@shared/game-state").GameEngineId | null;
   gamePlaying: boolean;
   onTogglePlaytest: () => void;
+  /** Animation-kind chrome — the header hosts Play/Pause next to Save
+   *  (replacing the previous in-canvas play button), mirroring the
+   *  video kind's Play affordance and game's Playtest. Self-gates inline
+   *  on `mediaKind === "animation"`. */
+  animationPlaying: boolean;
+  onToggleAnimationPlay: () => void;
   onOpenInvite: () => void;
   /** Roblox export — undefined when the project isn't 3D-world. When
    *  set, the header renders an "Export → Roblox" button next to
@@ -3649,6 +3736,32 @@ function EditorHeader({
               <>
                 <Play className="h-4 w-4" />
                 Playtest
+              </>
+            )}
+          </Button>
+        )}
+        {/* Animation-kind Play/Pause — same header slot the video editor
+            uses for Play and game uses for Playtest. Was previously a
+            button embedded in the canvas frame-strip; moved here so every
+            kind's playback control lives in the same place (header
+            actions, not in-canvas floaters). */}
+        {mediaKind === "animation" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={onToggleAnimationPlay}
+            aria-label={animationPlaying ? "Pause animation" : "Play animation"}
+          >
+            {animationPlaying ? (
+              <>
+                <Pause className="h-4 w-4" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Play
               </>
             )}
           </Button>

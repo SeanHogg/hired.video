@@ -11,6 +11,14 @@
  * the stage paints the active frame on top of an onion-skin
  * composite of the previous N frames at reduced opacity.
  *
+ * SURFACE-ONLY: this component is a PURE paint surface. The frame
+ * navigator (add / duplicate / delete / reorder / select) lives in the
+ * left-rail `<FramesRail>` and the Play/Pause control lives in the
+ * studio header — exactly where Scenes/Levels live for the video/game
+ * kinds. Playback is driven by the `isPlaying` PROP (the header toggles
+ * it); the rAF loop stays here because the frame pixels + setState live
+ * here, but the canvas no longer carries any navigator/playback chrome.
+ *
  * Composition order (back → front):
  *   1. Project background (transparent checker / solid color)
  *   2. Onion-skin layer — previous `onionSkinDepth` frames, opacity
@@ -26,16 +34,13 @@
  * stampBrushDab / strokeBetween / floodFillAt come straight from
  * `drawing-engine.ts`. The runtime owns ZERO duplicated paint logic.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   type AnimationState,
   type AnimationFrame,
   findFrame,
   frameIndex,
   updateFramePixels,
-  insertFrameAfter,
-  duplicateFrame,
-  removeFrame,
 } from "@shared/animation-state";
 import {
   stampBrushDab,
@@ -48,7 +53,6 @@ import {
   type DrawingTool,
 } from "@/lib/studio/drawing/drawing-types";
 import { cn } from "@/lib/utils";
-import { Copy, Pause, Play, Plus, Trash2 } from "lucide-react";
 
 interface AnimationStageProps {
   state: AnimationState;
@@ -62,6 +66,10 @@ interface AnimationStageProps {
   brush: BrushSettings;
   onBrushChange?: (next: BrushSettings) => void;
   onRecentColor?: (color: string) => void;
+  /** Playback flag — driven by the header Play/Pause control. When true
+   *  the rAF loop cycles frames at the project fps and the paint canvas
+   *  ignores pointer events. */
+  isPlaying: boolean;
 }
 
 /** Render the project background onto a 2D context. Transparent uses a
@@ -121,6 +129,7 @@ export default function AnimationStage({
   brush,
   onBrushChange,
   onRecentColor,
+  isPlaying,
 }: AnimationStageProps) {
   // Three canvases stacked:
   //   - bg: background fill (transparent checker / color)
@@ -137,9 +146,9 @@ export default function AnimationStage({
   const activeIdx = useMemo(() => frameIndex(state, activeFrameId), [state, activeFrameId]);
   const activeFrame: AnimationFrame | null = useMemo(() => findFrame(state, activeFrameId), [state, activeFrameId]);
 
-  // Playback state — when true, the active-frame canvas is driven by
-  // an rAF loop that cycles through frames at the project's fps.
-  const [isPlaying, setIsPlaying] = useState(false);
+  // Playback is driven by the `isPlaying` prop (the header Play/Pause
+  // control). The rAF loop below reads it; the paint canvas suppresses
+  // pointer events while it's true.
   const playbackFrameRef = useRef<number>(0);
 
   // ─── Paint canvas → load active frame's pixels on selection change ───
@@ -269,30 +278,6 @@ export default function AnimationStage({
     onRecentColor?.(brush.color);
   }, [brush.color, commitActiveFramePixels, onRecentColor]);
 
-  // ─── Frame strip actions ─────────────────────────────────────────────
-  const selectFrame = useCallback((frameId: string) => {
-    setState((prev) => ({ ...prev, activeFrameId: frameId }));
-  }, [setState]);
-
-  const handleAddFrame = useCallback(() => {
-    const next = insertFrameAfter(state, activeFrameId);
-    setState(next.state);
-    commit(next.state);
-  }, [state, activeFrameId, setState, commit]);
-
-  const handleDuplicateFrame = useCallback(() => {
-    const next = duplicateFrame(state, activeFrameId);
-    setState(next.state);
-    commit(next.state);
-  }, [state, activeFrameId, setState, commit]);
-
-  const handleDeleteFrame = useCallback(() => {
-    if (frames.length <= 1) return;
-    const next = removeFrame(state, activeFrameId);
-    setState(next);
-    commit(next);
-  }, [state, activeFrameId, frames.length, setState, commit]);
-
   // ─── Playback rAF loop ───────────────────────────────────────────────
   useEffect(() => {
     if (!isPlaying) return;
@@ -362,85 +347,6 @@ export default function AnimationStage({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
           />
-        </div>
-      </div>
-
-      {/* Frame strip — left rail of thumbnails + add/duplicate/delete +
-          play toggle. Mirrors the LevelsRail pattern for games. */}
-      <div className="border-t bg-white">
-        <div className="flex items-center gap-2 px-3 py-2">
-          <button
-            type="button"
-            onClick={() => setIsPlaying((p) => !p)}
-            className="flex h-8 items-center gap-1.5 rounded-full bg-fuchsia-600 px-3 text-xs font-semibold text-white hover:bg-fuchsia-500"
-            aria-label={isPlaying ? "Pause playback" : "Play animation"}
-          >
-            {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {isPlaying ? "Pause" : "Play"}
-          </button>
-          <span className="text-xs text-slate-500">{frames.length} frame{frames.length === 1 ? "" : "s"} · {fps} fps</span>
-          <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleAddFrame}
-              className="flex h-8 items-center gap-1 rounded border border-slate-200 px-2 text-xs hover:bg-slate-50"
-              aria-label="Add blank frame"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add
-            </button>
-            <button
-              type="button"
-              onClick={handleDuplicateFrame}
-              className="flex h-8 items-center gap-1 rounded border border-slate-200 px-2 text-xs hover:bg-slate-50"
-              aria-label="Duplicate active frame"
-            >
-              <Copy className="h-3.5 w-3.5" /> Duplicate
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteFrame}
-              disabled={frames.length <= 1}
-              className="flex h-8 items-center gap-1 rounded border border-slate-200 px-2 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Delete active frame"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
-          </div>
-        </div>
-        <div className="flex gap-2 overflow-x-auto px-3 pb-3">
-          {frames.map((frame, idx) => (
-            <button
-              key={frame.id}
-              type="button"
-              onClick={() => selectFrame(frame.id)}
-              className={cn(
-                "relative flex h-16 w-20 shrink-0 items-center justify-center rounded border-2 bg-white text-[10px] text-slate-400",
-                frame.id === activeFrameId
-                  ? "border-fuchsia-500 ring-2 ring-fuchsia-200"
-                  : "border-slate-200 hover:border-slate-300",
-              )}
-              aria-label={`Select frame ${idx + 1}`}
-              aria-pressed={frame.id === activeFrameId}
-            >
-              {frame.pixelsDataUrl ? (
-                <img
-                  src={frame.pixelsDataUrl}
-                  alt={`Frame ${idx + 1}`}
-                  className="h-full w-full rounded-sm object-contain"
-                />
-              ) : (
-                <span>Empty</span>
-              )}
-              <span className="absolute bottom-0 left-0 rounded-tr bg-black/60 px-1 text-[10px] text-white">
-                {idx + 1}
-              </span>
-              {(frame.hold ?? 1) > 1 ? (
-                <span className="absolute right-0 top-0 rounded-bl bg-fuchsia-600 px-1 text-[10px] text-white">
-                  ×{frame.hold}
-                </span>
-              ) : null}
-            </button>
-          ))}
         </div>
       </div>
     </div>

@@ -61,6 +61,30 @@ export function deleteLevel(state: GameState, levelId: string): GameState {
   return { ...state, levels: next, startLevelId };
 }
 
+/** Duplicate a level into the slot immediately after it, copying its
+ *  background + every sprite. The copy gets a fresh `level-<n>` id and a
+ *  "(copy)" label; sprite ids are per-level so the deep copy keeps them.
+ *  Mirrors `duplicateScene` / `duplicateFrame` so every kind's rail has
+ *  the same Duplicate affordance (DRY — see `<UnitsRail>`). */
+export function duplicateLevel(state: GameState, levelId: string): {
+  state: GameState;
+  level: GameLevel;
+} {
+  const idx = state.levels.findIndex((l) => l.id === levelId);
+  if (idx === -1) {
+    return { state, level: state.levels[0] };
+  }
+  const src = state.levels[idx];
+  const copy: GameLevel = {
+    ...structuredClone(src),
+    id: nextLevelId(state),
+    label: `${src.label} (copy)`,
+  };
+  const next = [...state.levels];
+  next.splice(idx + 1, 0, copy);
+  return { state: { ...state, levels: next }, level: copy };
+}
+
 export function updateLevel(
   state: GameState,
   levelId: string,
