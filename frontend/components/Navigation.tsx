@@ -22,6 +22,7 @@ import HeaderSearch from "@/components/HeaderSearch";
 import ShoppingCart from "@/components/ShoppingCart";
 import CommunicationHub from "@/components/CommunicationHub";
 import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
@@ -257,9 +258,15 @@ export default function Navigation({
 
             {/* Language switcher — same component used in BrandHeader +
                 Footer so a visitor can switch language from any chrome
-                surface. Hidden below md to keep the mobile top bar tight;
-                the Footer mount stays available on mobile. */}
-            <LocaleSwitcher variant="compact" className="hidden md:inline-flex" />
+                surface. Always visible: on mobile this top bar is the only
+                always-on place to switch language (the sidebar lives behind
+                the hamburger). */}
+            <LocaleSwitcher variant="compact" className="inline-flex" />
+
+            {/* Sign out — mobile/tablet only (lg:hidden). Below lg the sidebar
+                is a drawer, so without this the only logout is buried behind
+                the hamburger; on lg+ the docked sidebar already shows it. */}
+            {isAuthenticated && <SignOutButton iconOnly className="lg:hidden" />}
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
             {!isAuthenticated && <AuthButtons className="hidden md:flex" />}

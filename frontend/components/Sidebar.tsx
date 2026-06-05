@@ -11,7 +11,6 @@ import {
   Wrench,
   CheckSquare,
   Send,
-  LogOut,
   X,
   BarChart3,
   ShieldCheck,
@@ -23,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { AuthButtons } from "@/components/AuthButtons";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export default function Sidebar({
   onCollapse,
   collapsed = false,
 }: SidebarProps) {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
   const { isPro } = useSubscription();
   const location = useLocation();
@@ -125,10 +125,12 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Overlay for mobile */}
+      {/* Overlay for mobile — sits above the fixed top Navigation (z-50) so
+          the dimmed backdrop covers the whole screen and the drawer header
+          (with its close X) is never occluded. */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-[55] bg-black/50 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -136,7 +138,10 @@ export default function Sidebar({
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-500 ease-in-out",
+          // z-[60] keeps the mobile drawer (and its close X header) above the
+          // top Navigation bar (z-50); lg:z-auto drops it back to the docked
+          // rail's normal stacking on desktop where there's no overlay.
+          "fixed top-0 left-0 h-full bg-background border-r border-border z-[60] transform transition-all duration-500 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-[90%] lg:w-80 overflow-y-auto",
           // Mobile: hidden by default, show when isOpen
           isOpen ? "translate-x-0" : "-translate-x-full",
@@ -373,20 +378,7 @@ export default function Sidebar({
                 </Link>
 
                 {/* Sign Out */}
-                <button
-                  onClick={() => {
-                    logout();
-                    onClose();
-                  }}
-                  className={cn(
-                    "w-full flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                  )}
-                  title={collapsed ? t("actions.signOut") : undefined}
-                >
-                  <LogOut className="h-4 w-4" />
-                  {!collapsed && t("actions.signOut")}
-                </button>
+                <SignOutButton collapsed={collapsed} onAfter={onClose} />
               </>
             ) : (
               <>
