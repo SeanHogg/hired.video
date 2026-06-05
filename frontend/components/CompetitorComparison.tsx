@@ -369,6 +369,12 @@ export const FEATURE_ROWS: FeatureRow[] = [
     note: "Platform-seeded courses on AI fundamentals, Retrieval-Augmented Generation, and the AI-era must-have skills ship as part of every plan — including Free. LinkedIn Learning's content library is a separate ~$379/seat/yr SKU on top of Recruiter; Greenhouse, Bullhorn, and LOXO don't ship learning content at all. Surface lives at /tools?tab=learning (alias: /learning).",
   },
   {
+    feature: "Classrooms — cohorts, assigned/required training + due dates, live progress monitoring",
+    icon: GraduationCap,
+    values: { hired: "yes", loxo: "no", linkedin: "partial", greenhouse: "no", bullhorn: "no" },
+    note: "Educators and employers group learners into a classroom (self-serve join code or email invite), assign any course or learning path with a due date + required flag, and watch a live per-student progress roll-up (completed / in-progress / overdue, with scores) at /tools?tab=classrooms. This is the i-Ready / LMS administration layer — but on a platform where finishing the training feeds straight into getting hired, and where every lesson is gamified (points / streaks / badges) which i-Ready and LinkedIn Learning don't do. LinkedIn Learning can assign content but has no cohort progress dashboard for a non-admin educator and no employment funnel; Greenhouse, Bullhorn, and LOXO have no learning surface at all.",
+  },
+  {
     feature: "Map / geo-tagged discovery for jobs, events, people",
     icon: MapPin,
     values: { hired: "yes", loxo: "no", linkedin: "partial", greenhouse: "no", bullhorn: "no" },

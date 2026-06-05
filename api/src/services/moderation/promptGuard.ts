@@ -158,7 +158,7 @@ const RULES: GuardRule[] = [
     category: "violence",
     label: "graphic violence against people",
     pattern: new RegExp(
-      String.raw`\b(?:stab(?:bing|bed)|behead\w*|decapitat\w*|dismember\w*|slaughter(?:ing|ed)|massacr\w*|lynch\w*|strangl(?:e|ing|ed)|tortur(?:e|ing|ed)|mutilat\w*|gun(?:ning|ned) down)\b` +
+      String.raw`\b(?:stab(?:bing|bed)|behead\w*|decapitat\w*|dismember\w*|slaughter(?:ing|ed|s)?|massacr\w*|lynch\w*|strangl(?:e|ing|ed)|tortur(?:e|ing|ed)|mutilat\w*|gun(?:ning|ned) down)\b` +
         NEAR +
         String.raw`\b${TARGET}\b`,
       "i",
@@ -183,7 +183,7 @@ const RULES: GuardRule[] = [
     // person noun (optional determiner only — no intervening "it") so the
     // idioms don't trip it.
     pattern:
-      /\b(?:kill(?:ing|ed|s)?|murder(?:ing|ed|s)?)\s+(?:the|all|those|these|some|any|innocent|helpless|defenseless|defenceless|unarmed|more)?\s*(?:people|persons?|children|child|kids?|civilians?|students?|humans?|victims?|hostages?|prisoners?|babies|infants?|toddlers?|each ?other)\b/i,
+      /\b(?:kill(?:ing|ed|s)?|murder(?:ing|ed|s)?)\s+(?:(?:the|all|those|these|some|any|innocent|helpless|defenseless|defenceless|unarmed|more)\s+){0,2}(?:people|persons?|children|child|kids?|civilians?|students?|humans?|victims?|hostages?|prisoners?|babies|infants?|toddlers?|each ?other)\b/i,
   },
 
   // ─── Weapons of mass harm / making instructions ───────────────────

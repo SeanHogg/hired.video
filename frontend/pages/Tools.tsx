@@ -236,6 +236,14 @@ export default function Tools() {
                   1.2 + xAPI tracked with HMAC-signed certificates. No
                   separate license required.
                 </p>
+                <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
+                  Educators and employers go further: spin up a classroom,
+                  assign courses or learning paths with due dates, and watch
+                  every learner's progress roll up live — the LMS playbook,
+                  but on the one platform where finishing the training leads
+                  straight to getting hired, and every lesson earns points,
+                  streaks, and badges.
+                </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
                     <Button

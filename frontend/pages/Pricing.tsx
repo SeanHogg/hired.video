@@ -281,6 +281,7 @@ export default function Pricing() {
         "In-video lead-capture forms (Wistia Turnstile equivalent) → unified inbox",
         "Async interview tool — record once, share to many candidates",
         "Learning Pathways — author SCORM 1.2 / xAPI / verifiable certificates for employees",
+        "Classrooms — group employees into cohorts, assign required training with due dates, monitor completion + overdue live",
         "Two-way calendar + smart notifications (priority-ranked)",
         "ATS connectors (Greenhouse, Lever, Workday) + OpenAPI 3.1 public API",
         inboxSyncFeature(" per user"),
@@ -2106,6 +2107,12 @@ export default function Pricing() {
                         label="SCORM 1.2 player + xAPI LRS"
                         free
                         pro
+                      />
+                      <FeatureRow
+                        icon={GraduationCap}
+                        label="Classrooms — cohorts, assigned/required training + due dates, live per-student progress monitoring"
+                        free="Join + track assigned"
+                        pro="Create cohorts + assign + monitor"
                       />
                       <FeatureRow
                         icon={GraduationCap}
