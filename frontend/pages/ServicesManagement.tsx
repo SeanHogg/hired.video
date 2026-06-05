@@ -20,6 +20,7 @@ import {
   Star,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -54,45 +55,47 @@ import ServicesNav from "@/components/services/ServicesNav";
 
 const STATUS_CONFIG: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { labelKey: string; variant: "default" | "secondary" | "destructive" | "outline" }
 > = {
-  pending:   { label: "Pending",   variant: "secondary" },
-  accepted:  { label: "Accepted",  variant: "default" },
-  rejected:  { label: "Declined",  variant: "destructive" },
-  completed: { label: "Completed", variant: "outline" },
+  pending:   { labelKey: "labels.inquiryStatus.pending",   variant: "secondary" },
+  accepted:  { labelKey: "labels.inquiryStatus.accepted",  variant: "default" },
+  rejected:  { labelKey: "labels.inquiryStatus.declined",  variant: "destructive" },
+  completed: { labelKey: "labels.inquiryStatus.completed", variant: "outline" },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: "secondary" as const };
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  const { t } = useTranslation();
+  const cfg = STATUS_CONFIG[status];
+  return <Badge variant={cfg?.variant ?? "secondary"}>{cfg ? t(cfg.labelKey) : status}</Badge>;
 }
 
 function ServiceStatusBadge({ loading, active }: { loading: boolean; active: boolean }) {
+  const { t } = useTranslation();
   if (loading) return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
   if (!active) return null;
-  return <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>;
+  return <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">{t("status.active")}</Badge>;
 }
 
 function initials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-function formatPrice(cents: number | null) {
-  if (cents === null) return "Contact for pricing";
+function formatPrice(cents: number | null): string | null {
+  if (cents === null) return null;
   return `$${(cents / 100).toFixed(2)}`;
 }
 
 type ActiveTab = "dashboard" | "creator" | "inquiries";
 
-function timeAgo(dateStr: string) {
+function timeAgo(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("labels.minutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return t("labels.hoursAgo", { count: hrs });
+  return t("labels.daysAgo", { count: Math.floor(hrs / 24) });
 }
 
 function MetricCard({
@@ -120,6 +123,7 @@ function MetricCard({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ServicesManagement() {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const effectiveRole = useEffectiveRole();
   const [searchParams] = useSearchParams();
@@ -191,9 +195,9 @@ export default function ServicesManagement() {
     try {
       await affiliateService.getProfile(); // auto-creates profile
       setAffiliateActive(true);
-      toast.success("You're now an affiliate! Share your referral link to start earning.");
+      toast.success(t("messages.services.affiliateJoined"));
     } catch {
-      toast.error("Failed to join affiliate program. Please try again.");
+      toast.error(t("errors.services.affiliateJoinFailed"));
     } finally {
       setAffiliateEnrolling(false);
     }
@@ -234,7 +238,7 @@ export default function ServicesManagement() {
       const data = await servicesService.listMyServices();
       setServices(data);
     } catch {
-      toast.error("Failed to load services");
+      toast.error(t("errors.loadServicesFailed"));
     } finally {
       setLoading(false);
     }
@@ -250,7 +254,7 @@ export default function ServicesManagement() {
       setIncoming(incomingData);
       setMyRequests(requestsData);
     } catch {
-      toast.error("Failed to load inquiries");
+      toast.error(t("errors.loadInquiriesFailed"));
     } finally {
       setInquiriesLoading(false);
     }
@@ -265,9 +269,9 @@ export default function ServicesManagement() {
       setIncoming((prev) =>
         prev.map((item) => item.inquiry.id === id ? { ...item, inquiry: updated } : item),
       );
-      toast.success(`Inquiry ${status}`);
+      toast.success(t("messages.services.inquiryStatusUpdated", { status: t(`labels.inquiryStatus.${status === "rejected" ? "declined" : status}`) }));
     } catch {
-      toast.error("Failed to update inquiry");
+      toast.error(t("errors.updateInquiryFailed"));
     } finally {
       setUpdating(null);
     }
@@ -292,15 +296,14 @@ export default function ServicesManagement() {
                     <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Career Services Marketplace
+                    {t("services.marketplaceLabel")}
                   </span>
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Sell Your Expertise. Hire Top Talent.
+                  {t("services.heroTitle")}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  List resume reviews, interview coaching, career consulting, and more — or
-                  browse trusted professionals offering the help you need to land your next role.
+                  {t("services.heroSubtitle")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -308,13 +311,13 @@ export default function ServicesManagement() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                     >
-                      Get Started Free
+                      {t("actions.getStartedFree")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Link to="/login">
                     <Button size="lg" variant="outline" className="text-lg px-8">
-                      Sign In
+                      {t("actions.signIn")}
                     </Button>
                   </Link>
                 </div>
@@ -325,10 +328,9 @@ export default function ServicesManagement() {
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Tag className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>List Your Services</CardTitle>
+                    <CardTitle>{t("services.listServicesTitle")}</CardTitle>
                     <CardDescription>
-                      Set your own prices and turnaround times. Showcase your offerings on your
-                      profile and start receiving paid inquiries from a global audience.
+                      {t("services.listServicesDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -336,10 +338,9 @@ export default function ServicesManagement() {
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <Inbox className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>Manage Inquiries</CardTitle>
+                    <CardTitle>{t("services.manageInquiriesTitle")}</CardTitle>
                     <CardDescription>
-                      Accept, decline, and complete client requests in one inbox. Get push
-                      notifications when new orders arrive so you never miss a lead.
+                      {t("services.manageInquiriesDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -347,10 +348,9 @@ export default function ServicesManagement() {
                 <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                   <CardHeader>
                     <DollarSign className="h-10 w-10 text-primary mb-4" />
-                    <CardTitle>Get Paid Securely</CardTitle>
+                    <CardTitle>{t("services.getPaidTitle")}</CardTitle>
                     <CardDescription>
-                      Buyers can pay upfront or submit a custom inquiry. Transparent pricing,
-                      built-in messaging, and a creator-friendly revenue split.
+                      {t("services.getPaidDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -359,16 +359,15 @@ export default function ServicesManagement() {
               {/* Who it's for */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Built for Career Professionals
+                  {t("services.audienceTitle")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card className="text-center">
                     <CardHeader>
                       <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
-                      <CardTitle>Coaches & Consultants</CardTitle>
+                      <CardTitle>{t("services.coachesTitle")}</CardTitle>
                       <CardDescription>
-                        Resume writers, career coaches, and interview prep experts can reach
-                        candidates actively searching for their next opportunity.
+                        {t("services.coachesDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -376,10 +375,9 @@ export default function ServicesManagement() {
                   <Card className="text-center">
                     <CardHeader>
                       <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
-                      <CardTitle>Recruiters</CardTitle>
+                      <CardTitle>{t("services.recruitersTitle")}</CardTitle>
                       <CardDescription>
-                        Offer headhunting, lead generation, and placement services to job
-                        seekers and hiring managers in one professional marketplace.
+                        {t("services.recruitersDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -387,10 +385,9 @@ export default function ServicesManagement() {
                   <Card className="text-center">
                     <CardHeader>
                       <TrendingUp className="h-12 w-12 mx-auto text-purple-600 mb-4" />
-                      <CardTitle>Job Seekers</CardTitle>
+                      <CardTitle>{t("services.jobSeekersTitle")}</CardTitle>
                       <CardDescription>
-                        Browse vetted services to sharpen your resume, ace your interviews,
-                        and accelerate your job search with expert help.
+                        {t("services.jobSeekersDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -401,16 +398,16 @@ export default function ServicesManagement() {
               <div className="text-center">
                 <Card className="inline-block border-brand-purple/30 bg-gradient-to-br from-brand-purple/5 to-brand-blue/5">
                   <CardContent className="py-10 px-12">
-                    <h3 className="text-2xl font-bold mb-2">Ready to start?</h3>
+                    <h3 className="text-2xl font-bold mb-2">{t("services.readyToStartTitle")}</h3>
                     <p className="text-muted-foreground mb-6">
-                      Create your free account and list your first service in minutes.
+                      {t("services.readyToStartDesc")}
                     </p>
                     <Link to="/signup">
                       <Button
                         size="lg"
                         className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                       >
-                        Sign Up Free
+                        {t("actions.signUpFree")}
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
                     </Link>
@@ -434,9 +431,9 @@ export default function ServicesManagement() {
               renders its own heading + program panel. */}
           {activeTab !== "creator" && (
             <div className="mb-6">
-              <h1 className="text-2xl font-bold">Services</h1>
+              <h1 className="text-2xl font-bold">{t("headings.services")}</h1>
               <p className="text-muted-foreground mt-1">
-                Dashboard, offerings, and incoming leads
+                {t("services.servicesIntro")}
               </p>
             </div>
           )}
@@ -451,44 +448,44 @@ export default function ServicesManagement() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <MetricCard
                   icon={ShoppingBag}
-                  label="Active Services"
+                  label={t("labels.services.activeServices")}
                   value={services.filter((s) => s.isActive).length}
                 />
                 <MetricCard
                   icon={Inbox}
-                  label="New Leads"
+                  label={t("labels.services.newLeads")}
                   value={pendingCount}
                 />
                 <MetricCard
                   icon={MessageSquare}
-                  label="Total Inquiries"
+                  label={t("labels.services.totalInquiries")}
                   value={incoming.length}
                 />
                 <MetricCard
                   icon={CheckCircle2}
-                  label="Completed"
+                  label={t("labels.completed")}
                   value={incoming.filter((i) => i.inquiry.status === "completed").length}
                 />
                 {creatorActive && creatorProfile && (
                   <>
                     <MetricCard
                       icon={Video}
-                      label="Projects"
+                      label={t("labels.projects")}
                       value={creatorProfile.completedProjectsCount}
                     />
                     <MetricCard
                       icon={DollarSign}
-                      label="Earned"
+                      label={t("labels.earned")}
                       value={`$${(creatorProfile.totalEarnedCents / 100).toFixed(2)}`}
                     />
                     <MetricCard
                       icon={Star}
-                      label={`Rating (${creatorProfile.ratingCount})`}
+                      label={t("labels.ratingWithCount", { count: creatorProfile.ratingCount })}
                       value={creatorProfile.averageRating?.toFixed(1) ?? "—"}
                     />
                     <MetricCard
                       icon={Users}
-                      label="Display Name"
+                      label={t("labels.displayName")}
                       value={creatorProfile.displayName ?? "—"}
                     />
                   </>
@@ -511,10 +508,9 @@ export default function ServicesManagement() {
                     <Card className="border-dashed">
                       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                         <TrendingUp className="h-10 w-10 text-muted-foreground mb-3" />
-                        <h3 className="text-lg font-medium mb-1">No active programs</h3>
+                        <h3 className="text-lg font-medium mb-1">{t("services.noActivePrograms")}</h3>
                         <p className="text-sm text-muted-foreground max-w-sm">
-                          Join a standard service to see metrics here. Start with
-                          the Affiliate or Content Creator program.
+                          {t("services.noActiveProgramsDesc")}
                         </p>
                       </CardContent>
                     </Card>
@@ -533,7 +529,7 @@ export default function ServicesManagement() {
                             <Link2 className="h-4 w-4 text-white" />
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-semibold text-sm">Affiliate</h3>
+                            <h3 className="font-semibold text-sm">{t("services.affiliate")}</h3>
                             <div className="mt-0.5">
                               <ServiceStatusBadge loading={affiliateLoading} active={affiliateActive} />
                             </div>
@@ -546,13 +542,13 @@ export default function ServicesManagement() {
                           className="h-7 px-2 text-xs shrink-0 -mt-1 -mr-1"
                         >
                           <Link to="/affiliate-program">
-                            Affiliate Program
+                            {t("labels.affiliateProgram")}
                             <ArrowRight className="h-3 w-3 ml-1" />
                           </Link>
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Earn 25% commission on every referral's first-month subscription. Unlimited referrals, tiered rewards from Bronze to Platinum.
+                        {t("services.affiliateDesc")}
                       </p>
                       {affiliateActive && <ReferralLinkBox variant="compact" />}
                       {!affiliateLoading && !affiliateActive && (
@@ -567,7 +563,7 @@ export default function ServicesManagement() {
                           ) : (
                             <Link2 className="h-4 w-4 mr-1" />
                           )}
-                          Join Affiliate Program
+                          {t("actions.joinAffiliateProgram")}
                         </Button>
                       )}
                     </CardContent>
@@ -581,14 +577,14 @@ export default function ServicesManagement() {
                           <Video className="h-4 w-4 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-semibold text-sm">Content Creator</h3>
+                          <h3 className="font-semibold text-sm">{t("services.contentCreator")}</h3>
                           <div className="mt-0.5">
                             <ServiceStatusBadge loading={creatorLoading} active={creatorActive} />
                           </div>
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Sell promo videos, portfolio pieces, and creative services. Set your own pricing, track projects, and get reviewed by clients.
+                        {t("services.creatorDesc")}
                       </p>
                       {!creatorLoading && !creatorActive && (
                         <Button
@@ -597,7 +593,7 @@ export default function ServicesManagement() {
                           onClick={() => setWizardOpen(true)}
                         >
                           <Video className="h-4 w-4 mr-1" />
-                          Join Creator Program
+                          {t("actions.joinCreatorProgram")}
                         </Button>
                       )}
                     </CardContent>
@@ -630,7 +626,7 @@ export default function ServicesManagement() {
                   <TabsList className="mb-4">
                     <TabsTrigger value="incoming" className="flex items-center gap-2">
                       <Inbox className="h-4 w-4" />
-                      Incoming
+                      {t("tabs.incoming")}
                       {pendingCount > 0 && (
                         <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-xs">
                           {pendingCount}
@@ -639,7 +635,7 @@ export default function ServicesManagement() {
                     </TabsTrigger>
                     <TabsTrigger value="sent" className="flex items-center gap-2">
                       <Send className="h-4 w-4" />
-                      My Requests
+                      {t("tabs.myRequests")}
                     </TabsTrigger>
                   </TabsList>
 
@@ -649,9 +645,9 @@ export default function ServicesManagement() {
                       <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                           <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-medium mb-1">No incoming inquiries</h3>
+                          <h3 className="text-lg font-medium mb-1">{t("messages.noIncomingInquiries")}</h3>
                           <p className="text-muted-foreground text-sm">
-                            When someone requests one of your services, it will appear here.
+                            {t("messages.incomingInquiriesHint")}
                           </p>
                         </CardContent>
                       </Card>
@@ -669,7 +665,7 @@ export default function ServicesManagement() {
                                     <span className="font-semibold">{buyer.name}</span>
                                     <StatusBadge status={inquiry.status} />
                                     <Badge variant="outline" className="text-xs text-muted-foreground">
-                                      {inquiry.orderType === "purchase" ? "Purchase" : "Inquiry"}
+                                      {inquiry.orderType === "purchase" ? t("labels.orderType.purchase") : t("labels.orderType.inquiry")}
                                     </Badge>
                                   </div>
                                   <p className="text-sm text-muted-foreground mb-1">
@@ -677,7 +673,7 @@ export default function ServicesManagement() {
                                     {" · "}
                                     {inquiry.orderType === "purchase" && (
                                       <span className="text-violet-600 font-medium">
-                                        {formatPrice(inquiry.paidAmountCents)}
+                                        {formatPrice(inquiry.paidAmountCents) ?? t("labels.contactForPricing")}
                                       </span>
                                     )}
                                   </p>
@@ -688,7 +684,7 @@ export default function ServicesManagement() {
                                     </p>
                                   )}
                                   <p className="text-xs text-muted-foreground mt-2">
-                                    {timeAgo(inquiry.createdAt)}
+                                    {timeAgo(inquiry.createdAt, t)}
                                   </p>
                                 </div>
 
@@ -706,7 +702,7 @@ export default function ServicesManagement() {
                                       ) : (
                                         <Check className="h-4 w-4 mr-1" />
                                       )}
-                                      Accept
+                                      {t("actions.accept")}
                                     </Button>
                                     <Button
                                       size="sm"
@@ -716,7 +712,7 @@ export default function ServicesManagement() {
                                       onClick={() => handleUpdateStatus(inquiry.id, "rejected")}
                                     >
                                       <X className="h-4 w-4 mr-1" />
-                                      Decline
+                                      {t("actions.decline")}
                                     </Button>
                                   </div>
                                 )}
@@ -729,7 +725,7 @@ export default function ServicesManagement() {
                                     onClick={() => handleUpdateStatus(inquiry.id, "completed")}
                                   >
                                     <CheckCircle2 className="h-4 w-4 mr-1" />
-                                    Complete
+                                    {t("actions.complete")}
                                   </Button>
                                 )}
                               </div>
@@ -746,12 +742,12 @@ export default function ServicesManagement() {
                       <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                           <Send className="h-12 w-12 text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-medium mb-1">No requests yet</h3>
+                          <h3 className="text-lg font-medium mb-1">{t("messages.noRequestsYet")}</h3>
                           <p className="text-muted-foreground text-sm">
-                            Browse people's profiles to find and request services.
+                            {t("messages.browsePeopleHint")}
                           </p>
                           <Link to="/people" className="mt-4">
-                            <Button variant="outline">Browse People</Button>
+                            <Button variant="outline">{t("actions.browsePeople")}</Button>
                           </Link>
                         </CardContent>
                       </Card>
@@ -774,10 +770,10 @@ export default function ServicesManagement() {
                                     {" · "}
                                     {inquiry.orderType === "purchase" ? (
                                       <span className="text-violet-600 font-medium">
-                                        {formatPrice(inquiry.paidAmountCents)}
+                                        {formatPrice(inquiry.paidAmountCents) ?? t("labels.contactForPricing")}
                                       </span>
                                     ) : (
-                                      <span className="text-muted-foreground">Inquiry</span>
+                                      <span className="text-muted-foreground">{t("labels.orderType.inquiry")}</span>
                                     )}
                                   </p>
                                   {inquiry.message && (
@@ -787,7 +783,7 @@ export default function ServicesManagement() {
                                   )}
                                   <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
-                                    {timeAgo(inquiry.createdAt)}
+                                    {timeAgo(inquiry.createdAt, t)}
                                   </p>
                                 </div>
                               </div>

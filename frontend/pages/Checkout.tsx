@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,7 +55,9 @@ function parseTemplateCartId(id: string): { kind: TemplateKind; templateId: stri
   return { kind: "resume", templateId: rest };
 }
 
-export default function Checkout() {  const { user, isAuthenticated } = useAuth();
+export default function Checkout() {
+  const { t } = useTranslation();
+  const { user, isAuthenticated } = useAuth();
   const { items, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -106,13 +109,13 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
   useEffect(() => {
     const cancelled = searchParams.get("cancelled");
     if (cancelled === "true") {
-      toast.error("Payment setup was cancelled. You can try again or choose a different payment method.");
+      toast.error(t("messages.checkout.paymentCancelled"));
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete("cancelled");
       const newUrl = `${window.location.pathname}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ""}`;
       window.history.replaceState({}, "", newUrl);
     }
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   const fulfillTemplates = () => {
     for (const item of items) {
@@ -137,7 +140,7 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
       if (getTotalPrice() === 0) {
         fulfillTemplates();
         clearCart();
-        toast.success("Templates unlocked — they're yours to use.");
+        toast.success(t("messages.checkout.templatesUnlocked"));
         navigate("/resumes");
         return;
       }
@@ -154,7 +157,7 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
         }
         setAddressErrors(fieldErrors);
         setIsProcessing(false);
-        toast.error("Please complete the billing address.");
+        toast.error(t("messages.checkout.completeBillingAddress"));
         return;
       }
       setAddressErrors({});
@@ -195,17 +198,17 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
           }
           fulfillTemplates();
           clearCart();
-          toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
+          toast.success(t("messages.checkout.paymentSuccess", { welcome: TIER_COPY.welcomeAfterCheckout() }));
           navigate("/dashboard");
         },
         onError: (msg) => {
-          toast.error(msg || "Payment failed. Please try again.");
+          toast.error(msg || t("messages.checkout.paymentFailed"));
           setIsProcessing(false);
         },
       });
     } catch (error) {
       console.error("Payment processing error:", error);
-      toast.error("Payment failed. Please try again.");
+      toast.error(t("messages.checkout.paymentFailed"));
       setIsProcessing(false);
     }
   };
@@ -227,11 +230,11 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                 className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Pricing
+                {t("actions.checkout.backToPricing")}
               </Link>
-              <h1 className="text-3xl font-bold">Checkout</h1>
+              <h1 className="text-3xl font-bold">{t("headings.checkout.title")}</h1>
               <p className="text-muted-foreground">
-                Complete your {TIER_NAME.pro} upgrade
+                {t("messages.checkout.completeUpgrade", { tier: TIER_NAME.pro })}
               </p>
             </div>
 
@@ -242,7 +245,7 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Shield className="h-5 w-5" />
-                      Order Summary
+                      {t("headings.checkout.orderSummary")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -253,24 +256,24 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                             <h4 className="font-medium">{item.name}</h4>
                             {item.type === "template" ? (
                               <div className="text-sm text-muted-foreground">
-                                One-time purchase · Resume template
+                                {t("messages.checkout.oneTimeResumeTemplate")}
                               </div>
                             ) : item.type === "service" || item.type === "voice_clone" ? (
-                              <div className="text-sm text-muted-foreground">One-time purchase</div>
+                              <div className="text-sm text-muted-foreground">{t("messages.checkout.oneTimePurchase")}</div>
                             ) : (
                               <>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                   <Users className="h-4 w-4" />
-                                  {item.users} user{item.users > 1 ? "s" : ""}
+                                  {t("messages.checkout.userCount", { count: item.users })}
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                   <Calendar className="h-4 w-4" />
                                   {item.billingCycle === "annual"
-                                    ? "Annual billing"
-                                    : "Monthly billing"}
+                                    ? t("labels.checkout.annualBilling")
+                                    : t("labels.checkout.monthlyBilling")}
                                   {item.billingCycle === "annual" && (
                                     <Badge variant="secondary" className="text-xs">
-                                      Save 20%
+                                      {t("marketing.pricing.billing.save20")}
                                     </Badge>
                                   )}
                                 </div>
@@ -279,13 +282,15 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                           </div>
                           <div className="text-right">
                             <div className="font-medium">
-                              {item.price > 0 ? `$${item.price.toFixed(2)}` : "Free"}
+                              {item.price > 0 ? `$${item.price.toFixed(2)}` : t("labels.free")}
                               {item.type === "plan" &&
-                                (item.billingCycle === "annual" ? "/year" : "/month")}
+                                (item.billingCycle === "annual"
+                                  ? t("labels.checkout.perYear")
+                                  : t("labels.checkout.perMonth"))}
                             </div>
                             {item.quantity > 1 && item.type === "plan" && (
                               <div className="text-sm text-muted-foreground">
-                                Qty: {item.quantity}
+                                {t("labels.checkout.qty", { count: item.quantity })}
                               </div>
                             )}
                           </div>
@@ -297,16 +302,16 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
 
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span>Subtotal:</span>
+                        <span>{t("labels.checkout.subtotal")}</span>
                         <span>${totalPrice.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Tax (8%):</span>
+                        <span>{t("labels.checkout.taxLabel")}</span>
                         <span>${tax.toFixed(2)}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between text-lg font-semibold">
-                        <span>Total:</span>
+                        <span>{t("labels.checkout.totalLabel")}</span>
                         <span>${finalTotal.toFixed(2)}</span>
                       </div>
                     </div>
@@ -315,22 +320,21 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                       <div className="flex items-center gap-2 text-green-700 text-sm">
                         <CheckCircle2 className="h-4 w-4" />
                         <span className="font-medium">
-                          30-day money-back guarantee*
+                          {t("labels.checkout.moneyBackGuarantee")}
                         </span>
                       </div>
                       <p className="text-green-600 text-xs mt-1">
-                        Not satisfied? Get a full refund within 30 days.
+                        {t("messages.checkout.refundWithin30")}
                       </p>
                       <p className="text-green-600 text-xs mt-1">
-                        *Consumption-based usage beyond your free allotment is
-                        non-refundable. See{" "}
+                        {t("messages.checkout.consumptionNonRefundable")}{" "}
                         <Link
                           to="/terms-of-service"
                           className="underline hover:text-green-800"
                         >
-                          Terms of Service
+                          {t("labels.tos")}
                         </Link>{" "}
-                        for details.
+                        {t("messages.checkout.forDetails")}
                       </p>
                     </div>
                   </CardContent>
@@ -345,10 +349,10 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <CheckCircle2 className="h-5 w-5 text-green-600" />
-                          No payment required
+                          {t("headings.checkout.noPaymentRequired")}
                         </CardTitle>
                         <CardDescription>
-                          Your order total is $0.00. Click below to claim your templates — they'll be ready to apply immediately.
+                          {t("messages.checkout.zeroTotalDesc")}
                         </CardDescription>
                       </CardHeader>
                     </Card>
@@ -358,9 +362,9 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                     <>
                       <Card>
                         <CardHeader>
-                          <CardTitle>Billing Address</CardTitle>
+                          <CardTitle>{t("headings.checkout.billingAddress")}</CardTitle>
                           <CardDescription>
-                            We'll save this to your profile so you don't have to re-enter it next time. You can edit it anytime in Settings → Billing.
+                            {t("messages.checkout.billingAddressDesc")}
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -375,9 +379,9 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
 
                       <Card>
                         <CardHeader>
-                          <CardTitle>Payment Method</CardTitle>
+                          <CardTitle>{t("headings.checkout.paymentMethod")}</CardTitle>
                           <CardDescription>
-                            Choose how you'd like to pay. All payment information is encrypted and processed by our PCI-compliant payment provider — it never touches our servers.
+                            {t("messages.checkout.paymentMethodDesc")}
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -389,14 +393,14 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                               <RadioGroupItem value="card" id="pm-card" />
                               <Label htmlFor="pm-card" className="flex items-center gap-2">
                                 <CreditCard className="h-4 w-4" />
-                                Credit / Debit Card
+                                {t("labels.checkout.creditDebitCard")}
                               </Label>
                             </div>
                             <div className="flex items-center space-x-2">
                               <RadioGroupItem value="us_bank_account" id="pm-bank" />
                               <Label htmlFor="pm-bank" className="flex items-center gap-2">
                                 <Building2 className="h-4 w-4" />
-                                Bank Account (ACH)
+                                {t("labels.checkout.bankAccountAch")}
                               </Label>
                             </div>
                           </RadioGroup>
@@ -405,14 +409,14 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                             <div className="bg-gradient-to-r from-brand-purple/5 to-brand-blue/5 border border-brand-purple/20 rounded-lg p-4">
                               <div className="flex items-center gap-2 text-foreground font-medium mb-2">
                                 <Shield className="h-4 w-4 text-brand-purple" />
-                                Secure Card Payment
+                                {t("headings.checkout.secureCardPayment")}
                               </div>
                               <p className="text-sm text-muted-foreground mb-3">
-                                When you click "Complete Purchase", a secure payment window will open where you can enter your card details.
+                                {t("messages.checkout.cardWindowNote")}
                               </p>
                               <div className="text-xs text-muted-foreground space-y-1">
-                                <p>✓ PCI DSS Level 1 compliant</p>
-                                <p>✓ 256-bit SSL encryption</p>
+                                <p>{t("messages.checkout.pciCompliant")}</p>
+                                <p>{t("messages.checkout.sslEncryption")}</p>
                               </div>
                             </div>
                           )}
@@ -421,21 +425,21 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                               <div className="flex items-center gap-2 text-blue-800 font-medium mb-2">
                                 <Building2 className="h-4 w-4" />
-                                Bank Account (ACH)
+                                {t("labels.checkout.bankAccountAch")}
                               </div>
                               <p className="text-sm text-blue-700 mb-3">
-                                Lower fees than credit cards. Click "Complete Purchase" to securely connect your bank account; payments typically clear in 1–3 business days.
+                                {t("messages.checkout.achNote")}
                               </p>
                               <div className="text-xs text-blue-600 space-y-1">
-                                <p>✓ Lower processing fees</p>
-                                <p>✓ Bank-level security and encryption</p>
+                                <p>{t("messages.checkout.achLowerFees")}</p>
+                                <p>{t("messages.checkout.achBankSecurity")}</p>
                               </div>
                             </div>
                           )}
 
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Lock className="h-4 w-4" />
-                            <span>Your payment information is secure and encrypted</span>
+                            <span>{t("messages.checkout.paymentSecure")}</span>
                           </div>
                         </CardContent>
                       </Card>
@@ -451,26 +455,26 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
                     {isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Processing Payment...
+                        {t("status.checkout.processingPayment")}
                       </>
                     ) : (
                       <>
                         <DollarSign className="mr-2 h-4 w-4" />
                         {finalTotal === 0
-                          ? "Complete Free Order"
-                          : `Complete Purchase - $${finalTotal.toFixed(2)}`}
+                          ? t("actions.checkout.completeFreeOrder")
+                          : t("actions.checkout.completePurchaseAmount", { amount: finalTotal.toFixed(2) })}
                       </>
                     )}
                   </Button>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    By completing this purchase, you agree to our{" "}
+                    {t("messages.checkout.agreePrefix")}{" "}
                     <Link to="/terms" className="underline">
-                      Terms of Service
+                      {t("labels.tos")}
                     </Link>{" "}
-                    and{" "}
+                    {t("messages.checkout.agreeAnd")}{" "}
                     <Link to="/privacy" className="underline">
-                      Privacy Policy
+                      {t("labels.privacyPolicy")}
                     </Link>
                   </p>
                 </form>

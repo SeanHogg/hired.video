@@ -301,7 +301,7 @@ export default function People() {
       handleTotalItemsChange(result.total);
     } catch (err) {
       console.error("Failed to fetch people:", err);
-      setError("Failed to load people. Please try again.");
+      setError(t("messages.failedLoadPeople"));
     } finally {
       setIsLoading(false);
     }
@@ -840,7 +840,7 @@ export default function People() {
                     <Button asChild variant="outline" className="min-h-[44px]">
                       <Link to="/profile">
                         <UserCheck className="h-4 w-4 mr-2" />
-                        My Profile
+                        {t("actions.myProfile")}
                       </Link>
                     </Button>
                     {(activeTab === "browse" || activeTab === "connections") && (
@@ -885,9 +885,9 @@ export default function People() {
                   ) : (
                     <div className="text-center py-12">
                       <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No connections yet</h3>
+                      <h3 className="text-xl font-semibold mb-2">{t("headings.people.noConnectionsYet")}</h3>
                       <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        Follow people from the People tab to build your network. They'll show up here for quick access.
+                        {t("messages.people.noConnectionsDesc")}
                       </p>
                     </div>
                   )}
@@ -928,12 +928,12 @@ export default function People() {
                       <Card>
                         <CardContent className="py-12 text-center">
                           <Briefcase className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                          <h2 className="text-2xl font-bold mb-2">No candidates in talent pool yet</h2>
+                          <h2 className="text-2xl font-bold mb-2">{t("messages.noCandidatesInPool")}</h2>
                           <p className="text-muted-foreground mb-6">
-                            Start adding candidates from the Browse tab to build your talent pool
+                            {t("messages.startAddingFromBrowse")}
                           </p>
                           <Button onClick={() => handleTabChange("browse")}>
-                            Browse Candidates
+                            {t("actions.browseCandidates")}
                           </Button>
                         </CardContent>
                       </Card>
@@ -985,16 +985,16 @@ export default function People() {
                                     variant="default"
                                     size="sm"
                                     onClick={() => handleSubmitToJob(candidate)}
-                                    title="Submit to Job"
+                                    title={t("actions.submitToJob")}
                                   >
                                     <FileText className="h-4 w-4 mr-2" />
-                                    Submit to Job
+                                    {t("actions.submitToJob")}
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleAddInteraction(candidate)}
-                                    title="Log Interaction"
+                                    title={t("actions.logInteraction")}
                                   >
                                     <Phone className="h-5 w-5" />
                                   </Button>
@@ -1002,7 +1002,7 @@ export default function People() {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => handleEditCandidate(candidate)}
-                                    title="Edit"
+                                    title={t("actions.edit")}
                                   >
                                     <Edit className="h-5 w-5" />
                                   </Button>
@@ -1014,7 +1014,7 @@ export default function People() {
                                       setDeleteDialogOpen(true);
                                     }}
                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    title="Remove"
+                                    title={t("actions.remove")}
                                   >
                                     <Trash2 className="h-5 w-5" />
                                   </Button>
@@ -1032,22 +1032,22 @@ export default function People() {
                                 )}
                                 {candidate.notes && (
                                   <div className="p-3 bg-muted rounded-md">
-                                    <p className="text-sm font-medium mb-1">Notes:</p>
+                                    <p className="text-sm font-medium mb-1">{t("labels.notesColon")}</p>
                                     <p className="text-sm text-muted-foreground">{candidate.notes}</p>
                                   </div>
                                 )}
                                 <div className="flex items-center justify-between pt-3 border-t text-xs text-muted-foreground">
                                   <div className="flex items-center gap-4">
                                     {candidate.lastContactedAt && (
-                                      <span>Last contact: {formatDate(candidate.lastContactedAt)}</span>
+                                      <span>{t("labels.lastContactPrefix", { date: formatDate(candidate.lastContactedAt) })}</span>
                                     )}
                                     {candidate.nextFollowUpAt && (
                                       <span className="text-orange-600 font-medium">
-                                        Follow-up: {formatDate(candidate.nextFollowUpAt)}
+                                        {t("labels.followUpPrefix", { date: formatDate(candidate.nextFollowUpAt) })}
                                       </span>
                                     )}
                                   </div>
-                                  <span>Added {formatDate(candidate.createdAt)}</span>
+                                  <span>{t("labels.addedDate", { date: formatDate(candidate.createdAt) })}</span>
                                 </div>
                               </div>
                             </CardContent>
@@ -1077,12 +1077,12 @@ export default function People() {
                       <Card>
                         <CardContent className="py-12 text-center">
                           <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                          <h2 className="text-2xl font-bold mb-2">No submissions yet</h2>
+                          <h2 className="text-2xl font-bold mb-2">{t("messages.noSubmissionsYet")}</h2>
                           <p className="text-muted-foreground mb-6">
-                            Submit candidates from your talent pool to jobs to start tracking
+                            {t("messages.submitFromTalentPool")}
                           </p>
                           <Button onClick={() => handleTabChange("talent-pool")}>
-                            Go to Talent Pool
+                            {t("actions.goToTalentPool")}
                           </Button>
                         </CardContent>
                       </Card>
@@ -1097,7 +1097,7 @@ export default function People() {
                                     {submission.candidateName} → {submission.jobTitle}
                                   </CardTitle>
                                   <CardDescription>
-                                    {submission.companyName} • Submitted {formatDate(submission.submittedAt)}
+                                    {submission.companyName} • {t("messages.people.submittedDate", { date: formatDate(submission.submittedAt) })}
                                   </CardDescription>
                                 </div>
                                 <Badge
@@ -1119,7 +1119,7 @@ export default function People() {
                               <div className="space-y-2 text-sm">
                                 {submission.proposedSalary && (
                                   <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">Proposed Salary:</span>
+                                    <span className="text-muted-foreground">{t("labels.proposedSalaryColon")}</span>
                                     <span className="font-medium">
                                       ${submission.proposedSalary.toLocaleString()}
                                     </span>
@@ -1128,20 +1128,20 @@ export default function People() {
                                 {submission.availableStartDate && (
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">Available:</span>
+                                    <span className="text-muted-foreground">{t("labels.availableColon")}</span>
                                     <span>{formatDate(submission.availableStartDate)}</span>
                                   </div>
                                 )}
                                 {submission.interviewDate && (
                                   <div className="flex items-center gap-2">
                                     <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">Interview:</span>
+                                    <span className="text-muted-foreground">{t("labels.interviewColon")}</span>
                                     <span>{formatDate(submission.interviewDate)}</span>
                                   </div>
                                 )}
                                 {submission.statusNotes && (
                                   <div className="mt-2 p-2 bg-muted rounded-md">
-                                    <p className="text-xs text-muted-foreground">Notes:</p>
+                                    <p className="text-xs text-muted-foreground">{t("labels.notesColon")}</p>
                                     <p className="text-sm">{submission.statusNotes}</p>
                                   </div>
                                 )}
@@ -1164,16 +1164,16 @@ export default function People() {
               <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
                 <SheetContent side="right" className="sm:max-w-[600px] overflow-y-auto">
                   <SheetHeader>
-                    <SheetTitle>Edit Candidate Details</SheetTitle>
+                    <SheetTitle>{t("actions.editCandidateDetails")}</SheetTitle>
                     <SheetDescription>
-                      Update candidate information and relationship details
+                      {t("messages.editCandidateDescription")}
                     </SheetDescription>
                   </SheetHeader>
 
                   <div className="space-y-4 py-4">
                     {/* Relationship Strength */}
                     <div className="space-y-2">
-                      <Label htmlFor="relationshipStrength">Relationship Strength</Label>
+                      <Label htmlFor="relationshipStrength">{t("labels.relationshipStrength")}</Label>
                       <Select
                         value={editForm.relationshipStrength}
                         onValueChange={(value) =>
@@ -1181,20 +1181,20 @@ export default function People() {
                         }
                       >
                         <SelectTrigger id="relationshipStrength">
-                          <SelectValue placeholder="Select strength" />
+                          <SelectValue placeholder={t("fields.relationshipStrength.placeholder")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="New">New</SelectItem>
-                          <SelectItem value="Warm">Warm</SelectItem>
-                          <SelectItem value="Hot">Hot</SelectItem>
-                          <SelectItem value="Cold">Cold</SelectItem>
+                          <SelectItem value="New">{t("labels.statusNew")}</SelectItem>
+                          <SelectItem value="Warm">{t("labels.people.strengthWarm")}</SelectItem>
+                          <SelectItem value="Hot">{t("labels.hot")}</SelectItem>
+                          <SelectItem value="Cold">{t("labels.people.strengthCold")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     {/* Status */}
                     <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
+                      <Label htmlFor="status">{t("labels.status")}</Label>
                       <Select
                         value={editForm.status}
                         onValueChange={(value) =>
@@ -1202,33 +1202,33 @@ export default function People() {
                         }
                       >
                         <SelectTrigger id="status">
-                          <SelectValue placeholder="Select status" />
+                          <SelectValue placeholder={t("fields.statusSelect.placeholder")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Passive">Passive</SelectItem>
-                          <SelectItem value="Placed">Placed</SelectItem>
-                          <SelectItem value="Inactive">Inactive</SelectItem>
+                          <SelectItem value="Active">{t("status.active")}</SelectItem>
+                          <SelectItem value="Passive">{t("labels.people.statusPassive")}</SelectItem>
+                          <SelectItem value="Placed">{t("labels.people.statusPlaced")}</SelectItem>
+                          <SelectItem value="Inactive">{t("status.inactive")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     {/* Pool Name */}
                     <div className="space-y-2">
-                      <Label htmlFor="poolName">Pool Name</Label>
+                      <Label htmlFor="poolName">{t("labels.poolName")}</Label>
                       <Input
                         id="poolName"
                         value={editForm.poolName}
                         onChange={(e) =>
                           setEditForm({ ...editForm, poolName: e.target.value })
                         }
-                        placeholder="e.g., Senior Developers, Sales Team"
+                        placeholder={t("fields.poolName.placeholder")}
                       />
                     </div>
 
                     {/* Tags */}
                     <div className="space-y-2">
-                      <Label>Tags</Label>
+                      <Label>{t("labels.tagsLabel")}</Label>
                       <div className="flex gap-2">
                         <Input
                           value={tagInput}
@@ -1239,7 +1239,7 @@ export default function People() {
                               handleAddTag();
                             }
                           }}
-                          placeholder="Add tag and press Enter"
+                          placeholder={t("fields.tagInput.placeholder")}
                         />
                         <Button type="button" onClick={handleAddTag} size="icon">
                           <Plus className="h-4 w-4" />
@@ -1260,33 +1260,33 @@ export default function People() {
 
                     {/* Current Company */}
                     <div className="space-y-2">
-                      <Label htmlFor="currentCompany">Current Company</Label>
+                      <Label htmlFor="currentCompany">{t("labels.currentCompany")}</Label>
                       <Input
                         id="currentCompany"
                         value={editForm.currentCompany}
                         onChange={(e) =>
                           setEditForm({ ...editForm, currentCompany: e.target.value })
                         }
-                        placeholder="Company name"
+                        placeholder={t("fields.companyNameField.placeholder")}
                       />
                     </div>
 
                     {/* Current Title */}
                     <div className="space-y-2">
-                      <Label htmlFor="currentTitle">Current Title</Label>
+                      <Label htmlFor="currentTitle">{t("labels.currentTitle")}</Label>
                       <Input
                         id="currentTitle"
                         value={editForm.currentTitle}
                         onChange={(e) =>
                           setEditForm({ ...editForm, currentTitle: e.target.value })
                         }
-                        placeholder="Job title"
+                        placeholder={t("hiring.dialog.offer.jobTitle")}
                       />
                     </div>
 
                     {/* Desired Salary */}
                     <div className="space-y-2">
-                      <Label htmlFor="desiredSalary">Desired Salary</Label>
+                      <Label htmlFor="desiredSalary">{t("labels.desiredSalary")}</Label>
                       <Input
                         id="desiredSalary"
                         type="number"
@@ -1297,26 +1297,26 @@ export default function People() {
                             desiredSalary: e.target.value ? Number(e.target.value) : undefined,
                           })
                         }
-                        placeholder="Annual salary"
+                        placeholder={t("fields.salaryAnnual.placeholder")}
                       />
                     </div>
 
                     {/* Preferred Locations */}
                     <div className="space-y-2">
-                      <Label htmlFor="preferredLocations">Preferred Locations</Label>
+                      <Label htmlFor="preferredLocations">{t("fields.preferredLocations.label")}</Label>
                       <Input
                         id="preferredLocations"
                         value={editForm.preferredLocations}
                         onChange={(e) =>
                           setEditForm({ ...editForm, preferredLocations: e.target.value })
                         }
-                        placeholder="e.g., New York, Remote"
+                        placeholder={t("fields.locationsList.placeholder")}
                       />
                     </div>
 
                     {/* Contact Frequency */}
                     <div className="space-y-2">
-                      <Label htmlFor="contactFrequency">Contact Frequency</Label>
+                      <Label htmlFor="contactFrequency">{t("labels.contactFrequency")}</Label>
                       <Select
                         value={editForm.contactFrequency}
                         onValueChange={(value) =>
@@ -1324,20 +1324,20 @@ export default function People() {
                         }
                       >
                         <SelectTrigger id="contactFrequency">
-                          <SelectValue placeholder="Select frequency" />
+                          <SelectValue placeholder={t("fields.frequency.placeholder")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Weekly">Weekly</SelectItem>
-                          <SelectItem value="Biweekly">Biweekly</SelectItem>
-                          <SelectItem value="Monthly">Monthly</SelectItem>
-                          <SelectItem value="Quarterly">Quarterly</SelectItem>
+                          <SelectItem value="Weekly">{t("labels.frequency.weekly")}</SelectItem>
+                          <SelectItem value="Biweekly">{t("labels.frequency.biweekly")}</SelectItem>
+                          <SelectItem value="Monthly">{t("labels.frequency.monthly")}</SelectItem>
+                          <SelectItem value="Quarterly">{t("labels.frequency.quarterly")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     {/* Next Follow-up */}
                     <div className="space-y-2">
-                      <Label htmlFor="nextFollowUpAt">Next Follow-up Date</Label>
+                      <Label htmlFor="nextFollowUpAt">{t("labels.nextFollowUpDate")}</Label>
                       <Input
                         id="nextFollowUpAt"
                         type="date"
@@ -1350,14 +1350,14 @@ export default function People() {
 
                     {/* Notes */}
                     <div className="space-y-2">
-                      <Label htmlFor="notes">Notes</Label>
+                      <Label htmlFor="notes">{t("fields.notes.label")}</Label>
                       <Textarea
                         id="notes"
                         value={editForm.notes}
                         onChange={(e) =>
                           setEditForm({ ...editForm, notes: e.target.value })
                         }
-                        placeholder="Add notes about this candidate..."
+                        placeholder={t("fields.candidateNotes.placeholder")}
                         rows={4}
                       />
                     </div>
@@ -1365,9 +1365,9 @@ export default function People() {
 
                   <SheetFooter>
                     <Button variant="outline" onClick={() => setEditSheetOpen(false)}>
-                      Cancel
+                      {t("actions.cancel")}
                     </Button>
-                    <Button onClick={handleSaveEdit}>Save Changes</Button>
+                    <Button onClick={handleSaveEdit}>{t("actions.saveChanges")}</Button>
                   </SheetFooter>
                 </SheetContent>
               </Sheet>
@@ -1376,16 +1376,16 @@ export default function People() {
               <Sheet open={interactionSheetOpen} onOpenChange={setInteractionSheetOpen}>
                 <SheetContent side="right" className="sm:max-w-[500px] overflow-y-auto">
                   <SheetHeader>
-                    <SheetTitle>Log Interaction</SheetTitle>
+                    <SheetTitle>{t("actions.logInteraction")}</SheetTitle>
                     <SheetDescription>
-                      Record a call, email, meeting, or note with this candidate
+                      {t("messages.logInteractionDescription")}
                     </SheetDescription>
                   </SheetHeader>
 
                   <div className="space-y-4 py-4">
                     {/* Interaction Type */}
                     <div className="space-y-2">
-                      <Label htmlFor="interactionType">Interaction Type</Label>
+                      <Label htmlFor="interactionType">{t("labels.interactionType")}</Label>
                       <Select
                         value={interactionForm.interactionType}
                         onValueChange={(value) =>
@@ -1399,31 +1399,31 @@ export default function People() {
                           <SelectItem value="Call">
                             <div className="flex items-center gap-2">
                               <Phone className="h-4 w-4" />
-                              Call
+                              {t("labels.people.interactionCall")}
                             </div>
                           </SelectItem>
                           <SelectItem value="Email">
                             <div className="flex items-center gap-2">
                               <Mail className="h-4 w-4" />
-                              Email
+                              {t("fields.email.label")}
                             </div>
                           </SelectItem>
                           <SelectItem value="Meeting">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
-                              Meeting
+                              {t("labels.people.interactionMeeting")}
                             </div>
                           </SelectItem>
                           <SelectItem value="LinkedIn">
                             <div className="flex items-center gap-2">
                               <Network className="h-4 w-4" />
-                              LinkedIn
+                              {t("fields.linkedIn.label")}
                             </div>
                           </SelectItem>
                           <SelectItem value="Note">
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              Note
+                              {t("labels.people.interactionNote")}
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -1432,47 +1432,47 @@ export default function People() {
 
                     {/* Subject */}
                     <div className="space-y-2">
-                      <Label htmlFor="subject">Subject</Label>
+                      <Label htmlFor="subject">{t("fields.subject.label")}</Label>
                       <Input
                         id="subject"
                         value={interactionForm.subject}
                         onChange={(e) =>
                           setInteractionForm({ ...interactionForm, subject: e.target.value })
                         }
-                        placeholder="Brief subject or title"
+                        placeholder={t("fields.subjectField.placeholder")}
                       />
                     </div>
 
                     {/* Notes */}
                     <div className="space-y-2">
-                      <Label htmlFor="interactionNotes">Notes</Label>
+                      <Label htmlFor="interactionNotes">{t("fields.notes.label")}</Label>
                       <Textarea
                         id="interactionNotes"
                         value={interactionForm.notes}
                         onChange={(e) =>
                           setInteractionForm({ ...interactionForm, notes: e.target.value })
                         }
-                        placeholder="Details about the interaction..."
+                        placeholder={t("fields.interactionNotes.placeholder")}
                         rows={4}
                       />
                     </div>
 
                     {/* Outcome */}
                     <div className="space-y-2">
-                      <Label htmlFor="outcome">Outcome</Label>
+                      <Label htmlFor="outcome">{t("labels.outcome")}</Label>
                       <Input
                         id="outcome"
                         value={interactionForm.outcome}
                         onChange={(e) =>
                           setInteractionForm({ ...interactionForm, outcome: e.target.value })
                         }
-                        placeholder="e.g., Interested, Not interested, Follow-up needed"
+                        placeholder={t("fields.outcome.placeholder")}
                       />
                     </div>
 
                     {/* Duration */}
                     <div className="space-y-2">
-                      <Label htmlFor="duration">Duration (minutes)</Label>
+                      <Label htmlFor="duration">{t("labels.durationMinutes")}</Label>
                       <Input
                         id="duration"
                         type="number"
@@ -1483,7 +1483,7 @@ export default function People() {
                             durationMinutes: e.target.value ? Number(e.target.value) : undefined,
                           })
                         }
-                        placeholder="Optional"
+                        placeholder={t("fields.people.durationPlaceholder")}
                       />
                     </div>
 
@@ -1502,14 +1502,14 @@ export default function People() {
                         className="h-4 w-4"
                       />
                       <Label htmlFor="requiresFollowUp" className="cursor-pointer">
-                        Requires follow-up
+                        {t("labels.requiresFollowUp")}
                       </Label>
                     </div>
 
                     {/* Follow-up Date */}
                     {interactionForm.requiresFollowUp && (
                       <div className="space-y-2">
-                        <Label htmlFor="followUpDate">Follow-up Date</Label>
+                        <Label htmlFor="followUpDate">{t("labels.followUpDate")}</Label>
                         <Input
                           id="followUpDate"
                           type="date"
@@ -1527,9 +1527,9 @@ export default function People() {
 
                   <SheetFooter>
                     <Button variant="outline" onClick={() => setInteractionSheetOpen(false)}>
-                      Cancel
+                      {t("actions.cancel")}
                     </Button>
-                    <Button onClick={handleSaveInteraction}>Log Interaction</Button>
+                    <Button onClick={handleSaveInteraction}>{t("actions.logInteraction")}</Button>
                   </SheetFooter>
                 </SheetContent>
               </Sheet>
@@ -1538,19 +1538,18 @@ export default function People() {
               <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Remove from Talent Pool?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("actions.removeFromTalentPoolPrompt")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will remove the candidate from your talent pool. All interaction
-                      history will be deleted. This action cannot be undone.
+                      {t("messages.removeFromTalentPoolWarning")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDeleteCandidate}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      Remove
+                      {t("actions.remove")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1560,60 +1559,60 @@ export default function People() {
               <AlertDialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
                 <AlertDialogContent className="max-w-2xl">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Submit Candidate to Job</AlertDialogTitle>
+                    <AlertDialogTitle>{t("actions.submitCandidateToJob")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Submit {candidateToSubmit?.candidateName} to a job opening
+                      {t("messages.submitToJobDescription", { name: candidateToSubmit?.candidateName })}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <div className="space-y-4 py-4">
                     <div>
-                      <Label htmlFor="job-select">Job *</Label>
+                      <Label htmlFor="job-select">{t("fields.jobSelectModal.label")}</Label>
                       <Select value={submitForm.jobId} onValueChange={(value) => setSubmitForm({...submitForm, jobId: value})}>
                         <SelectTrigger id="job-select">
-                          <SelectValue placeholder="Select a job" />
+                          <SelectValue placeholder={t("fields.jobSelectModal.placeholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           {availableJobs.map((job) => (
                             <SelectItem key={job.id} value={job.id}>
-                              {job.title} - {job.company?.name || 'Unknown Company'}
+                              {job.title} - {job.company?.name || t("labels.unknownCompany")}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="cover-letter">Cover Letter</Label>
+                      <Label htmlFor="cover-letter">{t("labels.coverLetter")}</Label>
                       <Textarea
                         id="cover-letter"
                         value={submitForm.coverLetter}
                         onChange={(e) => setSubmitForm({...submitForm, coverLetter: e.target.value})}
-                        placeholder="Optional cover letter..."
+                        placeholder={t("fields.coverLetter.placeholder")}
                         rows={4}
                       />
                     </div>
                     <div>
-                      <Label htmlFor="recruiter-notes">Recruiter Notes (Internal)</Label>
+                      <Label htmlFor="recruiter-notes">{t("labels.recruiterNotesInternal")}</Label>
                       <Textarea
                         id="recruiter-notes"
                         value={submitForm.recruiterNotes}
                         onChange={(e) => setSubmitForm({...submitForm, recruiterNotes: e.target.value})}
-                        placeholder="Internal notes about this candidate..."
+                        placeholder={t("fields.recruiterNotes.placeholder")}
                         rows={3}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="proposed-salary">Proposed Salary</Label>
+                        <Label htmlFor="proposed-salary">{t("labels.proposedSalary")}</Label>
                         <Input
                           id="proposed-salary"
                           type="number"
                           value={submitForm.proposedSalary}
                           onChange={(e) => setSubmitForm({...submitForm, proposedSalary: e.target.value})}
-                          placeholder="e.g., 75000"
+                          placeholder={t("fields.proposedSalary.placeholder")}
                         />
                       </div>
                       <div>
-                        <Label htmlFor="start-date">Available Start Date</Label>
+                        <Label htmlFor="start-date">{t("labels.availableStartDate")}</Label>
                         <Input
                           id="start-date"
                           type="date"
@@ -1624,9 +1623,9 @@ export default function People() {
                     </div>
                   </div>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={submitting}>{t("actions.cancel")}</AlertDialogCancel>
                     <Button onClick={handleSubmitCandidate} disabled={submitting || !submitForm.jobId}>
-                      {submitting ? "Submitting..." : "Submit Candidate"}
+                      {submitting ? t("status.submitting") : t("actions.submitCandidate")}
                     </Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1650,16 +1649,14 @@ export default function People() {
                   <Network className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Professional Network
+                  {t("labels.professionalNetwork")}
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Connect. Collaborate. Grow Together.
+                {t("messages.connectCollaborateGrow")}
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Build meaningful professional relationships with job seekers,
-                recruiters, and industry leaders. Expand your network and unlock
-                new opportunities through authentic connections.
+                {t("messages.networkingValueProp")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -1667,13 +1664,13 @@ export default function People() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Join the Network
+                    {t("actions.joinNetwork")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Button size="lg" variant="outline" className="text-lg px-8">
                   <Play className="mr-2 h-5 w-5" />
-                  Explore Profiles
+                  {t("actions.exploreProfiles")}
                 </Button>
               </div>
             </div>
@@ -1685,23 +1682,23 @@ export default function People() {
                   250K+
                 </div>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Active professionals
+                  {t("messages.activeProfessionals")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">15K+</div>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Daily connections made
+                  {t("messages.dailyConnectionsMade")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">89%</div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Response rate</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{t("messages.responseRate")}</p>
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">50+</div>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Countries represented
+                  {t("messages.countriesRepresented")}
                 </p>
               </div>
             </div>
@@ -1709,7 +1706,7 @@ export default function People() {
             {/* Featured Professionals using PeopleCard */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Meet Our Community
+                {t("headings.meetOurCommunity")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {people.slice(0, 3).map((person) => {
@@ -1749,7 +1746,7 @@ export default function People() {
               <div className="text-center mt-8">
                 <Link to="/signup">
                   <Button variant="outline" size="lg">
-                    View All Professionals
+                    {t("actions.viewAllProfessionals")}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -1762,18 +1759,17 @@ export default function People() {
             {/* Final CTA */}
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
               <h3 className="text-2xl font-bold mb-4">
-                Ready to Expand Your Professional Network?
+                {t("headings.expandNetworkPrompt")}
               </h3>
               <p className="text-muted-foreground mb-6">
-                Join thousands of professionals who are building meaningful
-                connections and advancing their careers.
+                {t("messages.expandNetworkPara")}
               </p>
               <Link to="/signup">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                 >
-                  Start Networking Today
+                  {t("actions.startNetworkingToday")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>

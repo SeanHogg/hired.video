@@ -69,24 +69,24 @@ export default function Onboarding() {
     const baseSteps = [
       {
         id: "profile",
-        title: "Complete Your Profile",
-        description: "Add your basic information",
+        title: t("headings.onboarding.profileTitle"),
+        description: t("messages.onboarding.profileDesc"),
         icon: User,
         completed: completedTasks.includes("profile"),
         component: ProfileStep,
       },
       {
         id: "preferences",
-        title: "Set Your Preferences",
-        description: "Customize your experience",
+        title: t("headings.onboarding.preferencesTitle"),
+        description: t("messages.onboarding.preferencesDesc"),
         icon: Settings,
         completed: completedTasks.includes("preferences"),
         component: PreferencesStep,
       },
       {
         id: "verification",
-        title: "Verify Your Email",
-        description: "Confirm your email address",
+        title: t("headings.onboarding.verificationTitle"),
+        description: t("messages.onboarding.verificationDesc"),
         icon: Mail,
         completed: completedTasks.includes("verification"),
         component: VerificationStep,
@@ -99,24 +99,24 @@ export default function Onboarding() {
           ...baseSteps,
           {
             id: "resume",
-            title: "Upload Your Resume",
-            description: "Share your professional background",
+            title: t("headings.onboarding.resumeTitle"),
+            description: t("messages.onboarding.resumeDesc"),
             icon: FileText,
             completed: completedTasks.includes("resume"),
             component: ResumeUploadStep,
           },
           {
             id: "video",
-            title: "Create Video Resume",
-            description: "Make yourself stand out",
+            title: t("headings.onboarding.videoTitle"),
+            description: t("messages.onboarding.videoDesc"),
             icon: Video,
             completed: completedTasks.includes("video"),
             component: VideoResumeStep,
           },
           {
             id: "skills",
-            title: "Add Skills & Experience",
-            description: "Highlight your expertise",
+            title: t("headings.onboarding.skillsTitle"),
+            description: t("messages.onboarding.skillsDesc"),
             icon: Target,
             completed: completedTasks.includes("skills"),
             component: SkillsStep,
@@ -127,24 +127,24 @@ export default function Onboarding() {
           ...baseSteps,
           {
             id: "company",
-            title: "Company Profile",
-            description: "Set up your company information",
+            title: t("headings.onboarding.recruiterCompanyTitle"),
+            description: t("messages.onboarding.recruiterCompanyDesc"),
             icon: Building2,
             completed: completedTasks.includes("company"),
             component: CompanyStep,
           },
           {
             id: "team",
-            title: "Invite Team Members",
-            description: "Collaborate with your team",
+            title: t("headings.onboarding.recruiterTeamTitle"),
+            description: t("messages.onboarding.recruiterTeamDesc"),
             icon: Users,
             completed: completedTasks.includes("team"),
             component: TeamStep,
           },
           {
             id: "jobs",
-            title: "Post Your First Job",
-            description: "Start finding candidates",
+            title: t("headings.onboarding.jobsTitle"),
+            description: t("messages.onboarding.jobsDesc"),
             icon: Briefcase,
             completed: completedTasks.includes("jobs"),
             component: JobPostStep,
@@ -155,24 +155,24 @@ export default function Onboarding() {
           ...baseSteps,
           {
             id: "company",
-            title: "Company Information",
-            description: "Complete your company details",
+            title: t("headings.onboarding.employerCompanyTitle"),
+            description: t("messages.onboarding.employerCompanyDesc"),
             icon: Building2,
             completed: completedTasks.includes("company"),
             component: CompanyStep,
           },
           {
             id: "team",
-            title: "Add Team Members",
-            description: "Invite your hiring team",
+            title: t("headings.onboarding.employerTeamTitle"),
+            description: t("messages.onboarding.employerTeamDesc"),
             icon: Users,
             completed: completedTasks.includes("team"),
             component: TeamStep,
           },
           {
             id: "integration",
-            title: "Configure Integrations",
-            description: "Connect your tools",
+            title: t("headings.onboarding.integrationTitle"),
+            description: t("messages.onboarding.integrationDesc"),
             icon: Settings,
             completed: completedTasks.includes("integration"),
             component: IntegrationsStep,
@@ -221,14 +221,17 @@ export default function Onboarding() {
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Welcome to hired.video!</h1>
+            <h1 className="text-3xl font-bold">{t("headings.onboarding.welcome")}</h1>
           </div>
           <p className="text-muted-foreground text-lg">
-            Let's get your {persona.replace("_", " ")} profile set up in
-            just a few steps
+            {t("messages.onboarding.subtitle", {
+              persona: t(`labels.onboarding.persona.${persona}`),
+            })}
           </p>
-          <Badge variant="secondary" className="capitalize mt-2">
-            {persona.replace("_", " ")} Setup
+          <Badge variant="secondary" className="mt-2">
+            {t("labels.onboarding.personaSetup", {
+              persona: t(`labels.onboarding.persona.${persona}`),
+            })}
           </Badge>
         </div>
       </div>
@@ -243,17 +246,20 @@ export default function Onboarding() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Target className="h-5 w-5" />
-                    Setup Progress
+                    {t("headings.onboarding.setupProgress")}
                   </CardTitle>
                   <CardDescription>
-                    {completedTasks.length} of {steps.length} steps completed
+                    {t("messages.onboarding.stepsCompleted", {
+                      completed: completedTasks.length,
+                      total: steps.length,
+                    })}
                   </CardDescription>
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold text-primary">
                     {progressPercentage}%
                   </div>
-                  <div className="text-sm text-muted-foreground">Complete</div>
+                  <div className="text-sm text-muted-foreground">{t("labels.completePercent")}</div>
                 </div>
               </div>
             </CardHeader>
@@ -267,8 +273,8 @@ export default function Onboarding() {
             {/* Steps List - Scrollable */}
             <Card className="flex-shrink-0">
               <CardHeader>
-                <CardTitle>Setup Steps</CardTitle>
-                <CardDescription>Click on any step to navigate</CardDescription>
+                <CardTitle>{t("headings.onboarding.setupSteps")}</CardTitle>
+                <CardDescription>{t("messages.onboarding.clickToNavigate")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-4 overflow-x-auto pb-4 max-h-32 overflow-y-auto">
@@ -348,19 +354,21 @@ export default function Onboarding() {
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Previous
+            {t("actions.previous")}
           </Button>
 
           <div className="flex gap-2">
             <Button variant="ghost" onClick={handleSkipToEnd}>
-              Skip Setup
+              {t("actions.onboarding.skipSetup")}
             </Button>
             <Button
               onClick={handleNext}
               className="gap-2"
               disabled={!steps[currentStep].completed}
             >
-              {currentStep === steps.length - 1 ? "Complete Setup" : "Continue"}
+              {currentStep === steps.length - 1
+                ? t("actions.onboarding.completeSetup")
+                : t("actions.continue")}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -372,6 +380,7 @@ export default function Onboarding() {
 
 // Step Components
 function ProfileStep({ onComplete, isCompleted, user }: any) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: user.name || "",
     title: "",
@@ -387,7 +396,7 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name">Full Name</Label>
+          <Label htmlFor="name">{t("fields.fullName.label")}</Label>
           <Input
             id="name"
             value={formData.name}
@@ -395,10 +404,10 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
           />
         </div>
         <div>
-          <Label htmlFor="title">Professional Title</Label>
+          <Label htmlFor="title">{t("fields.professionalTitle.label")}</Label>
           <Input
             id="title"
-            placeholder="e.g. Senior Software Engineer"
+            placeholder={t("messages.onboarding.titlePlaceholder")}
             value={formData.title}
             onChange={(e) =>
               setFormData({ ...formData, title: e.target.value })
@@ -407,10 +416,10 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
         </div>
       </div>
       <div>
-        <Label htmlFor="location">Location</Label>
+        <Label htmlFor="location">{t("fields.location.label")}</Label>
         <Input
           id="location"
-          placeholder="e.g. San Francisco, CA"
+          placeholder={t("messages.onboarding.locationPlaceholder")}
           value={formData.location}
           onChange={(e) =>
             setFormData({ ...formData, location: e.target.value })
@@ -418,17 +427,17 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
         />
       </div>
       <div>
-        <Label htmlFor="bio">Professional Bio</Label>
+        <Label htmlFor="bio">{t("labels.onboarding.professionalBio")}</Label>
         <Textarea
           id="bio"
-          placeholder="Tell us about yourself..."
+          placeholder={t("messages.onboarding.bioPlaceholder")}
           value={formData.bio}
           onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
         />
       </div>
       {!isCompleted && (
         <Button onClick={handleSubmit} className="w-full">
-          Save Profile Information
+          {t("actions.onboarding.saveProfile")}
         </Button>
       )}
     </div>
@@ -436,14 +445,15 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
 }
 
 function PreferencesStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Set your notification and privacy preferences.
+        {t("messages.onboarding.preferencesBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Save Preferences
+          {t("actions.onboarding.savePreferences")}
         </Button>
       )}
     </div>
@@ -451,14 +461,15 @@ function PreferencesStep({ onComplete, isCompleted }: any) {
 }
 
 function VerificationStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        We've sent a verification email. Please check your inbox.
+        {t("messages.onboarding.verificationBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Mark as Verified
+          {t("actions.onboarding.markVerified")}
         </Button>
       )}
     </div>
@@ -466,17 +477,18 @@ function VerificationStep({ onComplete, isCompleted }: any) {
 }
 
 function ResumeUploadStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center">
         <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-lg font-medium mb-2">Upload Your Resume</p>
-        <p className="text-muted-foreground mb-4">PDF, DOC, or DOCX files</p>
-        <Button variant="outline">Choose File</Button>
+        <p className="text-lg font-medium mb-2">{t("headings.onboarding.uploadResume")}</p>
+        <p className="text-muted-foreground mb-4">{t("messages.onboarding.resumeFileTypes")}</p>
+        <Button variant="outline">{t("actions.chooseFile")}</Button>
       </div>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Resume Uploaded
+          {t("actions.onboarding.resumeUploaded")}
         </Button>
       )}
     </div>
@@ -484,14 +496,15 @@ function ResumeUploadStep({ onComplete, isCompleted }: any) {
 }
 
 function VideoResumeStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Create a video resume to stand out from other candidates.
+        {t("messages.onboarding.videoBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Create Video Resume
+          {t("actions.onboarding.createVideoResume")}
         </Button>
       )}
     </div>
@@ -499,14 +512,15 @@ function VideoResumeStep({ onComplete, isCompleted }: any) {
 }
 
 function SkillsStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Add your skills and experience level.
+        {t("messages.onboarding.skillsBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Add Skills
+          {t("actions.onboarding.addSkills")}
         </Button>
       )}
     </div>
@@ -514,14 +528,15 @@ function SkillsStep({ onComplete, isCompleted }: any) {
 }
 
 function CompanyStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Set up your company profile and information.
+        {t("messages.onboarding.companyBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Complete Company Setup
+          {t("actions.onboarding.completeCompanySetup")}
         </Button>
       )}
     </div>
@@ -529,14 +544,15 @@ function CompanyStep({ onComplete, isCompleted }: any) {
 }
 
 function TeamStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Invite team members to collaborate on hiring.
+        {t("messages.onboarding.teamBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Invite Team Members
+          {t("actions.onboarding.inviteTeamMembers")}
         </Button>
       )}
     </div>
@@ -544,14 +560,15 @@ function TeamStep({ onComplete, isCompleted }: any) {
 }
 
 function JobPostStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Create your first job posting to start finding candidates.
+        {t("messages.onboarding.jobPostBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Post First Job
+          {t("actions.onboarding.postFirstJob")}
         </Button>
       )}
     </div>
@@ -559,14 +576,15 @@ function JobPostStep({ onComplete, isCompleted }: any) {
 }
 
 function IntegrationsStep({ onComplete, isCompleted }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        Connect your existing tools and platforms.
+        {t("messages.onboarding.integrationsBody")}
       </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
-          Configure Integrations
+          {t("actions.onboarding.configureIntegrations")}
         </Button>
       )}
     </div>

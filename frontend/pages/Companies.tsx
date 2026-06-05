@@ -11,6 +11,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
@@ -52,6 +53,7 @@ import type { CompanyWithOwnership } from "@/types/company";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
 
 export default function Companies() {
+  const { t } = useTranslation();
   const location = useLocation();
   // SEO for companies page
   useSEO(location.pathname);
@@ -86,13 +88,13 @@ export default function Companies() {
   useHeaderFilters([
     {
       key: "industry",
-      label: "Industry",
+      label: t("fields.industry.label"),
       type: "select",
       options: INDUSTRIES.map((i) => ({ value: i, label: i })),
     },
     {
       key: "size",
-      label: "Company size",
+      label: t("labels.companies.size"),
       type: "select",
       options: COMPANY_SIZE_OPTIONS.map((o) => ({
         value: o.value,
@@ -190,7 +192,7 @@ export default function Companies() {
       handleTotalItemsChange(result.total);
     } catch (err) {
       console.error("Failed to fetch companies:", err);
-      setError("Failed to load companies. Please try again.");
+      setError(t("errors.companies.loadFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -283,7 +285,7 @@ export default function Companies() {
         <div>
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Search className="h-5 w-5" />
-            Explore Companies
+            {t("headings.companies.explore")}
           </h2>
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -296,16 +298,16 @@ export default function Companies() {
           ) : error ? (
             <div className="text-center py-12">
               <p className="text-red-600 mb-4">{error}</p>
-              <Button onClick={fetchCompanies}>Try Again</Button>
+              <Button onClick={fetchCompanies}>{t("actions.tryAgainCapital")}</Button>
             </div>
           ) : displayedCompanies.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 mb-4">
                 {listMembership
-                  ? "No companies in this list match your filters."
-                  : "No companies found matching your criteria."}
+                  ? t("messages.companies.noneInListMatch")
+                  : t("messages.companies.noneMatchCriteria")}
               </p>
-              <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+              <Button onClick={() => setSearchFilters({})}>{t("actions.clearFilters")}</Button>
             </div>
           ) : (
             <div
@@ -357,7 +359,7 @@ export default function Companies() {
                         <AddToListMenu
                           entityType="company"
                           entityId={company.id ?? ""}
-                          entityLabel={company.name ?? "company"}
+                          entityLabel={company.name ?? t("labels.companies.entityFallback")}
                         />
                       }
                     />
@@ -395,14 +397,13 @@ export default function Companies() {
       ) : (
         <div className="text-center py-12">
           <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No followed companies yet</h3>
+          <h3 className="text-xl font-semibold mb-2">{t("headings.companies.noFollowedYet")}</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Discover companies you're interested in and track their job openings.
-            Following companies helps you stay updated on new opportunities.
+            {t("messages.companies.noFollowedYet")}
           </p>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              💡 <strong>Tip:</strong> When you track a job, we automatically follow the company for you!
+              💡 <strong>{t("messages.tipPrefix")}</strong> {t("messages.companies.autoFollowTip")}
             </p>
           </div>
         </div>
@@ -426,14 +427,14 @@ export default function Companies() {
       ) : (
         <div className="text-center py-12">
           <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No companies yet</h3>
+          <h3 className="text-xl font-semibold mb-2">{t("headings.companies.noneYet")}</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Add a company profile to manage jobs, candidates, and team members.
+            {t("messages.companies.addProfilePrompt")}
           </p>
           <Button asChild>
             <Link to="/companies/create">
               <Plus className="h-4 w-4 mr-2" />
-              Add Company
+              {t("actions.companies.add")}
             </Link>
           </Button>
         </div>
@@ -455,7 +456,7 @@ export default function Companies() {
         <Button asChild>
           <Link to="/companies/create">
             <Plus className="h-4 w-4 mr-2" />
-            Add Company
+            {t("actions.companies.add")}
           </Link>
         </Button>
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
@@ -469,26 +470,26 @@ export default function Companies() {
       browse: {
         // `title` is required by EntityHubTab but ignored when `search` is
         // set — kept here only to satisfy the type contract.
-        title: "Companies",
+        title: t("labels.companies"),
         search: <HeaderSearch />,
         headerActions: browseActions,
         body: renderBrowseBody,
       },
       connections: {
-        title: "Following",
-        description: "Companies you're following.",
+        title: t("labels.following"),
+        description: t("messages.companies.followingDescription"),
         badge: trackedCompanyCount > 0 ? trackedCompanyCount : undefined,
         body: renderConnectionsBody,
       },
       mine: {
-        title: "My Companies",
-        description: "Companies you manage.",
+        title: t("headings.companies.mine"),
+        description: t("messages.companies.mineDescription"),
         headerActions: mineActions,
         body: renderMineBody,
       },
       team: {
-        title: "Team leaderboard",
-        description: "Per-recruiter pipeline activity. Sourcing, stage moves, hires.",
+        title: t("headings.companies.teamLeaderboard"),
+        description: t("messages.companies.teamLeaderboardDescription"),
         body: () => <TeamLeaderboardPanel />,
       },
     };
@@ -514,16 +515,14 @@ export default function Companies() {
                   <Video className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Smart Companies
+                  {t("headings.companies.smartCompanies")}
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Discover Your Next Opportunity
+                {t("headings.companies.heroTitle")}
               </h1>
               <p className="text-xl text-muted-foreground mb-8">
-                Explore company cultures, values, and job opportunities. Follow
-                companies you're interested in and get notified about new
-                openings.
+                {t("messages.companies.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -531,13 +530,13 @@ export default function Companies() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Explore Companies
+                    {t("actions.companies.explore")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Button size="lg" variant="outline" className="text-lg px-8">
                   <Play className="mr-2 h-5 w-5" />
-                  See How It Works
+                  {t("actions.seeHowItWorks")}
                 </Button>
               </div>
             </div>
@@ -547,23 +546,23 @@ export default function Companies() {
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">1K+</div>
                 <p className="text-sm text-muted-foreground">
-                  Active companies
+                  {t("labels.companies.statActiveCompanies")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">15K+</div>
-                <p className="text-sm text-muted-foreground">Open positions</p>
+                <p className="text-sm text-muted-foreground">{t("labels.companies.statOpenPositions")}</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">Verified</div>
+                <div className="text-3xl font-bold text-primary mb-2">{t("labels.companies.statVerified")}</div>
                 <p className="text-sm text-muted-foreground">
-                  Company profiles
+                  {t("labels.companies.statCompanyProfiles")}
                 </p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">Fast</div>
+                <div className="text-3xl font-bold text-primary mb-2">{t("labels.companies.statFast")}</div>
                 <p className="text-sm text-muted-foreground">
-                  Response times
+                  {t("labels.companies.statResponseTimes")}
                 </p>
               </div>
             </div>
@@ -573,43 +572,41 @@ export default function Companies() {
                 paid employer product. */}
             <div className="mb-16 rounded-2xl border bg-card p-8">
               <div className="text-center mb-8">
-                <span className="text-sm font-semibold text-primary uppercase tracking-wide">For employers</span>
-                <h2 className="text-3xl font-bold mt-2">Run your whole team with People Operations</h2>
+                <span className="text-sm font-semibold text-primary uppercase tracking-wide">{t("labels.companies.forEmployers")}</span>
+                <h2 className="text-3xl font-bold mt-2">{t("headings.companies.peopleOpsTitle")}</h2>
                 <p className="text-muted-foreground mt-2">
-                  hired.video isn't just where you hire — it's where you run the team. Roster &amp; org chart,
-                  1:1s, performance, goals, and team health, plus the video-first hiring you already know.
-                  Multi-tenant and <strong>embeddable</strong> into your own tools.
+                  {t("messages.companies.peopleOpsBlurb")}
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center text-lg"><Users className="h-5 w-5 mr-2" /> Roster &amp; org chart</CardTitle>
-                    <CardDescription>One source of truth for your team — directory, manager hierarchy, headcount, and billable seats.</CardDescription>
+                    <CardTitle className="flex items-center text-lg"><Users className="h-5 w-5 mr-2" /> {t("headings.companies.rosterOrgChart")}</CardTitle>
+                    <CardDescription>{t("messages.companies.rosterOrgChartDesc")}</CardDescription>
                   </CardHeader>
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center text-lg"><TrendingUp className="h-5 w-5 mr-2" /> Performance &amp; 1:1s</CardTitle>
-                    <CardDescription>A never-miss 1:1 cadence with shared agendas and action items, plus goals and team health.</CardDescription>
+                    <CardTitle className="flex items-center text-lg"><TrendingUp className="h-5 w-5 mr-2" /> {t("headings.companies.performance1on1s")}</CardTitle>
+                    <CardDescription>{t("messages.companies.performance1on1sDesc")}</CardDescription>
                   </CardHeader>
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center text-lg"><Building2 className="h-5 w-5 mr-2" /> Embed it anywhere</CardTitle>
-                    <CardDescription>Render your hired.video surfaces inside your own app with a copyable snippet — segment-isolated per company.</CardDescription>
+                    <CardTitle className="flex items-center text-lg"><Building2 className="h-5 w-5 mr-2" /> {t("headings.companies.embedAnywhere")}</CardTitle>
+                    <CardDescription>{t("messages.companies.embedAnywhereDesc")}</CardDescription>
                   </CardHeader>
                 </Card>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
                 <Link to="/people-operations">
                   <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
-                    Explore People Operations
+                    {t("actions.companies.explorePeopleOps")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/pricing">
-                  <Button size="lg" variant="outline">See pricing</Button>
+                  <Button size="lg" variant="outline">{t("actions.seePricing")}</Button>
                 </Link>
               </div>
             </div>
@@ -617,7 +614,7 @@ export default function Companies() {
             {/* Featured Companies using CompanyCard */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Featured Companies
+                {t("headings.companies.featured")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {companies
@@ -655,7 +652,7 @@ export default function Companies() {
               <div className="text-center mt-8">
                 <Link to="/signup">
                   <Button variant="outline" size="lg">
-                    View All Companies
+                    {t("actions.companies.viewAll")}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -665,16 +662,15 @@ export default function Companies() {
             {/* Features */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Why Companies Choose Us
+                {t("headings.companies.whyChooseUs")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Building2 className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>Company Profiles</CardTitle>
+                    <CardTitle>{t("headings.companies.featProfiles")}</CardTitle>
                     <CardDescription>
-                      Showcase your company culture, values, and opportunities
-                      with rich profiles and video content.
+                      {t("messages.companies.featProfilesDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -682,10 +678,9 @@ export default function Companies() {
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <Users className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>Talent Pipeline</CardTitle>
+                    <CardTitle>{t("headings.companies.featTalentPipeline")}</CardTitle>
                     <CardDescription>
-                      Build a following of interested candidates who want to
-                      hear about your opportunities.
+                      {t("messages.companies.featTalentPipelineDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -693,10 +688,9 @@ export default function Companies() {
                 <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                   <CardHeader>
                     <TrendingUp className="h-10 w-10 text-primary mb-4" />
-                    <CardTitle>Growth Analytics</CardTitle>
+                    <CardTitle>{t("headings.companies.featGrowthAnalytics")}</CardTitle>
                     <CardDescription>
-                      Track follower growth, job performance, and hiring success
-                      with detailed analytics.
+                      {t("messages.companies.featGrowthAnalyticsDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -706,18 +700,17 @@ export default function Companies() {
             {/* Final CTA */}
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
               <h3 className="text-2xl font-bold mb-4">
-                Ready to Discover Great Companies?
+                {t("headings.companies.ctaTitle")}
               </h3>
               <p className="text-muted-foreground mb-6">
-                Join thousands of professionals exploring company cultures and
-                career opportunities.
+                {t("messages.companies.ctaSubtitle")}
               </p>
               <Link to="/signup">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                 >
-                  Start Exploring Today
+                  {t("actions.companies.startExploring")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>

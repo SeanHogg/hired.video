@@ -19,6 +19,7 @@ import {
   User,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
@@ -95,6 +96,7 @@ type VideoSlotItem =
 // chrome only renders when N>1; a single video mounts bare so the
 // resume header reads as "the video", not "a tile in a deck".
 function VideoSlot({ items }: { items: VideoSlotItem[] }) {
+  const { t } = useTranslation();
   const [idx, setIdx] = useState(0);
   if (items.length === 0) return null;
   const current = items[idx % items.length];
@@ -142,7 +144,7 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
       {player}
       <button
         type="button"
-        aria-label="Previous"
+        aria-label={t("resumeViewer.aria.previousVideo")}
         className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
         onClick={() => setIdx((p) => (p - 1 + items.length) % items.length)}
       >
@@ -150,14 +152,14 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
       </button>
       <button
         type="button"
-        aria-label="Next"
+        aria-label={t("resumeViewer.aria.nextVideo")}
         className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
         onClick={() => setIdx((p) => (p + 1) % items.length)}
       >
         <ChevronRight className="w-5 h-5" />
       </button>
       <div className="mt-2 text-xs opacity-80 text-center text-white">
-        Video {idx + 1} / {items.length}
+        {t("labels.resumeDetail.videoCounter", { current: idx + 1, total: items.length })}
       </div>
     </div>
   );
@@ -165,6 +167,7 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
 
 export default function ResumeDetail() {
   usePageChrome();
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -209,7 +212,7 @@ export default function ResumeDetail() {
       .map((m) => ({
         kind: "metadata" as const,
         id: m.id,
-        title: m.name || "Video Resume",
+        title: m.name || t("headings.videoResume"),
         url: m.url,
         metaType: m.metaType,
       }));
@@ -219,7 +222,7 @@ export default function ResumeDetail() {
     const fromStudio: VideoSlotItem[] = studioVideos.map((v) => ({
       kind: "studio" as const,
       id: v.id,
-      title: v.title || "Studio Video Resume",
+      title: v.title || t("labels.resumeDetail.studioVideoResume"),
       thumbnailUrl: v.thumbnailUrl ?? null,
       videoUrl: v.videoUrl ?? null,
       youtubeVideoId: v.youtubeVideoId ?? null,
@@ -327,7 +330,7 @@ export default function ResumeDetail() {
     try {
       parsed = JSON.parse(editorText);
     } catch (e) {
-      setEditorError(`JSON parse error: ${(e as Error).message}`);
+      setEditorError(t("errors.resumeDetail.jsonParseError", { message: (e as Error).message }));
       return;
     }
     const result = validateDescriptor(parsed);
@@ -339,7 +342,7 @@ export default function ResumeDetail() {
     // preset — preserves id/name when it happens to match a preset exactly.
     const next = matchesAnyPreset(result.value)
       ? result.value
-      : { ...result.value, id: "custom", name: "Custom" };
+      : { ...result.value, id: "custom", name: t("labels.resumeDetail.customTemplateName") };
     setDescriptor(next);
     setEditorText(JSON.stringify(next, null, 2));
     setEditorError(null);
@@ -365,7 +368,7 @@ export default function ResumeDetail() {
 
   if (printMode) {
     if (loading || !resume) {
-      return <div className="p-8 text-center text-muted-foreground">Preparing resume for print…</div>;
+      return <div className="p-8 text-center text-muted-foreground">{t("messages.resumeDetail.preparingForPrint")}</div>;
     }
     return (
       <div className="print:bg-white">
@@ -421,11 +424,11 @@ export default function ResumeDetail() {
     if (!resume?.id) return;
     try {
       const okResp = await resumeService.setResumePrivacy(resume.id, privacy);
-      if (!okResp) throw new Error("Server rejected privacy change");
+      if (!okResp) throw new Error(t("errors.resumes.serverRejectedPrivacy"));
       await refreshResume();
-      toast({ title: "Privacy updated", description: `Visibility set to ${privacy.replace("_", " ")}.` });
+      toast({ title: t("messages.privacyUpdated"), description: t("messages.visibilitySetTo", { privacy: privacy.replace("_", " ") }) });
     } catch (e) {
-      toast({ title: "Failed to update privacy", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
+      toast({ title: t("errors.privacyUpdateFailedTitle"), description: (e as Error)?.message || t("messages.pleaseTryAgain"), variant: "destructive" });
     }
   };
 
@@ -434,13 +437,13 @@ export default function ResumeDetail() {
     try {
       const okResp = await resumeService.promoteVariantToMaster(resume.id);
       if (okResp) {
-        toast({ title: "Promoted", description: "Variant promoted to master." });
+        toast({ title: t("messages.promotedTitle"), description: t("messages.promotedDescription") });
         await refreshResume();
       } else {
-        toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+        toast({ title: t("errors.promoteFailedTitle"), description: t("errors.promoteFailedDescription"), variant: "destructive" });
       }
     } catch (e) {
-      toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+      toast({ title: t("errors.promoteFailedTitle"), description: (e as Error)?.message ?? t("errors.unexpectedError"), variant: "destructive" });
     }
   };
 
@@ -448,10 +451,10 @@ export default function ResumeDetail() {
     if (!resume?.id) return;
     try {
       await resumeService.deleteResume(resume.id);
-      toast({ title: "Deleted", description: "Resume deleted successfully." });
+      toast({ title: t("messages.deletedConfirmTitle"), description: t("messages.deletedConfirmDescription") });
       navigate("/resumes");
     } catch (e) {
-      toast({ title: "Delete failed", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
+      toast({ title: t("errors.deleteFailedTitle"), description: (e as Error)?.message || t("messages.pleaseTryAgain"), variant: "destructive" });
     }
   };
 
@@ -476,13 +479,13 @@ export default function ResumeDetail() {
       const updated = await resumeService.updateResumeData(resume.id, { data: nextData as any });
       setResume(updated);
       toast({
-        title: "Template assigned",
+        title: t("messages.resumeDetail.templateAssignedTitle"),
         description: slot === "template"
-          ? `"${descriptor.name}" is now the default view for this resume.`
-          : `"${descriptor.name}" is now the embedded view for this resume.`,
+          ? t("messages.resumeDetail.templateDefaultSet", { name: descriptor.name })
+          : t("messages.resumeDetail.templateEmbeddedSet", { name: descriptor.name }),
       });
     } catch (e) {
-      toast({ title: "Could not save template", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
+      toast({ title: t("errors.resumeDetail.couldNotSaveTemplate"), description: (e as Error)?.message || t("messages.pleaseTryAgain"), variant: "destructive" });
     }
   };
 
@@ -493,7 +496,7 @@ export default function ResumeDetail() {
     <>
       <AppShell bgClassName="bg-background">
         <div className={!isAuthenticated ? "relative" : ""}>
-          {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || "Resume"} />}
+          {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || t("labels.resume")} />}
 
           {/* Hub-level tab strip — keeps the My Resumes / Available /
               Sourced context visible as the user navigates into a single
@@ -521,8 +524,8 @@ export default function ResumeDetail() {
                     size="sm"
                     className="h-7 px-2"
                     onClick={() => navigate(`/resumes/edit/${resume.id}`)}
-                    aria-label="Edit Resume"
-                    title="Edit Resume"
+                    aria-label={t("labels.resumeDetail.editResume")}
+                    title={t("labels.resumeDetail.editResume")}
                   >
                     <Edit className="w-4 h-4" />
                   </Button>
@@ -535,7 +538,7 @@ export default function ResumeDetail() {
                   <TextNarrator
                     text={textFromResume(resume)}
                     preferenceKey={`resume.${resume.id}`}
-                    label="Listen"
+                    label={t("actions.resumeDetail.listen")}
                   />
                 )}
                 {resume?.userId && !isSample && (
@@ -544,22 +547,22 @@ export default function ResumeDetail() {
                     size="sm"
                     className="h-7 gap-1"
                     onClick={() => navigate(`/people/${resume.userId}`)}
-                    title="View this candidate's profile"
+                    title={t("messages.resumeDetail.viewCandidateProfile")}
                   >
                     <User className="w-3.5 h-3.5" />
-                    View Profile
+                    {t("actions.viewProfile")}
                   </Button>
                 )}
 
                 <SplitButton
                   label={descriptor.name}
                   icon={FileType}
-                  primaryTitle="Change template"
-                  chevronLabel="Template options"
+                  primaryTitle={t("actions.resumeDetail.changeTemplate")}
+                  chevronLabel={t("actions.resumeDetail.templateOptions")}
                   menuClassName="w-72"
                 >
                   <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                    Your templates
+                    {t("labels.resumeDetail.yourTemplates")}
                   </DropdownMenuLabel>
                   {TEMPLATE_PRESETS
                     // Show only the free default + templates this user has
@@ -590,12 +593,12 @@ export default function ResumeDetail() {
                               <span className="flex items-center gap-1 mt-0.5">
                                 {isAssignedDefault && (
                                   <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                    <Eye className="w-3 h-3" />Default view
+                                    <Eye className="w-3 h-3" />{t("labels.resumeDetail.defaultView")}
                                   </span>
                                 )}
                                 {isAssignedEmbedded && (
                                   <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                    <Monitor className="w-3 h-3" />Embedded
+                                    <Monitor className="w-3 h-3" />{t("labels.resumeDetail.embedded")}
                                   </span>
                                 )}
                               </span>
@@ -608,21 +611,21 @@ export default function ResumeDetail() {
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                        Assign "{descriptor.name}"
+                        {t("labels.resumeDetail.assignTemplate", { name: descriptor.name })}
                       </DropdownMenuLabel>
                       <DropdownMenuItem
                         onClick={() => saveTemplateAssignment("template")}
                         disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
                       >
                         <Eye className="w-4 h-4 mr-2" />
-                        Set as default view
+                        {t("actions.resumeDetail.setAsDefaultView")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => saveTemplateAssignment("embeddedTemplate")}
                         disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
                       >
                         <Monitor className="w-4 h-4 mr-2" />
-                        Set as embedded view
+                        {t("actions.resumeDetail.setAsEmbeddedView")}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -631,14 +634,14 @@ export default function ResumeDetail() {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
                         <Code2 className="w-4 h-4 mr-2" />
-                        {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
+                        {editorOpen ? t("actions.resumeDetail.hideTemplateEditor") : t("actions.resumeDetail.editTemplateDesign")}
                       </DropdownMenuItem>
                     </>
                   )}
                   <div className="p-1 pt-2">
                     <Button size="sm" className="w-full" onClick={() => navigate("/search?category=templates")}>
                       <Store className="w-4 h-4 mr-1" />
-                      Browse Marketplace
+                      {t("actions.resumeDetail.browseMarketplace")}
                     </Button>
                   </div>
                 </SplitButton>
@@ -647,25 +650,25 @@ export default function ResumeDetail() {
                     seekers viewing other people's resumes can't download. */}
                 {perms.canExport && (
                   <SplitButton
-                    label="Export"
+                    label={t("actions.export")}
                     icon={Download}
                     onPrimary={handlePdf}
                     disabled={!resume}
-                    primaryTitle="Export as PDF"
-                    chevronLabel="Export options"
+                    primaryTitle={t("actions.resumeDetail.exportAsPdf")}
+                    chevronLabel={t("actions.resumeDetail.exportOptions")}
                   >
                     <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
-                      <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
+                      <Printer className="w-4 h-4 mr-2" />{t("actions.resumeDetail.exportPdfBrowser")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
-                      <FileType className="w-4 h-4 mr-2" />Word (.doc)
+                      <FileType className="w-4 h-4 mr-2" />{t("actions.resumeDetail.exportWord")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
-                      <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
+                      <FileText className="w-4 h-4 mr-2" />{t("actions.resumeDetail.exportText")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
-                      <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
+                      <FileJson className="w-4 h-4 mr-2" />{t("actions.resumeDetail.exportJson")}
                     </DropdownMenuItem>
                   </SplitButton>
                 )}
@@ -684,9 +687,9 @@ export default function ResumeDetail() {
                     onCopyLink={async () => {
                       try {
                         await navigator.clipboard.writeText(window.location.href);
-                        toast({ title: "Link copied", description: window.location.href });
+                        toast({ title: t("messages.linkCopiedTitle"), description: window.location.href });
                       } catch {
-                        toast({ title: "Could not copy", description: "Clipboard access denied.", variant: "destructive" });
+                        toast({ title: t("errors.couldNotCopyTitle"), description: t("errors.couldNotCopyDesc"), variant: "destructive" });
                       }
                     }}
                     onShowQR={() => setQrOpen(true)}
@@ -719,24 +722,24 @@ export default function ResumeDetail() {
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h1 className="text-2xl font-bold mb-3">This resume is private</h1>
+              <h1 className="text-2xl font-bold mb-3">{t("headings.resumeDetail.privateTitle")}</h1>
               <p className="text-muted-foreground mb-6">
-                The owner hasn't made this resume public. Ask them to change its visibility or share it with you directly.
+                {t("messages.resumeDetail.privateBody")}
               </p>
               <div className="flex items-center justify-center gap-2">
                 <Button variant="outline" onClick={() => navigator.clipboard.writeText(window.location.href)}>
-                  <Share2 className="w-4 h-4 mr-1" />Copy link to send owner
+                  <Share2 className="w-4 h-4 mr-1" />{t("actions.resumeDetail.copyLinkToSendOwner")}
                 </Button>
-                <Button onClick={() => navigate("/resumes")}>Back to Resumes</Button>
+                <Button onClick={() => navigate("/resumes")}>{t("actions.backToResumes")}</Button>
               </div>
             </div>
           )}
 
           {!loading && !resume && !isPrivate && (
             <div className="px-6 py-12 text-center">
-              <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
-              <p className="text-muted-foreground mb-6">Could not load resume <code>{id}</code>.</p>
-              <Button onClick={() => navigate("/resumes")}><ArrowLeft className="w-4 h-4 mr-2" />Back to Resumes</Button>
+              <h1 className="text-2xl font-bold mb-4">{t("headings.resumeDetail.notFoundTitle")}</h1>
+              <p className="text-muted-foreground mb-6">{t("messages.resumeDetail.couldNotLoad")} <code>{id}</code>.</p>
+              <Button onClick={() => navigate("/resumes")}><ArrowLeft className="w-4 h-4 mr-2" />{t("actions.backToResumes")}</Button>
             </div>
           )}
 
@@ -766,9 +769,9 @@ export default function ResumeDetail() {
                 <aside className="hidden lg:block w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
                   <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">Template Design</h3>
+                      <h3 className="font-semibold">{t("headings.resumeDetail.templateDesign")}</h3>
                       <Button size="sm" variant="ghost" onClick={() => applyPreset(DEFAULT_DESCRIPTOR)}>
-                        <RotateCcw className="w-4 h-4 mr-1" />Reset
+                        <RotateCcw className="w-4 h-4 mr-1" />{t("actions.reset")}
                       </Button>
                     </div>
                     <textarea
@@ -779,9 +782,9 @@ export default function ResumeDetail() {
                     {editorError && (
                       <div className="text-sm text-destructive whitespace-pre-wrap">{editorError}</div>
                     )}
-                    <Button size="sm" className="w-full" onClick={applyEditor}>Apply</Button>
+                    <Button size="sm" className="w-full" onClick={applyEditor}>{t("headings.apply")}</Button>
                     <p className="text-xs text-muted-foreground">
-                      Edits are validated and shown as a "Custom" design. Previewing only — custom designs can't yet be saved as the default or embedded view.
+                      {t("messages.resumeDetail.customDesignNote")}
                     </p>
                   </div>
                 </aside>
@@ -821,8 +824,8 @@ export default function ResumeDetail() {
             onOpenChange={setEmbedOpen}
             snippet={snippet}
             previewUrl={embedUrl}
-            heading="Embed this resume"
-            description="Drop this snippet into any website, blog post, or portfolio to show the resume inline. The embed stays in sync with edits you make here."
+            heading={t("headings.resumeDetail.embedThisResume")}
+            description={t("messages.resumeDetail.embedDescription")}
           />
         );
       })()}
@@ -842,7 +845,7 @@ export default function ResumeDetail() {
           isOpen={qrOpen}
           onClose={() => setQrOpen(false)}
           url={window.location.href}
-          title={`QR Code — ${resume.title}`}
+          title={t("labels.resumeDetail.qrCodeTitle", { name: resume.title })}
           filename={`resume-${resume.id}-qr`}
         />
       )}
@@ -852,9 +855,9 @@ export default function ResumeDetail() {
           open={shareOpen}
           onOpenChange={setShareOpen}
           shareUrl={window.location.href}
-          title={`Share "${resume.title}"`}
-          message="Post your resume to your network — link previews use your name and headline."
-          shareText={`${resume.title} — my video resume on hired.video`}
+          title={t("labels.resumeDetail.shareTitle", { name: resume.title })}
+          message={t("messages.resumeDetail.shareMessage")}
+          shareText={t("messages.resumeDetail.shareText", { name: resume.title })}
         />
       )}
 

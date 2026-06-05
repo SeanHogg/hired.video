@@ -181,7 +181,7 @@ export default function Jobs() {
   const location = useLocation();
   // SEO for jobs page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Jobs", url: "/jobs" }]);
+  useBreadcrumbs([{ name: t("labels.jobs"), url: "/jobs" }]);
   const { isAuthenticated, user } = useAuth();
   // `effective` applies the 2-char threshold so single-keystroke ?q=A
   // doesn't fire a full /api/jobs/public fanout. Raw value isn't needed
@@ -198,27 +198,27 @@ export default function Jobs() {
   useHeaderFilters([
     {
       key: "employmentType",
-      label: "Employment type",
+      label: t("labels.employmentType"),
       type: "select",
       options: [
-        { value: "full-time", label: "Full-time" },
-        { value: "part-time", label: "Part-time" },
-        { value: "contract", label: "Contract" },
-        { value: "internship", label: "Internship" },
+        { value: "full-time", label: t("labels.employmentType.fullTime") },
+        { value: "part-time", label: t("labels.employmentType.partTime") },
+        { value: "contract", label: t("labels.employmentType.contract") },
+        { value: "internship", label: t("labels.employmentType.internship") },
       ],
     },
     {
       key: "experienceLevel",
-      label: "Experience level",
+      label: t("labels.experienceLevel"),
       type: "select",
       options: [
-        { value: "entry", label: "Entry level" },
-        { value: "mid", label: "Mid level" },
-        { value: "senior", label: "Senior level" },
-        { value: "executive", label: "Executive" },
+        { value: "entry", label: t("labels.experienceLevelLower.entry") },
+        { value: "mid", label: t("labels.experienceLevelLower.mid") },
+        { value: "senior", label: t("labels.experienceLevelLower.senior") },
+        { value: "executive", label: t("labels.experienceLevel.executive") },
       ],
     },
-    { key: "salary", label: "Salary range", type: "number-range" },
+    { key: "salary", label: t("labels.salaryRangeLabel"), type: "number-range" },
   ]);
 
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
@@ -384,7 +384,7 @@ export default function Jobs() {
       handleTotalItemsChange(result.total);
     } catch (err) {
       console.error("Failed to fetch jobs:", err);
-      setError("Failed to load jobs. Please try again.");
+      setError(t("errors.loadJobsFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -685,7 +685,7 @@ export default function Jobs() {
                       <Button asChild>
                         <Link to="/jobs/create">
                           <Plus className="h-4 w-4 mr-2" />
-                          Post Job
+                          {t("actions.postJob")}
                         </Link>
                       </Button>
                     )}
@@ -727,7 +727,7 @@ export default function Jobs() {
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold flex items-center gap-2">
                     <Briefcase className="h-5 w-5" />
-                    My Postings
+                    {t("headings.jobs.myPostings")}
                   </h2>
                   {/* Display owned jobs from the public-jobs grid filtered to
                       this user. The full company-scoped query lives in #401 —
@@ -736,14 +736,14 @@ export default function Jobs() {
                   {displayedJobs.filter((j) => (j as any).userId === user.id).length === 0 ? (
                     <div className="text-center py-12">
                       <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No postings yet</h3>
+                      <h3 className="text-xl font-semibold mb-2">{t("headings.jobs.noPostingsYet")}</h3>
                       <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        Post your first job to start sourcing candidates.
+                        {t("messages.jobs.postFirstJobDesc")}
                       </p>
                       <Button asChild>
                         <Link to="/jobs/create">
                           <Plus className="h-4 w-4 mr-2" />
-                          Post Job
+                          {t("actions.postJob")}
                         </Link>
                       </Button>
                     </div>
@@ -808,17 +808,17 @@ export default function Jobs() {
                   ) : error ? (
                     <div className="text-center py-12">
                       <p className="text-red-600 mb-4">{error}</p>
-                      <Button onClick={fetchJobs}>Try Again</Button>
+                      <Button onClick={fetchJobs}>{t("actions.tryAgainCapital")}</Button>
                     </div>
                   ) : displayedJobs.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-gray-600 mb-4">
                         {listMembership
-                          ? "No jobs in this list match your filters."
-                          : "No jobs found matching your criteria."}
+                          ? t("messages.jobs.noJobsInList")
+                          : t("messages.jobs.noJobsFound")}
                       </p>
                       <Button onClick={() => setSearchFilters({})}>
-                        Clear Filters
+                        {t("actions.clearFilters")}
                       </Button>
                     </div>
                   ) : (
@@ -903,12 +903,12 @@ export default function Jobs() {
                     <Card>
                       <CardContent className="py-12 text-center">
                         <Bookmark className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                        <h2 className="text-2xl font-bold mb-2">No saved jobs yet</h2>
+                        <h2 className="text-2xl font-bold mb-2">{t("headings.noSavedJobsYet")}</h2>
                         <p className="text-muted-foreground mb-6">
-                          Start saving jobs you're interested in to keep track of them here
+                          {t("messages.jobs.noSavedJobsDesc")}
                         </p>
                         <Button onClick={() => handleTabChange("jobs")}>
-                          Browse Jobs
+                          {t("actions.browseJobs")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -919,9 +919,9 @@ export default function Jobs() {
                           savedJob.salaryMin && savedJob.salaryMax
                             ? `$${savedJob.salaryMin.toLocaleString()} - $${savedJob.salaryMax.toLocaleString()}`
                             : savedJob.salaryMin
-                              ? `From $${savedJob.salaryMin.toLocaleString()}`
+                              ? t("labels.jobs.salaryFromAmount", { amount: savedJob.salaryMin.toLocaleString() })
                               : savedJob.salaryMax
-                                ? `Up to $${savedJob.salaryMax.toLocaleString()}`
+                                ? t("labels.jobs.salaryUpToAmount", { amount: savedJob.salaryMax.toLocaleString() })
                                 : null;
                         return (
                           <Card key={savedJob.id} className="hover:shadow-lg transition-shadow">
@@ -979,14 +979,14 @@ export default function Jobs() {
                               <div className="flex items-center justify-between pt-4 border-t">
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
-                                  Saved {formatDate(savedJob.createdAt ?? savedJob.postedDate ?? "")}
+                                  {t("labels.savedDate", { date: formatDate(savedJob.createdAt ?? savedJob.postedDate ?? "") })}
                                 </div>
                                 <div className="flex gap-2">
                                   <Button variant="outline" size="sm" asChild>
-                                    <Link to={`/jobs/${savedJob.id}`}>View Details</Link>
+                                    <Link to={`/jobs/${savedJob.id}`}>{t("actions.viewDetailsAdmin")}</Link>
                                   </Button>
                                   <Button size="sm" asChild>
-                                    <Link to={`/jobs/${savedJob.id}`}>Apply Now</Link>
+                                    <Link to={`/jobs/${savedJob.id}`}>{t("actions.applyNow")}</Link>
                                   </Button>
                                 </div>
                               </div>
@@ -1018,12 +1018,12 @@ export default function Jobs() {
                     <Card>
                       <CardContent className="py-12 text-center">
                         <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                        <h2 className="text-2xl font-bold mb-2">No applications yet</h2>
+                        <h2 className="text-2xl font-bold mb-2">{t("headings.noApplicationsYet")}</h2>
                         <p className="text-muted-foreground mb-6">
-                          Start applying to jobs to track your applications here
+                          {t("messages.noApplicationsDesc")}
                         </p>
                         <Button onClick={() => handleTabChange("jobs")}>
-                          Browse Jobs
+                          {t("actions.browseJobs")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -1069,7 +1069,7 @@ export default function Jobs() {
                               )}
                               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                 <Calendar className="h-4 w-4" />
-                                Applied {formatDate(application.appliedAt)}
+                                {t("labels.appliedDate", { date: formatDate(application.appliedAt) })}
                               </div>
                               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                 <Clock className="h-4 w-4" />
@@ -1079,7 +1079,7 @@ export default function Jobs() {
 
                             {application.resume && (
                               <div className="mb-4 p-3 bg-muted rounded-md">
-                                <p className="text-sm font-medium mb-1">Resume Used:</p>
+                                <p className="text-sm font-medium mb-1">{t("labels.resumeUsed")}</p>
                                 <Link
                                   to={`/resumes/${application.resumeId}`}
                                   className="text-sm text-primary hover:underline"
@@ -1091,7 +1091,7 @@ export default function Jobs() {
 
                             {application.coverLetter && (
                               <div className="mb-4 p-3 bg-muted rounded-md">
-                                <p className="text-sm font-medium mb-1">Cover Letter:</p>
+                                <p className="text-sm font-medium mb-1">{t("labels.coverLetterLabel")}</p>
                                 <p className="text-sm text-muted-foreground line-clamp-3">
                                   {application.coverLetter}
                                 </p>
@@ -1100,11 +1100,11 @@ export default function Jobs() {
 
                             <div className="flex gap-2 pt-4 border-t">
                               <Button variant="outline" size="sm" asChild>
-                                <Link to={`/jobs/${application.jobId}`}>View Job</Link>
+                                <Link to={`/jobs/${application.jobId}`}>{t("actions.viewJob")}</Link>
                               </Button>
                               {application.resume && (
                                 <Button variant="outline" size="sm" asChild>
-                                  <Link to={`/resumes/${application.resumeId}`}>View Resume</Link>
+                                  <Link to={`/resumes/${application.resumeId}`}>{t("actions.viewResume")}</Link>
                                 </Button>
                               )}
                             </div>
@@ -1119,9 +1119,9 @@ export default function Jobs() {
                 <TabsContent value="alerts" className="space-y-4">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-2xl font-bold">Job Alerts</h2>
+                      <h2 className="text-2xl font-bold">{t("headings.jobAlerts")}</h2>
                       <p className="text-muted-foreground">
-                        {alerts.length} {alerts.length === 1 ? "alert" : "alerts"} configured
+                        {t("messages.alertsConfiguredCount", { count: alerts.length })}
                       </p>
                     </div>
                     <CreateJobAlertButton
@@ -1130,7 +1130,7 @@ export default function Jobs() {
                       size="default"
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Alert
+                      {t("actions.createAlert")}
                     </CreateJobAlertButton>
                   </div>
 
@@ -1152,13 +1152,13 @@ export default function Jobs() {
                     <Card>
                       <CardContent className="py-12 text-center">
                         <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                        <h2 className="text-2xl font-bold mb-2">No job alerts yet</h2>
+                        <h2 className="text-2xl font-bold mb-2">{t("headings.noJobAlertsYet")}</h2>
                         <p className="text-muted-foreground mb-6">
-                          Create job alerts to get notified when new jobs match your criteria
+                          {t("messages.noJobAlertsDesc")}
                         </p>
                         <CreateJobAlertButton onAlertCreated={loadAlerts}>
                           <Plus className="h-4 w-4 mr-2" />
-                          Create Your First Alert
+                          {t("actions.createYourFirstAlert")}
                         </CreateJobAlertButton>
                       </CardContent>
                     </Card>
@@ -1174,7 +1174,7 @@ export default function Jobs() {
                                   <CardTitle className="text-xl mb-2">{alert.name}</CardTitle>
                                   <div className="flex flex-wrap gap-2 items-center">
                                     <Badge variant={alert.isActive ? "default" : "secondary"}>
-                                      {alert.isActive ? "Active" : "Inactive"}
+                                      {alert.isActive ? t("labels.active") : t("labels.inactive")}
                                     </Badge>
                                     <Badge variant="outline">
                                       {JOB_ALERT_FREQUENCY_LABELS[alert.alertFrequency] || alert.alertFrequency}
@@ -1209,23 +1209,23 @@ export default function Jobs() {
                                 <div className="flex items-start gap-2">
                                   <Search className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
                                   <div>
-                                    <p className="text-sm font-medium">Keywords:</p>
-                                    <p className="text-sm text-muted-foreground">{keywords || "Any"}</p>
+                                    <p className="text-sm font-medium">{t("labels.keywordsLabel")}</p>
+                                    <p className="text-sm text-muted-foreground">{keywords || t("labels.any")}</p>
                                   </div>
                                 </div>
                                 {location && (
                                   <div className="flex items-start gap-2">
                                     <MapPin className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
                                     <div>
-                                      <p className="text-sm font-medium">Location:</p>
+                                      <p className="text-sm font-medium">{t("labels.locationLabel")}</p>
                                       <p className="text-sm text-muted-foreground">{location}</p>
                                     </div>
                                   </div>
                                 )}
                                 <div className="pt-3 border-t text-xs text-muted-foreground">
-                                  Created {formatDate(alert.createdAt)}
+                                  {t("labels.createdDate", { date: formatDate(alert.createdAt) })}
                                   {alert.lastTriggered && (
-                                    <> • Last triggered {formatDate(alert.lastTriggered)}</>
+                                    <> {t("labels.lastTriggeredDateInline", { date: formatDate(alert.lastTriggered) })}</>
                                   )}
                                 </div>
                               </div>
@@ -1243,57 +1243,57 @@ export default function Jobs() {
               <Sheet open={alertSheetOpen} onOpenChange={setAlertSheetOpen}>
                 <SheetContent side="right" className="sm:max-w-[500px]">
                   <SheetHeader>
-                    <SheetTitle>Edit Job Alert</SheetTitle>
+                    <SheetTitle>{t("headings.editJobAlert")}</SheetTitle>
                     <SheetDescription>
-                      Update your job alert settings to refine your notifications
+                      {t("messages.jobs.editAlertDescription")}
                     </SheetDescription>
                   </SheetHeader>
 
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="alert-name">Alert Name *</Label>
+                      <Label htmlFor="alert-name">{t("fields.alertNameRequired.label")}</Label>
                       <Input
                         id="alert-name"
-                        placeholder="e.g., Senior Developer Jobs"
+                        placeholder={t("fields.alertName.placeholder")}
                         value={alertName}
                         onChange={(e) => setAlertName(e.target.value)}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="keywords">Keywords *</Label>
+                      <Label htmlFor="keywords">{t("fields.keywordsRequired.label")}</Label>
                       <Input
                         id="keywords"
-                        placeholder="e.g., React, TypeScript, Node.js"
+                        placeholder={t("fields.keywords.placeholder")}
                         value={alertKeywords}
                         onChange={(e) => setAlertKeywords(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Separate multiple keywords with commas
+                        {t("messages.separateKeywordsWithCommas")}
                       </p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="location">Location (Optional)</Label>
+                      <Label htmlFor="location">{t("fields.locationOptional.label")}</Label>
                       <Input
                         id="location"
-                        placeholder="e.g., San Francisco, CA"
+                        placeholder={t("fields.alertLocation.placeholder")}
                         value={alertLocation}
                         onChange={(e) => setAlertLocation(e.target.value)}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="frequency">Notification Frequency</Label>
+                      <Label htmlFor="frequency">{t("fields.notificationFrequency.label")}</Label>
                       <Select value={alertFrequency} onValueChange={setAlertFrequency}>
                         <SelectTrigger id="frequency">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="immediate">Immediate</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="immediate">{t("labels.frequency.immediate")}</SelectItem>
+                          <SelectItem value="daily">{t("labels.frequency.daily")}</SelectItem>
+                          <SelectItem value="weekly">{t("labels.frequency.weekly")}</SelectItem>
+                          <SelectItem value="monthly">{t("labels.frequency.monthly")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1305,10 +1305,10 @@ export default function Jobs() {
                       onClick={() => setAlertSheetOpen(false)}
                       disabled={isSubmittingAlert}
                     >
-                      Cancel
+                      {t("actions.cancel")}
                     </Button>
                     <Button onClick={handleSubmitAlert} disabled={isSubmittingAlert}>
-                      {isSubmittingAlert ? "Updating..." : "Update Alert"}
+                      {isSubmittingAlert ? t("status.updating") : t("actions.updateAlert")}
                     </Button>
                   </SheetFooter>
                 </SheetContent>
@@ -1318,15 +1318,15 @@ export default function Jobs() {
               <AlertDialog open={!!deleteAlertId} onOpenChange={() => setDeleteAlertId(null)}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Job Alert</AlertDialogTitle>
+                    <AlertDialogTitle>{t("headings.deleteJobAlert")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete this job alert? This action cannot be undone.
+                      {t("messages.jobs.deleteAlertConfirm")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDeleteAlert} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Delete
+                      {t("actions.delete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1347,20 +1347,20 @@ export default function Jobs() {
               <AlertDialog open={!!deleteJobDialog} onOpenChange={(open) => !open && setDeleteJobDialog(null)}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete job?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("headings.jobs.deleteJobTitle")}</AlertDialogTitle>
                     <AlertDialogDescription>
                       {deleteJobDialog
-                        ? `Are you sure you want to delete "${deleteJobDialog.title}"? This action cannot be undone — the posting and any saved-by-candidate / pipeline links will be removed.`
-                        : "This action cannot be undone."}
+                        ? t("messages.jobs.deleteJobConfirm", { title: deleteJobDialog.title })
+                        : t("messages.jobs.actionCannotBeUndone")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleConfirmDeleteJob}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      Delete
+                      {t("actions.delete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1373,7 +1373,7 @@ export default function Jobs() {
                   isOpen={!!qrJob}
                   onClose={() => setQrJob(null)}
                   url={`${window.location.origin}/jobs/${qrJob.id}`}
-                  title={`QR Code — ${qrJob.title}`}
+                  title={t("headings.jobs.qrCodeTitle", { title: qrJob.title })}
                   filename={`job-${qrJob.id}-qr`}
                 />
               )}
@@ -1407,16 +1407,14 @@ export default function Jobs() {
                   <Video className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Smart Jobs
+                  {t("labels.smartJobs")}
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Discover Your Perfect Career Match
+                {t("headings.discoverPerfectCareerMatch")}
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Find jobs that truly fit your skills and aspirations with
-                AI-powered matching, video job descriptions, and direct
-                connections to hiring managers.
+                {t("messages.jobs.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -1424,14 +1422,14 @@ export default function Jobs() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Find Your Dream Job
+                    {t("actions.findYourDreamJob")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/signup?role=recruiter">
                   <Button size="lg" variant="outline" className="text-lg px-8">
                     <Plus className="mr-2 h-5 w-5" />
-                    Post a Job
+                    {t("actions.postAJob")}
                   </Button>
                 </Link>
               </div>
@@ -1442,7 +1440,7 @@ export default function Jobs() {
                   className="text-muted-foreground"
                 >
                   <Play className="mr-2 h-4 w-4" />
-                  See How It Works
+                  {t("actions.seeHowItWorks")}
                 </Button>
               </div>
             </div>
@@ -1452,23 +1450,23 @@ export default function Jobs() {
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">50K+</div>
                 <p className="text-sm text-muted-foreground">
-                  Active job postings
+                  {t("labels.activeJobPostings")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">95%</div>
-                <p className="text-sm text-muted-foreground">Match accuracy</p>
+                <p className="text-sm text-muted-foreground">{t("labels.matchAccuracy")}</p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">72h</div>
                 <p className="text-sm text-muted-foreground">
-                  Average response time
+                  {t("labels.averageResponseTime")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">89%</div>
                 <p className="text-sm text-muted-foreground">
-                  Interview success rate
+                  {t("labels.interviewSuccessRate")}
                 </p>
               </div>
             </div>
@@ -1476,7 +1474,7 @@ export default function Jobs() {
             {/* Featured Jobs Preview using shared JobCard */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Featured Opportunities
+                {t("headings.featuredOpportunities")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {jobs.slice(0, 2).map((job) => {
@@ -1512,7 +1510,7 @@ export default function Jobs() {
               <div className="text-center mt-8">
                 <Link to="/signup">
                   <Button variant="outline" size="lg">
-                    View All 50,000+ Jobs
+                    {t("actions.viewAllJobsCount")}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -1522,17 +1520,15 @@ export default function Jobs() {
             {/* Features and other marketing content */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Why Choose Our Job Platform
+                {t("headings.whyChooseJobPlatform")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Target className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>AI-Powered Matching</CardTitle>
+                    <CardTitle>{t("headings.aiPoweredMatching")}</CardTitle>
                     <CardDescription>
-                      Our advanced AI analyzes your skills, experience, and
-                      preferences to find jobs that truly match your career
-                      goals.
+                      {t("messages.jobs.aiMatchingDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -1540,10 +1536,9 @@ export default function Jobs() {
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <Video className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>Video Job Descriptions</CardTitle>
+                    <CardTitle>{t("headings.videoJobDescriptions")}</CardTitle>
                     <CardDescription>
-                      Get a real feel for the role with video job descriptions
-                      from actual hiring managers and team members.
+                      {t("messages.jobs.videoDescriptionsDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -1551,10 +1546,9 @@ export default function Jobs() {
                 <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                   <CardHeader>
                     <Zap className="h-10 w-10 text-primary mb-4" />
-                    <CardTitle>Direct Connections</CardTitle>
+                    <CardTitle>{t("headings.directConnections")}</CardTitle>
                     <CardDescription>
-                      Skip the black hole of traditional applications. Connect
-                      directly with hiring managers and decision makers.
+                      {t("messages.jobs.directConnectionsDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -1566,12 +1560,10 @@ export default function Jobs() {
               <div className="text-center bg-gradient-to-r from-green-50 to-blue-50 p-8 rounded-2xl border border-green-200/50">
                 <Building2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold mb-4">
-                  Hiring? Find Top Talent Fast
+                  {t("headings.jobs.hiringFindTalent")}
                 </h3>
                 <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-                  Post your job openings and connect with qualified candidates
-                  who match your requirements. Our AI-powered platform helps you
-                  find the right talent quickly.
+                  {t("messages.jobs.employerCtaDesc")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup?role=recruiter">
@@ -1580,12 +1572,12 @@ export default function Jobs() {
                       className="bg-green-600 hover:bg-green-700 text-white"
                     >
                       <Plus className="mr-2 h-5 w-5" />
-                      Post Your First Job Free
+                      {t("actions.postFirstJobFree")}
                     </Button>
                   </Link>
                   <Link to="/for-recruiters">
                     <Button size="lg" variant="outline">
-                      Learn More About Hiring
+                      {t("actions.learnMoreAboutHiring")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -1596,18 +1588,17 @@ export default function Jobs() {
             {/* Final CTA */}
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
               <h3 className="text-2xl font-bold mb-4">
-                Ready to Find Your Perfect Job?
+                {t("headings.jobs.readyToFindJob")}
               </h3>
               <p className="text-muted-foreground mb-6">
-                Join thousands of professionals who have found their dream
-                careers through our platform.
+                {t("messages.jobs.finalCtaDesc")}
               </p>
               <Link to="/signup">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                 >
-                  Start Your Job Search Today
+                  {t("actions.startJobSearchToday")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>

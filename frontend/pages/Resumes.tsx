@@ -25,6 +25,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
@@ -116,10 +117,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function Resumes() {
+  const { t } = useTranslation();
   const location = useLocation();
   // SEO for resumes page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Resumes", url: "/resumes" }]);
+  useBreadcrumbs([{ name: t("labels.resumes"), url: "/resumes" }]);
   const { isAuthenticated, user } = useAuth();
   // role-aware tab visibility lives entirely inside EntityHubShell now —
   // the page itself doesn't need to inspect the viewer's role.
@@ -186,21 +188,21 @@ export default function Resumes() {
   useHeaderFilters([
     {
       key: "privacy",
-      label: "Privacy",
+      label: t("headings.privacy"),
       type: "select",
       options: [
-        { value: "private", label: "Private" },
-        { value: "recruiter_only", label: "Recruiter only" },
-        { value: "public", label: "Public" },
+        { value: "private", label: t("labels.privacy.private") },
+        { value: "recruiter_only", label: t("labels.recruiterOnly") },
+        { value: "public", label: t("labels.privacy.public") },
       ],
     },
     {
       key: "isMaster",
-      label: "Type",
+      label: t("labels.transactionType"),
       type: "select",
       options: [
-        { value: "true", label: "Master" },
-        { value: "false", label: "Variation" },
+        { value: "true", label: t("labels.master") },
+        { value: "false", label: t("search.bar.resumeType.variation") },
       ],
     },
   ]);
@@ -417,19 +419,19 @@ export default function Resumes() {
         await resumeService.updateResumeData(created.id, { data: request.content as any, slug: request.slug });
       }
 
-      setSuccessMessage("Resume created successfully!");
+      setSuccessMessage(t("messages.resumeCreatedSuccess"));
       setView("list");
       loadResumes({ notifyExtension: true });
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (e) {
       console.error("Failed to create resume", e);
-      setSuccessMessage("Failed to create resume");
+      setSuccessMessage(t("messages.failedCreateResumeMessage"));
       setTimeout(() => setSuccessMessage(null), 5000);
     }
   };
 
   const handleUpdateResume = (request: UpdateResumeRequest) => {
-    setSuccessMessage("Resume updated successfully!");
+    setSuccessMessage(t("messages.resumeUpdatedSuccess"));
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 
@@ -448,7 +450,7 @@ export default function Resumes() {
       setDetachConfirm({
         open: true,
         target: resume,
-        parentName: parent?.title ?? "its parent",
+        parentName: parent?.title ?? t("labels.resumes.itsParent"),
       });
       return;
     }
@@ -474,8 +476,8 @@ export default function Resumes() {
       });
     } catch (e) {
       toast({
-        title: "Detach failed",
-        description: (e as Error)?.message ?? "Could not detach variant from its parent.",
+        title: t("errors.detachFailedTitle"),
+        description: (e as Error)?.message ?? t("errors.resumes.detachVariantFailed"),
         variant: "destructive",
       });
     }
@@ -499,8 +501,8 @@ export default function Resumes() {
     try {
       await resumeService.setActiveResume(resumeId);
       toast({
-        title: "Success",
-        description: "Active resume set successfully!",
+        title: t("labels.success"),
+        description: t("messages.activeSetDescription"),
       });
       // Refresh data to ensure consistency
       loadResumes();
@@ -509,8 +511,8 @@ export default function Resumes() {
       // Revert optimistic update on error
       optimisticActions.revertOptimistic();
       toast({
-        title: "Error",
-        description: "Failed to set active resume. Please try again.",
+        title: t("labels.error"),
+        description: t("errors.resumes.setActiveFailed"),
         variant: "destructive",
       });
     }
@@ -543,13 +545,13 @@ export default function Resumes() {
 
     try {
       const ok = await resumeService.setResumePrivacy(resumeId, privacy);
-      if (!ok) throw new Error("Server rejected privacy change");
+      if (!ok) throw new Error(t("errors.resumes.serverRejectedPrivacy"));
 
       toast({
-        title: "Privacy updated",
+        title: t("messages.privacyUpdated"),
         description: demotedCandidates.length > 0
-          ? `${demotedCandidates.length} resume${demotedCandidates.length === 1 ? "" : "s"} set to Private due to exclusivity.`
-          : `Visibility set to ${privacy.replace("_", " ")}.`,
+          ? t("messages.resumes.demotedToPrivate", { count: demotedCandidates.length })
+          : t("messages.visibilitySetTo", { privacy: privacy.replace("_", " ") }),
       });
 
       // Refresh from server to ensure consistency with backend rules
@@ -558,8 +560,8 @@ export default function Resumes() {
       console.error("Failed to update privacy", error);
       optimisticActions.revertOptimistic();
       toast({
-        title: "Failed to update privacy",
-        description: (error as Error)?.message || "Please try again.",
+        title: t("errors.privacyUpdateFailedTitle"),
+        description: (error as Error)?.message || t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -568,7 +570,7 @@ export default function Resumes() {
   const handleShare = (item: ResumeWithOwnership) => {
     const shareUrl = `${window.location.origin}/resumes/${item.id}`;
     navigator.clipboard.writeText(shareUrl);
-    setSuccessMessage("Resume link copied to clipboard!");
+    setSuccessMessage(t("messages.resumeLinkCopied"));
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
@@ -576,9 +578,9 @@ export default function Resumes() {
     const shareUrl = `${window.location.origin}/resumes/${item.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
-      toast({ title: "Link copied", description: shareUrl });
+      toast({ title: t("messages.linkCopiedTitle"), description: shareUrl });
     } catch {
-      toast({ title: "Could not copy", description: "Clipboard access denied.", variant: "destructive" });
+      toast({ title: t("errors.couldNotCopyTitle"), description: t("errors.couldNotCopyDesc"), variant: "destructive" });
     }
   };
 
@@ -605,8 +607,8 @@ export default function Resumes() {
     } catch (error) {
       console.error("Failed to download resume:", error);
       toast({
-        title: "Download failed",
-        description: "Could not load resume content.",
+        title: t("errors.downloadFailedTitle"),
+        description: t("errors.downloadFailedDescription"),
         variant: "destructive",
       });
     }
@@ -641,7 +643,7 @@ export default function Resumes() {
 
     try {
       await resumeService.deleteResume(item.id);
-      toast({ title: "Deleted", description: "Resume deleted successfully." });
+      toast({ title: t("messages.deletedConfirmTitle"), description: t("messages.deletedConfirmDescription") });
 
       // If we deleted a master in collections view, reload groups from server
       await loadResumes({ notifyExtension: true });
@@ -653,10 +655,10 @@ export default function Resumes() {
 
       // Friendly error message
       toast({
-        title: "Delete failed",
+        title: t("errors.deleteFailedTitle"),
         description:
           (err as Error)?.message ||
-          "Could not delete resume. If this is a master with variations, delete variations first.",
+          t("errors.resumes.deleteMasterWithVariations"),
         variant: "destructive",
       });
     }
@@ -671,21 +673,21 @@ export default function Resumes() {
         if (isWatched) {
           await resumeService.unwatchResume(item.id);
           toast({
-            title: "Success",
-            description: "Resume removed from tracking list!",
+            title: t("labels.success"),
+            description: t("messages.resumeRemovedTracking"),
           });
         } else {
           await resumeService.watchResume(item.id);
           toast({
-            title: "Success",
-            description: "Resume added to tracking list!",
+            title: t("labels.success"),
+            description: t("messages.resumeAddedTracking"),
           });
         }
       } catch (error) {
         console.error("Failed to toggle resume tracking:", error);
         toast({
-          title: "Error",
-          description: "Failed to update tracking status",
+          title: t("labels.error"),
+          description: t("errors.failedToggleTracking"),
           variant: "destructive",
         });
       }
@@ -699,13 +701,13 @@ export default function Resumes() {
     try {
       const ok = await resumeService.promoteVariantToMaster(resumeId);
       if (ok) {
-        toast({ title: "Promoted", description: "Variant promoted to master." });
+        toast({ title: t("messages.promotedTitle"), description: t("messages.promotedDescription") });
         await loadResumes({ notifyExtension: true });
       } else {
-        toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+        toast({ title: t("errors.promoteFailedTitle"), description: t("errors.promoteFailedDescription"), variant: "destructive" });
       }
     } catch (e) {
-      toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+      toast({ title: t("errors.promoteFailedTitle"), description: (e as Error)?.message ?? t("errors.unexpectedError"), variant: "destructive" });
     }
   };
 
@@ -721,8 +723,8 @@ export default function Resumes() {
     } catch (error) {
       console.error("Failed to load resume metadata:", error);
       toast({
-        title: "Error",
-        description: "Failed to load resume data",
+        title: t("labels.error"),
+        description: t("errors.failedLoadResumeMetadata"),
         variant: "destructive",
       });
     }
@@ -740,8 +742,8 @@ export default function Resumes() {
     } catch (error) {
       console.error("Failed to load resume metadata:", error);
       toast({
-        title: "Error",
-        description: "Failed to load resume data",
+        title: t("labels.error"),
+        description: t("errors.failedLoadResumeMetadata"),
         variant: "destructive",
       });
     }
@@ -753,16 +755,16 @@ export default function Resumes() {
     try {
       await resumeService.updateResumeMetadata(metadataModal.resumeId, metadata);
       toast({
-        title: "Success",
-        description: "Resume media updated successfully!",
+        title: t("labels.success"),
+        description: t("messages.resumeMediaUpdated"),
       });
       // Refresh the resume list
       await loadResumes({ notifyExtension: true });
     } catch (error) {
       console.error("Failed to save metadata:", error);
       toast({
-        title: "Error",
-        description: "Failed to save resume media",
+        title: t("labels.error"),
+        description: t("errors.failedSaveMetadata"),
         variant: "destructive",
       });
       throw error; // Re-throw to prevent modal from closing
@@ -890,16 +892,14 @@ export default function Resumes() {
                     <Video className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Video Resumes
+                    {t("labels.videoResumes")}
                   </span>
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Transform Your Resume into a Powerful Video Story
+                  {t("messages.transformResumeIntoVideo")}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8">
-                  Stand out from the crowd with AI-powered video resumes that
-                  showcase your personality, skills, and experience in ways
-                  traditional resumes never could.
+                  {t("messages.standOutAiVideo")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   {isAuthenticated ? (
@@ -908,7 +908,7 @@ export default function Resumes() {
                         size="lg"
                         className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                       >
-                        Create Your Video Resume
+                        {t("actions.createVideoResume")}
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
                     </Link>
@@ -918,7 +918,7 @@ export default function Resumes() {
                         size="lg"
                         className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                       >
-                        Create Your Video Resume
+                        {t("actions.createVideoResume")}
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
                     </Link>
@@ -936,7 +936,7 @@ export default function Resumes() {
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">3x</div>
                   <p className="text-sm text-muted-foreground">
-                    More likely to get interviews
+                    {t("messages.threeXMoreInterviews")}
                   </p>
                 </div>
                 <div className="text-center">
@@ -944,7 +944,7 @@ export default function Resumes() {
                     85%
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Higher response rate
+                    {t("messages.higherResponseRate")}
                   </p>
                 </div>
                 <div className="text-center">
@@ -952,7 +952,7 @@ export default function Resumes() {
                     2 min
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Average creation time
+                    {t("messages.averageCreationTime")}
                   </p>
                 </div>
                 <div className="text-center">
@@ -960,7 +960,7 @@ export default function Resumes() {
                     500K+
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Video resumes created
+                    {t("messages.statsCreated")}
                   </p>
                 </div>
               </div>
@@ -968,31 +968,30 @@ export default function Resumes() {
               {/* Features Grid */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Everything You Need to Succeed
+                  {t("headings.everythingYouNeed")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                     <CardHeader>
                       <Zap className="h-10 w-10 text-brand-purple mb-4" />
-                      <CardTitle>AI-Powered Creation</CardTitle>
+                      <CardTitle>{t("headings.aiPoweredCreation")}</CardTitle>
                       <CardDescription>
-                        Our AI analyzes your resume and creates compelling video
-                        scripts tailored to your industry and experience level.
+                        {t("messages.aiPoweredCreationDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Smart script generation
+                          {t("labels.smartScriptGeneration")}
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Industry-specific templates
+                          {t("labels.industryTemplates")}
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Personal branding tips
+                          {t("labels.personalBrandingTips")}
                         </div>
                       </div>
                     </CardContent>
@@ -1001,25 +1000,24 @@ export default function Resumes() {
                   <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                     <CardHeader>
                       <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
-                      <CardTitle>Performance Analytics</CardTitle>
+                      <CardTitle>{t("headings.performanceAnalytics")}</CardTitle>
                       <CardDescription>
-                        Track how your video resume performs with detailed
-                        analytics on views, engagement, and recruiter interest.
+                        {t("messages.performanceAnalyticsDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          View tracking & heatmaps
+                          {t("labels.viewTrackingHeatmaps")}
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Engagement metrics
+                          {t("labels.engagementMetricsLabel")}
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Recruiter insights
+                          {t("labels.recruiterInsightsLabel")}
                         </div>
                       </div>
                     </CardContent>
@@ -1028,25 +1026,24 @@ export default function Resumes() {
                   <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                     <CardHeader>
                       <Users className="h-10 w-10 text-primary mb-4" />
-                      <CardTitle>Professional Network</CardTitle>
+                      <CardTitle>{t("labels.professionalNetwork")}</CardTitle>
                       <CardDescription>
-                        Connect directly with hiring managers and recruiters who
-                        are actively looking for candidates like you.
+                        {t("messages.networkProDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Direct recruiter access
+                          {t("labels.directRecruiterAccess")}
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Smart job matching
+                          {t("labels.smartJobMatching")}
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Interview scheduling
+                          {t("labels.interviewScheduling")}
                         </div>
                       </div>
                     </CardContent>
@@ -1057,43 +1054,43 @@ export default function Resumes() {
               {/* How It Works */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  How It Works
+                  {t("headings.howItWorksStudio")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Upload className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold mb-2">1. Upload Resume</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.uploadResumeStep")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Upload your resume or select your existing Master Resume
+                      {t("messages.uploadResumeStepDesc")}
                     </p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Sparkles className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold mb-2">2. AI Magic</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.aiMagicStep")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Our AI generates a compelling video script tailored to you
+                      {t("messages.aiMagicStepDesc")}
                     </p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Eye className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold mb-2">3. Review Video</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.reviewVideoStep")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Preview and refine your video before sharing
+                      {t("messages.reviewVideoStepDesc")}
                     </p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <TrendingUp className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold mb-2">4. Get Hired</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.getHiredStep")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Share with employers and track your success
+                      {t("messages.getHiredStepDesc")}
                     </p>
                   </div>
                 </div>
@@ -1102,7 +1099,7 @@ export default function Resumes() {
               {/* Success Stories */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Success Stories
+                  {t("headings.successStories")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <Card>
@@ -1116,16 +1113,14 @@ export default function Resumes() {
                         ))}
                       </div>
                       <p className="text-sm mb-4">
-                        "I got 5 interview requests within a week of posting my
-                        video resume. The AI script was spot-on and helped me
-                        highlight my strengths perfectly."
+                        {t("messages.resumes.testimonial1Quote")}
                       </p>
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
                         <div>
-                          <p className="font-medium text-sm">Sarah Chen</p>
+                          <p className="font-medium text-sm">{t("labels.resumes.testimonial1Name")}</p>
                           <p className="text-xs text-muted-foreground">
-                            Software Engineer
+                            {t("labels.resumes.testimonial1Role")}
                           </p>
                         </div>
                       </div>
@@ -1143,18 +1138,16 @@ export default function Resumes() {
                         ))}
                       </div>
                       <p className="text-sm mb-4">
-                        "As a career changer, I struggled to explain my
-                        transition. The video resume helped me tell my story in
-                        a way that resonated with employers."
+                        {t("messages.resumes.testimonial2Quote")}
                       </p>
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gradient-to-r from-brand-blue to-brand-purple rounded-full" />
                         <div>
                           <p className="font-medium text-sm">
-                            Michael Rodriguez
+                            {t("labels.resumes.testimonial2Name")}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Marketing Manager
+                            {t("labels.resumes.testimonial2Role")}
                           </p>
                         </div>
                       </div>
@@ -1172,16 +1165,14 @@ export default function Resumes() {
                         ))}
                       </div>
                       <p className="text-sm mb-4">
-                        "Landed my dream job at a Fortune 500 company! The video
-                        resume made me stand out from hundreds of other
-                        applicants."
+                        {t("messages.resumes.testimonial3Quote")}
                       </p>
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
                         <div>
-                          <p className="font-medium text-sm">Emma Johnson</p>
+                          <p className="font-medium text-sm">{t("labels.resumes.testimonial3Name")}</p>
                           <p className="text-xs text-muted-foreground">
-                            Product Designer
+                            {t("labels.resumes.testimonial3Role")}
                           </p>
                         </div>
                       </div>
@@ -1244,11 +1235,10 @@ export default function Resumes() {
             <div className="px-4 pb-16">
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
                 <h3 className="text-3xl font-bold mb-4">
-                  Ready to Create Your Video Resume?
+                  {t("headings.readyVideo")}
                 </h3>
                 <p className="text-muted-foreground mb-8">
-                  Join thousands of professionals who have transformed their
-                  careers with video resumes. Free to start.
+                  {t("messages.videoResumeCallToAction")}
                 </p>
                 {isAuthenticated ? (
                   <Link to="/studio">
@@ -1256,7 +1246,7 @@ export default function Resumes() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                     >
-                      Get Started Today
+                      {t("actions.getStartedToday")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -1266,7 +1256,7 @@ export default function Resumes() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                     >
-                      Get Started Today
+                      {t("actions.getStartedToday")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -1301,7 +1291,7 @@ export default function Resumes() {
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground mt-4">Loading resumes...</p>
+          <p className="text-muted-foreground mt-4">{t("messages.resumes.loading")}</p>
         </div>
       ) : ownedCount > 0 ? (
         <>
@@ -1309,7 +1299,7 @@ export default function Resumes() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-sm text-muted-foreground">
-                  {ownedCount} resume{ownedCount !== 1 ? "s" : ""}
+                  {t("labels.resumes.count", { count: ownedCount })}
                 </div>
               </div>
               <div
@@ -1391,13 +1381,13 @@ export default function Resumes() {
         <ResumeEmptyDropzone
           title={
             searchFilters.search || Object.keys(searchFilters).length > 0
-              ? "No matching resumes"
-              : "No resumes yet"
+              ? t("headings.resumes.noMatching")
+              : t("headings.resumes.noneYet")
           }
           description={
             searchFilters.search || Object.keys(searchFilters).length > 0
-              ? "Try adjusting your search criteria or filters — or drop a resume here to add a new one."
-              : "Drop your resume here, or click to upload. We'll parse PDF, Word, Markdown, JSON, and plain text."
+              ? t("messages.resumes.noMatchingDesc")
+              : t("messages.resumes.emptyDropzoneDesc")
           }
           onUploadSuccess={handleUploadSuccess}
           onCreateResume={() => {
@@ -1413,7 +1403,7 @@ export default function Resumes() {
     <>
       <Button onClick={() => setUploadSheetOpen(true)} variant="outline">
         <Upload className="h-4 w-4 mr-2" />
-        Upload Resume
+        {t("actions.uploadResumeAction")}
       </Button>
       <Button
         onClick={() => {
@@ -1422,7 +1412,7 @@ export default function Resumes() {
         }}
       >
         <Plus className="h-4 w-4 mr-2" />
-        Create Resume
+        {t("headings.createResumeHeading")}
       </Button>
       <ViewModeToggle value={viewMode} onChange={setViewMode} />
       <ListsButton entityType="resume" />
@@ -1432,9 +1422,9 @@ export default function Resumes() {
         variant={includeArchived ? "secondary" : "outline"}
         size="sm"
         onClick={() => setIncludeArchived((v) => !v)}
-        title="Show archived resumes alongside active ones"
+        title={t("messages.resumes.showArchivedTooltip")}
       >
-        {includeArchived ? "Hiding none" : "Include archived"}
+        {includeArchived ? t("actions.resumes.hidingNone") : t("actions.resumes.includeArchived")}
       </Button>
     </>
   );
@@ -1444,12 +1434,12 @@ export default function Resumes() {
       {getActiveResume() && (
         <Badge variant="secondary" className="bg-green-100 text-green-800">
           <Target className="w-3 h-3 mr-1" />
-          Active: {String(getActiveResume()?.title ?? "")}
+          {t("labels.resumes.activeBadge", { name: String(getActiveResume()?.title ?? "") })}
         </Badge>
       )}
       {!loading && !getActiveResume() && (
         <Badge variant="outline" className="text-orange-600 border-orange-200">
-          No active resume
+          {t("labels.noActiveResume")}
         </Badge>
       )}
     </div>
@@ -1461,20 +1451,20 @@ export default function Resumes() {
   // edit pages and the hub list page can never diverge on labels.
   const resumeTabBodies: Record<string, Omit<EntityHubTab, "key" | "label" | "icon" | "roles"> | undefined> = {
     mine: {
-      title: "Your Resumes",
-      description: "Manage and track your resumes.",
+      title: t("headings.yourResumes"),
+      description: t("messages.resumes.mineDescription"),
       headerActions: mineActions,
       meta: mineMeta,
       body: renderMineBody,
     },
     available: {
-      title: "Available Resumes",
-      description: "Browse public candidate resumes.",
+      title: t("headings.resumes.availableTab"),
+      description: t("messages.resumes.availableDescription"),
       body: <AvailableResumesPanel />,
     },
     sourced: {
-      title: "Sourced Candidates",
-      description: "Private to your company. Source, annotate, and share.",
+      title: t("headings.resumes.sourcedTab"),
+      description: t("messages.resumes.sourcedDescription"),
       headerActions: (
         <CandidatesHeaderActions
           scope={sourcedScope}
@@ -1513,16 +1503,16 @@ export default function Resumes() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete resume?</AlertDialogTitle>
+            <AlertDialogTitle>{t("headings.resumes.deleteResumeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteDialog.target
-                ? `Are you sure you want to delete “${deleteDialog.target.title}”? This action cannot be undone.`
-                : "This action cannot be undone."}
+                ? t("messages.resumes.deleteResumeConfirm", { name: deleteDialog.target.title })
+                : t("messages.resumes.actionCannotBeUndone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteDialog({ open: false, target: null })}>
-              Cancel
+              {t("actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
@@ -1532,7 +1522,7 @@ export default function Resumes() {
                 }
               }}
             >
-              Delete
+              {t("actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1548,11 +1538,11 @@ export default function Resumes() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Promote to Master?</AlertDialogTitle>
+            <AlertDialogTitle>{t("headings.resumes.promoteToMasterTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {promoteDialog.target
-                ? `This will convert “${promoteDialog.target.title}” into a new, independent Master Resume. The original group will remain unchanged. Proceed?`
-                : "Proceed to promote this variant to a new Master Resume?"}
+                ? t("messages.resumes.promoteToMasterConfirm", { name: promoteDialog.target.title })
+                : t("messages.resumes.promoteToMasterConfirmGeneric")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1560,7 +1550,7 @@ export default function Resumes() {
               disabled={promoteDialog.submitting}
               onClick={() => setPromoteDialog({ open: false, target: null, submitting: false })}
             >
-              Cancel
+              {t("actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
@@ -1571,18 +1561,18 @@ export default function Resumes() {
                   try {
                     const ok = await resumeService.promoteVariantToMaster(id);
                     if (ok) {
-                      toast({ title: "Promoted", description: "Variation promoted to a new Master Resume." });
+                      toast({ title: t("messages.promotedTitle"), description: t("messages.resumes.variationPromotedNew") });
                       await loadResumes({ notifyExtension: true });
                     } else {
-                      toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+                      toast({ title: t("errors.promoteFailedTitle"), description: t("errors.promoteFailedDescription"), variant: "destructive" });
                     }
                   } catch (e) {
-                    toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+                    toast({ title: t("errors.promoteFailedTitle"), description: (e as Error)?.message ?? t("errors.unexpectedError"), variant: "destructive" });
                   }
                 })();
               }}
             >
-              Promote
+              {t("actions.promote")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1625,16 +1615,18 @@ export default function Resumes() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Detach from parent to create variation?</AlertDialogTitle>
+            <AlertDialogTitle>{t("headings.resumes.detachTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {detachConfirm.target?.title ?? "This resume"} is currently a variation of {detachConfirm.parentName}.
-              Resumes can only be nested one level deep, so we'll detach it from its parent first — then create a new variation under it. Its existing content stays intact.
+              {t("messages.resumes.detachConfirm", {
+                name: detachConfirm.target?.title ?? t("labels.resumes.thisResume"),
+                parent: detachConfirm.parentName,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDetachAndCreateVariation}>
-              Detach and continue
+              {t("actions.resumes.detachAndContinue")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1693,7 +1685,7 @@ export default function Resumes() {
           isOpen={qrDialog.open}
           onClose={() => setQrDialog({ open: false, target: null })}
           url={`${window.location.origin}/resumes/${qrDialog.target.id}`}
-          title={`QR Code — ${qrDialog.target.title}`}
+          title={t("labels.resumes.qrCodeTitle", { name: qrDialog.target.title })}
           filename={`resume-${qrDialog.target.id}-qr`}
         />
       )}
@@ -1717,12 +1709,12 @@ export default function Resumes() {
           onOpenChange={(open) => {
             if (!open) setVersionHistoryFor(null);
           }}
-          entityLabel="Resume"
+          entityLabel={t("labels.resume")}
           canSnapshot
           adapter={{
             list: () => resumeService.listVersions(versionHistoryFor.id),
             snapshot: () => resumeService.createVersion(versionHistoryFor.id, {
-              label: "manual snapshot",
+              label: t("studio.versionHistory.manualSnapshot"),
               isAutosave: false,
             }),
             restore: async (vid) => {
@@ -1749,13 +1741,13 @@ export default function Resumes() {
             {view === "builder" && (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <h1 className="text-2xl sm:text-3xl font-bold">Create Resume</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold">{t("headings.createResumeHeading")}</h1>
                   <Button
                     variant="outline"
                     onClick={() => setView("list")}
                     className="w-full sm:w-auto min-h-[44px]"
                   >
-                    Back to Resumes
+                    {t("actions.backToResumes")}
                   </Button>
                 </div>
                 <ResumeBuilder onSave={handleCreateResume} onCancel={() => setView("list")} />
@@ -1772,7 +1764,7 @@ export default function Resumes() {
                     }}
                     className="min-h-[44px]"
                   >
-                    ← Back to Resumes
+                    {t("actions.backToResumesArrow")}
                   </Button>
                 </div>
                 <ResumeViewer

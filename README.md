@@ -2736,6 +2736,213 @@ This consolidates the **334 ✅ Done entries** from the Consolidated Gap Registe
 ---
 
 
+## Localization (i18n) Coverage Catalog
+
+**What this measures.** The catalogue files ([en.json](hired.video/frontend/public/locales/en.json) / [es.json](hired.video/frontend/public/locales/es.json) / [fr-CA.json](hired.video/frontend/public/locales/fr-CA.json)) are at ~99% **key** parity — almost every key that exists is translated into all three locales. The gap is the opposite end: most pages/components still render **hardcoded English literals that never call `t()`**, so a Quebec/LatAm visitor sees English regardless of catalogue completeness. The "~95% Spanish coverage" claim elsewhere in this README refers to *key* coverage; this section measures *page wiring* coverage, which is much lower.
+
+**How to regenerate (single source of truth).** Numbers below are produced by [scripts/i18n-coverage.cjs](hired.video/frontend/scripts/i18n-coverage.cjs), a heuristic detector that counts `t()`/`<Trans>` calls vs. user-facing hardcoded literals (JSX text nodes, UI attributes like `placeholder`/`title`/`aria-label`/`alt`, and `toast`/`alert`/`confirm` messages) per file:
+
+```
+cd hired.video/frontend
+node scripts/i18n-coverage.cjs            # user-facing pages, table
+node scripts/i18n-coverage.cjs --md       # markdown (this table)
+node scripts/i18n-coverage.cjs --components# include components/
+node scripts/i18n-coverage.cjs --staff     # include admin/superadmin
+```
+`coverage% = (t + Trans) / (t + Trans + hardcoded)`. The detector errs toward over-counting hardcoded text, so a page only reads 100% when it has no stray literals. Treat counts as ±a few; use them for ranking/triage, not as a compiler.
+
+**Scope of the "to 100%" target.**
+- **In scope:** all user-facing `pages/*` (table below) plus the components each page renders (a page is not "done" until its child components stop leaking English — see gap #1894 for the data-catalog leakers).
+- **Staff-only (`pages/admin/*`, `pages/superadmin/*`) — out of scope, English by policy** (gap #634): 24 files / ~408 hardcoded strings, excluded from the table. Pass `--staff` to include them.
+- **Legal bodies** ([TermsOfService.tsx](hired.video/frontend/pages/TermsOfService.tsx) #1200, plus already-extracted Privacy/Cookie) get structurally localized here, but the es/fr-CA copy is competent working-knowledge and still needs **certified legal-translator review before CA/MX launch** (gap #1202).
+- **Components scope (tracked separately):** `components/*` carries another ~5,600 hardcoded strings across ~656 files at ~26% coverage. Highest-leverage shared components ([SearchBar.tsx](hired.video/frontend/components/SearchBar.tsx), [ResumeViewer.tsx](hired.video/frontend/components/ResumeViewer.tsx), studio panels) are pulled in alongside the pages that render them.
+
+**Headline (user-facing pages, regenerated 2026-06-04):** **34% localized · 3,820 hardcoded strings across 173 files · 10 already at 100%.** Total project surface incl. components ≈ 9,800 hardcoded strings (31%).
+
+**Progress log** (newest first — update when a page reaches ✅ 100%):
+- 2026-06-04 — Home route ([Index.tsx](hired.video/frontend/pages/Index.tsx)) child components localized: [UnifiedSearch](hired.video/frontend/components/UnifiedSearch.tsx), [FeaturedTools](hired.video/frontend/components/FeaturedTools.tsx), [LatestGuides](hired.video/frontend/components/LatestGuides.tsx), [TemplateGallery](hired.video/frontend/components/resume-renderer/TemplateGallery.tsx) (30 keys × 3 locales). Catalog + this section established.
+
+### Catalog — user-facing pages (sorted by hardcoded count, highest leverage first)
+
+| File | t()+Trans | Hardcoded | Coverage |
+|------|----------:|----------:|---------:|
+| [pages/TermsOfService.tsx](hired.video/frontend/pages/TermsOfService.tsx) | 0 | 390 | 🔴 0% |
+| [pages/Pricing.tsx](hired.video/frontend/pages/Pricing.tsx) | 0 | 224 | 🔴 0% |
+| [pages/People.tsx](hired.video/frontend/pages/People.tsx) | 22 | 106 | 🔴 17% |
+| [pages/JobCreatePage.tsx](hired.video/frontend/pages/JobCreatePage.tsx) | 0 | 103 | 🔴 0% |
+| [pages/Jobs.tsx](hired.video/frontend/pages/Jobs.tsx) | 13 | 95 | 🔴 12% |
+| [pages/tools/SentimentAnalysis.tsx](hired.video/frontend/pages/tools/SentimentAnalysis.tsx) | 0 | 81 | 🔴 0% |
+| [pages/Resumes.tsx](hired.video/frontend/pages/Resumes.tsx) | 0 | 75 | 🔴 0% |
+| [pages/studio/v2/StudioEditorV2.tsx](hired.video/frontend/pages/studio/v2/StudioEditorV2.tsx) | 0 | 72 | 🔴 0% |
+| [pages/InterviewPractice.tsx](hired.video/frontend/pages/InterviewPractice.tsx) | 0 | 70 | 🔴 0% |
+| [pages/studio/StudioLayout.tsx](hired.video/frontend/pages/studio/StudioLayout.tsx) | 0 | 68 | 🔴 0% |
+| [pages/tools/InterviewQuestions.tsx](hired.video/frontend/pages/tools/InterviewQuestions.tsx) | 0 | 63 | 🔴 0% |
+| [pages/tools/ResumeConsolidator.tsx](hired.video/frontend/pages/tools/ResumeConsolidator.tsx) | 0 | 61 | 🔴 0% |
+| [pages/studio/StudioSidebar.tsx](hired.video/frontend/pages/studio/StudioSidebar.tsx) | 0 | 60 | 🔴 0% |
+| [pages/paid-media/PaidMediaPage.tsx](hired.video/frontend/pages/paid-media/PaidMediaPage.tsx) | 0 | 59 | 🔴 0% |
+| [pages/ServicesManagement.tsx](hired.video/frontend/pages/ServicesManagement.tsx) | 0 | 58 | 🔴 0% |
+| [pages/services/PitchDeckBuilder.tsx](hired.video/frontend/pages/services/PitchDeckBuilder.tsx) | 0 | 57 | 🔴 0% |
+| [pages/Companies.tsx](hired.video/frontend/pages/Companies.tsx) | 0 | 56 | 🔴 0% |
+| [pages/CompanyDetail.tsx](hired.video/frontend/pages/CompanyDetail.tsx) | 0 | 53 | 🔴 0% |
+| [pages/AffiliateProgram.tsx](hired.video/frontend/pages/AffiliateProgram.tsx) | 1 | 52 | 🔴 2% |
+| [pages/people/PeopleRoster.tsx](hired.video/frontend/pages/people/PeopleRoster.tsx) | 0 | 49 | 🔴 0% |
+| [pages/EventNew.tsx](hired.video/frontend/pages/EventNew.tsx) | 0 | 47 | 🔴 0% |
+| [pages/tools/SalaryCalculator.tsx](hired.video/frontend/pages/tools/SalaryCalculator.tsx) | 0 | 46 | 🔴 0% |
+| [pages/MyInterviewAssignments.tsx](hired.video/frontend/pages/MyInterviewAssignments.tsx) | 0 | 45 | 🔴 0% |
+| [pages/Tools.tsx](hired.video/frontend/pages/Tools.tsx) | 0 | 45 | 🔴 0% |
+| [pages/services/ScreeningTemplates.tsx](hired.video/frontend/pages/services/ScreeningTemplates.tsx) | 0 | 41 | 🔴 0% |
+| [pages/tools/InterviewTemplates.tsx](hired.video/frontend/pages/tools/InterviewTemplates.tsx) | 0 | 41 | 🔴 0% |
+| [pages/tools/ResumeTailor.tsx](hired.video/frontend/pages/tools/ResumeTailor.tsx) | 0 | 41 | 🔴 0% |
+| [pages/ResumeDetail.tsx](hired.video/frontend/pages/ResumeDetail.tsx) | 0 | 40 | 🔴 0% |
+| [pages/Checkout.tsx](hired.video/frontend/pages/Checkout.tsx) | 0 | 39 | 🔴 0% |
+| [pages/tools/SkillExtractor.tsx](hired.video/frontend/pages/tools/SkillExtractor.tsx) | 0 | 36 | 🔴 0% |
+| [pages/Rewards.tsx](hired.video/frontend/pages/Rewards.tsx) | 0 | 35 | 🔴 0% |
+| [pages/Onboarding.tsx](hired.video/frontend/pages/Onboarding.tsx) | 1 | 35 | 🔴 3% |
+| [pages/recruiter/PlacementDetail.tsx](hired.video/frontend/pages/recruiter/PlacementDetail.tsx) | 0 | 33 | 🔴 0% |
+| [pages/CourseLearner.tsx](hired.video/frontend/pages/CourseLearner.tsx) | 0 | 32 | 🔴 0% |
+| [pages/tools/VideoPitchLab.tsx](hired.video/frontend/pages/tools/VideoPitchLab.tsx) | 0 | 32 | 🔴 0% |
+| [pages/recruit/LiveScreens.tsx](hired.video/frontend/pages/recruit/LiveScreens.tsx) | 0 | 31 | 🔴 0% |
+| [pages/tools/ProfileAudit.tsx](hired.video/frontend/pages/tools/ProfileAudit.tsx) | 0 | 30 | 🔴 0% |
+| [pages/PrivacyPolicy.tsx](hired.video/frontend/pages/PrivacyPolicy.tsx) | 252 | 30 | 🟡 89% |
+| [pages/studio/AsyncInterviewPage.tsx](hired.video/frontend/pages/studio/AsyncInterviewPage.tsx) | 0 | 29 | 🔴 0% |
+| [pages/studio/StudioLanding.tsx](hired.video/frontend/pages/studio/StudioLanding.tsx) | 0 | 29 | 🔴 0% |
+| [pages/studio/StudioWizard.tsx](hired.video/frontend/pages/studio/StudioWizard.tsx) | 0 | 29 | 🔴 0% |
+| [pages/recruit/AgentRuns.tsx](hired.video/frontend/pages/recruit/AgentRuns.tsx) | 0 | 28 | 🔴 0% |
+| [pages/PeopleOperations.tsx](hired.video/frontend/pages/PeopleOperations.tsx) | 0 | 27 | 🔴 0% |
+| [pages/tools/FormAutofill.tsx](hired.video/frontend/pages/tools/FormAutofill.tsx) | 17 | 27 | 🔴 39% |
+| [pages/people/PeopleGoals.tsx](hired.video/frontend/pages/people/PeopleGoals.tsx) | 0 | 26 | 🔴 0% |
+| [pages/people/PeopleOneOnOnes.tsx](hired.video/frontend/pages/people/PeopleOneOnOnes.tsx) | 0 | 26 | 🔴 0% |
+| [pages/services/CandidateDetail.tsx](hired.video/frontend/pages/services/CandidateDetail.tsx) | 0 | 26 | 🔴 0% |
+| [pages/ChromeExtension.tsx](hired.video/frontend/pages/ChromeExtension.tsx) | 0 | 25 | 🔴 0% |
+| [pages/studio/StudioProjectActions.tsx](hired.video/frontend/pages/studio/StudioProjectActions.tsx) | 0 | 25 | 🔴 0% |
+| [pages/CandidateScreening.tsx](hired.video/frontend/pages/CandidateScreening.tsx) | 0 | 24 | 🔴 0% |
+| [pages/Feed.tsx](hired.video/frontend/pages/Feed.tsx) | 0 | 24 | 🔴 0% |
+| [pages/Help.tsx](hired.video/frontend/pages/Help.tsx) | 0 | 23 | 🔴 0% |
+| [pages/References.tsx](hired.video/frontend/pages/References.tsx) | 0 | 23 | 🔴 0% |
+| [pages/EventManage.tsx](hired.video/frontend/pages/EventManage.tsx) | 0 | 22 | 🔴 0% |
+| [pages/tools/EmployerResearch.tsx](hired.video/frontend/pages/tools/EmployerResearch.tsx) | 0 | 22 | 🔴 0% |
+| [pages/PrivacyOptOut.tsx](hired.video/frontend/pages/PrivacyOptOut.tsx) | 0 | 21 | 🔴 0% |
+| [pages/studio/StudioActions.tsx](hired.video/frontend/pages/studio/StudioActions.tsx) | 0 | 21 | 🔴 0% |
+| [pages/Outreach.tsx](hired.video/frontend/pages/Outreach.tsx) | 147 | 21 | 🟡 88% |
+| [pages/PivotExplorer.tsx](hired.video/frontend/pages/PivotExplorer.tsx) | 0 | 20 | 🔴 0% |
+| [pages/SectorLanding.tsx](hired.video/frontend/pages/SectorLanding.tsx) | 0 | 20 | 🔴 0% |
+| [pages/seo/SalaryPage.tsx](hired.video/frontend/pages/seo/SalaryPage.tsx) | 0 | 20 | 🔴 0% |
+| [pages/guides/VideoBestPractices.tsx](hired.video/frontend/pages/guides/VideoBestPractices.tsx) | 0 | 18 | 🔴 0% |
+| [pages/ForAgencies.tsx](hired.video/frontend/pages/ForAgencies.tsx) | 0 | 17 | 🔴 0% |
+| [pages/Careers.tsx](hired.video/frontend/pages/Careers.tsx) | 36 | 17 | 🔴 68% |
+| [pages/Settings.tsx](hired.video/frontend/pages/Settings.tsx) | 223 | 17 | 🟡 93% |
+| [pages/Contributors.tsx](hired.video/frontend/pages/Contributors.tsx) | 0 | 15 | 🔴 0% |
+| [pages/Security.tsx](hired.video/frontend/pages/Security.tsx) | 0 | 15 | 🔴 0% |
+| [pages/tools/PredictiveAssessments.tsx](hired.video/frontend/pages/tools/PredictiveAssessments.tsx) | 0 | 15 | 🔴 0% |
+| [pages/marketplace/CoursePublicDetail.tsx](hired.video/frontend/pages/marketplace/CoursePublicDetail.tsx) | 0 | 14 | 🔴 0% |
+| [pages/marketplace/VoicePublicDetail.tsx](hired.video/frontend/pages/marketplace/VoicePublicDetail.tsx) | 0 | 14 | 🔴 0% |
+| [pages/recruiter/BdPipeline.tsx](hired.video/frontend/pages/recruiter/BdPipeline.tsx) | 0 | 14 | 🔴 0% |
+| [pages/services/PitchDecksList.tsx](hired.video/frontend/pages/services/PitchDecksList.tsx) | 0 | 14 | 🔴 0% |
+| [pages/AICoach.tsx](hired.video/frontend/pages/AICoach.tsx) | 0 | 13 | 🔴 0% |
+| [pages/LiveScreenInvite.tsx](hired.video/frontend/pages/LiveScreenInvite.tsx) | 0 | 13 | 🔴 0% |
+| [pages/ResumeRoast.tsx](hired.video/frontend/pages/ResumeRoast.tsx) | 0 | 13 | 🔴 0% |
+| [pages/studio/StudioPreview.tsx](hired.video/frontend/pages/studio/StudioPreview.tsx) | 0 | 13 | 🔴 0% |
+| [pages/TakeHomeDeliveryPage.tsx](hired.video/frontend/pages/TakeHomeDeliveryPage.tsx) | 0 | 13 | 🔴 0% |
+| [pages/tools/CompAnalyzer.tsx](hired.video/frontend/pages/tools/CompAnalyzer.tsx) | 0 | 13 | 🔴 0% |
+| [pages/tools/Career360.tsx](hired.video/frontend/pages/tools/Career360.tsx) | 5 | 13 | 🔴 28% |
+| [pages/JobDetail.tsx](hired.video/frontend/pages/JobDetail.tsx) | 9 | 13 | 🔴 41% |
+| [pages/PhoneDashboard.tsx](hired.video/frontend/pages/PhoneDashboard.tsx) | 132 | 13 | 🟡 91% |
+| [pages/CertificateVerify.tsx](hired.video/frontend/pages/CertificateVerify.tsx) | 0 | 12 | 🔴 0% |
+| [pages/people/PeopleTco.tsx](hired.video/frontend/pages/people/PeopleTco.tsx) | 0 | 12 | 🔴 0% |
+| [pages/Tasks.tsx](hired.video/frontend/pages/Tasks.tsx) | 124 | 12 | 🟡 91% |
+| [pages/Competitors.tsx](hired.video/frontend/pages/Competitors.tsx) | 0 | 11 | 🔴 0% |
+| [pages/seo/ResumeGuidePage.tsx](hired.video/frontend/pages/seo/ResumeGuidePage.tsx) | 0 | 11 | 🔴 0% |
+| [pages/CourseCheckout.tsx](hired.video/frontend/pages/CourseCheckout.tsx) | 0 | 10 | 🔴 0% |
+| [pages/EventDetail.tsx](hired.video/frontend/pages/EventDetail.tsx) | 0 | 10 | 🔴 0% |
+| [pages/MarketplaceTemplatePreview.tsx](hired.video/frontend/pages/MarketplaceTemplatePreview.tsx) | 0 | 10 | 🔴 0% |
+| [pages/blog/BlogIndex.tsx](hired.video/frontend/pages/blog/BlogIndex.tsx) | 0 | 9 | 🔴 0% |
+| [pages/CheckoutSuccess.tsx](hired.video/frontend/pages/CheckoutSuccess.tsx) | 0 | 9 | 🔴 0% |
+| [pages/EmbeddedResume.tsx](hired.video/frontend/pages/EmbeddedResume.tsx) | 0 | 9 | 🔴 0% |
+| [pages/people/PeopleTeamHealth.tsx](hired.video/frontend/pages/people/PeopleTeamHealth.tsx) | 0 | 9 | 🔴 0% |
+| [pages/seo/SalaryIndexPage.tsx](hired.video/frontend/pages/seo/SalaryIndexPage.tsx) | 0 | 9 | 🔴 0% |
+| [pages/services/ScorecardsPage.tsx](hired.video/frontend/pages/services/ScorecardsPage.tsx) | 0 | 9 | 🔴 0% |
+| [pages/TakeHomeAssignment.tsx](hired.video/frontend/pages/TakeHomeAssignment.tsx) | 0 | 9 | 🔴 0% |
+| [pages/WarmIntros.tsx](hired.video/frontend/pages/WarmIntros.tsx) | 0 | 9 | 🔴 0% |
+| [pages/tools/VendorSync.tsx](hired.video/frontend/pages/tools/VendorSync.tsx) | 21 | 9 | 🟡 70% |
+| [pages/ArticlesIndex.tsx](hired.video/frontend/pages/ArticlesIndex.tsx) | 0 | 8 | 🔴 0% |
+| [pages/Contact.tsx](hired.video/frontend/pages/Contact.tsx) | 0 | 8 | 🔴 0% |
+| [pages/CourseReviewQueue.tsx](hired.video/frontend/pages/CourseReviewQueue.tsx) | 0 | 8 | 🔴 0% |
+| [pages/people/PeopleOpsHub.tsx](hired.video/frontend/pages/people/PeopleOpsHub.tsx) | 0 | 8 | 🔴 0% |
+| [pages/PlayInvite.tsx](hired.video/frontend/pages/PlayInvite.tsx) | 0 | 8 | 🔴 0% |
+| [pages/ForIndex.tsx](hired.video/frontend/pages/ForIndex.tsx) | 0 | 7 | 🔴 0% |
+| [pages/HiringManagerPortal.tsx](hired.video/frontend/pages/HiringManagerPortal.tsx) | 0 | 7 | 🔴 0% |
+| [pages/landing/AudienceLandingPage.tsx](hired.video/frontend/pages/landing/AudienceLandingPage.tsx) | 0 | 7 | 🔴 0% |
+| [pages/landing/LocationLandingPage.tsx](hired.video/frontend/pages/landing/LocationLandingPage.tsx) | 0 | 7 | 🔴 0% |
+| [pages/PublicVideoResume.tsx](hired.video/frontend/pages/PublicVideoResume.tsx) | 0 | 7 | 🔴 0% |
+| [pages/studio/ATSLandingPage.tsx](hired.video/frontend/pages/studio/ATSLandingPage.tsx) | 0 | 7 | 🔴 0% |
+| [pages/VerifyEmail.tsx](hired.video/frontend/pages/VerifyEmail.tsx) | 15 | 7 | 🔴 68% |
+| [pages/Dashboard.tsx](hired.video/frontend/pages/Dashboard.tsx) | 20 | 7 | 🟡 74% |
+| [pages/services/HiringOnboarding.tsx](hired.video/frontend/pages/services/HiringOnboarding.tsx) | 76 | 7 | 🟡 92% |
+| [pages/blog/BlogPost.tsx](hired.video/frontend/pages/blog/BlogPost.tsx) | 0 | 6 | 🔴 0% |
+| [pages/CompanyReviewsPage.tsx](hired.video/frontend/pages/CompanyReviewsPage.tsx) | 0 | 6 | 🔴 0% |
+| [pages/guides/WorkforceGuide.tsx](hired.video/frontend/pages/guides/WorkforceGuide.tsx) | 0 | 6 | 🔴 0% |
+| [pages/landing/TemplateLandingPage.tsx](hired.video/frontend/pages/landing/TemplateLandingPage.tsx) | 0 | 6 | 🔴 0% |
+| [pages/ResumeTemplatesGallery.tsx](hired.video/frontend/pages/ResumeTemplatesGallery.tsx) | 0 | 6 | 🔴 0% |
+| [pages/RetainedSearchDirectory.tsx](hired.video/frontend/pages/RetainedSearchDirectory.tsx) | 0 | 6 | 🔴 0% |
+| [pages/studio/StudioEditor.tsx](hired.video/frontend/pages/studio/StudioEditor.tsx) | 0 | 6 | 🔴 0% |
+| [pages/JobApplicationPage.tsx](hired.video/frontend/pages/JobApplicationPage.tsx) | 29 | 6 | 🟡 83% |
+| [pages/AffiliateDashboard.tsx](hired.video/frontend/pages/AffiliateDashboard.tsx) | 40 | 6 | 🟡 87% |
+| [pages/guides/JobSearchStrategies.tsx](hired.video/frontend/pages/guides/JobSearchStrategies.tsx) | 0 | 5 | 🔴 0% |
+| [pages/PersonaSelection.tsx](hired.video/frontend/pages/PersonaSelection.tsx) | 0 | 5 | 🔴 0% |
+| [pages/ReferencesShared.tsx](hired.video/frontend/pages/ReferencesShared.tsx) | 0 | 5 | 🔴 0% |
+| [pages/studio/StudioSettings.tsx](hired.video/frontend/pages/studio/StudioSettings.tsx) | 0 | 5 | 🔴 0% |
+| [pages/tools/ValueProposition.tsx](hired.video/frontend/pages/tools/ValueProposition.tsx) | 12 | 5 | 🟡 71% |
+| [pages/guides/NetworkingTips.tsx](hired.video/frontend/pages/guides/NetworkingTips.tsx) | 0 | 4 | 🔴 0% |
+| [pages/JobEmbed.tsx](hired.video/frontend/pages/JobEmbed.tsx) | 0 | 4 | 🔴 0% |
+| [pages/PlaceholderPage.tsx](hired.video/frontend/pages/PlaceholderPage.tsx) | 0 | 4 | 🔴 0% |
+| [pages/ResumeEditPage.tsx](hired.video/frontend/pages/ResumeEditPage.tsx) | 0 | 4 | 🔴 0% |
+| [pages/SectorsIndex.tsx](hired.video/frontend/pages/SectorsIndex.tsx) | 0 | 4 | 🔴 0% |
+| [pages/ToolDetail.tsx](hired.video/frontend/pages/ToolDetail.tsx) | 0 | 4 | 🔴 0% |
+| [pages/ArticleView.tsx](hired.video/frontend/pages/ArticleView.tsx) | 5 | 4 | 🔴 56% |
+| [pages/tools/JobResumeMatch.tsx](hired.video/frontend/pages/tools/JobResumeMatch.tsx) | 15 | 4 | 🟡 79% |
+| [pages/Home.tsx](hired.video/frontend/pages/Home.tsx) | 82 | 4 | 🟡 95% |
+| [pages/guides/GettingStarted.tsx](hired.video/frontend/pages/guides/GettingStarted.tsx) | 0 | 3 | 🔴 0% |
+| [pages/guides/Tutorials.tsx](hired.video/frontend/pages/guides/Tutorials.tsx) | 0 | 3 | 🔴 0% |
+| [pages/JobEditPage.tsx](hired.video/frontend/pages/JobEditPage.tsx) | 0 | 3 | 🔴 0% |
+| [pages/landing/LifeStageLandingPage.tsx](hired.video/frontend/pages/landing/LifeStageLandingPage.tsx) | 0 | 3 | 🔴 0% |
+| [pages/tools/AIResumeScorer.tsx](hired.video/frontend/pages/tools/AIResumeScorer.tsx) | 0 | 3 | 🔴 0% |
+| [pages/ServiceInquiries.tsx](hired.video/frontend/pages/ServiceInquiries.tsx) | 23 | 3 | 🟡 88% |
+| [pages/SourcingBrowse.tsx](hired.video/frontend/pages/SourcingBrowse.tsx) | 25 | 3 | 🟡 89% |
+| [pages/ForRecruiters.tsx](hired.video/frontend/pages/ForRecruiters.tsx) | 89 | 3 | 🟡 97% |
+| [pages/CompanyEditPage.tsx](hired.video/frontend/pages/CompanyEditPage.tsx) | 0 | 2 | 🔴 0% |
+| [pages/Features.tsx](hired.video/frontend/pages/Features.tsx) | 0 | 2 | 🔴 0% |
+| [pages/NotFound.tsx](hired.video/frontend/pages/NotFound.tsx) | 0 | 2 | 🔴 0% |
+| [pages/PublicProfile.tsx](hired.video/frontend/pages/PublicProfile.tsx) | 0 | 2 | 🔴 0% |
+| [pages/SecuritySessions.tsx](hired.video/frontend/pages/SecuritySessions.tsx) | 0 | 2 | 🔴 0% |
+| [pages/SitemapLocations.tsx](hired.video/frontend/pages/SitemapLocations.tsx) | 0 | 2 | 🔴 0% |
+| [pages/studio/Studio.tsx](hired.video/frontend/pages/studio/Studio.tsx) | 0 | 2 | 🔴 0% |
+| [pages/TranscriptSearch.tsx](hired.video/frontend/pages/TranscriptSearch.tsx) | 16 | 2 | 🟡 89% |
+| [pages/AcceptInvitation.tsx](hired.video/frontend/pages/AcceptInvitation.tsx) | 25 | 2 | 🟡 93% |
+| [pages/PeopleDetail.tsx](hired.video/frontend/pages/PeopleDetail.tsx) | 33 | 2 | 🟡 94% |
+| [pages/tools/PdfToJson.tsx](hired.video/frontend/pages/tools/PdfToJson.tsx) | 36 | 2 | 🟡 95% |
+| [pages/tools/SummarizeResume.tsx](hired.video/frontend/pages/tools/SummarizeResume.tsx) | 35 | 2 | 🟡 95% |
+| [pages/CookiePolicy.tsx](hired.video/frontend/pages/CookiePolicy.tsx) | 71 | 2 | 🟡 97% |
+| [pages/CompanyCreatePage.tsx](hired.video/frontend/pages/CompanyCreatePage.tsx) | 0 | 1 | 🔴 0% |
+| [pages/people/PeopleSurface.tsx](hired.video/frontend/pages/people/PeopleSurface.tsx) | 0 | 1 | 🔴 0% |
+| [pages/Points.tsx](hired.video/frontend/pages/Points.tsx) | 0 | 1 | 🔴 0% |
+| [pages/SharedCandidateResume.tsx](hired.video/frontend/pages/SharedCandidateResume.tsx) | 8 | 1 | 🟡 89% |
+| [pages/SharedPitchDeck.tsx](hired.video/frontend/pages/SharedPitchDeck.tsx) | 14 | 1 | 🟡 93% |
+| [pages/SignupSuccess.tsx](hired.video/frontend/pages/SignupSuccess.tsx) | 21 | 1 | 🟡 95% |
+| [pages/About.tsx](hired.video/frontend/pages/About.tsx) | 56 | 1 | 🟡 98% |
+| [pages/ConfirmEmail.tsx](hired.video/frontend/pages/ConfirmEmail.tsx) | 6 | 0 | ✅ 100% |
+| [pages/ForgotPassword.tsx](hired.video/frontend/pages/ForgotPassword.tsx) | 20 | 0 | ✅ 100% |
+| [pages/Index.tsx](hired.video/frontend/pages/Index.tsx) | 14 | 0 | ✅ 100% |
+| [pages/Login.tsx](hired.video/frontend/pages/Login.tsx) | 55 | 0 | ✅ 100% |
+| [pages/MagicLinkVerify.tsx](hired.video/frontend/pages/MagicLinkVerify.tsx) | 7 | 0 | ✅ 100% |
+| [pages/OAuthCallback.tsx](hired.video/frontend/pages/OAuthCallback.tsx) | 11 | 0 | ✅ 100% |
+| [pages/PostAJob.tsx](hired.video/frontend/pages/PostAJob.tsx) | 27 | 0 | ✅ 100% |
+| [pages/ResetPassword.tsx](hired.video/frontend/pages/ResetPassword.tsx) | 29 | 0 | ✅ 100% |
+| [pages/Search.tsx](hired.video/frontend/pages/Search.tsx) | 1 | 0 | ✅ 100% |
+| [pages/Signup.tsx](hired.video/frontend/pages/Signup.tsx) | 68 | 0 | ✅ 100% |
+
+
+---
+
 ## Consolidated Gap Register
 
 Single source of truth for **open + partial + removed** items. Add a new entry to the bottom of the value tier it belongs to (see **Ordering** below); status changes happen in place. The bulk of `✅ Done` history is summarized in the [Done — Shipped Capability Summary](#done--shipped-capability-summary) above; Done rows that still carry useful detail are collected in the Resolved sections at the very bottom.
@@ -3277,6 +3484,7 @@ Single source of truth for **open + partial + removed** items. Add a new entry t
 | 1890 | ✅ Done | Soon | P2 | `feature` | **No educator/employer progress-monitoring dashboard — xAPI is stored but never surfaced** (opened+shipped 2026-06-04). SHIPPED: [cohort-analytics.ts](hired.video/api/src/services/learning/cohort-analytics.ts) `CohortAnalyticsService` — per-member × per-assignment status (not_started/in_progress/completed/not_linked), score %, fraction, overdue-vs-dueAt, + cohort summary (completion rate, overdue count). FULLY BATCHED (O(1) round-trips) and served through `getOrSetCached` (45s TTL); structural mutations call `invalidateCohortAnalyticsCache`. Surfaced as the progress grid in [ClassroomsPanel.tsx](hired.video/frontend/components/courses/ClassroomsPanel.tsx) — the **Classrooms tab on `/tools?tab=classrooms`** (`/learning/cohorts` redirects) — via `GET /api/cohorts/:id/analytics`. RESIDUAL (logged as #1892): student progress writes in courses.ts (SCORM commit / lesson progress) have no cohort handle, so live progress only refreshes within the 45s TTL — wiring reverse cohort-cache invalidation on learner writes would make it instant. Also: time-on-task / lessons-per-week trend columns not yet surfaced (data in `scorm_cmi_states.totalTimeSec` + `xapi_statements`). |
 | 1892 | 🔲 Open | Soon | P3 | `arch` | **Cohort analytics roll-up only refreshes within its 45s cache TTL after a student progresses** (opened 2026-06-04, from #1890). [cohort-analytics.ts](hired.video/api/src/services/learning/cohort-analytics.ts) serves the educator progress grid through `getOrSetCached` and invalidates instantly on STRUCTURAL changes (member/assignment/cohort mutations in cohort-service + assignment-service). But STUDENT progress is written in [courses.ts](hired.video/api/src/routes/courses.ts) (SCORM commit / `PATCH …/progress`) which has no cohort handle, so a learner finishing a lesson surfaces in the educator view only after the 45s TTL lapses. Fix: on a learner progress/SCORM write, look up the cohorts that user is an active member of and call `invalidateCohortAnalyticsCache(cohortId)` for each (a single indexed `cohort_members WHERE user_id=` query). Unblocks real-time progress monitoring. Also owed: time-on-task / lessons-per-week trend columns (data already in `scorm_cmi_states.totalTimeSec` + `xapi_statements`). |
 | 1893 | 🔲 Open | Later | P3 | `feature` | **Assigned learning-path → per-course enrollment isn't auto-created until the student opens each course** (opened 2026-06-04, from #1888). [assignment-service.ts](hired.video/api/src/services/learning/assignment-service.ts) `fanOutEnrollments` materialises a `learning_path_enrollments` row for a path assignment, but the constituent `course_enrollments` are still created lazily when the learner enters each course (existing flow). So a path assignment's per-course rows (and thus the analytics fraction for unopened courses) read as not_started even though assigned. Acceptable for now (the path-level completion is tracked), but auto-enrolling the path's courses on assignment would make the cohort grid exact from minute zero. Unblocks precise path-assignment analytics. |
+| 1894 | 🔲 Open | Soon | P3 | `feature` | **No dedicated Educator/Student marketing landing page for the Classrooms capability** (opened 2026-06-04). The new cohort/assigned-training feature (#1887-#1890) is now marketed inline on the [Pricing](hired.video/frontend/pages/Pricing.tsx) feature rows, the [CompetitorComparison](hired.video/frontend/components/CompetitorComparison.tsx) table (vs i-Ready / LinkedIn Learning), and the unauth `/tools` hero ([Tools.tsx](hired.video/frontend/pages/Tools.tsx)) — but there's no standalone `/for/educators` or `/for/students` landing page tying "build content → group a class → assign training → learners get hired" into one SEO-targeted funnel (the audiences exist in template-seeds per #900/#903 but have no marketing page). Build via the existing AudienceLandingPage pattern + PAGE_SEO. Unblocks educator/student top-of-funnel acquisition — the exact audience the feature was built to attract. |
 | 1891 | 🔲 Open | Later | P3 | `feature` | **Student self-service signup, minor/COPPA-FERPA handling, and school/district tenant onboarding unscoped** (opened 2026-06-04). If Students self-register (vs invite-only via educator cohort #1887), the signup picker + `RegisterSchema` enum ([auth.ts](hired.video/api/src/routes/auth.ts) ~L192) + [Signup.tsx](hired.video/frontend/pages/Signup.tsx) picker need a learning entry, AND any sub-18 / K-12 audience pulls in COPPA/FERPA parental-consent + data-handling obligations the current adult-upskilling signup doesn't address. Existing register flow seeds role-keyed profile sections + onboarding tasks, so a learning persona needs its own seeds. Ties to the dormant "University + bootcamp tenant types + student-recruiting analytics (#79)" register entry. Decide: adult-upskilling-only (low risk, ship now) vs K-12 (requires consent/compliance workstream) before opening self-serve student signup. |
 
 ### Tier 4 — Cost / Quality / Arch  (code health, performance, bugs, refactors — risk & cost reduction) — 193 items

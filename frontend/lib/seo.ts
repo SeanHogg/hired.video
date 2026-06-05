@@ -254,6 +254,20 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Track company, team, and individual OKRs with key-result progress that rolls up automatically and flags at-risk goals.",
     keywords: "OKR software, goals tracking, key results, objectives, people operations, at-risk goals",
   },
+  "/bookings": {
+    title: "1:1 Sessions — Bookings — hired.video",
+    description:
+      "Configure your bookable sessions: offerings, availability, payouts, and a public booking page your audience can use without signing up.",
+    keywords: "bookings, 1:1 sessions, coaching calendar, consulting bookings",
+  },
+  "/book/:handle": {
+    title: "Book a session — hired.video",
+    description: "Pick a time on the host's public calendar. No sign-up required.",
+  },
+  "/book/:handle/r/:token": {
+    title: "Your reservation — hired.video",
+    description: "View, comment, reschedule or cancel your reservation.",
+  },
   "/people": {
     // `/people` serves two audiences off one route: the consumer
     // Professional Network (warm intros, coffee chats, free DMs) and the

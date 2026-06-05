@@ -61,6 +61,7 @@ export const creatorProfiles = pgTable(
     articlesActive: boolean("articles_active").default(false).notNull(),
     coursesActive: boolean("courses_active").default(false).notNull(),
     templatesActive: boolean("templates_active").default(false).notNull(),
+    bookingsActive: boolean("bookings_active").default(false).notNull(),
 
     // Opt-in state
     isActive: boolean("is_active").default(false).notNull(),

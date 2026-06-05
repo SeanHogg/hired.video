@@ -32,6 +32,7 @@ import {
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { promptDialog } from "@/lib/dialogs";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -65,6 +66,7 @@ import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import { entityBreadcrumb } from "@/components/entity-breadcrumb";
 
 export default function CompanyDetail() {
+  const { t } = useTranslation();
   usePageChrome();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -95,7 +97,7 @@ export default function CompanyDetail() {
         setCompany(companyData);
       } catch (err) {
         console.error("Failed to load company:", err);
-        setError("Failed to load company. Please try again.");
+        setError(t("errors.companyDetail.loadFailed"));
       } finally {
         setIsLoading(false);
       }
@@ -127,7 +129,7 @@ export default function CompanyDetail() {
       navigate("/login", {
         state: {
           from: `/companies/${id}`,
-          message: "Please log in to follow companies",
+          message: t("messages.companyDetail.loginToFollow"),
         },
       });
       return;
@@ -186,15 +188,14 @@ export default function CompanyDetail() {
       <AppShell bgClassName="bg-background">
 <div className="p-6">
             <div className="text-center">
-              <h1 className="text-2xl font-bold mb-4">Company Not Found</h1>
+              <h1 className="text-2xl font-bold mb-4">{t("headings.companyDetail.notFound")}</h1>
               <p className="text-muted-foreground mb-6">
-                The company you're looking for doesn't exist or has been
-                removed.
+                {t("messages.companyDetail.notFoundBody")}
               </p>
               <Button asChild>
                 <Link to="/companies">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Companies
+                  {t("actions.companyDetail.backToCompanies")}
                 </Link>
               </Button>
             </div>
@@ -226,7 +227,7 @@ export default function CompanyDetail() {
   const onboardingProgress = Math.round((completedTasks / totalTasks) * 100);
 
   const companyTabs = entityBreadcrumb(
-    { label: "Companies", to: "/companies", icon: Building2 },
+    { label: t("labels.companies"), to: "/companies", icon: Building2 },
     company.data.name,
   );
 
@@ -301,7 +302,7 @@ export default function CompanyDetail() {
                             {company.data.size && company.data.size !== "Not specified" && (
                               <div className="flex items-center gap-1">
                                 <Users className="h-4 w-4" />
-                                <span>{company.data.size} employees</span>
+                                <span>{t("labels.companyDetail.sizeEmployees", { size: company.data.size })}</span>
                               </div>
                             )}
                             {(company.data.headquarters?.city || company.data.headquarters?.state) && (
@@ -310,7 +311,7 @@ export default function CompanyDetail() {
                                 <span>
                                   {[company.data.headquarters.city, company.data.headquarters.state]
                                     .filter(Boolean)
-                                    .join(", ") || "Location not specified"}
+                                    .join(", ") || t("labels.companyDetail.locationNotSpecified")}
                                 </span>
                               </div>
                             )}
@@ -328,7 +329,7 @@ export default function CompanyDetail() {
                             <Button asChild>
                               <Link to={`/companies/edit/${company.id}`}>
                                 <Edit className="h-4 w-4 mr-2" />
-                                Edit Company
+                                {t("actions.companyDetail.edit")}
                               </Link>
                             </Button>
                           ) : (
@@ -340,18 +341,18 @@ export default function CompanyDetail() {
                                 isTracked ? (
                                   <>
                                     <BookmarkCheck className="h-4 w-4 mr-2" />
-                                    Following
+                                    {t("actions.following")}
                                   </>
                                 ) : (
                                   <>
                                     <Bookmark className="h-4 w-4 mr-2" />
-                                    Follow
+                                    {t("actions.follow")}
                                   </>
                                 )
                               ) : (
                                 <>
                                   <Bookmark className="h-4 w-4 mr-2" />
-                                  Follow Company
+                                  {t("actions.companyDetail.followCompany")}
                                 </>
                               )}
                             </Button>
@@ -365,13 +366,13 @@ export default function CompanyDetail() {
                                 .writeText(url)
                                 .then(() => {
                                   toast({
-                                    title: "Link copied!",
-                                    description: "Company link has been copied to your clipboard.",
+                                    title: t("messages.linkCopiedTitle"),
+                                    description: t("messages.companyDetail.linkCopiedDesc"),
                                   });
                                 })
                                 .catch(async () => {
                                   // Fallback for older browsers
-                                  await promptDialog({ title: "Copy link", label: "Copy this link:", defaultValue: url });
+                                  await promptDialog({ title: t("actions.copyLink"), label: t("labels.companyDetail.copyThisLink"), defaultValue: url });
                                 });
                             }}
                           >
@@ -379,7 +380,7 @@ export default function CompanyDetail() {
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="icon" aria-label="More actions">
+                              <Button variant="outline" size="icon" aria-label={t("actions.moreActions")}>
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -403,7 +404,7 @@ export default function CompanyDetail() {
                               {company.activeJobCount}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Open Jobs
+                              {t("labels.companyDetail.openJobs")}
                             </div>
                           </div>
                         </div>
@@ -416,7 +417,7 @@ export default function CompanyDetail() {
                                 : "—"}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Reviews
+                              {t("labels.companyDetail.reviews")}
                             </div>
                           </div>
                         </div>
@@ -427,7 +428,7 @@ export default function CompanyDetail() {
                               {company.followers}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Followers
+                              {t("labels.followers")}
                             </div>
                           </div>
                         </div>
@@ -437,7 +438,7 @@ export default function CompanyDetail() {
                             <div>
                               <div className="font-medium">{company.views}</div>
                               <div className="text-xs text-muted-foreground">
-                                Profile Views
+                                {t("labels.profileViews")}
                               </div>
                             </div>
                           </div>
@@ -446,10 +447,10 @@ export default function CompanyDetail() {
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <div>
                             <div className="font-medium">
-                              {company.data.founded || "N/A"}
+                              {company.data.founded || t("labels.notAvailable")}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Founded
+                              {t("labels.companyDetail.founded")}
                             </div>
                           </div>
                         </div>
@@ -471,21 +472,20 @@ export default function CompanyDetail() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <Target className="h-5 w-5" />
-                          Complete Your Company Setup
+                          {t("headings.companyDetail.completeSetup")}
                         </CardTitle>
                         <CardDescription>
-                          Complete these tasks to make your company profile
-                          public and attract talent.
+                          {t("messages.companyDetail.completeSetupDesc")}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">
-                              Progress
+                              {t("labels.progress")}
                             </span>
                             <span className="text-sm text-muted-foreground">
-                              {onboardingProgress}% complete
+                              {t("labels.companyDetail.percentComplete", { percent: onboardingProgress })}
                             </span>
                           </div>
                           <Progress
@@ -523,7 +523,7 @@ export default function CompanyDetail() {
                                           variant="outline"
                                           className="text-xs"
                                         >
-                                          Required
+                                          {t("labels.required")}
                                         </Badge>
                                       )}
                                       {task.completed && (
@@ -544,13 +544,11 @@ export default function CompanyDetail() {
                                 <div className="flex items-center gap-2 text-green-800">
                                   <CheckCircle className="h-5 w-5" />
                                   <span className="font-medium">
-                                    Ready to Go Live!
+                                    {t("headings.companyDetail.readyToGoLive")}
                                   </span>
                                 </div>
                                 <p className="text-sm text-green-700 mt-1">
-                                  Your company profile is complete and ready to
-                                  be published. Your profile will become visible
-                                  to job seekers.
+                                  {t("messages.companyDetail.readyToGoLiveBody")}
                                 </p>
                               </div>
                             )}
@@ -562,7 +560,7 @@ export default function CompanyDetail() {
                 {/* Company Overview */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>About {company.data.name}</CardTitle>
+                    <CardTitle>{t("headings.companyDetail.about", { name: company.data.name })}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {/* Listen to the company overview — description +
@@ -577,7 +575,7 @@ export default function CompanyDetail() {
                           vision: company.data.vision,
                         })}
                         preferenceKey={`company.${company.id}`}
-                        label="Listen to overview"
+                        label={t("actions.companyDetail.listenToOverview")}
                       />
                     </div>
 
@@ -587,14 +585,14 @@ export default function CompanyDetail() {
                       </p>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">
-                        No company description available.
+                        {t("messages.companyDetail.noDescription")}
                       </p>
                     )}
 
                     {company.data.mission && company.data.mission.trim() && (
                       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                         <h4 className="font-medium text-blue-900 mb-2">
-                          Our Mission
+                          {t("headings.companyDetail.ourMission")}
                         </h4>
                         <p className="text-sm text-blue-800">
                           {company.data.mission}
@@ -605,7 +603,7 @@ export default function CompanyDetail() {
                     {company.data.vision && company.data.vision.trim() && (
                       <div className="mt-4 p-4 bg-purple-50 rounded-lg">
                         <h4 className="font-medium text-purple-900 mb-2">
-                          Our Vision
+                          {t("headings.companyDetail.ourVision")}
                         </h4>
                         <p className="text-sm text-purple-800">
                           {company.data.vision}
@@ -620,12 +618,12 @@ export default function CompanyDetail() {
                   company.data.values?.length > 0) && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Culture & Values</CardTitle>
+                      <CardTitle>{t("headings.companyDetail.cultureValues")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {company.data.culture?.length > 0 && (
                         <div className="mb-6">
-                          <h4 className="font-medium mb-3">Our Culture</h4>
+                          <h4 className="font-medium mb-3">{t("headings.companyDetail.ourCulture")}</h4>
                           <div className="flex flex-wrap gap-2">
                             {company.data.culture.map((item, index) => (
                               <Badge key={index} variant="outline">
@@ -639,7 +637,7 @@ export default function CompanyDetail() {
                       {company.data.values &&
                         company.data.values.length > 0 && (
                           <div>
-                            <h4 className="font-medium mb-3">Our Values</h4>
+                            <h4 className="font-medium mb-3">{t("headings.companyDetail.ourValues")}</h4>
                             <ul className="space-y-2">
                               {company.data.values.map((value, index) => (
                                 <li
@@ -661,7 +659,7 @@ export default function CompanyDetail() {
                 {company.data.technologies?.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Technologies We Use</CardTitle>
+                      <CardTitle>{t("headings.companyDetail.technologiesWeUse")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
@@ -680,7 +678,7 @@ export default function CompanyDetail() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Award className="h-5 w-5" />
-                      Benefits & Perks
+                      {t("headings.companyDetail.benefitsPerks")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -712,7 +710,7 @@ export default function CompanyDetail() {
 
                     {company.data.perks?.length > 0 && (
                       <div>
-                        <h4 className="font-medium mb-3">Additional Perks</h4>
+                        <h4 className="font-medium mb-3">{t("headings.companyDetail.additionalPerks")}</h4>
                         <div className="flex flex-wrap gap-2">
                           {company.data.perks.map((perk, index) => (
                             <Badge key={index} variant="outline">
@@ -726,7 +724,7 @@ export default function CompanyDetail() {
                     {company.data.benefits?.other &&
                       company.data.benefits.other.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="font-medium mb-2">Special Benefits</h4>
+                          <h4 className="font-medium mb-2">{t("headings.companyDetail.specialBenefits")}</h4>
                           <ul className="space-y-1">
                             {company.data.benefits.other.map(
                               (benefit, index) => (
@@ -759,7 +757,7 @@ export default function CompanyDetail() {
                 {company.activeJobCount > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Open Positions</CardTitle>
+                      <CardTitle>{t("headings.companyDetail.openPositions")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-center">
@@ -767,13 +765,13 @@ export default function CompanyDetail() {
                           {company.activeJobCount}
                         </div>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Open position{company.activeJobCount !== 1 ? "s" : ""}
+                          {t("labels.companyDetail.openPositionCount", { count: company.activeJobCount })}
                         </p>
                         <Button asChild className="w-full">
                           <Link
                             to={`/jobs?company=${encodeURIComponent(company.data.name)}`}
                           >
-                            View All Jobs
+                            {t("actions.viewAllJobs")}
                             <ExternalLink className="h-4 w-4 ml-2" />
                           </Link>
                         </Button>
@@ -785,7 +783,7 @@ export default function CompanyDetail() {
                 {/* Contact Information */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Contact Information</CardTitle>
+                    <CardTitle>{t("headings.contactInformation")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {company.data.contact?.website && (
@@ -864,7 +862,7 @@ export default function CompanyDetail() {
                      !company.data.contact?.linkedin && 
                      !company.data.contact?.twitter && (
                       <p className="text-sm text-muted-foreground italic">
-                        No contact information available.
+                        {t("messages.companyDetail.noContactInfo")}
                       </p>
                     )}
                   </CardContent>
@@ -873,44 +871,44 @@ export default function CompanyDetail() {
                 {/* Company Stats */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Company Details</CardTitle>
+                    <CardTitle>{t("headings.companyDetail.companyDetails")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Industry</span>
+                      <span className="text-muted-foreground">{t("fields.industry.label")}</span>
                       <span className="font-medium">
                         {company.data.industry}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Size</span>
+                      <span className="text-muted-foreground">{t("labels.companyDetail.size")}</span>
                       <span className="font-medium">
-                        {company.data.size} employees
+                        {t("labels.companyDetail.sizeEmployees", { size: company.data.size })}
                       </span>
                     </div>
                     {company.data.founded && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Founded</span>
+                        <span className="text-muted-foreground">{t("labels.companyDetail.founded")}</span>
                         <span className="font-medium">
                           {company.data.founded}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Followers</span>
+                      <span className="text-muted-foreground">{t("labels.followers")}</span>
                       <span className="font-medium">{company.followers}</span>
                     </div>
                     {isOwner && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">
-                          Profile Views
+                          {t("labels.profileViews")}
                         </span>
                         <span className="font-medium">{company.views}</span>
                       </div>
                     )}
                     {company.data.financials?.fundingStage && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Funding</span>
+                        <span className="text-muted-foreground">{t("labels.companyDetail.funding")}</span>
                         <span className="font-medium capitalize">
                           {company.data.financials.fundingStage.replace(
                             "-",
@@ -928,13 +926,13 @@ export default function CompanyDetail() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        Headquarters
+                        {t("headings.companyDetail.headquarters")}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {company.data.headquarters.address && (
                         <div>
-                          <p className="text-sm text-muted-foreground">Address</p>
+                          <p className="text-sm text-muted-foreground">{t("labels.companyDetail.address")}</p>
                           <p className="text-sm font-medium">
                             {company.data.headquarters.address}
                           </p>
@@ -945,7 +943,7 @@ export default function CompanyDetail() {
                         company.data.headquarters.state ||
                         company.data.headquarters.country) && (
                         <div>
-                          <p className="text-sm text-muted-foreground">Location</p>
+                          <p className="text-sm text-muted-foreground">{t("fields.location.label")}</p>
                           <p className="text-sm font-medium">
                             {[
                               company.data.headquarters.city,
@@ -961,7 +959,7 @@ export default function CompanyDetail() {
                       {company.data.headquarters.postalCode && (
                         <div>
                           <p className="text-sm text-muted-foreground">
-                            Postal Code
+                            {t("labels.companyDetail.postalCode")}
                           </p>
                           <p className="text-sm font-medium">
                             {company.data.headquarters.postalCode}
@@ -972,7 +970,7 @@ export default function CompanyDetail() {
                       {company.data.headquarters.timezone && (
                         <div>
                           <p className="text-sm text-muted-foreground">
-                            Timezone
+                            {t("settings.appearance.timezoneLabel")}
                           </p>
                           <p className="text-sm font-medium">
                             {company.data.headquarters.timezone}
@@ -982,7 +980,7 @@ export default function CompanyDetail() {
 
                       {company.data.headquarters.remote && (
                         <div className="pt-2 border-t">
-                          <Badge variant="secondary">Remote-first Company</Badge>
+                          <Badge variant="secondary">{t("labels.companyDetail.remoteFirst")}</Badge>
                         </div>
                       )}
                     </CardContent>
@@ -994,7 +992,7 @@ export default function CompanyDetail() {
                   company.data.locations.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle>Additional Locations</CardTitle>
+                        <CardTitle>{t("headings.companyDetail.additionalLocations")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">

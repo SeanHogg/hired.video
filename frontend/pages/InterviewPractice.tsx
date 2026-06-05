@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
@@ -85,52 +87,53 @@ function SetupStep({
   onStart: (jobDescription: string, type: InterviewType) => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [jobDescription, setJobDescription] = useState("");
   const [interviewType, setInterviewType] = useState<InterviewType>("behavioral");
 
-  const types: { value: InterviewType; label: string; description: string }[] = [
-    { value: "behavioral", label: "Behavioral", description: "STAR-method questions about past experience" },
-    { value: "technical", label: "Technical", description: "Coding, architecture, and problem-solving" },
-    { value: "system-design", label: "System Design", description: "Design scalable systems and discuss trade-offs" },
-    { value: "product", label: "Product", description: "Product sense, metrics, and strategy" },
-    { value: "general", label: "General", description: "Mixed questions for any role" },
+  const types: { value: InterviewType; labelKey: string; descriptionKey: string }[] = [
+    { value: "behavioral", labelKey: "studio.interviewPractice.category.behavioral", descriptionKey: "labels.interview.typeBehavioralDesc" },
+    { value: "technical", labelKey: "studio.interviewPractice.category.technical", descriptionKey: "labels.interview.typeTechnicalDesc" },
+    { value: "system-design", labelKey: "labels.interview.typeSystemDesign", descriptionKey: "labels.interview.typeSystemDesignDesc" },
+    { value: "product", labelKey: "labels.product", descriptionKey: "labels.interview.typeProductDesc" },
+    { value: "general", labelKey: "labels.tabGroupGeneral", descriptionKey: "labels.interview.typeGeneralDesc" },
   ];
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">AI Interview Practice</h1>
+        <h1 className="text-3xl font-bold mb-2">{t("headings.interview.practiceTitle")}</h1>
         <p className="text-muted-foreground">
-          Paste a job description and practice with AI-generated questions. Get instant feedback on your answers.
+          {t("messages.interview.setupSubtitle")}
         </p>
       </div>
 
       <div className="space-y-4">
-        <label className="text-sm font-medium">Job Description</label>
+        <label className="text-sm font-medium">{t("headings.jobDescription")}</label>
         <Textarea
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
-          placeholder="Paste the job description here...&#10;&#10;Example:&#10;Senior Backend Engineer at Stripe&#10;• Design scalable APIs&#10;• Build distributed systems&#10;• Collaborate across teams"
+          placeholder={t("labels.interview.jdPlaceholder")}
           className="min-h-[200px] font-mono text-sm"
         />
-        <p className="text-xs text-muted-foreground">{jobDescription.length}/5000 characters</p>
+        <p className="text-xs text-muted-foreground">{t("labels.interview.charCount", { count: jobDescription.length })}</p>
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium">Interview Type</label>
+        <label className="text-sm font-medium">{t("labels.interview.interviewType")}</label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {types.map((t) => (
+          {types.map((ty) => (
             <button
-              key={t.value}
-              onClick={() => setInterviewType(t.value)}
+              key={ty.value}
+              onClick={() => setInterviewType(ty.value)}
               className={`text-left p-3 rounded-lg border-2 transition-colors ${
-                interviewType === t.value
+                interviewType === ty.value
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/50"
               }`}
             >
-              <div className="font-medium text-sm">{t.label}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{t.description}</div>
+              <div className="font-medium text-sm">{t(ty.labelKey)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{t(ty.descriptionKey)}</div>
             </button>
           ))}
         </div>
@@ -145,11 +148,11 @@ function SetupStep({
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Generating questions...
+            {t("status.interview.generatingQuestions")}
           </>
         ) : (
           <>
-            Generate Questions
+            {t("actions.interview.generateQuestions")}
             <ChevronRight className="ml-2 h-4 w-4" />
           </>
         )}
@@ -173,6 +176,7 @@ function QuestionsPreviewStep({
   onRegenerate: () => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const totalSeconds = questions.reduce((s, q) => s + q.timeLimit, 0);
   const totalMinutes = Math.round(totalSeconds / 60);
 
@@ -182,12 +186,12 @@ function QuestionsPreviewStep({
         <div className="flex items-center gap-2 mb-2">
           <Badge variant="outline" className="capitalize">{interviewType}</Badge>
           <span className="text-sm text-muted-foreground">
-            {questions.length} questions · ~{totalMinutes} min
+            {t("labels.interview.questionsCountMins", { count: questions.length, minutes: totalMinutes })}
           </span>
         </div>
-        <h2 className="text-2xl font-bold">Your Interview Questions</h2>
+        <h2 className="text-2xl font-bold">{t("headings.interview.yourQuestions")}</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Review the questions, then start your practice session.
+          {t("messages.interview.reviewThenStart")}
         </p>
       </div>
 
@@ -206,7 +210,7 @@ function QuestionsPreviewStep({
                 <Badge variant="secondary" className="text-xs capitalize">{q.category}</Badge>
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {q.timeLimit}s
+                  {t("labels.interview.seconds", { count: q.timeLimit })}
                 </span>
               </div>
             </div>
@@ -217,10 +221,10 @@ function QuestionsPreviewStep({
       <div className="flex gap-3">
         <Button variant="outline" onClick={onRegenerate} disabled={loading} className="flex-1">
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-          Regenerate
+          {t("actions.regenerate")}
         </Button>
         <Button onClick={onBegin} className="flex-1">
-          Start Practice
+          {t("studio.interviewPractice.startPractice")}
           <Play className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -241,6 +245,7 @@ function RecordingStep({
   onAnswerComplete: (transcript: string, videoBlob: Blob | null) => void;
   onSkip: () => void;
 }) {
+  const { t } = useTranslation();
   const question = questions[questionIndex];
   const [isRecording, setIsRecording] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -380,7 +385,7 @@ function RecordingStep({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            Question {questionIndex + 1} of {questions.length}
+            {t("labels.interview.questionOfTotal", { current: questionIndex + 1, total: questions.length })}
           </p>
           <div className="flex gap-1 mt-1">
             {questions.map((_, i) => (
@@ -392,7 +397,7 @@ function RecordingStep({
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onSkip}>
-          Skip
+          {t("actions.skip")}
         </Button>
       </div>
 
@@ -402,7 +407,7 @@ function RecordingStep({
           <div className="flex gap-2 mb-2">
             <Badge variant="secondary" className="capitalize text-xs">{question.category}</Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" />{question.timeLimit}s limit
+              <Clock className="h-3 w-3" />{t("labels.interview.secondsLimit", { count: question.timeLimit })}
             </span>
           </div>
           <p className="font-medium text-lg leading-snug">{question.question}</p>
@@ -415,21 +420,21 @@ function RecordingStep({
 
         {countdown !== null && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-            <span className="text-7xl font-bold text-white animate-ping">{countdown || "GO"}</span>
+            <span className="text-7xl font-bold text-white animate-ping">{countdown || t("status.interview.go")}</span>
           </div>
         )}
 
         {cameraError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted">
             <VideoOff className="h-12 w-12 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Camera not available</p>
+            <p className="text-sm text-muted-foreground">{t("messages.interview.cameraNotAvailable")}</p>
           </div>
         )}
 
         {isRecording && (
           <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
             <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-            REC
+            {t("status.interview.rec")}
           </div>
         )}
 
@@ -449,8 +454,8 @@ function RecordingStep({
       {/* Live transcript */}
       {(isRecording || hasRecorded) && transcript && (
         <div className="p-3 rounded-lg bg-muted/50 border">
-          <p className="text-xs text-muted-foreground mb-1 font-medium">Live transcript</p>
-          <p className="text-sm">{transcript || <span className="text-muted-foreground italic">Listening...</span>}</p>
+          <p className="text-xs text-muted-foreground mb-1 font-medium">{t("labels.interview.liveTranscript")}</p>
+          <p className="text-sm">{transcript || <span className="text-muted-foreground italic">{t("status.interview.listening")}</span>}</p>
         </div>
       )}
 
@@ -464,9 +469,9 @@ function RecordingStep({
             size="lg"
           >
             {countdown !== null ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Starting in {countdown}...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("status.interview.startingIn", { count: countdown })}</>
             ) : (
-              <><Mic className="mr-2 h-4 w-4" />Record Answer</>
+              <><Mic className="mr-2 h-4 w-4" />{t("actions.interview.recordAnswer")}</>
             )}
           </Button>
         )}
@@ -474,7 +479,7 @@ function RecordingStep({
         {isRecording && (
           <Button onClick={stopRecording} variant="destructive" className="flex-1" size="lg">
             <Square className="mr-2 h-4 w-4" />
-            Stop Recording
+            {t("studio.interviewPractice.stopRecording")}
           </Button>
         )}
 
@@ -482,10 +487,10 @@ function RecordingStep({
           <>
             <Button variant="outline" onClick={handleReRecord} className="flex-1">
               <RotateCcw className="mr-2 h-4 w-4" />
-              Re-record
+              {t("actions.interview.reRecord")}
             </Button>
             <Button onClick={handleSubmit} className="flex-1" size="lg">
-              Submit Answer
+              {t("actions.interview.submitAnswer")}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </>
@@ -495,11 +500,11 @@ function RecordingStep({
       {/* No camera fallback — allow text-only answer */}
       {cameraError && !hasRecorded && (
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">No camera? Type your answer instead:</p>
+          <p className="text-sm text-muted-foreground">{t("messages.interview.noCameraTypeInstead")}</p>
           <Textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Type your answer here..."
+            placeholder={t("labels.interview.typeAnswerPlaceholder")}
             className="min-h-[100px]"
           />
           <Button
@@ -507,7 +512,7 @@ function RecordingStep({
             disabled={transcript.trim().length < 10}
             className="w-full"
           >
-            Submit Text Answer
+            {t("actions.interview.submitTextAnswer")}
           </Button>
         </div>
       )}
@@ -518,6 +523,7 @@ function RecordingStep({
 // ─── Analysis Loading ─────────────────────────────────────────────────────────
 
 function AnalyzingStep({ questionIndex, total }: { questionIndex: number; total: number }) {
+  const { t } = useTranslation();
   return (
     <div className="text-center space-y-6 py-16">
       <div className="relative mx-auto w-20 h-20">
@@ -527,9 +533,9 @@ function AnalyzingStep({ questionIndex, total }: { questionIndex: number; total:
         </div>
       </div>
       <div>
-        <h2 className="text-xl font-semibold">Analyzing your answer...</h2>
+        <h2 className="text-xl font-semibold">{t("status.interview.analyzingAnswer")}</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Evaluating question {questionIndex} of {total}
+          {t("status.interview.evaluatingQuestion", { current: questionIndex, total })}
         </p>
       </div>
       <Progress value={(questionIndex / total) * 100} className="h-2" />
@@ -550,6 +556,7 @@ function ResultsStep({
   onRestart: () => void;
   onRetry: (questionIndex: number) => void;
 }) {
+  const { t } = useTranslation();
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   const overallScore =
@@ -580,12 +587,12 @@ function ResultsStep({
         <CardContent className="pt-6 pb-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground font-medium">Interview Score</p>
+              <p className="text-sm text-muted-foreground font-medium">{t("headings.interview.interviewScore")}</p>
               <div className={`text-5xl font-bold mt-1 ${scoreColor(overallScore)}`}>
                 {overallScore}<span className="text-2xl text-muted-foreground font-normal"> / 10</span>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {overallScore >= 8 ? "Excellent performance!" : overallScore >= 6 ? "Good — a few areas to polish." : "Keep practicing — great improvement opportunity."}
+                {overallScore >= 8 ? t("messages.interview.scoreExcellent") : overallScore >= 6 ? t("messages.interview.scoreGood") : t("messages.interview.scoreKeepPracticing")}
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -603,7 +610,7 @@ function ResultsStep({
               {(Object.entries(avgBreakdown) as [keyof ScoreBreakdown, number][]).map(([k, v]) => (
                 <div key={k} className="text-center">
                   <div className={`text-sm font-semibold ${scoreColor(v)}`}>{v}</div>
-                  <div className="text-xs text-muted-foreground capitalize">{k}</div>
+                  <div className="text-xs text-muted-foreground">{t(`labels.interview.metric.${k}`)}</div>
                   <Progress value={v * 10} className="h-1 mt-1" />
                 </div>
               ))}
@@ -614,7 +621,7 @@ function ResultsStep({
 
       {/* Per-question tabs */}
       <div>
-        <p className="text-sm font-medium mb-2">Question Breakdown</p>
+        <p className="text-sm font-medium mb-2">{t("headings.interview.questionBreakdown")}</p>
         <div className="flex gap-2 flex-wrap">
           {questions.map((q, i) => {
             const r = results[i];
@@ -626,7 +633,7 @@ function ResultsStep({
                   selectedIdx === i ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"
                 }`}
               >
-                Q{i + 1}
+                {t("labels.interview.qShort", { number: i + 1 })}
                 {r && (
                   <span className={`ml-1.5 text-xs ${selectedIdx === i ? "text-primary-foreground/80" : scoreColor(r.score)}`}>
                     {r.score}
@@ -651,7 +658,7 @@ function ResultsStep({
                 {(Object.entries(selected.scoreBreakdown) as [keyof ScoreBreakdown, number][]).map(([k, v]) => (
                   <div key={k} className="text-center">
                     <div className={`text-base font-bold ${scoreColor(v)}`}>{v}</div>
-                    <div className="text-xs text-muted-foreground capitalize">{k}</div>
+                    <div className="text-xs text-muted-foreground">{t(`labels.interview.metric.${k}`)}</div>
                     <Progress value={v * 10} className="h-1 mt-1" />
                   </div>
                 ))}
@@ -660,7 +667,7 @@ function ResultsStep({
               {/* Strengths */}
               <div>
                 <div className="flex items-center gap-1.5 text-sm font-medium text-green-700 mb-1.5">
-                  <CheckCircle className="h-4 w-4" /> Strengths
+                  <CheckCircle className="h-4 w-4" /> {t("headings.strengths")}
                 </div>
                 <ul className="space-y-1">
                   {selected.feedback.strengths.map((s, i) => (
@@ -674,7 +681,7 @@ function ResultsStep({
               {/* Improvements */}
               <div>
                 <div className="flex items-center gap-1.5 text-sm font-medium text-amber-700 mb-1.5">
-                  <TrendingUp className="h-4 w-4" /> Areas to Improve
+                  <TrendingUp className="h-4 w-4" /> {t("headings.interview.areasToImprove")}
                 </div>
                 <ul className="space-y-1">
                   {selected.feedback.improvements.map((s, i) => (
@@ -688,7 +695,7 @@ function ResultsStep({
               {/* Sample answer */}
               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3">
                 <div className="flex items-center gap-1.5 text-sm font-medium text-blue-700 dark:text-blue-400 mb-1.5">
-                  <Lightbulb className="h-4 w-4" /> Model Answer
+                  <Lightbulb className="h-4 w-4" /> {t("headings.interview.modelAnswer")}
                 </div>
                 <p className="text-sm text-muted-foreground">{selected.feedback.suggestedAnswer}</p>
               </div>
@@ -697,7 +704,7 @@ function ResultsStep({
               {selected.transcript && (
                 <details className="group">
                   <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                    Your transcript
+                    {t("labels.interview.yourTranscript")}
                   </summary>
                   <p className="text-sm text-muted-foreground mt-2 p-3 bg-muted/50 rounded-lg">
                     {selected.transcript}
@@ -711,7 +718,7 @@ function ResultsStep({
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground text-sm">
             <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            This question was skipped
+            {t("messages.interview.questionSkipped")}
           </CardContent>
         </Card>
       )}
@@ -720,11 +727,11 @@ function ResultsStep({
       <div className="flex gap-3">
         <Button variant="outline" onClick={onRestart} className="flex-1">
           <RefreshCw className="mr-2 h-4 w-4" />
-          New Session
+          {t("actions.interview.newSession")}
         </Button>
         <Button onClick={() => onRetry(selectedIdx)} className="flex-1">
           <RotateCcw className="mr-2 h-4 w-4" />
-          Re-practice Q{selectedIdx + 1}
+          {t("actions.interview.rePracticeQ", { number: selectedIdx + 1 })}
         </Button>
       </div>
     </div>
@@ -734,6 +741,7 @@ function ResultsStep({
 // ─── Landing (unauthenticated) ───────────────────────────────────────────────
 
 function Landing() {
+  const { t } = useTranslation();
   return (
     <div className="px-4 py-16">
 
@@ -745,15 +753,14 @@ function Landing() {
               <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
             </div>
             <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-              Interview Practice
+              {t("studio.interviewPractice.heading")}
             </span>
           </div>
           <h1 className="text-5xl font-bold mb-6">
-            Practice Interviews. Get Hired Faster.
+            {t("headings.interview.landingHero")}
           </h1>
           <p className="text-xl text-muted-foreground mb-8">
-            Paste any job description and get AI-generated interview questions tailored to the role.
-            Record your video answers and receive instant feedback on clarity, confidence, structure, and impact.
+            {t("messages.interview.landingHeroSub")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/signup">
@@ -761,13 +768,13 @@ function Landing() {
                 size="lg"
                 className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
               >
-                Start Practicing Free
+                {t("actions.interview.startPracticingFree")}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/login">
               <Button size="lg" variant="outline" className="text-lg px-8">
-                Sign In
+                {t("actions.signIn")}
               </Button>
             </Link>
           </div>
@@ -776,14 +783,14 @@ function Landing() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
           {[
-            { stat: "5–10 min", label: "Per practice session" },
-            { stat: "5 types", label: "Behavioral, Technical, System Design, Product & more" },
-            { stat: "5 scores", label: "Clarity, Confidence, Structure, Relevance & Impact" },
-            { stat: "Instant", label: "AI feedback with model answers" },
+            { statKey: "labels.interview.stat1Value", labelKey: "labels.interview.stat1Label" },
+            { statKey: "labels.interview.stat2Value", labelKey: "labels.interview.stat2Label" },
+            { statKey: "labels.interview.stat3Value", labelKey: "labels.interview.stat3Label" },
+            { statKey: "labels.interview.stat4Value", labelKey: "labels.interview.stat4Label" },
           ].map((s) => (
-            <div key={s.stat} className="text-center">
-              <div className="text-3xl font-bold text-primary mb-2">{s.stat}</div>
-              <p className="text-sm text-muted-foreground">{s.label}</p>
+            <div key={s.statKey} className="text-center">
+              <div className="text-3xl font-bold text-primary mb-2">{t(s.statKey)}</div>
+              <p className="text-sm text-muted-foreground">{t(s.labelKey)}</p>
             </div>
           ))}
         </div>
@@ -791,23 +798,22 @@ function Landing() {
         {/* Features */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">
-            Everything You Need to Nail Your Interview
+            {t("headings.interview.featuresTitle")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Zap className="h-10 w-10 text-brand-purple mb-4" />
-                <CardTitle>AI-Generated Questions</CardTitle>
+                <CardTitle>{t("headings.interview.feature1Title")}</CardTitle>
                 <CardDescription>
-                  Paste any job description and our AI instantly crafts questions tailored to the exact
-                  role, company, and interview type you're preparing for.
+                  {t("messages.interview.feature1Desc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Job-specific question tailoring</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Behavioral, technical & system design</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Adjustable difficulty and count</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature1Bullet1")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature1Bullet2")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature1Bullet3")}</div>
                 </div>
               </CardContent>
             </Card>
@@ -815,17 +821,16 @@ function Landing() {
             <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
               <CardHeader>
                 <Video className="h-10 w-10 text-brand-blue mb-4" />
-                <CardTitle>Video Recording & Transcription</CardTitle>
+                <CardTitle>{t("headings.interview.feature2Title")}</CardTitle>
                 <CardDescription>
-                  Record your answers with your webcam just like a real interview.
-                  Your speech is transcribed live so the AI can evaluate every word you say.
+                  {t("messages.interview.feature2Desc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Live webcam recording</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Real-time speech transcription</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Re-record any answer</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature2Bullet1")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature2Bullet2")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature2Bullet3")}</div>
                 </div>
               </CardContent>
             </Card>
@@ -833,17 +838,16 @@ function Landing() {
             <Card className="border-primary/20 hover:border-primary/40 transition-colors">
               <CardHeader>
                 <BarChart3 className="h-10 w-10 text-primary mb-4" />
-                <CardTitle>Scored AI Feedback</CardTitle>
+                <CardTitle>{t("headings.interview.feature3Title")}</CardTitle>
                 <CardDescription>
-                  Get a detailed score breakdown on five dimensions — clarity, confidence, structure,
-                  relevance, and impact — plus a model answer to compare against.
+                  {t("messages.interview.feature3Desc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />0–10 score per answer</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Specific strengths & improvements</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />AI model answer for every question</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature3Bullet1")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature3Bullet2")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.interview.feature3Bullet3")}</div>
                 </div>
               </CardContent>
             </Card>
@@ -852,20 +856,20 @@ function Landing() {
 
         {/* How it works */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">{t("headings.interview.howItWorks")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
-              { icon: Target, step: "1. Paste Job Description", desc: "Drop in any job posting and pick your interview type" },
-              { icon: Sparkles, step: "2. AI Generates Questions", desc: "Get 5 tailored questions in seconds" },
-              { icon: Mic, step: "3. Record Your Answers", desc: "Answer on camera with a live countdown timer" },
-              { icon: TrendingUp, step: "4. Get Your Score", desc: "Instant feedback with a model answer to learn from" },
-            ].map(({ icon: Icon, step, desc }) => (
-              <div key={step} className="text-center">
+              { icon: Target, stepKey: "headings.interview.step1Title", descKey: "messages.interview.step1Desc" },
+              { icon: Sparkles, stepKey: "headings.interview.step2Title", descKey: "messages.interview.step2Desc" },
+              { icon: Mic, stepKey: "headings.interview.step3Title", descKey: "messages.interview.step3Desc" },
+              { icon: TrendingUp, stepKey: "headings.interview.step4Title", descKey: "messages.interview.step4Desc" },
+            ].map(({ icon: Icon, stepKey, descKey }) => (
+              <div key={stepKey} className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">{step}</h3>
-                <p className="text-sm text-muted-foreground">{desc}</p>
+                <h3 className="font-semibold mb-2">{t(stepKey)}</h3>
+                <p className="text-sm text-muted-foreground">{t(descKey)}</p>
               </div>
             ))}
           </div>
@@ -873,38 +877,38 @@ function Landing() {
 
         {/* Testimonials */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">What Candidates Are Saying</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">{t("headings.interview.testimonialsTitle")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
-                quote: "I used to freeze up on behavioral questions. After 3 practice sessions I finally landed a FAANG offer. The AI feedback was brutally honest and incredibly helpful.",
+                quoteKey: "messages.interview.testimonial1Quote",
                 name: "James Park",
-                title: "Software Engineer → Google",
+                titleKey: "labels.interview.testimonial1Title",
               },
               {
-                quote: "The tailored questions for a specific job description blew me away. It asked me almost exactly what came up in my real interview at Stripe.",
+                quoteKey: "messages.interview.testimonial2Quote",
                 name: "Priya Mehta",
-                title: "Product Manager → Stripe",
+                titleKey: "labels.interview.testimonial2Title",
               },
               {
-                quote: "I score myself a 6 before practicing and an 8.5 after. The model answers showed me exactly how to restructure my responses with STAR format.",
+                quoteKey: "messages.interview.testimonial3Quote",
                 name: "Marcus Williams",
-                title: "Engineering Manager → Meta",
+                titleKey: "labels.interview.testimonial3Title",
               },
-            ].map((t) => (
-              <Card key={t.name}>
+            ].map((item) => (
+              <Card key={item.name}>
                 <CardContent className="p-6">
                   <div className="flex items-center mb-4">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                     ))}
                   </div>
-                  <p className="text-sm mb-4">"{t.quote}"</p>
+                  <p className="text-sm mb-4">"{t(item.quoteKey)}"</p>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
                     <div>
-                      <p className="font-medium text-sm">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.title}</p>
+                      <p className="font-medium text-sm">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">{t(item.titleKey)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -916,17 +920,17 @@ function Landing() {
         {/* Final CTA */}
         <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
           <h3 className="text-2xl font-bold mb-4">
-            Ready to Ace Your Next Interview?
+            {t("headings.interview.ctaTitle")}
           </h3>
           <p className="text-muted-foreground mb-6">
-            Join thousands of job seekers who practice smarter and interview with confidence.
+            {t("messages.interview.ctaSubtitle")}
           </p>
           <Link to="/signup">
             <Button
               size="lg"
               className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
             >
-              Start Practicing Free
+              {t("actions.interview.startPracticingFree")}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
@@ -941,15 +945,16 @@ function Landing() {
 type Step = "setup" | "preview" | "recording" | "analyzing" | "results";
 
 export default function InterviewPractice() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useSEO(location.pathname, {
-    title: "AI Interview Practice — hired.video",
-    description: "Simulate real job interviews and get AI feedback on your answers.",
+    title: t("messages.interview.seoTitle"),
+    description: t("messages.interview.seoDescription"),
   });
-  useBreadcrumbs([{ name: "Interview Practice", url: "/interview" }]);
+  useBreadcrumbs([{ name: t("studio.interviewPractice.heading"), url: "/interview" }]);
 
   const [step, setStep] = useState<Step>("setup");
   const [loading, setLoading] = useState(false);
@@ -974,7 +979,7 @@ export default function InterviewPractice() {
       setQuestions(res.data.questions);
       setStep("preview");
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to generate questions");
+      toast.error(err.message ?? t("errors.interview.generateQuestions"));
     } finally {
       setLoading(false);
     }
@@ -989,7 +994,7 @@ export default function InterviewPractice() {
       });
       return res.data.id;
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to start session");
+      toast.error(err.message ?? t("studio.interviewPractice.errors.startSession"));
       return null;
     }
   }
@@ -1059,7 +1064,7 @@ export default function InterviewPractice() {
 
     if (!result && transcript.trim().length > 5) {
       // Client-side fallback scoring (no API needed)
-      result = buildClientFeedback(q.question, transcript, q.id);
+      result = buildClientFeedback(t, q.question, transcript, q.id);
     }
 
     const newResults = [...results];
@@ -1163,7 +1168,7 @@ function canUploadVideo(): boolean {
   return false; // Disable video upload for now — transcripts only
 }
 
-function buildClientFeedback(question: string, transcript: string, questionId: string): AnswerResult {
+function buildClientFeedback(t: TFunction, question: string, transcript: string, questionId: string): AnswerResult {
   const wordCount = transcript.split(/\s+/).filter(Boolean).length;
   const hasNumbers = /\d/.test(transcript);
   const hasExample = /example|when i|i led|i built|i managed|project|result/i.test(transcript);
@@ -1192,16 +1197,16 @@ function buildClientFeedback(question: string, transcript: string, questionId: s
     },
     feedback: {
       strengths: [
-        wordCount > 60 ? "Good level of detail in your response" : "Clear and direct answer",
-        hasExample ? "You used a concrete example to support your point" : "You addressed the core question",
-        hasNumbers ? "You included specific metrics which add credibility" : "You demonstrated relevant knowledge",
+        wordCount > 60 ? t("messages.interview.fbStrengthDetail") : t("messages.interview.fbStrengthDirect"),
+        hasExample ? t("messages.interview.fbStrengthExample") : t("messages.interview.fbStrengthCore"),
+        hasNumbers ? t("messages.interview.fbStrengthMetrics") : t("messages.interview.fbStrengthKnowledge"),
       ].slice(0, 2),
       improvements: [
-        !hasStar ? "Use the STAR method (Situation → Task → Action → Result) for clearer structure" : "Good structure — keep using STAR",
-        !hasNumbers ? "Add specific numbers (%, $, team size, timeline) to quantify your impact" : "Consider adding even more metrics",
-        hasFillers > 3 ? `Reduce filler words (detected ${hasFillers} filler words — aim for confident pauses instead)` : "Speak at a steady pace and avoid rushing",
+        !hasStar ? t("messages.interview.fbImproveStar") : t("messages.interview.fbImproveStarGood"),
+        !hasNumbers ? t("messages.interview.fbImproveNumbers") : t("messages.interview.fbImproveMoreMetrics"),
+        hasFillers > 3 ? t("messages.interview.fbImproveFillers", { count: hasFillers }) : t("messages.interview.fbImprovePace"),
       ].filter(Boolean).slice(0, 3),
-      suggestedAnswer: `A strong answer to this question uses the STAR method: describe the Situation briefly, your specific Task or responsibility, the concrete Actions you took, and the measurable Results. Include specific numbers where possible (e.g., "reduced load time by 40%", "led a team of 5", "increased revenue by $200k").`,
+      suggestedAnswer: t("messages.interview.fbSuggestedAnswer"),
     },
     transcript,
   };

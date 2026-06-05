@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -57,67 +58,71 @@ import { SectorPicker } from "@/components/sector/SectorPicker";
 import { SECTORS, type Sector } from "@shared/sectors";
 
 
-// Job creation form schema
-const jobCreateSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Job title is required")
-    .max(100, "Title must be less than 100 characters"),
-  description: z
-    .string()
-    .min(50, "Description must be at least 50 characters")
-    .max(5000, "Description must be less than 5000 characters"),
-  company: z
-    .string()
-    .min(1, "Company name is required")
-    .max(100, "Company name must be less than 100 characters"),
-  location: z
-    .string()
-    .min(1, "Location is required")
-    .max(100, "Location must be less than 100 characters"),
-  responsibilities: z.string().optional(),
-  requirements: z.string().optional(),
-  employmentType: z
-    .array(
-      z.enum([
-        "FullTime",
-        "PartTime",
-        "Freelance",
-        "Contractor",
-        "ContractToHire",
-        "Temporary",
-        "Internship",
-        // Exec opportunity types (#1674). PascalCase to match this form's
-        // local convention; the backend normalizes every spelling to the
-        // canonical kebab value (shared/employment-types.ts) on write.
-        "Fractional",
-        "Advisor",
-        "Interim",
-        "BoardSeat",
-      ]),
-    )
-    .min(1, "At least one employment type is required"),
-  seniority: z
-    .array(
-      z.enum(["Entry", "Junior", "Mid", "Senior", "LeadExecutive", "None"]),
-    )
-    .min(1, "At least one experience level is required"),
-  workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).default("Onsite"),
-  isRemote: z.boolean().optional(),
-  isPublic: z.boolean().optional(),
-  salaryMin: z.number().optional(),
-  salaryMax: z.number().optional(),
-  currency: z.string().optional(),
-  expirationDate: z.string().optional(),
-  status: z.enum(["Draft", "Open", "Closed", "Hired"]).default("Open"),
-  heroImageUrl: z.string().url().optional().or(z.literal("")),
-  // #743 — Optional Studio Project attached to the job (recruiter pitch
-  // / job-ad video). Stored as a UUID on `job_items.video_project_id`.
-  videoProjectId: z.string().uuid().optional().or(z.literal("")),
-  sector: z.enum(SECTORS as readonly [string, ...string[]]).optional(),
-});
+// Job creation form schema. Built via a factory so the validation
+// messages can be localized with the render-time `t` — no t() at module
+// scope. Field shape is identical regardless of locale, so the inferred
+// type is taken from the factory's return.
+const buildJobCreateSchema = (t: (key: string) => string) =>
+  z.object({
+    title: z
+      .string()
+      .min(1, t("errors.jobTitleRequiredMsg"))
+      .max(100, t("errors.titleMaxLength")),
+    description: z
+      .string()
+      .min(50, t("errors.descriptionMinLength"))
+      .max(5000, t("errors.descriptionMaxLength")),
+    company: z
+      .string()
+      .min(1, t("errors.companyNameRequired"))
+      .max(100, t("errors.companyNameMaxLength")),
+    location: z
+      .string()
+      .min(1, t("errors.locationRequired"))
+      .max(100, t("errors.locationMaxLength")),
+    responsibilities: z.string().optional(),
+    requirements: z.string().optional(),
+    employmentType: z
+      .array(
+        z.enum([
+          "FullTime",
+          "PartTime",
+          "Freelance",
+          "Contractor",
+          "ContractToHire",
+          "Temporary",
+          "Internship",
+          // Exec opportunity types (#1674). PascalCase to match this form's
+          // local convention; the backend normalizes every spelling to the
+          // canonical kebab value (shared/employment-types.ts) on write.
+          "Fractional",
+          "Advisor",
+          "Interim",
+          "BoardSeat",
+        ]),
+      )
+      .min(1, t("errors.employmentTypeRequired")),
+    seniority: z
+      .array(
+        z.enum(["Entry", "Junior", "Mid", "Senior", "LeadExecutive", "None"]),
+      )
+      .min(1, t("errors.experienceLevelRequired")),
+    workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).default("Onsite"),
+    isRemote: z.boolean().optional(),
+    isPublic: z.boolean().optional(),
+    salaryMin: z.number().optional(),
+    salaryMax: z.number().optional(),
+    currency: z.string().optional(),
+    expirationDate: z.string().optional(),
+    status: z.enum(["Draft", "Open", "Closed", "Hired"]).default("Open"),
+    heroImageUrl: z.string().url().optional().or(z.literal("")),
+    // #743 — Optional Studio Project attached to the job (recruiter pitch
+    // / job-ad video). Stored as a UUID on `job_items.video_project_id`.
+    videoProjectId: z.string().uuid().optional().or(z.literal("")),
+    sector: z.enum(SECTORS as readonly [string, ...string[]]).optional(),
+  });
 
-type JobCreateForm = z.infer<typeof jobCreateSchema>;
+type JobCreateForm = z.infer<ReturnType<typeof buildJobCreateSchema>>;
 
 // Types for different input methods
 type JobCreationMethod = "manual" | "excel" | "document" | "ai";
@@ -147,6 +152,7 @@ interface ExcelJobRow {
 }
 
 export default function JobCreatePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated, apiCall } = useAuth();
@@ -195,7 +201,7 @@ export default function JobCreatePage() {
     reset,
     formState: { errors },
   } = useForm<JobCreateForm>({
-    resolver: zodResolver(jobCreateSchema),
+    resolver: zodResolver(buildJobCreateSchema(t)),
     defaultValues: {
       employmentType: ["FullTime"],
       seniority: ["Mid"],
@@ -236,18 +242,18 @@ export default function JobCreatePage() {
       "currency",
     ],
     fieldLabels: {
-      title: "Job title",
-      description: "Job description",
-      company: "Company",
-      location: "Location",
-      responsibilities: "Responsibilities",
-      requirements: "Requirements",
-      employmentType: "Employment type",
-      seniority: "Seniority",
-      workSetting: "Work setting",
-      salaryMin: "Salary (min)",
-      salaryMax: "Salary (max)",
-      currency: "Currency",
+      title: t("fields.jobTitle.label"),
+      description: t("headings.jobDescription"),
+      company: t("fields.company.label"),
+      location: t("fields.location.label"),
+      responsibilities: t("labels.responsibilities"),
+      requirements: t("headings.requirements"),
+      employmentType: t("labels.employmentType"),
+      seniority: t("labels.seniority"),
+      workSetting: t("fields.workSetting.label"),
+      salaryMin: t("labels.salaryMinShort"),
+      salaryMax: t("labels.salaryMaxShort"),
+      currency: t("fields.currency.label"),
     },
   });
 
@@ -406,16 +412,14 @@ export default function JobCreatePage() {
         // Handle document file with AI parsing
         await handleDocumentUpload(file);
       } else {
-        throw new Error(
-          "Unsupported file type. Please upload Excel (.xlsx, .xls, .csv) or document files (.pdf, .docx, .doc)",
-        );
+        throw new Error(t("errors.unsupportedFileType"));
       }
     } catch (error: any) {
       // Set error based on file type
       if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
-        setExcelError(error.message || "Failed to process Excel/CSV file");
+        setExcelError(error.message || t("errors.failedToProcessExcelCsv"));
       } else {
-        setDocumentError(error.message || "Failed to process document file");
+        setDocumentError(error.message || t("errors.failedToProcessDocument"));
       }
     } finally {
       setIsProcessingFile(false);
@@ -445,7 +449,7 @@ export default function JobCreatePage() {
       setActiveMethod("excel");
     } catch (error: any) {
       console.error("Excel upload error:", error);
-      throw new Error(error.message || "Failed to parse Excel file");
+      throw new Error(error.message || t("errors.failedToParseExcel"));
     }
   };
 
@@ -475,7 +479,7 @@ export default function JobCreatePage() {
       populateFormWithParsedData(parsedJob);
     } catch (error: any) {
       console.error("Document upload error:", error);
-      throw new Error(error.message || "Failed to parse document");
+      throw new Error(error.message || t("errors.failedToParseDocument"));
     }
   };
 
@@ -590,7 +594,7 @@ export default function JobCreatePage() {
     } catch (error: any) {
       console.error("Failed to create job:", error);
       setSubmitError(
-        error.message || "Failed to create job. Please try again.",
+        error.message || t("errors.failedToCreateJob"),
       );
     } finally {
       setIsSubmitting(false);
@@ -599,7 +603,7 @@ export default function JobCreatePage() {
 
   // Show loading or redirect if not authenticated
   if (!isAuthenticated || !user) {
-    return <div>Loading...</div>;
+    return <div>{t("status.loading")}</div>;
   }
 
   // Show access denied if not recruiter/employer
@@ -609,13 +613,13 @@ export default function JobCreatePage() {
   return (
     <EntityEditShell
       hubEntity="job"
-      parent={{ label: "Jobs", to: "/jobs", icon: Briefcase }}
+      parent={{ label: t("labels.jobs"), to: "/jobs", icon: Briefcase }}
       entity={{}}
       accessDenied={accessDenied}
-      accessDeniedMessage="Only recruiters and employers can create job postings."
-      leafLabel="Create"
-      title="Create Job Posting"
-      description="Create a new job posting using manual entry, Excel upload, or document parsing"
+      accessDeniedMessage={t("messages.jobCreate.accessDenied")}
+      leafLabel={t("actions.create")}
+      title={t("headings.createJobPosting")}
+      description={t("messages.jobCreate.pageDescription")}
     >
             {/* Input Method Tabs */}
             <Tabs
@@ -633,22 +637,22 @@ export default function JobCreatePage() {
                 <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
                   <TabsTrigger value="manual" className="flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Manual Entry
+                    {t("tabs.manualEntry")}
                   </TabsTrigger>
                   <TabsTrigger value="excel" className="flex items-center gap-2">
                     <FileSpreadsheet className="h-4 w-4" />
-                    File Upload
+                    {t("tabs.fileUpload")}
                   </TabsTrigger>
                   <TabsTrigger
                     value="document"
                     className="flex items-center gap-2"
                   >
                     <Upload className="h-4 w-4" />
-                    Document Upload
+                    {t("tabs.documentUpload")}
                   </TabsTrigger>
                   <TabsTrigger value="ai" className="flex items-center gap-2">
                     <Brain className="h-4 w-4" />
-                    Use AI
+                    {t("actions.useAi")}
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -659,11 +663,10 @@ export default function JobCreatePage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileSpreadsheet className="h-5 w-5" />
-                      File Bulk Upload
+                      {t("headings.fileBulkUpload")}
                     </CardTitle>
                     <CardDescription>
-                      Upload an Excel (.xlsx, .xls) or CSV file with multiple job postings. Download
-                      our CSV template to get started.
+                      {t("messages.jobCreate.bulkUploadDescription")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -675,7 +678,7 @@ export default function JobCreatePage() {
                         className="flex items-center gap-2"
                       >
                         <Download className="h-4 w-4" />
-                        Download CSV Template
+                        {t("actions.downloadCsvTemplate")}
                       </Button>
                       <Button
                         type="button"
@@ -685,8 +688,8 @@ export default function JobCreatePage() {
                       >
                         <Upload className="h-4 w-4" />
                         {isProcessingFile
-                          ? "Processing..."
-                          : "Upload File"}
+                          ? t("status.processing")
+                          : t("actions.uploadFile")}
                       </Button>
                     </div>
 
@@ -713,7 +716,7 @@ export default function JobCreatePage() {
                     {showExcelPreview && excelJobs.length > 0 && (
                       <div className="mt-6">
                         <h4 className="font-semibold mb-4">
-                          Preview Jobs ({excelJobs.length} found)
+                          {t("headings.jobCreate.previewJobs", { count: excelJobs.length })}
                         </h4>
                         <div className="space-y-4 max-h-96 overflow-y-auto">
                           {excelJobs.map((job, index) => (
@@ -736,7 +739,7 @@ export default function JobCreatePage() {
                                     setActiveMethod("manual");
                                   }}
                                 >
-                                  Edit
+                                  {t("actions.edit")}
                                 </Button>
                               </div>
                             </Card>
@@ -754,11 +757,10 @@ export default function JobCreatePage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileImage className="h-5 w-5" />
-                      AI Document Parsing
+                      {t("headings.aiDocumentParsing")}
                     </CardTitle>
                     <CardDescription>
-                      Upload a PDF or Word document and let AI extract the job
-                      details for you.
+                      {t("messages.jobCreate.documentParsingDescription")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -766,10 +768,10 @@ export default function JobCreatePage() {
                       <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <div className="space-y-2">
                         <p className="text-sm font-medium">
-                          Drop your document here or click to browse
+                          {t("messages.jobCreate.dropDocument")}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Supports PDF, DOC, and DOCX files
+                          {t("messages.jobCreate.supportsPdfDocDocx")}
                         </p>
                       </div>
                       <Button
@@ -789,7 +791,7 @@ export default function JobCreatePage() {
                         }}
                         disabled={isProcessingFile}
                       >
-                        {isProcessingFile ? "Processing..." : "Choose File"}
+                        {isProcessingFile ? t("status.processing") : t("actions.chooseFile")}
                       </Button>
                     </div>
 
@@ -804,7 +806,7 @@ export default function JobCreatePage() {
 
                     {parsedJobs.length > 0 && (
                       <div className="mt-6">
-                        <h4 className="font-semibold mb-4">Parsed Job Data</h4>
+                        <h4 className="font-semibold mb-4">{t("headings.parsedJobData")}</h4>
                         <Card className="p-4">
                           <div className="space-y-2">
                             <h5 className="font-medium">
@@ -820,7 +822,7 @@ export default function JobCreatePage() {
                               size="sm"
                               onClick={() => setActiveMethod("manual")}
                             >
-                              Review & Edit
+                              {t("actions.reviewAndEdit")}
                             </Button>
                           </div>
                         </Card>
@@ -836,10 +838,10 @@ export default function JobCreatePage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Brain className="h-5 w-5" />
-                      Use AI
+                      {t("actions.useAi")}
                     </CardTitle>
                     <CardDescription>
-                      Open the AI side panel to generate or refine parts of this job posting.
+                      {t("messages.jobCreate.useAiDescription")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -849,10 +851,10 @@ export default function JobCreatePage() {
                       className="flex items-center gap-2"
                     >
                       <Brain className="h-4 w-4" />
-                      Open AI Side Panel
+                      {t("actions.openAiSidePanel")}
                     </Button>
                     <p className="text-sm text-muted-foreground">
-                      The AI receives your current form values as context and can populate fields for you.
+                      {t("messages.jobCreate.aiReceivesFormValues")}
                     </p>
                   </CardContent>
                 </Card>
@@ -865,7 +867,7 @@ export default function JobCreatePage() {
                   <Alert className="mb-6 border-green-200 bg-green-50">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      Job posted successfully! Redirecting to jobs page...
+                      {t("messages.jobCreate.jobPostedSuccess")}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -888,19 +890,19 @@ export default function JobCreatePage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Briefcase className="h-5 w-5" />
-                        Basic Information
+                        {t("headings.basicInformation")}
                       </CardTitle>
                       <CardDescription>
-                        Provide the essential details about the job position
+                        {t("messages.jobCreate.basicInfoDescription")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       {/* Job Title */}
                       <div className="space-y-2">
-                        <Label htmlFor="title">Job Title *</Label>
+                        <Label htmlFor="title">{t("fields.jobTitleRequired.label")}</Label>
                         <Input
                           id="title"
-                          placeholder="e.g., Senior Software Engineer"
+                          placeholder={t("fields.jobTitle.placeholder")}
                           {...register("title")}
                           className={errors.title ? "border-red-500" : ""}
                         />
@@ -913,19 +915,19 @@ export default function JobCreatePage() {
 
                       {/* Hero Image — Upload / Stock / AI */}
                       <div className="space-y-2">
-                        <Label>Hero Image (Optional)</Label>
+                        <Label>{t("labels.jobCreate.heroImageOptional")}</Label>
                         {watchedValues.heroImageUrl ? (
                           <div className="flex items-start gap-3">
                             <img
                               src={watchedValues.heroImageUrl}
-                              alt="Job hero preview"
+                              alt={t("labels.jobCreate.heroImagePreviewAlt")}
                               className="h-24 w-40 object-cover rounded-md border"
                             />
                             <div className="flex flex-col gap-2">
                               <MediaPicker
                                 accept="image"
-                                title="Choose job hero image"
-                                triggerLabel="Replace"
+                                title={t("labels.jobCreate.chooseHeroImage")}
+                                triggerLabel={t("actions.replace")}
                                 onPick={(asset) => setValue("heroImageUrl", asset.url)}
                               />
                               <Button
@@ -934,20 +936,20 @@ export default function JobCreatePage() {
                                 size="sm"
                                 onClick={() => setValue("heroImageUrl", "")}
                               >
-                                Remove
+                                {t("actions.remove")}
                               </Button>
                             </div>
                           </div>
                         ) : (
                           <MediaPicker
                             accept="image"
-                            title="Choose job hero image"
-                            triggerLabel="Add hero image"
+                            title={t("labels.jobCreate.chooseHeroImage")}
+                            triggerLabel={t("actions.addHeroImage")}
                             onPick={(asset) => setValue("heroImageUrl", asset.url)}
                           />
                         )}
                         <p className="text-xs text-muted-foreground">
-                          Shown above the job title. Upload your own, browse stock photography, or generate one with AI.
+                          {t("messages.jobCreate.heroImageHint")}
                         </p>
                       </div>
 
@@ -962,10 +964,10 @@ export default function JobCreatePage() {
 
                       {/* Company */}
                       <div className="space-y-2">
-                        <Label htmlFor="company">Company *</Label>
+                        <Label htmlFor="company">{t("fields.companyRequired.label")}</Label>
                         <Input
                           id="company"
-                          placeholder="Company name"
+                          placeholder={t("fields.jobCompany.placeholder")}
                           {...register("company")}
                           className={errors.company ? "border-red-500" : ""}
                         />
@@ -981,10 +983,10 @@ export default function JobCreatePage() {
                           structured ids via /api/locations/entities/job/:id
                           after the job save completes. */}
                       <div className="space-y-2">
-                        <Label htmlFor="location">Location *</Label>
+                        <Label htmlFor="location">{t("fields.locationRequired.label")}</Label>
                         <Input
                           id="location"
-                          placeholder="e.g., San Francisco, CA or Remote"
+                          placeholder={t("fields.jobLocation.placeholder")}
                           {...register("location")}
                           className={errors.location ? "border-red-500" : ""}
                         />
@@ -997,7 +999,7 @@ export default function JobCreatePage() {
                           value={jobLocations}
                           onChange={setJobLocations}
                           multiRegion={false}
-                          originLabel="Pin location to map (optional)"
+                          originLabel={t("labels.jobCreate.pinLocationToMap")}
                         />
                       </div>
 
@@ -1005,7 +1007,7 @@ export default function JobCreatePage() {
                           filters, and the AI-pivot funnel. Optional;
                           legacy jobs stay untagged. */}
                       <div className="space-y-2">
-                        <Label htmlFor="sector">Sector</Label>
+                        <Label htmlFor="sector">{t("labels.sector")}</Label>
                         <SectorPicker
                           value={(watchedValues.sector as Sector | undefined) ?? null}
                           onChange={(s) =>
@@ -1014,11 +1016,10 @@ export default function JobCreatePage() {
                             })
                           }
                           mode="recruitable"
-                          emptyLabel="Unspecified"
+                          emptyLabel={t("labels.unspecified")}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Tag this job to a sector so it surfaces on the
-                          right landing page and in vertical search.
+                          {t("messages.jobCreate.sectorHint")}
                         </p>
                       </div>
 
@@ -1035,7 +1036,7 @@ export default function JobCreatePage() {
                           htmlFor="isRemote"
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                         >
-                          This is a remote position
+                          {t("labels.jobCreate.remotePosition")}
                         </Label>
                       </div>
                     </CardContent>
@@ -1046,17 +1047,17 @@ export default function JobCreatePage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
-                        Job Details
+                        {t("headings.jobDetails")}
                       </CardTitle>
                       <CardDescription>
-                        Describe the role, responsibilities, and requirements
+                        {t("messages.jobCreate.jobDetailsDescription")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       {/* Employment Type */}
                       <div className="space-y-2">
                         <Label htmlFor="employmentType">
-                          Employment Type *
+                          {t("fields.employmentTypeRequired.label")}
                         </Label>
                         <Select
                           value={watchedValues.employmentType?.[0] || ""}
@@ -1065,36 +1066,36 @@ export default function JobCreatePage() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select employment type" />
+                            <SelectValue placeholder={t("fields.employmentType.placeholder")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="FullTime">Full-time</SelectItem>
-                            <SelectItem value="PartTime">Part-time</SelectItem>
-                            <SelectItem value="Contractor">Contract</SelectItem>
+                            <SelectItem value="FullTime">{t("labels.employmentType.fullTime")}</SelectItem>
+                            <SelectItem value="PartTime">{t("labels.employmentType.partTime")}</SelectItem>
+                            <SelectItem value="Contractor">{t("labels.employmentType.contract")}</SelectItem>
                             <SelectItem value="Internship">
-                              Internship
+                              {t("labels.employmentType.internship")}
                             </SelectItem>
-                            <SelectItem value="Freelance">Freelance</SelectItem>
-                            <SelectItem value="Temporary">Temporary</SelectItem>
+                            <SelectItem value="Freelance">{t("labels.employmentType.freelance")}</SelectItem>
+                            <SelectItem value="Temporary">{t("labels.employmentType.temporary")}</SelectItem>
                             <SelectItem value="ContractToHire">
-                              Contract to Hire
+                              {t("labels.employmentType.contractToHire")}
                             </SelectItem>
                             {/* Exec opportunity types (#1674). Canonical
                                 kebab values — the backend normalizes all
                                 spellings to canonical on write, so mixing
                                 with the PascalCase legacy values above is
                                 safe. */}
-                            <SelectItem value="Fractional">Fractional</SelectItem>
-                            <SelectItem value="Advisor">Advisor</SelectItem>
-                            <SelectItem value="Interim">Interim</SelectItem>
-                            <SelectItem value="BoardSeat">Board Seat</SelectItem>
+                            <SelectItem value="Fractional">{t("labels.employmentType.fractional")}</SelectItem>
+                            <SelectItem value="Advisor">{t("labels.employmentType.advisor")}</SelectItem>
+                            <SelectItem value="Interim">{t("labels.employmentType.interim")}</SelectItem>
+                            <SelectItem value="BoardSeat">{t("labels.employmentType.boardSeat")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       {/* Work Setting */}
                       <div className="space-y-2">
-                        <Label htmlFor="workSetting">Work Setting *</Label>
+                        <Label htmlFor="workSetting">{t("fields.workSettingRequired.label")}</Label>
                         <Select
                           value={watchedValues.workSetting}
                           onValueChange={(value) =>
@@ -1102,19 +1103,19 @@ export default function JobCreatePage() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select work setting" />
+                            <SelectValue placeholder={t("fields.workSetting.placeholder")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Onsite">On-site</SelectItem>
-                            <SelectItem value="Remote">Remote</SelectItem>
-                            <SelectItem value="Hybrid">Hybrid</SelectItem>
+                            <SelectItem value="Onsite">{t("labels.workSetting.onsite")}</SelectItem>
+                            <SelectItem value="Remote">{t("labels.workSetting.remote")}</SelectItem>
+                            <SelectItem value="Hybrid">{t("labels.workSetting.hybrid")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       {/* Experience Level */}
                       <div className="space-y-2">
-                        <Label htmlFor="seniority">Experience Level *</Label>
+                        <Label htmlFor="seniority">{t("fields.experienceLevelRequired.label")}</Label>
                         <Select
                           value={watchedValues.seniority?.[0] || ""}
                           onValueChange={(value) =>
@@ -1122,17 +1123,17 @@ export default function JobCreatePage() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select experience level" />
+                            <SelectValue placeholder={t("fields.experienceLevel.placeholder")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Entry">Entry Level</SelectItem>
-                            <SelectItem value="Junior">Junior Level</SelectItem>
-                            <SelectItem value="Mid">Mid Level</SelectItem>
-                            <SelectItem value="Senior">Senior Level</SelectItem>
+                            <SelectItem value="Entry">{t("labels.experienceLevel.entry")}</SelectItem>
+                            <SelectItem value="Junior">{t("labels.experienceLevel.junior")}</SelectItem>
+                            <SelectItem value="Mid">{t("labels.experienceLevel.mid")}</SelectItem>
+                            <SelectItem value="Senior">{t("labels.experienceLevel.senior")}</SelectItem>
                             <SelectItem value="LeadExecutive">
-                              Lead/Executive
+                              {t("labels.experienceLevel.leadExecutive")}
                             </SelectItem>
-                            <SelectItem value="None">Not Specified</SelectItem>
+                            <SelectItem value="None">{t("labels.experienceLevel.notSpecified")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1140,19 +1141,19 @@ export default function JobCreatePage() {
                       {/* Job Description */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="description">Job Description *</Label>
+                          <Label htmlFor="description">{t("fields.jobDescriptionRequired.label")}</Label>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => openAIForTask("description")}
                           >
-                            Use AI
+                            {t("actions.useAi")}
                           </Button>
                         </div>
                         <Textarea
                           id="description"
-                          placeholder="Provide a detailed description of the role, responsibilities, and what makes this opportunity exciting..."
+                          placeholder={t("fields.jobDescription.placeholder")}
                           rows={8}
                           {...register("description")}
                           className={errors.description ? "border-red-500" : ""}
@@ -1163,8 +1164,9 @@ export default function JobCreatePage() {
                           </p>
                         )}
                         <p className="text-sm text-muted-foreground">
-                          {watchedValues.description?.length || 0} / 5000
-                          characters (minimum 50)
+                          {t("messages.jobCreate.descriptionCharCount", {
+                            count: watchedValues.description?.length || 0,
+                          })}
                         </p>
                       </div>
 
@@ -1172,7 +1174,7 @@ export default function JobCreatePage() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label htmlFor="requirements">
-                            Requirements (Optional)
+                            {t("fields.requirementsOptional.label")}
                           </Label>
                           <Button
                             type="button"
@@ -1180,17 +1182,17 @@ export default function JobCreatePage() {
                             size="sm"
                             onClick={() => openAIForTask("requirements")}
                           >
-                            Use AI
+                            {t("actions.useAi")}
                           </Button>
                         </div>
                         <Textarea
                           id="requirements"
-                          placeholder="List the key requirements, one per line:&#10;• Bachelor's degree in Computer Science&#10;• 3+ years of React experience&#10;• Strong communication skills"
+                          placeholder={t("fields.requirements.placeholder")}
                           rows={6}
                           {...register("requirements")}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Enter each requirement on a new line
+                          {t("messages.jobCreate.requirementsHint")}
                         </p>
                       </div>
                     </CardContent>
@@ -1201,17 +1203,17 @@ export default function JobCreatePage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5" />
-                        Compensation (Optional)
+                        {t("headings.compensationOptional")}
                       </CardTitle>
                       <CardDescription>
-                        Specify salary range to attract qualified candidates
+                        {t("messages.jobCreate.compensationDescription")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Minimum Salary */}
                         <div className="space-y-2">
-                          <Label htmlFor="salaryMin">Minimum Salary</Label>
+                          <Label htmlFor="salaryMin">{t("fields.minSalary.label")}</Label>
                           <Input
                             id="salaryMin"
                             type="number"
@@ -1228,7 +1230,7 @@ export default function JobCreatePage() {
 
                         {/* Maximum Salary */}
                         <div className="space-y-2">
-                          <Label htmlFor="salaryMax">Maximum Salary</Label>
+                          <Label htmlFor="salaryMax">{t("fields.maxSalary.label")}</Label>
                           <Input
                             id="salaryMax"
                             type="number"
@@ -1245,7 +1247,7 @@ export default function JobCreatePage() {
 
                         {/* Currency */}
                         <div className="space-y-2">
-                          <Label htmlFor="currency">Currency</Label>
+                          <Label htmlFor="currency">{t("fields.currency.label")}</Label>
                           <Select
                             value={watchedValues.currency}
                             onValueChange={(value) =>
@@ -1253,7 +1255,7 @@ export default function JobCreatePage() {
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select currency" />
+                              <SelectValue placeholder={t("fields.currency.placeholder")} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="USD">USD ($)</SelectItem>
@@ -1273,10 +1275,10 @@ export default function JobCreatePage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Eye className="h-5 w-5" />
-                        Job Settings
+                        {t("headings.jobSettings")}
                       </CardTitle>
                       <CardDescription>
-                        Configure visibility and expiration settings
+                        {t("messages.jobCreate.jobSettingsDescription")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -1293,15 +1295,14 @@ export default function JobCreatePage() {
                           htmlFor="isPublic"
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                         >
-                          Make this job posting public (visible to all job
-                          seekers)
+                          {t("labels.jobCreate.makePublic")}
                         </Label>
                       </div>
 
                       {/* Expiry Date */}
                       <div className="space-y-2">
                         <Label htmlFor="expirationDate">
-                          Expiry Date (Optional)
+                          {t("fields.expiryDateOptional.label")}
                         </Label>
                         <Input
                           id="expirationDate"
@@ -1310,7 +1311,7 @@ export default function JobCreatePage() {
                           min={new Date().toISOString().split("T")[0]}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Leave empty for no expiration date
+                          {t("messages.jobCreate.noExpirationHint")}
                         </p>
                       </div>
                     </CardContent>
@@ -1324,7 +1325,7 @@ export default function JobCreatePage() {
                       onClick={() => navigate("/jobs")}
                       disabled={isSubmitting}
                     >
-                      Cancel
+                      {t("actions.cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -1335,12 +1336,12 @@ export default function JobCreatePage() {
                       {isSubmitting ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                          Creating...
+                          {t("status.creating")}
                         </>
                       ) : (
                         <>
                           <Save className="h-4 w-4 mr-2" />
-                          Post Job
+                          {t("actions.postJob")}
                         </>
                       )}
                     </Button>
@@ -1365,10 +1366,10 @@ export default function JobCreatePage() {
                         }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Create Another Job
+                        {t("actions.createAnotherJob")}
                       </Button>
                       <Button onClick={() => navigate("/jobs")}>
-                        View All Jobs
+                        {t("actions.viewAllJobs")}
                       </Button>
                     </div>
                   )}

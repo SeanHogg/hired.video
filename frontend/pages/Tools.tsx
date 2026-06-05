@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
@@ -63,15 +64,15 @@ function parseCategoryFilter(raw: string | null): CategoryFilter {
 }
 
 const TIER_OPTIONS = [
-  { value: "free", label: "Free" },
-  { value: "pro", label: "Paid" },
+  { value: "free", labelKey: "labels.free" },
+  { value: "pro", labelKey: "labels.paid" },
 ];
 
 const AUDIENCE_OPTIONS = [
-  { value: "for_me", label: "For me" },
-  { value: "job_seeker", label: "For job seekers" },
-  { value: "recruiter_employer", label: "For recruiters & employers" },
-  { value: "all", label: "Show all" },
+  { value: "for_me", labelKey: "labels.tools.audienceForMe" },
+  { value: "job_seeker", labelKey: "labels.tools.audienceJobSeekers" },
+  { value: "recruiter_employer", labelKey: "labels.tools.audienceRecruitersEmployers" },
+  { value: "all", labelKey: "labels.tools.audienceShowAll" },
 ];
 
 function parseAudienceFilter(raw: string | null): AudienceFilter {
@@ -88,6 +89,7 @@ function parseAudienceFilter(raw: string | null): AudienceFilter {
 
 export default function Tools() {
   const location = useLocation();
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const effectiveRole = useEffectiveRole();
 
@@ -221,28 +223,18 @@ export default function Tools() {
                     <Brain className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    AI Tools + Learning
+                    {t("headings.tools.aiToolsLearning")}
                   </span>
                   <GraduationCap className="h-12 w-12 text-brand-purple" />
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Smart Tools and Built-in Courses to Supercharge Your Career
+                  {t("headings.tools.heroTitle")}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8">
-                  Free AI career tools — resume scoring, ATS optimization,
-                  salary benchmarks, interview practice — paired with a
-                  built-in learning library covering AI, RAG, prompt
-                  engineering, and the must-have skills for the AI era. SCORM
-                  1.2 + xAPI tracked with HMAC-signed certificates. No
-                  separate license required.
+                  {t("messages.tools.heroDescription")}
                 </p>
                 <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Educators and employers go further: spin up a classroom,
-                  assign courses or learning paths with due dates, and watch
-                  every learner's progress roll up live — the LMS playbook,
-                  but on the one platform where finishing the training leads
-                  straight to getting hired, and every lesson earns points,
-                  streaks, and badges.
+                  {t("messages.tools.heroEducators")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -250,14 +242,14 @@ export default function Tools() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                     >
-                      Access All Tools
+                      {t("actions.accessAllTools")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Button asChild size="lg" variant="outline" className="text-lg px-8">
                     <Link to="/tools/ai-resume-scorer">
                       <Play className="mr-2 h-5 w-5" />
-                      Try Free Tool
+                      {t("actions.tryFreeTool")}
                     </Link>
                   </Button>
                 </div>
@@ -273,13 +265,10 @@ export default function Tools() {
                   see ToolsLearningGrid. */}
               <div className="mb-12 sm:mb-16">
                 <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
-                  AI Career Tools + Built-in Courses
+                  {t("headings.tools.careerToolsCourses")}
                 </h2>
                 <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
-                  Free single-purpose AI tools and a bundled learning library —
-                  side by side. Score your resume in seconds, then go deeper
-                  with courses on AI, RAG, and the must-have skills employers
-                  are hiring for. No separate license required.
+                  {t("messages.tools.careerToolsCoursesDesc")}
                 </p>
                 <ToolsLearningGrid tools={TOOLS_CATALOG} courseLimit={12} />
               </div>
@@ -289,7 +278,7 @@ export default function Tools() {
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">10+</div>
                   <p className="text-sm text-muted-foreground">
-                    AI-powered tools
+                    {t("labels.tools.statAiTools")}
                   </p>
                 </div>
                 <div className="text-center">
@@ -297,21 +286,21 @@ export default function Tools() {
                     1M+
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Resumes analyzed
+                    {t("labels.tools.statResumesAnalyzed")}
                   </p>
                 </div>
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
                     95%
                   </div>
-                  <p className="text-sm text-muted-foreground">Accuracy rate</p>
+                  <p className="text-sm text-muted-foreground">{t("labels.tools.statAccuracyRate")}</p>
                 </div>
                 <div className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
                     SCORM
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    1.2 + xAPI learning library included
+                    {t("labels.tools.statScormLibrary")}
                   </p>
                 </div>
               </div>
@@ -319,43 +308,43 @@ export default function Tools() {
           {/* How It Works */}
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-center mb-12">
-              How Our AI Tools Work
+              {t("headings.tools.howItWorks")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">1. Upload Content</h3>
+                <h3 className="font-semibold mb-2">{t("headings.tools.step1Title")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Upload your resume, job description, or input
+                  {t("messages.tools.step1Desc")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Brain className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">2. AI Analysis</h3>
+                <h3 className="font-semibold mb-2">{t("headings.tools.step2Title")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Our AI processes and analyzes your content
+                  {t("messages.tools.step2Desc")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <BarChart3 className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">3. Get Insights</h3>
+                <h3 className="font-semibold mb-2">{t("headings.tools.step3Title")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Receive detailed feedback and recommendations
+                  {t("messages.tools.step3Desc")}
                 </p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <TrendingUp className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">4. Improve & Succeed</h3>
+                <h3 className="font-semibold mb-2">{t("headings.tools.step4Title")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Apply insights to enhance your career
+                  {t("messages.tools.step4Desc")}
                 </p>
               </div>
             </div>
@@ -369,11 +358,10 @@ export default function Tools() {
                   <Heart className="h-8 w-8 text-pink-600" />
                 </div>
                 <h2 className="text-3xl font-bold mb-4">
-                  New: Resume Sentiment Analysis
+                  {t("headings.tools.sentimentTitle")}
                 </h2>
                 <p className="text-xl text-muted-foreground">
-                  Discover how positive your resume sounds to employers with our
-                  AI-powered sentiment analysis tool
+                  {t("messages.tools.sentimentDesc")}
                 </p>
               </div>
 
@@ -383,7 +371,7 @@ export default function Tools() {
                     85%
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Analysis Accuracy
+                    {t("labels.tools.sentimentAccuracy")}
                   </p>
                 </div>
                 <div className="text-center">
@@ -391,7 +379,7 @@ export default function Tools() {
                     40%
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    More Interview Invites
+                    {t("labels.tools.sentimentMoreInvites")}
                   </p>
                 </div>
                 <div className="text-center">
@@ -399,7 +387,7 @@ export default function Tools() {
                     0-100
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Sentiment Score Range
+                    {t("labels.tools.sentimentScoreRange")}
                   </p>
                 </div>
               </div>
@@ -411,7 +399,7 @@ export default function Tools() {
                     className="bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90"
                   >
                     <Heart className="mr-2 h-5 w-5" />
-                    Try Sentiment Analysis Free
+                    {t("actions.trySentimentFree")}
                   </Button>
                 </Link>
               </div>
@@ -421,7 +409,7 @@ export default function Tools() {
           {/* Success Stories */}
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-center mb-12">
-              Tool Success Stories
+              {t("headings.tools.successStories")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               <Card>
@@ -435,16 +423,14 @@ export default function Tools() {
                     ))}
                   </div>
                   <p className="text-sm mb-4">
-                    "The Resume Optimizer helped me increase my callback rate by
-                    300%. The AI suggestions were spot-on and helped me tailor
-                    my resume for each application."
+                    {t("messages.tools.testimonial1")}
                   </p>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
                     <div>
                       <p className="font-medium text-sm">Jennifer Liu</p>
                       <p className="text-xs text-muted-foreground">
-                        Data Analyst
+                        {t("labels.tools.testimonial1Role")}
                       </p>
                     </div>
                   </div>
@@ -462,16 +448,14 @@ export default function Tools() {
                     ))}
                   </div>
                   <p className="text-sm mb-4">
-                    "The Interview Simulator gave me the confidence I needed. I
-                    practiced for weeks and nailed my dream job interview. The
-                    feedback was incredibly detailed."
+                    {t("messages.tools.testimonial2")}
                   </p>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gradient-to-r from-brand-blue to-brand-purple rounded-full" />
                     <div>
                       <p className="font-medium text-sm">Carlos Martinez</p>
                       <p className="text-xs text-muted-foreground">
-                        Software Engineer
+                        {t("labels.tools.testimonial2Role")}
                       </p>
                     </div>
                   </div>
@@ -489,17 +473,14 @@ export default function Tools() {
                     ))}
                   </div>
                   <p className="text-sm mb-4">
-                    "I never realized my resume sounded so negative! The
-                    sentiment analysis showed me exactly what to change. After
-                    improving my score from 35 to 78, I started getting way more
-                    interview calls."
+                    {t("messages.tools.testimonial3")}
                   </p>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full" />
                     <div>
                       <p className="font-medium text-sm">Sarah Chen</p>
                       <p className="text-xs text-muted-foreground">
-                        Marketing Manager
+                        {t("labels.tools.testimonial3Role")}
                       </p>
                     </div>
                   </div>
@@ -511,12 +492,10 @@ export default function Tools() {
           {/* Final CTA */}
           <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
             <h3 className="text-2xl font-bold mb-4">
-              Tools to fix it. Courses to learn it.
+              {t("headings.tools.ctaTitle")}
             </h3>
             <p className="text-muted-foreground mb-6">
-              Sharpen your resume in seconds with our AI tools, then go deeper
-              with built-in courses on AI, RAG, and the must-have skills
-              employers are hiring for now — all on one platform.
+              {t("messages.tools.ctaDesc")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/signup">
@@ -524,14 +503,14 @@ export default function Tools() {
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                 >
-                  Get Started Today
+                  {t("actions.getStartedToday")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link to="/courses/e064d488-0b47-bcc7-d0c8-572f9c61cb3c/ai-era-must-have-skills">
                 <Button size="lg" variant="outline">
                   <GraduationCap className="mr-2 h-5 w-5" />
-                  Browse AI-Era Skills Course
+                  {t("actions.browseAiEraCourse")}
                 </Button>
               </Link>
             </div>
@@ -548,10 +527,10 @@ export default function Tools() {
           <div>
             <PageHeader
               tabs={[
-                { key: "tools", label: "Tools", icon: Wrench, to: "/tools" },
-                { key: "learning", label: "Learning", icon: GraduationCap, to: "/tools?tab=learning" },
-                { key: "my-learning", label: "My Learning", icon: GraduationCap, to: "/tools?tab=my-learning" },
-                { key: "classrooms", label: "Classrooms", icon: Users, to: "/tools?tab=classrooms" },
+                { key: "tools", label: t("labels.tools.tabTools"), icon: Wrench, to: "/tools" },
+                { key: "learning", label: t("labels.tools.tabLearning"), icon: GraduationCap, to: "/tools?tab=learning" },
+                { key: "my-learning", label: t("labels.tools.tabMyLearning"), icon: GraduationCap, to: "/tools?tab=my-learning" },
+                { key: "classrooms", label: t("labels.tools.tabClassrooms"), icon: Users, to: "/tools?tab=classrooms" },
               ]}
               activeTabKey={tabParam}
               search={<HeaderSearch />}
@@ -573,12 +552,12 @@ export default function Tools() {
               className="mb-2"
               value={audienceFilter}
               onChange={setAudienceFilter}
-              allLabel="Show all"
+              allLabel={t("labels.tools.audienceShowAll")}
               allCount={0}
               hideZeroCounts={false}
               options={AUDIENCE_OPTIONS.filter((o) => o.value !== "all").map((o) => ({
                 value: o.value,
-                label: o.label,
+                label: t(o.labelKey),
                 count: 0,
               }))}
             />
@@ -589,12 +568,12 @@ export default function Tools() {
               className="mb-3"
               value={tierFilter}
               onChange={setTierFilter}
-              allLabel="Any tier"
+              allLabel={t("labels.tools.anyTier")}
               allCount={0}
               hideZeroCounts={false}
               options={TIER_OPTIONS.map((o) => ({
                 value: o.value,
-                label: o.label,
+                label: t(o.labelKey),
                 count: 0,
               }))}
             />
@@ -617,12 +596,12 @@ export default function Tools() {
             {isFiltering && (
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
-                  {filteredTools.length} tool
-                  {filteredTools.length === 1 ? "" : "s"}
+                  {toolQuery.trim() !== ""
+                    ? t("messages.tools.countMatch", { count: filteredTools.length })
+                    : t("messages.tools.count", { count: filteredTools.length })}
                   {toolQuery.trim() !== "" && (
                     <>
-                      {" "}match
-                      {filteredTools.length === 1 ? "es" : ""}{" "}
+                      {" "}
                       <span className="font-medium text-foreground">
                         &quot;{toolQuery}&quot;
                       </span>
@@ -630,23 +609,26 @@ export default function Tools() {
                   )}
                   {tierFilter !== "all" && (
                     <>
-                      {" "}in{" "}
+                      {" "}{t("messages.tools.filterIn")}{" "}
                       <span className="font-medium text-foreground">
-                        {tierFilter === "free" ? "Free" : "Paid"}
+                        {tierFilter === "free" ? t("labels.free") : t("labels.paid")}
                       </span>
                     </>
                   )}
                   {audienceFilter !== "for_me" && (
                     <>
-                      {" "}for{" "}
+                      {" "}{t("messages.tools.filterFor")}{" "}
                       <span className="font-medium text-foreground">
-                        {AUDIENCE_OPTIONS.find((o) => o.value === audienceFilter)?.label ?? "everyone"}
+                        {t(
+                          AUDIENCE_OPTIONS.find((o) => o.value === audienceFilter)?.labelKey ??
+                            "labels.tools.audienceEveryone",
+                        )}
                       </span>
                     </>
                   )}
                   {categoryFilter !== "all" && (
                     <>
-                      {" "}in{" "}
+                      {" "}{t("messages.tools.filterIn")}{" "}
                       <span className="font-medium text-foreground">
                         {categoryFilter}
                       </span>
@@ -660,7 +642,7 @@ export default function Tools() {
             <div className="mb-8 sm:mb-12">
               {filteredTools.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-                  <p>No tools match the current filters.</p>
+                  <p>{t("messages.tools.noMatch")}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">

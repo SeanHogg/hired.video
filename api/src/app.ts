@@ -155,6 +155,7 @@ import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
 import { serviceRoutes } from "./routes/services.js";
 import { creatorRoutes } from "./routes/creators.js";
+import { bookingsRoutes } from "./routes/bookings.js";
 import { articleRoutes } from "./routes/articles.js";
 import { adminArticleRoutes } from "./routes/admin-articles.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
@@ -298,6 +299,8 @@ export function createApp() {
     "/api/creators/public",
     "/api/creators/browse",
     "/api/creators/portfolio/public",
+    "/api/bookings/public",
+    "/api/bookings/r",
     "/api/articles/public",
     "/api/courses/public",
     "/api/legal/current",
@@ -771,6 +774,7 @@ export function createApp() {
   app.route("/api/whitelabel", whitelabelRoutes);
   app.route("/api/services", serviceRoutes);
   app.route("/api/creators", creatorRoutes);
+  app.route("/api/bookings", bookingsRoutes);
   app.route("/api/articles", articleRoutes);
   app.route("/api/reports", reportRoutes);
   app.route("/api/community-resources", communityResourceRoutes);

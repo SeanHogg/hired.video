@@ -12,6 +12,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Award,
   Coins,
@@ -38,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import MarketingFAQ, { type MarketingFAQItem } from "@/components/MarketingFAQ";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import {
   BadgesGallery,
   type BadgeGalleryItem,
@@ -50,10 +51,10 @@ import {
   type ShowcaseBadge,
 } from "@/lib/services/points-service";
 
-const ROLE_LABELS: Record<string, string> = {
-  job_seeker: "Job seeker",
-  recruiter: "Recruiter",
-  employer: "Employer",
+const ROLE_LABEL_KEYS: Record<string, string> = {
+  job_seeker: "labels.rewards.roleJobSeeker",
+  recruiter: "labels.rewards.roleRecruiter",
+  employer: "labels.rewards.roleEmployer",
 };
 
 function showcaseBadgeToGalleryItem(b: ShowcaseBadge): BadgeGalleryItem {
@@ -75,8 +76,9 @@ function showcaseBadgeToGalleryItem(b: ShowcaseBadge): BadgeGalleryItem {
 }
 
 export default function RewardsPage() {
+  const { t } = useTranslation();
   useSEO("/rewards");
-  useBreadcrumbs([{ name: "Rewards", url: "/rewards" }]);
+  useBreadcrumbs([{ name: t("labels.rewards.breadcrumb"), url: "/rewards" }]);
 
   const { user } = useAuth();
   const eligible = isPointsEligible(user);
@@ -99,34 +101,30 @@ export default function RewardsPage() {
         <article className="py-10 px-4">
           <header className="space-y-3 mb-10 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-          <Sparkles className="h-3.5 w-3.5" /> hired.video Rewards
+          <Sparkles className="h-3.5 w-3.5" /> {t("labels.rewards.badge")}
         </div>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-          Earn points. Win badges. Cash out.
+          {t("headings.rewards.heroTitle")}
         </h1>
         <p className="text-lg text-muted-foreground">
-          Every meaningful step on hired.video earns you points — applications,
-          tailored resumes, daily streaks, posts to the feed. Trade them for AI credits,
-          a free month of Pro, or a real-world gift card.
+          {t("messages.rewards.heroDescription")}
         </p>
         {user && eligible && (
           <div className="flex items-center justify-center gap-2 pt-3">
             <Button asChild>
-              <Link to="/points">See my points</Link>
+              <Link to="/points">{t("actions.rewards.seeMyPoints")}</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link to="/settings?tab=points">Cash out</Link>
+              <Link to="/settings?tab=points">{t("actions.rewards.cashOut")}</Link>
             </Button>
           </div>
         )}
       </header>
 
       {/* ── Badges showcase ─────────────────────────────────────── */}
-      <Section icon={<Trophy className="h-5 w-5" />} title="Badges you can win">
+      <Section icon={<Trophy className="h-5 w-5" />} title={t("headings.rewards.badgesYouCanWin")}>
         <p className="text-muted-foreground mb-5">
-          Earn a badge for each milestone — some unlock once, others (like streak rungs)
-          you can win every time you rebuild them. Each badge pays a one-time points
-          bonus when you unlock it.
+          {t("messages.rewards.badgesDesc")}
         </p>
         {badges.isLoading || !badges.data ? (
           <div className="flex items-center justify-center py-8">
@@ -143,11 +141,9 @@ export default function RewardsPage() {
       </Section>
 
       {/* ── Earning ─────────────────────────────────────────────── */}
-      <Section icon={<Coins className="h-5 w-5" />} title="How you earn points">
+      <Section icon={<Coins className="h-5 w-5" />} title={t("headings.rewards.howYouEarn")}>
         <p className="text-muted-foreground mb-5">
-          Every action below earns its base point value. Daily caps keep things fair —
-          once you hit the cap for a specific action, that action still counts toward your
-          streak even though the points are paused for the day.
+          {t("messages.rewards.earnDesc")}
         </p>
         {catalog.isLoading || !catalog.data ? (
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -156,10 +152,10 @@ export default function RewardsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Who it's for</TableHead>
-                  <TableHead className="text-right">Points</TableHead>
-                  <TableHead className="text-right">Daily cap</TableHead>
+                  <TableHead>{t("labels.rewards.colAction")}</TableHead>
+                  <TableHead>{t("labels.rewards.colWhoFor")}</TableHead>
+                  <TableHead className="text-right">{t("labels.rewards.colPoints")}</TableHead>
+                  <TableHead className="text-right">{t("labels.rewards.colDailyCap")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,8 +169,10 @@ export default function RewardsPage() {
                       </TableCell>
                       <TableCell className="text-xs">
                         {a.roles.length === 0
-                          ? "Everyone"
-                          : a.roles.map((r) => ROLE_LABELS[r] ?? r).join(" · ")}
+                          ? t("labels.rewards.everyone")
+                          : a.roles
+                              .map((r) => (ROLE_LABEL_KEYS[r] ? t(ROLE_LABEL_KEYS[r]) : r))
+                              .join(" · ")}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
                         +{a.points}
@@ -191,21 +189,16 @@ export default function RewardsPage() {
         <Callout
           tone="info"
           icon={<ShieldCheck className="h-4 w-4" />}
-          title="One anti-gaming rule"
+          title={t("headings.rewards.antiGamingTitle")}
         >
-          Self-created tasks don't earn points until you've closed 100 of them. System
-          tasks (onboarding, AI-generated suggestions) always pay. This stops anyone from
-          farming the system by spinning up fake to-dos and closing them.
+          {t("messages.rewards.antiGamingBody")}
         </Callout>
       </Section>
 
       {/* ── Streaks ─────────────────────────────────────────────── */}
-      <Section icon={<Flame className="h-5 w-5 text-orange-500" />} title="Streaks">
+      <Section icon={<Flame className="h-5 w-5 text-orange-500" />} title={t("headings.rewards.streaks")}>
         <p className="text-muted-foreground mb-5">
-          Show up daily and your streak grows. Hit a milestone — 7, 14, 30, 60, 90 days —
-          and you earn a repeatable streak badge plus a points bonus. Skip a day and the
-          streak resets to one, but every milestone is winnable again the next time you
-          rebuild.
+          {t("messages.rewards.streaksDesc")}
         </p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {STREAK_MILESTONES.map((m) => (
@@ -216,20 +209,18 @@ export default function RewardsPage() {
                 }`}
               />
               <div className="text-2xl font-bold">{m.day}</div>
-              <div className="text-xs text-muted-foreground">days</div>
-              <div className="text-xs font-medium mt-2">+{m.bonus} pts</div>
-              <div className="text-[10px] text-muted-foreground">{m.name}</div>
+              <div className="text-xs text-muted-foreground">{t("labels.rewards.days")}</div>
+              <div className="text-xs font-medium mt-2">{t("labels.rewards.bonusPts", { count: m.bonus })}</div>
+              <div className="text-[10px] text-muted-foreground">{t(m.nameKey)}</div>
             </Card>
           ))}
         </div>
       </Section>
 
       {/* ── Cashout ─────────────────────────────────────────────── */}
-      <Section icon={<CreditCard className="h-5 w-5" />} title="Cash out your points">
+      <Section icon={<CreditCard className="h-5 w-5" />} title={t("headings.rewards.cashOutTitle")}>
         <p className="text-muted-foreground mb-5">
-          Four ways to spend what you earn. AI credits, Pro time, and Campaign $
-          fulfill instantly; gift cards dispatch through Tremendous within minutes
-          (or after a short review if you cross IRS reporting thresholds).
+          {t("messages.rewards.cashOutDesc")}
         </p>
         {catalog.isLoading || !catalog.data ? (
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -237,26 +228,26 @@ export default function RewardsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <CashoutColumn
               icon={<Sparkles className="h-5 w-5" />}
-              title="AI Credits"
-              subtitle="Top up your token wallet"
+              title={t("labels.rewards.aiCreditsTitle")}
+              subtitle={t("labels.rewards.aiCreditsSubtitle")}
               items={catalog.data.redemptions.filter((r) => r.kind === "ai_credits")}
             />
             <CashoutColumn
               icon={<Award className="h-5 w-5" />}
-              title="Pro Time"
-              subtitle="Free month of Pro"
+              title={t("labels.rewards.proTimeTitle")}
+              subtitle={t("labels.rewards.proTimeSubtitle")}
               items={catalog.data.redemptions.filter((r) => r.kind === "premium_month")}
             />
             <CashoutColumn
               icon={<Gift className="h-5 w-5" />}
-              title="Gift Cards"
-              subtitle="Amazon, Visa, Target & more"
+              title={t("labels.rewards.giftCardsTitle")}
+              subtitle={t("labels.rewards.giftCardsSubtitle")}
               items={catalog.data.redemptions.filter((r) => r.kind === "gift_card")}
             />
             <CashoutColumn
               icon={<Megaphone className="h-5 w-5" />}
-              title="Campaign $"
-              subtitle="Platform credit for paid boosts"
+              title={t("labels.rewards.campaignTitle")}
+              subtitle={t("labels.rewards.campaignSubtitle")}
               items={catalog.data.redemptions.filter((r) => r.kind === "campaign_dollars")}
             />
           </div>
@@ -264,12 +255,9 @@ export default function RewardsPage() {
         <Callout
           tone="warn"
           icon={<Lock className="h-4 w-4" />}
-          title="Tax reporting at $599 / year"
+          title={t("headings.rewards.taxTitle")}
         >
-          The IRS treats earned rewards as income for non-employees. Once your gift-card
-          redemptions cross $599 in a calendar year, we'll ask you to file a W-9 before
-          dispatching the next one. AI credits and premium-month grants count toward the
-          same threshold.
+          {t("messages.rewards.taxBody")}
         </Callout>
       </Section>
 
@@ -279,31 +267,33 @@ export default function RewardsPage() {
           marketing page on the site gets. */}
       <MarketingFAQ
         schemaId="rewards"
-        heading="Frequently asked"
-        items={FAQ}
+        heading={t("headings.rewards.faqHeading")}
+        items={FAQ.map((f) => ({
+          question: t(f.questionKey),
+          answer: t(f.answerKey),
+        }))}
         className="py-8 px-0"
       />
 
       {/* ── CTA ─────────────────────────────────────────────────── */}
       <Card className="p-8 mt-12 text-center bg-gradient-to-br from-primary/10 via-primary/5 to-background">
         <Trophy className="h-10 w-10 mx-auto text-primary mb-3" />
-        <h2 className="text-2xl font-bold mb-2">Start earning today</h2>
+        <h2 className="text-2xl font-bold mb-2">{t("headings.rewards.ctaTitle")}</h2>
         <p className="text-muted-foreground mb-5">
-          Sign in to track your balance, see your badges, and cash out the moment you hit
-          a redemption tier.
+          {t("messages.rewards.ctaDesc")}
         </p>
         <div className="flex items-center justify-center gap-2">
           {user ? (
             <Button asChild>
-              <Link to="/points">Go to my points</Link>
+              <Link to="/points">{t("actions.rewards.goToMyPoints")}</Link>
             </Button>
           ) : (
             <>
               <Button asChild>
-                <Link to="/signup">Sign up free</Link>
+                <Link to="/signup">{t("actions.signUpFree")}</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to="/login">Sign in</Link>
+                <Link to="/login">{t("actions.signIn")}</Link>
               </Button>
             </>
           )}
@@ -375,6 +365,7 @@ function CashoutColumn({
   subtitle: string;
   items: PointsCatalog["redemptions"];
 }) {
+  const { t } = useTranslation();
   if (items.length === 0) return null;
   return (
     <Card className="p-5 h-full">
@@ -391,7 +382,7 @@ function CashoutColumn({
           >
             <span>{sku.label}</span>
             <span className="tabular-nums text-muted-foreground">
-              {sku.pointsCost.toLocaleString()} pts
+              {t("labels.rewards.ptsValue", { amount: sku.pointsCost.toLocaleString() })}
             </span>
           </li>
         ))}
@@ -402,41 +393,20 @@ function CashoutColumn({
 
 // ── Static content ───────────────────────────────────────────────────
 
-const STREAK_MILESTONES: Array<{ day: number; bonus: number; name: string }> = [
-  { day: 7, bonus: 100, name: "On Fire" },
-  { day: 14, bonus: 250, name: "Fortnight Force" },
-  { day: 30, bonus: 500, name: "Streak 30" },
-  { day: 60, bonus: 1000, name: "Unstoppable" },
-  { day: 90, bonus: 2500, name: "Legendary" },
+const STREAK_MILESTONES: Array<{ day: number; bonus: number; nameKey: string }> = [
+  { day: 7, bonus: 100, nameKey: "labels.rewards.streakOnFire" },
+  { day: 14, bonus: 250, nameKey: "labels.rewards.streakFortnightForce" },
+  { day: 30, bonus: 500, nameKey: "labels.rewards.streak30" },
+  { day: 60, bonus: 1000, nameKey: "labels.rewards.streakUnstoppable" },
+  { day: 90, bonus: 2500, nameKey: "labels.rewards.streakLegendary" },
 ];
 
-const FAQ: MarketingFAQItem[] = [
-  {
-    question: "Do my points ever expire?",
-    answer: "No. Points stay in your balance until you redeem them. Lifetime earned and lifetime redeemed are tracked separately so you can see your full history.",
-  },
-  {
-    question: "Can I lose points I've already earned?",
-    answer: "Only in three cases. (1) When you redeem, the points are debited. (2) If you refund a purchase that earned points, the original earning is reversed. (3) If our fraud system flags unusual activity, earning is paused until support reviews — confirmed fraud leads to point reversal.",
-  },
-  {
-    question: "How fast do gift cards arrive?",
-    answer: "Tremendous typically delivers the gift-card email within minutes of approval. If you cross the $599 / year reporting threshold, we'll collect a W-9 first.",
-  },
-  {
-    question: "What counts toward my streak?",
-    answer: "Almost any meaningful action — submitting an application, tailoring a resume, generating a cover letter, completing a task, posting to the feed, running a saved search, making a purchase, or just showing up daily. One qualifying action per day keeps the streak alive.",
-  },
-  {
-    question: "Why is there a 100-task gate?",
-    answer: "Self-created tasks don't earn points until you've closed 100 of them. This prevents abuse — without the gate, someone could create and close thousands of fake tasks to farm points. System-generated tasks (onboarding flows, AI suggestions) always pay.",
-  },
-  {
-    question: "Can I share points with another user?",
-    answer: "Not directly. The affiliate program (separate from this) lets you earn commission on referrals; see /affiliate-program for details.",
-  },
-  {
-    question: "Why didn't my action earn?",
-    answer: "A few possibilities: you may have hit the daily cap for that action, your role may not be on the rule's eligibility list, or your points may be paused for review. Check the Activity feed on your points page for the per-action audit trail.",
-  },
+const FAQ: Array<{ questionKey: string; answerKey: string }> = [
+  { questionKey: "messages.rewards.faq1Q", answerKey: "messages.rewards.faq1A" },
+  { questionKey: "messages.rewards.faq2Q", answerKey: "messages.rewards.faq2A" },
+  { questionKey: "messages.rewards.faq3Q", answerKey: "messages.rewards.faq3A" },
+  { questionKey: "messages.rewards.faq4Q", answerKey: "messages.rewards.faq4A" },
+  { questionKey: "messages.rewards.faq5Q", answerKey: "messages.rewards.faq5A" },
+  { questionKey: "messages.rewards.faq6Q", answerKey: "messages.rewards.faq6A" },
+  { questionKey: "messages.rewards.faq7Q", answerKey: "messages.rewards.faq7A" },
 ];

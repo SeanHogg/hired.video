@@ -62,6 +62,7 @@ import { listShippableKindPitches } from "@/lib/studio/kind-marketing";
 import type { ComponentType, ReactNode } from "react";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs, generatePricingSchema } from "@/lib/seo";
 import MarketingFAQ from "@/components/MarketingFAQ";
@@ -92,6 +93,7 @@ import { useCart } from "@/lib/cart-context";
 import { useContactPanel } from "@/components/ContactPanel";
 
 export default function Pricing() {
+  const { t } = useTranslation();
   const location = useLocation();
   // Live prices from the runtime config (admin-editable). Fall back to the
   // shared/pricing.ts compile-time defaults until the fetch resolves.
@@ -159,166 +161,91 @@ export default function Pricing() {
   // One copy line per persona today — keep the inbox quota + add-on price
   // in one string so changing either reaches every plan card simultaneously.
   // "per user" suffix only renders on personas where Pro is billed per-seat.
-  const inboxSyncFeature = (perUserSuffix = ""): string =>
-    `Inbox Sync — Gmail / Outlook (${INBOX_SYNC_INCLUDED_ACCOUNTS} mailboxes${perUserSuffix}, +$${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo each)`;
+  // One copy line per persona today. The "scope" variant carries the
+  // per-seat / per-user qualifier so changing the quota or add-on price
+  // reaches every plan card simultaneously.
+  const inboxSyncFeature = (
+    scope: "none" | "perSeat" | "perUser" = "none",
+  ): string =>
+    t(`messages.pricing.inboxSyncFeature.${scope}`, {
+      count: INBOX_SYNC_INCLUDED_ACCOUNTS,
+      price: INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
+    });
 
-  const personaCopy: Partial<Record<
-    UserRole,
-    {
-      label: string;
-      freeDescription: string;
-      proDescription: string;
-      freeFeatures: string[];
-      proFeatures: string[];
-      unitLabel: string; // e.g., per seat / month
-      userCountLabel: string; // label for the user count selector
-    }
-  >> = {
+  // Per-persona copy is i18n-key driven: each persona carries the dotted keys
+  // for its descriptions, feature arrays (resolved via returnObjects), unit /
+  // count labels, and an inbox-sync scope appended at render so the dynamic
+  // quota + add-on price stay in one place. t() is called at render below —
+  // never at module scope.
+  type InboxScope = "none" | "perSeat" | "perUser";
+  type PersonaCopyKeys = {
+    labelKey: string;
+    freeDescriptionKey: string;
+    proDescriptionKey: string;
+    freeFeaturesKey: string;
+    proFeaturesKey: string;
+    inboxScope: InboxScope; // appended to proFeatures when not "none"
+    unitLabelKey: string;
+    userCountLabelKey: string | null; // null → no count selector label
+  };
+  const personaCopy: Partial<Record<UserRole, PersonaCopyKeys>> = {
     [USER_ROLES.JOB_SEEKER]: {
-      label: "Job Seeker",
-      freeDescription:
-        "Get started with the AI Studio (video / comic / game / podcast), the Chrome extension, and your career home.",
-      proDescription:
-        "Unlock 1M monthly AI tokens, voice cloning, every Pro export format (4K video, PDF / CBZ comics, motion-comic MP4), and priority matching.",
-      freeFeatures: [
-        "1 published pitch — video, comic, game, or podcast (unlimited drafts)",
-        "ATS-friendly resume builder + AI scoring + Resume Roast viral share",
-        "Chrome extension — job tracking & match scoring",
-        "Profile Sync — one master resume to LinkedIn / Indeed / Glassdoor / ZipRecruiter / Monster / Wellfound / Dice / GitHub (extension auto-fills Headline + Summary on 7)",
-        "50K AI tokens / mo",
-        "Career Home dashboard & community feed",
-        "Unlimited networking — connections, followers, warm intros through mutuals, coffee meetups & free DMs to any user (no InMail credits)",
-        "Apply to jobs with video / comic intros + 1-click Auto-Apply (Pro-gated for bulk)",
-        "AI Studio — 1080p video, PNG-strip comic export (with watermark)",
-        "AI interview practice (limited) + AI Coach / Career360 gap analysis",
-        "Public profile + per-section visibility controls (10 gateable sections)",
-        "Gamification — points, streaks, badges (cashout requires Pro)",
-        "Map + globe discovery (jobs, events, people, articles)",
-      ],
-      proFeatures: [
-        "Unlimited published projects across every format",
-        "1M AI tokens / mo + pay-as-you-go top-up packs ($3.99–$199.99)",
-        "AI Studio — Brand Kits, 4K video, PDF / CBZ comic, motion-comic MP4, watermark-free",
-        "Voice cloning + earn 95/5 on voice marketplace sales",
-        "Stock media library (Unsplash + Pexels + Pixabay) with dedup",
-        "One-click publishing — YouTube, Webtoon, itch.io, LinkedIn post AI",
-        "Resume Tailor (per-job JSON-preserving variations) + ATS package generator",
-        "Unlimited AI interview practice + async interview recorder",
-        "Learning Pathways — SCORM 1.2, xAPI, HMAC-verified certificates",
-        "Priority job matching, salary insights, hiring-pipeline analytics",
-        "Project + profile analytics, per-second engagement heatmap, AI thumbnails, hook optimizer",
-        "Gift-card cashout (Tremendous) + AI-credit & premium-month redemption",
-        inboxSyncFeature(),
-      ],
-      unitLabel: "per month",
-      userCountLabel: "",
+      labelKey: "labels.jobSeeker",
+      freeDescriptionKey: "messages.pricing.persona.jobSeeker.freeDesc",
+      proDescriptionKey: "messages.pricing.persona.jobSeeker.proDesc",
+      freeFeaturesKey: "pricing.persona.jobSeeker.freeFeatures",
+      proFeaturesKey: "pricing.persona.jobSeeker.proFeatures",
+      inboxScope: "none",
+      unitLabelKey: "marketing.pricing.persona.jobSeeker.unitLabel",
+      userCountLabelKey: null,
     },
     [USER_ROLES.RECRUITER]: {
-      label: "recruiter",
-      freeDescription:
-        "Essential ATS, Chrome sourcing, and visual pipeline for individual recruiters.",
-      proDescription:
-        "Scale your team with AI candidate matching, automation, and analytics.",
-      freeFeatures: [
-        "Applicant Tracking System (ATS) + visual Kanban pipeline",
-        "Unlimited job postings (Google for Jobs structured-data indexed)",
-        "Recruiter Chrome extension — Loxo-Boost-parity capture with personal email + phone + LinkedIn/GitHub/X/website enrichment, bulk capture from search-result pages, lists + call queues, outreach sequences, click-to-call (recorded VoIP), and the interactive 🪄 picker",
-        "Unlimited searchable talent pool + Boolean operators (AND/OR/NOT/quoted)",
-        "Basic interview scheduling (1-way calendar)",
-        "Up to 2 team members",
-        "50K AI tokens / mo",
-        "Map + globe discovery (geo-tagged talent feed)",
-        "Real-time chat with presence + typing indicators",
-      ],
-      proFeatures: [
-        "Unlimited talent pool & candidate imports",
-        "AI candidate ↔ job match scoring + bulk resume scoring & screening",
-        "Smart outreach campaigns, follow-up sequences, AI message personalization",
-        "Two-way calendar sync (Google + Outlook) with interview-slot generator",
-        "Video resume screening + transcript search",
-        "Structured scorecards + interview kits + competency framework with leveled rubrics",
-        "Calibration sessions — re-score past candidates blind, see per-attribute deltas vs. real decisions",
-        "Blind / anonymous review mode — hide candidate identity + peer scorecards from evaluators until they submit",
-        "Bias linter — inline LLM flags coded-language ('culture fit', gendered descriptors) while scorecards are written",
-        "Take-home assignments — candidate magic-link delivery + reviewer scorecard binding",
-        "Scorecard SLAs + interviewer reliability tracking (on-time %, avg lag, overdue count)",
-        "AI question generator — calibrated to competency + level (closes rubric/question coverage gaps)",
-        "Validated AI hiring assessments — Big Five (IPIP), cognitive, SJT, EQ, DISC",
-        "Async interview recorder + reviewer (Frame.io-style time-coded comments)",
-        "Exclusive job boards + bidding marketplace (recruiter auction)",
-        "ATS connectors — Greenhouse, Lever, Workday (HMAC-verified webhooks)",
-        "Performance dashboards, time-to-hire benchmarks, audit log",
-        "Public API + OpenAPI 3.1 spec (SHA-256 hashed API keys)",
-        "Unlimited seats & team collaboration · gamification leaderboards + cashout",
-        inboxSyncFeature(" per seat"),
-      ],
-      unitLabel: "per seat / month",
-      userCountLabel: "Seats",
+      labelKey: "labels.recruiterLowercase",
+      freeDescriptionKey: "marketing.pricing.persona.recruiter.freeDesc",
+      proDescriptionKey: "marketing.pricing.persona.recruiter.proDesc",
+      freeFeaturesKey: "pricing.persona.recruiter.freeFeatures",
+      proFeaturesKey: "pricing.persona.recruiter.proFeatures",
+      inboxScope: "perSeat",
+      unitLabelKey: "marketing.pricing.persona.recruiter.unitLabel",
+      userCountLabelKey: "marketing.pricing.persona.recruiter.userCountLabel",
     },
     [USER_ROLES.EMPLOYER]: {
-      label: "employer",
-      freeDescription:
-        "Core HR tools to start hiring with a video-first candidate experience.",
-      proDescription:
-        "All-in-one HR suite with engagement, onboarding, and advanced analytics.",
-      freeFeatures: [
-        "ATS + unlimited job postings (Google for Jobs structured-data indexed)",
-        "Recruiting & Sales CRM",
-        "Video resume screening",
-        "Recruiter Chrome extension",
-        "1 admin user · up to 2 employees",
-        "50K AI tokens / mo",
-        "Employer-branded company profile + follow system",
-      ],
-      proFeatures: [
-        "Unlimited users + multi-tenant org structure",
-        "Employee community (Engage / Inform / Inspire) + company-wide feed",
-        "People Operations (CHRO) — roster & org chart, 1:1s with action items, team health",
-        "Embeddable — render your roster, 1:1s & hiring surfaces inside your own app (segment-isolated)",
-        "Hiring & onboarding — offer letters via Dropbox Sign, onboarding checklists",
-        "Performance management — OKRs, review cycles, employee sign-off",
-        "Company video promos via AI Studio + Brand Kits + company-wide templates",
-        "In-video lead-capture forms (Wistia Turnstile equivalent) → unified inbox",
-        "Async interview tool — record once, share to many candidates",
-        "Learning Pathways — author SCORM 1.2 / xAPI / verifiable certificates for employees",
-        "Classrooms — group employees into cohorts, assign required training with due dates, monitor completion + overdue live",
-        "Two-way calendar + smart notifications (priority-ranked)",
-        "ATS connectors (Greenhouse, Lever, Workday) + OpenAPI 3.1 public API",
-        inboxSyncFeature(" per user"),
-        "White-label tenant — subdomain, custom branding, dedicated portal",
-        "Advanced analytics — time-to-hire, DEI funnel, source mix, account audit log",
-        "GDPR / CCPA compliance + data-residency policy (SOC 2 on the roadmap)",
-        "Affiliate program for talent referrals (tiered 10–25% commission)",
-      ],
-      unitLabel: "per user / month",
-      userCountLabel: "Users",
+      labelKey: "labels.employerLowercase",
+      freeDescriptionKey: "marketing.pricing.persona.employer.freeDesc",
+      proDescriptionKey: "marketing.pricing.persona.employer.proDesc",
+      freeFeaturesKey: "pricing.persona.employer.freeFeatures",
+      proFeaturesKey: "pricing.persona.employer.proFeatures",
+      inboxScope: "perUser",
+      unitLabelKey: "marketing.pricing.persona.employer.unitLabel",
+      userCountLabelKey: "marketing.pricing.persona.employer.userCountLabel",
     },
-
-
     [USER_ROLES.ADMIN]: {
-      label: "admin",
-      freeDescription: "Administrative access to manage the platform.",
-      proDescription:
-        "Full administrative control with advanced management features.",
-      freeFeatures: [
-        "User management",
-        "Basic analytics",
-        "System configuration",
-        "Support access",
-      ],
-      proFeatures: [
-        "Advanced user management",
-        "Full system analytics",
-        "API access",
-        "Priority support",
-        "Custom integrations",
-      ],
-      unitLabel: "per admin / month",
-      userCountLabel: "Admins",
+      labelKey: "marketing.pricing.persona.admin.label",
+      freeDescriptionKey: "marketing.pricing.persona.admin.freeDesc",
+      proDescriptionKey: "marketing.pricing.persona.admin.proDesc",
+      freeFeaturesKey: "marketing.pricing.persona.admin.freeFeatures",
+      proFeaturesKey: "marketing.pricing.persona.admin.proFeatures",
+      inboxScope: "none",
+      unitLabelKey: "marketing.pricing.persona.admin.unitLabel",
+      userCountLabelKey: "marketing.pricing.persona.admin.userCountLabel",
     },
-
-
   };
+
+  // Resolve the active persona's copy once per render. Feature arrays come
+  // from the catalogue via returnObjects; the inbox-sync line is appended
+  // for personas that bundle it into Pro.
+  const activeCopy = personaCopy[persona]!;
+  const resolveFeatures = (key: string): string[] => {
+    const v = t(key, { returnObjects: true });
+    return Array.isArray(v) ? (v as string[]) : [];
+  };
+  const freeFeatures = resolveFeatures(activeCopy.freeFeaturesKey);
+  const proFeatures = [
+    ...resolveFeatures(activeCopy.proFeaturesKey),
+    ...(activeCopy.inboxScope !== "none"
+      ? [inboxSyncFeature(activeCopy.inboxScope)]
+      : []),
+  ];
 
   const [selectedUsers, setSelectedUsers] = useState(1);
   // Default persona from logged-in user if available
@@ -349,7 +276,7 @@ export default function Pricing() {
   const handleAddToCart = () => {
     addItem({
       id: `pro-${selectedUsers}-${isAnnual ? "annual" : "monthly"}`,
-      name: "Pro Plan",
+      name: t("marketing.pricing.proPlanName"),
       price: calculatePrice(selectedUsers, isAnnual),
       type: "plan",
       billingCycle: isAnnual ? "annual" : "monthly",
@@ -398,11 +325,10 @@ export default function Pricing() {
             {/* Hero + Controls — compact */}
             <div className="text-center mb-6">
               <h1 className="text-3xl md:text-4xl font-bold mb-2">
-                Simple, Transparent Pricing
+                {t("marketing.pricing.heroTitle")}
               </h1>
               <p className="text-sm text-muted-foreground">
-                All-in-one HR platform — social, referrals, ATS, CRM,
-                crowdsourcing, and recruitment marketing.
+                {t("messages.pricing.heroSubtitleCompact")}
               </p>
             </div>
 
@@ -434,19 +360,19 @@ export default function Pricing() {
                       value={USER_ROLES.JOB_SEEKER}
                       className="rounded-full px-3 py-1.5 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                     >
-                      <Users className="h-4 w-4 mr-2" /> Job Seeker
+                      <Users className="h-4 w-4 mr-2" /> {t("labels.jobSeeker")}
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value={USER_ROLES.RECRUITER}
                       className="rounded-full px-3 py-1.5 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                     >
-                      <Briefcase className="h-4 w-4 mr-2" /> Recruiter
+                      <Briefcase className="h-4 w-4 mr-2" /> {t("labels.recruiter")}
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value={USER_ROLES.EMPLOYER}
                       className="rounded-full px-3 py-1.5 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                     >
-                      <Building2 className="h-4 w-4 mr-2" /> Employer
+                      <Building2 className="h-4 w-4 mr-2" /> {t("labels.employer")}
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
@@ -457,7 +383,7 @@ export default function Pricing() {
                   htmlFor="billing-toggle"
                   className={!isAnnual ? "font-semibold" : ""}
                 >
-                  Monthly
+                  {t("marketing.pricing.billing.monthly")}
                 </Label>
                 <Switch
                   id="billing-toggle"
@@ -468,9 +394,9 @@ export default function Pricing() {
                   htmlFor="billing-toggle"
                   className={isAnnual ? "font-semibold" : ""}
                 >
-                  Annual
+                  {t("marketing.pricing.billing.annual")}
                   <Badge variant="secondary" className="ml-2">
-                    Save 20%
+                    {t("marketing.pricing.billing.save20")}
                   </Badge>
                 </Label>
               </div>
@@ -478,11 +404,11 @@ export default function Pricing() {
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Shield className="h-3.5 w-3.5" />
-                  No hidden fees
+                  {t("marketing.pricing.noHiddenFees")}
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
-                  Cancel anytime
+                  {t("marketing.pricing.cancelAnytime")}
                 </span>
               </div>
             </div>
@@ -492,19 +418,21 @@ export default function Pricing() {
               {/* Free Plan */}
               <Card className="relative border-2 border-border hover:border-primary/20 transition-colors">
                 <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl">Free</CardTitle>
+                  <CardTitle className="text-2xl">{t("labels.free")}</CardTitle>
                   <div className="mt-4">
                     <span className="text-5xl font-bold">$0.00</span>
                   </div>
                   <CardDescription className="text-lg mt-4">
-                    {personaCopy[persona].freeDescription}
+                    {t(activeCopy.freeDescriptionKey)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
-                    <h4 className="font-semibold text-lg">What's included:</h4>
+                    <h4 className="font-semibold text-lg">
+                      {t("marketing.pricing.whatsIncluded")}
+                    </h4>
                     <div className="space-y-3">
-                      {personaCopy[persona].freeFeatures.map((feat) => (
+                      {freeFeatures.map((feat) => (
                         <div key={feat} className="flex items-center gap-3">
                           <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                             <Check className="h-3 w-3 text-green-600" />
@@ -519,12 +447,12 @@ export default function Pricing() {
                     {!isAuthenticated ? (
                       <Link to="/signup" className="block">
                         <Button className="w-full" variant="outline" size="lg">
-                          Get Started
+                          {t("actions.getStarted")}
                         </Button>
                       </Link>
                     ) : (
                       <Button className="w-full" variant="outline" size="lg">
-                        Current Plan
+                        {t("marketing.pricing.currentPlan")}
                       </Button>
                     )}
                   </div>
@@ -535,11 +463,11 @@ export default function Pricing() {
               <Card className="relative border-2 border-primary shadow-lg">
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <Badge className="bg-gradient-to-r from-brand-purple to-brand-blue text-white px-4 py-1">
-                    Most Popular
+                    {t("marketing.pricing.mostPopular")}
                   </Badge>
                 </div>
                 <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl">Pro</CardTitle>
+                  <CardTitle className="text-2xl">{t("labels.proBadge")}</CardTitle>
 
                   {/* Pricing Summary & (Conditional) User Selection */}
                   <div className="mt-4 space-y-4">
@@ -554,17 +482,17 @@ export default function Pricing() {
                           : calculatePrice(selectedUsers, false).toFixed(2)}
                       </span>
                       <span className="text-lg text-muted-foreground ml-2">
-                        / {personaCopy[persona].unitLabel}
-                        {isAnnual ? " (billed annually)" : ""}
+                        / {t(activeCopy.unitLabelKey)}
+                        {isAnnual ? ` ${t("marketing.pricing.billedAnnually")}` : ""}
                       </span>
                       {isAnnual && (
                         <div className="text-sm text-green-600 mt-2">
-                          Save $
-                          {(
-                            calculatePrice(selectedUsers, false) * 12 -
-                            calculatePrice(selectedUsers, true)
-                          ).toFixed(2)}{" "}
-                          per year!
+                          {t("marketing.pricing.saveAmountPerYear", {
+                            amount: (
+                              calculatePrice(selectedUsers, false) * 12 -
+                              calculatePrice(selectedUsers, true)
+                            ).toFixed(2),
+                          })}
                         </div>
                       )}
                     </div>
@@ -573,8 +501,9 @@ export default function Pricing() {
                     {persona !== USER_ROLES.JOB_SEEKER && (
                       <div className="flex items-center justify-center gap-4">
                         <Label htmlFor="user-select">
-                          {personaCopy[persona].userCountLabel ||
-                            "Number of users"}
+                          {activeCopy.userCountLabelKey
+                            ? t(activeCopy.userCountLabelKey)
+                            : t("marketing.pricing.numberOfUsers")}
                           :
                         </Label>
                         <div className="flex items-center gap-2">
@@ -625,16 +554,16 @@ export default function Pricing() {
                   </div>
 
                   <CardDescription className="text-lg mt-4">
-                    {personaCopy[persona].proDescription}
+                    {t(activeCopy.proDescriptionKey)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
                     <h4 className="font-semibold text-lg">
-                      All FREE features plus:
+                      {t("marketing.pricing.allFreePlus")}
                     </h4>
                     <div className="space-y-3">
-                      {personaCopy[persona].proFeatures.map((feat) => (
+                      {proFeatures.map((feat) => (
                         <div key={feat} className="flex items-start gap-3">
                           <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <Check className="h-3 w-3 text-primary" />
@@ -652,7 +581,7 @@ export default function Pricing() {
                           className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                           size="lg"
                         >
-                          Get Started
+                          {t("actions.getStarted")}
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                       </Link>
@@ -663,13 +592,13 @@ export default function Pricing() {
                         onClick={handleAddToCart}
                       >
                         <ShoppingCart className="mr-2 h-4 w-4" />
-                        Add to Cart - $
-                        {isAnnual
-                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(
-                              2,
-                            )
-                          : calculatePrice(selectedUsers, false).toFixed(2)}
-                        /month
+                        {t("marketing.pricing.addToCartPerMonth", {
+                          amount: isAnnual
+                            ? (
+                                calculatePrice(selectedUsers, true) / 12
+                              ).toFixed(2)
+                            : calculatePrice(selectedUsers, false).toFixed(2),
+                        })}
                       </Button>
                     )}
                   </div>
@@ -680,15 +609,15 @@ export default function Pricing() {
             {/* Feature Comparison */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Compare Features
+                {t("marketing.pricing.compareFeatures")}
               </h2>
               <div className="text-center mb-6">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm">
                   <span className="text-muted-foreground">
-                    Viewing features for
+                    {t("marketing.pricing.viewingFeaturesFor")}
                   </span>
                   <span className="font-medium">
-                    {personaCopy[persona].label}
+                    {t(activeCopy.labelKey)}
                   </span>
                 </div>
               </div>
@@ -699,338 +628,176 @@ export default function Pricing() {
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="text-left p-4 font-semibold">
-                          Features
+                          {t("marketing.pricing.featuresColumn")}
                         </th>
-                        <th className="text-center p-4 font-semibold">Free</th>
-                        <th className="text-center p-4 font-semibold">Pro</th>
+                        <th className="text-center p-4 font-semibold">{t("labels.free")}</th>
+                        <th className="text-center p-4 font-semibold">{t("labels.proBadge")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {/* Core Platform Features */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Core Platform
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          Applicant Tracking System (ATS)
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          Job Postings
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Unlimited"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.RECRUITER
-                            ? "Unlimited + Exclusive"
+                      <SectionRow label={t("marketing.pricing.section.corePlatform")} />
+                      <FeatureRow
+                        icon={Briefcase}
+                        label={t("marketing.pricing.feature.ats")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.jobPostings")}
+                        free={
+                          persona === USER_ROLES.JOB_SEEKER
+                            ? false
+                            : t("marketing.pricing.value.unlimited")
+                        }
+                        pro={
+                          persona === USER_ROLES.RECRUITER
+                            ? t("marketing.pricing.value.unlimitedExclusive")
                             : persona === USER_ROLES.EMPLOYER
-                              ? "Unlimited"
-                              : "—"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Team Size
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
+                              ? t("marketing.pricing.value.unlimited")
+                              : false
+                        }
+                      />
+                      <FeatureRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.teamSize")}
+                        free={
+                          persona === USER_ROLES.JOB_SEEKER
                             ? "1"
-                            : persona === USER_ROLES.RECRUITER
-                              ? "Up to 2"
-                              : "Up to 2"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
+                            : t("marketing.pricing.value.upTo2")
+                        }
+                        pro={
+                          persona === USER_ROLES.JOB_SEEKER
                             ? "1"
-                            : "Unlimited"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Admin Users
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER ? "1" : "1"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
+                            : t("marketing.pricing.value.unlimited")
+                        }
+                      />
+                      <FeatureRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.adminUsers")}
+                        free="1"
+                        pro={
+                          persona === USER_ROLES.JOB_SEEKER
                             ? "1"
-                            : "Unlimited"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Applicants & Contacts
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
+                            : t("marketing.pricing.value.unlimited")
+                        }
+                      />
+                      <FeatureRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.applicantsContacts")}
+                        free={t("marketing.pricing.value.unlimited")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
 
                       {/* Browser Extensions */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Browser Extensions (Chrome / Edge / Brave)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Chrome className="h-4 w-4 text-muted-foreground" />
-                          Job Seeker Chrome Extension
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Chrome className="h-4 w-4 text-muted-foreground" />
-                          Recruiter Chrome Extension
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          One-click job tracking from 16+ boards
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
-                          Auto-detect job banners
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          AI resume ↔ job match scoring (in-extension)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Included · uses AI tokens
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-muted-foreground" />
-                          AI resume tailoring per job (in-extension)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Included · uses AI tokens
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Candidate profile extraction (LinkedIn, Indeed)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Included · uses AI tokens"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Unlimited"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          Company page extraction (LinkedIn, Glassdoor)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Included · uses AI tokens"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Unlimited"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          Personal email + phone + social URL enrichment on capture
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <ListChecks className="h-4 w-4 text-muted-foreground" />
-                          Bulk capture from LinkedIn / Indeed / GitHub search results (up to 25/click)
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          Click-to-call (recorded VoIP via SignalWire)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Requires phone number"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "100 min/mo included"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Lists + Call Queues (add from extension picker)
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Send className="h-4 w-4 text-muted-foreground" />
-                          Outreach sequence enrollment from extension
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Wand2 className="h-4 w-4 text-muted-foreground" />
-                          Interactive 🪄 picker (job / profile / company modes with replay)
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          Application tracking — which resume went where
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
+                      <SectionRow label={t("marketing.pricing.section.browserExtensions")} />
+                      <FeatureRow
+                        icon={Chrome}
+                        label={t("marketing.pricing.feature.jobSeekerExtension")}
+                        free
+                        pro
+                      />
+                      <PersonaGatedRow
+                        icon={Chrome}
+                        label={t("marketing.pricing.feature.recruiterExtension")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <FeatureRow
+                        icon={Target}
+                        label={t("marketing.pricing.feature.oneClickJobTracking")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Zap}
+                        label={t("marketing.pricing.feature.autoDetectJobBanners")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Target}
+                        label={t("marketing.pricing.feature.matchScoringInExt")}
+                        free={t("marketing.pricing.value.includedTokens")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={Sparkles}
+                        label={t("marketing.pricing.feature.tailoringInExt")}
+                        free={t("marketing.pricing.value.includedTokens")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <PersonaGatedRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.candidateExtract")}
+                        free={t("marketing.pricing.value.includedTokens")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Building2}
+                        label={t("marketing.pricing.feature.companyExtract")}
+                        free={t("marketing.pricing.value.includedTokens")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Mail}
+                        label={t("messages.pricing.feature.enrichmentOnCapture")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={ListChecks}
+                        label={t("messages.pricing.feature.bulkCapture")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Phone}
+                        label={t("messages.pricing.feature.clickToCall")}
+                        free={t("messages.pricing.value.requiresPhoneNumber")}
+                        pro={t("messages.pricing.value.callMinutesIncluded")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Users}
+                        label={t("messages.pricing.feature.listsCallQueues")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Send}
+                        label={t("messages.pricing.feature.outreachEnrollment")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <FeatureRow
+                        icon={Wand2}
+                        label={t("messages.pricing.feature.interactivePicker")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.appTracking")}
+                        free
+                        pro
+                      />
 
                       {/* AI Studio — multi-format (video / comics / games /
                           podcasts / voice / animation). Section header reads
@@ -1039,31 +806,33 @@ export default function Pricing() {
                           rows below automatically. Each row uses the shared
                           <FeatureRow> helper (DRY anchor for the whole
                           comparison table) — adding a feature is one line. */}
-                      <SectionRow label="AI Studio (Video, Comics, Games, Podcasts)" />
+                      <SectionRow label={t("headings.pricing.section.aiStudioMulti")} />
 
                       <FeatureRow
                         icon={Sparkles}
-                        label="AI script & storyboard generation (every format)"
+                        label={t("messages.pricing.feature.scriptStoryboard")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={Sparkles}
-                        label="AI-generated drafts (videos, comics, games, podcasts)"
-                        free="Unlimited (token budget gated)"
-                        pro="Unlimited"
+                        label={t("messages.pricing.feature.aiDraftsMulti")}
+                        free={t("messages.pricing.value.unlimitedTokenGated")}
+                        pro={t("marketing.pricing.value.unlimited")}
                       />
                       <FeatureRow
                         icon={Share2}
-                        label="Published / downloadable projects"
-                        free="1 published"
-                        pro="Unlimited"
+                        label={t("messages.pricing.feature.publishedProjects")}
+                        free={t("marketing.pricing.value.onePublished")}
+                        pro={t("marketing.pricing.value.unlimited")}
                       />
                       <FeatureRow
                         icon={LayoutGrid}
-                        label="Built-in templates & themes (every format)"
-                        free="Basic (3 video + starter comic / game / podcast)"
-                        pro={TIER_COPY.proCollectionLabel("Full library + premium")}
+                        label={t("messages.pricing.feature.builtinTemplatesMulti")}
+                        free={t("messages.pricing.value.basicTemplatesMulti")}
+                        pro={TIER_COPY.proCollectionLabel(
+                          t("messages.pricing.value.fullLibraryPremium"),
+                        )}
                       />
 
                       {/* Per-kind capability rows — one per shippable
@@ -1078,79 +847,89 @@ export default function Pricing() {
                           icon={pitch.icon}
                           label={pitch.title}
                           free
-                          pro="All templates + Pro export options"
+                          pro={t("messages.pricing.value.allTemplatesProExport")}
                         />
                       ))}
 
                       <FeatureRow
                         icon={Zap}
-                        label="Animated scenes & motion presets (video / animation)"
-                        free="Minimal only"
-                        pro="Minimal / Moderate / Cinematic"
+                        label={t("messages.pricing.feature.animatedScenesMulti")}
+                        free={t("marketing.pricing.value.minimalOnly")}
+                        pro={t("marketing.pricing.value.minimalModerateCinematic")}
                       />
                       <FeatureRow
                         icon={Palette}
-                        label="Brand Kits — colors, logo, fonts"
+                        label={t("marketing.pricing.feature.brandKits")}
                         free={false}
                         pro
                         upgradeId="brand-kit"
                       />
-                      <FeatureRow icon={Download} label="720p video export" free pro />
-                      <FeatureRow icon={Download} label="1080p video export" free pro />
                       <FeatureRow
                         icon={Download}
-                        label="4K video + PDF / CBZ comic export"
+                        label={t("messages.pricing.feature.export720video")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Download}
+                        label={t("messages.pricing.feature.export1080video")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Download}
+                        label={t("messages.pricing.feature.export4kComic")}
                         free={false}
                         pro
                       />
                       <FeatureRow
                         icon={Video}
-                        label="Vertical 9:16 export (TikTok, Reels, LinkedIn)"
+                        label={t("marketing.pricing.feature.verticalExport")}
                         free={false}
                         pro
                       />
                       <FeatureRow
                         icon={Shield}
-                        label="Watermark"
-                        free="hired.video watermark"
-                        pro="Watermark-free"
+                        label={t("marketing.pricing.feature.watermark")}
+                        free={t("marketing.pricing.value.brandedWatermark")}
+                        pro={t("marketing.pricing.value.watermarkFree")}
                       />
                       <FeatureRow
                         icon={Mic}
-                        label="AI voice cloning (your own voice)"
+                        label={t("marketing.pricing.feature.voiceCloning")}
                         free={false}
                         pro
                         upgradeId="voice-clone"
                       />
                       <FeatureRow
                         icon={Mic}
-                        label="Voice Marketplace (Kokoro, Piper, VibeVoice)"
-                        free="1 free voice (Web Speech)"
-                        pro="Full marketplace + creator revenue share"
+                        label={t("marketing.pricing.feature.voiceMarketplace")}
+                        free={t("marketing.pricing.value.oneFreeVoice")}
+                        pro={t("marketing.pricing.value.fullMarketplace")}
                       />
                       <FeatureRow
                         icon={Share2}
-                        label="One-click publishing — YouTube, Webtoon, itch.io"
+                        label={t("messages.pricing.feature.oneClickPublishing")}
                         free={false}
                         pro
                       />
                       <FeatureRow
                         icon={Sparkles}
-                        label="LinkedIn Post AI (hook, caption, hashtags)"
+                        label={t("marketing.pricing.feature.linkedinPostAi")}
                         free={false}
                         pro
                       />
                       <FeatureRow
                         icon={Share2}
-                        label="Public share link, embed code & QR code"
+                        label={t("marketing.pricing.feature.publicShareLink")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={BarChart3}
-                        label="View analytics & engagement (every format)"
-                        free="Basic (views only)"
-                        pro="Advanced (heatmaps, CTA clicks, campaigns)"
+                        label={t("messages.pricing.feature.viewAnalyticsMulti")}
+                        free={t("marketing.pricing.value.basicViewsOnly")}
+                        pro={t("marketing.pricing.value.advancedAnalytics")}
                       />
 
                       {/* Reviews & Salary Insights — cross-persona surface
@@ -1159,564 +938,183 @@ export default function Pricing() {
                           seekers research employers, employers manage
                           their reputation, recruiters cite real pay
                           bands when sourcing. */}
-                      <SectionRow label="Company Reviews & Salary Insights" />
+                      <SectionRow label={t("headings.pricing.section.reviewsSalary")} />
                       <FeatureRow
                         icon={Star}
-                        label="Browse company reviews (multi-axis ratings)"
+                        label={t("messages.pricing.feature.browseReviews")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={Star}
-                        label="Write a verified employee review"
+                        label={t("messages.pricing.feature.writeReview")}
                         free={false}
                         pro
                       />
                       <FeatureRow
                         icon={TrendingUp}
-                        label="Salary guides by role"
+                        label={t("messages.pricing.feature.salaryGuidesRole")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={Globe}
-                        label="Salary guides by role × city (e.g. SF software engineer)"
+                        label={t("messages.pricing.feature.salaryGuidesCity")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={TrendingUp}
-                        label="AI salary negotiation script (your offer vs market)"
+                        label={t("messages.pricing.feature.salaryNegotiation")}
                         free={false}
                         pro
                       />
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          Resume Optimization
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          AI-Powered (3/mo)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          AI-Powered (Unlimited)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Download className="h-4 w-4 text-muted-foreground" />
-                          ATS-friendly PDF & Word (.docx) export
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
+                      <FeatureRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.resumeOptimization")}
+                        free={t("messages.pricing.value.aiPowered3PerMo")}
+                        pro={t("marketing.pricing.value.aiPoweredUnlimited")}
+                      />
+                      <FeatureRow
+                        icon={Download}
+                        label={t("marketing.pricing.feature.atsExport")}
+                        free
+                        pro
+                      />
 
                       {/* AI-Powered Tools */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          AI-Powered Tools
-                        </td>
-                      </tr>
-                      <tr
-                        data-upgrade-id="ai-tokens"
-                        className="data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
-                      >
-                        <td className="p-4 flex items-center gap-2">
-                          <Brain className="h-4 w-4 text-muted-foreground" />
-                          AI Assistance
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          50K tokens / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          1M tokens / mo
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          Smart Job Matching
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          AI-Enhanced
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          AI Interview Simulator
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (3/mo)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          AI Resume Scoring & Feedback
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (preview only)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced (Unlimited)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          Salary Calculator
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-muted-foreground" />
-                          AI Resume Tailor — per-job variations
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          3 variations / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          AI Resume Consolidator — merge multiple resumes
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
-                          AI Resume Roast — brutally honest feedback
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          3 roasts / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          AI Resume Summarizer
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          5 summaries / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          AI Value Proposition Builder
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          3 pitches / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Brain className="h-4 w-4 text-muted-foreground" />
-                          AI Sentiment & Tone Analysis
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          PDF → JSON resume parser
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          5 parses / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          24/7 AI Career Coach (chat)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          20 messages / mo
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-muted-foreground" />
-                          AI Next-Best-Action recommendations
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Daily
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Real-time
-                        </td>
-                      </tr>
+                      <SectionRow label={t("marketing.pricing.section.aiTools")} />
+                      <FeatureRow
+                        icon={Brain}
+                        label={t("marketing.pricing.feature.aiAssistance")}
+                        free={t("marketing.pricing.value.tokens50k")}
+                        pro={t("marketing.pricing.value.tokens1m")}
+                        upgradeId="ai-tokens"
+                      />
+                      <FeatureRow
+                        icon={Target}
+                        label={t("marketing.pricing.feature.smartJobMatching")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro={t("marketing.pricing.value.aiEnhanced")}
+                      />
+                      <FeatureRow
+                        icon={MessageCircle}
+                        label={t("marketing.pricing.feature.interviewSimulator")}
+                        free={t("messages.pricing.value.basic3PerMo")}
+                        pro={t("marketing.pricing.value.advanced")}
+                      />
+                      <FeatureRow
+                        icon={BarChart3}
+                        label={t("marketing.pricing.feature.resumeScoring")}
+                        free={t("messages.pricing.value.basicPreviewOnly")}
+                        pro={t("marketing.pricing.value.advancedUnlimited")}
+                      />
+                      <FeatureRow
+                        icon={Clock}
+                        label={t("marketing.pricing.feature.salaryCalculator")}
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Sparkles}
+                        label={t("marketing.pricing.feature.resumeTailor")}
+                        free={t("marketing.pricing.value.variations3PerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.resumeConsolidator")}
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Zap}
+                        label={t("marketing.pricing.feature.resumeRoast")}
+                        free={t("marketing.pricing.value.roasts3PerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.resumeSummarizer")}
+                        free={t("marketing.pricing.value.summaries5PerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={Target}
+                        label={t("marketing.pricing.feature.valueProp")}
+                        free={t("marketing.pricing.value.pitches3PerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={Brain}
+                        label={t("marketing.pricing.feature.sentimentAnalysis")}
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.pdfParser")}
+                        free={t("marketing.pricing.value.parses5PerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={MessageCircle}
+                        label={t("marketing.pricing.feature.careerCoachChat")}
+                        free={t("marketing.pricing.value.messages20PerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={Sparkles}
+                        label={t("marketing.pricing.feature.nextBestAction")}
+                        free={t("marketing.pricing.value.daily")}
+                        pro={t("marketing.pricing.value.realtime")}
+                      />
 
                       {/* Sourcing & Talent Pipeline — recruiter / employer */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Sourcing & Talent Pipeline
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Search className="h-4 w-4 text-muted-foreground" />
-                          Searchable talent pool
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              Unlimited
-                            </span>
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              Unlimited
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                          Visual Kanban hiring pipeline (6 stages)
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                          AI candidate ↔ job match scoring
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          Candidate tags, notes & custom fields
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Search className="h-4 w-4 text-muted-foreground" />
-                          Saved searches & talent lists
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Up to 3"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Unlimited"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Send className="h-4 w-4 text-muted-foreground" />
-                          In-app candidate messaging & outreach log
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                          Video resume transcript search
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Download className="h-4 w-4 text-muted-foreground" />
-                          Bulk CSV import / export to ATS
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          Company database (extracted + manual)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Up to 50"}
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER
-                            ? "—"
-                            : "Unlimited"}
-                        </td>
-                      </tr>
-
-                      {/* Recruitment & CRM */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Recruitment & CRM
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Recruiting & Sales CRM
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Handshake className="h-4 w-4 text-muted-foreground" />
-                          Hiring & Onboarding
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "job_seeker" ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" ? (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          Interview Scheduling
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced + Automation
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Performance Management
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-
-                      {/* Communication & Outreach */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Communication & Outreach
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Send className="h-4 w-4 text-muted-foreground" />
-                          Smart Outreach Campaigns
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "recruiter" ? (
-                            <span className="text-muted-foreground">Basic</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "recruiter" ? (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          AI Message Personalization
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic (template only)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced (Unlimited)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          Automated Follow-ups
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-
-                      {/* AI Recruiter Agent v2 + Live Screening — the
-                          LinkedIn Hiring Assistant / ZipIntro parity
-                          rows. PersonaGatedRow keeps the JSX terse vs
-                          the older hand-rolled persona conditionals. */}
+                      <SectionRow label={t("marketing.pricing.section.sourcingPipeline")} />
                       <PersonaGatedRow
-                        icon={Brain}
-                        label="AI Recruiter Agent — brief intake (plain-English → search criteria)"
-                        free="1 run / mo"
-                        pro="Unlimited"
+                        icon={Search}
+                        label={t("marketing.pricing.feature.talentPool")}
+                        free={t("marketing.pricing.value.unlimited")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={LayoutGrid}
+                        label={t("marketing.pricing.feature.kanbanPipeline")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Target}
+                        label={t("marketing.pricing.feature.candidateJobMatch")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={FileText}
+                        label={t("marketing.pricing.feature.candidateTags")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Search}
+                        label={t("marketing.pricing.feature.savedSearches")}
+                        free={t("marketing.pricing.value.upTo3")}
+                        pro={t("marketing.pricing.value.unlimited")}
                         visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
                         currentPersona={persona}
                       />
                       <PersonaGatedRow
                         icon={Send}
-                        label="AI Recruiter Agent — sourced candidates + scored outreach drafts"
-                        free="3 candidates / run"
-                        pro="Up to 50 / run"
-                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
-                        currentPersona={persona}
-                      />
-                      <PersonaGatedRow
-                        icon={Clock}
-                        label="Scheduled follow-up sequences (3d / 7d / 14d default)"
+                        label={t("marketing.pricing.feature.candidateMessaging")}
                         free={false}
                         pro
                         visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
@@ -1724,7 +1122,114 @@ export default function Pricing() {
                       />
                       <PersonaGatedRow
                         icon={Video}
-                        label="Live screening blocks — back-to-back video slots (ZipIntro-style)"
+                        label={t("marketing.pricing.feature.transcriptSearch")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Download}
+                        label={t("marketing.pricing.feature.bulkCsv")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Building2}
+                        label={t("marketing.pricing.feature.companyDatabase")}
+                        free={t("marketing.pricing.value.upTo50")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+
+                      {/* Recruitment & CRM */}
+                      <SectionRow label={t("marketing.pricing.section.recruitmentCrm")} />
+                      <PersonaGatedRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.recruitingCrm")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Handshake}
+                        label={t("marketing.pricing.feature.hiringOnboarding")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <FeatureRow
+                        icon={Calendar}
+                        label={t("marketing.pricing.feature.interviewScheduling")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro={t("marketing.pricing.value.advancedAutomation")}
+                      />
+                      <FeatureRow
+                        icon={BarChart3}
+                        label={t("marketing.pricing.feature.performanceMgmt")}
+                        free={false}
+                        pro
+                      />
+
+                      {/* Communication & Outreach */}
+                      <SectionRow label={t("marketing.pricing.section.commsOutreach")} />
+                      <PersonaGatedRow
+                        icon={Send}
+                        label={t("marketing.pricing.feature.outreachCampaigns")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER]}
+                        currentPersona={persona}
+                      />
+                      <FeatureRow
+                        icon={MessageCircle}
+                        label={t("marketing.pricing.feature.messagePersonalization")}
+                        free={t("messages.pricing.value.basicTemplateOnly")}
+                        pro={t("marketing.pricing.value.advancedUnlimited")}
+                      />
+                      <FeatureRow
+                        icon={Clock}
+                        label={t("marketing.pricing.feature.autoFollowups")}
+                        free={false}
+                        pro
+                      />
+
+                      {/* AI Recruiter Agent v2 + Live Screening — the
+                          LinkedIn Hiring Assistant / ZipIntro parity
+                          rows. PersonaGatedRow keeps the JSX terse vs
+                          the older hand-rolled persona conditionals. */}
+                      <PersonaGatedRow
+                        icon={Brain}
+                        label={t("messages.pricing.feature.recruiterAgentIntake")}
+                        free={t("messages.pricing.value.oneRunPerMo")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Send}
+                        label={t("messages.pricing.feature.recruiterAgentSourced")}
+                        free={t("messages.pricing.value.threeCandidatesPerRun")}
+                        pro={t("messages.pricing.value.upTo50PerRun")}
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Clock}
+                        label={t("messages.pricing.feature.scheduledFollowups")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Video}
+                        label={t("messages.pricing.feature.liveScreeningBlocks")}
                         free={false}
                         pro
                         visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
@@ -1732,343 +1237,172 @@ export default function Pricing() {
                       />
                       <PersonaGatedRow
                         icon={Calendar}
-                        label="Candidate accept / decline magic links (no candidate login required)"
+                        label={t("messages.pricing.feature.candidateMagicLinks")}
                         free={false}
                         pro
                         visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
                         currentPersona={persona}
                       />
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Employee Community
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" ? (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
+                      <PersonaGatedRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.employeeCommunity")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
 
                       {/* Career Home & Community */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Career Home & Community
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          Career Home unified dashboard
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          Community feed (text, video, article posts)
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Lock className="h-4 w-4 text-muted-foreground" />
-                          Per-post privacy controls (public / connections / private)
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Professional networking (connections, followers)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          Career resilience tools
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-muted-foreground" />
-                          Personal brand / creator studio
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-muted-foreground" />
-                          White-label marketing — remove hired.video branding
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          hired.video branded
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Opt-out available
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          Google for Jobs structured-data publishing
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
+                      <SectionRow label={t("marketing.pricing.section.careerHome")} />
+                      <FeatureRow
+                        icon={TrendingUp}
+                        label={t("marketing.pricing.feature.careerHomeDash")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={MessageCircle}
+                        label={t("marketing.pricing.feature.communityFeed")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Lock}
+                        label={t("marketing.pricing.feature.privacyControls")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.professionalNetworking")}
+                        free={t("marketing.pricing.value.unlimited")}
+                        pro={t("marketing.pricing.value.unlimited")}
+                      />
+                      <FeatureRow
+                        icon={TrendingUp}
+                        label={t("marketing.pricing.feature.resilienceTools")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Sparkles}
+                        label={t("marketing.pricing.feature.creatorStudio")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Shield}
+                        label={t("marketing.pricing.feature.whiteLabel")}
+                        free={t("marketing.pricing.value.hiredBranded")}
+                        pro={t("marketing.pricing.value.optOutAvailable")}
+                      />
+                      <PersonaGatedRow
+                        icon={Globe}
+                        label={t("marketing.pricing.feature.googleForJobs")}
+                        free
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
 
                       {/* Analytics & Reporting */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Analytics & Reporting
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                          Resume & profile view tracking
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced (viewer identity, time on page)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                          Pipeline conversion funnel
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Bell className="h-4 w-4 text-muted-foreground" />
-                          Weekly digest emails
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Team activity leaderboards
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === USER_ROLES.JOB_SEEKER ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Dashboard Analytics
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced + Insights
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                          Career Progress Tracking
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Hiring Success Metrics
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" || persona === "recruiter" ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" || persona === "recruiter" ? (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          Time-to-hire Analytics
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" || persona === "recruiter" ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="text-center p-4">
-                          {persona === "employer" || persona === "recruiter" ? (
-                            <Check className="h-5 w-5 text-green-600 mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
+                      <SectionRow label={t("marketing.pricing.section.analyticsReporting")} />
+                      <FeatureRow
+                        icon={Eye}
+                        label={t("marketing.pricing.feature.viewTracking")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro={t("marketing.pricing.value.advancedViewer")}
+                      />
+                      <PersonaGatedRow
+                        icon={LayoutGrid}
+                        label={t("marketing.pricing.feature.conversionFunnel")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <FeatureRow
+                        icon={Bell}
+                        label={t("marketing.pricing.feature.weeklyDigest")}
+                        free
+                        pro
+                      />
+                      <PersonaGatedRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.teamLeaderboards")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <FeatureRow
+                        icon={BarChart3}
+                        label={t("marketing.pricing.feature.dashboardAnalytics")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro={t("marketing.pricing.value.advancedInsights")}
+                      />
+                      <FeatureRow
+                        icon={TrendingUp}
+                        label={t("marketing.pricing.feature.careerProgress")}
+                        free={false}
+                        pro
+                      />
+                      <PersonaGatedRow
+                        icon={BarChart3}
+                        label={t("marketing.pricing.feature.hiringMetrics")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
+                      <PersonaGatedRow
+                        icon={Clock}
+                        label={t("marketing.pricing.feature.timeToHire")}
+                        free={false}
+                        pro
+                        visibleFor={[USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER]}
+                        currentPersona={persona}
+                      />
 
                       {/* Productivity Features */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Productivity & Organization
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <CheckSquare className="h-4 w-4 text-muted-foreground" />
-                          Task Management
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced + Automation
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          Calendar Integration
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr
-                        data-upgrade-id="inbox-sync"
-                        className="data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
-                      >
-                        <td className="p-4 flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          Inbox Sync (Gmail / Outlook)
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          {INBOX_SYNC_INCLUDED_ACCOUNTS} mailboxes included
-                          <div className="text-xs">
-                            +${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo per extra
-                          </div>
-                        </td>
-                      </tr>
-                      <tr
-                        data-upgrade-id="smart-notifications"
-                        className="data-[upgrade-active=true]:bg-primary/10 data-[upgrade-active=true]:ring-2 data-[upgrade-active=true]:ring-primary/40 transition-colors"
-                      >
-                        <td className="p-4 flex items-center gap-2">
-                          <Bell className="h-4 w-4 text-muted-foreground" />
-                          Smart Notifications
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          AI-Powered + Prioritized
-                        </td>
-                      </tr>
+                      <SectionRow label={t("marketing.pricing.section.productivity")} />
+                      <FeatureRow
+                        icon={CheckSquare}
+                        label={t("marketing.pricing.feature.taskManagement")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro={t("marketing.pricing.value.advancedAutomation")}
+                      />
+                      <FeatureRow
+                        icon={Calendar}
+                        label={t("marketing.pricing.feature.calendarIntegration")}
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Mail}
+                        label={t("messages.pricing.feature.inboxSyncLabel")}
+                        free={false}
+                        pro={
+                          <>
+                            {t("messages.pricing.value.mailboxesIncluded", {
+                              count: INBOX_SYNC_INCLUDED_ACCOUNTS,
+                            })}
+                            <div className="text-xs">
+                              {t("messages.pricing.value.perExtraMailbox", {
+                                price: INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
+                              })}
+                            </div>
+                          </>
+                        }
+                        upgradeId="inbox-sync"
+                      />
+                      <FeatureRow
+                        icon={Bell}
+                        label={t("marketing.pricing.feature.smartNotifications")}
+                        free={t("marketing.pricing.value.basic")}
+                        pro={t("marketing.pricing.value.aiPrioritized")}
+                        upgradeId="smart-notifications"
+                      />
 
                       {/* Engagement, Learning & Discovery — modules that
                           competitors don't ship at all (gamification cashout,
@@ -2077,191 +1411,124 @@ export default function Pricing() {
                           profile gating). These ride on the same Pro seat —
                           no per-module upcharge, no separately-licensed
                           LinkedIn-Learning-style SKU. */}
-                      <SectionRow label="Engagement, Learning & Discovery" />
+                      <SectionRow label={t("headings.pricing.section.engagementLearning")} />
                       <FeatureRow
                         icon={Trophy}
-                        label="Gamification — points, streaks, badges"
+                        label={t("messages.pricing.feature.gamification")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={Trophy}
-                        label="Gift-card cashout (Tremendous) + AI-credit / premium-month redemption"
-                        free="Earn points only"
-                        pro="Full cashout + redemption"
+                        label={t("messages.pricing.feature.giftCardCashout")}
+                        free={t("messages.pricing.value.earnPointsOnly")}
+                        pro={t("messages.pricing.value.fullCashoutRedemption")}
                       />
                       <FeatureRow
                         icon={GraduationCap}
-                        label="Built-in Learning Content Library — AI, RAG, prompt engineering, must-have skills (LinkedIn Learning is ~$379/seat/yr, separately licensed)"
-                        free="Browse + enroll"
-                        pro="Browse + enroll + employer authoring"
+                        label={t("messages.pricing.feature.learningLibrary")}
+                        free={t("messages.pricing.value.browseEnroll")}
+                        pro={t("messages.pricing.value.browseEnrollAuthoring")}
                       />
                       <FeatureRow
                         icon={GraduationCap}
-                        label="Learning Paths — DAG-structured courses with prerequisites"
-                        free="Browse + enroll"
-                        pro="Authoring + assign to team"
+                        label={t("messages.pricing.feature.learningPaths")}
+                        free={t("messages.pricing.value.browseEnroll")}
+                        pro={t("messages.pricing.value.authoringAssign")}
                       />
                       <FeatureRow
                         icon={GraduationCap}
-                        label="SCORM 1.2 player + xAPI LRS"
+                        label={t("messages.pricing.feature.scormXapi")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={GraduationCap}
-                        label="Classrooms — cohorts, assigned/required training + due dates, live per-student progress monitoring"
-                        free="Join + track assigned"
-                        pro="Create cohorts + assign + monitor"
+                        label={t("messages.pricing.feature.classrooms")}
+                        free={t("messages.pricing.value.joinTrackAssigned")}
+                        pro={t("messages.pricing.value.createCohortsMonitor")}
                       />
                       <FeatureRow
                         icon={GraduationCap}
-                        label="HMAC-signed verifiable certificates"
+                        label={t("messages.pricing.feature.verifiableCerts")}
                         free={false}
                         pro
                       />
                       <FeatureRow
                         icon={MapPin}
-                        label="Geo-tagged search + /map discovery (jobs, events, members)"
+                        label={t("messages.pricing.feature.geoSearch")}
                         free
                         pro
                       />
                       <FeatureRow
                         icon={Lock}
-                        label="Per-section profile visibility (10 gateable sections on /people/[id])"
+                        label={t("messages.pricing.feature.sectionVisibility")}
                         free
                         pro
                       />
 
                       {/* Support & Security */}
-                      <tr className="bg-muted/20">
-                        <td
-                          className="p-4 font-semibold text-sm uppercase tracking-wide"
-                          colSpan={3}
-                        >
-                          Compliance, Security & Support
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Lock className="h-4 w-4 text-muted-foreground" />
-                          Encryption at rest & in transit
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-muted-foreground" />
-                          GDPR compliance (data export & right-to-delete)
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-muted-foreground" />
-                          SOC 2 Type II certification
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          In progress
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          On the roadmap
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          Regional data residency
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          On the roadmap
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Lock className="h-4 w-4 text-muted-foreground" />
-                          SSO (SAML / OIDC)
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          On the roadmap
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-muted-foreground" />
-                          Audit logs
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          Customer Support
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Email (48h)
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          Priority + Live Chat (4h)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          Dedicated customer success manager
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">
-                          On the roadmap
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
-                          API Access
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
-                          Custom integrations
-                        </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
-                      </tr>
+                      <SectionRow label={t("marketing.pricing.section.compliance")} />
+                      <FeatureRow
+                        icon={Lock}
+                        label={t("marketing.pricing.feature.encryption")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Shield}
+                        label={t("marketing.pricing.feature.gdpr")}
+                        free
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Shield}
+                        label={t("marketing.pricing.feature.soc2")}
+                        free={t("marketing.pricing.value.inProgress")}
+                        pro={t("marketing.pricing.value.onRoadmap")}
+                      />
+                      <FeatureRow
+                        icon={Globe}
+                        label={t("marketing.pricing.feature.dataResidency")}
+                        free={false}
+                        pro={t("marketing.pricing.value.onRoadmap")}
+                      />
+                      <FeatureRow
+                        icon={Lock}
+                        label={t("marketing.pricing.feature.sso")}
+                        free={false}
+                        pro={t("marketing.pricing.value.onRoadmap")}
+                      />
+                      <FeatureRow
+                        icon={Shield}
+                        label={t("marketing.pricing.feature.auditLogs")}
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={MessageCircle}
+                        label={t("marketing.pricing.feature.customerSupport")}
+                        free={t("marketing.pricing.value.email48h")}
+                        pro={t("marketing.pricing.value.priorityChat4h")}
+                      />
+                      <FeatureRow
+                        icon={Users}
+                        label={t("marketing.pricing.feature.csm")}
+                        free={false}
+                        pro={t("marketing.pricing.value.onRoadmap")}
+                      />
+                      <FeatureRow
+                        icon={Globe}
+                        label={t("marketing.pricing.feature.apiAccess")}
+                        free={false}
+                        pro
+                      />
+                      <FeatureRow
+                        icon={Zap}
+                        label={t("marketing.pricing.feature.customIntegrations")}
+                        free={false}
+                        pro
+                      />
                     </tbody>
                   </table>
                 </div>
@@ -2274,7 +1541,7 @@ export default function Pricing() {
                 two pages can't drift on vendor pricing or feature claims. */}
             <div className="mb-16">
               <CompetitorComparison
-                eyebrow="vs. the market"
+                eyebrow={t("messages.pricing.vsMarketEyebrow")}
                 showSectionHeader
               />
             </div>
@@ -2287,31 +1554,30 @@ export default function Pricing() {
               <Card className="text-center p-6 hover:shadow-lg transition-shadow">
                 <MessageCircle className="h-12 w-12 mx-auto mb-4 text-primary" />
                 <h3 className="font-semibold text-lg mb-2">
-                  Need more information?
+                  {t("marketing.pricing.support.infoTitle")}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Our team is here to help you choose the right plan
+                  {t("marketing.pricing.support.infoBody")}
                 </p>
                 <Button
                   variant="outline"
                   onClick={() =>
                     openContactPanel({
                       inquiryType: "sales",
-                      title: "Talk to our team",
-                      description:
-                        "Tell us what you're solving for and we'll help you choose the right plan.",
+                      title: t("messages.pricing.contact.salesTitle"),
+                      description: t("messages.pricing.contact.salesDescription"),
                     })
                   }
                 >
-                  Talk to us
+                  {t("marketing.pricing.support.talkToUs")}
                 </Button>
               </Card>
 
               <Card className="text-center p-6 hover:shadow-lg transition-shadow">
                 <Play className="h-12 w-12 mx-auto mb-4 text-primary" />
-                <h3 className="font-semibold text-lg mb-2">Not sure yet?</h3>
+                <h3 className="font-semibold text-lg mb-2">{t("marketing.pricing.support.demoTitle")}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  See hired.video in action with a personalized demo
+                  {t("marketing.pricing.support.demoBody")}
                 </p>
                 <Button
                   variant="outline"
@@ -2322,17 +1588,17 @@ export default function Pricing() {
                     })
                   }
                 >
-                  Request a demo
+                  {t("marketing.pricing.support.requestDemo")}
                 </Button>
               </Card>
 
               <Card className="text-center p-6 hover:shadow-lg transition-shadow border-green-200">
                 <Heart className="h-12 w-12 mx-auto mb-4 text-green-600" />
                 <h3 className="font-semibold text-lg mb-2">
-                  Start-up or non-profit?
+                  {t("marketing.pricing.support.startupTitle")}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  We offer special pricing for qualifying organizations
+                  {t("marketing.pricing.support.startupBody")}
                 </p>
                 <Button
                   variant="outline"
@@ -2341,12 +1607,13 @@ export default function Pricing() {
                     openContactPanel({
                       inquiryType: "nonprofit_discount",
                       subjectLocked: true,
-                      prefillMessage:
-                        "Hi — we're a start-up / non-profit interested in reduced pricing. Here's a bit about us: ",
+                      prefillMessage: t(
+                        "messages.pricing.contact.nonprofitPrefill",
+                      ),
                     })
                   }
                 >
-                  Contact us for reduced pricing
+                  {t("marketing.pricing.support.contactReduced")}
                 </Button>
               </Card>
             </div>
@@ -2354,40 +1621,47 @@ export default function Pricing() {
             {/* FAQ — generates FAQPage JSON-LD for Google/Bing/AI rich results */}
             <MarketingFAQ
               schemaId="pricing"
-              heading="Pricing FAQ"
-              subheading="Everything you need to know about hired.video plans"
+              heading={t("marketing.pricing.faqHeading")}
+              subheading={t("marketing.pricing.faqSubheading")}
               items={[
                 {
-                  question: "How much does hired.video cost?",
-                  answer: `hired.video is free to start with generous limits — AI resume scoring, one published Studio project (video, comic, game, or podcast), and 50K AI tokens per month. The Pro plan is $${basePrice}/month (or $${PRO_YEARLY_PRICE}/year with a 20% annual discount) and includes 1M AI tokens/month, 1080p + 4K video export, PDF / CBZ comic export, voice cloning, brand kits, and unlimited published projects across every format. You can cancel anytime.`,
+                  question: t("faq.pricing.cost.q"),
+                  answer: t("faq.pricing.cost.a", {
+                    monthly: basePrice,
+                    yearly: PRO_YEARLY_PRICE,
+                  }),
                 },
                 {
-                  question: "What's included in the free plan?",
-                  answer: "The free plan includes AI resume scoring, one published Studio project (video, comic, game, or podcast), job-resume matching (5/month), 10 job applications/month, 50K AI tokens for tools like the resume optimizer and salary calculator, and access to the full tool suite. No credit card required.",
+                  question: t("faq.pricing.freePlan.q"),
+                  answer: t("faq.pricing.freePlan.a"),
                 },
                 {
-                  question: "Can I try Pro features before committing?",
-                  answer: "Yes — all AI tools are available on the free tier with a monthly token budget. You can generate videos, comics, games, and podcasts to see the quality before upgrading. Pro unlocks higher limits, 4K video export, PDF / CBZ comic export, voice cloning, and brand kits.",
+                  question: t("faq.pricing.tryPro.q"),
+                  answer: t("faq.pricing.tryPro.a"),
                 },
                 {
-                  question: "What are AI tokens and how do they work?",
-                  answer: "AI tokens are the currency that powers every AI feature — resume scoring, Studio script generation (video / comic / game / podcast), job matching, and more. Free users get 50K tokens/month; Pro users get 1M tokens/month. If you need more, top-up token packs start at $3.99 for 500K tokens.",
+                  question: t("faq.pricing.tokens.q"),
+                  answer: t("faq.pricing.tokens.a"),
                 },
                 {
-                  question: "Do you offer team or recruiter pricing?",
-                  answer: "Yes — Pro supports multi-seat teams with per-seat pricing. Recruiters get access to AI candidate sourcing, match scoring, and a visual hiring pipeline. Contact us for volume discounts on 10+ seats.",
+                  question: t("faq.pricing.teamPricing.q"),
+                  answer: t("faq.pricing.teamPricing.a"),
                 },
                 {
-                  question: "What is People Operations, and can I embed it?",
-                  answer: "People Operations is the CHRO suite for employers — roster & org chart, 1:1s with shared agendas and action items, performance, goals, and team health, on top of the video-first hiring you already use. It's a paid employer feature, multi-tenant and segment-isolated per company. You can also embed your hired.video surfaces (roster, 1:1s, hiring) directly into your own app with a copyable JavaScript snippet — turn it on under your company's Embed settings and inject the embed key from an environment variable (never hardcode it).",
+                  question: t("faq.pricing.peopleOps.q"),
+                  answer: t("faq.pricing.peopleOps.a"),
                 },
                 {
-                  question: "Can I cancel my subscription anytime?",
-                  answer: "Absolutely. There are no contracts or cancellation fees. Cancel from your account settings at any time and you'll keep access through the end of your billing period. Your data stays safe and you can re-subscribe whenever you want.",
+                  question: t("faq.pricing.cancel.q"),
+                  answer: t("faq.pricing.cancel.a"),
                 },
                 {
-                  question: "Is there a discount for annual billing?",
-                  answer: `Yes — the annual plan saves 20%. Instead of $${basePrice}/month, you pay $${PRO_YEARLY_PRICE}/year (about $${(PRO_YEARLY_PRICE / 12).toFixed(2)}/month).`,
+                  question: t("faq.pricing.annualDiscount.q"),
+                  answer: t("faq.pricing.annualDiscount.a", {
+                    monthly: basePrice,
+                    yearly: PRO_YEARLY_PRICE,
+                    monthlyEquivalent: (PRO_YEARLY_PRICE / 12).toFixed(2),
+                  }),
                 },
               ]}
             />
@@ -2395,11 +1669,10 @@ export default function Pricing() {
             {/* Trust Signals */}
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
               <h3 className="text-2xl font-bold mb-4">
-                Trusted by thousands of companies
+                {t("marketing.pricing.trustHeading")}
               </h3>
               <p className="text-muted-foreground mb-6">
-                Join the growing community of employers revolutionizing their
-                talent management with our comprehensive HR platform
+                {t("marketing.pricing.trustBody")}
               </p>
               <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">

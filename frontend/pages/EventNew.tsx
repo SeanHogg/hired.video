@@ -8,6 +8,7 @@
  * deferred per gap #1246/1247).
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -35,10 +36,11 @@ import type {
 } from "@shared/events";
 
 export default function EventNew() {
+  const { t } = useTranslation();
   useSEO("/events/new");
   useBreadcrumbs([
-    { name: "Events", url: "/tasks?surface=discover" },
-    { name: "Host an event", url: "/events/new" },
+    { name: t("headings.eventNew.eventsBreadcrumb"), url: "/tasks?surface=discover" },
+    { name: t("headings.eventNew.hostEvent"), url: "/events/new" },
   ]);
 
   const navigate = useNavigate();
@@ -73,11 +75,11 @@ export default function EventNew() {
   async function submit(publish: boolean) {
     setError(null);
     if (!title.trim() || !startAt || !endAt) {
-      setError("Title, start, and end times are required.");
+      setError(t("errors.eventNew.requiredFields"));
       return;
     }
     if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
-      setError("End time must be after start time.");
+      setError(t("errors.eventNew.endAfterStart"));
       return;
     }
 
@@ -107,7 +109,7 @@ export default function EventNew() {
       const created = await eventsService.create(input);
       navigate(`/events/${created.slug ?? created.id}`);
     } catch (err: any) {
-      setError(err?.message ?? "Could not create event.");
+      setError(err?.message ?? t("errors.eventNew.createFailed"));
     } finally {
       setBusy(false);
     }
@@ -116,9 +118,9 @@ export default function EventNew() {
   return (
     <AppShell bgClassName="bg-background">
       <main className="px-4 sm:px-6 lg:px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Host an event</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">{t("headings.eventNew.hostEvent")}</h1>
         <p className="text-muted-foreground mb-6">
-          In-person, remote, or hybrid — invite anyone, accept RSVPs, and meet the right people.
+          {t("messages.eventNew.subtitle")}
         </p>
 
         {error && (
@@ -129,32 +131,32 @@ export default function EventNew() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Basics</CardTitle>
+            <CardTitle>{t("headings.eventNew.basics")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="title">Title *</Label>
+              <Label htmlFor="title">{t("fields.eventTitle.label")}</Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Backend engineers coffee chat — May 31"
+                placeholder={t("fields.eventTitle.placeholder")}
                 maxLength={500}
               />
             </div>
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("fields.description.label")}</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
-                placeholder="What is this event about? Who should come?"
+                placeholder={t("fields.eventDescription.placeholder")}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start">Start *</Label>
+                <Label htmlFor="start">{t("fields.eventStart.label")}</Label>
                 <Input
                   id="start"
                   type="datetime-local"
@@ -163,7 +165,7 @@ export default function EventNew() {
                 />
               </div>
               <div>
-                <Label htmlFor="end">End *</Label>
+                <Label htmlFor="end">{t("fields.eventEnd.label")}</Label>
                 <Input
                   id="end"
                   type="datetime-local"
@@ -174,13 +176,13 @@ export default function EventNew() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Category</Label>
+                <Label>{t("fields.serviceCategory.label")}</Label>
                 <Select value={category || "none"} onValueChange={(v) => setCategory(v === "none" ? "" : v)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose…" />
+                    <SelectValue placeholder={t("fields.eventCategory.placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Uncategorized</SelectItem>
+                    <SelectItem value="none">{t("labels.eventNew.uncategorized")}</SelectItem>
                     {categories.map((c) => (
                       <SelectItem key={c.id} value={c.slug}>
                         {c.label}
@@ -190,15 +192,15 @@ export default function EventNew() {
                 </Select>
               </div>
               <div>
-                <Label>Visibility</Label>
+                <Label>{t("fields.visibility.label")}</Label>
                 <Select value={visibility} onValueChange={(v) => setVisibility(v as EventVisibility)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="public">Public (discoverable)</SelectItem>
-                    <SelectItem value="unlisted">Unlisted (link only)</SelectItem>
-                    <SelectItem value="private">Private (invited only)</SelectItem>
+                    <SelectItem value="public">{t("labels.eventNew.visibilityPublic")}</SelectItem>
+                    <SelectItem value="unlisted">{t("labels.eventNew.visibilityUnlisted")}</SelectItem>
+                    <SelectItem value="private">{t("labels.eventNew.visibilityPrivate")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -208,55 +210,55 @@ export default function EventNew() {
 
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Format & location</CardTitle>
+            <CardTitle>{t("headings.eventNew.formatLocation")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Format</Label>
+              <Label>{t("fields.eventFormat.label")}</Label>
               <Select value={eventFormat} onValueChange={(v) => setEventFormat(v as EventFormat)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="in_person">In-person</SelectItem>
-                  <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  <SelectItem value="in_person">{t("labels.eventNew.formatInPerson")}</SelectItem>
+                  <SelectItem value="remote">{t("labels.remote")}</SelectItem>
+                  <SelectItem value="hybrid">{t("labels.workSetting.hybrid")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {(eventFormat === "in_person" || eventFormat === "hybrid") && (
               <div>
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location">{t("fields.location.label")}</Label>
                 <Input
                   id="location"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Venue, address, or neighborhood"
+                  placeholder={t("fields.eventLocation.placeholder")}
                 />
               </div>
             )}
             {(eventFormat === "remote" || eventFormat === "hybrid") && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Video provider</Label>
+                  <Label>{t("fields.eventVideoProvider.label")}</Label>
                   <Select
                     value={videoProvider || "none"}
                     onValueChange={(v) => setVideoProvider(v === "none" ? "" : (v as VideoProvider))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose…" />
+                      <SelectValue placeholder={t("fields.eventCategory.placeholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="none">{t("labels.none")}</SelectItem>
                       <SelectItem value="zoom">Zoom</SelectItem>
                       <SelectItem value="meet">Google Meet</SelectItem>
                       <SelectItem value="teams">Microsoft Teams</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="other">{t("labels.eventNew.videoProviderOther")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="meetingUrl">Meeting URL</Label>
+                  <Label htmlFor="meetingUrl">{t("fields.eventMeetingUrl.label")}</Label>
                   <Input
                     id="meetingUrl"
                     type="url"
@@ -272,18 +274,18 @@ export default function EventNew() {
 
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>RSVPs</CardTitle>
+            <CardTitle>{t("headings.eventNew.rsvps")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="capacity">Capacity (optional)</Label>
+              <Label htmlFor="capacity">{t("fields.eventCapacity.label")}</Label>
               <Input
                 id="capacity"
                 type="number"
                 min={1}
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
-                placeholder="Leave blank for unlimited"
+                placeholder={t("fields.eventCapacity.placeholder")}
               />
             </div>
             <div className="flex items-start gap-3">
@@ -293,9 +295,9 @@ export default function EventNew() {
                 onCheckedChange={(v) => setRequiresApproval(Boolean(v))}
               />
               <div>
-                <Label htmlFor="approval">Require host approval</Label>
+                <Label htmlFor="approval">{t("fields.eventApproval.label")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  RSVPs land as "pending" until you approve. Best for curated networking events.
+                  {t("messages.eventNew.approvalHint")}
                 </p>
               </div>
             </div>
@@ -306,9 +308,9 @@ export default function EventNew() {
                 onCheckedChange={(v) => setAllowsPlusOnes(Boolean(v))}
               />
               <div>
-                <Label htmlFor="plusone">Allow +1s</Label>
+                <Label htmlFor="plusone">{t("fields.eventPlusOnes.label")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Attendees can bring up to one guest.
+                  {t("messages.eventNew.plusOnesHint")}
                 </p>
               </div>
             </div>
@@ -319,9 +321,9 @@ export default function EventNew() {
                 onCheckedChange={(v) => setMatchmakingEnabled(Boolean(v))}
               />
               <div>
-                <Label htmlFor="match">Enable AI introductions</Label>
+                <Label htmlFor="match">{t("fields.eventMatchmaking.label")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Default on. Suggests who each attendee should meet based on complementary skills.
+                  {t("messages.eventNew.matchmakingHint")}
                 </p>
               </div>
             </div>
@@ -330,11 +332,11 @@ export default function EventNew() {
 
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={() => submit(false)} disabled={busy}>
-            Save draft
+            {t("actions.saveDraft")}
           </Button>
           <Button onClick={() => submit(true)} disabled={busy}>
             {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Publish event
+            {t("actions.eventNew.publishEvent")}
           </Button>
         </div>
       </main>

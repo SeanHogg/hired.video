@@ -8,7 +8,7 @@
  * and category derivation never drift between the two.
  */
 
-export const CREATOR_PROGRAMS = ["video", "voice", "services", "articles", "courses", "templates"] as const;
+export const CREATOR_PROGRAMS = ["video", "voice", "services", "articles", "courses", "templates", "bookings"] as const;
 export type CreatorProgram = (typeof CREATOR_PROGRAMS)[number];
 
 export const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
@@ -18,6 +18,7 @@ export const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
   articles: "program_articles_terms",
   courses: "program_courses_terms",
   templates: "program_templates_terms",
+  bookings: "program_bookings_terms",
 };
 
 // Marketplace search-facet category written into `creator_profiles.categories`
@@ -30,6 +31,7 @@ export const PROGRAM_CATEGORY: Record<CreatorProgram, string> = {
   articles: "articles",
   courses: "courses",
   templates: "templates",
+  bookings: "bookings",
 };
 
 export function isCreatorProgram(p: unknown): p is CreatorProgram {
@@ -43,10 +45,11 @@ export type CreatorProgramFlags = {
   articlesActive?: boolean | null;
   coursesActive?: boolean | null;
   templatesActive?: boolean | null;
+  bookingsActive?: boolean | null;
 };
 
 export type CreatorProgramFlagColumn =
-  | "videoActive" | "voiceActive" | "servicesActive" | "articlesActive" | "coursesActive" | "templatesActive";
+  | "videoActive" | "voiceActive" | "servicesActive" | "articlesActive" | "coursesActive" | "templatesActive" | "bookingsActive";
 
 export function programFlagColumn(program: CreatorProgram): CreatorProgramFlagColumn {
   return program === "video" ? "videoActive"
@@ -54,7 +57,8 @@ export function programFlagColumn(program: CreatorProgram): CreatorProgramFlagCo
     : program === "services" ? "servicesActive"
     : program === "articles" ? "articlesActive"
     : program === "courses" ? "coursesActive"
-    : "templatesActive";
+    : program === "templates" ? "templatesActive"
+    : "bookingsActive";
 }
 
 export function activeFlagsToPrograms(flags: CreatorProgramFlags): CreatorProgram[] {
@@ -65,6 +69,7 @@ export function activeFlagsToPrograms(flags: CreatorProgramFlags): CreatorProgra
   if (flags.articlesActive) out.push("articles");
   if (flags.coursesActive) out.push("courses");
   if (flags.templatesActive) out.push("templates");
+  if (flags.bookingsActive) out.push("bookings");
   return out;
 }
 
@@ -76,5 +81,6 @@ export function programsToCategories(programs: readonly CreatorProgram[]): strin
 // `is_active` derived column on `creator_profiles`.
 export function deriveIsActive(flags: CreatorProgramFlags): boolean {
   return !!(flags.videoActive || flags.voiceActive || flags.servicesActive
-    || flags.articlesActive || flags.coursesActive || flags.templatesActive);
+    || flags.articlesActive || flags.coursesActive || flags.templatesActive
+    || flags.bookingsActive);
 }

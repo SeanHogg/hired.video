@@ -253,6 +253,9 @@ const BdPipeline = lazy(() => import("./pages/recruiter/BdPipeline"));
 const TakeHomeAssignment = lazy(() => import("./pages/TakeHomeAssignment"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
+const BookPage = lazy(() => import("./pages/bookings/BookPage"));
+const ReservationPage = lazy(() => import("./pages/bookings/ReservationPage"));
+const BookingsHost = lazy(() => import("./pages/bookings/BookingsHost"));
 const ArticlesIndex = lazy(() => import("./pages/ArticlesIndex"));
 const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
@@ -944,6 +947,10 @@ const App = () => (
                       <Route path="/phone" element={<PhoneDashboard />} />
                       {/* My Services hub — see ServicesNav. Each top-level tab is its own route. */}
                       <Route path="/services" element={<ServicesManagement />} />
+                      {/* Bookings (gap #1648) — host config + reservation dashboard. */}
+                      <Route path="/bookings" element={<BookingsHost />} />
+                      <Route path="/book/:handle" element={<BookPage />} />
+                      <Route path="/book/:handle/r/:token" element={<ReservationPage />} />
                       <Route path="/services/creator" element={<ServicesManagement />} />
                       {/* Content Creator sub-tabs are URL-driven via CreatorWorkspace
                           (basePath="/services/creator"). Every tab value the workspace

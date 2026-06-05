@@ -5,6 +5,7 @@
 // Detail view is reached at /interview-assignments/:id.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -52,6 +53,7 @@ import {
 import { toast } from "sonner";
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const styles: Record<string, string> = {
     pending: "bg-blue-100 text-blue-800",
     in_progress: "bg-amber-100 text-amber-800",
@@ -59,7 +61,11 @@ function StatusBadge({ status }: { status: string }) {
     reviewed: "bg-purple-100 text-purple-800",
     expired: "bg-red-100 text-red-800",
   };
-  return <Badge className={styles[status] ?? ""}>{status.replace("_", " ")}</Badge>;
+  return (
+    <Badge className={styles[status] ?? ""}>
+      {t(`status.interviewAssignments.${status}`, { defaultValue: status.replace("_", " ") })}
+    </Badge>
+  );
 }
 
 function InterviewRow({
@@ -78,6 +84,7 @@ function InterviewRow({
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Card>
       <CardContent className="pt-4 pb-4">
@@ -88,7 +95,7 @@ function InterviewRow({
                 checked={!!selected}
                 onCheckedChange={() => onToggleSelect?.(row.id)}
                 className="mt-1"
-                aria-label={`Compare ${row.title}`}
+                aria-label={t("labels.interviewAssignments.compareAria", { title: row.title })}
               />
             )}
             <div className="min-w-0 flex-1">
@@ -99,7 +106,7 @@ function InterviewRow({
               <StatusBadge status={row.status} />
               {row.assignmentType === "invite" && (
                 <Badge variant="outline" className="text-[10px]">
-                  Invite
+                  {t("labels.interviewAssignments.invite")}
                 </Badge>
               )}
               {row.targetRole && (
@@ -110,16 +117,16 @@ function InterviewRow({
             </div>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
               <span>
-                {row.questions.length} question{row.questions.length === 1 ? "" : "s"}
+                {t("labels.interviewAssignments.questionCount", { count: row.questions.length })}
               </span>
               {perspective === "creator" && row.candidateEmail && <span>→ {row.candidateEmail}</span>}
               {row.questionResponseDeadline && (
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  Due {new Date(row.questionResponseDeadline).toLocaleDateString()}
+                  {t("labels.interviewAssignments.due", { date: new Date(row.questionResponseDeadline).toLocaleDateString() })}
                 </span>
               )}
-              {row.resendCount > 0 && <span>Resent {row.resendCount}×</span>}
+              {row.resendCount > 0 && <span>{t("labels.interviewAssignments.resentCount", { count: row.resendCount })}</span>}
             </div>
             </div>
           </div>
@@ -133,12 +140,12 @@ function InterviewRow({
                 className="gap-1"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Resend
+                {t("actions.resend")}
               </Button>
             )}
             <Button asChild size="sm" variant={perspective === "candidate" ? "default" : "outline"}>
               <Link to={`/interview-assignments/${row.id}`}>
-                {perspective === "candidate" ? "Open" : "View"}
+                {perspective === "candidate" ? t("actions.interviewAssignments.open") : t("actions.view")}
               </Link>
             </Button>
           </div>
@@ -149,6 +156,7 @@ function InterviewRow({
 }
 
 function ListView() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [createdByMe, setCreatedByMe] = useState<InterviewAssignmentRow[]>([]);
   const [assignedToMe, setAssignedToMe] = useState<InterviewAssignmentRow[]>([]);
@@ -164,7 +172,7 @@ function ListView() {
       const next = toggleCompareSelection(prev, id);
       if (next.length === prev.length && !prev.includes(id)) {
         // Cap reached.
-        toast.error("Compare up to 6 interviews at once");
+        toast.error(t("messages.interviewAssignments.compareCap"));
       }
       return next;
     });
@@ -177,7 +185,7 @@ function ListView() {
       setCreatedByMe(res.createdByMe);
       setAssignedToMe(res.assignedToMe);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load interviews");
+      setError(err instanceof Error ? err.message : t("errors.interviewAssignments.loadList"));
     } finally {
       setLoading(false);
     }
@@ -190,10 +198,10 @@ function ListView() {
   async function handleResend(id: string) {
     try {
       await resendInterviewInvite(id);
-      toast.success("Magic link re-sent");
+      toast.success(t("messages.interviewAssignments.magicLinkResent"));
       void refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not resend");
+      toast.error(err instanceof Error ? err.message : t("errors.interviewAssignments.resend"));
     }
   }
 
@@ -216,7 +224,7 @@ function ListView() {
     <div className="space-y-8">
       {assignedToMe.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Assigned to me</h2>
+          <h2 className="text-lg font-semibold">{t("headings.interviewAssignments.assignedToMe")}</h2>
           {assignedToMe.map((row) => (
             <InterviewRow key={row.id} row={row} perspective="candidate" />
           ))}
@@ -228,11 +236,11 @@ function ListView() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Send className="h-4 w-4" />
-              Sent by me
+              {t("headings.interviewAssignments.sentByMe")}
             </h2>
             {createdByMe.length >= 2 && (
               <span className="text-xs text-muted-foreground">
-                Tick 2&ndash;6 to compare side&#8209;by&#8209;side
+                {t("messages.interviewAssignments.tickToCompare")}
               </span>
             )}
           </div>
@@ -249,13 +257,13 @@ function ListView() {
           ))}
           {selected.length >= 2 && (
             <div className="sticky bottom-4 z-10 mt-4 flex items-center justify-between gap-2 rounded-md border bg-background/95 backdrop-blur p-3 shadow">
-              <span className="text-sm font-medium">{selected.length} selected</span>
+              <span className="text-sm font-medium">{t("labels.interviewAssignments.selectedCount", { count: selected.length })}</span>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setSelected([])}>
-                  Clear
+                  {t("actions.clear")}
                 </Button>
                 <Button size="sm" onClick={() => navigate(buildInterviewCompareHref(selected))}>
-                  Compare {selected.length}
+                  {t("actions.interviewAssignments.compareCount", { count: selected.length })}
                 </Button>
               </div>
             </div>
@@ -267,9 +275,9 @@ function ListView() {
         <Card>
           <CardContent className="py-12 text-center space-y-3">
             <Users className="h-10 w-10 text-muted-foreground/50 mx-auto" />
-            <p className="text-sm text-muted-foreground">No interview assignments yet.</p>
+            <p className="text-sm text-muted-foreground">{t("messages.interviewAssignments.empty")}</p>
             <Button asChild>
-              <Link to="/tools/interview-questions">Generate interview questions</Link>
+              <Link to="/tools/interview-questions">{t("actions.interviewAssignments.generateQuestions")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -279,6 +287,7 @@ function ListView() {
 }
 
 function DetailView({ id }: { id: string }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<{
     interview: InterviewAssignmentRow;
     responses: AssignmentResponse[];
@@ -295,7 +304,7 @@ function DetailView({ id }: { id: string }) {
         setData(report);
         setError(null);
       })
-      .catch((err) => setError(err?.message ?? "Could not load interview"))
+      .catch((err) => setError(err?.message ?? t("errors.interviewAssignments.loadOne")))
       .finally(() => setLoading(false));
   }
 
@@ -320,7 +329,7 @@ function DetailView({ id }: { id: string }) {
   if (error || !data) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>{error ?? "Interview not found"}</AlertDescription>
+        <AlertDescription>{error ?? t("errors.interviewAssignments.notFound")}</AlertDescription>
       </Alert>
     );
   }
@@ -333,7 +342,7 @@ function DetailView({ id }: { id: string }) {
       <Button asChild variant="ghost" size="sm">
         <Link to="/interview-assignments">
           <ArrowLeft className="h-4 w-4 mr-1" />
-          All interview assignments
+          {t("actions.interviewAssignments.allAssignments")}
         </Link>
       </Button>
 
@@ -350,7 +359,7 @@ function DetailView({ id }: { id: string }) {
         <CardContent className="space-y-2 text-sm">
           {interview.targetRole && (
             <p>
-              <span className="font-medium">Target role:</span> {interview.targetRole}
+              <span className="font-medium">{t("labels.interviewAssignments.targetRole")}</span> {interview.targetRole}
             </p>
           )}
           {interview.instructions && (
@@ -358,13 +367,13 @@ function DetailView({ id }: { id: string }) {
           )}
           {isCreator && candidate && (
             <p className="text-muted-foreground">
-              <span className="font-medium">Candidate:</span> {candidate.name ?? candidate.email ?? "Unknown"}
+              <span className="font-medium">{t("labels.interviewAssignments.candidate")}</span> {candidate.name ?? candidate.email ?? t("labels.interviewAssignments.unknown")}
               {candidate.email && candidate.name ? ` · ${candidate.email}` : ""}
             </p>
           )}
           {interview.questionResponseDeadline && (
             <p className="text-muted-foreground">
-              <span className="font-medium">Response deadline:</span>{" "}
+              <span className="font-medium">{t("labels.interviewAssignments.responseDeadline")}</span>{" "}
               {new Date(interview.questionResponseDeadline).toLocaleString()}
             </p>
           )}
@@ -372,7 +381,7 @@ function DetailView({ id }: { id: string }) {
             <div className="pt-3">
               <Button asChild>
                 <Link to={`/interview/${interview.inviteToken}`}>
-                  {responses.length > 0 ? "Continue answering" : "Start answering"}
+                  {responses.length > 0 ? t("actions.interviewAssignments.continueAnswering") : t("actions.interviewAssignments.startAnswering")}
                 </Link>
               </Button>
             </div>
@@ -395,25 +404,25 @@ function DetailView({ id }: { id: string }) {
             <Card key={q.id}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">
-                  Q{i + 1}. {q.text}
+                  {t("labels.interviewAssignments.questionNumber", { number: i + 1 })} {q.text}
                 </CardTitle>
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline" className="text-[10px]">
                     {q.category}
                   </Badge>
                   <Badge variant="outline" className="text-[10px]">
-                    {q.maxDurationSec}s
+                    {t("labels.interview.seconds", { count: q.maxDurationSec })}
                   </Badge>
                   {r && (
                     <Badge className="bg-green-500/10 text-green-600 text-[10px]">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       {r.responseMode === "text" ? (
                         <>
-                          <Type className="h-3 w-3 mr-1" /> Text
+                          <Type className="h-3 w-3 mr-1" /> {t("labels.interviewAssignments.text")}
                         </>
                       ) : (
                         <>
-                          <Mic className="h-3 w-3 mr-1" /> Video
+                          <Mic className="h-3 w-3 mr-1" /> {t("labels.interviewAssignments.video")}
                         </>
                       )}
                     </Badge>
@@ -421,13 +430,13 @@ function DetailView({ id }: { id: string }) {
                   {r && r.attempt > 1 && (
                     <Badge variant="outline" className="text-[10px]">
                       <RotateCcw className="h-2.5 w-2.5 mr-1" />
-                      Take {r.attempt}
+                      {t("labels.interviewAssignments.take", { number: r.attempt })}
                     </Badge>
                   )}
                   {r && typeof r.aiScore === "number" && (
                     <Badge className="bg-purple-100 text-purple-800 text-[10px]">
                       <Sparkles className="h-3 w-3 mr-1" />
-                      AI {r.aiScore.toFixed(1)}/10
+                      {t("labels.interviewAssignments.aiScore", { score: r.aiScore.toFixed(1) })}
                     </Badge>
                   )}
                 </div>
@@ -447,21 +456,21 @@ function DetailView({ id }: { id: string }) {
                         />
                         {r.transcription && (
                           <details className="text-xs text-muted-foreground">
-                            <summary className="cursor-pointer">Transcript</summary>
+                            <summary className="cursor-pointer">{t("labels.interviewAssignments.transcript")}</summary>
                             <p className="whitespace-pre-wrap mt-2">{r.transcription}</p>
                           </details>
                         )}
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground italic">
-                        Video recorded but not yet uploaded.
+                        {t("messages.interviewAssignments.videoNotUploaded")}
                       </p>
                     )}
                     {isCreator && <AnswerAIPanel interviewId={interview.id} response={r} onScored={refresh} />}
                     {isCreator && <ProctoringStrip response={r} />}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic">No answer yet.</p>
+                  <p className="text-xs text-muted-foreground italic">{t("messages.interviewAssignments.noAnswerYet")}</p>
                 )}
               </CardContent>
             </Card>
@@ -483,6 +492,7 @@ function RecruiterActionsCard({
   responses: AssignmentResponse[];
   onChanged: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [scoringAll, setScoringAll] = useState(false);
   const [decidingTo, setDecidingTo] = useState<InterviewDecision | null>(null);
   const [reason, setReason] = useState(interview.decisionReason ?? "");
@@ -497,12 +507,12 @@ function RecruiterActionsCard({
       const { scoredCount, overall, coverage } = await scoreAllAnswers(interview.id);
       toast.success(
         scoredCount > 0
-          ? `Scored ${scoredCount} new answer${scoredCount === 1 ? "" : "s"} · overall ${overall.toFixed(1)}/10 (${coverage}% coverage)`
-          : `Nothing new to score · overall ${overall.toFixed(1)}/10`,
+          ? t("messages.interviewAssignments.scoredNew", { count: scoredCount, overall: overall.toFixed(1), coverage })
+          : t("messages.interviewAssignments.nothingToScore", { overall: overall.toFixed(1) }),
       );
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not score answers");
+      toast.error(err instanceof Error ? err.message : t("errors.interviewAssignments.scoreAll"));
     } finally {
       setScoringAll(false);
     }
@@ -512,11 +522,15 @@ function RecruiterActionsCard({
     setDecidingTo(d);
     try {
       await setInterviewDecision(interview.id, d, reason.trim() || undefined);
-      toast.success(d ? `Marked ${d}` : "Decision cleared");
+      toast.success(
+        d
+          ? t("messages.interviewAssignments.markedDecision", { decision: t(`labels.interviewAssignments.decision.${d}`) })
+          : t("messages.interviewAssignments.decisionCleared"),
+      );
       setReasonOpen(false);
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save decision");
+      toast.error(err instanceof Error ? err.message : t("errors.interviewAssignments.saveDecision"));
     } finally {
       setDecidingTo(null);
     }
@@ -527,21 +541,21 @@ function RecruiterActionsCard({
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-brand-purple" />
-          Recruiter review
+          {t("headings.interviewAssignments.recruiterReview")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
           <Button size="sm" variant="outline" onClick={handleScoreAll} disabled={scoringAll || total === 0}>
             {scoringAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            Score every answer with AI
+            {t("actions.interviewAssignments.scoreEveryAnswer")}
           </Button>
           <span className="text-xs text-muted-foreground">
-            {scored}/{total} scored
+            {t("labels.interviewAssignments.scoredOfTotal", { scored, total })}
           </span>
           {typeof interview.aiOverallScore === "number" && (
             <Badge className="bg-purple-100 text-purple-800">
-              Overall {interview.aiOverallScore.toFixed(1)}/10
+              {t("labels.interviewAssignments.overallScore", { score: interview.aiOverallScore.toFixed(1) })}
             </Badge>
           )}
         </div>
@@ -550,7 +564,7 @@ function RecruiterActionsCard({
         )}
 
         <div className="flex items-center gap-2 flex-wrap border-t pt-3">
-          <span className="text-xs font-medium">Decision:</span>
+          <span className="text-xs font-medium">{t("labels.interviewAssignments.decisionLabel")}</span>
           <Button
             size="sm"
             variant={interview.decision === "shortlist" ? "default" : "outline"}
@@ -559,7 +573,7 @@ function RecruiterActionsCard({
             className="gap-1"
           >
             <ThumbsUp className="h-3.5 w-3.5" />
-            Shortlist
+            {t("labels.interviewAssignments.decision.shortlist")}
           </Button>
           <Button
             size="sm"
@@ -567,7 +581,7 @@ function RecruiterActionsCard({
             onClick={() => handleDecide("maybe")}
             disabled={decidingTo === "maybe"}
           >
-            Maybe
+            {t("labels.interviewAssignments.decision.maybe")}
           </Button>
           <Button
             size="sm"
@@ -577,22 +591,22 @@ function RecruiterActionsCard({
             className="gap-1"
           >
             <ThumbsDown className="h-3.5 w-3.5" />
-            Reject
+            {t("actions.reject")}
           </Button>
           {interview.decision && (
             <Button size="sm" variant="ghost" onClick={() => handleDecide(null)}>
-              Clear
+              {t("actions.clear")}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => setReasonOpen((o) => !o)}>
-            {reasonOpen ? "Hide note" : "Add note"}
+            {reasonOpen ? t("actions.interviewAssignments.hideNote") : t("actions.interviewAssignments.addNote")}
           </Button>
         </div>
         {reasonOpen && (
           <Textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Why this decision? (optional, saved with the decision)"
+            placeholder={t("labels.interviewAssignments.decisionReasonPlaceholder")}
             rows={2}
           />
         )}
@@ -610,6 +624,7 @@ function AnswerAIPanel({
   response: AssignmentResponse;
   onScored: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [scoring, setScoring] = useState(false);
 
   async function handleScore() {
@@ -618,7 +633,7 @@ function AnswerAIPanel({
       await scoreSingleAnswer(interviewId, response.id);
       await onScored();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not score this answer");
+      toast.error(err instanceof Error ? err.message : t("errors.interviewAssignments.scoreOne"));
     } finally {
       setScoring(false);
     }
@@ -627,10 +642,10 @@ function AnswerAIPanel({
   if (typeof response.aiScore !== "number") {
     return (
       <div className="rounded-md border border-dashed p-3 flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">No AI score yet.</span>
+        <span className="text-xs text-muted-foreground">{t("messages.interviewAssignments.noAiScoreYet")}</span>
         <Button size="sm" variant="outline" onClick={handleScore} disabled={scoring}>
           {scoring ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
-          Score with AI
+          {t("actions.interviewAssignments.scoreWithAi")}
         </Button>
       </div>
     );
@@ -641,11 +656,11 @@ function AnswerAIPanel({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-purple-600" />
-          <span className="text-sm font-medium">AI score: {response.aiScore.toFixed(1)} / 10</span>
+          <span className="text-sm font-medium">{t("labels.interviewAssignments.aiScoreFull", { score: response.aiScore.toFixed(1) })}</span>
         </div>
         <Button size="sm" variant="ghost" onClick={handleScore} disabled={scoring}>
           {scoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-          Re-score
+          {t("actions.interviewAssignments.reScore")}
         </Button>
       </div>
       {response.aiSummary && (
@@ -654,13 +669,13 @@ function AnswerAIPanel({
       {response.aiScoreBreakdown && <BreakdownGrid breakdown={response.aiScoreBreakdown} />}
       {(response.aiStrengths?.length ?? 0) > 0 && (
         <div className="text-xs">
-          <span className="font-medium text-green-700">Strengths: </span>
+          <span className="font-medium text-green-700">{t("labels.interviewAssignments.strengthsLabel")} </span>
           <span className="text-muted-foreground">{response.aiStrengths!.join(" · ")}</span>
         </div>
       )}
       {(response.aiConcerns?.length ?? 0) > 0 && (
         <div className="text-xs">
-          <span className="font-medium text-red-700">Concerns: </span>
+          <span className="font-medium text-red-700">{t("labels.interviewAssignments.concernsLabel")} </span>
           <span className="text-muted-foreground">{response.aiConcerns!.join(" · ")}</span>
         </div>
       )}
@@ -669,12 +684,13 @@ function AnswerAIPanel({
 }
 
 function BreakdownGrid({ breakdown }: { breakdown: AnswerScoreBreakdown }) {
+  const { t } = useTranslation();
   const rows: Array<{ label: string; value: number }> = [
-    { label: "Situation", value: breakdown.situation },
-    { label: "Task", value: breakdown.task },
-    { label: "Action", value: breakdown.action },
-    { label: "Result", value: breakdown.result },
-    { label: "Skill probe", value: breakdown.skillProbe },
+    { label: t("studio.interviewPractice.star.situation.title"), value: breakdown.situation },
+    { label: t("studio.interviewPractice.star.task.title"), value: breakdown.task },
+    { label: t("studio.interviewPractice.star.action.title"), value: breakdown.action },
+    { label: t("studio.interviewPractice.star.result.title"), value: breakdown.result },
+    { label: t("labels.interviewAssignments.skillProbe"), value: breakdown.skillProbe },
   ];
   return (
     <div className="grid grid-cols-5 gap-2 text-[10px]">
@@ -692,6 +708,7 @@ function BreakdownGrid({ breakdown }: { breakdown: AnswerScoreBreakdown }) {
 }
 
 function ProctoringStrip({ response }: { response: AssignmentResponse }) {
+  const { t } = useTranslation();
   const p = response.proctoringFlags ?? { tabBlurCount: 0, pasteCount: 0, copyCount: 0, fullscreenExits: 0, prepUsedSec: 0, retakesUsed: 0 };
   const hasFlags =
     p.tabBlurCount > 0 ||
@@ -705,24 +722,32 @@ function ProctoringStrip({ response }: { response: AssignmentResponse }) {
     <div className={`flex items-center gap-3 text-[11px] ${tone}`}>
       <AlertTriangle className="h-3 w-3" />
       <span>
-        Proctoring: {p.tabBlurCount} tab blurs · {p.pasteCount} pastes · {p.copyCount} copies · {p.retakesUsed} retakes · {p.prepUsedSec}s prep used
+        {t("labels.interviewAssignments.proctoring", {
+          tabBlurs: p.tabBlurCount,
+          pastes: p.pasteCount,
+          copies: p.copyCount,
+          retakes: p.retakesUsed,
+          prepSec: p.prepUsedSec,
+        })}
       </span>
     </div>
   );
 }
 
 function DecisionBadge({ decision }: { decision: InterviewDecision }) {
+  const { t } = useTranslation();
   const styles: Record<InterviewDecision, string> = {
     shortlist: "bg-green-100 text-green-800",
     maybe: "bg-amber-100 text-amber-800",
     reject: "bg-red-100 text-red-800",
   };
-  return <Badge className={styles[decision]}>{decision}</Badge>;
+  return <Badge className={styles[decision]}>{t(`labels.interviewAssignments.decision.${decision}`)}</Badge>;
 }
 
 // ─── Compare view (#1235) ──────────────────────────────────────────────────
 
 function CompareView({ ids }: { ids: string[] }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<Awaited<ReturnType<typeof compareInterviews>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -731,7 +756,7 @@ function CompareView({ ids }: { ids: string[] }) {
     setLoading(true);
     compareInterviews(ids)
       .then(setData)
-      .catch((err) => setError(err?.message ?? "Could not load comparison"))
+      .catch((err) => setError(err?.message ?? t("errors.interviewAssignments.loadComparison")))
       .finally(() => setLoading(false));
   }, [ids.join(",")]);
 
@@ -743,14 +768,14 @@ function CompareView({ ids }: { ids: string[] }) {
     );
   }
   if (error || !data) {
-    return <Alert variant="destructive"><AlertDescription>{error ?? "No data"}</AlertDescription></Alert>;
+    return <Alert variant="destructive"><AlertDescription>{error ?? t("messages.interviewAssignments.noData")}</AlertDescription></Alert>;
   }
   return (
     <div className="space-y-4">
       <Button asChild variant="ghost" size="sm">
         <Link to="/interview-assignments">
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to assignments
+          {t("actions.interviewAssignments.backToAssignments")}
         </Link>
       </Button>
       <div className="overflow-x-auto">
@@ -780,17 +805,17 @@ function CompareView({ ids }: { ids: string[] }) {
               </CardHeader>
               <CardContent className="space-y-2">
                 {responses.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No answers yet.</p>
+                  <p className="text-xs text-muted-foreground italic">{t("messages.interviewAssignments.noAnswersYet")}</p>
                 ) : (
                   responses.map((r, i) => (
                     <div key={r.id} className="border-t pt-2 first:border-t-0 first:pt-0">
-                      <div className="text-xs font-medium">Q{i + 1}</div>
+                      <div className="text-xs font-medium">{t("labels.interview.qShort", { number: i + 1 })}</div>
                       {typeof r.aiScore === "number" ? (
                         <Badge className="bg-purple-100 text-purple-800 text-[10px]">
-                          AI {r.aiScore.toFixed(1)}
+                          {t("labels.interviewAssignments.aiScoreShort", { score: r.aiScore.toFixed(1) })}
                         </Badge>
                       ) : (
-                        <span className="text-[10px] text-muted-foreground italic">Not scored</span>
+                        <span className="text-[10px] text-muted-foreground italic">{t("labels.interviewAssignments.notScored")}</span>
                       )}
                       {r.aiSummary && (
                         <p className="text-[11px] text-muted-foreground mt-1 line-clamp-3">{r.aiSummary}</p>
@@ -802,7 +827,7 @@ function CompareView({ ids }: { ids: string[] }) {
                   to={`/interview-assignments/${interview.id}`}
                   className="text-xs text-primary hover:underline"
                 >
-                  Open full review →
+                  {t("actions.interviewAssignments.openFullReview")}
                 </Link>
               </CardContent>
             </Card>
@@ -814,6 +839,7 @@ function CompareView({ ids }: { ids: string[] }) {
 }
 
 export default function MyInterviewAssignments() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
@@ -836,13 +862,13 @@ export default function MyInterviewAssignments() {
       <div className="px-4 py-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-6">
           <h1 className="text-2xl font-bold">
-            {isCompareRoute ? "Compare interviews" : "Interview assignments"}
+            {isCompareRoute ? t("headings.interviewAssignments.compareTitle") : t("headings.interviewAssignments.pageTitle")}
           </h1>
           {!isCompareRoute && (
             <Button asChild variant="outline">
               <Link to="/tools/interview-questions">
                 <Copy className="h-4 w-4 mr-1.5" />
-                New question set
+                {t("actions.interviewAssignments.newQuestionSet")}
               </Link>
             </Button>
           )}
@@ -853,8 +879,9 @@ export default function MyInterviewAssignments() {
           ) : (
             <Alert>
               <AlertDescription>
-                Pick 2 to 6 interviews from{" "}
-                <Link to="/interview-assignments" className="underline">your list</Link> to compare.
+                {t("messages.interviewAssignments.pickToComparePrefix")}{" "}
+                <Link to="/interview-assignments" className="underline">{t("messages.interviewAssignments.pickToCompareLink")}</Link>{" "}
+                {t("messages.interviewAssignments.pickToCompareSuffix")}
               </AlertDescription>
             </Alert>
           )
