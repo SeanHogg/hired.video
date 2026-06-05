@@ -46,7 +46,7 @@ export class CohortNotFoundError extends Error {
 function generateJoinCode(): string {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   const bytes = new Uint8Array(8);
-  (globalThis.crypto ?? ({} as Crypto)).getRandomValues?.(bytes);
+  crypto.getRandomValues(bytes);
   let out = "";
   for (let i = 0; i < 8; i++) out += alphabet[(bytes[i] ?? i) % alphabet.length];
   return out;
