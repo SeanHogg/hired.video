@@ -112,7 +112,12 @@ export function AppShell({
 
   return (
     <div className={cn("min-h-screen overflow-x-clip", bg)}>
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        onCollapse={toggleSidebar}
+        collapsed={sidebarCollapsed}
+      />
       <div className={cn("min-w-0", sidebarCollapsed ? "lg:ml-16" : "lg:ml-80")}>
         <Navigation
           onMenuClick={openSidebar}

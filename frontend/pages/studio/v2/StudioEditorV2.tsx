@@ -2413,6 +2413,7 @@ export default function StudioEditorV2() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onCollapse={() => setSidebarCollapsed((c) => !c)}
         collapsed={sidebarCollapsed}
       />
       <div

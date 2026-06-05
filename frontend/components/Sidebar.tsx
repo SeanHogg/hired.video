@@ -35,12 +35,16 @@ import { useAdminPermissions } from "@/lib/admin-permissions";
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Desktop-only: collapse the docked rail to its icon strip. The header
+   *  (X) uses this on `lg+` where the sidebar can't be dismissed entirely. */
+  onCollapse?: () => void;
   collapsed?: boolean;
 }
 
 export default function Sidebar({
   isOpen,
   onClose,
+  onCollapse,
   collapsed = false,
 }: SidebarProps) {
   const { isAuthenticated, user, logout } = useAuth();
@@ -151,14 +155,31 @@ export default function Sidebar({
                 </span>
               )}
             </Link>
+            {/* Mobile: dismiss the slide-out drawer entirely. */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
               className="lg:hidden"
+              aria-label={t("nav.closeMenu")}
             >
               <X className="h-5 w-5" />
             </Button>
+            {/* Desktop: the rail is docked and can't be hidden, so (X)
+                collapses it to the icon strip. Hidden once already
+                collapsed — the nav's menu button re-expands it. */}
+            {!collapsed && onCollapse && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onCollapse}
+                className="hidden lg:flex"
+                aria-label={t("nav.collapseSidebar")}
+                title={t("nav.collapseSidebar")}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            )}
           </div>
 
           <div

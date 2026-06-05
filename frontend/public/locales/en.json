@@ -4301,6 +4301,7 @@
   "nav.descriptions.videoStudio": "Create marketing videos with AI scripting, voiceover, captions, and teleprompter — promote a resume, profile, job, or company.",
   "nav.expandSidebar": "Expand sidebar",
   "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
   "passwordRequirement.lowercase": "lowercase letter",
   "passwordRequirement.number": "number",
   "passwordRequirement.specialChar": "special character",

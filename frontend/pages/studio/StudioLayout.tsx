@@ -1793,6 +1793,7 @@ export default function StudioLayout() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onCollapse={() => setSidebarCollapsed((c) => !c)}
         collapsed={sidebarCollapsed}
       />
       <div className={cn("transition-all duration-500", sidebarCollapsed ? "lg:ml-16" : "lg:ml-80")}>
