@@ -41,12 +41,11 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { slugify } from "../../../shared/slugify.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
+import { resolveAuthorEligibility } from "../services/learning/author-eligibility.js";
 
 const {
   courses,
-  creatorProfiles,
   learningPaths,
   learningPathCourses,
   learningPathEnrollments,
@@ -61,35 +60,6 @@ function uid(c: any): string | null {
 function roles(c: any): string[] {
   const r = c.var.user?.roles;
   return Array.isArray(r) ? (r as string[]) : [];
-}
-
-/** Course/path authoring is open to creator-program enrollees AND any
- *  user holding the `employer` role. Returns `{ authored: true, kind }`
- *  on success so callers can stamp `is_employer_authored`. */
-async function checkAuthorEligibility(
-  db: ReturnType<typeof getDb>,
-  c: any,
-): Promise<
-  | { ok: true; isEmployerAuthored: boolean }
-  | { ok: false }
-> {
-  const userId = uid(c);
-  if (!userId) return { ok: false };
-
-  if (roles(c).includes(USER_ROLES.EMPLOYER)) {
-    return { ok: true, isEmployerAuthored: true };
-  }
-
-  const [creator] = await db.select()
-    .from(creatorProfiles)
-    .where(and(
-      eq(creatorProfiles.userId, userId),
-      sql`${creatorProfiles.endedAt} IS NULL`,
-      eq(creatorProfiles.coursesActive, true),
-    ))
-    .limit(1);
-  if (creator) return { ok: true, isEmployerAuthored: false };
-  return { ok: false };
 }
 
 // ── Validators ────────────────────────────────────────────────────────────
@@ -185,7 +155,7 @@ learningPathRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid body"), 400);
   }
   const db = getDb();
-  const eligibility = await checkAuthorEligibility(db, c);
+  const eligibility = await resolveAuthorEligibility(db, userId, roles(c));
   if (!eligibility.ok) {
     return c.json(error(
       "AUTHORING_NOT_ELIGIBLE",

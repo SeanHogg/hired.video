@@ -1,4 +1,5 @@
 import { ArrowRight, BookOpen, Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +40,7 @@ const latestPosts = [...BLOG_POSTS]
   .slice(0, 6);
 
 export default function LatestGuides() {
+  const { t } = useTranslation();
   if (latestPosts.length === 0) return null;
 
   return (
@@ -48,14 +50,14 @@ export default function LatestGuides() {
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" />
             <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-              Latest Guides
+              {t("headings.latestGuides")}
             </h2>
           </div>
           <Link
             to="/blog"
             className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 group"
           >
-            View all guides
+            {t("actions.viewAllGuides")}
             <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
@@ -78,7 +80,9 @@ export default function LatestGuides() {
                     </Badge>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {post.readingTime} min
+                      {t("messages.readingTimeMin", {
+                        count: post.readingTime,
+                      })}
                     </span>
                   </div>
                   <h3 className="text-base font-semibold mb-1 group-hover:text-primary transition-colors line-clamp-2">

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ActionsModal from "@/components/ActionsModal";
 import SearchBar from "@/components/SearchBar";
@@ -62,23 +63,25 @@ interface UnifiedSearchProps {
   promoCard?: React.ReactNode;
 }
 
+// Category labels resolve through i18n at render time (labelKey). The id is
+// the stable wire/URL value; only the display label is localised.
 const CATEGORIES = [
-  { id: "all", label: "All", icon: TrendingUp },
-  { id: "events", label: "Events", icon: Calendar },
-  { id: "people", label: "People", icon: User },
-  { id: "creators", label: "Creators", icon: Star },
-  { id: "services", label: "Services", icon: ShoppingBag },
-  { id: "courses", label: "Courses", icon: GraduationCap },
-  { id: "companies", label: "Companies", icon: Building2 },
-  { id: "resumes", label: "Resumes", icon: User },
-  { id: "jobs", label: "Jobs", icon: Briefcase },
-  { id: "templates", label: "Templates", icon: Sparkles },
-  { id: "media", label: "Media", icon: Play },
-  { id: "voices", label: "Voices", icon: Mic },
-  { id: "articles", label: "Articles", icon: Newspaper },
-  { id: "guides", label: "Guides", icon: BookOpen },
-  { id: "tools", label: "Tools", icon: Wrench },
-  { id: "faqs", label: "FAQs", icon: HelpCircle },
+  { id: "all", labelKey: "search.category.all", icon: TrendingUp },
+  { id: "events", labelKey: "search.category.events", icon: Calendar },
+  { id: "people", labelKey: "search.category.people", icon: User },
+  { id: "creators", labelKey: "search.category.creators", icon: Star },
+  { id: "services", labelKey: "search.category.services", icon: ShoppingBag },
+  { id: "courses", labelKey: "search.category.courses", icon: GraduationCap },
+  { id: "companies", labelKey: "search.category.companies", icon: Building2 },
+  { id: "resumes", labelKey: "search.category.resumes", icon: User },
+  { id: "jobs", labelKey: "search.category.jobs", icon: Briefcase },
+  { id: "templates", labelKey: "search.category.templates", icon: Sparkles },
+  { id: "media", labelKey: "search.category.media", icon: Play },
+  { id: "voices", labelKey: "search.category.voices", icon: Mic },
+  { id: "articles", labelKey: "search.category.articles", icon: Newspaper },
+  { id: "guides", labelKey: "search.category.guides", icon: BookOpen },
+  { id: "tools", labelKey: "search.category.tools", icon: Wrench },
+  { id: "faqs", labelKey: "search.category.faqs", icon: HelpCircle },
 ];
 
 const categoryToTypes = (category: string): CardFeedType[] => {
@@ -144,6 +147,7 @@ export default function UnifiedSearch({
   promoCard,
 }: UnifiedSearchProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -563,7 +567,7 @@ export default function UnifiedSearch({
                     className="gap-2 flex-shrink-0 min-h-[44px]"
                   >
                     <category.icon className="w-4 h-4" />
-                    {category.label}
+                    {t(category.labelKey)}
                   </Button>
                 ))}
               </div>
@@ -577,16 +581,25 @@ export default function UnifiedSearch({
         <div className="max-w-7xl mx-auto">
           <div className="mb-4 sm:mb-6">
             <p className="text-xs sm:text-sm text-muted-foreground">
-              {totalFound} items found
-              {clientSearchNeedle !== "" && ` for "${clientSearchNeedle}"`}
+              {clientSearchNeedle !== ""
+                ? t("search.resultsCountForQuery", {
+                    count: totalFound,
+                    query: clientSearchNeedle,
+                  })
+                : t("search.resultsCount", { count: totalFound })}
               {totalFound > itemsPerPage &&
-                ` (showing ${startIndex + 1}-${Math.min(endIndex, totalFound)})`}
+                ` ${t("search.showingRange", {
+                  start: startIndex + 1,
+                  end: Math.min(endIndex, totalFound),
+                })}`}
             </p>
           </div>
 
           {contentError ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">{contentError}</p>
+              <p className="text-muted-foreground">
+                {t("errors.loadContentFailed")}
+              </p>
               <Button
                 variant="outline"
                 size="sm"
@@ -595,7 +608,7 @@ export default function UnifiedSearch({
                   loadContent(selectedCategory, currentPage, itemsPerPage)
                 }
               >
-                Retry
+                {t("actions.retry")}
               </Button>
             </div>
           ) : isLoadingContent && filteredItems.length === 0 ? (
@@ -733,7 +746,7 @@ export default function UnifiedSearch({
                               onClick={() => handleView(item)}
                               className="min-h-[44px] flex-shrink-0"
                             >
-                              View
+                              {t("actions.view")}
                             </Button>
                           </div>
                           <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
@@ -746,7 +759,9 @@ export default function UnifiedSearch({
                                 (item as any).isOwner === true) && (
                                 <span className="flex items-center gap-1">
                                   <Eye className="w-3 h-3" />
-                                  {item.views} views
+                                  {t("metrics.viewsCount", {
+                                    count: item.views,
+                                  })}
                                 </span>
                               )}
                           </div>
@@ -771,10 +786,10 @@ export default function UnifiedSearch({
                 <Search className="h-8 w-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                No content found
+                {t("messages.noContentFound")}
               </h3>
               <p className="text-muted-foreground">
-                Try adjusting your search or filters.
+                {t("messages.tryAdjustingSearch")}
               </p>
             </div>
           )}

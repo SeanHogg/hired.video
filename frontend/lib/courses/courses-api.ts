@@ -152,3 +152,117 @@ export function getPathProgress(pathId: string, auth?: string | null) {
 export function enrollInPath(pathId: string, auth?: string | null) {
   return call(`/learning-paths/${pathId}/enroll`, { method: "POST", auth });
 }
+
+// ── Cohorts / classrooms + assignments (#1887/#1888/#1890) ─────────────
+
+export interface Cohort {
+  id: string;
+  ownerUserId: string;
+  ownerCompanyId: string | null;
+  name: string;
+  description: string | null;
+  joinCode: string | null;
+  status: "active" | "archived";
+  createdAt: string;
+  memberCount?: number;
+}
+
+export interface CohortMemberRow {
+  member: {
+    id: string;
+    userId: string | null;
+    invitedEmail: string | null;
+    displayName: string | null;
+    role: string;
+    status: string;
+  };
+  userName?: string | null;
+  userEmail?: string | null;
+}
+
+export interface AssignmentRow {
+  id: string;
+  cohortId: string;
+  memberId: string | null;
+  subjectType: "course" | "path";
+  subjectId: string;
+  required: boolean;
+  dueAt: string | null;
+  status: string;
+}
+
+export interface LearnerAssignment {
+  assignmentId: string;
+  cohortId: string;
+  cohortName: string;
+  subjectType: "course" | "path";
+  subjectId: string;
+  title: string;
+  slug: string | null;
+  required: boolean;
+  dueAt: string | null;
+  enrollmentId: string | null;
+  passed: boolean;
+}
+
+export interface CohortAnalytics {
+  cohortId: string;
+  generatedAt: string;
+  memberCount: number;
+  assignmentCount: number;
+  summary: { completed: number; inProgress: number; notStarted: number; overdue: number; completionRate: number };
+  members: Array<{
+    memberId: string;
+    userId: string | null;
+    name: string | null;
+    email: string | null;
+    role: string;
+    status: string;
+    linked: boolean;
+    completedCount: number;
+    totalCount: number;
+    overdueCount: number;
+    items: Array<{
+      assignmentId: string;
+      subjectType: "course" | "path";
+      subjectId: string;
+      title: string;
+      required: boolean;
+      dueAt: string | null;
+      status: "not_started" | "in_progress" | "completed" | "not_linked";
+      scorePct: number | null;
+      fraction: number;
+      completedAt: string | null;
+      overdue: boolean;
+    }>;
+  }>;
+}
+
+// Educator
+export const listManageableCohorts = () => call<Cohort[]>(`/cohorts/me`);
+export const getCohort = (id: string) => call<{ cohort: Cohort; members: CohortMemberRow[] }>(`/cohorts/${id}`);
+export const createCohort = (body: { name: string; description?: string; companyId?: string }) =>
+  call<Cohort>(`/cohorts`, { method: "POST", body: JSON.stringify(body) });
+export const updateCohort = (id: string, body: { name?: string; description?: string | null; rotateJoinCode?: boolean; status?: "active" | "archived" }) =>
+  call<Cohort>(`/cohorts/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const addCohortMember = (id: string, body: { userId?: string; invitedEmail?: string; displayName?: string; role?: "student" | "co_educator" }) =>
+  call(`/cohorts/${id}/members`, { method: "POST", body: JSON.stringify(body) });
+export const removeCohortMember = (id: string, memberId: string) =>
+  call(`/cohorts/${id}/members/${memberId}`, { method: "DELETE" });
+export const listCohortAssignments = (id: string) => call<AssignmentRow[]>(`/cohorts/${id}/assignments`);
+export const createAssignment = (id: string, body: { subjectType: "course" | "path"; subjectId: string; memberId?: string; required?: boolean; dueAt?: string }) =>
+  call<AssignmentRow>(`/cohorts/${id}/assignments`, { method: "POST", body: JSON.stringify(body) });
+export const removeAssignment = (id: string, assignmentId: string) =>
+  call(`/cohorts/${id}/assignments/${assignmentId}`, { method: "DELETE" });
+export const getCohortAnalytics = (id: string) => call<CohortAnalytics>(`/cohorts/${id}/analytics`);
+
+// Learner
+export const listMyAssignments = () => call<LearnerAssignment[]>(`/cohorts/assignments/me`);
+export const listMyCohortMemberships = () =>
+  call<Array<{ cohort: Cohort; member: { id: string; role: string } }>>(`/cohorts/memberships/me`);
+export const joinCohortByCode = (joinCode: string) =>
+  call<{ cohort: Cohort; member: unknown }>(`/cohorts/join`, { method: "POST", body: JSON.stringify({ joinCode }) });
+
+/** The educator's own learning paths (for the assignment picker). */
+export const listMyPaths = () =>
+  call<Array<{ id: string; title: string; slug: string }>>(`/learning-paths/me`);

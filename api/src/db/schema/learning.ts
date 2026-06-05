@@ -31,6 +31,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { companyProfiles } from "./companies.js";
 import { courses, courseLessons, courseEnrollments } from "./courses.js";
 
 // ---------------------------------------------------------------------------
@@ -264,3 +265,132 @@ export const externalLrsTargets = pgTable(
 
 export type ExternalLrsTarget = typeof externalLrsTargets.$inferSelect;
 export type NewExternalLrsTarget = typeof externalLrsTargets.$inferInsert;
+
+// ===========================================================================
+// Cohorts / classrooms + assignments — the educator↔student relationship
+// (gaps #1887 / #1888, migration 0194).
+//
+// The learning vertical (courses, enrollments, SCORM CMI, xAPI, paths,
+// certs — mig 0126) tracks an INDIVIDUAL learner end-to-end. Cohorts add
+// the missing group layer: an educator (creator) or employer groups
+// students, assigns content with a due date, and watches the group
+// (analytics roll-up, #1890).
+//
+// Ownership mirrors the Studio aggregate (services/studio/workspace.ts):
+// `ownerUserId` is ALWAYS the actor/creator (audit trail); `ownerCompanyId`
+// is set for company-owned cohorts. Every mutation routes through
+// canActFor(actor, ownerUserId, ownerCompanyId) — no `canManage` boolean is
+// prop-drilled (feedback_extract_on_duplication).
+// ===========================================================================
+
+export const COHORT_STATUSES = ["active", "archived"] as const;
+export type CohortStatus = (typeof COHORT_STATUSES)[number];
+
+export const learningCohorts = pgTable(
+  "learning_cohorts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Owner = the educator who created it (always set, audit trail). For a
+    // company-owned classroom, ownerCompanyId carries the tenancy and any
+    // company member may manage it via canActFor.
+    ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    ownerCompanyId: uuid("owner_company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    // Short human-shareable code a student types to self-join (Google
+    // Classroom / i-Ready style). Null = invite-only. Unique when present.
+    joinCode: varchar("join_code", { length: 16 }),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_learning_cohorts_owner_user").on(t.ownerUserId, t.createdAt),
+    index("idx_learning_cohorts_owner_company").on(t.ownerCompanyId, t.createdAt),
+    uniqueIndex("uq_learning_cohorts_join_code").on(t.joinCode),
+  ],
+);
+
+export type LearningCohort = typeof learningCohorts.$inferSelect;
+export type NewLearningCohort = typeof learningCohorts.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// cohort_members — identity-link roster (mirrors people_employees):
+//   userId       → native hired.video learner (the tracked path)
+//   invitedEmail → pending invite (no account yet)
+//   displayName  → placeholder label when neither is set
+// Exactly one of the first two is the norm; a member with only displayName
+// is a roster placeholder (no progress tracked until linked).
+// ---------------------------------------------------------------------------
+export const COHORT_MEMBER_ROLES = ["student", "co_educator"] as const;
+export type CohortMemberRole = (typeof COHORT_MEMBER_ROLES)[number];
+
+export const COHORT_MEMBER_STATUSES = ["invited", "active", "removed"] as const;
+export type CohortMemberStatus = (typeof COHORT_MEMBER_STATUSES)[number];
+
+export const cohortMembers = pgTable(
+  "cohort_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    cohortId: uuid("cohort_id").notNull().references(() => learningCohorts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    invitedEmail: varchar("invited_email", { length: 320 }),
+    displayName: varchar("display_name", { length: 200 }),
+    role: varchar("role", { length: 16 }).default("student").notNull(),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_cohort_members_cohort").on(t.cohortId, t.status),
+    index("idx_cohort_members_user").on(t.userId),
+    uniqueIndex("uq_cohort_members_cohort_user").on(t.cohortId, t.userId),
+    uniqueIndex("uq_cohort_members_cohort_email").on(t.cohortId, t.invitedEmail),
+  ],
+);
+
+export type CohortMember = typeof cohortMembers.$inferSelect;
+export type NewCohortMember = typeof cohortMembers.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// learning_assignments — assign a course OR path to a whole cohort, or to a
+// single member, with an optional due date + required flag. Enrollment
+// fan-out is materialised in AssignmentService so progress tracking starts
+// immediately (the existing per-learner enrollment/progress tables stay the
+// SSoT for completion — an assignment is just the "who must do what by when"
+// layer on top).
+// ---------------------------------------------------------------------------
+export const ASSIGNMENT_SUBJECT_TYPES = ["course", "path"] as const;
+export type AssignmentSubjectType = (typeof ASSIGNMENT_SUBJECT_TYPES)[number];
+
+export const ASSIGNMENT_STATUSES = ["active", "archived"] as const;
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
+
+export const learningAssignments = pgTable(
+  "learning_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    cohortId: uuid("cohort_id").notNull().references(() => learningCohorts.id, { onDelete: "cascade" }),
+    // Null = applies to every active member of the cohort; set = targets one
+    // member specifically (differentiated remediation / make-up work).
+    memberId: uuid("member_id").references(() => cohortMembers.id, { onDelete: "cascade" }),
+    assignedByUserId: uuid("assigned_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    subjectType: varchar("subject_type", { length: 16 }).notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    required: boolean("required").default(true).notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_learning_assignments_cohort").on(t.cohortId, t.status),
+    index("idx_learning_assignments_subject").on(t.subjectType, t.subjectId),
+    index("idx_learning_assignments_member").on(t.memberId),
+  ],
+);
+
+export type LearningAssignment = typeof learningAssignments.$inferSelect;
+export type NewLearningAssignment = typeof learningAssignments.$inferInsert;

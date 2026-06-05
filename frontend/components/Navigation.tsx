@@ -266,7 +266,7 @@ export default function Navigation({
             {/* Sign out — mobile/tablet only (lg:hidden). Below lg the sidebar
                 is a drawer, so without this the only logout is buried behind
                 the hamburger; on lg+ the docked sidebar already shows it. */}
-            {isAuthenticated && <SignOutButton iconOnly className="lg:hidden" />}
+            {isAuthenticated && <SignOutButton variant="icon" className="lg:hidden" />}
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
             {!isAuthenticated && <AuthButtons className="hidden md:flex" />}

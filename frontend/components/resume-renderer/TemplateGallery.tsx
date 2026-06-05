@@ -1,4 +1,5 @@
 import { Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import { TEMPLATE_PRESETS } from "@/types/resume-template";
 
@@ -10,17 +11,18 @@ interface TemplateGalleryProps {
 }
 
 export default function TemplateGallery({ templates = TEMPLATE_PRESETS, compact }: TemplateGalleryProps) {
+  const { t } = useTranslation();
   return (
     <section className={compact ? "" : "py-12"}>
       <div className={compact ? "mb-4" : "mb-8"}>
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
           <h2 className={compact ? "text-xl font-bold" : "text-2xl md:text-3xl font-bold"}>
-            Resume Templates
+            {t("headings.resumeTemplates")}
           </h2>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          {templates.length} free templates curated for different industries. Preview, add to cart, apply to your resume.
+          {t("messages.resumeTemplatesIntro", { count: templates.length })}
         </p>
       </div>
 

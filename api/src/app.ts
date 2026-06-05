@@ -166,6 +166,7 @@ import { courseRoutes } from "./routes/courses.js";
 import { courseAuthoringRoutes } from "./routes/course-authoring.js";
 import { campaignDollarsRoutes } from "./routes/campaign-dollars.js";
 import { learningPathRoutes } from "./routes/learning-paths.js";
+import { cohortRoutes } from "./routes/cohorts.js";
 import { verifyRoutes } from "./routes/verify.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
@@ -781,6 +782,7 @@ export function createApp() {
   // defines no overlapping literal paths.
   app.route("/api/courses", courseAuthoringRoutes);
   app.route("/api/learning-paths", learningPathRoutes);
+  app.route("/api/cohorts", cohortRoutes);
   app.route("/api/verify", verifyRoutes);
   app.route("/api/legal", legalRoutes);
   app.route("/api/advertising", advertisingRoutes);

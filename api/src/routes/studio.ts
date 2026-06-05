@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { and, count, desc, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -22,6 +22,7 @@ import {
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
+import { screenPrompt, userBlockMessage } from "../services/moderation/promptGuard.js";
 import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-copy.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
@@ -218,6 +219,33 @@ function fail(code: string, message: string, details?: unknown) {
     error: { code, message, ...(details !== undefined ? { details } : {}) },
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * Prompt-safety gate for the AI generation routes (image / inpaint /
+ * outpaint / comic / storyboard). Screens the user's free-form prompt
+ * fields BEFORE any model fires — fast-fail, no token spend — and is the
+ * authoritative block for the Workers-AI image path (which never touches
+ * LLMClient) and for routes that catch LLM errors and fall back to a mock.
+ * Returns a ready-to-return 422 response on a hit, or null when clean.
+ * Single helper so all five routes share one rule set and one envelope.
+ */
+function guardGenerationPrompt(
+  c: Context<AppEnv>,
+  ...prompts: Array<string | null | undefined>
+): Response | null {
+  for (const p of prompts) {
+    const screen = screenPrompt(p);
+    if (!screen.safe) {
+      return c.json(
+        fail("CONTENT_BLOCKED", userBlockMessage(screen.category!), {
+          category: screen.category,
+        }),
+        422,
+      );
+    }
+  }
+  return null;
 }
 
 function asIso(value: Date | string | null | undefined): string {
@@ -907,6 +935,14 @@ studioRoutes.post("/storyboard", async (c) => {
     purpose = "resume", brandKitId, ctaUrl, ctaText,
   } = parsed.data;
 
+  // Authoritative safety gate. The LLMClient net already screens this
+  // input, but this route catches LLM errors and falls back to a mock
+  // script — so a net-thrown block would be swallowed and still produce
+  // output. Screen here (and for the "basic" mock branch, which never
+  // calls the LLM at all) so a blocked prompt is refused outright.
+  const blocked = guardGenerationPrompt(c, prompt, jobDescription, resumeText);
+  if (blocked) return blocked;
+
   // Optionally load brand kit to inject colours into generated script
   let brandKit: typeof studioBrandKits.$inferSelect | null = null;
   if (brandKitId) {
@@ -1038,6 +1074,9 @@ studioRoutes.post("/generate-comic", async (c) => {
     );
   }
   const input = parsed.data;
+
+  const blocked = guardGenerationPrompt(c, input.prompt, input.protagonistName);
+  if (blocked) return blocked;
 
   // ─── Resolve source artefact ─────────────────────────────────────
   // Single read path — the route looks up exactly the artefact the
@@ -1954,6 +1993,9 @@ studioRoutes.post("/generate-image", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "prompt is required"), 400);
   }
 
+  const blocked = guardGenerationPrompt(c, prompt);
+  if (blocked) return blocked;
+
   // Optional img2img source. Two accepted shapes:
   //   • `sourceImageUrl` — public CDN URL (game sprite asset, timeline
   //     widget URL, MediaPicker library item). Server fetches it.
@@ -2093,6 +2135,9 @@ studioRoutes.post("/inpaint-image", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "maskImageDataUrl is required (data: URL — white = inpaint)"), 400);
   }
 
+  const blocked = guardGenerationPrompt(c, prompt);
+  if (blocked) return blocked;
+
   const ai = (c.env as any).AI;
   if (!ai) return c.json(fail("AI_UNAVAILABLE", "AI is not configured"), 503);
   const bucket: R2Bucket | undefined =
@@ -2177,6 +2222,9 @@ studioRoutes.post("/outpaint-image", async (c) => {
   if (expandTop + expandRight + expandBottom + expandLeft === 0) {
     return c.json(fail("VALIDATION_ERROR", "At least one expand direction must be > 0"), 400);
   }
+
+  const blocked = guardGenerationPrompt(c, prompt);
+  if (blocked) return blocked;
 
   const ai = (c.env as any).AI;
   if (!ai) return c.json(fail("AI_UNAVAILABLE", "AI is not configured"), 503);

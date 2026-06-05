@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
-import { Video, Sparkles, LogOut } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Video, Sparkles } from "lucide-react";
 import { LocaleSwitcher } from "@/components/i18n/LocaleSwitcher";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useAuth } from "@/lib/auth";
 
 /**
@@ -35,14 +33,7 @@ export function BrandLogo({ className }: { className?: string }): JSX.Element {
  * fallback so the customer always knows they're on hired.video.
  */
 export function BrandHeader(): JSX.Element {
-  const { isAuthenticated, logout } = useAuth();
-  const navigate = useNavigate();
-  const { t } = useTranslation();
-
-  const handleSignOut = async () => {
-    await logout();
-    navigate("/login", { replace: true });
-  };
+  const { isAuthenticated } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-md border-border">
@@ -51,16 +42,10 @@ export function BrandHeader(): JSX.Element {
           <BrandLogo />
           <div className="flex items-center gap-2">
             <LocaleSwitcher variant="compact" />
+            {/* Post-logout redirect to /login keeps the bootstrap /
+                verification-limbo shell's "clean exit" behavior. */}
             {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">{t("actions.signOut")}</span>
-              </Button>
+              <SignOutButton variant="inline" redirectTo="/login" />
             )}
           </div>
         </div>

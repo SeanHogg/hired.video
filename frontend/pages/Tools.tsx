@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Heart,
   GraduationCap,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -22,8 +23,11 @@ import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { ToolCard } from "@/components/ToolCard";
+import { ToolsLearningGrid } from "@/components/ToolsLearningGrid";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import LearningPanel from "@/components/courses/LearningPanel";
+import MyLearningPanel from "@/components/courses/MyLearningPanel";
+import ClassroomsPanel from "@/components/courses/ClassroomsPanel";
 import {
   TOOLS_CATALOG,
   audienceForRole,
@@ -100,17 +104,25 @@ export default function Tools() {
     tierParam === "free" || tierParam === "pro" ? tierParam : "all";
   const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
   const categoryFilter = parseCategoryFilter(searchParams.get("category"));
-  // Sub-tab on /tools — "tools" (default AI-tool grid) or "learning"
-  // (built-in Learning Content Library; competes with LinkedIn Learning's
-  // separately-licensed library by being bundled into every plan).
-  const tabParam = searchParams.get("tab") === "learning" ? "learning" : "tools";
+  // Sub-tab on /tools:
+  //   "tools"       — default AI-tool grid
+  //   "learning"    — built-in Learning Content Library (browse), competes
+  //                   with LinkedIn Learning by being bundled into every plan
+  //   "my-learning" — the learner's enrolled + assigned training (#1889)
+  //   "classrooms"  — educator/employer cohort hub + progress roll-up (#1890)
+  // Learning + plans live under /tools (no separate sidebar item).
+  const rawTab = searchParams.get("tab");
+  const tabParam =
+    rawTab === "learning" || rawTab === "my-learning" || rawTab === "classrooms"
+      ? rawTab
+      : "tools";
 
-  // #1401 — on the Learning tab the AI-tool filter params (audience /
-  // tier / category) are irrelevant; the chip rows that set them aren't
-  // rendered either. Scrub them from the URL on tab switch so the URL
-  // never carries stale state that nothing reads.
+  // #1401 — outside the default Tools grid the AI-tool filter params
+  // (audience / tier / category) are irrelevant; the chip rows that set
+  // them aren't rendered either. Scrub them from the URL on tab switch so
+  // the URL never carries stale state that nothing reads.
   useEffect(() => {
-    if (tabParam !== "learning") return;
+    if (tabParam === "tools") return;
     const next = new URLSearchParams(searchParams);
     let changed = false;
     for (const key of ["audience", "tier", "category"] as const) {
@@ -243,6 +255,27 @@ export default function Tools() {
                 </div>
               </div>
 
+              {/* Intermixed Tools + Learning grid — surfaced directly under
+                  the hero (ahead of the stats band) so signed-out visitors
+                  see BOTH the AI tools and the bundled course library in the
+                  first row, above the fold. Previously tools and courses
+                  lived in two stacked sections and the course section sat
+                  below the fold where visitors never scrolled. The grid
+                  forces a course into the second slot on every breakpoint —
+                  see ToolsLearningGrid. */}
+              <div className="mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
+                  AI Career Tools + Built-in Courses
+                </h2>
+                <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
+                  Free single-purpose AI tools and a bundled learning library —
+                  side by side. Score your resume in seconds, then go deeper
+                  with courses on AI, RAG, and the must-have skills employers
+                  are hiring for. No separate license required.
+                </p>
+                <ToolsLearningGrid tools={TOOLS_CATALOG} courseLimit={12} />
+              </div>
+
               {/* Stats Section */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
                 <div className="text-center">
@@ -273,32 +306,6 @@ export default function Tools() {
                     1.2 + xAPI learning library included
                   </p>
                 </div>
-              </div>
-
-              {/* Unified Tools Grid */}
-              <div className="mb-12 sm:mb-16">
-                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
-                  AI-Powered Career Tools
-                </h2>
-                <p className="text-center text-muted-foreground mb-8 sm:mb-12">
-                  Free, single-purpose tools you can use without an account.
-                  Need structured learning instead? Scroll past the grid for
-                  the built-in course library.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {TOOLS_CATALOG.map((tool) => (
-                    <ToolCard key={tool.id} tool={tool} />
-                  ))}
-                </div>
-              </div>
-
-              {/* Built-in Learning Content Library — competes with LinkedIn
-                  Learning's separately-licensed library by being bundled
-                  with every plan (including Free). Surfaced on the marketing
-                  page so signed-out visitors see the entitlement before
-                  they hit signup. */}
-              <div className="mb-12 sm:mb-16">
-                <LearningPanel limit={12} />
               </div>
 
           {/* How It Works */}
@@ -535,6 +542,8 @@ export default function Tools() {
               tabs={[
                 { key: "tools", label: "Tools", icon: Wrench, to: "/tools" },
                 { key: "learning", label: "Learning", icon: GraduationCap, to: "/tools?tab=learning" },
+                { key: "my-learning", label: "My Learning", icon: GraduationCap, to: "/tools?tab=my-learning" },
+                { key: "classrooms", label: "Classrooms", icon: Users, to: "/tools?tab=classrooms" },
               ]}
               activeTabKey={tabParam}
               search={<HeaderSearch />}
@@ -542,6 +551,10 @@ export default function Tools() {
 
             {tabParam === "learning" ? (
               <LearningPanel />
+            ) : tabParam === "my-learning" ? (
+              <MyLearningPanel />
+            ) : tabParam === "classrooms" ? (
+              <ClassroomsPanel />
             ) : (
               <>
             {/* Audience filter — chip row (#472). Counts are not shown

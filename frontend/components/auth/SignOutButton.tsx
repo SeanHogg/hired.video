@@ -1,39 +1,53 @@
 import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+type SignOutVariant = "row" | "icon" | "inline";
+
 interface SignOutButtonProps {
-  /** Icon-only ghost button — e.g. the mobile top bar. */
-  iconOnly?: boolean;
-  /** Sidebar collapsed rail: center the icon and surface the label via tooltip. */
+  /** Presentation:
+   *  - "row" (default): full-width labelled row — sidebar drawer footer.
+   *  - "icon": icon-only ghost button — mobile top bar.
+   *  - "inline": ghost button, icon + label that collapses to icon-only
+   *    below `sm` — the minimal brand header strip. */
+  variant?: SignOutVariant;
+  /** Sidebar collapsed rail (row variant only): center the icon, label via tooltip. */
   collapsed?: boolean;
-  /** Runs after sign-out (e.g. close the drawer). */
+  /** Navigate here (replace) after sign-out — e.g. "/login" from the
+   *  bootstrap / verification-limbo shell. */
+  redirectTo?: string;
+  /** Runs after sign-out, before any redirect (e.g. close the drawer). */
   onAfter?: () => void;
   className?: string;
 }
 
 /**
  * Single source of truth for the sign-out control. Owns the
- * `useAuth().logout` call so every surface (sidebar drawer, mobile top bar)
+ * `useAuth().logout` call (and the optional post-logout redirect) so every
+ * chrome surface — sidebar drawer, mobile top bar, bootstrap brand header —
  * shares one implementation rather than re-wiring logout per call site.
  */
 export function SignOutButton({
-  iconOnly,
+  variant = "row",
   collapsed,
+  redirectTo,
   onAfter,
   className,
 }: SignOutButtonProps) {
   const { logout } = useAuth();
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
-  const handleSignOut = () => {
-    logout();
+  const handleSignOut = async () => {
+    await logout();
     onAfter?.();
+    if (redirectTo) navigate(redirectTo, { replace: true });
   };
 
-  if (iconOnly) {
+  if (variant === "icon") {
     return (
       <Button
         variant="ghost"
@@ -48,6 +62,22 @@ export function SignOutButton({
     );
   }
 
+  if (variant === "inline") {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleSignOut}
+        className={cn("text-muted-foreground hover:text-foreground", className)}
+        aria-label={t("actions.signOut")}
+      >
+        <LogOut className="h-4 w-4 mr-2" />
+        <span className="hidden sm:inline">{t("actions.signOut")}</span>
+      </Button>
+    );
+  }
+
+  // "row" — sidebar drawer footer.
   return (
     <button
       onClick={handleSignOut}

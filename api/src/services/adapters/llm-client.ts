@@ -37,6 +37,7 @@ import {
 } from "@seanhogg/builderforce-sdk";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
 import { tokenLedger } from "../../domains/billing/token-ledger.js";
+import { screenPrompt, PromptBlockedError } from "../moderation/promptGuard.js";
 import type { JwtPayload } from "../../types/index.js";
 import {
   resolveProfileChainForUseCase,
@@ -192,6 +193,12 @@ export interface LLMCallOpts {
   timeoutMs?: number;
   /** Idempotency key for cron / scheduled retries. */
   idempotencyKey?: string;
+  /** Opt out of the prompt-safety screen. Set ONLY by trusted internal
+   *  calls that legitimately pass flagged text — e.g. the moderation
+   *  content scanner, which is fed the very content it must classify and
+   *  would otherwise block itself. Defaults to false: every other call
+   *  is screened. */
+  skipContentGuard?: boolean;
 }
 
 export interface LLMEnv {
@@ -713,6 +720,27 @@ export function createLLMClient(
   }): Promise<LLMResult> {
     const correlationId = `llm-${crypto.randomUUID()}`;
     const attempts: LLMDispatchAttempt[] = [];
+
+    // Universal content-safety net. Every text LLM call funnels through
+    // dispatch, so screening the user-role input here covers the career
+    // coach, storyboard script, comic scaffolder, and any future feature
+    // for free. Throws PromptBlockedError (an AppError → clean 422 via the
+    // global handler) before a single token is spent. Trusted internal
+    // callers (moderation scanner) opt out via `skipContentGuard`.
+    if (!opts.callOpts.skipContentGuard) {
+      const userText = opts.messages
+        .filter((m) => m.role === "user")
+        .map((m) => (typeof m.content === "string" ? m.content : ""))
+        .join("\n");
+      const screen = screenPrompt(userText);
+      if (!screen.safe) {
+        console.warn(
+          `[llm-client ${correlationId}] ${opts.useCase} prompt blocked: ` +
+            `${screen.category} (${screen.label})`,
+        );
+        throw new PromptBlockedError(screen);
+      }
+    }
 
     for (let i = 0; i < opts.chain.length; i++) {
       const profile = opts.chain[i];

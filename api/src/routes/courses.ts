@@ -54,6 +54,7 @@ import { USER_ROLES, pickScoringRole } from "../../../shared/user-roles.js";
 import { resolveUserRef } from "../services/user/resolveUserRef.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { LearningPathService } from "../services/learning/learning-path-service.js";
+import { resolveAuthorEligibility as resolveAuthorEligibilityShared } from "../services/learning/author-eligibility.js";
 import { CertificateService } from "../services/learning/certificate-service.js";
 import { forwardStatementForUser } from "../services/learning/lrs-forwarder.js";
 import { evaluateCourseCompletion } from "../services/learning/course-completion.js";
@@ -68,7 +69,6 @@ const {
   courseLessons,
   courseEnrollments,
   courseCertificates,
-  creatorProfiles,
   users,
   userProfiles,
   coursePrerequisites,
@@ -88,36 +88,12 @@ function userRoles(c: any): string[] {
   return Array.isArray(r) ? (r as string[]) : [];
 }
 
-async function getCoursesEnrollment(db: ReturnType<typeof getDb>, userId: string) {
-  const [row] = await db.select()
-    .from(creatorProfiles)
-    .where(and(
-      eq(creatorProfiles.userId, userId),
-      sql`${creatorProfiles.endedAt} IS NULL`,
-      eq(creatorProfiles.coursesActive, true),
-    ))
-    .limit(1);
-  return row ?? null;
-}
-
-/** Authoring eligibility for courses + paths. Creator-program enrollees
- *  OR users holding the `employer` role. Single seam used by every
- *  create / publish handler in courses.ts + learning-paths.ts (rule:
- *  feedback_extract_on_duplication). Employers get
- *  `isEmployerAuthored=true` on the row so the public marketplace can
- *  scope listings. */
-async function resolveAuthorEligibility(
-  db: ReturnType<typeof getDb>,
-  c: any,
-): Promise<{ ok: true; isEmployerAuthored: boolean } | { ok: false }> {
-  const userId = uid(c);
-  if (!userId) return { ok: false };
-  if (userRoles(c).includes(USER_ROLES.EMPLOYER)) {
-    return { ok: true, isEmployerAuthored: true };
-  }
-  const creator = await getCoursesEnrollment(db, userId);
-  if (creator) return { ok: true, isEmployerAuthored: false };
-  return { ok: false };
+/** Authoring eligibility for courses + paths — thin adapter over the
+ *  shared `resolveAuthorEligibility` seam (services/learning/author-
+ *  eligibility.ts), used by every create / publish handler here +
+ *  learning-paths.ts + cohorts.ts (rule: feedback_extract_on_duplication). */
+function resolveAuthorEligibility(db: ReturnType<typeof getDb>, c: any) {
+  return resolveAuthorEligibilityShared(db, uid(c), userRoles(c));
 }
 
 async function ownsCourse(db: ReturnType<typeof getDb>, userId: string, courseId: string) {

@@ -14,6 +14,7 @@ import {
   createLLMClient,
   hasAnyLLMProviderKey,
 } from "../adapters/llm-client.js";
+import { HARMFUL_SLURS } from "./promptGuard.js";
 import type { JwtPayload } from "../../types/index.js";
 import {
   MODERATION_SEVERITY,
@@ -39,9 +40,10 @@ export interface ScanResult {
 const PROFANITY_SEEDS = [
   "fuck", "shit", "bitch", "asshole", "cunt", "dick", "piss",
 ];
-const RACISM_SEEDS = [
-  "nigger", "n1gger", "chink", "spic", "kike", "wetback", "gook", "tranny",
-];
+// Slur list is shared with the generation prompt-guard (single source of
+// truth — `promptGuard.HARMFUL_SLURS`) so the article scanner and the
+// generation gate can never drift on what counts as a slur.
+const RACISM_SEEDS = HARMFUL_SLURS;
 const TOS_SEEDS = [
   "buy followers", "guaranteed job", "click here", "free crypto",
   "send money", "pyramid scheme", "mlm opportunity",
@@ -127,6 +129,9 @@ export async function scanContent(
           `"rationale": "<one short sentence>" }`,
       },
       SCAN_SCHEMA,
+      // This call is FED the flagged content on purpose — opt out of the
+      // generation prompt-guard so the scanner doesn't block itself.
+      { skipContentGuard: true },
     );
 
     // Merge LLM findings with the keyword floor — anything the floor caught

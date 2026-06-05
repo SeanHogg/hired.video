@@ -4,11 +4,13 @@
 // card component, so the two surfaces can never drift.
 
 import { ArrowRight, Wrench } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { ToolCard } from "@/components/ToolCard";
 import { getToolsForHome } from "@/data/tools-catalog";
 
 export default function FeaturedTools() {
+  const { t } = useTranslation();
   const tools = getToolsForHome();
   if (tools.length === 0) return null;
 
@@ -19,14 +21,14 @@ export default function FeaturedTools() {
           <div className="flex items-center gap-2">
             <Wrench className="w-5 h-5 text-primary" />
             <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-              AI Career Tools
+              {t("headings.aiCareerTools")}
             </h2>
           </div>
           <Link
             to="/tools"
             className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 group"
           >
-            View all tools
+            {t("actions.viewAllTools")}
             <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
