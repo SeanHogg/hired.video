@@ -143,14 +143,42 @@ async function runEncodeWorker(args: {
   renderFrame: (frame: number) => Promise<ImageBitmap>;
   onProgress?: (v: number) => void;
 }): Promise<Blob> {
+  // Backpressure between the compositor (here) and the encoder (worker).
+  // The compose loop below ships frames as fast as it can composite them;
+  // a source-less or fast-seeking timeline can outrun a software AVC
+  // encoder by orders of magnitude, growing the encoder's queue of
+  // multi-MB VideoFrames without bound until the renderer OOM-crashes
+  // (surfaces as `worker.onerror` → "render worker crashed", preceded by
+  // the tab's chrome-error page + a WebAudio device error as the process
+  // dies). We cap in-flight frames: pause producing once the worker's
+  // reported queue depth hits HIGH_WATER, resume once it drains to
+  // LOW_WATER. Bounds peak memory to ~a dozen frames regardless of
+  // timeline length or encoder speed.
+  const HIGH_WATER = 12;
+  const LOW_WATER = 6;
   const worker = new Worker(
     new URL("../../workers/render-encode.worker.ts", import.meta.url),
     { type: "module" },
   );
   return new Promise<Blob>((resolve, reject) => {
     let finished = false;
+    // Latest encoder queue depth the worker has reported. The compose
+    // loop optimistically bumps this on each send and the worker corrects
+    // it on every admit/drain, so it never under-reports the backlog.
+    let queueDepth = 0;
+    let drainWaiter: (() => void) | null = null;
+    const wakeDrainWaiter = () => {
+      if (drainWaiter) {
+        const w = drainWaiter;
+        drainWaiter = null;
+        w();
+      }
+    };
     const cleanup = () => {
       finished = true;
+      // Unblock the compose loop if it's parked on the backpressure gate,
+      // so it observes `finished` and exits instead of hanging forever.
+      wakeDrainWaiter();
       worker.terminate();
     };
     worker.onerror = (err) => {
@@ -159,14 +187,18 @@ async function runEncodeWorker(args: {
       reject(err.error ?? new Error("render worker crashed"));
     };
     worker.onmessage = async (e: MessageEvent<{
-      type: "progress" | "done" | "error";
+      type: "progress" | "done" | "error" | "queue";
       value?: number;
+      size?: number;
       buffer?: ArrayBuffer;
       mime?: string;
       message?: string;
     }>) => {
       const msg = e.data;
-      if (msg.type === "progress" && typeof msg.value === "number") {
+      if (msg.type === "queue" && typeof msg.size === "number") {
+        queueDepth = msg.size;
+        if (queueDepth <= LOW_WATER) wakeDrainWaiter();
+      } else if (msg.type === "progress" && typeof msg.value === "number") {
         // Worker reports 0..0.97 across encode + flush; main thread
         // owns the final 0.97..1 in the strategy.
         args.onProgress?.(Math.min(0.97, msg.value));
@@ -205,8 +237,20 @@ async function runEncodeWorker(args: {
       try {
         for (let frame = 0; frame < args.totalFrames; frame++) {
           if (finished) return;
+          // Backpressure gate: if the encoder backlog is at the high-water
+          // mark, stop compositing until the worker reports it has drained
+          // to LOW_WATER. Keeps in-flight VideoFrame memory bounded so a
+          // fast-compositing timeline can't OOM the renderer.
+          if (queueDepth >= HIGH_WATER) {
+            await new Promise<void>((r) => { drainWaiter = r; });
+            if (finished) return;
+          }
           const bitmap = await args.renderFrame(frame);
           worker.postMessage({ type: "frame", bitmap, frameIndex: frame }, [bitmap]);
+          // Optimistic bump — the worker's authoritative `queue` report
+          // corrects this, but counting the send immediately means a burst
+          // of fast composites trips the gate before any reply arrives.
+          queueDepth++;
           if (frame % 30 === 0) {
             args.onProgress?.((frame / args.totalFrames) * 0.8);
             await new Promise((r) => setTimeout(r, 0));

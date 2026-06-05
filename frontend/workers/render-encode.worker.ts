@@ -68,8 +68,15 @@ type InMessage = InitMessage | FrameMessage | AudioMessage | FinishMessage;
 interface ProgressOut { type: "progress"; value: number }
 interface DoneOut { type: "done"; buffer: ArrayBuffer; mime: string }
 interface ErrorOut { type: "error"; message: string }
+/** Backpressure signal — the encoder's current queue depth. Reported on
+ *  every admit (handleFrame) AND every drain (the encoder's `output`
+ *  callback) so the compositor on the main thread can throttle frame
+ *  production and keep in-flight VideoFrame memory bounded. Without it a
+ *  source-less timeline (canvas/animation) composites far faster than the
+ *  encoder drains, the queue grows without bound, and the renderer OOMs. */
+interface QueueOut { type: "queue"; size: number }
 
-type OutMessage = ProgressOut | DoneOut | ErrorOut;
+type OutMessage = ProgressOut | DoneOut | ErrorOut | QueueOut;
 
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 
@@ -102,7 +109,15 @@ async function init(config: InitConfig): Promise<void> {
   });
 
   videoEncoder = new VideoEncoder({
-    output: (chunk, meta) => muxer!.addVideoChunk(chunk, meta ?? undefined),
+    output: (chunk, meta) => {
+      muxer!.addVideoChunk(chunk, meta ?? undefined);
+      // Drain signal: a frame just left the encoder. Report the new
+      // (lower) queue depth so the main-thread compositor — which may be
+      // parked waiting for the backlog to clear — can resume producing
+      // frames. This is the reliable wake-up that keeps the credit-based
+      // backpressure loop from dead-locking.
+      if (videoEncoder) post({ type: "queue", size: videoEncoder.encodeQueueSize });
+    },
     error: (e) => post({ type: "error", message: (e as Error).message ?? String(e) }),
   });
   videoEncoder.configure({
@@ -124,6 +139,10 @@ function handleFrame(msg: FrameMessage): void {
   try {
     videoEncoder.encode(videoFrame, { keyFrame: frameIndex % (cfg.fps * 2) === 0 });
     framesEncoded++;
+    // Fill signal: report the queue depth right after admitting a frame so
+    // the compositor sees the backlog rise promptly and can stop ahead of
+    // the high-water mark.
+    post({ type: "queue", size: videoEncoder.encodeQueueSize });
     if (framesEncoded % 15 === 0) {
       post({ type: "progress", value: Math.min(0.8, framesEncoded / cfg.totalFrames * 0.8) });
     }
