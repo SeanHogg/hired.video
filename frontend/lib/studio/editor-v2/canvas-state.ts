@@ -61,6 +61,31 @@ export type WidgetKind =
   // engagement kind.
   | "engagement-asset";
 
+/** The widget kinds a user (or the AI CHRO via `studio_insert_widget`)
+ *  can drop onto a scene from scratch. Co-located with the `WidgetKind`
+ *  union so the list can't silently drift from the type. Excludes the
+ *  kinds that are only created through a bound picker — `linked-content`
+ *  (needs an entity id) and `engagement-asset` (needs an asset id) — and
+ *  `webcam`, which is produced by the recorder, not a blank insert.
+ *  `WidgetPalette`'s catalog adds presentation (label/icon/group) and
+ *  the per-project mediaKind gate on top of this. */
+export const INSERTABLE_WIDGET_KINDS: readonly WidgetKind[] = [
+  "heading",
+  "text",
+  "chips",
+  "image",
+  "video",
+  "avatar",
+  "shape-rect",
+  "shape-circle",
+  "divider",
+  "cta",
+  "chart",
+  "speech-bubble",
+  "caption-box",
+  "sfx-burst",
+] as const;
+
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
   x: number;
@@ -719,6 +744,39 @@ export function emptyScene(label: string): Scene {
     durationSeconds: 5,
     backgroundColor: "#0f172a",
     widgets: [],
+    filters: null,
+  };
+}
+
+/** Build a scene whose entire content IS a recorded clip — a single
+ *  full-bleed video widget on a black background, with the scene
+ *  duration matched to the recording. This is the unit behind the
+ *  "start with a slide, then a recording, then a slide" flow: the
+ *  recording becomes its OWN scene so save/publish stitches
+ *  slide → recording → slide into one continuous video (the renderer
+ *  already concatenates scenes sequentially — no special stitch path).
+ *
+ *  Used by the Alt+Shift+R recorder shortcut and the AI CHRO's
+ *  `studio_start_recording` tool; the legacy ActionsPanel recorder tiles
+ *  keep the overlay-widget behaviour for picture-in-picture use. */
+export function makeRecordingScene(
+  label: string,
+  url: string,
+  durationSeconds: number,
+): Scene {
+  const video = defaultWidget("video");
+  if (video.params.kind === "video") {
+    video.params.data.source = { kind: "url", url };
+    video.params.data.muted = false;
+  }
+  // Full-bleed: the recording fills the frame.
+  video.position = { x: 0, y: 0, width: 1, height: 1, z: 1, rotation: 0 };
+  return {
+    id: makeId("scene"),
+    label,
+    durationSeconds: durationSeconds > 0 ? durationSeconds : 5,
+    backgroundColor: "#000000",
+    widgets: [video],
     filters: null,
   };
 }

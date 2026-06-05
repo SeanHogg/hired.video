@@ -101,7 +101,7 @@ const EngagementAssetPaletteSection = lazy(
 
 type RecordingMode = "webcam" | "screen" | "screen+webcam";
 
-type ActionId =
+export type ActionId =
   | "webcam"
   | "screen"
   | "screen-pip"
@@ -151,6 +151,24 @@ export interface ActionsPanelProps {
    *  subsequent changes are ignored so a user closing the sheet doesn't
    *  re-trigger it. */
   defaultOpenAction?: ActionId;
+  /** Controlled open-action. When `onOpenActionChange` is supplied the
+   *  panel is CONTROLLED — the host owns which sheet is open, so the
+   *  Alt+Shift+R shortcut and the AI CHRO can open the recorder at
+   *  runtime (and the open sheet survives left-tab switches, which would
+   *  otherwise unmount this panel's internal state). When omitted the
+   *  panel falls back to internal state seeded once by
+   *  `defaultOpenAction` (the `?capture=` deep-link path). */
+  openAction?: ActionId | null;
+  onOpenActionChange?: (next: ActionId | null) => void;
+  /** When true, a finished recording becomes a new full-bleed scene via
+   *  `onAddRecordingScene` instead of a video widget on the active scene.
+   *  Set by the host when the recorder was armed through the Alt+Shift+R
+   *  shortcut or the AI CHRO (the slide → recording → slide flow). */
+  recordAsScene?: boolean;
+  /** Append the finished recording as its own full-bleed scene. Required
+   *  for the `recordAsScene` path; falls back to `onAddVideoWidget`
+   *  (overlay on the active scene) when absent. */
+  onAddRecordingScene?: (url: string, durationSeconds: number) => void;
   /** Preview-playback time in seconds. Threaded into
    *  ReviewCommentsDialog so a new review comment anchors to wherever
    *  the user is scrubbing in the preview (#654). */
@@ -170,10 +188,18 @@ const SECTION_IDS = ["recording", "media", "ai", "engagement", "advisory"] as co
 type SectionId = (typeof SECTION_IDS)[number];
 
 export default function ActionsPanel(props: ActionsPanelProps) {
-  const [openAction, setOpenAction] = useState<ActionId | null>(
+  // Controlled when the host passes `onOpenActionChange`; otherwise the
+  // panel owns the state, seeded once by `defaultOpenAction`. One reader
+  // (`openAction`) + one writer (`setOpenAction`) downstream regardless.
+  const [internalOpenAction, setInternalOpenAction] = useState<ActionId | null>(
     props.defaultOpenAction ?? null,
   );
-  const close = useCallback(() => setOpenAction(null), []);
+  const isControlled = props.onOpenActionChange !== undefined;
+  const openAction = isControlled ? props.openAction ?? null : internalOpenAction;
+  const setOpenAction = isControlled
+    ? props.onOpenActionChange!
+    : setInternalOpenAction;
+  const close = useCallback(() => setOpenAction(null), [setOpenAction]);
   // Shared multi-open accordion state — every left-rail panel uses the
   // SAME hook so the open/close UX is identical across Widgets / Design
   // / Actions tabs.
@@ -342,10 +368,12 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         </Suspense>
       </LeftPanelSection>
 
+      {/* Spread props FIRST so the resolved `openAction` (controlled or
+          internal) and `close` win over the raw `props.openAction`. */}
       <ActionSheet
+        {...props}
         openAction={openAction}
         onClose={close}
-        {...props}
       />
     </LeftPanelScroller>
   );
@@ -364,6 +392,8 @@ function ActionSheet({
   selectedWidget,
   persistedProjectId,
   onAddVideoWidget,
+  onAddRecordingScene,
+  recordAsScene,
   onAddVoiceover,
   onSetCaptions,
   onSetMusicFromBlob,
@@ -402,8 +432,16 @@ function ActionSheet({
                 mode={recordingMode}
                 projectId={persistedProjectId ?? undefined}
                 onCaptured={(url, durationSeconds) => {
-                  onAddVideoWidget(url, durationSeconds);
-                  toast({ title: "Clip added to canvas" });
+                  // Armed via Alt+Shift+R / the AI CHRO → the recording
+                  // becomes its own full-bleed scene (slide → recording →
+                  // slide). Tile path → overlay widget on the active scene.
+                  if (recordAsScene && onAddRecordingScene) {
+                    onAddRecordingScene(url, durationSeconds);
+                    toast({ title: "Recording added as a new scene" });
+                  } else {
+                    onAddVideoWidget(url, durationSeconds);
+                    toast({ title: "Clip added to canvas" });
+                  }
                   onClose();
                 }}
               />

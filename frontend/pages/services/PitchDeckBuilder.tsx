@@ -9,6 +9,7 @@
 //     revoke, with view counters.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowDown,
@@ -78,14 +79,15 @@ function initials(name: string): string {
   );
 }
 
-function displayName(row: CandidateResumeRow): string {
+function displayName(row: CandidateResumeRow, unnamedFallback: string): string {
   const basics = (row.content as any)?.basics;
-  return row.label || basics?.name || "Unnamed candidate";
+  return row.label || basics?.name || unnamedFallback;
 }
 
 export default function PitchDeckBuilder() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const peopleTabs = usePeopleTabs();
 
@@ -175,11 +177,11 @@ export default function PitchDeckBuilder() {
       });
       setDeck((prev) => (prev ? { ...prev, ...updated } : prev));
       setMetaDirty(false);
-      toast({ title: "Deck updated" });
+      toast({ title: t("messages.pitchDeck.deckUpdated") });
     } catch (e) {
       toast({
-        title: "Save failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.saveFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -192,11 +194,11 @@ export default function PitchDeckBuilder() {
     try {
       const updated = await recruitService.updatePitchDeck(deck.id, patch);
       setDeck((prev) => (prev ? { ...prev, ...updated } : prev));
-      toast({ title: "Deck updated" });
+      toast({ title: t("messages.pitchDeck.deckUpdated") });
     } catch (e) {
       toast({
-        title: "Save failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.saveFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -217,8 +219,8 @@ export default function PitchDeckBuilder() {
       setExpandedSlideId(slide.id);
     } catch (e) {
       toast({
-        title: "Add failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.addFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -235,8 +237,8 @@ export default function PitchDeckBuilder() {
       if (candidate) setAvailableCandidates((prev) => [...prev, candidate]);
     } catch (e) {
       toast({
-        title: "Remove failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.removeFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -263,8 +265,8 @@ export default function PitchDeckBuilder() {
       );
     } catch (e) {
       toast({
-        title: "Reorder failed",
-        description: (e as Error)?.message ?? "Please refresh.",
+        title: t("messages.pitchDeck.reorderFailed"),
+        description: (e as Error)?.message ?? t("messages.pitchDeck.pleaseRefresh"),
         variant: "destructive",
       });
     }
@@ -285,8 +287,8 @@ export default function PitchDeckBuilder() {
       setSlides((prev) => prev.map((s) => (s.id === slideId ? { ...s, ...updated } : s)));
     } catch (e) {
       toast({
-        title: "Slide save failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.slideSaveFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -311,19 +313,19 @@ export default function PitchDeckBuilder() {
       try {
         await navigator.clipboard.writeText(url);
         toast({
-          title: "Share link created + copied",
-          description: "Paste it into your email or Slack to the hiring client.",
+          title: t("messages.pitchDeck.shareCreatedCopied"),
+          description: t("messages.pitchDeck.shareCreatedCopiedDesc"),
         });
       } catch {
         toast({
-          title: "Share link created",
+          title: t("messages.pitchDeck.shareCreated"),
           description: url,
         });
       }
     } catch (e) {
       toast({
-        title: "Failed to create share",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.shareCreateFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -338,7 +340,7 @@ export default function PitchDeckBuilder() {
       setCopiedShareId(share.id);
       setTimeout(() => setCopiedShareId(null), 2000);
     } catch {
-      toast({ title: "Clipboard unavailable", description: url, variant: "destructive" });
+      toast({ title: t("messages.pitchDeck.clipboardUnavailable"), description: url, variant: "destructive" });
     }
   };
 
@@ -348,8 +350,8 @@ export default function PitchDeckBuilder() {
       setShares((prev) => prev.filter((s) => s.id !== shareId));
     } catch (e) {
       toast({
-        title: "Revoke failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.revokeFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -357,15 +359,15 @@ export default function PitchDeckBuilder() {
 
   const handleDeleteDeck = async () => {
     if (!deck) return;
-    if (!(await confirmDialog({ title: "Delete deck", description: "Delete this deck? Slides and shares will also be removed.", confirmText: "Delete", destructive: true }))) return;
+    if (!(await confirmDialog({ title: t("messages.pitchDeck.deleteDeckTitle"), description: t("messages.pitchDeck.deleteDeckConfirm"), confirmText: t("actions.delete"), destructive: true }))) return;
     try {
       await recruitService.deletePitchDeck(deck.id);
-      toast({ title: "Deck deleted" });
+      toast({ title: t("messages.pitchDeck.deckDeleted") });
       navigate("/people/pitch-decks");
     } catch (e) {
       toast({
-        title: "Delete failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("messages.pitchDeck.deleteFailed"),
+        description: (e as Error)?.message ?? t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
     }
@@ -381,20 +383,20 @@ export default function PitchDeckBuilder() {
               <Button variant="outline" size="sm" asChild>
                 <Link to="/people/pitch-decks">
                   <ArrowLeft className="w-4 h-4 mr-1" />
-                  All decks
+                  {t("actions.pitchDeck.allDecks")}
                 </Link>
               </Button>
             </div>
 
             {loading && (
               <div className="rounded-lg border bg-muted/30 p-10 text-center text-sm text-muted-foreground">
-                Loading deck…
+                {t("messages.pitchDeck.loadingDeck")}
               </div>
             )}
 
             {!loading && (notFound || !deck) && (
               <div className="rounded-lg border bg-muted/30 p-10 text-center">
-                <h2 className="font-semibold">Deck not found</h2>
+                <h2 className="font-semibold">{t("messages.pitchDeck.deckNotFound")}</h2>
               </div>
             )}
 
@@ -405,7 +407,7 @@ export default function PitchDeckBuilder() {
                   <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="text-base">Deck details</CardTitle>
+                        <CardTitle className="text-base">{t("headings.pitchDeck.deckDetails")}</CardTitle>
                         <div className="flex items-center gap-2">
                           <Select
                             value={deck.status}
@@ -417,9 +419,9 @@ export default function PitchDeckBuilder() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="draft">Draft</SelectItem>
-                              <SelectItem value="sent">Sent</SelectItem>
-                              <SelectItem value="archived">Archived</SelectItem>
+                              <SelectItem value="draft">{t("status.draftStatus")}</SelectItem>
+                              <SelectItem value="sent">{t("labels.sent")}</SelectItem>
+                              <SelectItem value="archived">{t("status.archivedStatus")}</SelectItem>
                             </SelectContent>
                           </Select>
                           <Button
@@ -435,7 +437,7 @@ export default function PitchDeckBuilder() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="space-y-1.5">
-                        <Label>Name</Label>
+                        <Label>{t("labels.name")}</Label>
                         <Input
                           value={name}
                           onChange={(e) => {
@@ -445,7 +447,7 @@ export default function PitchDeckBuilder() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Description</Label>
+                        <Label>{t("fields.description.label")}</Label>
                         <Textarea
                           value={description}
                           onChange={(e) => {
@@ -457,7 +459,7 @@ export default function PitchDeckBuilder() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                          <Label>Brand kit</Label>
+                          <Label>{t("headings.pitchDeck.brandKit")}</Label>
                           <Select
                             value={deck.whitelabelTenantId ?? NONE}
                             onValueChange={(v) =>
@@ -467,10 +469,10 @@ export default function PitchDeckBuilder() {
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Pick a brand kit" />
+                              <SelectValue placeholder={t("headings.pitchDeck.pickBrandKit")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={NONE}>None (plain chrome)</SelectItem>
+                              <SelectItem value={NONE}>{t("headings.pitchDeck.noneePlainChrome")}</SelectItem>
                               {companyBrandKits.map((b) => (
                                 <SelectItem key={b.id} value={b.id}>
                                   {b.name}
@@ -480,7 +482,7 @@ export default function PitchDeckBuilder() {
                           </Select>
                         </div>
                         <div className="space-y-1.5">
-                          <Label>Default redaction</Label>
+                          <Label>{t("headings.pitchDeck.defaultRedaction")}</Label>
                           <Select
                             value={deck.redactionProfileId ?? NONE}
                             onValueChange={(v) =>
@@ -490,14 +492,14 @@ export default function PitchDeckBuilder() {
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Pick a profile" />
+                              <SelectValue placeholder={t("headings.pitchDeck.pickProfile")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={NONE}>None (fallback defaults)</SelectItem>
+                              <SelectItem value={NONE}>{t("headings.pitchDeck.noneFallbackDefaults")}</SelectItem>
                               {companyProfiles.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
                                   {p.name}
-                                  {p.isDefault ? " (default)" : ""}
+                                  {p.isDefault ? t("headings.pitchDeck.defaultSuffix") : ""}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -507,7 +509,7 @@ export default function PitchDeckBuilder() {
                       {metaDirty && (
                         <Button size="sm" onClick={handleSaveMeta} disabled={metaSaving}>
                           <Save className="w-4 h-4 mr-1" />
-                          {metaSaving ? "Saving…" : "Save changes"}
+                          {metaSaving ? t("messages.pitchDeck.saving") : t("actions.saveChanges")}
                         </Button>
                       )}
                     </CardContent>
@@ -519,7 +521,7 @@ export default function PitchDeckBuilder() {
                       <div className="flex items-center justify-between gap-2">
                         <CardTitle className="text-base flex items-center gap-2">
                           <UserCheck className="w-4 h-4" />
-                          Slides
+                          {t("headings.pitchDeck.slides")}
                           <Badge variant="outline" className="ml-1">
                             {slides.length}
                           </Badge>
@@ -530,23 +532,23 @@ export default function PitchDeckBuilder() {
                           disabled={availableCandidates.length === 0}
                         >
                           <Plus className="w-4 h-4 mr-1" />
-                          Add candidate
+                          {t("actions.addCandidate")}
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {slides.length === 0 && (
                         <div className="rounded border border-dashed p-6 text-center text-sm text-muted-foreground">
-                          No candidates in this deck yet. Click{" "}
-                          <span className="font-medium">Add candidate</span> to pull from your
-                          company's candidate pool.
+                          {t("messages.pitchDeck.noSlidesPrefix")}{" "}
+                          <span className="font-medium">{t("actions.addCandidate")}</span>{" "}
+                          {t("messages.pitchDeck.noSlidesSuffix")}
                         </div>
                       )}
                       {slides.map((slide, idx) => {
                         const candidate = candidatesById[slide.candidateResumeId];
                         const candidateName = candidate
-                          ? displayName(candidate)
-                          : "Unknown candidate";
+                          ? displayName(candidate, t("messages.pitchDeck.unnamedCandidate"))
+                          : t("messages.pitchDeck.unknownCandidate");
                         const expanded = expandedSlideId === slide.id;
                         return (
                           <div
@@ -568,7 +570,7 @@ export default function PitchDeckBuilder() {
                                   {typeof slide.matchScore === "number" && (
                                     <span className="inline-flex items-center gap-1">
                                       <Sparkles className="w-3 h-3" />
-                                      {slide.matchScore}% match
+                                      {t("messages.pitchDeck.matchPercent", { score: slide.matchScore })}
                                     </span>
                                   )}
                                   {slide.fitSummary && (
@@ -584,7 +586,7 @@ export default function PitchDeckBuilder() {
                                   size="sm"
                                   disabled={idx === 0}
                                   onClick={() => handleReorderSlide(slide.id, -1)}
-                                  title="Move up"
+                                  title={t("actions.pitchDeck.moveUp")}
                                 >
                                   <ArrowUp className="w-4 h-4" />
                                 </Button>
@@ -593,7 +595,7 @@ export default function PitchDeckBuilder() {
                                   size="sm"
                                   disabled={idx === slides.length - 1}
                                   onClick={() => handleReorderSlide(slide.id, 1)}
-                                  title="Move down"
+                                  title={t("actions.pitchDeck.moveDown")}
                                 >
                                   <ArrowDown className="w-4 h-4" />
                                 </Button>
@@ -642,7 +644,7 @@ export default function PitchDeckBuilder() {
                       <div className="flex items-center justify-between gap-2">
                         <CardTitle className="text-base flex items-center gap-2">
                           <Share2 className="w-4 h-4" />
-                          Share links
+                          {t("headings.pitchDeck.shareLinks")}
                           <Badge variant="outline" className="ml-1">
                             {shares.length}
                           </Badge>
@@ -653,20 +655,21 @@ export default function PitchDeckBuilder() {
                           disabled={slides.length === 0}
                         >
                           <Send className="w-4 h-4 mr-1" />
-                          New
+                          {t("actions.pitchDeck.new")}
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {slides.length === 0 && (
                         <p className="text-xs text-muted-foreground">
-                          Add at least one candidate before creating a share link.
+                          {t("messages.pitchDeck.addCandidateBeforeShare")}
                         </p>
                       )}
                       {slides.length > 0 && shares.length === 0 && (
                         <p className="text-xs text-muted-foreground">
-                          No shares yet. Click <span className="font-medium">New</span> to
-                          generate a public link for a hiring client.
+                          {t("messages.pitchDeck.noSharesPrefix")}{" "}
+                          <span className="font-medium">{t("actions.pitchDeck.new")}</span>{" "}
+                          {t("messages.pitchDeck.noSharesSuffix")}
                         </p>
                       )}
                       {shares.map((share) => {
@@ -682,14 +685,13 @@ export default function PitchDeckBuilder() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="font-medium truncate">
-                                  {share.recipientName || share.recipientEmail || "Link"}
+                                  {share.recipientName || share.recipientEmail || t("messages.pitchDeck.linkFallback")}
                                 </div>
                                 <div className="text-muted-foreground">
-                                  {share.viewCount} view{share.viewCount === 1 ? "" : "s"}
+                                  {t("messages.pitchDeck.viewCount", { count: share.viewCount })}
                                   {share.lastViewedAt && (
                                     <>
-                                      {" "}· last{" "}
-                                      {new Date(share.lastViewedAt).toLocaleDateString()}
+                                      {" "}{t("messages.pitchDeck.lastViewed", { date: new Date(share.lastViewedAt).toLocaleDateString() })}
                                     </>
                                   )}
                                 </div>
@@ -697,12 +699,12 @@ export default function PitchDeckBuilder() {
                               <div className="flex flex-col items-end gap-1">
                                 {!share.isActive && (
                                   <Badge variant="secondary" className="text-[10px]">
-                                    Revoked
+                                    {t("status.pitchDeck.revoked")}
                                   </Badge>
                                 )}
                                 {expired && (
                                   <Badge variant="outline" className="text-[10px]">
-                                    Expired
+                                    {t("status.pitchDeck.expired")}
                                   </Badge>
                                 )}
                               </div>
@@ -717,12 +719,12 @@ export default function PitchDeckBuilder() {
                                 {copiedShareId === share.id ? (
                                   <>
                                     <Check className="w-3 h-3 mr-1" />
-                                    Copied
+                                    {t("labels.copied")}
                                   </>
                                 ) : (
                                   <>
                                     <Copy className="w-3 h-3 mr-1" />
-                                    Copy link
+                                    {t("actions.copyLink")}
                                   </>
                                 )}
                               </Button>
@@ -762,17 +764,15 @@ export default function PitchDeckBuilder() {
       <Dialog open={addSlideOpen} onOpenChange={setAddSlideOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add candidate to deck</DialogTitle>
+            <DialogTitle>{t("headings.pitchDeck.addCandidateToDeck")}</DialogTitle>
             <DialogDescription>
-              Pick from your company's candidate pool. The slide inherits the deck's default
-              redaction profile unless you override it inline.
+              {t("messages.pitchDeck.addCandidateDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[50vh] overflow-y-auto divide-y">
             {availableCandidates.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
-                All candidates are already in this deck. Import more candidates to add to a
-                new deck.
+                {t("messages.pitchDeck.allCandidatesInDeck")}
               </p>
             ) : (
               availableCandidates.map((candidate) => (
@@ -784,11 +784,11 @@ export default function PitchDeckBuilder() {
                 >
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="text-xs">
-                      {initials(displayName(candidate))}
+                      {initials(displayName(candidate, t("messages.pitchDeck.unnamedCandidate")))}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{displayName(candidate)}</div>
+                    <div className="font-medium truncate">{displayName(candidate, t("messages.pitchDeck.unnamedCandidate"))}</div>
                     {((candidate.content as any)?.basics?.label) && (
                       <div className="text-xs text-muted-foreground truncate">
                         {(candidate.content as any).basics.label}
@@ -802,7 +802,7 @@ export default function PitchDeckBuilder() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddSlideOpen(false)}>
-              Close
+              {t("actions.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -812,34 +812,33 @@ export default function PitchDeckBuilder() {
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Share this deck</DialogTitle>
+            <DialogTitle>{t("headings.pitchDeck.shareThisDeck")}</DialogTitle>
             <DialogDescription>
-              Creates an unauthenticated link that applies this deck's brand kit + redaction
-              profile at render time.
+              {t("messages.pitchDeck.shareDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Recipient name (optional)</Label>
+                <Label>{t("headings.pitchDeck.recipientName")}</Label>
                 <Input
                   value={shareRecipientName}
                   onChange={(e) => setShareRecipientName(e.target.value)}
-                  placeholder="Jane at Contoso"
+                  placeholder={t("headings.pitchDeck.recipientNamePlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Recipient email (optional)</Label>
+                <Label>{t("headings.pitchDeck.recipientEmail")}</Label>
                 <Input
                   type="email"
                   value={shareRecipientEmail}
                   onChange={(e) => setShareRecipientEmail(e.target.value)}
-                  placeholder="jane@contoso.com"
+                  placeholder={t("headings.pitchDeck.recipientEmailPlaceholder")}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Expires (optional)</Label>
+              <Label>{t("headings.pitchDeck.expiresOptional")}</Label>
               <Input
                 type="datetime-local"
                 value={shareExpiresAt}
@@ -853,10 +852,10 @@ export default function PitchDeckBuilder() {
               onClick={() => setShareDialogOpen(false)}
               disabled={shareBusy}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleCreateShare} disabled={shareBusy}>
-              {shareBusy ? "Creating…" : "Create + copy link"}
+              {shareBusy ? t("messages.pitchDeck.creating") : t("actions.pitchDeck.createCopyLink")}
             </Button>
           </DialogFooter>
         </DialogContent>

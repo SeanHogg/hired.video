@@ -7,6 +7,9 @@ import {
   Brain,
   Briefcase,
   CalendarClock,
+  Camera,
+  Clapperboard,
+  Copy,
   FileText,
   Film,
   Gauge,
@@ -14,11 +17,15 @@ import {
   Image as ImageIcon,
   Layers,
   ListChecks,
+  ListTree,
+  Paintbrush,
   Pencil,
   Plus,
   Scissors,
+  Shapes,
   Sparkles,
   Target,
+  Trash2,
   Wand2,
   Zap,
 } from "lucide-react";
@@ -42,6 +49,15 @@ import { pageVideoSpecToCanvas } from "@/lib/studio/editor-v2/page-spec-to-canva
 import type { PageVideoSpec } from "@shared/page-video-spec";
 import { resolveUserContent } from "@/lib/studio/editor-v2/resolve-user-content";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
+import {
+  INSERTABLE_WIDGET_KINDS,
+  type WidgetKind,
+} from "@/lib/studio/editor-v2/canvas-state";
+import {
+  getStudioEditor,
+  requireStudioEditor,
+  type StudioRecordingMode,
+} from "@/lib/studio/editor-v2/studio-editor-bridge";
 import {
   assertWritableField,
   fieldLabel,
@@ -806,6 +822,149 @@ export async function commitMutation(
   }
 }
 
+// ── Studio editor tools (drive the OPEN editor via the bridge) ──────────────
+//
+// These mutate the Studio editor that is currently open in the tab — the
+// headline ask: users keep asking the in-studio AI CHRO to "screen
+// record". Each runner calls into the module-level studio-editor bridge
+// (registered by StudioEditorV2 on mount), which wraps the SAME callbacks
+// the on-screen buttons fire (DRY). They self-gate: `getCoachToolSpecs`
+// only exposes them to the model when an editor is mounted, and
+// `requireStudioEditor()` throws a friendly error otherwise.
+//
+// Client-only: the bridge lives in the browser, so the server-side
+// /api/mcp endpoint cannot run these — only the in-app AI CHRO can.
+
+function asTrimmed(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+const RECORDING_MODES: readonly StudioRecordingMode[] = [
+  "screen",
+  "webcam",
+  "screen-pip",
+];
+
+async function runStudioStartRecording(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const raw = ctx.args.mode;
+  const mode: StudioRecordingMode = RECORDING_MODES.includes(raw as StudioRecordingMode)
+    ? (raw as StudioRecordingMode)
+    : "screen";
+  // The browser requires a user gesture for screen/camera capture, so we
+  // can't silently start recording from a tool call — we surface the
+  // armed recorder and let the user hit Record.
+  requireStudioEditor().openRecorder(mode, { asScene: true });
+  const label =
+    mode === "webcam" ? "webcam" : mode === "screen-pip" ? "screen + webcam" : "screen";
+  return {
+    summary: `Opened the ${label} recorder. Click Record to start — your recording becomes its own scene, so you can stitch slide → recording → slide on save.`,
+    raw: { kind: "studio_start_recording", mode },
+  };
+}
+
+async function runStudioInsertWidget(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const editor = requireStudioEditor();
+  const kind = ctx.args.kind as WidgetKind;
+  const allowed = editor.insertableWidgetKinds();
+  if (!allowed.includes(kind)) {
+    throw new Error(
+      `Can't insert "${String(kind)}" into this ${editor.mediaKind} project. Insertable kinds: ${allowed.join(", ")}.`,
+    );
+  }
+  editor.insertWidget(kind);
+  return {
+    summary: `Added a ${kind} widget to the active scene.`,
+    raw: { kind: "studio_insert_widget", widgetKind: kind },
+  };
+}
+
+async function runStudioAddScene(): Promise<NormalizedToolRunResult> {
+  const sceneId = requireStudioEditor().addScene();
+  return {
+    summary: "Added a new blank scene.",
+    raw: { kind: "studio_add_scene", sceneId },
+  };
+}
+
+async function runStudioDuplicateScene(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const sceneId = asTrimmed(ctx.args.sceneId);
+  if (!sceneId) throw new Error("studio_duplicate_scene requires `sceneId` (call studio_list_scenes to get ids).");
+  requireStudioEditor().duplicateScene(sceneId);
+  return { summary: "Duplicated the scene.", raw: { kind: "studio_duplicate_scene", sceneId } };
+}
+
+async function runStudioDeleteScene(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const sceneId = asTrimmed(ctx.args.sceneId);
+  if (!sceneId) throw new Error("studio_delete_scene requires `sceneId` (call studio_list_scenes to get ids).");
+  requireStudioEditor().deleteScene(sceneId);
+  return { summary: "Deleted the scene.", raw: { kind: "studio_delete_scene", sceneId } };
+}
+
+async function runStudioReorderScenes(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const orderedIds = Array.isArray(ctx.args.orderedIds)
+    ? ctx.args.orderedIds.filter((v): v is string => typeof v === "string")
+    : [];
+  if (orderedIds.length === 0) {
+    throw new Error("studio_reorder_scenes requires `orderedIds` — the scene ids in the new order.");
+  }
+  requireStudioEditor().reorderScenes(orderedIds);
+  return { summary: "Reordered the scenes.", raw: { kind: "studio_reorder_scenes", orderedIds } };
+}
+
+async function runStudioActivateScene(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const sceneId = asTrimmed(ctx.args.sceneId);
+  if (!sceneId) throw new Error("studio_activate_scene requires `sceneId`.");
+  requireStudioEditor().setActiveScene(sceneId);
+  return { summary: "Switched to the scene.", raw: { kind: "studio_activate_scene", sceneId } };
+}
+
+async function runStudioSetSceneBackground(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const color = asTrimmed(ctx.args.color);
+  if (!color || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+    throw new Error("studio_set_scene_background requires `color` as a 6-digit hex (e.g. \"#0f172a\").");
+  }
+  const editor = requireStudioEditor();
+  const sceneId = asTrimmed(ctx.args.sceneId) ?? editor.getActiveSceneId();
+  editor.setSceneBackground(sceneId, color);
+  return { summary: `Set the scene background to ${color}.`, raw: { kind: "studio_set_scene_background", sceneId, color } };
+}
+
+async function runStudioCaptureScreenshot(): Promise<NormalizedToolRunResult> {
+  await requireStudioEditor().captureScreenshot();
+  return {
+    summary: "Opened the screenshot picker — pick a window/tab/screen to capture it onto the scene.",
+    raw: { kind: "studio_capture_screenshot" },
+  };
+}
+
+async function runStudioAddImage(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const url = asTrimmed(ctx.args.url);
+  if (!url) throw new Error("studio_add_image requires `url` (a public image URL — e.g. one returned by generate_image).");
+  requireStudioEditor().addImageWidget(url);
+  return { summary: "Added the image to the active scene.", raw: { kind: "studio_add_image", url } };
+}
+
+async function runStudioAddVideo(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const url = asTrimmed(ctx.args.url);
+  if (!url) throw new Error("studio_add_video requires `url` (a public video URL).");
+  const durationSeconds = typeof ctx.args.durationSeconds === "number" ? ctx.args.durationSeconds : 0;
+  requireStudioEditor().addVideoWidget(url, durationSeconds);
+  return { summary: "Added the video to the active scene.", raw: { kind: "studio_add_video", url, durationSeconds } };
+}
+
+async function runStudioListScenes(): Promise<NormalizedToolRunResult> {
+  const scenes = requireStudioEditor().listScenes();
+  const lines = scenes.map(
+    (s, i) =>
+      `${i + 1}. ${s.label} — ${s.durationSeconds}s, ${s.widgetCount} widget${s.widgetCount === 1 ? "" : "s"}${s.active ? " (active)" : ""} [id: ${s.id}]`,
+  );
+  return {
+    summary: `${scenes.length} scene${scenes.length === 1 ? "" : "s"} in this project.`,
+    previewText: lines.join("\n"),
+    raw: { kind: "studio_list_scenes", scenes },
+  };
+}
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 // JSON-schema fragment shared by every tool that operates on the active
@@ -1234,6 +1393,228 @@ export const toolRegistry: ToolDefinition[] = [
     },
     run: runShortenBullet,
   },
+
+  // ── Studio editor tools — drive the open editor (in-studio only) ────────
+  // All flagged `requiresStudioEditor` so `getCoachToolSpecs` exposes them
+  // to the model ONLY when an editor is mounted. They execute immediately
+  // (no Apply step) — the user sees the result on the canvas.
+  {
+    id: "studio_start_recording",
+    label: "Record",
+    description:
+      "Open the Studio recorder so the user can capture a screen, webcam, or screen+webcam (picture-in-picture) clip. Use this whenever the user asks to 'screen record', 'record my screen', 'record a webcam clip', 'record a demo', etc. — do NOT tell them to find a button. The browser requires a click to start capture, so this surfaces the armed recorder; the finished recording becomes its OWN full-bleed scene, which save & publish stitches in sequence (slide → recording → slide).",
+    icon: Clapperboard,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["screen", "webcam", "screen-pip"],
+          description:
+            "What to record: 'screen' (the headline ask), 'webcam' (camera only), or 'screen-pip' (screen with a webcam overlay). Default 'screen'.",
+        },
+      },
+      additionalProperties: false,
+    },
+    run: runStudioStartRecording,
+  },
+  {
+    id: "studio_insert_widget",
+    label: "Insert widget",
+    description:
+      "Add a widget to the active scene of the open Studio video — text, heading, image, video, shapes, chart, CTA card, chips, AI presenter, etc. Use when the user asks you to add an element to their video. The widget lands with placeholder content the user can then edit; set its text/source with the dedicated tools or by guiding the user.",
+    icon: Shapes,
+    accentClassName: "bg-brand-blue/10 text-brand-blue",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: INSERTABLE_WIDGET_KINDS as unknown as string[],
+          description:
+            "Which widget to insert. Some kinds (comic primitives) are only valid on comic projects — the tool validates against the open project and tells you if it's not allowed.",
+        },
+      },
+      required: ["kind"],
+      additionalProperties: false,
+    },
+    run: runStudioInsertWidget,
+  },
+  {
+    id: "studio_list_scenes",
+    label: "List scenes",
+    description:
+      "List the scenes in the open Studio video with their ids, labels, durations, and widget counts. Call this FIRST when the user wants to duplicate, delete, reorder, recolor, or switch to a scene — the other scene tools need the scene id this returns.",
+    icon: ListTree,
+    accentClassName: "bg-brand-green/10 text-brand-green",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    run: runStudioListScenes,
+  },
+  {
+    id: "studio_add_scene",
+    label: "Add scene",
+    description: "Append a new blank scene to the open Studio video. Returns the new scene's id.",
+    icon: Plus,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    run: runStudioAddScene,
+  },
+  {
+    id: "studio_duplicate_scene",
+    label: "Duplicate scene",
+    description: "Duplicate a scene in the open Studio video. Pass the scene id from studio_list_scenes.",
+    icon: Copy,
+    accentClassName: "bg-brand-blue/10 text-brand-blue",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: { sceneId: { type: "string", description: "Id of the scene to duplicate." } },
+      required: ["sceneId"],
+      additionalProperties: false,
+    },
+    run: runStudioDuplicateScene,
+  },
+  {
+    id: "studio_delete_scene",
+    label: "Delete scene",
+    description: "Delete a scene from the open Studio video. Pass the scene id from studio_list_scenes. The editor refuses to delete the last remaining scene.",
+    icon: Trash2,
+    accentClassName: "bg-red-100 text-red-600",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: { sceneId: { type: "string", description: "Id of the scene to delete." } },
+      required: ["sceneId"],
+      additionalProperties: false,
+    },
+    run: runStudioDeleteScene,
+  },
+  {
+    id: "studio_reorder_scenes",
+    label: "Reorder scenes",
+    description: "Reorder the scenes of the open Studio video. Pass ALL scene ids in the desired order (get them from studio_list_scenes).",
+    icon: Layers,
+    accentClassName: "bg-indigo-100 text-indigo-600",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: {
+        orderedIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Scene ids in the new order, first to last.",
+        },
+      },
+      required: ["orderedIds"],
+      additionalProperties: false,
+    },
+    run: runStudioReorderScenes,
+  },
+  {
+    id: "studio_activate_scene",
+    label: "Go to scene",
+    description: "Switch the Studio editor's focus to a specific scene so subsequent inserts land there. Pass the scene id from studio_list_scenes.",
+    icon: Target,
+    accentClassName: "bg-teal-100 text-teal-600",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: { sceneId: { type: "string", description: "Id of the scene to make active." } },
+      required: ["sceneId"],
+      additionalProperties: false,
+    },
+    run: runStudioActivateScene,
+  },
+  {
+    id: "studio_set_scene_background",
+    label: "Scene background",
+    description: "Set a scene's solid background colour in the open Studio video. Defaults to the active scene when no sceneId is given.",
+    icon: Paintbrush,
+    accentClassName: "bg-amber-100 text-amber-600",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: {
+        color: { type: "string", description: "6-digit hex colour, e.g. \"#0f172a\"." },
+        sceneId: { type: "string", description: "Optional scene id; omit to recolor the active scene." },
+      },
+      required: ["color"],
+      additionalProperties: false,
+    },
+    run: runStudioSetSceneBackground,
+  },
+  {
+    id: "studio_capture_screenshot",
+    label: "Screenshot to canvas",
+    description: "Open the browser screenshot picker and drop the captured window/tab/screen onto the active scene as an image. Use when the user wants to grab something on screen into their video.",
+    icon: Camera,
+    accentClassName: "bg-brand-blue/10 text-brand-blue",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    run: runStudioCaptureScreenshot,
+  },
+  {
+    id: "studio_add_image",
+    label: "Add image to scene",
+    description: "Add an image (by public URL) to the active scene of the open Studio video. Pairs with generate_image: generate an image, then pass its returned URL here to drop it on the canvas.",
+    icon: ImageIcon,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: { url: { type: "string", description: "Public image URL to insert." } },
+      required: ["url"],
+      additionalProperties: false,
+    },
+    run: runStudioAddImage,
+  },
+  {
+    id: "studio_add_video",
+    label: "Add video to scene",
+    description: "Add a video (by public URL) to the active scene of the open Studio video. The active scene's duration extends to fit the clip.",
+    icon: Film,
+    accentClassName: "bg-brand-blue/10 text-brand-blue",
+    route: "/studio",
+    inputs: ["video"],
+    requiresStudioEditor: true,
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Public video URL to insert." },
+        durationSeconds: { type: "number", description: "Clip duration in seconds (extends the scene). Optional." },
+      },
+      required: ["url"],
+      additionalProperties: false,
+    },
+    run: runStudioAddVideo,
+  },
 ];
 
 /**
@@ -1253,11 +1634,17 @@ export function getCoachToolSpecs(opts?: { superAdmin?: boolean }): Array<{
   };
 }> {
   const superAdmin = opts?.superAdmin === true;
+  // Studio editor tools only make sense — and only work — when an editor
+  // is mounted in this tab. Self-gate on the bridge so the model sees
+  // "record / insert widget / add scene" in /studio and nowhere else
+  // (no contextType plumbing needed; one predicate, computed here).
+  const studioEditorOpen = getStudioEditor() !== null;
   return toolRegistry
     .filter((t) => t.parameters)
     // SuperAdmin-only tools are never exposed to the model for other
     // users — the backend route enforces the same gate as a backstop.
     .filter((t) => (t.requiresSuperAdmin ? superAdmin : true))
+    .filter((t) => (t.requiresStudioEditor ? studioEditorOpen : true))
     .map((t) => ({
       type: "function",
       function: {

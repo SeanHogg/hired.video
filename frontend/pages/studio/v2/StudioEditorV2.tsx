@@ -25,6 +25,7 @@
  * routes — server enforces canActFor.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -78,6 +79,7 @@ import {
   emptyScene,
   makeLinkedContentWidget,
   makeEngagementAssetWidget,
+  makeRecordingScene,
   totalDurationSeconds,
   updateMusicTiming,
   updateVoiceoverClip,
@@ -185,7 +187,9 @@ import { runtimeStatePayload } from "@/lib/studio/editor-v2/runtime-state-payloa
 import { exportProjectByKind, extensionForBlob } from "@/lib/studio/editor-v2/export-facade";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
-import WidgetPalette from "@/components/studio/v2/WidgetPalette";
+import WidgetPalette, {
+  insertableWidgetKindsFor,
+} from "@/components/studio/v2/WidgetPalette";
 import FloatingLayersPanel from "@/components/studio/v2/FloatingLayersPanel";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
@@ -194,7 +198,13 @@ import ZoomControl from "@/components/studio/v2/ZoomControl";
 import CanvasEditToolbar from "@/components/studio/v2/CanvasEditToolbar";
 import SubjectSeedBanner from "@/components/studio/v2/SubjectSeedBanner";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
-import ActionsPanel from "@/components/studio/v2/ActionsPanel";
+import ActionsPanel, { type ActionId } from "@/components/studio/v2/ActionsPanel";
+import {
+  registerStudioEditor,
+  unregisterStudioEditor,
+  type StudioEditorHandle,
+  type StudioRecordingMode,
+} from "@/lib/studio/editor-v2/studio-editor-bridge";
 import { PageEmbedDialog } from "@/components/studio/PageEmbedDialog";
 import { isSuperAdminFromToken } from "@/lib/auth-claims";
 import AudioEmptyHint from "@/components/studio/v2/AudioEmptyHint";
@@ -218,6 +228,7 @@ export default function StudioEditorV2() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   // Branding-policy inputs — `shouldShowBranding()` is the single seam
   // every surface reads (DOM `<BrandWatermark/>` on screen, the encoder
   // pill on export). Mounting the hooks here lets `renderToBlob()` pass
@@ -334,7 +345,7 @@ export default function StudioEditorV2() {
     },
   });
   const { state, setState, undo, redo, canUndo, canRedo, reset: resetHistory, commit: commitHistory } = history;
-  const [title, setTitle] = useState<string>("Untitled video");
+  const [title, setTitle] = useState<string>(t("studio.editor.untitledVideo"));
   const [persistedProjectId, setPersistedProjectId] = useState<string | null>(
     projectId === "new" ? null : projectId,
   );
@@ -360,13 +371,6 @@ export default function StudioEditorV2() {
   // shell because it authors via CanvasState even though its export
   // pipeline is non-Timeline.
   const usesTimelineChrome = mediaKindUsesCanvasStateAuthoring(currentMediaKind);
-  const currentDefaults = useMemo(
-    () => deriveKindDefaults(currentMediaKind, urlCapture),
-    // urlCapture is stable across the editor's lifetime (read once on
-    // mount via the searchParams.get inside the useMemo above).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentMediaKind],
-  );
   // Sticky banner shown when the route id resolves to nothing the caller
   // can read — the API returns 404 for both "doesn't exist" and "no
   // access" (deliberate, see studio.ts comment), so the message stays
@@ -668,14 +672,14 @@ export default function StudioEditorV2() {
       const blob = await flattenCanvasToBlob(imageCanvas, "image/png");
       const url = await uploadImage(blob, `drawing-${Date.now()}.png`);
       toast({
-        title: "Saved to your library",
-        description: "Pick it from MediaPicker → Library in any studio project.",
+        title: t("studio.editor.savedToLibraryTitle"),
+        description: t("studio.editor.savedToLibraryDesc"),
       });
       return url;
     } catch (err) {
       toast({
-        title: "Save failed",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("errors.saveFailed"),
+        description: err instanceof Error ? err.message : t("errors.unknownError"),
         variant: "destructive",
       });
     } finally {
@@ -733,12 +737,12 @@ export default function StudioEditorV2() {
   const handleImageMarqueeInpaint = useCallback(async () => {
     if (!imageMarquee) return;
     const promptText = await promptDialog({
-      title: "AI fill",
-      description: "Describe what should fill the selection.",
-      placeholder: "e.g. a clear blue sky with soft clouds",
+      title: t("studio.editor.aiFillTitle"),
+      description: t("studio.editor.aiFillDesc"),
+      placeholder: t("studio.editor.aiFillPlaceholder"),
       multiline: true,
       required: true,
-      confirmText: "Generate",
+      confirmText: t("actions.generate"),
     });
     if (!promptText || promptText.trim().length < 3) return;
     const layer = findImageLayer(imageState, imageState.activeLayerId);
@@ -787,12 +791,12 @@ export default function StudioEditorV2() {
       URL.revokeObjectURL(result.previewUrl);
     } catch (err) {
       toast({
-        title: "AI fill failed",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("studio.editor.aiFillFailed"),
+        description: err instanceof Error ? err.message : t("errors.unknownError"),
         variant: "destructive",
       });
     }
-  }, [imageMarquee, imageState, setImageState, imageCommit, toast]);
+  }, [imageMarquee, imageState, setImageState, imageCommit, toast, t]);
 
   // Hand-tool transform commit — DrawingStage's TransformHandles emit
   // the combined offset / scale / rotation; the host writes it back to
@@ -973,6 +977,11 @@ export default function StudioEditorV2() {
   activeSceneIdRef.current = activeSceneId;
   setSelectionRef.current = setSelection;
   setActiveSceneIdRef.current = setActiveSceneId;
+  // Live state mirror — lets the studio-editor bridge handle read the
+  // current scene list at AI-tool-call time without re-registering on
+  // every keystroke (the handle closes over this ref, not `state`).
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [zoom, setZoom] = useState<number>(0.56);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(
@@ -994,6 +1003,19 @@ export default function StudioEditorV2() {
   // on the Actions tab so the recorder / voiceover panel is the first
   // thing they see. Single SoT via `deriveKindDefaults` (#651 + #894).
   const [leftTab, setLeftTab] = useState<LeftTabId>(mountTimeDefaults.leftTab);
+  // Open action sheet (recorder / voiceover / captions / …), LIFTED here
+  // from ActionsPanel so the Alt+Shift+R shortcut and the AI CHRO can
+  // open the recorder at runtime — and so the sheet survives left-tab
+  // switches (ActionsPanel unmounts when the user flips to Widgets).
+  // Seeded once from the `?capture=` deep-link (mountTimeDefaults).
+  const [openAction, setOpenAction] = useState<ActionId | null>(
+    mountTimeDefaults.defaultAction ?? null,
+  );
+  // Whether the NEXT finished recording becomes its own full-bleed scene
+  // (Alt+Shift+R / AI path → true) or an overlay widget on the active
+  // scene (ActionsPanel recorder tiles → false). Reset to false whenever
+  // an action is opened through the panel's own tiles.
+  const [recordAsScene, setRecordAsScene] = useState(false);
   // Tracks whether the kind-aware post-load defaults have been applied
   // yet — flipped on first server-load to avoid clobbering manual
   // tab/timeline toggles on subsequent project refreshes.
@@ -1210,8 +1232,8 @@ export default function StudioEditorV2() {
           return;
         }
         toast({
-          title: "Couldn't load project",
-          description: err instanceof Error ? err.message : "Unknown error",
+          title: t("studio.editor.loadProjectFailed"),
+          description: err instanceof Error ? err.message : t("errors.unknownError"),
           variant: "destructive",
         });
       }
@@ -1219,7 +1241,7 @@ export default function StudioEditorV2() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, toast, resetHistory]);
+  }, [projectId, toast, resetHistory, t]);
 
   // Apply `?studioTemplate=<slug>` once on mount when present. The
   // marketplace's "Use this template" button (use-apply-template) emits
@@ -1236,8 +1258,8 @@ export default function StudioEditorV2() {
         const script = tpl.videoScript as VideoScript | null | undefined;
         if (!script) {
           toast({
-            title: "Template has no content",
-            description: "The creator hasn't finished setting it up yet.",
+            title: t("studio.editor.templateNoContentTitle"),
+            description: t("studio.editor.templateNoContentDesc"),
             variant: "destructive",
           });
           return;
@@ -1249,8 +1271,8 @@ export default function StudioEditorV2() {
         setTitle(tpl.name);
       } catch (err) {
         toast({
-          title: "Couldn't load template",
-          description: err instanceof Error ? err.message : "Unknown error",
+          title: t("studio.editor.loadTemplateFailed"),
+          description: err instanceof Error ? err.message : t("errors.unknownError"),
           variant: "destructive",
         });
       }
@@ -1258,7 +1280,7 @@ export default function StudioEditorV2() {
     return () => {
       cancelled = true;
     };
-  }, [studioTemplateSlug, projectId, toast, resetHistory]);
+  }, [studioTemplateSlug, projectId, toast, resetHistory, t]);
 
   // Local autosave so unsaved work survives reloads. The single effect
   // covers BOTH the Timeline-kind `state` (CanvasState) and the
@@ -1365,11 +1387,13 @@ export default function StudioEditorV2() {
     [],
   );
 
-  const addScene = useCallback(() => {
-    setState((prev) => {
-      const next = emptyScene(`Scene ${prev.scenes.length + 1}`);
-      return { ...prev, scenes: [...prev.scenes, next] };
-    });
+  const addScene = useCallback((): string => {
+    // Mint the scene OUTSIDE the updater so the id is stable under
+    // strict-mode's double-invoke (mirrors duplicateScene) — the bridge
+    // + AI tool need the returned id to reference the new scene.
+    const next = emptyScene(`Scene ${stateRef.current.scenes.length + 1}`);
+    setState((prev) => ({ ...prev, scenes: [...prev.scenes, next] }));
+    return next.id;
   }, []);
 
   const deleteScene = useCallback(
@@ -1700,15 +1724,15 @@ export default function StudioEditorV2() {
   const placeScreenshot = useCallback(
     async (atFraction?: { x: number; y: number }) => {
       const handle = toast({
-        title: "Capturing screenshot…",
-        description: "Pick a window, tab, or screen in the browser dialog.",
+        title: t("studio.editor.capturingScreenshot"),
+        description: t("studio.editor.capturingScreenshotDesc"),
       });
       const url = await captureScreenshot();
       handle.dismiss();
       if (!url) return;
       addMediaWidget("image", url, 0, atFraction);
     },
-    [addMediaWidget, captureScreenshot, toast],
+    [addMediaWidget, captureScreenshot, toast, t],
   );
 
   const setCaptionsState = useCallback((captions: CanvasState["captions"]) => {
@@ -1769,7 +1793,7 @@ export default function StudioEditorV2() {
         kindNoun: "layer",
         label: layer.label,
         dataUrl: layer.pixelsDataUrl,
-        placeholder: "Repaint this layer as a foggy forest at dusk…",
+        placeholder: t("studio.editor.aiChipPlaceholderLayer"),
         onGenerated: (result, prompt) =>
           void handleImageAiGenerated(result, prompt, {
             replaceActiveLayer: true,
@@ -1784,9 +1808,11 @@ export default function StudioEditorV2() {
       if (!frame?.pixelsDataUrl) return null;
       return {
         kindNoun: "frame",
-        label: `Frame ${animationState.frames.indexOf(frame) + 1}`,
+        label: t("studio.editor.frameLabel", {
+          number: animationState.frames.indexOf(frame) + 1,
+        }),
         dataUrl: frame.pixelsDataUrl,
-        placeholder: "Same pose, brighter lighting…",
+        placeholder: t("studio.editor.aiChipPlaceholderFrame"),
         onGenerated: (result) => void handleAnimationAiGenerated(result),
       };
     }
@@ -1799,9 +1825,9 @@ export default function StudioEditorV2() {
       if (!asset?.url || !sprite) return null;
       return {
         kindNoun: "sprite",
-        label: `Sprite ${sprite.id}`,
+        label: t("studio.editor.spriteLabel", { id: sprite.id }),
         url: asset.url,
-        placeholder: "Same silhouette, neon cyberpunk palette…",
+        placeholder: t("studio.editor.aiChipPlaceholderSprite"),
         bbox: {
           x: sprite.x * zoom,
           y: sprite.y * zoom,
@@ -1831,9 +1857,9 @@ export default function StudioEditorV2() {
       if (!url) return null;
       return {
         kindNoun: "image",
-        label: "Selected image",
+        label: t("studio.editor.selectedImageLabel"),
         url,
-        placeholder: "Same composition, dramatic golden-hour light…",
+        placeholder: t("studio.editor.aiChipPlaceholderImage"),
         // Timeline widgets store fractional position (0..1). Multiply
         // by canvas dims then by zoom to land in the canvas wrapper's
         // pixel coordinate space (the wrapper is sized `width × zoom`).
@@ -1876,6 +1902,7 @@ export default function StudioEditorV2() {
     handleAnimationAiGenerated,
     handleGameAiGenerated,
     updateWidgetParams,
+    t,
   ]);
 
   // Single chip ReactNode — composed once, mounted as a sibling inside
@@ -1973,6 +2000,105 @@ export default function StudioEditorV2() {
     setActiveSceneId,
     setSelection,
   });
+  // ───── Recorder runtime seams (Alt+Shift+R + AI CHRO)
+  // What ActionsPanel calls from its OWN tiles + on close. Opening via a
+  // tile is the legacy overlay path, so reset `recordAsScene`.
+  const handleOpenActionChange = useCallback((next: ActionId | null) => {
+    setOpenAction(next);
+    setRecordAsScene(false);
+  }, []);
+  // Runtime entry used by the Alt+Shift+R shortcut AND the studio-editor
+  // bridge: surface the Actions tab with the recorder armed to `mode`.
+  // The finished clip becomes its own full-bleed scene by default
+  // (slide → recording → slide); pass `asScene: false` for overlay.
+  const openRecorder = useCallback(
+    (mode: StudioRecordingMode, opts?: { asScene?: boolean }) => {
+      setLeftTab("actions");
+      setLeftBottomOpen(true);
+      setRecordAsScene(opts?.asScene ?? true);
+      setOpenAction(mode);
+    },
+    [],
+  );
+  // A finished recording becomes its OWN full-bleed scene, inserted right
+  // after the active scene, duration matched to the clip. The renderer
+  // already concatenates scenes sequentially, so save/publish stitches
+  // slide → recording → slide with no special stitch path.
+  const addRecordingScene = useCallback(
+    (url: string, durationSeconds: number) => {
+      const label =
+        openAction === "webcam"
+          ? "Webcam recording"
+          : openAction === "screen-pip"
+            ? "Screen + webcam"
+            : "Screen recording";
+      const scene = makeRecordingScene(label, url, durationSeconds);
+      setState((prev) => {
+        const idx = prev.scenes.findIndex(
+          (s) => s.id === activeSceneIdRef.current,
+        );
+        const scenes = [...prev.scenes];
+        scenes.splice(idx < 0 ? scenes.length : idx + 1, 0, scene);
+        return { ...prev, scenes };
+      });
+      setActiveSceneId(scene.id);
+      setSelection({ kind: "scene", sceneId: scene.id });
+    },
+    [openAction],
+  );
+
+  // Register this editor with the studio-editor bridge so the AI CHRO's
+  // studio_* tools can drive it. Every method wraps the SAME callback the
+  // on-screen control fires (DRY); the handle reads live scene state via
+  // `stateRef`, so it never goes stale and never needs re-registering on
+  // edits. Self-unregisters on unmount → tools fail loudly elsewhere.
+  useEffect(() => {
+    const handle: StudioEditorHandle = {
+      projectId: persistedProjectId,
+      mediaKind: currentMediaKind,
+      getActiveSceneId: () => activeSceneIdRef.current,
+      listScenes: () =>
+        stateRef.current.scenes.map((s) => ({
+          id: s.id,
+          label: s.label,
+          durationSeconds: s.durationSeconds,
+          widgetCount: s.widgets.length,
+          active: s.id === activeSceneIdRef.current,
+        })),
+      insertableWidgetKinds: () => insertableWidgetKindsFor(currentMediaKind),
+      insertWidget: (kind) => insertWidget(kind),
+      addScene: () => addScene(),
+      duplicateScene: (sceneId) => duplicateScene(sceneId),
+      deleteScene: (sceneId) => deleteScene(sceneId),
+      reorderScenes: (orderedIds) => reorderScenes(orderedIds),
+      setActiveScene: (sceneId) => {
+        setActiveSceneId(sceneId);
+        setSelection({ kind: "scene", sceneId });
+      },
+      setSceneBackground: (sceneId, color) =>
+        updateScene(sceneId, { backgroundColor: color, backgroundEffect: null }),
+      addImageWidget: (url) => addMediaWidget("image", url),
+      addVideoWidget: (url, durationSeconds) =>
+        addMediaWidget("video", url, durationSeconds),
+      captureScreenshot: () => placeScreenshot(),
+      openRecorder: (mode, opts) => openRecorder(mode, opts),
+    };
+    registerStudioEditor(handle);
+    return () => unregisterStudioEditor(handle);
+  }, [
+    persistedProjectId,
+    currentMediaKind,
+    insertWidget,
+    addScene,
+    duplicateScene,
+    deleteScene,
+    reorderScenes,
+    updateScene,
+    addMediaWidget,
+    placeScreenshot,
+    openRecorder,
+  ]);
+
   // Delete handler — uses the SAME mutators that the on-screen Delete
   // buttons fire (DRY) so keyboard + mouse paths can never diverge. We
   // refuse to drop the last remaining scene because the editor invariant
@@ -1991,6 +2117,10 @@ export default function StudioEditorV2() {
     onCut: clipboard.cut,
     onPaste: clipboard.paste,
     onDelete: onDeleteSelection,
+    // Alt+Shift+R → screen recorder as a new scene. "Screen record" is
+    // the literal ask users keep typing into the AI chat; the recording
+    // lands as its own full-bleed scene (slide → recording → slide).
+    onOpenRecorder: () => openRecorder("screen", { asScene: true }),
   });
 
   // ───── Export — converts CanvasState → Timeline JSON → `renderTimeline()`
@@ -2051,7 +2181,7 @@ export default function StudioEditorV2() {
       return await run();
     } catch (err) {
       toast({
-        title: `${label} failed`,
+        title: t("studio.editor.actionFailed", { action: label }),
         description: err instanceof Error ? err.message : String(err),
         variant: "destructive",
       });
@@ -2085,7 +2215,7 @@ export default function StudioEditorV2() {
           renderTimeline: async () => {
             // Timeline kinds: route through the existing error-recovery
             // wrapper so the heavy render path keeps its toast UX.
-            return withRenderErrorRecovery("Export", async () => {
+            return withRenderErrorRecovery(t("actions.export"), async () => {
               if (state.scenes.length === 0) return null;
               return renderToBlob();
             });
@@ -2099,8 +2229,8 @@ export default function StudioEditorV2() {
         // (empty timeline / no image canvas yet) and stay silent.
         if (currentMediaKind === "game" && !gameState) {
           toast({
-            title: "Save the project first",
-            description: "Pick a game template + save before exporting.",
+            title: t("studio.editor.saveProjectFirstTitle"),
+            description: t("studio.editor.saveProjectFirstGameDesc"),
             variant: "destructive",
           });
         }
@@ -2112,10 +2242,10 @@ export default function StudioEditorV2() {
       a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "project"}.${extensionForBlob(blob)}`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast({ title: "Exported", description: "Your project has been downloaded." });
+      toast({ title: t("studio.editor.exportedTitle"), description: t("studio.editor.exportedDesc") });
     } catch (err) {
       toast({
-        title: "Export failed",
+        title: t("messages.exportFailedTitle"),
         description: err instanceof Error ? err.message : String(err),
         variant: "destructive",
       });
@@ -2133,8 +2263,8 @@ export default function StudioEditorV2() {
   async function ensureRendered(): Promise<StudioProject | null> {
     if (state.scenes.length === 0) {
       toast({
-        title: "Add a widget first",
-        description: "Drop something onto the canvas before publishing.",
+        title: t("studio.editor.addWidgetFirstTitle"),
+        description: t("studio.editor.addWidgetFirstDesc"),
         variant: "destructive",
       });
       return null;
@@ -2158,7 +2288,7 @@ export default function StudioEditorV2() {
     if (projectRow && isProjectBakedFresh(projectRow)) return projectRow;
 
     setExporting(true);
-    const result = await withRenderErrorRecovery("Render", async () => {
+    const result = await withRenderErrorRecovery(t("studio.editor.renderLabel"), async () => {
       try {
         const blob = await renderToBlob();
         if (!blob) return null;
@@ -2205,9 +2335,7 @@ export default function StudioEditorV2() {
         // copy so the shared recovery wrapper toasts it under "Render
         // failed" instead of pretending it's a device issue.
         if (/QUOTA_EXCEEDED/i.test(msg)) {
-          throw new Error(
-            "Free accounts can publish 1 video. Upgrade for unlimited.",
-          );
+          throw new Error(t("studio.editor.publishQuotaExceeded"));
         }
         throw err;
       }
@@ -2227,11 +2355,11 @@ export default function StudioEditorV2() {
       });
       if (!res.data) throw new Error("Publish failed");
       setPersistedProject(res.data);
-      toast({ title: "Published to YouTube!", description: "Your video is live." });
+      toast({ title: t("messages.publishedYouTubeTitle"), description: t("studio.editor.videoLiveDesc") });
     } catch (err) {
       toast({
-        title: "Publish failed",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("messages.publishFailedTitle"),
+        description: err instanceof Error ? err.message : t("errors.unknownError"),
         variant: "destructive",
       });
     }
@@ -2261,16 +2389,18 @@ export default function StudioEditorV2() {
       if (res.data) {
         setPersistedProject(res.data);
         toast({
-          title: isOnProfile ? "Removed from profile" : "Published to profile!",
+          title: isOnProfile
+            ? t("studio.editor.removedFromProfileTitle")
+            : t("messages.publishedProfileTitle"),
           description: isOnProfile
-            ? "The video stays in your library — share it whenever you want."
-            : "Your video is now visible on your profile.",
+            ? t("studio.editor.removedFromProfileDesc")
+            : t("studio.editor.publishedProfileDesc"),
         });
       }
     } catch (err) {
       toast({
-        title: isOnProfile ? "Remove failed" : "Publish failed",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: isOnProfile ? t("studio.editor.removeFailed") : t("messages.publishFailedTitle"),
+        description: err instanceof Error ? err.message : t("errors.unknownError"),
         variant: "destructive",
       });
     }
@@ -2349,12 +2479,12 @@ export default function StudioEditorV2() {
         }
         setMissingProject(false);
       }
-      toast({ title: "Saved" });
+      toast({ title: t("messages.savedTitle") });
       return res.data ?? null;
     } catch (err) {
       toast({
-        title: "Save failed",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("errors.saveFailed"),
+        description: err instanceof Error ? err.message : t("errors.unknownError"),
         variant: "destructive",
       });
       return null;
@@ -2370,8 +2500,8 @@ export default function StudioEditorV2() {
   if (!user) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-lg font-medium">Sign in to use the Studio editor.</p>
-        <Button onClick={() => navigate("/login")}>Sign in</Button>
+        <p className="text-lg font-medium">{t("studio.editor.signInPrompt")}</p>
+        <Button onClick={() => navigate("/login")}>{t("actions.signIn")}</Button>
       </div>
     );
   }
@@ -2501,9 +2631,9 @@ export default function StudioEditorV2() {
         />
         {missingProject && (
           <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-            <p className="font-medium">This project doesn't exist or isn't shared with you.</p>
+            <p className="font-medium">{t("studio.editor.missingProjectTitle")}</p>
             <p className="mt-0.5 text-xs opacity-80">
-              You're now editing a fresh, empty project — save when you're ready and it'll be created as a new one.
+              {t("studio.editor.missingProjectDesc")}
             </p>
           </div>
         )}
@@ -2529,7 +2659,7 @@ export default function StudioEditorV2() {
           {currentMediaKind === "image" && (
             <CollapsiblePanel
               side="left"
-              label="Tools"
+              label={t("studio.editor.panelTools")}
               storageKey="studio.v2.panel.left"
               expandedClassName="w-56"
             >
@@ -2551,7 +2681,7 @@ export default function StudioEditorV2() {
           {currentMediaKind === "game" && gameState && (
             <CollapsiblePanel
               side="left"
-              label="Levels"
+              label={t("studio.editor.panelLevels")}
               storageKey="studio.v2.panel.left"
               expandedClassName="w-64"
             >
@@ -2576,7 +2706,7 @@ export default function StudioEditorV2() {
                 {gameState?.engine === "world-3d" && (
                   <>
                     <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Pieces
+                      {t("studio.editor.sectionPieces")}
                     </div>
                     <div className="max-h-[40%] min-h-0 overflow-y-auto border-b border-border">
                       <EntityPaletteLeft />
@@ -2584,7 +2714,9 @@ export default function StudioEditorV2() {
                   </>
                 )}
                 <div className="border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {gameState?.engine === "world-3d" ? "Sprites & assets" : "Sprites"}
+                  {gameState?.engine === "world-3d"
+                    ? t("studio.editor.sectionSpritesAssets")
+                    : t("studio.editor.sectionSprites")}
                 </div>
                 <div className="min-h-0 flex-1">
                   <SpritePalette
@@ -2616,7 +2748,7 @@ export default function StudioEditorV2() {
           {currentMediaKind === "animation" && (
             <CollapsiblePanel
               side="left"
-              label="Frames"
+              label={t("studio.editor.panelFrames")}
               storageKey="studio.v2.panel.left"
               expandedClassName="w-64"
             >
@@ -2641,7 +2773,7 @@ export default function StudioEditorV2() {
           {usesTimelineChrome && (
           <CollapsiblePanel
             side="left"
-            label="Scenes"
+            label={t("studio.editor.panelScenes")}
             storageKey="studio.v2.panel.left"
             expandedClassName="w-64"
           >
@@ -2694,7 +2826,10 @@ export default function StudioEditorV2() {
                   )}
                   {leftTab === "actions" && (
                     <ActionsPanel
-                      defaultOpenAction={currentDefaults.defaultAction ?? undefined}
+                      openAction={openAction}
+                      onOpenActionChange={handleOpenActionChange}
+                      recordAsScene={recordAsScene}
+                      onAddRecordingScene={addRecordingScene}
                       currentTimeSec={playback.playhead}
                       state={state}
                       activeScene={activeScene}
@@ -2987,7 +3122,7 @@ export default function StudioEditorV2() {
                             const theme = VISUAL_THEMES.find((t) => t.id === themeId);
                             if (!theme) return;
                             setState((prev) => applyThemeToState(prev, theme));
-                            toast({ title: `Theme: ${theme.label}` });
+                            toast({ title: t("studio.editor.themeToast", { label: theme.label }) });
                           }
                     }
                     onBackgroundDrop={
@@ -2997,7 +3132,7 @@ export default function StudioEditorV2() {
                             const preset = BG_PRESETS.find((p) => p.value === bgValue);
                             if (!preset) return;
                             updateScene(activeScene.id, scenePatchFromBgPreset(preset));
-                            toast({ title: `Background: ${preset.label}` });
+                            toast({ title: t("studio.editor.backgroundToast", { label: preset.label }) });
                           }
                     }
                     onMediaDrop={
@@ -3217,14 +3352,14 @@ export default function StudioEditorV2() {
               onSelectMusic={(track) => {
                 if (track.id === "none") {
                   setState((prev) => ({ ...prev, musicSource: null }));
-                  toast({ title: "Music removed" });
+                  toast({ title: t("studio.editor.musicRemoved") });
                   return;
                 }
                 setState((prev) => ({
                   ...prev,
                   musicSource: { kind: "stock", trackId: track.id },
                 }));
-                toast({ title: `Music: ${track.label}` });
+                toast({ title: t("studio.editor.musicToast", { label: track.label }) });
               }}
               onSelectFormat={(format) => {
                 // Widgets are stored as fractional (0..1) positions so
@@ -3235,7 +3370,7 @@ export default function StudioEditorV2() {
                   height: format.height,
                 }));
                 toast({
-                  title: `Format: ${format.label}`,
+                  title: t("studio.editor.formatToast", { label: format.label }),
                   description: `${format.width} × ${format.height}`,
                 });
               }}

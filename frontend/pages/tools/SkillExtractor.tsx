@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Briefcase,
   Check,
@@ -46,6 +47,7 @@ import type { Skill as ResumeSkill, ResumeContent } from "@shared/resume";
 import SkillNetwork from "@/components/SkillNetwork";
 
 export default function SkillExtractor() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
   const { resumeId: deepLinkResumeId, jobId: deepLinkJobId } = useToolEntityParams();
@@ -78,19 +80,28 @@ export default function SkillExtractor() {
     refs: { resumeId?: string; jobId?: string },
   ) => {
     const grouped = groupSkillsByCategory(extracted.skills);
+    const sourceLabel =
+      extracted.sourceType === "job"
+        ? t("labels.skillExtractor.sourceJobDescription")
+        : t("labels.skillExtractor.sourceResume");
     void recordRun({
       score: null,
       result: {
         summary:
           extracted.summary ||
-          `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"} from ${extracted.sourceType === "job" ? "job description" : "resume"}.`,
+          t("messages.skillExtractor.runSummaryFromSource", {
+            count: extracted.skills.length,
+            source: sourceLabel,
+          }),
         extras: grouped.map((g) => ({
           label: SKILL_CATEGORY_LABEL[g.category],
           value: g.skills.map((s) => s.name).join(", "),
         })),
         raw: extracted,
       },
-      summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
+      summary: t("messages.skillExtractor.runSummary", {
+        count: extracted.skills.length,
+      }),
       ...refs,
     });
   };
@@ -178,11 +189,11 @@ export default function SkillExtractor() {
       "application/ld+json",
     ];
     if (!allowedTypes.includes(selected.type)) {
-      setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
+      setError(t("errors.uploadResumeFile"));
       return;
     }
     if (selected.size > 10 * 1024 * 1024) {
-      setError("File size must be less than 10MB.");
+      setError(t("errors.fileSizeMax10Mb"));
       return;
     }
     setFile(selected);
@@ -212,7 +223,11 @@ export default function SkillExtractor() {
 
   const handleTextExtraction = async () => {
     if (!pastedText.trim()) {
-      setError(`Please paste ${sourceType === "job" ? "a job description" : "your resume"}.`);
+      setError(
+        sourceType === "job"
+          ? t("errors.skillExtractor.pasteJobDescription")
+          : t("errors.skillExtractor.pasteResume"),
+      );
       return;
     }
 
@@ -234,7 +249,7 @@ export default function SkillExtractor() {
       recordSkillRun(extracted, {});
       clear();
     } catch (err: any) {
-      setError(err?.message || "Failed to extract skills. Please try again.");
+      setError(err?.message || t("errors.skillExtractor.extractFailed"));
     } finally {
       setIsExtracting(false);
     }

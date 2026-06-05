@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   GitMerge,
@@ -44,6 +45,7 @@ import { mapContentToResumeData } from "@/lib/resume-shape";
 type Step = "select" | "review" | "preview" | "result";
 
 export default function ResumeConsolidator() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
@@ -80,10 +82,10 @@ export default function ResumeConsolidator() {
     if (restored.targetId) setTargetId(restored.targetId);
     if (restored.sourceFileName && !sourceFile) {
       setError(
-        `You were merging "${restored.sourceFileName}" before signing in — please re-upload it to continue.`,
+        t("errors.reuploadAfterSignIn", { name: restored.sourceFileName }),
       );
     }
-  }, [restored, isAuthenticated, sourceFile]);
+  }, [restored, isAuthenticated, sourceFile, t]);
 
   // Analysis
   const [analysis, setAnalysis] = useState<MergeAnalysis | null>(null);
@@ -108,8 +110,8 @@ export default function ResumeConsolidator() {
   const [previewStats, setPreviewStats] = useState<{ mergedSections: number; skippedSections: number; newSections: number } | null>(null);
 
   const getResumeLabel = useCallback((r: any) => {
-    return r.title || "Untitled Resume";
-  }, []);
+    return r.title || t("labels.untitledResume");
+  }, [t]);
 
   const getResumeId = useCallback((r: any) => {
     return r.id || "";
@@ -152,7 +154,7 @@ export default function ResumeConsolidator() {
         setDecisions(buildDecisions(result.analysis));
         setNewItemDecisions(buildNewItemDecisions(result.analysis));
         const targetResume = filteredResumes.find((r) => getResumeId(r) === targetId);
-        setNewTitle(`${getResumeLabel(targetResume)} (merged from file)`);
+        setNewTitle(t("labels.mergedFromFileTitle", { name: getResumeLabel(targetResume) }));
       } else if (sourceId) {
         const result = await resumeService.analyzeMerge(sourceId, targetId);
         setAnalysis(result.analysis);
@@ -161,15 +163,15 @@ export default function ResumeConsolidator() {
         setDecisions(buildDecisions(result.analysis));
         setNewItemDecisions(buildNewItemDecisions(result.analysis));
         const targetResume = filteredResumes.find((r) => getResumeId(r) === targetId);
-        setNewTitle(`${getResumeLabel(targetResume)} (merged)`);
+        setNewTitle(t("labels.mergedTitle", { name: getResumeLabel(targetResume) }));
       }
       setStep("review");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed. Please try again.");
+      setError(err instanceof Error ? err.message : t("errors.analysisFailed"));
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, sourceFile, filteredResumes, getResumeId, getResumeLabel, isAuthenticated, snapshot]);
+  }, [targetId, sourceId, sourceFile, filteredResumes, getResumeId, getResumeLabel, isAuthenticated, snapshot, t]);
 
   /** Build the complete decision list (matches + new-item "add"s) the
    *  preview/execute endpoints expect. Shared so preview and save
@@ -211,11 +213,11 @@ export default function ResumeConsolidator() {
       setPreviewStats(preview.stats);
       setStep("preview");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Preview failed. Please try again.");
+      setError(err instanceof Error ? err.message : t("errors.previewFailed"));
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, sourceContent, analysis, basicDecisions, createNew, newTitle, buildFinalDecisions]);
+  }, [targetId, sourceId, sourceContent, analysis, basicDecisions, createNew, newTitle, buildFinalDecisions, t]);
 
   const handleExecute = useCallback(async () => {
     if (!targetId || !analysis) return;
@@ -234,8 +236,11 @@ export default function ResumeConsolidator() {
       });
 
       toast({
-        title: "Merge complete",
-        description: `Merged ${result.mergedSections} sections, added ${result.newSections} new items.`,
+        title: t("messages.mergeCompleteTitle"),
+        description: t("messages.mergeCompleteDesc", {
+          merged: result.mergedSections,
+          added: result.newSections,
+        }),
       });
 
       try {
@@ -249,11 +254,11 @@ export default function ResumeConsolidator() {
       clear();
       refetch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Merge failed. Please try again.");
+      setError(err instanceof Error ? err.message : t("errors.mergeFailed"));
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, sourceContent, analysis, basicDecisions, createNew, newTitle, toast, refetch, clear, buildFinalDecisions]);
+  }, [targetId, sourceId, sourceContent, analysis, basicDecisions, createNew, newTitle, toast, refetch, clear, buildFinalDecisions, t]);
 
   const handleStartOver = useCallback(() => {
     setStep("select");
@@ -286,14 +291,12 @@ export default function ResumeConsolidator() {
       header={{
         icon: <GitMerge className="h-6 w-6 text-teal-600" />,
         iconBgClassName: "bg-teal-100 dark:bg-teal-900/30",
-        title: "Resume Consolidator",
-        description:
-          "Merge multiple resumes into one — combine bullets, deduplicate, and consolidate",
+        title: t("tools.resumeConsolidator.title"),
+        description: t("tools.resumeConsolidator.subtitle"),
       }}
       authOverlay={{
         show: showAuthOverlay,
-        message:
-          "Sign in to merge your resumes — we'll keep the source and target you've picked and pick up where you left off.",
+        message: t("messages.signInToMergeResumes"),
       }}
     >
             {step === "select" && (
@@ -302,13 +305,13 @@ export default function ResumeConsolidator() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Badge className="bg-blue-100 text-blue-800">Target</Badge>
-                      Merge Into
+                      <Badge className="bg-blue-100 text-blue-800">{t("labels.target")}</Badge>
+                      {t("labels.mergeInto")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Select the resume you want to merge content <strong>into</strong>.
+                      {t("messages.selectResumeToMergeInto")}
                     </p>
                     <div className="space-y-1 max-h-64 overflow-y-auto">
                       {filteredResumes.map((r) => {
@@ -327,7 +330,7 @@ export default function ResumeConsolidator() {
                             <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                             <span className="truncate">{getResumeLabel(r)}</span>
                             {(r as any).isMaster && (
-                              <Badge variant="outline" className="text-xs ml-auto shrink-0">Master</Badge>
+                              <Badge variant="outline" className="text-xs ml-auto shrink-0">{t("labels.master")}</Badge>
                             )}
                           </button>
                         );
@@ -335,8 +338,8 @@ export default function ResumeConsolidator() {
                       {filteredResumes.length === 0 && (
                         <p className="text-sm text-muted-foreground p-3 border border-dashed rounded-md">
                           {isAuthenticated
-                            ? "No resumes found. Create a resume first."
-                            : "Upload a source resume below, then click Analyze — we'll prompt you to sign in and pick a target from your account."}
+                            ? t("messages.noResumesFoundCreateFirst")
+                            : t("messages.uploadSourceThenSignInForTarget")}
                         </p>
                       )}
                     </div>
@@ -347,20 +350,20 @@ export default function ResumeConsolidator() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Badge className="bg-green-100 text-green-800">Source</Badge>
-                      Merge From
+                      <Badge className="bg-green-100 text-green-800">{t("labels.mergeSourceBadge")}</Badge>
+                      {t("labels.mergeFrom")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Tabs defaultValue="resume">
                       <TabsList className="mb-3">
-                        <TabsTrigger value="resume">Existing Resume</TabsTrigger>
-                        <TabsTrigger value="file">Upload File</TabsTrigger>
+                        <TabsTrigger value="resume">{t("labels.existingResume")}</TabsTrigger>
+                        <TabsTrigger value="file">{t("labels.uploadFile")}</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="resume">
                         <p className="text-sm text-muted-foreground mb-3">
-                          Select the resume to merge <strong>from</strong>.
+                          {t("messages.selectResumeToMergeFrom")}
                         </p>
                         <div className="space-y-1 max-h-48 overflow-y-auto">
                           {filteredResumes
@@ -385,8 +388,7 @@ export default function ResumeConsolidator() {
                             })}
                           {!isAuthenticated && (
                             <p className="text-sm text-muted-foreground p-3 border border-dashed rounded-md">
-                              Sign in to pick from your saved resumes — or switch to the
-                              Upload File tab to merge from a local file.
+                              {t("messages.signInOrSwitchToUploadTab")}
                             </p>
                           )}
                         </div>
@@ -404,12 +406,12 @@ export default function ResumeConsolidator() {
                         >
                           <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                           <p className="text-sm text-muted-foreground mb-2">
-                            Drag & drop a resume file, or click to browse
+                            {t("messages.dragDropResumeOrBrowse")}
                           </p>
-                          <p className="text-xs text-muted-foreground mb-3">PDF, Word (.docx), Text, Markdown, JSON</p>
+                          <p className="text-xs text-muted-foreground mb-3">{t("messages.supportedResumeFormats")}</p>
                           <label>
                             <Button variant="outline" size="sm" asChild>
-                              <span>Choose File</span>
+                              <span>{t("actions.chooseFile")}</span>
                             </Button>
                             <input
                               type="file"
@@ -434,7 +436,7 @@ export default function ResumeConsolidator() {
                 <div className="lg:col-span-2">
                   {sourceId && targetId && sourceId === targetId && (
                     <Alert variant="destructive" className="mb-4">
-                      <AlertDescription>Source and target must be different resumes.</AlertDescription>
+                      <AlertDescription>{t("errors.sourceAndTargetMustDiffer")}</AlertDescription>
                     </Alert>
                   )}
                   {error && (
@@ -449,9 +451,9 @@ export default function ResumeConsolidator() {
                     disabled={!canAnalyze || loading}
                   >
                     {loading ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analyzing...</>
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("status.analyzing")}</>
                     ) : (
-                      <><GitMerge className="h-4 w-4 mr-2" />Analyze &amp; Compare</>
+                      <><GitMerge className="h-4 w-4 mr-2" />{t("actions.analyzeAndCompare")}</>
                     )}
                   </Button>
                 </div>
@@ -461,10 +463,10 @@ export default function ResumeConsolidator() {
             {step === "review" && analysis && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Review Merge</h2>
+                  <h2 className="text-xl font-semibold">{t("headings.reviewMerge")}</h2>
                   <Button variant="outline" onClick={() => setStep("select")}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
+                    {t("actions.back")}
                   </Button>
                 </div>
 
@@ -472,19 +474,19 @@ export default function ResumeConsolidator() {
                 <div className="flex flex-wrap gap-3 text-sm">
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span>{analysis.summary.autoMerge} auto-merge</span>
+                    <span>{t("labels.mergeAutoMergeCount", { count: analysis.summary.autoMerge })}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                    <span>{analysis.summary.manualReview} review</span>
+                    <span>{t("labels.mergeReviewCount", { count: analysis.summary.manualReview })}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <SkipForward className="h-4 w-4 text-gray-400" />
-                    <span>{analysis.summary.skip} skip</span>
+                    <span>{t("labels.mergeSkipCount", { count: analysis.summary.skip })}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Plus className="h-4 w-4 text-blue-600" />
-                    <span>{analysis.summary.newItems} new</span>
+                    <span>{t("labels.mergeNewCount", { count: analysis.summary.newItems })}</span>
                   </div>
                 </div>
 
@@ -532,9 +534,9 @@ export default function ResumeConsolidator() {
                   disabled={loading || (!sourceId && !sourceContent)}
                 >
                   {loading ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Building preview...</>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("status.buildingPreview")}</>
                   ) : (
-                    <><Eye className="h-4 w-4 mr-2" />Preview Merged Resume</>
+                    <><Eye className="h-4 w-4 mr-2" />{t("headings.previewMergedResume")}</>
                   )}
                 </Button>
               </div>
@@ -563,22 +565,22 @@ export default function ResumeConsolidator() {
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="h-6 w-6 text-green-600" />
                     <div>
-                      <h2 className="text-xl font-semibold">Merge Complete</h2>
+                      <h2 className="text-xl font-semibold">{t("headings.mergeComplete")}</h2>
                       <p className="text-sm text-muted-foreground">
-                        Merged {mergeResult.mergedSections} section{mergeResult.mergedSections === 1 ? "" : "s"}
-                        {mergeResult.newSections > 0 && `, added ${mergeResult.newSections} new item${mergeResult.newSections === 1 ? "" : "s"}`}
-                        {mergeResult.skippedSections > 0 && `, skipped ${mergeResult.skippedSections}`}
+                        {t("messages.mergedSectionsCount", { count: mergeResult.mergedSections })}
+                        {mergeResult.newSections > 0 && t("messages.addedItemsSuffix", { count: mergeResult.newSections })}
+                        {mergeResult.skippedSections > 0 && t("messages.skippedSectionsSuffix", { count: mergeResult.skippedSections })}
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={handleStartOver}>
                       <GitMerge className="h-4 w-4 mr-2" />
-                      Merge Another
+                      {t("actions.mergeAnother")}
                     </Button>
                     <Link to={`/resumes/${mergeResult.resumeId}`}>
                       <Button size="sm">
-                        Open in Resume Builder
+                        {t("actions.openInResumeBuilder")}
                       </Button>
                     </Link>
                   </div>
@@ -602,7 +604,7 @@ export default function ResumeConsolidator() {
                     ) : (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span className="ml-2 text-sm text-muted-foreground">Loading merged resume...</span>
+                        <span className="ml-2 text-sm text-muted-foreground">{t("status.loadingMergedResume")}</span>
                       </div>
                     )}
                   </CardContent>
@@ -671,6 +673,7 @@ function PreviewStep({
   onBack,
   onConfirm,
 }: PreviewStepProps) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<PreviewTab>("preview");
   const [copied, setCopied] = useState<PreviewTab | null>(null);
 
@@ -680,7 +683,7 @@ function PreviewStep({
     () => ({
       id: "preview",
       userId: "",
-      title: newTitle || "Merged Resume",
+      title: newTitle || t("labels.mergedResumeFallback"),
       slug: "preview",
       status: "draft",
       privacy: "private",
@@ -699,7 +702,7 @@ function PreviewStep({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
-    [previewContent, newTitle],
+    [previewContent, newTitle, t],
   );
 
   // Pre-stringify each JSON view — memoised so switching tabs doesn't
@@ -734,19 +737,19 @@ function PreviewStep({
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Preview Merged Resume</h2>
+          <h2 className="text-xl font-semibold">{t("headings.previewMergedResume")}</h2>
           {previewStats && (
             <p className="text-sm text-muted-foreground">
-              {previewStats.mergedSections} merged
-              {previewStats.newSections > 0 && `, ${previewStats.newSections} added`}
-              {previewStats.skippedSections > 0 && `, ${previewStats.skippedSections} skipped`}
-              {" — nothing has been saved yet."}
+              {t("messages.previewStatsMerged", { count: previewStats.mergedSections })}
+              {previewStats.newSections > 0 && t("messages.previewStatsAddedSuffix", { count: previewStats.newSections })}
+              {previewStats.skippedSections > 0 && t("messages.previewStatsSkippedSuffix", { count: previewStats.skippedSections })}
+              {t("messages.previewNothingSavedSuffix")}
             </p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={onBack} disabled={loading}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Review
+          {t("actions.backToReview")}
         </Button>
       </div>
 
@@ -754,19 +757,19 @@ function PreviewStep({
         <TabsList>
           <TabsTrigger value="preview">
             <Eye className="h-4 w-4 mr-2" />
-            Rendered
+            {t("labels.rendered")}
           </TabsTrigger>
           <TabsTrigger value="merged">
             <Code className="h-4 w-4 mr-2" />
-            Merged JSON
+            {t("labels.mergedJson")}
           </TabsTrigger>
           <TabsTrigger value="source">
             <Code className="h-4 w-4 mr-2" />
-            Source JSON
+            {t("labels.sourceJson")}
           </TabsTrigger>
           <TabsTrigger value="target">
             <Code className="h-4 w-4 mr-2" />
-            Target JSON
+            {t("labels.targetJson")}
           </TabsTrigger>
         </TabsList>
 
@@ -785,7 +788,7 @@ function PreviewStep({
 
         <TabsContent value="merged" className="mt-4">
           <JsonPanel
-            title="Merged JSON Resume — what will be saved"
+            title={t("labels.jsonPanelMergedTitle")}
             json={mergedJson}
             isCopied={copied === "merged"}
             onCopy={() => handleCopy("merged", mergedJson)}
@@ -795,7 +798,7 @@ function PreviewStep({
 
         <TabsContent value="source" className="mt-4">
           <JsonPanel
-            title="Source JSON — the resume you're merging FROM"
+            title={t("labels.jsonPanelSourceTitle")}
             json={sourceJson}
             isCopied={copied === "source"}
             onCopy={() => handleCopy("source", sourceJson)}
@@ -805,7 +808,7 @@ function PreviewStep({
 
         <TabsContent value="target" className="mt-4">
           <JsonPanel
-            title="Target JSON — the resume you're merging INTO"
+            title={t("labels.jsonPanelTargetTitle")}
             json={targetJson}
             isCopied={copied === "target"}
             onCopy={() => handleCopy("target", targetJson)}
@@ -818,20 +821,20 @@ function PreviewStep({
         <CardContent className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <Label htmlFor="create-new" className="text-sm">
-              Save as new resume (instead of updating target)
+              {t("labels.saveAsNewResumeLabel")}
             </Label>
             <Switch id="create-new" checked={createNew} onCheckedChange={setCreateNew} />
           </div>
           {createNew && (
             <div>
               <Label htmlFor="new-title" className="text-xs text-muted-foreground">
-                New resume title
+                {t("fields.newResumeTitle.label")}
               </Label>
               <Input
                 id="new-title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Merged Resume"
+                placeholder={t("labels.mergedResumeFallback")}
                 className="mt-1"
               />
             </div>
@@ -848,15 +851,15 @@ function PreviewStep({
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onBack} disabled={loading}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          {t("actions.back")}
         </Button>
         <Button size="lg" className="flex-1" onClick={onConfirm} disabled={loading}>
           {loading ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("status.saving")}</>
           ) : createNew ? (
-            <><GitMerge className="h-4 w-4 mr-2" />Save as New Resume</>
+            <><GitMerge className="h-4 w-4 mr-2" />{t("actions.saveAsNewResume")}</>
           ) : (
-            <><GitMerge className="h-4 w-4 mr-2" />Update Target Resume</>
+            <><GitMerge className="h-4 w-4 mr-2" />{t("actions.updateTargetResume")}</>
           )}
         </Button>
       </div>
@@ -877,6 +880,7 @@ interface JsonPanelProps {
 }
 
 function JsonPanel({ title, json, isCopied, onCopy, onDownload }: JsonPanelProps) {
+  const { t } = useTranslation();
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -884,14 +888,14 @@ function JsonPanel({ title, json, isCopied, onCopy, onDownload }: JsonPanelProps
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onCopy}>
             {isCopied ? (
-              <><CheckCircle2 className="h-4 w-4 mr-2" />Copied</>
+              <><CheckCircle2 className="h-4 w-4 mr-2" />{t("labels.copied")}</>
             ) : (
-              <><Copy className="h-4 w-4 mr-2" />Copy</>
+              <><Copy className="h-4 w-4 mr-2" />{t("actions.copy")}</>
             )}
           </Button>
           <Button variant="outline" size="sm" onClick={onDownload}>
             <Download className="h-4 w-4 mr-2" />
-            Download
+            {t("actions.download")}
           </Button>
         </div>
       </CardHeader>

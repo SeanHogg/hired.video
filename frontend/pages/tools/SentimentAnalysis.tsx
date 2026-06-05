@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Upload,
   Loader2,
@@ -37,6 +38,7 @@ import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 
 export default function SentimentAnalysis() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
 
   // State for file upload
@@ -71,7 +73,10 @@ export default function SentimentAnalysis() {
         recommendations: interpretation.recommendations.map((title) => ({ title })),
         raw: { score, interpretation },
       },
-      summary: `Sentiment score ${Math.round(score)} (${interpretation.label})`,
+      summary: t("messages.sentiment.runSummary", {
+        score: Math.round(score),
+        label: interpretation.label,
+      }),
       ...refs,
     });
   };
@@ -134,7 +139,7 @@ export default function SentimentAnalysis() {
       if (droppedFile && allowedTypes.includes(droppedFile.type)) {
         setFile(droppedFile);
       } else {
-        setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
+        setError(t("errors.uploadResumeFile"));
       }
     },
     [allowedTypes],
@@ -147,7 +152,7 @@ export default function SentimentAnalysis() {
     if (selectedFile && allowedTypes.includes(selectedFile.type)) {
       setFile(selectedFile);
     } else {
-      setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
+      setError(t("errors.uploadResumeFile"));
     }
   };
 
@@ -174,7 +179,7 @@ export default function SentimentAnalysis() {
       clear();
     } catch (err) {
       console.error("Sentiment analysis failed:", err);
-      setError(appendDiagnosticReference("Failed to analyze sentiment. Please try again.", err));
+      setError(appendDiagnosticReference(t("errors.sentiment.analyzeFailed"), err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -198,7 +203,7 @@ export default function SentimentAnalysis() {
       recordSentimentRun(score, { jobId: selectedJobId });
     } catch (err) {
       console.error("Job sentiment analysis failed:", err);
-      setError(appendDiagnosticReference("Failed to analyze job sentiment. Please try again.", err));
+      setError(appendDiagnosticReference(t("errors.sentiment.analyzeJobFailed"), err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -226,7 +231,7 @@ export default function SentimentAnalysis() {
       clear();
     } catch (err) {
       console.error("Resume sentiment analysis failed:", err);
-      setError(appendDiagnosticReference("Failed to analyze resume sentiment. Please try again.", err));
+      setError(appendDiagnosticReference(t("errors.sentiment.analyzeResumeFailed"), err));
     } finally {
       setIsAnalyzing(false);
     }
@@ -258,16 +263,14 @@ export default function SentimentAnalysis() {
       header={{
         icon: <Heart className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-brand-purple/10",
-        title: "Resume Sentiment Analysis",
-        description:
-          "Discover how positive and engaging your resume sounds to employers",
+        title: t("headings.sentiment.toolTitle"),
+        description: t("messages.sentiment.toolDescription"),
       }}
       authOverlay={{
         show: showAuthOverlay,
-        message:
-          "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
+        message: t("messages.signInToRunToolKeepInputs"),
       }}
-      breadcrumbLabel="Sentiment Analysis"
+      breadcrumbLabel={t("headings.sentiment.breadcrumb")}
     >
             {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -277,7 +280,7 @@ export default function SentimentAnalysis() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Upload className="h-5 w-5" />
-                      Analyze Resume Sentiment
+                      {t("headings.sentiment.cardTitle")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -286,18 +289,18 @@ export default function SentimentAnalysis() {
                       className="w-full"
                     >
                       <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="upload">Upload File</TabsTrigger>
+                        <TabsTrigger value="upload">{t("labels.uploadFile")}</TabsTrigger>
                         <TabsTrigger
                           value="existing"
                           disabled={!isAuthenticated}
                         >
-                          My Resumes {!isAuthenticated && "(Login Required)"}
+                          {t("headings.myResumes")} {!isAuthenticated && t("labels.loginRequiredParen")}
                         </TabsTrigger>
                         <TabsTrigger
                           value="job"
                           disabled={!isAuthenticated}
                         >
-                          Saved Jobs {!isAuthenticated && "(Login Required)"}
+                          {t("labels.sentiment.savedJobsTab")} {!isAuthenticated && t("labels.loginRequiredParen")}
                         </TabsTrigger>
                       </TabsList>
 
@@ -315,10 +318,10 @@ export default function SentimentAnalysis() {
                           >
                             <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                             <p className="text-lg font-medium mb-2">
-                              Drop your resume here, or click to browse
+                              {t("messages.sentiment.dropResume")}
                             </p>
                             <p className="text-sm text-muted-foreground mb-4">
-                              Supports PDF, Word (.doc, .docx), Markdown, JSON, and text files
+                              {t("messages.sentiment.supportedFormats")}
                             </p>
                             <Input
                               type="file"
@@ -332,7 +335,7 @@ export default function SentimentAnalysis() {
                                 htmlFor="file-upload"
                                 className="cursor-pointer"
                               >
-                                Choose File
+                                {t("actions.chooseFile")}
                               </label>
                             </Button>
                           </div>
@@ -368,12 +371,12 @@ export default function SentimentAnalysis() {
                               {isAnalyzing ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Analyzing...
+                                  {t("status.analyzing")}
                                 </>
                               ) : (
                                 <>
                                   <Heart className="mr-2 h-4 w-4" />
-                                  Analyze Sentiment
+                                  {t("actions.sentiment.analyze")}
                                 </>
                               )}
                             </Button>
@@ -386,14 +389,14 @@ export default function SentimentAnalysis() {
                           <div className="space-y-4">
                             <div>
                               <Label htmlFor="resume-select">
-                                Select Resume
+                                {t("headings.selectResume")}
                               </Label>
                               <Select
                                 value={selectedResumeId}
                                 onValueChange={setSelectedResumeId}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Choose a resume to analyze" />
+                                  <SelectValue placeholder={t("fields.sentiment.resumeSelect.placeholder")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {resumes.filter((resume) => resume.Id || resume.id).map((resume) => (
@@ -413,12 +416,12 @@ export default function SentimentAnalysis() {
                               {isAnalyzing ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Analyzing...
+                                  {t("status.analyzing")}
                                 </>
                               ) : (
                                 <>
                                   <Heart className="mr-2 h-4 w-4" />
-                                  Analyze Sentiment
+                                  {t("actions.sentiment.analyze")}
                                 </>
                               )}
                             </Button>
@@ -426,10 +429,10 @@ export default function SentimentAnalysis() {
                         ) : (
                           <div className="text-center py-8">
                             <p className="text-muted-foreground mb-4">
-                              Please log in to analyze your existing resumes
+                              {t("messages.sentiment.loginToAnalyzeResumes")}
                             </p>
                             <Link to="/login">
-                              <Button>Log In</Button>
+                              <Button>{t("actions.logIn")}</Button>
                             </Link>
                           </div>
                         )}
@@ -440,19 +443,19 @@ export default function SentimentAnalysis() {
                           savedJobs.length === 0 ? (
                             <div className="text-center py-8">
                               <p className="text-muted-foreground">
-                                You don't have any saved jobs yet. Save a job from the Jobs page to score its tone.
+                                {t("messages.sentiment.noSavedJobs")}
                               </p>
                             </div>
                           ) : (
                             <div className="space-y-4">
                               <div>
-                                <Label htmlFor="job-select">Select Job</Label>
+                                <Label htmlFor="job-select">{t("fields.selectJob.label")}</Label>
                                 <Select
                                   value={selectedJobId}
                                   onValueChange={setSelectedJobId}
                                 >
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Choose a saved job to analyze" />
+                                    <SelectValue placeholder={t("fields.sentiment.jobSelect.placeholder")} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {savedJobs.map((job: any) => (
@@ -472,12 +475,12 @@ export default function SentimentAnalysis() {
                                 {isAnalyzing ? (
                                   <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Analyzing...
+                                    {t("status.analyzing")}
                                   </>
                                 ) : (
                                   <>
                                     <Heart className="mr-2 h-4 w-4" />
-                                    Analyze Sentiment
+                                    {t("actions.sentiment.analyze")}
                                   </>
                                 )}
                               </Button>
@@ -486,10 +489,10 @@ export default function SentimentAnalysis() {
                         ) : (
                           <div className="text-center py-8">
                             <p className="text-muted-foreground mb-4">
-                              Please log in to analyze your saved jobs
+                              {t("messages.sentiment.loginToAnalyzeJobs")}
                             </p>
                             <Link to="/login">
-                              <Button>Log In</Button>
+                              <Button>{t("actions.logIn")}</Button>
                             </Link>
                           </div>
                         )}
@@ -519,11 +522,11 @@ export default function SentimentAnalysis() {
                         variant="outline"
                         className="flex-1"
                       >
-                        Analyze Another
+                        {t("actions.sentiment.analyzeAnother")}
                       </Button>
                       {isAuthenticated && (
                         <Link to="/resumes" className="flex-1">
-                          <Button className="w-full">View My Resumes</Button>
+                          <Button className="w-full">{t("actions.viewMyResumes")}</Button>
                         </Link>
                       )}
                     </div>
@@ -533,11 +536,10 @@ export default function SentimentAnalysis() {
                     <CardContent className="p-8 text-center">
                       <Heart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold mb-2">
-                        Ready to Analyze
+                        {t("headings.sentiment.readyToAnalyze")}
                       </h3>
                       <p className="text-muted-foreground">
-                        Upload a resume file or select from your existing
-                        resumes to get started.
+                        {t("messages.sentiment.readyToAnalyzeBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -550,14 +552,11 @@ export default function SentimentAnalysis() {
               {/* What is Resume Sentiment Analysis */}
               <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">
-                  What is Resume Sentiment Analysis?
+                  {t("headings.sentiment.whatIs")}
                 </h2>
                 <div className="prose prose-lg max-w-none text-muted-foreground">
                   <p className="text-center text-xl leading-relaxed">
-                    Resume sentiment analysis uses advanced AI to evaluate the
-                    emotional tone and positivity of your resume content,
-                    helping you understand how your resume might be perceived by
-                    hiring managers and recruiters.
+                    {t("messages.sentiment.whatIsBody")}
                   </p>
                 </div>
 
@@ -568,11 +567,10 @@ export default function SentimentAnalysis() {
                         <Heart className="h-6 w-6 text-blue-600" />
                       </div>
                       <h3 className="font-semibold mb-2">
-                        AI-Powered Analysis
+                        {t("headings.aiPoweredAnalysis")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Our machine learning model analyzes your resume's
-                        language patterns to determine overall sentiment
+                        {t("messages.sentiment.feature.aiPoweredBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -582,10 +580,9 @@ export default function SentimentAnalysis() {
                       <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                         <FileText className="h-6 w-6 text-green-600" />
                       </div>
-                      <h3 className="font-semibold mb-2">Instant Results</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.sentiment.instantResults")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Get immediate feedback on your resume's tone with a
-                        detailed sentiment score from 0-100
+                        {t("messages.sentiment.feature.instantResultsBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -596,11 +593,10 @@ export default function SentimentAnalysis() {
                         <Lightbulb className="h-6 w-6 text-purple-600" />
                       </div>
                       <h3 className="font-semibold mb-2">
-                        Actionable Insights
+                        {t("headings.actionableInsights")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Receive personalized recommendations to improve your
-                        resume's appeal to employers
+                        {t("messages.sentiment.feature.actionableBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -610,50 +606,36 @@ export default function SentimentAnalysis() {
               {/* Why Resume Sentiment Matters */}
               <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">
-                  Why Resume Sentiment Matters
+                  {t("headings.sentiment.whyMatters")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">
-                      First Impressions Count
+                      {t("headings.sentiment.firstImpressions")}
                     </h3>
                     <p className="text-muted-foreground">
-                      Recruiters spend an average of 6-7 seconds scanning a
-                      resume. The emotional tone of your content can make the
-                      difference between moving forward or being passed over. A
-                      positive sentiment creates an immediate favorable
-                      impression.
+                      {t("messages.sentiment.firstImpressionsBody")}
                     </p>
 
                     <h3 className="text-xl font-semibold">
-                      Stand Out from Competition
+                      {t("headings.sentiment.standOut")}
                     </h3>
                     <p className="text-muted-foreground">
-                      With hundreds of applications for each position, resumes
-                      with positive sentiment are more likely to capture
-                      attention and create memorable impressions that lead to
-                      interview invitations.
+                      {t("messages.sentiment.standOutBody")}
                     </p>
                   </div>
 
                   <div className="space-y-4">
                     <h3 className="text-xl font-semibold">
-                      Psychological Impact
+                      {t("headings.sentiment.psychologicalImpact")}
                     </h3>
                     <p className="text-muted-foreground">
-                      Positive language triggers favorable psychological
-                      responses in readers. Hiring managers are more likely to
-                      associate positive sentiment with confident, capable
-                      candidates who will contribute positively to their
-                      organization.
+                      {t("messages.sentiment.psychologicalImpactBody")}
                     </p>
 
-                    <h3 className="text-xl font-semibold">ATS Optimization</h3>
+                    <h3 className="text-xl font-semibold">{t("headings.sentiment.atsOptimization")}</h3>
                     <p className="text-muted-foreground">
-                      Modern Applicant Tracking Systems increasingly use
-                      sentiment analysis as a ranking factor. Resumes with
-                      positive sentiment scores may receive higher rankings in
-                      automated screening processes.
+                      {t("messages.sentiment.atsOptimizationBody")}
                     </p>
                   </div>
                 </div>
@@ -662,16 +644,16 @@ export default function SentimentAnalysis() {
               {/* How It Works */}
               <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">
-                  How Our Sentiment Analysis Works
+                  {t("headings.sentiment.howItWorks")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <span className="text-2xl font-bold text-primary">1</span>
                     </div>
-                    <h3 className="font-semibold mb-2">Upload Resume</h3>
+                    <h3 className="font-semibold mb-2">{t("actions.uploadResumeAction")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Upload your resume in PDF, Word, or text format
+                      {t("messages.sentiment.step.uploadBody")}
                     </p>
                   </div>
 
@@ -679,10 +661,9 @@ export default function SentimentAnalysis() {
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <span className="text-2xl font-bold text-primary">2</span>
                     </div>
-                    <h3 className="font-semibold mb-2">AI Processing</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.sentiment.step.aiProcessing")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Our ML model analyzes language patterns and emotional
-                      indicators
+                      {t("messages.sentiment.step.aiProcessingBody")}
                     </p>
                   </div>
 
@@ -690,10 +671,9 @@ export default function SentimentAnalysis() {
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <span className="text-2xl font-bold text-primary">3</span>
                     </div>
-                    <h3 className="font-semibold mb-2">Score Generation</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.sentiment.step.scoreGeneration")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Receive a detailed sentiment score from 0-100 with
-                      interpretation
+                      {t("messages.sentiment.step.scoreGenerationBody")}
                     </p>
                   </div>
 
@@ -701,10 +681,9 @@ export default function SentimentAnalysis() {
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <span className="text-2xl font-bold text-primary">4</span>
                     </div>
-                    <h3 className="font-semibold mb-2">Get Recommendations</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.sentiment.step.getRecommendations")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Receive personalized tips to improve your resume's
-                      sentiment
+                      {t("messages.sentiment.step.getRecommendationsBody")}
                     </p>
                   </div>
                 </div>
@@ -713,18 +692,16 @@ export default function SentimentAnalysis() {
               {/* Benefits Section */}
               <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">
-                  Benefits of Resume Sentiment Analysis
+                  {t("headings.sentiment.benefits")}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-green-600">
-                        Increase Interview Chances
+                        {t("headings.sentiment.benefit.interviewChances")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Resumes with positive sentiment are 40% more likely to
-                        receive interview invitations according to recruitment
-                        studies.
+                        {t("messages.sentiment.benefit.interviewChancesBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -732,11 +709,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-blue-600">
-                        Improve ATS Rankings
+                        {t("headings.sentiment.benefit.atsRankings")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Modern ATS systems factor sentiment into ranking
-                        algorithms, giving positive resumes higher visibility.
+                        {t("messages.sentiment.benefit.atsRankingsBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -744,11 +720,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-purple-600">
-                        Build Confidence
+                        {t("headings.sentiment.benefit.buildConfidence")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Understanding your resume's sentiment helps you approach
-                        job applications with greater confidence and clarity.
+                        {t("messages.sentiment.benefit.buildConfidenceBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -756,11 +731,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-orange-600">
-                        Save Time
+                        {t("headings.sentiment.benefit.saveTime")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Get instant feedback instead of waiting for application
-                        responses to gauge your resume's effectiveness.
+                        {t("messages.sentiment.benefit.saveTimeBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -768,11 +742,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-red-600">
-                        Competitive Advantage
+                        {t("headings.sentiment.benefit.competitiveAdvantage")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Stand out from other candidates by ensuring your resume
-                        creates the most positive first impression possible.
+                        {t("messages.sentiment.benefit.competitiveAdvantageBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -780,11 +753,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-3 text-teal-600">
-                        Data-Driven Insights
+                        {t("headings.sentiment.benefit.dataDriven")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Make resume improvements based on objective AI analysis
-                        rather than guesswork or subjective opinions.
+                        {t("messages.sentiment.benefit.dataDrivenBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -794,20 +766,16 @@ export default function SentimentAnalysis() {
               {/* FAQ Section */}
               <section className="space-y-6">
                 <h2 className="text-3xl font-bold text-center">
-                  Frequently Asked Questions
+                  {t("headings.faq")}
                 </h2>
                 <div className="space-y-4">
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-2">
-                        What is a good sentiment score for a resume?
+                        {t("headings.sentiment.faq.goodScore")}
                       </h3>
                       <p className="text-muted-foreground">
-                        A sentiment score above 60 is considered positive and
-                        will create a favorable impression. Scores between 31-60
-                        are neutral and have room for improvement, while scores
-                        below 30 indicate negative sentiment that should be
-                        addressed immediately.
+                        {t("messages.sentiment.faq.goodScoreBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -815,14 +783,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-2">
-                        How accurate is the sentiment analysis?
+                        {t("headings.sentiment.faq.accuracy")}
                       </h3>
                       <p className="text-muted-foreground">
-                        Our AI model has been trained on thousands of resumes
-                        and achieves over 85% accuracy in sentiment
-                        classification. The analysis considers context,
-                        industry-specific language, and professional terminology
-                        for precise results.
+                        {t("messages.sentiment.faq.accuracyBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -830,13 +794,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-2">
-                        Can I analyze multiple resumes?
+                        {t("headings.sentiment.faq.multipleResumes")}
                       </h3>
                       <p className="text-muted-foreground">
-                        Yes! Registered users can analyze all their saved
-                        resumes and compare sentiment scores to identify their
-                        strongest applications. You can also upload new files
-                        for analysis at any time.
+                        {t("messages.sentiment.faq.multipleResumesBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -844,12 +805,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-2">
-                        What file formats are supported?
+                        {t("headings.sentiment.faq.fileFormats")}
                       </h3>
                       <p className="text-muted-foreground">
-                        We support PDF, Microsoft Word (.doc, .docx), and plain
-                        text (.txt) files. Most modern resume formats are
-                        compatible with our text extraction and analysis system.
+                        {t("messages.sentiment.faq.fileFormatsBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -857,14 +816,10 @@ export default function SentimentAnalysis() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="font-semibold mb-2">
-                        Is my resume data secure?
+                        {t("headings.sentiment.faq.dataSecure")}
                       </h3>
                       <p className="text-muted-foreground">
-                        Absolutely. We use enterprise-grade encryption and never
-                        store your resume content permanently. Analysis is
-                        performed in real-time and data is immediately discarded
-                        after processing, ensuring complete privacy and
-                        security.
+                        {t("messages.sentiment.faq.dataSecureBody")}
                       </p>
                     </CardContent>
                   </Card>
@@ -874,11 +829,10 @@ export default function SentimentAnalysis() {
               {/* Call to Action */}
               <section className="text-center space-y-6 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
                 <h2 className="text-3xl font-bold">
-                  Ready to Optimize Your Resume?
+                  {t("headings.sentiment.ctaTitle")}
                 </h2>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Join thousands of job seekers who have improved their
-                  interview chances with our AI-powered sentiment analysis.
+                  {t("messages.sentiment.ctaBody")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button
@@ -888,11 +842,11 @@ export default function SentimentAnalysis() {
                     }
                   >
                     <Heart className="mr-2 h-5 w-5" />
-                    Analyze My Resume Now
+                    {t("actions.sentiment.analyzeNow")}
                   </Button>
                   <Link to="/signup">
                     <Button size="lg" variant="outline">
-                      Create Free Account
+                      {t("actions.createFreeAccount")}
                     </Button>
                   </Link>
                 </div>

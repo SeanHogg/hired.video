@@ -121,6 +121,16 @@ export interface ToolDefinition {
    */
   requiresSuperAdmin?: boolean;
   /**
+   * If true, this tool drives the Studio editor that is currently open in
+   * the tab (via the module-level studio-editor bridge). It is exposed to
+   * the model ONLY when an editor is actually mounted — `getCoachToolSpecs`
+   * self-gates on `getStudioEditor()` — so the AI CHRO offers "record /
+   * insert widget / add scene" in /studio and nowhere else. Client-only:
+   * these mutate in-browser canvas state, so the server-side /api/mcp
+   * endpoint cannot run them.
+   */
+  requiresStudioEditor?: boolean;
+  /**
    * If true, this tool MUTATES user data (resume content, profile fields).
    * The AI coach's ToolCallCard renders a preview + Apply button rather
    * than auto-applying — unless the user has opted into auto-apply via

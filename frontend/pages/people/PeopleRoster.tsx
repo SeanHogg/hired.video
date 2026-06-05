@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -44,20 +45,21 @@ import {
 } from "@/lib/people-ops/api";
 import { Users, UserPlus, Building2, Star, CalendarClock, CreditCard } from "lucide-react";
 
-const IDENTITY_LABEL: Record<EmployeeIdentityKind, string> = {
-  member: "Member",
-  invited: "Invited",
-  external: "External",
-  placeholder: "Placeholder",
+const IDENTITY_LABEL_KEY: Record<EmployeeIdentityKind, string> = {
+  member: "labels.peopleRoster.identityMember",
+  invited: "labels.peopleRoster.identityInvited",
+  external: "labels.peopleRoster.identityExternal",
+  placeholder: "labels.peopleRoster.identityPlaceholder",
 };
 
 function IdentityBadge({ employee }: { employee: Employee }) {
+  const { t } = useTranslation();
   const kind = employeeIdentityKind(employee);
   // Members are billable seats; everyone else is visible-but-not-billable.
   const variant = kind === "member" ? "default" : "secondary";
   return (
-    <Badge variant={variant} title={employee.billable ? "Billable seat" : "Not billable"}>
-      {IDENTITY_LABEL[kind]}
+    <Badge variant={variant} title={employee.billable ? t("labels.peopleRoster.billableSeat") : t("labels.peopleRoster.notBillable")}>
+      {t(IDENTITY_LABEL_KEY[kind])}
     </Badge>
   );
 }
@@ -88,6 +90,7 @@ function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: stri
 }
 
 function OrgTree({ nodes, depth = 0 }: { nodes: OrgNode[]; depth?: number }) {
+  const { t } = useTranslation();
   if (nodes.length === 0) return null;
   return (
     <ul className={depth === 0 ? "space-y-2" : "ml-6 border-l pl-4 space-y-2 mt-2"}>
@@ -96,7 +99,7 @@ function OrgTree({ nodes, depth = 0 }: { nodes: OrgNode[]; depth?: number }) {
           <div className="flex items-center gap-2">
             <span className="font-medium">{employeeName(n.employee)}</span>
             <span className="text-sm text-muted-foreground">{n.employee.position || "—"}</span>
-            {n.employee.isFounder && <Badge variant="secondary">Founder</Badge>}
+            {n.employee.isFounder && <Badge variant="secondary">{t("labels.peopleRoster.founder")}</Badge>}
           </div>
           <OrgTree nodes={n.reports} depth={depth + 1} />
         </li>
@@ -106,10 +109,11 @@ function OrgTree({ nodes, depth = 0 }: { nodes: OrgNode[]; depth?: number }) {
 }
 
 export default function PeopleRoster() {
+  const { t } = useTranslation();
   useSEO("/people/roster");
   useBreadcrumbs([
-    { name: "People Operations", url: "/people-operations" },
-    { name: "Roster", url: "/people/roster" },
+    { name: t("headings.peopleRoster.peopleOperations"), url: "/people-operations" },
+    { name: t("headings.peopleRoster.roster"), url: "/people/roster" },
   ]);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -140,13 +144,13 @@ export default function PeopleRoster() {
       setTree(hierarchy);
       setMetrics(m);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to load roster";
+      const msg = e instanceof Error ? e.message : t("errors.peopleRoster.loadFailed");
       if (/paid|upgrade/i.test(msg)) setUpgradeRequired(true);
       else setError(msg);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -203,19 +207,19 @@ export default function PeopleRoster() {
       setDialogOpen(false);
       await load();
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : "Save failed");
+      setFormError(e instanceof Error ? e.message : t("errors.peopleRoster.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (e: Employee) => {
-    if (!window.confirm(`Remove ${employeeName(e)} from the roster?`)) return;
+    if (!window.confirm(t("messages.peopleRoster.confirmRemove", { name: employeeName(e) }))) return;
     try {
       await peopleApi.deleteEmployee(e.id);
       await load();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Delete failed");
+      window.alert(err instanceof Error ? err.message : t("errors.peopleRoster.deleteFailed"));
     }
   };
 
@@ -224,14 +228,13 @@ export default function PeopleRoster() {
       <AppShell bgClassName="bg-background">
         <main className="px-6 py-16 max-w-2xl mx-auto text-center space-y-6">
           <Users className="h-12 w-12 mx-auto text-primary" />
-          <h1 className="text-3xl font-bold">People Operations is a paid employer feature</h1>
+          <h1 className="text-3xl font-bold">{t("headings.peopleRoster.upgradeTitle")}</h1>
           <p className="text-muted-foreground">
-            Manage your roster, org chart, 1:1s, and team health on a paid company plan. Upgrade
-            to unlock the full CHRO suite.
+            {t("messages.peopleRoster.upgradeBody")}
           </p>
           <div className="flex justify-center gap-3">
             <Button asChild>
-              <Link to="/people-operations">See plans & features</Link>
+              <Link to="/people-operations">{t("actions.peopleRoster.seePlans")}</Link>
             </Button>
           </div>
         </main>
@@ -244,66 +247,66 @@ export default function PeopleRoster() {
       <main className="px-6 py-8 space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Corporate Roster</h1>
-            <p className="text-muted-foreground">Your team directory and org chart — the spine of People Operations.</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t("headings.peopleRoster.title")}</h1>
+            <p className="text-muted-foreground">{t("messages.peopleRoster.subtitle")}</p>
           </div>
           <Button onClick={openCreate}>
-            <UserPlus className="h-4 w-4 mr-2" /> Add employee
+            <UserPlus className="h-4 w-4 mr-2" /> {t("actions.peopleRoster.addEmployee")}
           </Button>
         </div>
 
         {metrics && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <MetricCard icon={<Users className="h-5 w-5" />} label="Total headcount" value={String(metrics.totalHeadcount)} />
-            <MetricCard icon={<Building2 className="h-5 w-5" />} label="Active" value={String(metrics.activeHeadcount)} />
-            <MetricCard icon={<CreditCard className="h-5 w-5" />} label="Billable seats" value={String(metrics.billableSeats)} />
+            <MetricCard icon={<Users className="h-5 w-5" />} label={t("labels.peopleRoster.totalHeadcount")} value={String(metrics.totalHeadcount)} />
+            <MetricCard icon={<Building2 className="h-5 w-5" />} label={t("status.active")} value={String(metrics.activeHeadcount)} />
+            <MetricCard icon={<CreditCard className="h-5 w-5" />} label={t("labels.peopleRoster.billableSeats")} value={String(metrics.billableSeats)} />
             <MetricCard
               icon={<Star className="h-5 w-5" />}
-              label="Avg performance"
+              label={t("labels.peopleRoster.avgPerformance")}
               value={metrics.avgPerformanceRating ? metrics.avgPerformanceRating.toFixed(1) : "—"}
             />
-            <MetricCard icon={<CalendarClock className="h-5 w-5" />} label="Upcoming 1:1s" value={String(metrics.upcomingOneOnOnes)} />
+            <MetricCard icon={<CalendarClock className="h-5 w-5" />} label={t("labels.peopleRoster.upcomingOneOnOnes")} value={String(metrics.upcomingOneOnOnes)} />
           </div>
         )}
 
         <Tabs defaultValue="roster">
           <TabsList>
-            <TabsTrigger value="roster">Roster</TabsTrigger>
-            <TabsTrigger value="org">Org chart</TabsTrigger>
+            <TabsTrigger value="roster">{t("headings.peopleRoster.roster")}</TabsTrigger>
+            <TabsTrigger value="org">{t("headings.peopleRoster.orgChartTab")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="roster" className="space-y-4">
             <Input
-              placeholder="Search by name, role, department, or skill…"
+              placeholder={t("labels.peopleRoster.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
             {loading ? (
-              <p className="text-muted-foreground">Loading roster…</p>
+              <p className="text-muted-foreground">{t("messages.peopleRoster.loadingRoster")}</p>
             ) : error ? (
               <p className="text-red-600">{error}</p>
             ) : filtered.length === 0 ? (
-              <p className="text-muted-foreground">No employees yet. Add your first team member.</p>
+              <p className="text-muted-foreground">{t("messages.peopleRoster.emptyRoster")}</p>
             ) : (
               <Card>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Manager</TableHead>
-                      <TableHead>Identity</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{t("labels.name")}</TableHead>
+                      <TableHead>{t("fields.position.label")}</TableHead>
+                      <TableHead>{t("labels.peopleRoster.department")}</TableHead>
+                      <TableHead>{t("labels.peopleRoster.manager")}</TableHead>
+                      <TableHead>{t("labels.peopleRoster.identity")}</TableHead>
+                      <TableHead>{t("labels.status")}</TableHead>
+                      <TableHead className="text-right">{t("labels.peopleRoster.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filtered.map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="font-medium">
-                          {employeeName(e)} {e.isFounder && <Badge variant="secondary" className="ml-1">Founder</Badge>}
+                          {employeeName(e)} {e.isFounder && <Badge variant="secondary" className="ml-1">{t("labels.peopleRoster.founder")}</Badge>}
                         </TableCell>
                         <TableCell>{e.position || "—"}</TableCell>
                         <TableCell>{e.department || "—"}</TableCell>
@@ -315,8 +318,8 @@ export default function PeopleRoster() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(e)}>Edit</Button>
-                          <Button variant="ghost" size="sm" onClick={() => remove(e)}>Remove</Button>
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(e)}>{t("actions.edit")}</Button>
+                          <Button variant="ghost" size="sm" onClick={() => remove(e)}>{t("actions.remove")}</Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -329,11 +332,11 @@ export default function PeopleRoster() {
           <TabsContent value="org">
             <Card>
               <CardHeader>
-                <CardTitle>Organization chart</CardTitle>
+                <CardTitle>{t("headings.peopleRoster.orgChart")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {tree.length === 0 ? (
-                  <p className="text-muted-foreground">No org structure yet. Assign managers to build the tree.</p>
+                  <p className="text-muted-foreground">{t("messages.peopleRoster.emptyOrg")}</p>
                 ) : (
                   <OrgTree nodes={tree} />
                 )}
@@ -346,31 +349,31 @@ export default function PeopleRoster() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit employee" : "Add employee"}</DialogTitle>
+            <DialogTitle>{editing ? t("headings.peopleRoster.editEmployee") : t("actions.peopleRoster.addEmployee")}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>First name</Label>
+              <Label>{t("labels.peopleRoster.firstName")}</Label>
               <Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
             </div>
             <div>
-              <Label>Last name</Label>
+              <Label>{t("labels.peopleRoster.lastName")}</Label>
               <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
             </div>
             <div className="col-span-2">
-              <Label>Email</Label>
+              <Label>{t("fields.email.label")}</Label>
               <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
             <div>
-              <Label>Position</Label>
+              <Label>{t("fields.position.label")}</Label>
               <Input value={form.position ?? ""} onChange={(e) => setForm({ ...form, position: e.target.value })} />
             </div>
             <div>
-              <Label>Department</Label>
+              <Label>{t("labels.peopleRoster.department")}</Label>
               <Input value={form.department ?? ""} onChange={(e) => setForm({ ...form, department: e.target.value })} />
             </div>
             <div>
-              <Label>Employment type</Label>
+              <Label>{t("labels.peopleRoster.employmentType")}</Label>
               <Select
                 value={form.employmentType}
                 onValueChange={(v) => setForm({ ...form, employmentType: v as EmployeeWrite["employmentType"] })}
@@ -384,7 +387,7 @@ export default function PeopleRoster() {
               </Select>
             </div>
             <div>
-              <Label>Status</Label>
+              <Label>{t("labels.status")}</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as EmployeeWrite["status"] })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -395,14 +398,14 @@ export default function PeopleRoster() {
               </Select>
             </div>
             <div className="col-span-2">
-              <Label>Manager</Label>
+              <Label>{t("labels.peopleRoster.manager")}</Label>
               <Select
                 value={form.managerId ?? "none"}
                 onValueChange={(v) => setForm({ ...form, managerId: v === "none" ? null : v })}
               >
-                <SelectTrigger><SelectValue placeholder="No manager" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("labels.peopleRoster.noManager")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No manager</SelectItem>
+                  <SelectItem value="none">{t("labels.peopleRoster.noManager")}</SelectItem>
                   {employees
                     .filter((e) => !editing || e.id !== editing.id)
                     .map((e) => (
@@ -414,9 +417,9 @@ export default function PeopleRoster() {
           </div>
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)} disabled={saving}>{t("actions.cancel")}</Button>
             <Button onClick={save} disabled={saving || !form.firstName || !form.lastName || !form.email}>
-              {saving ? "Saving…" : editing ? "Save changes" : "Add employee"}
+              {saving ? t("messages.peopleRoster.saving") : editing ? t("actions.saveChanges") : t("actions.peopleRoster.addEmployee")}
             </Button>
           </DialogFooter>
         </DialogContent>

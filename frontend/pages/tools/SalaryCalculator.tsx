@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Calculator,
   Loader2,
@@ -114,6 +115,7 @@ interface SalaryData {
 }
 
 export default function SalaryCalculator() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
   const [jobTitle, setJobTitle] = useState("");
@@ -146,12 +148,12 @@ export default function SalaryCalculator() {
 
   const calculateSalary = async () => {
     if (!jobTitle.trim() || !location_.trim()) {
-      setError("Please enter both job title and location.");
+      setError(t("errors.enterJobTitleAndLocation"));
       return;
     }
 
     if (!industry) {
-      setError("Please select an industry.");
+      setError(t("errors.selectIndustry"));
       return;
     }
 
@@ -195,7 +197,7 @@ export default function SalaryCalculator() {
 
       // Check for API error response
       if ('success' in apiResponse && apiResponse.success === false && 'error' in apiResponse) {
-        throw new Error(apiResponse.error.message || "Salary analysis failed");
+        throw new Error(apiResponse.error.message || t("errors.salaryAnalysisFailed"));
       }
 
       // Get the result data — the raw shape varies between API versions so
@@ -212,7 +214,7 @@ export default function SalaryCalculator() {
         raw.percentiles?.p50 || raw.salaryRange?.percentile50 || 0;
 
       if (!baseSalary && !raw.salaryRange) {
-        throw new Error("Invalid salary data received from server.");
+        throw new Error(t("errors.invalidSalaryData"));
       }
 
       // Location adjustment can be a plain number (1 = no change) or an object { factor }
@@ -290,7 +292,7 @@ export default function SalaryCalculator() {
       clear();
     } catch (err: unknown) {
       console.error("Salary calculation failed:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to calculate salary. Please try again.";
+      const errorMessage = err instanceof Error ? err.message : t("errors.calculateSalaryFailed");
       setError(errorMessage);
     } finally {
       setIsCalculating(false);
@@ -323,15 +325,13 @@ export default function SalaryCalculator() {
       header={{
         icon: <Calculator className="h-6 w-6 text-brand-green" />,
         iconBgClassName: "bg-brand-green/10",
-        title: "AI-Powered Salary Calculator",
-        description:
-          "Get AI-driven salary insights based on current market data and trends",
+        title: t("tools.salaryCalculator.heading"),
+        description: t("tools.salaryCalculator.subtitle"),
       }}
       authOverlay={{
         show: showAuthOverlay,
-        title: "Salary Calculator",
-        message:
-          "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
+        title: t("tools.salaryCalculator.title"),
+        message: t("messages.signInToRunToolKeepInputs"),
       }}
     >
 
@@ -345,13 +345,10 @@ export default function SalaryCalculator() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-blue-900 mb-1">
-                        AI-Powered Analysis
+                        {t("headings.aiPoweredAnalysis")}
                       </h3>
                       <p className="text-sm text-blue-800">
-                        Our AI analyzes current market data, location
-                        cost-of-living, experience premiums, and industry
-                        standards to provide personalized salary estimates and
-                        comprehensive compensation insights.
+                        {t("messages.salaryAiAnalysisDesc")}
                       </p>
                     </div>
                   </div>
@@ -367,16 +364,16 @@ export default function SalaryCalculator() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Calculator className="h-5 w-5" />
-                      Calculate Your Salary
+                      {t("headings.calculateYourSalary")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Job Title *
+                        {t("fields.jobTitle.label")} *
                       </label>
                       <Input
-                        placeholder="e.g., Software Engineer, Marketing Manager"
+                        placeholder={t("fields.jobTitle.placeholderExample")}
                         value={jobTitle}
                         onChange={(e) => setJobTitle(e.target.value)}
                       />
@@ -384,10 +381,10 @@ export default function SalaryCalculator() {
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Location *
+                        {t("fields.location.label")} *
                       </label>
                       <Input
-                        placeholder="e.g., San Francisco, CA or New York, NY"
+                        placeholder={t("fields.location.placeholderExample")}
                         value={location_}
                         onChange={(e) => setLocation(e.target.value)}
                       />
@@ -395,7 +392,7 @@ export default function SalaryCalculator() {
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Years of Experience: {experience[0]} years
+                        {t("labels.salary.yearsOfExperience", { count: experience[0] })}
                       </label>
                       <Slider
                         value={experience}
@@ -406,18 +403,18 @@ export default function SalaryCalculator() {
                         className="w-full"
                       />
                       <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>0 years</span>
-                        <span>20+ years</span>
+                        <span>{t("labels.zeroYears")}</span>
+                        <span>{t("labels.twentyPlusYears")}</span>
                       </div>
                     </div>
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Education Level
+                        {t("fields.educationLevel.label")}
                       </label>
                       <Select value={education} onValueChange={setEducation}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select education level" />
+                          <SelectValue placeholder={t("fields.educationLevel.placeholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           {EDUCATION_LEVELS.map((level) => (
@@ -431,11 +428,11 @@ export default function SalaryCalculator() {
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Industry
+                        {t("fields.industry.label")}
                       </label>
                       <Select value={industry} onValueChange={setIndustry}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select industry" />
+                          <SelectValue placeholder={t("fields.industry.placeholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           {INDUSTRIES.map((ind) => (
@@ -449,10 +446,10 @@ export default function SalaryCalculator() {
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Company (Optional)
+                        {t("fields.companyOptional.label")}
                       </label>
                       <Input
-                        placeholder="e.g., Google, Microsoft, Startup"
+                        placeholder={t("fields.companyOptional.placeholder")}
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
                       />
@@ -469,12 +466,12 @@ export default function SalaryCalculator() {
                       {isCalculating ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          AI Analyzing...
+                          {t("status.aiAnalyzing")}
                         </>
                       ) : (
                         <>
                           <Calculator className="h-4 w-4 mr-2" />
-                          Get AI Salary Analysis
+                          {t("actions.getAiSalaryAnalysis")}
                         </>
                       )}
                     </Button>
@@ -497,7 +494,7 @@ export default function SalaryCalculator() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <DollarSign className="h-5 w-5" />
-                          AI Salary Analysis
+                          {t("headings.aiSalaryAnalysis")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -506,7 +503,7 @@ export default function SalaryCalculator() {
                             {formatSalary(salaryData.baseSalary)}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            Estimated Annual Salary
+                            {t("labels.estimatedAnnualSalary")}
                           </p>
                         </div>
 
@@ -516,7 +513,7 @@ export default function SalaryCalculator() {
                               {formatSalary(salaryData.lowRange)}
                             </div>
                             <div className="text-muted-foreground">
-                              Low Range
+                              {t("labels.lowRange")}
                             </div>
                           </div>
                           <div className="text-center p-3 bg-muted rounded-lg">
@@ -524,7 +521,7 @@ export default function SalaryCalculator() {
                               {formatSalary(salaryData.highRange)}
                             </div>
                             <div className="text-muted-foreground">
-                              High Range
+                              {t("labels.highRange")}
                             </div>
                           </div>
                         </div>
@@ -536,41 +533,40 @@ export default function SalaryCalculator() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <TrendingUp className="h-5 w-5" />
-                          Salary Breakdown
+                          {t("headings.salaryBreakdown")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex justify-between items-center">
-                          <span>Market Average</span>
+                          <span>{t("labels.marketAverage")}</span>
                           <span className="font-semibold">
                             {formatSalary(salaryData.marketAverage)}
                           </span>
                         </div>
 
                         <div className="flex justify-between items-center">
-                          <span>25th Percentile</span>
+                          <span>{t("labels.percentile25")}</span>
                           <span className="font-semibold">
                             {formatSalary(salaryData.percentile25)}
                           </span>
                         </div>
 
                         <div className="flex justify-between items-center">
-                          <span>75th Percentile</span>
+                          <span>{t("labels.percentile75")}</span>
                           <span className="font-semibold">
                             {formatSalary(salaryData.percentile75)}
                           </span>
                         </div>
 
                         <div className="flex justify-between items-center border-t pt-3">
-                          <span>Total Compensation</span>
+                          <span>{t("labels.totalCompensation")}</span>
                           <span className="font-semibold text-brand-green">
                             {formatSalary(salaryData.totalCompensation)}
                           </span>
                         </div>
 
                         <div className="text-xs text-muted-foreground">
-                          * Total compensation includes estimated benefits and
-                          bonuses
+                          {t("messages.totalCompensationNote")}
                         </div>
                       </CardContent>
                     </Card>
@@ -580,14 +576,14 @@ export default function SalaryCalculator() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
-                          Salary Adjustments
+                          {t("headings.salaryAdjustments")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="flex items-center gap-2">
                             <MapPin className="h-4 w-4" />
-                            Location Adjustment
+                            {t("labels.locationAdjustment")}
                           </span>
                           <Badge
                             variant={
@@ -604,7 +600,7 @@ export default function SalaryCalculator() {
                         <div className="flex justify-between items-center">
                           <span className="flex items-center gap-2">
                             <Briefcase className="h-4 w-4" />
-                            Experience Adjustment
+                            {t("labels.experienceAdjustment")}
                           </span>
                           <Badge variant="default">
                             +{salaryData.experienceAdjustment}%
@@ -618,7 +614,7 @@ export default function SalaryCalculator() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <Briefcase className="h-5 w-5" />
-                          Industry Comparison
+                          {t("headings.industryComparison")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -653,21 +649,28 @@ export default function SalaryCalculator() {
 
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={resetCalculator}>
-                        Calculate Another
+                        {t("actions.calculateAnother")}
                       </Button>
                       <Button
                         onClick={async () => {
-                          const report = `Salary Report for ${jobTitle} in ${location_}\n\nEstimated Salary: ${formatSalary(salaryData.baseSalary)}\nSalary Range: ${formatSalary(salaryData.lowRange)} - ${formatSalary(salaryData.highRange)}\nTotal Compensation: ${formatSalary(salaryData.totalCompensation)}\n\nGenerated by hired.video Salary Calculator`;
+                          const report = t("messages.salary.reportBody", {
+                            jobTitle,
+                            location: location_,
+                            estimated: formatSalary(salaryData.baseSalary),
+                            low: formatSalary(salaryData.lowRange),
+                            high: formatSalary(salaryData.highRange),
+                            total: formatSalary(salaryData.totalCompensation),
+                          });
                           try {
                             await navigator.clipboard.writeText(report);
-                            toast.success("Salary report copied to clipboard");
+                            toast.success(t("messages.salary.reportCopied"));
                           } catch {
-                            toast.error("Could not copy to clipboard");
+                            toast.error(t("errors.couldNotCopyToClipboard"));
                           }
                         }}
                         variant="outline"
                       >
-                        Copy Report
+                        {t("actions.copyReport")}
                       </Button>
                     </div>
                   </>
@@ -677,20 +680,19 @@ export default function SalaryCalculator() {
                   <Card>
                     <CardContent className="p-8 text-center">
                       <Calculator className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="font-semibold mb-2">Ready to Calculate</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.readyToCalculate")}</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Enter your job details to get personalized salary
-                        insights and market data.
+                        {t("messages.readyToCalculateBody")}
                       </p>
 
                       <div className="text-left bg-muted rounded-lg p-4 mt-4">
-                        <h4 className="font-medium mb-2">What you'll get:</h4>
+                        <h4 className="font-medium mb-2">{t("headings.whatYoullGet")}</h4>
                         <ul className="text-sm text-muted-foreground space-y-1">
-                          <li>• Estimated salary range for your role</li>
-                          <li>• Location-based adjustments</li>
-                          <li>• Industry comparisons</li>
-                          <li>• Experience level impact</li>
-                          <li>• Total compensation estimates</li>
+                          <li>• {t("labels.salary.benefitSalaryRange")}</li>
+                          <li>• {t("labels.salary.benefitLocationAdjustments")}</li>
+                          <li>• {t("labels.salary.benefitIndustryComparisons")}</li>
+                          <li>• {t("labels.salary.benefitExperienceImpact")}</li>
+                          <li>• {t("labels.salary.benefitTotalComp")}</li>
                         </ul>
                       </div>
                     </CardContent>
@@ -704,13 +706,8 @@ export default function SalaryCalculator() {
               <div className="mt-8">
                 <Alert className="bg-amber-50 border-amber-200">
                   <AlertDescription className="text-amber-800">
-                    <strong>AI-Generated Estimates:</strong> These salary
-                    estimates are generated by AI based on market analysis and
-                    should be used as a general guide. Actual salaries may vary
-                    based on specific company policies, negotiation, additional
-                    skills, and current market conditions. We recommend using
-                    multiple sources and conducting your own research for the
-                    most accurate salary information.
+                    <strong>{t("labels.salary.aiDisclaimerLabel")}</strong>{" "}
+                    {t("messages.salary.aiDisclaimerBody")}
                   </AlertDescription>
                 </Alert>
               </div>

@@ -28,6 +28,11 @@ export interface StudioShortcutHandlers {
    *  (widget or scene). Suppressed while the user is typing into an
    *  input/textarea so the backspace doesn't eat their text. */
   onDelete: () => void;
+  /** Open the screen recorder. Bound to Alt+Shift+R — the closest
+   *  in-page-safe match to the Win+Shift+R muscle memory (Ctrl+Shift+R
+   *  is the browser hard-reload and can't be reliably intercepted).
+   *  Optional so callers that don't wire recording still type-check. */
+  onOpenRecorder?: () => void;
 }
 
 /** Whether keystrokes targeted at this element should be ignored
@@ -63,6 +68,18 @@ export function useStudioShortcuts(handlers: StudioShortcutHandlers): void {
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         h.onDelete();
+        return;
+      }
+
+      // Alt+Shift+R → open the recorder. Lives ABOVE the Cmd/Ctrl gate
+      // because it deliberately uses Alt (not Cmd/Ctrl) to dodge the
+      // browser's reserved Ctrl+Shift+R hard-reload. `e.code` ("KeyR")
+      // is layout-stable and, on some platforms, Alt mutates `e.key`.
+      if (e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey && e.code === "KeyR") {
+        if (h.onOpenRecorder) {
+          e.preventDefault();
+          h.onOpenRecorder();
+        }
         return;
       }
 

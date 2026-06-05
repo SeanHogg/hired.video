@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Sparkles,
   Loader2,
@@ -45,6 +46,7 @@ import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { ToolShell } from "@/components/tools/ToolShell";
 
 export default function ResumeTailor() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
@@ -113,7 +115,7 @@ export default function ResumeTailor() {
     const allowedMime = /^text\/|application\/json/;
     const allowedExt = /\.(txt|md|html?|json|jd)$/i;
     if (!allowedMime.test(file.type) && !allowedExt.test(file.name)) {
-      setError("Unsupported file. Upload a .txt, .md, or .html job description.");
+      setError(t("errors.unsupportedJobDescriptionFile"));
       return;
     }
     try {
@@ -122,7 +124,7 @@ export default function ResumeTailor() {
       setUploadedFileName(file.name);
     } catch (err) {
       console.error("[ResumeTailor] file read failed", err);
-      setError("Could not read that file — try copying the contents into the Paste tab.");
+      setError(t("errors.couldNotReadFilePasteInstead"));
     }
   };
 
@@ -131,8 +133,8 @@ export default function ResumeTailor() {
     if (!canGenerate) {
       setError(
         jobSource === "saved"
-          ? "Pick one of your saved jobs first."
-          : "Enter a job description first.",
+          ? t("errors.pickSavedJobFirst")
+          : t("errors.enterJobDescriptionFirst"),
       );
       return;
     }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -55,14 +56,16 @@ interface PlacementRow {
 
 type TabKey = "overview" | "documents" | "timesheets" | "margin";
 
-const TABS: PageHeaderTab[] = [
-  { key: "overview", label: "Overview", icon: Briefcase },
-  { key: "documents", label: "Documents", icon: FileText },
-  { key: "timesheets", label: "Timesheets", icon: Clock },
-  { key: "margin", label: "Margin", icon: DollarSign },
+/** Module-scope tab defs carry a stable i18n key resolved at render. */
+const TABS: { key: string; labelKey: string; icon: PageHeaderTab["icon"] }[] = [
+  { key: "overview", labelKey: "tabs.overview", icon: Briefcase },
+  { key: "documents", labelKey: "labels.placement.documents", icon: FileText },
+  { key: "timesheets", labelKey: "labels.placement.timesheets", icon: Clock },
+  { key: "margin", labelKey: "labels.placement.margin", icon: DollarSign },
 ];
 
 export default function PlacementDetail() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
@@ -87,14 +90,14 @@ export default function PlacementDetail() {
   }, [id]);
 
   const tabsWithLinks = useMemo<PageHeaderTab[]>(() =>
-    TABS.map((t) => ({ ...t, to: `?tab=${t.key}` })),
-    []);
+    TABS.map((tab) => ({ key: tab.key, icon: tab.icon, label: t(tab.labelKey), to: `?tab=${tab.key}` })),
+    [t]);
 
   if (loading) {
     return (
       <AppShell bgClassName="bg-background">
         <div className="max-w-6xl mx-auto p-6 text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading placement…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("messages.placement.loading")}
         </div>
       </AppShell>
     );
@@ -105,9 +108,9 @@ export default function PlacementDetail() {
         <div className="max-w-6xl mx-auto p-6">
           <Card>
             <CardHeader>
-              <CardTitle>Placement not found</CardTitle>
+              <CardTitle>{t("headings.placement.notFound")}</CardTitle>
               <CardDescription>
-                {error ?? "Either this placement doesn't exist or you don't own it."}
+                {error ?? t("messages.placement.notFoundBody")}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -121,7 +124,7 @@ export default function PlacementDetail() {
       <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard"><ArrowLeft className="h-4 w-4 mr-1" /> Back</Link>
+            <Link to="/dashboard"><ArrowLeft className="h-4 w-4 mr-1" /> {t("actions.back")}</Link>
           </Button>
         </div>
 
@@ -165,20 +168,21 @@ export default function PlacementDetail() {
  *  local state instead of URL routing — avoids a separate router config
  *  for sub-tabs while still feeling like real tabs. */
 function TabSwitcher({ activeTab, onChange }: { activeTab: TabKey; onChange: (t: TabKey) => void }) {
+  const { t } = useTranslation();
   return (
     <div className="-mt-4 flex gap-1 border-b">
-      {TABS.map((t) => (
+      {TABS.map((tab) => (
         <button
-          key={t.key}
+          key={tab.key}
           type="button"
-          onClick={() => onChange(t.key as TabKey)}
+          onClick={() => onChange(tab.key as TabKey)}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === t.key
+            activeTab === tab.key
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          {t.label}
+          {t(tab.labelKey)}
         </button>
       ))}
     </div>
@@ -186,6 +190,7 @@ function TabSwitcher({ activeTab, onChange }: { activeTab: TabKey; onChange: (t:
 }
 
 function OverviewTab({ placement }: { placement: PlacementRow }) {
+  const { t } = useTranslation();
   const fmtRate = (rate: string | null) =>
     rate
       ? new Intl.NumberFormat(undefined, { style: "currency", currency: placement.currency ?? "USD" })
@@ -195,40 +200,40 @@ function OverviewTab({ placement }: { placement: PlacementRow }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Engagement details</CardTitle>
+        <CardTitle>{t("headings.placement.engagementDetails")}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div>
-            <div className="text-muted-foreground text-xs">Bill rate</div>
+            <div className="text-muted-foreground text-xs">{t("labels.placement.billRate")}</div>
             <div className="font-mono tabular-nums">{fmtRate(placement.billRateHourly)} / h</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">Pay rate</div>
+            <div className="text-muted-foreground text-xs">{t("labels.placement.payRate")}</div>
             <div className="font-mono tabular-nums">{fmtRate(placement.payRateHourly)} / h</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">Currency</div>
+            <div className="text-muted-foreground text-xs">{t("fields.currency.label")}</div>
             <div>{placement.currency ?? "USD"}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">Start</div>
+            <div className="text-muted-foreground text-xs">{t("labels.start")}</div>
             <div>{placement.startDate ? new Date(placement.startDate).toLocaleDateString() : "—"}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">End</div>
+            <div className="text-muted-foreground text-xs">{t("labels.placement.end")}</div>
             <div>{placement.endDate ? new Date(placement.endDate).toLocaleDateString() : "—"}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">Recruiter</div>
+            <div className="text-muted-foreground text-xs">{t("labels.recruiter")}</div>
             <div>{placement.recruiterName}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">PO #</div>
+            <div className="text-muted-foreground text-xs">{t("labels.placement.poNumber")}</div>
             <div>{placement.poNumber ?? "—"}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-xs">MSA ref</div>
+            <div className="text-muted-foreground text-xs">{t("labels.placement.msaRef")}</div>
             <div>{placement.msaRef ?? "—"}</div>
           </div>
         </div>
@@ -238,6 +243,7 @@ function OverviewTab({ placement }: { placement: PlacementRow }) {
 }
 
 function DocumentsTab({ placementId, toast }: { placementId: string; toast: ReturnType<typeof useToast>["toast"] }) {
+  const { t } = useTranslation();
   const [docs, setDocs] = useState<PlacementDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -248,11 +254,11 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
       const r = await workforceService.listDocuments();
       setDocs(r.documents.filter((d) => d.placementId === placementId));
     } catch (e) {
-      toast({ title: "Failed to load documents", description: String((e as Error).message), variant: "destructive" });
+      toast({ title: t("messages.placement.docsLoadFailed"), description: String((e as Error).message), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [placementId, toast]);
+  }, [placementId, toast, t]);
 
   useEffect(() => { refresh(); }, [refresh]);
 

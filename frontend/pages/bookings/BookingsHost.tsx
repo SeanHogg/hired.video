@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { AppShell } from "@/components/AppShell";
@@ -46,14 +47,24 @@ import {
 import { BOOKING_DURATIONS_MINUTES } from "@shared/bookings";
 import { apiClient } from "@/lib/api-client";
 
-const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Stable i18n keys (Sun…Sat) resolved at render with t(); no t() at module scope.
+const WEEKDAY_NAME_KEYS = [
+  "labels.bookings.weekday.sun",
+  "labels.bookings.weekday.mon",
+  "labels.bookings.weekday.tue",
+  "labels.bookings.weekday.wed",
+  "labels.bookings.weekday.thu",
+  "labels.bookings.weekday.fri",
+  "labels.bookings.weekday.sat",
+];
 
 export default function BookingsHost() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Bookings", url: "/bookings" }]);
+  useBreadcrumbs([{ name: t("headings.bookings.title"), url: "/bookings" }]);
 
   const [host, setHost] = useState<Awaited<ReturnType<typeof fetchOwnHost>> | null>(null);
   const [hostError, setHostError] = useState<string | null>(null);
@@ -89,9 +100,9 @@ export default function BookingsHost() {
       setRules(r);
       setReservations(res);
     } catch (e: any) {
-      toast({ title: "Could not load data", description: e?.message });
+      toast({ title: t("errors.bookings.loadDataFailed"), description: e?.message });
     }
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,11 +132,11 @@ export default function BookingsHost() {
       const h = await fetchOwnHost();
       setHost(h);
       setHostError(null);
-      toast({ title: "Bookings enabled" });
+      toast({ title: t("messages.bookings.enabled") });
     } catch (e: any) {
       toast({
-        title: "Could not enable bookings",
-        description: e?.message ?? "Try again later",
+        title: t("errors.bookings.enableFailed"),
+        description: e?.message ?? t("messages.tryAgainLater"),
         variant: "destructive",
       });
     }
@@ -133,7 +144,7 @@ export default function BookingsHost() {
 
   async function handleCreateOffering() {
     if (!offName.trim() || !offSlug.trim()) {
-      toast({ title: "Name + slug required" });
+      toast({ title: t("errors.bookings.nameSlugRequired") });
       return;
     }
     try {
@@ -156,9 +167,9 @@ export default function BookingsHost() {
       setOffMeetLink("");
       setOffPriceCents(0);
       await reload();
-      toast({ title: "Offering created" });
+      toast({ title: t("messages.bookings.offeringCreated") });
     } catch (e: any) {
-      toast({ title: "Could not create", description: e?.message });
+      toast({ title: t("errors.bookings.createFailed"), description: e?.message });
     }
   }
 
@@ -167,13 +178,13 @@ export default function BookingsHost() {
       await deleteOffering(id);
       await reload();
     } catch (e: any) {
-      toast({ title: "Could not deactivate", description: e?.message });
+      toast({ title: t("errors.bookings.deactivateFailed"), description: e?.message });
     }
   }
 
   async function handleAddRule() {
     if (ruleEnd <= ruleStart) {
-      toast({ title: "End must be after start" });
+      toast({ title: t("errors.bookings.endAfterStart") });
       return;
     }
     try {
@@ -184,7 +195,7 @@ export default function BookingsHost() {
       });
       await reload();
     } catch (e: any) {
-      toast({ title: "Could not add rule", description: e?.message });
+      toast({ title: t("errors.bookings.addRuleFailed"), description: e?.message });
     }
   }
 
@@ -193,7 +204,7 @@ export default function BookingsHost() {
       await deleteAvailabilityRule(id);
       await reload();
     } catch (e: any) {
-      toast({ title: "Could not delete rule", description: e?.message });
+      toast({ title: t("errors.bookings.deleteRuleFailed"), description: e?.message });
     }
   }
 
@@ -375,7 +386,7 @@ export default function BookingsHost() {
             {rules.map((r) => (
               <div key={r.id} className="flex items-center justify-between border rounded-md p-2">
                 <div className="text-sm">
-                  {WEEKDAY_NAMES[r.weekday]} · {r.startTimeLocal.slice(0, 5)}–
+                  {t(WEEKDAY_NAME_KEYS[r.weekday] ?? "")} · {r.startTimeLocal.slice(0, 5)}–
                   {r.endTimeLocal.slice(0, 5)}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => handleDeleteRule(r.id)}>
@@ -394,9 +405,9 @@ export default function BookingsHost() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {WEEKDAY_NAMES.map((d, i) => (
-                      <SelectItem key={d} value={String(i)}>
-                        {d}
+                    {WEEKDAY_NAME_KEYS.map((k, i) => (
+                      <SelectItem key={k} value={String(i)}>
+                        {t(k)}
                       </SelectItem>
                     ))}
                   </SelectContent>

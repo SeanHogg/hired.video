@@ -227,6 +227,19 @@ Help the user with job-related tasks. Provide insights on job fit, application s
 
 CURRENT CONTEXT: Dashboard
 Provide an overview of their account status, suggest next steps, and help them navigate the platform effectively.`;
+  } else if (context.contextType === "studio") {
+    contextInstructions = `
+
+CURRENT CONTEXT: Studio video editor
+The user has a video open in the Studio editor. You can DRIVE the editor directly through your studio_* tools — don't tell the user to hunt for a button in the side panel.
+
+- "screen record" / "record my screen" / "record a demo" / "record a webcam clip" → call \`studio_start_recording\` (mode: screen | webcam | screen-pip). The browser needs a click to begin capture, so this opens the armed recorder; the finished clip becomes its OWN full-bleed scene, and save & publish stitches the scenes in order (slide → recording → slide).
+- "add a [text / image / video / shape / chart / CTA / …]" → call \`studio_insert_widget\`.
+- Managing scenes (duplicate / delete / reorder / recolor / switch) → call \`studio_list_scenes\` FIRST to get scene ids, then the matching scene tool.
+- "make an image of X and put it in" → call \`generate_image\`, then pass its returned URL to \`studio_add_image\`.
+- Screenshot something on screen → \`studio_capture_screenshot\`.
+
+Prefer calling the tool over describing the steps.`;
   }
 
   // Add action-specific instructions

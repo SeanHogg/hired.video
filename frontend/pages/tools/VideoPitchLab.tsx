@@ -15,6 +15,7 @@
 //      the recruiter sees.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -64,6 +65,7 @@ interface PitchDraft {
 }
 
 export default function VideoPitchLab() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [length, setLength] = useState<Length>(60);
   const [tone, setTone] = useState<Tone>("professional");
@@ -73,8 +75,8 @@ export default function VideoPitchLab() {
   const [step, setStep] = useState<"setup" | "record" | "review">("setup");
   const [recording, setRecording] = useState<{ url: string; durationSec: number } | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
-  const [authMessage, setAuthMessage] = useState(
-    "Sign in to draft, record, and save your video pitch — we'll keep your script.",
+  const [authMessage, setAuthMessage] = useState(() =>
+    t("messages.videoPitch.signInDefault"),
   );
 
   const { restored, snapshot, clear } = usePendingToolInput<PitchDraft>();
@@ -114,9 +116,9 @@ export default function VideoPitchLab() {
       const next = await setPitchProfile(recording.url);
       setSavedPitchUrl(next.videoPitchUrl);
       clear();
-      toast.success("Saved as your profile pitch — recruiters will see it on your profile");
+      toast.success(t("messages.videoPitch.savedProfilePitch"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save");
+      toast.error(err instanceof Error ? err.message : t("errors.couldNotSave"));
     } finally {
       setSavingPitch(false);
     }
@@ -131,9 +133,7 @@ export default function VideoPitchLab() {
   async function handleGenerateScript() {
     if (!isAuthenticated) {
       snapshot(currentDraft());
-      setAuthMessage(
-        "Sign in to let AI draft your pitch script — we'll keep the length and tone you picked.",
-      );
+      setAuthMessage(t("messages.videoPitch.signInDraftScript"));
       setShowAuthOverlay(true);
       return;
     }
@@ -146,7 +146,7 @@ export default function VideoPitchLab() {
       });
       setScript(result.script);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not generate a script");
+      toast.error(err instanceof Error ? err.message : t("errors.couldNotGenerateScript"));
     } finally {
       setGenerating(false);
     }
@@ -155,9 +155,7 @@ export default function VideoPitchLab() {
   function handleContinueToRecord() {
     if (!isAuthenticated) {
       snapshot(currentDraft());
-      setAuthMessage(
-        "Sign in to record your pitch — we'll keep your script ready to go.",
-      );
+      setAuthMessage(t("messages.videoPitch.signInRecord"));
       setShowAuthOverlay(true);
       return;
     }

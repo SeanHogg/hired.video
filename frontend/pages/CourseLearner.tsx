@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
@@ -74,11 +75,12 @@ const SOURCE_ICON: Record<CourseLessonSourceType, typeof FileText> = {
   external_url: ExternalLink,
 };
 
-const LESSON_TYPE_LABEL: Record<CourseLessonSourceType, string> = {
-  text_md: "Reading",
-  studio_video: "Video",
-  scorm_package: "Interactive SCORM",
-  external_url: "External link",
+// Stable i18n keys resolved at render with t(); never call t() at module scope.
+const LESSON_TYPE_LABEL_KEY: Record<CourseLessonSourceType, string> = {
+  text_md: "labels.courseLearner.lessonType.reading",
+  studio_video: "labels.courseLearner.lessonType.video",
+  scorm_package: "labels.courseLearner.lessonType.scorm",
+  external_url: "labels.courseLearner.lessonType.externalLink",
 };
 
 export default function CourseLearner() {
@@ -86,6 +88,7 @@ export default function CourseLearner() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [data, setData] = useState<CourseLearnerContent | null>(null);
   // Celebration modal — fires once when the enrollment transitions
@@ -230,23 +233,23 @@ export default function CourseLearner() {
       signalBadgeRefresh();
     } catch (e: unknown) {
       toast({
-        title: "Couldn't save progress",
-        description: e instanceof Error ? e.message : "Try again",
+        title: t("errors.courseLearner.saveProgressFailed"),
+        description: e instanceof Error ? e.message : t("actions.tryAgain"),
         variant: "destructive",
       });
     }
-  }, [data, toast]);
+  }, [data, toast, t]);
 
   const markComplete = useCallback(async () => {
     if (!data || !activeLesson) return;
     setMarkingComplete(true);
     try {
       await applyLessonPassed(activeLesson.id);
-      toast({ title: "Lesson complete" });
+      toast({ title: t("messages.courseLearner.lessonComplete") });
     } finally {
       setMarkingComplete(false);
     }
-  }, [data, activeLesson, applyLessonPassed, toast]);
+  }, [data, activeLesson, applyLessonPassed, toast, t]);
 
   // Called by <ScormPlayer> when the runtime fires Commit with passed/
   // completed. Same path as markComplete so completion celebration fires
@@ -264,7 +267,7 @@ export default function CourseLearner() {
     return (
       <AppShell>
         <div className="min-h-[60vh] flex items-center justify-center text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading course…
+          <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t("status.loadingCourse")}
         </div>
       </AppShell>
     );
@@ -287,7 +290,7 @@ export default function CourseLearner() {
         <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <GraduationCap className="h-4 w-4" /> Course
+              <GraduationCap className="h-4 w-4" /> {t("labels.courseLearner.course")}
               {course.category && <>· <Badge variant="outline">{course.category}</Badge></>}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold truncate">{course.title}</h1>
@@ -295,19 +298,19 @@ export default function CourseLearner() {
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground mb-1">
-              {passedCount} of {totalLessons} lessons complete
+              {t("labels.courseLearner.lessonsComplete", { passed: passedCount, total: totalLessons })}
             </div>
             <Progress value={progressPct} className="w-48" />
             {enrollment.passed && (
               <div className="mt-2 flex items-center justify-end gap-2">
                 <span className="flex items-center gap-1 text-sm text-emerald-600">
                   <Award className="h-4 w-4" />
-                  Course passed
+                  {t("status.courseLearner.coursePassed")}
                 </span>
                 {data.certificate && (
                   <Button asChild size="sm" variant="outline">
                     <a href={`/verify/${data.certificate.certNumber}`} target="_blank" rel="noreferrer">
-                      View certificate
+                      {t("actions.courseLearner.viewCertificate")}
                     </a>
                   </Button>
                 )}
@@ -318,7 +321,7 @@ export default function CourseLearner() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[20rem_1fr] gap-4">
           {/* Curriculum rail */}
-          <nav aria-label="Course curriculum" className="space-y-4">
+          <nav aria-label={t("labels.courseLearner.curriculumNav")} className="space-y-4">
             <Card>
               <CardContent className="p-3 space-y-3">
                 {modules
@@ -348,7 +351,7 @@ export default function CourseLearner() {
                 {unfiled.length > 0 && (
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 px-2">
-                      Other lessons
+                      {t("labels.courseLearner.otherLessons")}
                     </div>
                     <ul className="space-y-0.5">
                       {unfiled.map((l) => (
@@ -365,13 +368,13 @@ export default function CourseLearner() {
                 )}
                 {totalLessons === 0 && (
                   <div className="p-4 text-sm text-muted-foreground text-center">
-                    This course has no lessons yet.
+                    {t("messages.courseLearner.noLessonsYet")}
                   </div>
                 )}
               </CardContent>
             </Card>
             <Button variant="outline" className="w-full" onClick={() => navigate(`/courses/${course.userId}/${course.slug}`)}>
-              ← Back to course page
+              ← {t("actions.courseLearner.backToCoursePage")}
             </Button>
           </nav>
 
@@ -397,8 +400,10 @@ export default function CourseLearner() {
                   <div className="p-4 border-b flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs text-muted-foreground">
-                        {LESSON_TYPE_LABEL[activeLesson.sourceType]}
-                        {activeLesson.estimatedMinutes ? ` · ${activeLesson.estimatedMinutes}m` : ""}
+                        {t(LESSON_TYPE_LABEL_KEY[activeLesson.sourceType])}
+                        {activeLesson.estimatedMinutes
+                          ? ` · ${t("labels.courseLearner.minutesShort", { count: activeLesson.estimatedMinutes })}`
+                          : ""}
                       </div>
                       <h2 className="font-semibold truncate">{activeLesson.title}</h2>
                       {activeLesson.summary && (
@@ -419,10 +424,10 @@ export default function CourseLearner() {
                               `/services/creator/courses?courseId=${course.id}&lessonId=${activeLesson.id}`,
                             )
                           }
-                          title="Edit this lesson"
+                          title={t("actions.courseLearner.editLesson")}
                         >
                           <Pencil className="h-4 w-4 mr-1" />
-                          Edit
+                          {t("actions.edit")}
                         </Button>
                       )}
                       {/* SCORM lessons mark complete on their own Commit event;
@@ -442,8 +447,8 @@ export default function CourseLearner() {
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                           )}
                           {enrollment.progress?.[activeLesson.id]?.status === "passed"
-                            ? "Completed"
-                            : "Mark complete"}
+                            ? t("labels.completed")
+                            : t("actions.courseLearner.markComplete")}
                         </Button>
                       )}
                     </div>
@@ -460,7 +465,7 @@ export default function CourseLearner() {
             ) : (
               <Card>
                 <CardContent className="p-12 text-center text-muted-foreground">
-                  Pick a lesson from the rail to start.
+                  {t("messages.courseLearner.pickLesson")}
                 </CardContent>
               </Card>
             )}
@@ -506,6 +511,7 @@ function CourseCompletePanel({
   issuesCertificate: boolean;
   certNumber: string | null;
 }) {
+  const { t } = useTranslation();
   if (!passed) return null;
   return (
     <Card className="border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-900">
@@ -515,11 +521,12 @@ function CourseCompletePanel({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-emerald-900 dark:text-emerald-200">
-            Course complete
+            {t("headings.courseLearner.courseComplete")}
           </p>
           <p className="text-sm text-emerald-800/80 dark:text-emerald-300/80">
-            You've finished every lesson in {courseTitle}. Your progress is
-            saved{issuesCertificate ? " and your certificate is ready" : ""}.
+            {issuesCertificate
+              ? t("messages.courseLearner.completePanelWithCert", { courseTitle })
+              : t("messages.courseLearner.completePanel", { courseTitle })}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -527,12 +534,12 @@ function CourseCompletePanel({
             <Button asChild size="sm">
               <a href={`/verify/${certNumber}`} target="_blank" rel="noreferrer">
                 <Award className="h-4 w-4 mr-2" />
-                View certificate
+                {t("actions.courseLearner.viewCertificate")}
               </a>
             </Button>
           )}
           <Button asChild size="sm" variant="outline">
-            <a href="/tools?tab=learning">Browse more courses</a>
+            <a href="/tools?tab=learning">{t("actions.courseLearner.browseMoreCourses")}</a>
           </Button>
         </div>
       </CardContent>
@@ -551,6 +558,7 @@ function CourseCompletionDialog({
   courseTitle: string;
   certNumber: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -559,11 +567,12 @@ function CourseCompletionDialog({
             <Award className="h-7 w-7 text-emerald-600" />
           </div>
           <DialogTitle className="text-center text-2xl">
-            Course complete!
+            {t("headings.courseLearner.courseCompleteBang")}
           </DialogTitle>
           <DialogDescription className="text-center">
-            You finished <span className="font-medium text-foreground">{courseTitle}</span>.
-            Your progress is recorded and any earned badges will appear in the corner momentarily.
+            {t("messages.courseLearner.dialogFinishedPrefix")}{" "}
+            <span className="font-medium text-foreground">{courseTitle}</span>.{" "}
+            {t("messages.courseLearner.dialogFinishedSuffix")}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="sm:justify-center sm:flex-col sm:gap-2">
@@ -571,15 +580,15 @@ function CourseCompletionDialog({
             <Button asChild className="w-full sm:w-auto">
               <a href={`/verify/${certNumber}`} target="_blank" rel="noreferrer">
                 <Award className="h-4 w-4 mr-2" />
-                View your certificate
+                {t("actions.courseLearner.viewYourCertificate")}
               </a>
             </Button>
           )}
           <Button asChild variant="outline" className="w-full sm:w-auto">
-            <a href="/tools?tab=learning">Browse more courses</a>
+            <a href="/tools?tab=learning">{t("actions.courseLearner.browseMoreCourses")}</a>
           </Button>
           <Button variant="ghost" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-            Keep reviewing
+            {t("actions.courseLearner.keepReviewing")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -598,15 +607,17 @@ function LessonRailItem({
   active: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useTranslation();
   const Icon = SOURCE_ICON[lesson.sourceType];
   const passed = progress?.status === "passed";
+  const ariaLabel = `${lesson.title}${passed ? ` ${t("labels.courseLearner.railCompletedSuffix")}` : ""}${lesson.isRequired ? "" : ` ${t("labels.courseLearner.railOptionalSuffix")}`}`;
   return (
     <li>
       <button
         type="button"
         onClick={onSelect}
         aria-current={active ? "true" : undefined}
-        aria-label={`${lesson.title}${passed ? " (completed)" : ""}${lesson.isRequired ? "" : " (optional)"}`}
+        aria-label={ariaLabel}
         className={cn(
           // #1503 — focus-visible ring on the lesson-row button so
           // keyboard learners can see which lesson they're about to
@@ -627,7 +638,7 @@ function LessonRailItem({
         <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         <span className="text-sm truncate flex-1">{lesson.title}</span>
         {!lesson.isRequired && (
-          <span className="text-[10px] text-muted-foreground">optional</span>
+          <span className="text-[10px] text-muted-foreground">{t("labels.courseLearner.optional")}</span>
         )}
       </button>
     </li>
@@ -647,6 +658,7 @@ function LessonBody({
   themeTokens?: Record<string, string>;
   onScormCompleted: () => void;
 }) {
+  const { t } = useTranslation();
   // One switch on sourceType — every lesson kind self-renders without
   // prop-drilling capability flags through the parent.
   switch (lesson.sourceType) {
@@ -658,7 +670,7 @@ function LessonBody({
         return (
           <div className="p-6 flex items-center gap-2 text-sm text-amber-700 bg-amber-50">
             <Lock className="h-4 w-4" />
-            SCORM package isn't fully configured yet. Ask the course author to upload the zip.
+            {t("messages.courseLearner.scormNotConfigured")}
           </div>
         );
       }
@@ -679,7 +691,7 @@ function LessonBody({
       if (!lesson.studioProjectId) {
         return (
           <div className="p-6 text-sm text-muted-foreground italic">
-            No Studio project linked to this lesson.
+            {t("messages.courseLearner.noStudioProject")}
           </div>
         );
       }
@@ -705,7 +717,7 @@ function LessonBody({
       if (!lesson.externalUrl) {
         return (
           <div className="p-6 text-sm text-muted-foreground italic">
-            No URL provided for this lesson.
+            {t("messages.courseLearner.noUrlProvided")}
           </div>
         );
       }
@@ -725,7 +737,7 @@ function LessonBody({
             rel="noreferrer"
             className="text-sm text-primary hover:underline inline-flex items-center gap-1"
           >
-            Open in a new tab <ExternalLink className="h-3 w-3" />
+            {t("actions.courseLearner.openInNewTab")} <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       );
@@ -742,6 +754,7 @@ function LessonBody({
  * no `hasCompanion` boolean drilled into parents.
  */
 function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
+  const { t } = useTranslation();
   const companionId = (lesson as any).companionStudioProjectId as string | undefined;
   const [tab, setTab] = useState<"read" | "watch">("read");
 
@@ -761,7 +774,7 @@ function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
         <Markdown>{lesson.bodyMd}</Markdown>
       ) : (
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <p className="text-muted-foreground italic">This lesson has no content yet.</p>
+          <p className="text-muted-foreground italic">{t("messages.courseLearner.noContentYet")}</p>
         </div>
       )}
     </div>
@@ -777,14 +790,14 @@ function TextMdLesson({ lesson }: { lesson: CourseLesson }) {
           className={`px-3 py-1 rounded ${tab === "read" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           onClick={() => setTab("read")}
         >
-          Read
+          {t("actions.courseLearner.read")}
         </button>
         <button
           type="button"
           className={`px-3 py-1 rounded ${tab === "watch" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           onClick={() => setTab("watch")}
         >
-          Watch
+          {t("actions.courseLearner.watch")}
         </button>
       </div>
       {tab === "read" ? (

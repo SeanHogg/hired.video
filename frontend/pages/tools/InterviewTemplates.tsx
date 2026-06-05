@@ -17,6 +17,7 @@
 // company memberships.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -81,6 +82,7 @@ interface TemplateDraft {
 }
 
 export default function InterviewTemplates() {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const isRecruiterOrEmployer =
     user?.role === USER_ROLES.RECRUITER ||
@@ -99,7 +101,7 @@ export default function InterviewTemplates() {
   const [creating, setCreating] = useState(false);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
   const [authMessage, setAuthMessage] = useState(
-    "Sign in as a recruiter or employer to save this template.",
+    t("messages.interviewTemplates.authSignInRecruiter"),
   );
 
   // Preserve an in-progress draft across the anonymous → authenticated
@@ -118,18 +120,18 @@ export default function InterviewTemplates() {
   const archiveMut = useMutation({
     mutationFn: (id: string) => archiveQuestionSet(id),
     onSuccess: () => {
-      toast.success("Set archived");
+      toast.success(t("messages.interviewTemplates.setArchived"));
       void qc.invalidateQueries({ queryKey: ["interview-question-sets"] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Could not archive"),
+    onError: (err) => toast.error(err instanceof Error ? err.message : t("errors.couldNotArchive")),
   });
 
   const handleUnauthSave = (draft: TemplateDraft) => {
     snapshot(draft);
     setAuthMessage(
       !isAuthenticated
-        ? "Sign in to save this template — we'll keep everything you've entered."
-        : "Switch to a recruiter or employer account to save interview templates.",
+        ? t("messages.interviewTemplates.authSignInKeep")
+        : t("messages.interviewTemplates.authSwitchRole"),
     );
     setShowAuthOverlay(true);
   };
@@ -140,9 +142,8 @@ export default function InterviewTemplates() {
       header={{
         icon: <ClipboardCheck className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-purple-100",
-        title: "Interview Templates",
-        description:
-          "Build reusable interview question sets once, attach them to any job posting, and send the same screening to every applicant automatically.",
+        title: t("headings.interviewTemplates.title"),
+        description: t("messages.interviewTemplates.description"),
         tier: "free",
       }}
       authOverlay={{
@@ -154,16 +155,16 @@ export default function InterviewTemplates() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-muted-foreground">
             {sets.length === 0
-              ? "No templates yet — build one from scratch or import questions from the Interview Questions tool."
-              : `${sets.length} template${sets.length === 1 ? "" : "s"} ready to attach to a job.`}
+              ? t("messages.interviewTemplates.noTemplates")
+              : t("messages.interviewTemplates.countReady", { count: sets.length })}
           </p>
           <div className="flex gap-2">
             <Button asChild variant="outline">
-              <Link to="/tools/interview-questions">Generate from skills</Link>
+              <Link to="/tools/interview-questions">{t("actions.interviewTemplates.generateFromSkills")}</Link>
             </Button>
             <Button onClick={() => setCreating(true)} className="gap-1">
               <Plus className="h-4 w-4" />
-              New template
+              {t("actions.interviewTemplates.newTemplate")}
             </Button>
           </div>
         </div>
@@ -177,7 +178,7 @@ export default function InterviewTemplates() {
             <CardContent className="py-12 text-center space-y-3">
               <ClipboardCheck className="h-10 w-10 text-muted-foreground/50 mx-auto" />
               <p className="text-sm text-muted-foreground">
-                Your library is empty.
+                {t("messages.interviewTemplates.libraryEmpty")}
               </p>
             </CardContent>
           </Card>
@@ -189,7 +190,10 @@ export default function InterviewTemplates() {
                   <CardTitle className="text-base flex items-start justify-between gap-2">
                     <span className="min-w-0 flex-1">{s.title}</span>
                     {s.ownerCompanyId && (
-                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" aria-label="Company-owned" />
+                      <Building2
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                        aria-label={t("labels.interviewTemplates.companyOwned")}
+                      />
                     )}
                   </CardTitle>
                   <div className="flex flex-wrap gap-1.5 mt-1">
@@ -198,10 +202,12 @@ export default function InterviewTemplates() {
                     )}
                     <Badge variant="outline" className="text-[10px]">{s.style}</Badge>
                     <Badge variant="outline" className="text-[10px]">
-                      {Array.isArray(s.questions) ? s.questions.length : 0} questions
+                      {t("labels.interviewTemplates.questionsCount", {
+                        count: Array.isArray(s.questions) ? s.questions.length : 0,
+                      })}
                     </Badge>
                     <Badge variant="outline" className="text-[10px]">
-                      {s.useCount} use{s.useCount === 1 ? "" : "s"}
+                      {t("labels.interviewTemplates.useCount", { count: s.useCount })}
                     </Badge>
                   </div>
                 </CardHeader>

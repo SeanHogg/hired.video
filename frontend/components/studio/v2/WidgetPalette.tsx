@@ -80,6 +80,25 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "sfx-burst",     label: "SFX burst",     icon: Zap,            group: "comic", mediaKinds: ["comic"] },
 ];
 
+/** The catalog's per-mediaKind gate in ONE place: a tile with no
+ *  `mediaKinds` shows everywhere; one with `mediaKinds: ["comic"]` only
+ *  when the active project is a comic. Shared by the palette render loop
+ *  and `insertableWidgetKindsFor` so the click path and the AI CHRO's
+ *  `studio_insert_widget` tool never disagree on what's available. */
+function isCatalogItemAvailable(item: WidgetPaletteItem, mediaKind?: string): boolean {
+  return (
+    !item.mediaKinds ||
+    (mediaKind !== undefined && item.mediaKinds.includes(mediaKind))
+  );
+}
+
+/** Widget kinds a user can insert from scratch for the given mediaKind. */
+export function insertableWidgetKindsFor(mediaKind?: string): WidgetKind[] {
+  return WIDGET_CATALOG.filter((i) => isCatalogItemAvailable(i, mediaKind)).map(
+    (i) => i.kind,
+  );
+}
+
 type CatalogGroup = Exclude<WidgetPaletteItem["group"], "media">;
 
 const GROUP_LABEL: Record<CatalogGroup, string> = {
@@ -151,9 +170,7 @@ export default function WidgetPalette({
     // kind; one with `mediaKinds: ["comic"]` only renders when the
     // active project is a comic.
     const items = WIDGET_CATALOG.filter(
-      (i) =>
-        i.group === group &&
-        (!i.mediaKinds || (mediaKind !== undefined && i.mediaKinds.includes(mediaKind))),
+      (i) => i.group === group && isCatalogItemAvailable(i, mediaKind),
     );
     if (items.length === 0) return null;
     return (

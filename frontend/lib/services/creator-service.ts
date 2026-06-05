@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   Briefcase,
+  Calendar,
   FileText,
   GraduationCap,
   LayoutTemplate,
@@ -45,6 +46,7 @@ export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   articles: "Articles",
   courses: "Courses",
   templates: "Templates",
+  bookings: "1:1 Sessions",
 };
 
 // SSoT for the program → icon mapping. Imported by both the owner's
@@ -57,6 +59,7 @@ export const CREATOR_PROGRAM_ICON: Record<CreatorProgram, ComponentType<{ classN
   articles: FileText,
   courses: GraduationCap,
   templates: LayoutTemplate,
+  bookings: Calendar,
 };
 
 // Per-program "home" — where a creator goes to actually do the work after
@@ -83,6 +86,7 @@ export const CREATOR_PROGRAM_HOME: Record<CreatorProgram, string> = {
   // category page is the closest existing landing surface for "my
   // templates" until a dedicated manager ships.
   templates: "/search?category=templates",
+  bookings: "/bookings",
 };
 
 export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
@@ -92,6 +96,7 @@ export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
   articles: "Publish long-form articles to the community feed and search. Markdown editor + AI quality review.",
   courses: "Author courses with optional certifications. Studio-built lessons + SCORM export. Sell once, earn 95%.",
   templates: "Publish resume, job, and studio templates to the marketplace. Buyers fork your designs; you earn 95% of every sale.",
+  bookings: "Offer bookable 1:1 sessions (30 / 60 / 90 / 120 min). Configure availability, take payments, and let your audience self-serve a magic-link reservation.",
 };
 
 export interface CreatorProfile {

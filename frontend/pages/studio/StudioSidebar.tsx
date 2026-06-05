@@ -1,6 +1,7 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose, Film } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import MediaPicker from "@/components/shared/MediaPicker";
@@ -56,15 +57,18 @@ export {
 
 // ─── Audio presets ─────────────────────────────────────────────────────────
 
-type AudioPreset = { label: string; track: string; genre: string };
+// Module-scope preset list — labels/genres carry stable i18n keys resolved
+// at render via t() (no t() at module scope). `label`/`genre` remain as the
+// English fallback for any consumer that reads them directly.
+type AudioPreset = { label: string; labelKey: string; track: string; genre: string; genreKey?: string };
 
 const AUDIO_PRESETS: AudioPreset[] = [
-  { label: "Corporate Inspire",  track: "corporate-inspire",  genre: "Corporate" },
-  { label: "Tech Ambient",       track: "tech-ambient",       genre: "Electronic" },
-  { label: "Upbeat Career",      track: "upbeat-career",      genre: "Pop" },
-  { label: "Cinematic Rise",     track: "cinematic-rise",     genre: "Cinematic" },
-  { label: "Minimal Focus",      track: "minimal-focus",      genre: "Ambient" },
-  { label: "None",               track: "none",               genre: "" },
+  { label: "Corporate Inspire",  labelKey: "studio.sidebar.musicCorporate",   track: "corporate-inspire",  genre: "Corporate",  genreKey: "studio.sidebar.musicCorporateGenre" },
+  { label: "Tech Ambient",       labelKey: "studio.sidebar.musicTechAmbient", track: "tech-ambient",       genre: "Electronic", genreKey: "studio.sidebar.musicTechAmbientGenre" },
+  { label: "Upbeat Career",      labelKey: "studio.sidebar.musicUpbeat",      track: "upbeat-career",      genre: "Pop",        genreKey: "studio.sidebar.musicUpbeatGenre" },
+  { label: "Cinematic Rise",     labelKey: "studio.sidebar.musicCinematic",   track: "cinematic-rise",     genre: "Cinematic",  genreKey: "studio.sidebar.musicCinematicGenre" },
+  { label: "Minimal Focus",      labelKey: "studio.sidebar.musicMinimal",     track: "minimal-focus",      genre: "Ambient",    genreKey: "studio.sidebar.musicMinimalGenre" },
+  { label: "None",               labelKey: "studio.sidebar.musicNone",        track: "none",               genre: "" },
 ];
 
 interface Props {
@@ -123,6 +127,7 @@ const SIDEBAR_COLLAPSED_DEFAULTS: Record<string, boolean> = {
 };
 
 export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange, activeProjectActions }: Props) {
+  const { t } = useTranslation();
   // Remember the last template the user picked from the New Video dropdown
   // so the main button keeps starting them in their preferred template
   // across sessions. Defaults to "basic" — the blank-slate starter.
@@ -412,9 +417,9 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             size="sm"
             variant="outline"
             onClick={() => startNewWithTemplate(defaultTemplate)}
-            title={`New ${TEMPLATE_CATALOG.find((t) => t.id === defaultTemplate)?.label ?? "video"}`}
+            title={t("studio.sidebar.newWithTemplateTooltip", { label: TEMPLATE_CATALOG.find((tc) => tc.id === defaultTemplate)?.label ?? t("studio.sidebar.videoFallback") })}
           >
-            <Plus className="w-4 h-4 mr-2" /> New Video
+            <Plus className="w-4 h-4 mr-2" /> {t("studio.sidebar.newVideo")}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -422,8 +427,8 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                 size="sm"
                 variant="outline"
                 className="rounded-l-none px-1.5 shrink-0"
-                title="Choose a template"
-                aria-label="Choose a template"
+                title={t("studio.sidebar.chooseTemplate")}
+                aria-label={t("studio.sidebar.chooseTemplate")}
               >
                 <ChevronDown className="w-4 h-4" />
               </Button>
@@ -453,7 +458,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             variant="ghost"
             className="h-8 shrink-0 px-2"
             onClick={onOpenWizard}
-            title="Open new video wizard"
+            title={t("studio.sidebar.openWizardTooltip")}
           >
             <Wand2 className="w-4 h-4" />
           </Button>
@@ -464,8 +469,8 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             variant="ghost"
             className="h-8 shrink-0 px-2"
             onClick={onCollapseSidebar}
-            title="Hide sidebar"
-            aria-label="Hide sidebar"
+            title={t("actions.hideSidebar")}
+            aria-label={t("actions.hideSidebar")}
           >
             <PanelLeftClose className="w-4 h-4" />
           </Button>
@@ -492,34 +497,34 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             onClick={() => toggleSection("recent")}
             aria-expanded={!collapsed.recent}
           >
-            <Clock className="w-3 h-3" /> Recent
+            <Clock className="w-3 h-3" /> {t("studio.sidebar.recent")}
             {collapsed.recent ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
           <WorkspaceSwitcher />
         </div>
         {!collapsed.recent && <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
           {orderedProjects.length === 0 && (
-            <li className="text-xs text-muted-foreground px-1">No projects yet</li>
+            <li className="text-xs text-muted-foreground px-1">{t("studio.sidebar.empty")}</li>
           )}
           {orderedProjects.map((p) => (
             <li key={p.id} className="group relative">
               {confirmDeleteId === p.id ? (
                 /* Confirm row */
                 <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-red-500/10 border border-red-500/30 text-xs">
-                  <span className="flex-1 text-red-400 truncate">Delete "{p.title}"?</span>
+                  <span className="flex-1 text-red-400 truncate">{t("studio.sidebar.confirmDelete", { title: p.title })}</span>
                   <button
                     type="button"
                     className="shrink-0 px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] hover:bg-red-600"
                     onClick={() => { onDeleteProject?.(p.id); setConfirmDeleteId(null); }}
                   >
-                    Delete
+                    {t("actions.delete")}
                   </button>
                   <button
                     type="button"
                     className="shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[10px] hover:bg-accent"
                     onClick={() => setConfirmDeleteId(null)}
                   >
-                    Cancel
+                    {t("actions.cancel")}
                   </button>
                 </div>
               ) : editingProjectId === p.id ? (
@@ -533,7 +538,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     onBlur={() => commitProjectRename()}
                     onKeyDown={(e) => { if (e.key === "Escape") setEditingProjectId(null); }}
                   />
-                  <button type="submit" className="shrink-0 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px]">Save</button>
+                  <button type="submit" className="shrink-0 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px]">{t("actions.save")}</button>
                 </form>
               ) : (
                 /* Active row turns into the project's full action panel —
@@ -555,7 +560,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="truncate flex-1 text-xs">{p.title}</span>
                         {(p.viewCount ?? 0) > 0 && (
-                          <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${p.viewCount} views · ${p.ctaClickCount ?? 0} CTA clicks`}>
+                          <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={t("studio.sidebar.viewsCtaTooltip", { views: p.viewCount, clicks: p.ctaClickCount ?? 0 })}>
                             <Eye className="w-2.5 h-2.5" />{p.viewCount}
                           </span>
                         )}
@@ -579,7 +584,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     {p.id === activeProjectId && (
                       <button
                         type="button"
-                        title="Rename project"
+                        title={t("studio.sidebar.renameProject")}
                         className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
                         onClick={(e) => startEditingProject(p, e)}
                       >
@@ -588,7 +593,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     )}
                     <button
                       type="button"
-                      title="Delete project"
+                      title={t("studio.sidebar.deleteProject")}
                       className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-all"
                       onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
                     >
@@ -612,7 +617,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
           onClick={() => toggleSection("contentTemplates")}
         >
-          <LayoutTemplate className="w-3 h-3" /> <span className="flex-1 text-left">Templates</span>
+          <LayoutTemplate className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.templates")}</span>
           {collapsed.contentTemplates ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         {!collapsed.contentTemplates && onContentTemplateSelect && (
@@ -632,15 +637,15 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
           onClick={() => toggleSection("templates")}
         >
-          <Palette className="w-3 h-3" /> <span className="flex-1 text-left">Visual Themes</span>
+          <Palette className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.visualThemes")}</span>
           {collapsed.templates ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         {!collapsed.templates && <ul className="flex flex-col gap-2">
-          {TEMPLATES.map((t) => {
+          {TEMPLATES.map((vt) => {
 
-            const isActive = activeTemplate === t.file;
+            const isActive = activeTemplate === vt.file;
             return (
-              <li key={t.file}>
+              <li key={vt.file}>
                 <button
                   type="button"
                   className={`w-full text-left px-2.5 py-2.5 rounded-lg border transition-colors group ${
@@ -648,12 +653,12 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-primary/40 hover:bg-accent"
                   }`}
-                  onClick={() => handleTemplate(t.file)}
-                  title={`Load ${t.label} template`}
+                  onClick={() => handleTemplate(vt.file)}
+                  title={t("studio.sidebar.loadTemplateTooltip", { label: vt.label })}
                 >
                   {/* Color strip */}
                   <div className="flex gap-1 mb-2">
-                    {t.colors.map((c) => (
+                    {vt.colors.map((c) => (
                       <div
                         key={c}
                         className="h-2 flex-1 rounded-sm"
@@ -665,13 +670,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                   {/* Label + active check */}
                   <div className="flex items-center justify-between mb-0.5">
                     <span className={`text-xs font-semibold ${isActive ? "text-primary" : ""}`}>
-                      {t.label}
+                      {vt.label}
                     </span>
                     {isActive && <Check className="w-3 h-3 text-primary" />}
                   </div>
 
                   {/* Description */}
-                  <p className="text-[10px] text-muted-foreground leading-tight">{t.desc}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">{vt.desc}</p>
                 </button>
               </li>
             );
@@ -686,7 +691,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
           onClick={() => toggleSection("backgrounds")}
         >
-          <Layers className="w-3 h-3" /> <span className="flex-1 text-left">Backgrounds</span>
+          <Layers className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.backgrounds")}</span>
           {collapsed.backgrounds ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         {!collapsed.backgrounds && <>
@@ -695,13 +700,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             {customBgUrl && (
               <button
                 type="button"
-                title="Custom upload"
+                title={t("studio.sidebar.customBackground")}
                 onClick={() => { setActiveBg("custom"); onBackgroundSelect?.("custom", customBgUrl); }}
                 className={`relative h-9 rounded-md border-2 transition-all overflow-hidden ${
                   activeBg === "custom" ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-primary/40"
                 }`}
               >
-                <img src={customBgUrl} className="w-full h-full object-cover" alt="Custom background" crossOrigin="anonymous" />
+                <img src={customBgUrl} className="w-full h-full object-cover" alt={t("studio.sidebar.customBackgroundAlt")} crossOrigin="anonymous" />
                 {activeBg === "custom" && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                     <Check className="w-3 h-3 text-white drop-shadow" />
@@ -731,7 +736,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           {/* Background source — Upload / Stock / AI Image */}
           <MediaPicker
             accept="image"
-            title="Choose scene background"
+            title={t("studio.sidebar.chooseSceneBackground")}
             onPick={(asset) => handleBgPicked(asset.url)}
             trigger={
               <Button
@@ -741,7 +746,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                 className="w-full h-7 text-xs"
               >
                 <ImagePlus className="w-3 h-3 mr-1.5" />
-                {customBgUrl ? "Change background" : "Upload / Stock / AI"}
+                {customBgUrl ? t("studio.sidebar.changeBackground") : t("studio.sidebar.uploadStockAi")}
               </Button>
             }
           />
@@ -760,7 +765,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
           onClick={() => toggleSection("stockMedia")}
         >
-          <Library className="w-3 h-3" /> <span className="flex-1 text-left">Stock Media</span>
+          <Library className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.stockMedia")}</span>
           {collapsed.stockMedia ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         {!collapsed.stockMedia && (
@@ -768,9 +773,9 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             {/* Target toggle: where do picks go? */}
             <div className="flex gap-1 mb-1.5">
               {([
-                { value: "scene-background", label: "Background" },
-                { value: "scene-element",    label: "Add Element" },
-                { value: "all-scenes",       label: "All Scenes" },
+                { value: "scene-background", labelKey: "studio.sidebar.targetBackground" },
+                { value: "scene-element",    labelKey: "studio.sidebar.targetAddElement" },
+                { value: "all-scenes",       labelKey: "studio.sidebar.targetAllScenes" },
               ] as const).map((opt) => (
                 <button
                   key={opt.value}
@@ -782,7 +787,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                       : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
                   }`}
                 >
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </button>
               ))}
             </div>
@@ -797,9 +802,9 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               if (mediaTarget === "all-scenes") {
                 return (
                   <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
-                    <p className="text-primary font-semibold">All scenes</p>
+                    <p className="text-primary font-semibold">{t("studio.sidebar.allScenesLabel")}</p>
                     <p className="text-muted-foreground leading-tight mt-0.5">
-                      Picks will set the storyboard-wide background. Individual scene backgrounds override it.
+                      {t("studio.sidebar.allScenesHint")}
                     </p>
                   </div>
                 );
@@ -807,12 +812,12 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               if (focusedScene) {
                 const description =
                   mediaTarget === "scene-element"
-                    ? "Picks will be added as a new element you can position freely."
-                    : "Picks will replace this scene's full background.";
+                    ? t("studio.sidebar.targetElementHint")
+                    : t("studio.sidebar.targetBackgroundHint");
                 return (
                   <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
                     <p className="text-primary font-semibold">
-                      Scene {focusedIdx}: {focusedScene.title ?? focusedScene.type}
+                      {t("studio.sidebar.sceneFocusLabel", { index: focusedIdx, title: focusedScene.title ?? focusedScene.type })}
                     </p>
                     <p className="text-muted-foreground leading-tight mt-0.5">
                       {description}
@@ -822,7 +827,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               }
               return (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 mb-1.5 text-[10px] text-amber-700 dark:text-amber-400">
-                  Click a scene in the storyboard first to target it.
+                  {t("studio.sidebar.targetNoSceneHint")}
                 </div>
               );
             })()}
@@ -850,7 +855,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
             onClick={() => toggleSection("mediaInUse")}
           >
-            <ImagePlus className="w-3 h-3" /> <span className="flex-1 text-left">Media in Use</span>
+            <ImagePlus className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.mediaInUse")}</span>
             {collapsed.mediaInUse ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
           {!collapsed.mediaInUse && (
@@ -859,8 +864,8 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               {script.video.theme.customBackground && (
                 <li className="rounded-md border border-primary/30 bg-primary/5 p-1.5 text-[10px]">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="font-semibold text-primary">All Scenes</span>
-                    <span className="text-muted-foreground/70">Storyboard background</span>
+                    <span className="font-semibold text-primary">{t("studio.sidebar.allScenesLabel")}</span>
+                    <span className="text-muted-foreground/70">{t("studio.sidebar.storyboardBackground")}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {script.video.theme.customBackgroundType === "video" ? (
@@ -877,11 +882,11 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                       />
                     )}
                     <span className="flex-1 truncate text-muted-foreground">
-                      {script.video.theme.customBackgroundType === "video" ? "Video" : "Image"}
+                      {script.video.theme.customBackgroundType === "video" ? t("studio.sidebar.bgVideo") : t("studio.sidebar.bgImage")}
                     </span>
                     <button
                       type="button"
-                      title="Remove storyboard background"
+                      title={t("studio.sidebar.removeStoryboardBg")}
                       className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
                       onClick={removeGlobalBackground}
                     >
@@ -898,7 +903,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                 return (
                   <li key={s.id} className="rounded-md border border-border bg-card p-1.5 text-[10px]">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className="font-semibold text-muted-foreground">Scene {i + 1}</span>
+                      <span className="font-semibold text-muted-foreground">{t("studio.sidebar.sceneLabel", { index: i + 1 })}</span>
                       <span className="truncate text-muted-foreground/70">{s.title ?? s.type}</span>
                     </div>
                     {s.backgroundImage && (
@@ -917,11 +922,11 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                           />
                         )}
                         <span className="flex-1 truncate text-muted-foreground">
-                          Background ({isVideoBg ? "video" : "image"})
+                          {t("studio.sidebar.bgKindBackground", { kind: isVideoBg ? t("studio.sidebar.kindVideo") : t("studio.sidebar.kindImage") })}
                         </span>
                         <button
                           type="button"
-                          title="Remove background"
+                          title={t("studio.sidebar.removeBackground")}
                           className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
                           onClick={() => removeSceneMedia(s.id, "background")}
                         >
@@ -945,11 +950,11 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                           />
                         )}
                         <span className="flex-1 truncate text-muted-foreground">
-                          Overlay ({isVideoOverlay ? "video" : "image"})
+                          {t("studio.sidebar.bgKindOverlay", { kind: isVideoOverlay ? t("studio.sidebar.kindVideo") : t("studio.sidebar.kindImage") })}
                         </span>
                         <button
                           type="button"
-                          title="Remove overlay"
+                          title={t("studio.sidebar.removeOverlay")}
                           className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
                           onClick={() => removeSceneMedia(s.id, "overlay")}
                         >
@@ -960,10 +965,10 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     {s.sceneAudio && (
                       <div className="flex items-center gap-1.5 mt-1">
                         <Music2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="flex-1 truncate text-muted-foreground">{s.sceneAudioLabel ?? "Audio"}</span>
+                        <span className="flex-1 truncate text-muted-foreground">{s.sceneAudioLabel ?? t("studio.sidebar.audioFallback")}</span>
                         <button
                           type="button"
-                          title="Remove audio"
+                          title={t("studio.sidebar.removeAudio")}
                           className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
                           onClick={() => removeSceneMedia(s.id, "audio")}
                         >
@@ -987,13 +992,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
             onClick={() => toggleSection("theme")}
           >
-            <Palette className="w-3 h-3" /> <span className="flex-1 text-left">Theme</span>
+            <Palette className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.theme")}</span>
             {collapsed.theme ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
           {!collapsed.theme && <>
           {/* Color palette */}
           <div className="mb-3">
-            <Label className="mb-1.5 block text-xs text-muted-foreground">Colors</Label>
+            <Label className="mb-1.5 block text-xs text-muted-foreground">{t("studio.sidebar.colors")}</Label>
             <div className="flex gap-2 flex-wrap">
               {(script.video.theme.colorPalette ?? []).slice(0, 4).map((c, i) => (
                 <label key={i} className="flex flex-col items-center gap-1 cursor-pointer">
@@ -1008,7 +1013,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     }}
                   />
                   <span className="text-[9px] text-muted-foreground font-mono">
-                    {i === 0 ? "Primary" : i === 1 ? "Secondary" : i === 2 ? "Light" : "Accent"}
+                    {i === 0 ? t("studio.sidebar.fontPrimary") : i === 1 ? t("studio.sidebar.fontSecondary") : i === 2 ? t("studio.sidebar.fontLight") : t("studio.sidebar.fontAccent")}
                   </span>
                 </label>
               ))}
@@ -1016,28 +1021,28 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           </div>
           {/* Font */}
           <div className="mb-3">
-            <Label className="mb-1.5 block text-xs text-muted-foreground">Font</Label>
+            <Label className="mb-1.5 block text-xs text-muted-foreground">{t("studio.sidebar.font")}</Label>
             <Select value={script.video.theme.fontFamily ?? "Inter, sans-serif"} onValueChange={(v) => patchTheme({ fontFamily: v })}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="Inter, sans-serif">Inter (default)</SelectItem>
-                <SelectItem value="Roboto, sans-serif">Roboto</SelectItem>
-                <SelectItem value="Montserrat, sans-serif">Montserrat</SelectItem>
-                <SelectItem value="Playfair Display, serif">Playfair Display</SelectItem>
-                <SelectItem value="JetBrains Mono, monospace">JetBrains Mono</SelectItem>
+                <SelectItem value="Inter, sans-serif">{t("studio.sidebar.fontInter")}</SelectItem>
+                <SelectItem value="Roboto, sans-serif">{t("studio.sidebar.fontRoboto")}</SelectItem>
+                <SelectItem value="Montserrat, sans-serif">{t("studio.sidebar.fontMontserrat")}</SelectItem>
+                <SelectItem value="Playfair Display, serif">{t("studio.sidebar.fontPlayfair")}</SelectItem>
+                <SelectItem value="JetBrains Mono, monospace">{t("studio.sidebar.fontJetBrains")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {/* Transition */}
           <div>
-            <Label className="mb-1.5 block text-xs text-muted-foreground">Transition</Label>
+            <Label className="mb-1.5 block text-xs text-muted-foreground">{t("studio.sidebar.transition")}</Label>
             <Select value={script.video.theme.transition ?? "fade"} onValueChange={(v) => patchTheme({ transition: v as VideoTheme["transition"] })}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="fade">Fade</SelectItem>
-                <SelectItem value="cut">Cut (instant)</SelectItem>
-                <SelectItem value="slide">Slide</SelectItem>
-                <SelectItem value="cinematic-fade">Cinematic Fade</SelectItem>
+                <SelectItem value="fade">{t("studio.sidebar.transitionFade")}</SelectItem>
+                <SelectItem value="cut">{t("studio.sidebar.transitionCut")}</SelectItem>
+                <SelectItem value="slide">{t("studio.sidebar.transitionSlide")}</SelectItem>
+                <SelectItem value="cinematic-fade">{t("studio.sidebar.transitionCinematic")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1045,30 +1050,30 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           {/* Filters / colour grading — gap #125 */}
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs text-muted-foreground">Filters</Label>
+              <Label className="text-xs text-muted-foreground">{t("studio.sidebar.filters")}</Label>
               {script.video.theme.filters && (
                 <button
                   type="button"
                   className="text-[10px] text-muted-foreground hover:text-foreground"
                   onClick={() => patchTheme({ filters: undefined })}
-                  title="Reset all filters"
+                  title={t("studio.sidebar.resetFilters")}
                 >
-                  Reset
+                  {t("studio.sidebar.reset")}
                 </button>
               )}
             </div>
             {([
-              { key: "brightness", label: "Brightness", min: 0.5, max: 1.5, step: 0.05, def: 1 },
-              { key: "contrast",   label: "Contrast",   min: 0.5, max: 1.5, step: 0.05, def: 1 },
-              { key: "saturation", label: "Saturation", min: 0,   max: 2,   step: 0.05, def: 1 },
-              { key: "warmth",     label: "Warmth",     min: -100, max: 100, step: 5,    def: 0 },
-              { key: "blur",       label: "Blur",       min: 0,    max: 10,  step: 0.5,  def: 0 },
+              { key: "brightness", labelKey: "studio.sidebar.brightness", min: 0.5, max: 1.5, step: 0.05, def: 1 },
+              { key: "contrast",   labelKey: "studio.sidebar.contrast",   min: 0.5, max: 1.5, step: 0.05, def: 1 },
+              { key: "saturation", labelKey: "studio.sidebar.saturation", min: 0,   max: 2,   step: 0.05, def: 1 },
+              { key: "warmth",     labelKey: "studio.sidebar.warmth",     min: -100, max: 100, step: 5,    def: 0 },
+              { key: "blur",       labelKey: "studio.sidebar.blur",       min: 0,    max: 10,  step: 0.5,  def: 0 },
             ] as const).map((cfg) => {
               const current = (script.video.theme.filters as any)?.[cfg.key] ?? cfg.def;
               return (
                 <div key={cfg.key} className="mb-2">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] text-muted-foreground">{cfg.label}</span>
+                    <span className="text-[10px] text-muted-foreground">{t(cfg.labelKey)}</span>
                     <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
                       {Number(current).toFixed(cfg.step < 1 ? 2 : 0)}
                     </span>
@@ -1098,7 +1103,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
             onClick={() => toggleSection("music")}
           >
-            <Music2 className="w-3 h-3" /> <span className="flex-1 text-left">Music</span>
+            <Music2 className="w-3 h-3" /> <span className="flex-1 text-left">{t("studio.sidebar.music")}</span>
             {collapsed.music ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
           {!collapsed.music && <>
@@ -1119,20 +1124,20 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     onClick={() => {
                       // Stop any preview when selecting
                       if (previewingTrack) { getAmbientPlayer().stop(); setPreviewingTrack(null); }
-                      selectPresetTrack(p.track, p.label);
+                      selectPresetTrack(p.track, t(p.labelKey));
                     }}
                   >
                     <span className={`text-xs truncate block ${isSelected ? "text-primary font-medium" : "text-foreground"}`}>
-                      {p.label}
+                      {t(p.labelKey)}
                     </span>
-                    {p.genre && <span className="text-[10px] text-muted-foreground">{p.genre}</span>}
+                    {p.genreKey && <span className="text-[10px] text-muted-foreground">{t(p.genreKey)}</span>}
                   </button>
 
                   {/* Sample play/stop button (not shown for "None") */}
                   {p.track !== "none" && (
                     <button
                       type="button"
-                      title={isPreviewing ? "Stop sample" : "Play sample"}
+                      title={isPreviewing ? t("studio.sidebar.stopSample") : t("studio.sidebar.previewSample")}
                       className={`shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors ${
                         isPreviewing
                           ? "bg-primary/20 text-primary hover:bg-primary/30"
