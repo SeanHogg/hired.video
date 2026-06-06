@@ -58,6 +58,10 @@ export const MEDIA_KINDS = [
   "image",
   "cad",
   "cad_3d",
+  // Paged WYSIWYG document runtime (#1912) — resume / job / article / blog
+  // authored on a fixed print sheet. Self-hosting canvas (DocumentStage),
+  // exports PDF. State shape: frontend/lib/studio/editor-v2/document-state.ts.
+  "document",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -139,7 +143,9 @@ export function mediaKindUsesTimelineExport(kind: MediaKind): boolean {
     kind !== "image" &&
     kind !== "animation" &&
     kind !== "cad" &&
-    kind !== "cad_3d"
+    kind !== "cad_3d" &&
+    // document exports PDF (browser print), not a Timeline-shaped media file.
+    kind !== "document"
   );
 }
 
@@ -168,7 +174,10 @@ export function mediaKindUsesCanvasStateAuthoring(kind: MediaKind): boolean {
     kind !== "image" &&
     kind !== "animation" &&
     kind !== "cad" &&
-    kind !== "cad_3d"
+    kind !== "cad_3d" &&
+    // document mounts its own <DocumentStage> (paged WYSIWYG), not the
+    // Timeline scenes/widgets chrome.
+    kind !== "document"
   );
 }
 
@@ -780,6 +789,35 @@ export const OUTPUT_PROFILES: OutputProfile[] = [
     proOnly: false,
     fileExt: ".png",
   },
+
+  // ─── Document (paged WYSIWYG — #1912) ──────────────────────────────────────
+  // Resume / job / article / blog on a fixed print sheet. PDF is the canonical
+  // artefact (browser print of the live renderer — preview === render). PNG is
+  // a single-page raster for social-share / thumbnails.
+  {
+    id: "document-pdf",
+    label: "PDF",
+    hint: "Print-ready · Letter / Legal / A4",
+    mediaKind: "document",
+    container: "pdf",
+    mime: "application/pdf",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".pdf",
+  },
+  {
+    id: "document-png",
+    label: "PNG",
+    hint: "Single-page raster · social-share",
+    mediaKind: "document",
+    container: "png",
+    mime: "image/png",
+    videoCodec: null,
+    audioCodec: null,
+    proOnly: false,
+    fileExt: ".png",
+  },
 ];
 
 /** Every profile registered for a given mediaKind, in declaration order. */
@@ -960,4 +998,9 @@ export const MEDIA_KIND_UI: Record<MediaKind, MediaKindUiHints> = {
   // interactiveComicState. Exports CBZ / PDF via a "first valid branch"
   // linear walk; reader runtime resolves choices live.
   interactive_comic: { exportVerb: "Export comic", badgeLabel: "Comic+", shortLabel: "B", createVerb: "Create interactive comic" },
+  // `document` is the paged WYSIWYG runtime (#1912) — resume / job / article /
+  // blog. Generic "Document" badge here (keyed by mediaKind); the finer
+  // entity label (Resume / Job / …) is an entity-axis concern surfaced by the
+  // document editor, not this media-kind record.
+  document:  { exportVerb: "Export PDF",     badgeLabel: "Document",  shortLabel: "T", createVerb: "Create document"     },
 };

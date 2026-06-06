@@ -1,5 +1,5 @@
 /**
- * PublishedToList — "where has this project been published" (#1896).
+ * PublishedToList — "where has this project been published" (#1920).
  *
  * Renders one row per destination the project has gone live on, each with a
  * View link (YouTube watch URL / LinkedIn post / on-platform /v/ link) and an

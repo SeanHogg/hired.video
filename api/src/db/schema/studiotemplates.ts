@@ -61,8 +61,9 @@ export const studioTemplates = pgTable(
      *  who applies a `'podcast'` template gets a podcast-shaped project
      *  back, not a silently-mismatched video. Default `'video'` matches
      *  the projects-side default so pre-#894 templates keep behaviour.
-     *  See migration 0100. */
-    mediaKind:       varchar("media_kind", { length: 16 }).default("video").notNull(),
+     *  See migration 0100. Length 24 (was 16) so "interactive_comic" fits —
+     *  widened in migration 0197 (mirrors the studio_projects fix). */
+    mediaKind:       varchar("media_kind", { length: 24 }).default("video").notNull(),
     name:            varchar("name", { length: 200 }).notNull(),
     description:     text("description"),
     /** Optional preview thumbnail (frame from the source render or uploaded). */

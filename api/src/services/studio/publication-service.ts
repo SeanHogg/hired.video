@@ -1,6 +1,6 @@
 /**
  * PublicationService — records + reads "where has this Studio project been
- * published" (#1896, migration 0196).
+ * published" (#1920, migration 0196).
  *
  * The editor's Save menu and Details drawer both ask "list the destinations
  * this project went to (with their view URLs)". That read is served through
@@ -75,7 +75,7 @@ export async function recordPublication(
       status: input.status ?? "published",
       publishedAt: now,
       updatedAt: now,
-    } as any)
+    })
     .onConflictDoUpdate({
       target: [
         studioProjectPublications.projectId,
@@ -87,7 +87,7 @@ export async function recordPublication(
         status: input.status ?? "published",
         publishedAt: now,
         updatedAt: now,
-      } as any,
+      },
     })
     .returning();
 

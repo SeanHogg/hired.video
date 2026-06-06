@@ -65,6 +65,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "scorm-again": "^3.0.4",
+    "tone": "^15.1.22",
     "web-vitals": "^5.1.0",
     "webm-muxer": "^5.1.4",
     "zod": "^4.3.6"

@@ -192,7 +192,10 @@ export const studioProjects = pgTable("studio_projects", {
   // `shared/media-kinds.ts` for the enum + per-kind output profiles.
   // Default 'video' so every pre-migration row keeps today's behaviour.
   // Migration 0099.
-  mediaKind: varchar("media_kind", { length: 16 }).default("video").notNull(),
+  // Canvas-runtime axis (shared/media-kinds.ts MEDIA_KINDS). Length 24 (was
+  // 16) so the longest value, "interactive_comic" (17 chars), actually fits —
+  // a latent bug fixed in migration 0197 alongside adding "document".
+  mediaKind: varchar("media_kind", { length: 24 }).default("video").notNull(),
   storyboard: jsonb("storyboard"),
   // Frame-accurate Timeline JSON for kind='nle' projects. See
   // shared/timeline.ts for the shape and isRenderable() for the
@@ -230,6 +233,13 @@ export const studioProjects = pgTable("studio_projects", {
   // boolean ops + materials + build-volume). Null for non-cad_3d projects.
   // Migration 0184 / #930 Phase 2.
   cad3dState: jsonb("cad_3d_state"),
+  // Document state JSON for mediaKind='document' projects — the paged
+  // WYSIWYG canvas backing resume / job / article / blog (#1912). Same
+  // parallel-column pattern as the other non-Timeline runtimes. Shape lives
+  // in `frontend/lib/studio/editor-v2/document-state.ts` (DocumentState —
+  // pages + flow blocks + Widget overlays + theme + page geometry). Null
+  // for every non-document project. Migration 0197.
+  documentState: jsonb("document_state"),
   // Public-URL slug. Promoted from `storyboard._slug` to a real column
   // in migration 0141 because the JSONB extraction made the per-save
   // uniqueness check sequentially scan studio_projects and blow the

@@ -158,6 +158,12 @@ export async function exportProjectByKind(inputs: ExportInputs): Promise<Blob | 
       if (!snapshot.renderTimeline) return null;
       return snapshot.renderTimeline();
     }
+    case "document":
+      // PDF/PNG export for the paged document runtime is a client-side print
+      // of the live renderer (preview === render) — it lands with the
+      // DocumentStage build (#1912), not through this Blob facade.
+      // Unreachable today: no document projects can be created yet.
+      throw new Error("document mediaKind export not yet wired — see gap #1912");
     default:
       return assertNever(mediaKind, `Unhandled mediaKind in exportProjectByKind(): ${String(mediaKind)}`);
   }

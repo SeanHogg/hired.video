@@ -26,6 +26,7 @@
 import {
   BookOpen,
   Box,
+  FileText,
   Film,
   Gamepad2,
   Headphones,
@@ -159,6 +160,17 @@ export const KIND_MARKETING: Record<MediaKind, KindMarketingPitch> = {
       "Choose-your-own-adventure comics — reader picks panels' next page, flags unlock branches. Coming soon (#929).",
     icon: Workflow,
     accentClass: "bg-indigo-600/10 text-indigo-600",
+    isShippable: false,
+  },
+  document: {
+    // Paged WYSIWYG document runtime (#1912) — resume / job / article / blog
+    // authored on a fixed print sheet. Hidden from the public grid until the
+    // DocumentStage runtime ships.
+    title: "Resumes & documents",
+    blurb:
+      "Design resumes, job posts, and articles on a print-perfect canvas — drag in sections, add interactive media, export to PDF. Coming soon (#1912).",
+    icon: FileText,
+    accentClass: "bg-blue-700/10 text-blue-700",
     isShippable: false,
   },
 };

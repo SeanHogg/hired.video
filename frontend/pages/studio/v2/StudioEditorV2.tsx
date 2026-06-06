@@ -223,6 +223,16 @@ const LinkedInPublisher = lazy(
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
+/** Pull the server's machine-readable error code off an ApiClient error.
+ *  NetworkError stashes the original code under `context.serverCode`; typed
+ *  errors expose `code` directly. Used to branch on YOUTUBE_NOT_CONNECTED. */
+function serverCodeOf(err: unknown): string | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const e = err as { context?: { serverCode?: unknown }; code?: unknown };
+  const code = e.context?.serverCode ?? e.code;
+  return typeof code === "string" ? code : undefined;
+}
+
 export default function StudioEditorV2() {
   const { id: routeId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -1051,7 +1061,7 @@ export default function StudioEditorV2() {
   }, [leftBottomOpen]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const playback = usePreviewPlayback(state);
-  // "Where has this project been published" (#1896) — one fetch shared by the
+  // "Where has this project been published" (#1920) — one fetch shared by the
   // Save menu + Details drawer; refreshed after each successful publish.
   const { publications, refresh: refreshPublications } =
     usePublications(persistedProjectId);
@@ -2370,7 +2380,7 @@ export default function StudioEditorV2() {
     if (!project) return;
     setRepublishing("youtube");
     try {
-      // Real upload to the user's connected YouTube channel (#1896). The
+      // Real upload to the user's connected YouTube channel (#1920). The
       // server pulls the rendered MP4, uploads via the Data API, persists
       // the watch URL, and records the publication — so re-publishing the
       // same project updates the same record (one row per destination).
@@ -2387,7 +2397,7 @@ export default function StudioEditorV2() {
         action: viewAction(url),
       });
     } catch (err) {
-      const code = (err as any)?.context?.serverCode ?? (err as any)?.code;
+      const code = serverCodeOf(err);
       if (code === "YOUTUBE_NOT_CONNECTED") {
         // Distinct, actionable path: send the user to Settings to link a
         // channel rather than a generic "publish failed".
@@ -3711,7 +3721,7 @@ export default function StudioEditorV2() {
                     setLinkedInPublishOpen(false);
                     // LinkedIn's upload finishes in the browser, so record the
                     // publication from here (server-completed flows record
-                    // their own). #1896.
+                    // their own). #1920.
                     const postUrl = `https://www.linkedin.com/feed/update/${postId}`;
                     if (persistedProjectId) {
                       void studioService
@@ -3837,7 +3847,7 @@ function EditorHeader({
    *  shared gate (#936) so non-Timeline kinds (game / image) don't see
    *  scene-shaped controls that don't apply to their runtime. */
   usesTimelineChrome: boolean;
-  /** Publication records (#1896) — passed through to the Save menu's
+  /** Publication records (#1920) — passed through to the Save menu's
    *  "Published to" section and the Details drawer. */
   publications: StudioPublication[];
   onRepublish: (destination: string) => void;

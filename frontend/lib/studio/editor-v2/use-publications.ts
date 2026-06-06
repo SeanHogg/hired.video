@@ -1,5 +1,5 @@
 /**
- * usePublications — fetches "where has this project been published" (#1896)
+ * usePublications — fetches "where has this project been published" (#1920)
  * and exposes a `refresh()` the editor calls after each successful publish.
  *
  * ONE fetch shared by every surface (Save menu + Details drawer) per the DRY

@@ -2836,7 +2836,7 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
   return c.json(ok(dto));
 });
 
-// ─── Publication records (#1896) ─────────────────────────────────────────────
+// ─── Publication records (#1920) ─────────────────────────────────────────────
 // "Where has this project been published?" — one row per destination, served
 // to the editor's Save menu + Details drawer. See publication-service.ts.
 

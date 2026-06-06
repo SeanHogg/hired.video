@@ -92,7 +92,7 @@ interface StudioSaveMenuV2Props {
    *  pass `canPublishToYouTube`; the menu derives from
    *  `publishDestinationsFor(mediaKind)` and looks up handlers by id. */
   publishHandlers?: PublishHandlers;
-  /** Where this project has already been published (#1896). Drives the
+  /** Where this project has already been published (#1920). Drives the
    *  "Published to" section at the top of the dropdown — each row links to
    *  the live destination + offers Re-publish. Self-gates: the section
    *  hides when empty. The editor fetches these once via `usePublications`

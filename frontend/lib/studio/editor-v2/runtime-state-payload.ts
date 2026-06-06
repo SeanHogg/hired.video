@@ -112,6 +112,11 @@ export function runtimeStatePayload(
         kind: "nle",
         timelineSpec: canvasStateToTimeline(snapshot.canvasState),
       };
+    case "document":
+      // Paged document runtime — its persistence (document_state column,
+      // RuntimeSnapshot.documentState) lands with the DocumentStage build
+      // (#1912). Unreachable today: no document projects can be created yet.
+      throw new Error("document mediaKind persistence not yet wired — see gap #1912");
     default:
       // Exhaustiveness guard — TS errors here if MEDIA_KINDS gains a
       // new entry without a matching branch above. Runtime throw is

@@ -319,7 +319,7 @@ export interface PublishVideoRequest {
   privacyStatus?: "public" | "private" | "unlisted";
 }
 
-// ─── Publication records (#1896) ────────────────────────────────────────────
+// ─── Publication records (#1920) ────────────────────────────────────────────
 // "Where has this project been published?" — one record per destination,
 // mirroring the api `PublicationRecord` (publication-service.ts). `destination`
 // is a shared `PublishDestinationId`; `externalUrl` is the view/preview link
@@ -670,7 +670,7 @@ export const studioService = {
 
   /**
    * Upload the project's rendered video to the caller's connected YouTube
-   * channel (#1896). The project must already be rendered (have a linked
+   * channel (#1920). The project must already be rendered (have a linked
    * video); the editor calls this after ensureRendered(). Returns the watch
    * URL + the recorded publication. Throws with `context.serverCode ===
    * "YOUTUBE_NOT_CONNECTED"` when the user hasn't linked a channel.

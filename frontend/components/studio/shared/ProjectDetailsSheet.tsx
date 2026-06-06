@@ -54,7 +54,7 @@ interface Props {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   noTrigger?: boolean;
-  /** Publication records (#1896) — where this project has been published.
+  /** Publication records (#1920) — where this project has been published.
    *  Supplied by the editor's shared `usePublications` so the drawer and the
    *  Save menu read the same list (DRY). When omitted/empty the "Published"
    *  tab self-hides. */
@@ -297,7 +297,7 @@ export default function ProjectDetailsSheet({
     // View links + Re-publish. Self-gates: the tab only appears once there's
     // at least one live publication. Same `PublishedToList` the Save menu's
     // compact section uses (DRY) — this surface just renders the `full`
-    // variant with timestamps. (#1896)
+    // variant with timestamps. (#1920)
     ...(livePublications.length > 0
       ? ([
           {

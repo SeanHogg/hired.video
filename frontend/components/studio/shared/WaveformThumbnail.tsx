@@ -42,6 +42,9 @@ const KIND_PALETTE: Record<MediaKind, { bg: string; bar: string; label: string }
   cad:       { bg: "from-cyan-700/40 to-slate-900",     bar: "#22d3ee", label: "#a5f3fc" },
   cad_3d:    { bg: "from-teal-700/40 to-slate-900",     bar: "#2dd4bf", label: "#99f6e4" },
   interactive_comic: { bg: "from-indigo-700/40 to-slate-900", bar: "#818cf8", label: "#c7d2fe" },
+  // document is a paged visual artifact, never audio — defined only to keep
+  // the Record<MediaKind,…> exhaustive (it never reaches this audio thumb).
+  document:  { bg: "from-blue-800/40 to-slate-900",     bar: "#60a5fa", label: "#bfdbfe" },
 };
 
 const BAR_COUNT = 56;

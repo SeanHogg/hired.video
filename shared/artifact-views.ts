@@ -33,6 +33,7 @@ export const ARTIFACT_KINDS = [
   "image",
   "cad",
   "cad_3d",
+  "document",
   // ─── Non-studio artifacts (own entity tables) ───────────────────────────
   "resume",
   "article",
@@ -58,7 +59,8 @@ export function isStudioArtifactKind(kind: ArtifactKind): boolean {
     kind === "game" ||
     kind === "comic" ||
     kind === "image" ||
-    kind === "cad"
+    kind === "cad" ||
+    kind === "document"
   );
 }
 
