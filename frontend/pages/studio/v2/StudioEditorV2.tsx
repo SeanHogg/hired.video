@@ -143,6 +143,9 @@ import {
   type DocumentState,
   createBlankDocumentState,
 } from "@/lib/studio/editor-v2/document-state";
+import { resumeService } from "@/lib/services/resume-service";
+import type { ResumeData } from "@/types/resume";
+import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
 import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer, makeVectorLayer, makeTextLayer } from "@shared/image-state";
 import { spillLayersIfNeeded } from "@/lib/studio/drawing/layer-r2-spill";
@@ -499,6 +502,11 @@ export default function StudioEditorV2() {
     canRedo: documentCanRedo,
   } = documentHistory;
   const [documentStateHydrated, setDocumentStateHydrated] = useState(false);
+  // The bound entity's CONTENT for a document project (resume today). Lives
+  // separately from DocumentState (which is layout/structure) — content is
+  // owned by the resume row. Seeded blank for a fresh draft; fetched from the
+  // resume row when DocumentState.entityId is set; persisted back on save.
+  const [documentEntityContent, setDocumentEntityContent] = useState<ResumeData | null>(null);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -1191,6 +1199,32 @@ export default function StudioEditorV2() {
     },
     unhydrate: () => setDocumentStateHydrated(false),
   });
+
+  // Document content fetch/seed (#1920). Once the document runtime hydrates,
+  // load the bound resume's content (so section blocks render real data), or
+  // seed a blank ResumeData for a fresh draft with no entity row yet.
+  useEffect(() => {
+    if (currentMediaKind !== "document" || !documentStateHydrated) return;
+    let cancelled = false;
+    (async () => {
+      const entityId = documentState.entityId;
+      if (entityId && documentState.entityKind === "resume") {
+        try {
+          const r = await resumeService.getResumeById(entityId);
+          if (!cancelled) setDocumentEntityContent(mapContentToResumeData(r.content));
+          return;
+        } catch {
+          // fall through to a blank doc if the resume can't be read
+        }
+      }
+      if (!cancelled) setDocumentEntityContent((prev) => prev ?? getEmptyResumeData());
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // documentState.entityId is the binding signal; entityKind is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMediaKind, documentStateHydrated, documentState.entityId]);
 
   // Game uses the null-sentinel hydration pattern instead of a
   // separate boolean flag — `gameState !== null` IS the hydration
@@ -2569,6 +2603,34 @@ export default function StudioEditorV2() {
           setImageState(imageStateToPersist);
         }
       }
+      // Document content persistence (#1916/#1920): a document's CONTENT
+      // lives in its entity row (the resume), NOT in DocumentState. On save,
+      // write the edited content to the resume — creating the row on first
+      // save — and stamp its id onto DocumentState so reads re-bind. The
+      // DocumentState (layout/structure) itself persists via the slice below.
+      let documentStateForSave = documentState;
+      if (currentMediaKind === "document" && documentEntityContent) {
+        try {
+          if (documentState.entityId) {
+            await resumeService.updateResumeData(documentState.entityId, {
+              data: documentEntityContent,
+            });
+          } else {
+            const createdResume = await resumeService.createResume({
+              title,
+              data: documentEntityContent,
+            });
+            documentStateForSave = { ...documentState, entityId: createdResume.id };
+            setDocumentState(() => documentStateForSave);
+          }
+        } catch (err) {
+          toast({
+            title: t("errors.saveFailed"),
+            description: err instanceof Error ? err.message : t("errors.unknownError"),
+            variant: "destructive",
+          });
+        }
+      }
       const runtimeSlice = runtimeStatePayload(currentMediaKind, {
         canvasState: state,
         imageState: imageStateToPersist,
@@ -2576,7 +2638,7 @@ export default function StudioEditorV2() {
         gameState,
         cadState,
         cad3dState: cad3DState,
-        documentState,
+        documentState: documentStateForSave,
       });
       const res = await studioService.saveDraft({
         name: title,
@@ -3208,7 +3270,8 @@ export default function StudioEditorV2() {
                           setState={setDocumentState}
                           commit={documentCommit}
                           zoom={zoom}
-                          entityContent={null}
+                          entityContent={documentEntityContent}
+                          onContentChange={setDocumentEntityContent}
                         />
                       ) : null,
                       timeline: (

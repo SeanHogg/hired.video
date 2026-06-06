@@ -253,7 +253,7 @@ export default function JobApplicationPage() {
                     type="button"
                     variant="link"
                     className="p-0 h-auto"
-                    onClick={() => navigate("/resumes/create")}
+                    onClick={() => navigate("/studio?contentTemplate=resume-doc")}
                   >
                     {t("actions.createResumeFirst")}
                   </Button>

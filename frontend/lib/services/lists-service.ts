@@ -13,11 +13,14 @@ export const LIST_ENTITY_TYPES = [
   "pipeline_entry",
   // A published course — backs the marketplace wishlist heart.
   "course",
+  // A published voice clone — voice marketplace wishlist heart.
+  "voice_clone",
 ] as const;
 export type ListEntityType = (typeof LIST_ENTITY_TYPES)[number];
 
-// The PublicCourseCard shape returned by /api/lists/wishlist/courses. Mirrors
-// the marketplace feed card so the My-Wishlist page reuses the same card.
+// The PublicCourseCard shape returned by /api/lists/wishlist/enriched for
+// entityType=course. Mirrors the marketplace feed card so the My-Wishlist page
+// reuses the same card. (Also reused by learning-goal recommendations.)
 export interface WishlistCourseCard {
   id: string;
   type: "course";
@@ -178,10 +181,12 @@ export const listsService = {
     return res.data?.ids ?? [];
   },
 
-  /** Wishlisted courses, enriched into marketplace card shape. */
-  async wishlistCourses(): Promise<WishlistCourseCard[]> {
-    const res = await apiClient.get<WishlistCourseCard[]>(
-      "/api/lists/wishlist/courses",
+  /** Wishlisted items of one enrichable type, in that type's marketplace-card
+   *  shape (course → WishlistCourseCard, voice_clone → VoiceMarketplaceCardItem).
+   *  Caller casts to the concrete card type per tab. */
+  async wishlistEnriched<T = unknown>(entityType: ListEntityType): Promise<T[]> {
+    const res = await apiClient.get<T[]>(
+      `/api/lists/wishlist/enriched?entityType=${entityType}`,
       undefined,
       { suppressErrorEvent: true },
     );

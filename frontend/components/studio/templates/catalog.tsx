@@ -41,6 +41,7 @@ import {
 import type { StudioProjectState } from "@/types/studio";
 import type { StudioPurpose } from "@/lib/services/studio-service";
 import type { MediaKind } from "@shared/media-kinds";
+import type { DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
 
 import BasicIntake from "./intake/BasicIntake";
 import ProfileIntake from "./intake/ProfileIntake";
@@ -68,6 +69,10 @@ export type ContentTemplate =
   // from the video "resume" template above (mediaKind "video"). Opens the
   // <DocumentStage> print canvas instead of the timeline.
   | "resume_doc"
+  // Paged job-posting DOCUMENT (#1917) — mediaKind "document", entity "job".
+  // Distinct from the "job_ad" VIDEO template below; opens <DocumentStage>
+  // with the job design templates instead of the timeline.
+  | "job_doc"
   | "personal_brand"
   | "skills_demo"
   | "code_walkthrough"
@@ -263,6 +268,11 @@ export interface TemplateDef {
    *  Every existing template is `"video"` — Podcast / Voice / Animation
    *  kinds land alongside their first template entries. */
   mediaKind: MediaKind;
+  /** For `mediaKind: "document"` templates (#1917) — which entity the paged
+   *  canvas authors (resume / job / article / blog). Drives the seeded
+   *  `DocumentState.entityKind`, the block palette, and which design-template
+   *  library the in-editor picker surfaces. Omitted for non-document kinds. */
+  documentEntityKind?: DocumentEntityKind;
   /** Demographics this template serves. Single SoT for #900 audience pages
    *  (`/for/:audience`) and #901 template-page "best for" chips. Filter the
    *  catalog directly — no parallel `AUDIENCE_TO_TEMPLATES` lookup. */
@@ -331,6 +341,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "resume",
     category: "showcase",
     mediaKind: "document",
+    documentEntityKind: "resume",
     audiences: ["job_seeker"],
     defaultName: "New Resume",
     defaultPrompt: "",
@@ -456,6 +467,25 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultPrompt: "Create a compelling 30-second job advertisement video",
     firstTabLabel: "Job Details",
     IntakeForm: JobAdIntake,
+  },
+  {
+    // Paged job-posting DOCUMENT (#1917) — opens <DocumentStage> with the job
+    // design templates (job-template.ts). Distinct from "job_ad" (a VIDEO);
+    // this authors the written posting itself.
+    id: "job_doc",
+    label: "Job Posting (Document)",
+    desc: "Write a print-ready job posting on the canvas — pick a layout, drag in sections, export PDF.",
+    icon: Briefcase,
+    importMode: "none",
+    purpose: "job_ad",
+    category: "hiring",
+    mediaKind: "document",
+    documentEntityKind: "job",
+    audiences: ["recruiter", "employer"],
+    defaultName: "New Job Posting",
+    defaultPrompt: "",
+    firstTabLabel: "Document",
+    IntakeForm: BasicIntake,
   },
   {
     id: "company_promo",

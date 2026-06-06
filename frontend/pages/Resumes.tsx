@@ -90,7 +90,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { downloadResume } from "@/lib/resume-download";
 import { useAuth } from "@/lib/auth";
 import { usePermissions } from "@/hooks/use-permissions";
-import { generateResumeId, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Resume,
@@ -1391,8 +1391,9 @@ export default function Resumes() {
           }
           onUploadSuccess={handleUploadSuccess}
           onCreateResume={() => {
-            const newId = generateResumeId();
-            navigate(`/resumes/create/${newId}`);
+            // Resume creation now happens in the Studio document canvas
+            // (#1912/#1915) — seed a resume document and open the editor.
+            navigate("/studio?contentTemplate=resume-doc");
           }}
         />
       )}
@@ -1405,12 +1406,7 @@ export default function Resumes() {
         <Upload className="h-4 w-4 mr-2" />
         {t("actions.uploadResumeAction")}
       </Button>
-      <Button
-        onClick={() => {
-          const newId = generateResumeId();
-          navigate(`/resumes/create/${newId}`);
-        }}
-      >
+      <Button onClick={() => navigate("/studio?contentTemplate=resume-doc")}>
         <Plus className="h-4 w-4 mr-2" />
         {t("headings.createResumeHeading")}
       </Button>

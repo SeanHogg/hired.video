@@ -80,6 +80,7 @@ export type LLMUseCase =
   | "scorecard_bias_check"
   | "article_moderation"
   | "course_generation"
+  | "course_recommend"
   // 3D world game-builder agent (gap #1638). Multi-turn tool-using
   // agent that calls the world-3d mutation tools to build the game
   // from natural-language prompts. Needs a model with strong tool-use
@@ -294,6 +295,9 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // gemma 4 instruct family hits the sweet spot of cheap + structured.
   article_moderation: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
   course_generation: { model: "anthropic/claude-3-haiku", temperature: 0.5 },
+  // Re-rank a small keyword-recall candidate set against a learner's goal
+  // (#1926). Tiny structured output (ordered ids) — cheap haiku, low temp.
+  course_recommend: { model: "anthropic/claude-3-haiku", temperature: 0.2, maxTokens: 300 },
   scorecard_bias_check: {
     model: "google/gemma-4-26b-a4b-it:free",
     temperature: 0.1,

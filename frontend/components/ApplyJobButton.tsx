@@ -150,7 +150,7 @@ export default function ApplyJobButton({
               {resumes.length === 0 && (
                 <p className="text-sm text-muted-foreground">
                   You need to create a resume first.{" "}
-                  <a href="/resumes/create" className="text-primary hover:underline">
+                  <a href="/studio?contentTemplate=resume-doc" className="text-primary hover:underline">
                     Create one now
                   </a>
                 </p>

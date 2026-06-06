@@ -43,6 +43,8 @@ interface CourseAuthor {
   name: string;
   avatarUrl: string | null;
   slug: string;
+  headline?: string | null;
+  bio?: string | null;
 }
 
 interface CourseDetail {
@@ -499,9 +501,16 @@ export default function CoursePublicDetail() {
                     )}
                     <div>
                       <h2 className="font-semibold">{course.author.name}</h2>
-                      <p className="text-sm text-muted-foreground">Instructor</p>
+                      <p className="text-sm text-muted-foreground">
+                        {course.author.headline || "Instructor"}
+                      </p>
                     </div>
                   </div>
+                  {course.author.bio && (
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {course.author.bio}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-6 text-sm">
                     <div>
                       <div className="font-semibold tabular-nums">

@@ -25,7 +25,9 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import type { ResumeContent } from "@shared/resume";
+import type { ResumeData } from "@/types/resume";
+import SectionEditor from "@/components/studio/document/SectionEditor";
+import { resumeSectionSchema } from "@/lib/studio/document/resume-field-schema";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -43,33 +45,39 @@ import {
   type PageSize,
 } from "@/lib/studio/editor-v2/document-state";
 import {
-  type DocumentSelection,
-  RESUME_BLOCK_PRESETS,
+  blockPresetsForEntity,
   addBlock,
   firstPageId,
   moveBlock,
+  newId,
   removeBlock,
   setBlockMode,
   setOrientation,
   setPageSize,
   updateBlock,
 } from "@/lib/studio/editor-v2/document-edit";
+import { applyDocumentTemplate } from "@/lib/studio/editor-v2/document-templates";
+import DocumentTemplatePicker from "@/components/studio/document/DocumentTemplatePicker";
 
 interface DocumentStageProps {
   state: DocumentState;
   setState: (updater: (prev: DocumentState) => DocumentState) => void;
   commit: () => void;
   zoom: number;
-  /** The bound entity's content (resume today). Section blocks summarize it
-   *  when present; null while a fresh draft has no saved content yet. */
-  entityContent?: ResumeContent | null;
+  /** The bound entity's content (resume today). Section blocks render it —
+   *  editable when `onContentChange` is supplied, read-only summary otherwise.
+   *  null while a fresh draft has no content yet. */
+  entityContent?: ResumeData | null;
+  /** When supplied, section blocks become inline-editable (#1916) and edits
+   *  flow back through here; the host owns persistence. */
+  onContentChange?: (next: ResumeData) => void;
 }
 
 /** Compact display lines for a section block — a primary label per item.
  *  Lightweight by design; full-fidelity rendering is the renderer
  *  generalization tracked in #1912. */
 function sectionItemLabels(
-  content: ResumeContent | null | undefined,
+  content: ResumeData | null | undefined,
   sectionKey: string | undefined,
 ): string[] {
   if (!content || !sectionKey) return [];
@@ -96,12 +104,14 @@ export default function DocumentStage({
   commit,
   zoom,
   entityContent,
+  onContentChange,
 }: DocumentStageProps) {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const pageId = firstPageId(state);
   const { width, height } = pageDimensions(state);
   const page = state.pages[0];
   const canSetPageMode = documentSupportsPageMode(state.entityKind);
+  const blockPresets = blockPresetsForEntity(state.entityKind);
 
   const commitState = (next: DocumentState) => {
     setState(() => next);
@@ -123,7 +133,7 @@ export default function DocumentStage({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
-            {RESUME_BLOCK_PRESETS.map((preset) => (
+            {blockPresets.map((preset) => (
               <DropdownMenuItem
                 key={preset.label}
                 onSelect={() => {
@@ -137,6 +147,17 @@ export default function DocumentStage({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Design template gallery — self-gates to nothing for entities with
+            no design library (article / blog). Applying one swaps the page's
+            flow blocks + theme; content is untouched. */}
+        <DocumentTemplatePicker
+          entityKind={state.entityKind}
+          currentThemeKey={state.theme.themeKey}
+          onApply={(option) =>
+            commitState(applyDocumentTemplate(state, option, () => newId("blk")))
+          }
+        />
 
         {/* Page geometry — resume only (other entities are locked Letter
             portrait; the control self-gates via documentSupportsPageMode). */}
@@ -209,6 +230,7 @@ export default function DocumentStage({
               block={block}
               selected={selectedBlockId === block.id}
               entityContent={entityContent}
+              onContentChange={onContentChange}
               onSelect={(e) => {
                 e.stopPropagation();
                 setSelectedBlockId(block.id);
@@ -249,6 +271,7 @@ export default function DocumentStage({
                 block={block}
                 selected={selectedBlockId === block.id}
                 entityContent={entityContent}
+                onContentChange={onContentChange}
                 onSelect={(e) => {
                   e.stopPropagation();
                   setSelectedBlockId(block.id);
@@ -299,6 +322,7 @@ function DocumentBlockView({
   block,
   selected,
   entityContent,
+  onContentChange,
   onSelect,
   onMoveUp,
   onMoveDown,
@@ -309,7 +333,8 @@ function DocumentBlockView({
 }: {
   block: DocumentBlock;
   selected: boolean;
-  entityContent?: ResumeContent | null;
+  entityContent?: ResumeData | null;
+  onContentChange?: (next: ResumeData) => void;
   onSelect: (e: React.MouseEvent) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -357,7 +382,12 @@ function DocumentBlockView({
           </button>
         </div>
       )}
-      <BlockBody block={block} entityContent={entityContent} onCommitText={onCommitText} />
+      <BlockBody
+        block={block}
+        entityContent={entityContent}
+        onContentChange={onContentChange}
+        onCommitText={onCommitText}
+      />
     </div>
   );
 }
@@ -365,10 +395,12 @@ function DocumentBlockView({
 function BlockBody({
   block,
   entityContent,
+  onContentChange,
   onCommitText,
 }: {
   block: DocumentBlock;
-  entityContent?: ResumeContent | null;
+  entityContent?: ResumeData | null;
+  onContentChange?: (next: ResumeData) => void;
   onCommitText?: (text: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -424,13 +456,38 @@ function BlockBody({
       </div>
     );
   }
-  // section / component
-  const labels = sectionItemLabels(entityContent, block.sectionKey);
+  // section / component. Inline the null/schema checks (not a hoisted bool) so
+  // TS narrows entityContent + onContentChange to non-null in the edit branch.
   return (
     <div>
       <h3 className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-semibold uppercase tracking-wide text-slate-800">
         {block.title ?? block.sectionKey ?? "Section"}
       </h3>
+      {onContentChange && entityContent && resumeSectionSchema(block.sectionKey) ? (
+        <SectionEditor
+          sectionKey={block.sectionKey as string}
+          content={entityContent}
+          onChange={onContentChange}
+        />
+      ) : (
+        <SectionSummary content={entityContent} sectionKey={block.sectionKey} />
+      )}
+    </div>
+  );
+}
+
+/** Read-only fallback when a section block isn't editable (no content bound,
+ *  or no edit callback — e.g. the viewer / PDF path). */
+function SectionSummary({
+  content,
+  sectionKey,
+}: {
+  content?: ResumeData | null;
+  sectionKey: string | undefined;
+}) {
+  const labels = sectionItemLabels(content, sectionKey);
+  return (
+    <>
       {labels.length > 0 ? (
         <ul className="space-y-0.5 text-sm text-slate-700">
           {labels.map((l, i) => (
@@ -441,10 +498,10 @@ function BlockBody({
         </ul>
       ) : (
         <p className="text-xs italic text-slate-400">
-          No {block.sectionKey ?? "content"} yet
+          No {sectionKey ?? "content"} yet
         </p>
       )}
-    </div>
+    </>
   );
 }
 

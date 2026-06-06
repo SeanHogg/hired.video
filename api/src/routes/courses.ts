@@ -394,7 +394,12 @@ courseRoutes.get("/public/:userIdOrSlug/:slug", async (c) => {
     .select({
       course: courses,
       author: { id: users.id, name: users.name },
-      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      authorProfile: {
+        avatarUrl: userProfiles.avatarUrl,
+        customUrlSlug: userProfiles.customUrlSlug,
+        headline: userProfiles.headline,
+        summary: userProfiles.summary,
+      },
     })
     .from(courses)
     .innerJoin(users, eq(courses.userId, users.id))
@@ -453,6 +458,8 @@ courseRoutes.get("/public/:userIdOrSlug/:slug", async (c) => {
         name: row.author.name,
         avatarUrl: row.authorProfile?.avatarUrl ?? null,
         slug: row.authorProfile?.customUrlSlug ?? row.author.id,
+        headline: row.authorProfile?.headline ?? null,
+        bio: row.authorProfile?.summary ?? null,
       },
     },
     modules,

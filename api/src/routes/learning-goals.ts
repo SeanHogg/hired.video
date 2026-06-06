@@ -15,6 +15,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { LEARNING_GOAL_STATUSES } from "../db/schema/learning.js";
 import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
 export const learningGoalsRoutes = new Hono<AppEnv>();
 
@@ -139,14 +140,63 @@ learningGoalsRoutes.get("/:id/recommendations", async (c) => {
     .limit(1);
   if (!goal) return c.json(error("NOT_FOUND", "Goal not found"), 404);
 
+  // LLM re-rank only runs on a cache miss (per goal, 600s TTL) — bounds cost.
+  const llm = hasAnyLLMProviderKey(c.env as any)
+    ? createLLMClient(c.env as any, c.var.user ?? null)
+    : null;
+
   const items = await getOrSetCached<unknown[]>({
     key: recsCacheKey(id),
     ttlSeconds: 600,
-    loader: () => recommendCoursesForText(goal.goalText),
+    loader: async () => {
+      // Recall: cheap keyword candidate set (wider than we'll return).
+      const candidates = await recommendCoursesForText(goal.goalText, 12);
+      if (candidates.length <= 1) return candidates.slice(0, 6);
+      // Precision: have the LLM re-rank candidates against the goal. On any
+      // failure (no key, refusal, drift) fall back to the keyword order.
+      const orderedIds = llm
+        ? await llmRerankCandidates(llm, goal.goalText, candidates).catch(() => null)
+        : null;
+      if (!orderedIds || orderedIds.length === 0) return candidates.slice(0, 6);
+      const byId = new Map(candidates.map((c2) => [c2.id, c2]));
+      const ranked = orderedIds.map((cid) => byId.get(cid)).filter(Boolean);
+      // Append any candidate the model dropped, preserving keyword order, so
+      // we always return up to 6 even if the model returned fewer.
+      for (const cand of candidates) if (!orderedIds.includes(cand.id)) ranked.push(cand);
+      return ranked.slice(0, 6);
+    },
     revive: (raw) => (Array.isArray(raw) ? raw : null),
   });
   return c.json(success(items), 200);
 });
+
+// Re-rank keyword candidates by relevance to the goal. Returns an ordered list
+// of course ids (best first) or throws → caller falls back to keyword order.
+async function llmRerankCandidates(
+  llm: ReturnType<typeof createLLMClient>,
+  goalText: string,
+  candidates: Array<{ id: string; title: string; summary: string | null; category: string | null; difficulty: string | null }>,
+): Promise<string[]> {
+  const list = candidates
+    .map(
+      (c2, i) =>
+        `${i + 1}. id=${c2.id} | ${c2.title}${c2.category ? ` [${c2.category}]` : ""}${c2.difficulty ? ` (${c2.difficulty})` : ""}${c2.summary ? ` — ${c2.summary.slice(0, 140)}` : ""}`,
+    )
+    .join("\n");
+  const { data } = await llm.callJson(
+    "course_recommend",
+    {
+      useCase: "course_recommend",
+      systemPrompt:
+        "You rank courses by how well they help a learner reach a stated goal. Return ONLY the ids of the genuinely relevant courses, best first (most directly on-goal). Drop irrelevant ones entirely. Never invent ids.",
+      userMessage: `Learner goal: "${goalText}"\n\nCandidate courses:\n${list}\n\nReturn the relevant course ids, best first.`,
+      responseFormat: "json_object",
+    },
+    z.object({ orderedIds: z.array(z.string()) }),
+  );
+  const validIds = new Set(candidates.map((c2) => c2.id));
+  return data.orderedIds.filter((cid) => validIds.has(cid));
+}
 
 // Stop words we never want to match on — they'd pull in every course.
 const STOP_WORDS = new Set([
@@ -155,7 +205,27 @@ const STOP_WORDS = new Set([
   "about", "more", "build", "building", "make", "using", "use",
 ]);
 
-async function recommendCoursesForText(goalText: string): Promise<unknown[]> {
+interface RecommendCard {
+  id: string;
+  type: "course";
+  title: string;
+  slug: string;
+  summary: string | null;
+  coverImageUrl: string | null;
+  category: string | null;
+  tags: string[] | null;
+  difficulty: string | null;
+  estimatedMinutes: number | null;
+  priceCents: number | null;
+  issuesCertificate: boolean;
+  enrollmentCount: number;
+  averageRating: number | null;
+  ratingCount: number;
+  publishedAt: Date | string | null;
+  author: { id: string; name: string | null; avatarUrl: string | null; slug: string };
+}
+
+async function recommendCoursesForText(goalText: string, limit = 6): Promise<RecommendCard[]> {
   const db = getDb();
   const tokens = goalText
     .toLowerCase()
@@ -200,7 +270,7 @@ async function recommendCoursesForText(goalText: string): Promise<unknown[]> {
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(whereClause)
     .orderBy(desc(courses.enrollmentCount))
-    .limit(6);
+    .limit(limit);
 
   return rows.map((r) => ({
     id: r.course.id,

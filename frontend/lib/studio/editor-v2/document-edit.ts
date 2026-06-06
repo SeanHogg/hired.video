@@ -10,6 +10,7 @@ import {
   type BlockBox,
   type DocumentBlock,
   type DocumentBlockKind,
+  type DocumentEntityKind,
   type DocumentOverlay,
   type DocumentPage,
   type DocumentState,
@@ -45,12 +46,20 @@ export interface DocumentBlockPreset {
   layout?: string;
 }
 
+// Free-content primitives shared by every entity palette — not bound to entity
+// content, so they make sense for resume, job, article, and blog alike.
+const FREE_CONTENT_PRESETS: DocumentBlockPreset[] = [
+  { kind: "text", label: "Text", layout: undefined },
+  { kind: "image", label: "Image", layout: undefined },
+  { kind: "divider", label: "Divider", layout: undefined },
+  { kind: "spacer", label: "Spacer", layout: undefined },
+];
+
 /**
  * Resume section blocks + layout primitives offered in the palette. Section
  * keys + their default layouts mirror the declarative resume template
  * (`frontend/types/resume-template.ts`) so a section dropped here renders the
- * same way the read-only resume does. Entity-specific palettes for job /
- * article land with #1914.
+ * same way the read-only resume does.
  */
 export const RESUME_BLOCK_PRESETS: DocumentBlockPreset[] = [
   { kind: "section", label: "Work Experience", sectionKey: "work", layout: "timeline" },
@@ -64,12 +73,43 @@ export const RESUME_BLOCK_PRESETS: DocumentBlockPreset[] = [
   { kind: "section", label: "Languages", sectionKey: "languages", layout: "compact" },
   { kind: "section", label: "Interests", sectionKey: "interests", layout: "compact" },
   { kind: "section", label: "References", sectionKey: "references", layout: "list" },
-  // Free-content primitives — not bound to entity content.
-  { kind: "text", label: "Text", layout: undefined },
-  { kind: "image", label: "Image", layout: undefined },
-  { kind: "divider", label: "Divider", layout: undefined },
-  { kind: "spacer", label: "Spacer", layout: undefined },
+  ...FREE_CONTENT_PRESETS,
 ];
+
+/**
+ * Job-posting section blocks. Section keys + default layouts mirror the
+ * declarative job template (`frontend/types/job-template.ts`) so a section
+ * dropped here renders the same way the read-only job posting does.
+ */
+export const JOB_BLOCK_PRESETS: DocumentBlockPreset[] = [
+  { kind: "section", label: "About this role", sectionKey: "description", layout: "prose" },
+  { kind: "section", label: "What you'll do", sectionKey: "responsibilities", layout: "list" },
+  { kind: "section", label: "Requirements", sectionKey: "requirements", layout: "list" },
+  { kind: "section", label: "Qualifications", sectionKey: "qualifications", layout: "list" },
+  { kind: "section", label: "Skills", sectionKey: "skills", layout: "grid" },
+  { kind: "section", label: "Benefits", sectionKey: "benefits", layout: "cards" },
+  { kind: "section", label: "About the company", sectionKey: "company", layout: "prose" },
+  { kind: "section", label: "Apply", sectionKey: "apply", layout: "compact" },
+  ...FREE_CONTENT_PRESETS,
+];
+
+/**
+ * The block palette for an entity kind. Single source of truth so the
+ * DocumentStage "Add block" menu self-selects the right sections without
+ * branching on kind at the call site (DRY). Article/blog have no section model
+ * yet (#1914) — they get the free-content primitives only.
+ */
+export function blockPresetsForEntity(kind: DocumentEntityKind): DocumentBlockPreset[] {
+  switch (kind) {
+    case "resume":
+      return RESUME_BLOCK_PRESETS;
+    case "job":
+      return JOB_BLOCK_PRESETS;
+    case "article":
+    case "blog":
+      return FREE_CONTENT_PRESETS;
+  }
+}
 
 // ── Internal page helpers ────────────────────────────────────────────────────
 

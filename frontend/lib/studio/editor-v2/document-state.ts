@@ -295,6 +295,31 @@ export interface DocumentState {
   entityId: string | null;
 }
 
+/** Default flow blocks a fresh document of `entityKind` opens with. Resume
+ *  starts with its core sections so "create resume" lands on a ready-to-fill
+ *  document, not a blank page; other entities start empty until their block
+ *  models land (#1914). */
+function defaultBlocksFor(
+  entityKind: DocumentEntityKind,
+  idFactory: () => string,
+): DocumentBlock[] {
+  if (entityKind !== "resume") return [];
+  const section = (sectionKey: string, title: string, layout: string): DocumentBlock => ({
+    id: idFactory(),
+    kind: "section",
+    sectionKey,
+    title,
+    layout,
+    mode: "flow",
+  });
+  return [
+    section("work", "Work Experience", "timeline"),
+    section("education", "Education", "timeline"),
+    section("skills", "Skills", "grid"),
+    section("projects", "Projects", "cards"),
+  ];
+}
+
 /** Blank single-page document seeded for a fresh draft of the given entity. */
 export function createBlankDocumentState(
   entityKind: DocumentEntityKind,
@@ -306,7 +331,7 @@ export function createBlankDocumentState(
     orientation: "portrait",
     columns: 12,
     theme: { ...DEFAULT_DOCUMENT_THEME },
-    pages: [{ id: idFactory(), blocks: [], overlays: [] }],
+    pages: [{ id: idFactory(), blocks: defaultBlocksFor(entityKind, idFactory), overlays: [] }],
     entityKind,
     entityId: null,
   };

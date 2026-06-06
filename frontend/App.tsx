@@ -231,7 +231,6 @@ function ServicesPitchDeckRedirect() {
   return <Navigate to={`/people/pitch-decks/${id}`} replace />;
 }
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
-const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
 const StudioProjectRoute = lazy(() =>
@@ -727,9 +726,18 @@ const App = () => (
                       <Route path="/salary/:jobSlug" element={<SalaryPage />} />
                       <Route path="/salary/:jobSlug/:locationSlug" element={<SalaryPage />} />
                       <Route path="/resume-guide/:jobSlug" element={<ResumeGuidePage />} />
+                      {/* Resume creation moved entirely into the Studio
+                          document canvas (#1912/#1915). The legacy
+                          create-form routes redirect so old links land on the
+                          new flow — the `/resumes/create*` URLs no longer
+                          render a form. */}
+                      <Route
+                        path="/resumes/create"
+                        element={<Navigate to="/studio?contentTemplate=resume-doc" replace />}
+                      />
                       <Route
                         path="/resumes/create/:id"
-                        element={<ResumeCreatePage />}
+                        element={<Navigate to="/studio?contentTemplate=resume-doc" replace />}
                       />
                       <Route
                         path="/resumes/edit/:id"

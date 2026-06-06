@@ -209,6 +209,28 @@ export default function JobDetail() {
   );
   }
 
+  // External application URL, if the posting links out (e.g. LinkedIn /
+  // company ATS). Drives whether Apply now renders as a link or a stub.
+  const applyUrl = (job.data as any).applyUrl as string | undefined;
+
+  // Narration text for the "Listen to this job" pill — title, company,
+  // description, and every bullet list the posting carries.
+  const narratorText = textFromJobDescription({
+    title: job.data.title,
+    company: job.data.company?.name,
+    description: job.data.description,
+    responsibilities: job.data.responsibilities,
+    requirements: job.data.requirements?.map((r) =>
+      [r.skill, r.level, r.required ? "(required)" : null]
+        .filter(Boolean)
+        .join(" "),
+    ),
+    qualifications: job.data.qualifications,
+    benefits: job.data.benefits?.map((b) =>
+      [b.type, b.description].filter(Boolean).join(": "),
+    ),
+  });
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
@@ -332,6 +354,13 @@ export default function JobDetail() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {/* Listen-to-this-job pill — narrates the full posting.
+                    Lives in the action bar alongside Apply / Edit / Share. */}
+                <TextNarrator
+                  text={narratorText}
+                  preferenceKey={`job.${job.id}`}
+                  label="Listen to this job"
+                />
                 {permissions.canEdit ? (
                   <Button asChild>
                     <Link to={`/jobs/edit/${job.id}`}>
@@ -340,19 +369,40 @@ export default function JobDetail() {
                     </Link>
                   </Button>
                 ) : (
-                  <Button variant="outline" onClick={handleTrackJob}>
-                    {isTracked ? (
-                      <>
-                        <BookmarkCheck className="h-4 w-4 mr-2" />
-                        Tracked
-                      </>
-                    ) : (
-                      <>
-                        <Bookmark className="h-4 w-4 mr-2" />
-                        Track
-                      </>
-                    )}
-                  </Button>
+                  <>
+                    {/* Apply now — primary action for candidates. Links out
+                        to the external ATS when the posting carries an
+                        applyUrl, otherwise renders disabled until auth. */}
+                    <Button
+                      disabled={!isAuthenticated}
+                      asChild={Boolean(applyUrl)}
+                    >
+                      {applyUrl ? (
+                        <a href={applyUrl} target="_blank" rel="noopener noreferrer">
+                          Apply now
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </a>
+                      ) : (
+                        <>
+                          Apply now
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleTrackJob}>
+                      {isTracked ? (
+                        <>
+                          <BookmarkCheck className="h-4 w-4 mr-2" />
+                          Tracked
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="h-4 w-4 mr-2" />
+                          Track
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
                 <Button variant="outline" size="icon">
                   <Share className="h-4 w-4" />
@@ -380,37 +430,17 @@ export default function JobDetail() {
               </div>
             )}
 
-            {/* Time-to-hire metric. Self-gates on manager-only access via
-                the backend's 403 — no `if (isOwner)` wrapping needed at
-                the call site per the platform's "shared components decide
-                their own visibility" rule. */}
-            <div className="mb-4">
-              <TimeToHireCard jobId={job.id} />
-            </div>
-
-            {/* Listen-to-this-job pill — narrates title, description,
-                and every bullet list a job posting carries. */}
-            <div className="mb-4">
-              <TextNarrator
-                text={textFromJobDescription({
-                  title: job.data.title,
-                  company: job.data.company?.name,
-                  description: job.data.description,
-                  responsibilities: job.data.responsibilities,
-                  requirements: job.data.requirements?.map((r) =>
-                    [r.skill, r.level, r.required ? "(required)" : null]
-                      .filter(Boolean)
-                      .join(" "),
-                  ),
-                  qualifications: job.data.qualifications,
-                  benefits: job.data.benefits?.map((b) =>
-                    [b.type, b.description].filter(Boolean).join(": "),
-                  ),
-                })}
-                preferenceKey={`job.${job.id}`}
-                label="Listen to this job"
-              />
-            </div>
+            {/* Time-to-hire metric. The card self-gates on the backend's
+                403 as a backstop, but we also gate the mount on the same
+                manager-only SSoT (`canManagePipeline`) that drives the
+                Candidates / Reports tabs — otherwise every job-seeker
+                viewer fires a guaranteed-403 request and sees a card whose
+                "your pipeline history" copy doesn't apply to them. */}
+            {canManagePipeline && (
+              <div className="mb-4">
+                <TimeToHireCard jobId={job.id} />
+              </div>
+            )}
 
             <DeclarativeJobRenderer
               job={{
@@ -442,35 +472,10 @@ export default function JobDetail() {
               }
               embedded
               heroActionSlot={
-                // Owners / editors already have the Edit Job button up in the
-                // toolbar — passing an empty fragment here suppresses the
-                // hero's default Apply Now (you can't apply to your own job).
-                permissions.canEdit ? (
-                  <></>
-                ) : (
-                  <Button
-                    size="lg"
-                    className="bg-white text-black hover:bg-white/90"
-                    disabled={!isAuthenticated}
-                    asChild={Boolean((job.data as any).applyUrl)}
-                  >
-                    {(job.data as any).applyUrl ? (
-                      <a
-                        href={(job.data as any).applyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Apply now
-                        <ExternalLink className="h-4 w-4 ml-2" />
-                      </a>
-                    ) : (
-                      <>
-                        Apply now
-                        <ExternalLink className="h-4 w-4 ml-2" />
-                      </>
-                    )}
-                  </Button>
-                )
+                // Apply now + Edit Job both live in the action bar up top
+                // now, so suppress the hero's default Apply Now button for
+                // every viewer with an empty fragment.
+                <></>
               }
             />
 

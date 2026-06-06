@@ -491,6 +491,15 @@ function wishlistIdsCacheKey(userId: string, entityType: string): string {
   return `wishlist:ids:${userId}:${entityType}`;
 }
 
+function wishlistEnrichedCacheKey(userId: string, entityType: string): string {
+  return `wishlist:enriched:${userId}:${entityType}`;
+}
+
+// Entity types that have a server-side enricher (→ a marketplace card). The
+// `/wishlist/enriched` endpoint refuses others so the page never renders a
+// half-hydrated tab. Adding a type = add a case in `enrichWishlist`.
+const WISHLIST_ENRICHABLE_TYPES = ["course", "voice_clone"] as const;
+
 async function findWishlist(userId: string) {
   const db = getDb();
   const [row] = await db
@@ -579,6 +588,7 @@ listsRoutes.post("/wishlist/toggle", async (c) => {
     .where(eq(schema.lists.id, wishlist.id));
 
   invalidateCachedKey(wishlistIdsCacheKey(userId, entityType));
+  invalidateCachedKey(wishlistEnrichedCacheKey(userId, entityType));
   return c.json(success({ wishlisted }), 200);
 });
 
@@ -618,64 +628,100 @@ listsRoutes.get("/wishlist/ids", async (c) => {
   return c.json(success({ ids }), 200);
 });
 
-// GET /api/lists/wishlist/courses — wishlisted courses, enriched into the same
-// PublicCourseCard shape the marketplace feed uses. One join, owner-scoped.
-listsRoutes.get("/wishlist/courses", async (c) => {
+// GET /api/lists/wishlist/enriched?entityType=course — wishlisted items of one
+// type, enriched into the same marketplace-card shape the feed uses, so the
+// /wishlist page reuses the exact card component. Cached read-through per
+// (user, type); invalidated on toggle. One type = one enricher (no N+1).
+listsRoutes.get("/wishlist/enriched", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const wishlist = await findWishlist(userId);
-  if (!wishlist) return c.json(success([] as unknown[]), 200);
+  const entityType = c.req.query("entityType");
+  if (!entityType || !(WISHLIST_ENRICHABLE_TYPES as readonly string[]).includes(entityType)) {
+    return c.json(error("VALIDATION_ERROR", "Valid enrichable entityType is required"), 400);
+  }
 
-  const db = getDb();
-  const rows = await db
-    .select({
-      course: schema.courses,
-      author: { id: schema.users.id, name: schema.users.name },
-      authorProfile: {
-        avatarUrl: schema.userProfiles.avatarUrl,
-        customUrlSlug: schema.userProfiles.customUrlSlug,
-      },
-      addedAt: schema.listItems.addedAt,
-    })
-    .from(schema.listItems)
-    .innerJoin(schema.courses, eq(schema.courses.id, schema.listItems.entityId))
-    .innerJoin(schema.users, eq(schema.courses.userId, schema.users.id))
-    .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.users.id))
-    .where(
-      and(
-        eq(schema.listItems.listId, wishlist.id),
-        eq(schema.listItems.entityType, "course"),
-      ),
-    )
-    .orderBy(desc(schema.listItems.addedAt));
-
-  const items = rows.map((r) => ({
-    id: r.course.id,
-    type: "course" as const,
-    title: r.course.title,
-    slug: r.course.slug,
-    summary: r.course.summary,
-    coverImageUrl: r.course.coverImageUrl,
-    category: r.course.category,
-    tags: r.course.tags,
-    difficulty: r.course.difficulty,
-    estimatedMinutes: r.course.estimatedMinutes,
-    priceCents: r.course.priceVisible ? r.course.priceCents : null,
-    issuesCertificate: r.course.issuesCertificate,
-    enrollmentCount: r.course.enrollmentCount,
-    averageRating: r.course.averageRating,
-    ratingCount: r.course.ratingCount,
-    publishedAt: r.course.publishedAt,
-    author: {
-      id: r.author.id,
-      name: r.author.name,
-      avatarUrl: r.authorProfile?.avatarUrl ?? null,
-      slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+  const items = await getOrSetCached<unknown[]>({
+    key: wishlistEnrichedCacheKey(userId, entityType),
+    ttlSeconds: 300,
+    loader: async () => {
+      const wishlist = await findWishlist(userId);
+      if (!wishlist) return [];
+      return enrichWishlist(wishlist.id, entityType as (typeof WISHLIST_ENRICHABLE_TYPES)[number]);
     },
-  }));
+    revive: (raw) => (Array.isArray(raw) ? raw : null),
+  });
   return c.json(success(items), 200);
 });
+
+async function enrichWishlist(
+  listId: string,
+  entityType: (typeof WISHLIST_ENRICHABLE_TYPES)[number],
+): Promise<unknown[]> {
+  const db = getDb();
+  if (entityType === "course") {
+    const rows = await db
+      .select({
+        course: schema.courses,
+        author: { id: schema.users.id, name: schema.users.name },
+        authorProfile: {
+          avatarUrl: schema.userProfiles.avatarUrl,
+          customUrlSlug: schema.userProfiles.customUrlSlug,
+        },
+      })
+      .from(schema.listItems)
+      .innerJoin(schema.courses, eq(schema.courses.id, schema.listItems.entityId))
+      .innerJoin(schema.users, eq(schema.courses.userId, schema.users.id))
+      .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.users.id))
+      .where(and(eq(schema.listItems.listId, listId), eq(schema.listItems.entityType, "course")))
+      .orderBy(desc(schema.listItems.addedAt));
+    return rows.map((r) => ({
+      id: r.course.id,
+      type: "course" as const,
+      title: r.course.title,
+      slug: r.course.slug,
+      summary: r.course.summary,
+      coverImageUrl: r.course.coverImageUrl,
+      category: r.course.category,
+      tags: r.course.tags,
+      difficulty: r.course.difficulty,
+      estimatedMinutes: r.course.estimatedMinutes,
+      priceCents: r.course.priceVisible ? r.course.priceCents : null,
+      issuesCertificate: r.course.issuesCertificate,
+      enrollmentCount: r.course.enrollmentCount,
+      averageRating: r.course.averageRating,
+      ratingCount: r.course.ratingCount,
+      publishedAt: r.course.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+  }
+  // voice_clone → VoiceMarketplaceCardItem shape.
+  const rows = await db
+    .select({ clone: schema.studioVoiceClones, addedAt: schema.listItems.addedAt })
+    .from(schema.listItems)
+    .innerJoin(schema.studioVoiceClones, eq(schema.studioVoiceClones.id, schema.listItems.entityId))
+    .where(and(eq(schema.listItems.listId, listId), eq(schema.listItems.entityType, "voice_clone")))
+    .orderBy(desc(schema.listItems.addedAt));
+  return rows.map((r) => ({
+    id: r.clone.id,
+    voiceCloneId: r.clone.id,
+    name: r.clone.name,
+    summary: r.clone.description ?? undefined,
+    previewAudioUrl: r.clone.previewAudioUrl,
+    priceCents: r.clone.priceCents,
+    currency: r.clone.currency,
+    language: r.clone.language,
+    gender: r.clone.gender,
+    accent: r.clone.accent,
+    creatorId: r.clone.userId,
+    purchaseCount: r.clone.purchaseCount,
+  }));
+}
 
 // ─── Polymorphic entity validation ───────────────────────────────────────
 
@@ -727,6 +773,14 @@ async function entityExists(entityType: ListItemEntityType, entityId: string): P
         .select({ id: schema.courses.id })
         .from(schema.courses)
         .where(eq(schema.courses.id, entityId))
+        .limit(1);
+      return Boolean(row);
+    }
+    case "voice_clone": {
+      const [row] = await db
+        .select({ id: schema.studioVoiceClones.id })
+        .from(schema.studioVoiceClones)
+        .where(eq(schema.studioVoiceClones.id, entityId))
         .limit(1);
       return Boolean(row);
     }

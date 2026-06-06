@@ -53,10 +53,9 @@ export function useWishlist(entityType: ListEntityType) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: wishlistIdsKey(entityType) });
-      // The enriched My-Wishlist card list derives from the same membership.
-      if (entityType === "course") {
-        queryClient.invalidateQueries({ queryKey: ["wishlist", "courses"] });
-      }
+      // The enriched My-Wishlist card list (per type) derives from the same
+      // membership — refresh it so the page reflects the toggle.
+      queryClient.invalidateQueries({ queryKey: ["wishlist", "enriched", entityType] });
     },
   });
 

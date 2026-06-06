@@ -21,6 +21,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import { useCart } from "@/lib/cart-context";
 import { buildShareAction } from "@/lib/card-share-action";
 import { useAudioPreview } from "@/lib/hooks/useAudioPreview";
+import WishlistButton from "@/components/wishlist/WishlistButton";
 import { toast } from "sonner";
 
 export interface VoiceMarketplaceCardItem {
@@ -97,6 +98,11 @@ export default function VoiceMarketplaceCard({ item }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <WishlistButton
+              entityType="voice_clone"
+              entityId={item.voiceCloneId}
+              className="h-7 w-7"
+            />
             <Button
               type="button"
               variant="ghost"

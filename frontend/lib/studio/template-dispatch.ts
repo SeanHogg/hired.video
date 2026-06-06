@@ -127,11 +127,11 @@ export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
         timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),
       };
     case "document": {
-      // Document runtime (#1912) — seed a blank DocumentState. The entity
-      // axis (resume / job / article / blog) defaults to resume until the
-      // catalog carries a per-template `documentEntityKind` (#1917); the
-      // template id will select it then.
-      const entityKind: DocumentEntityKind = "resume";
+      // Document runtime (#1912) — seed a blank DocumentState. The entity axis
+      // (resume / job / article / blog) comes from the catalog's
+      // `documentEntityKind` (#1917); fall back to resume for older document
+      // templates that predate the field.
+      const entityKind: DocumentEntityKind = template.documentEntityKind ?? "resume";
       return {
         name,
         documentState: createBlankDocumentState(entityKind, () => newId("page")),

@@ -52,14 +52,22 @@ function AuthenticatedCommunicationHub() {
   // Clicking a row in the header overlay must DO something — before this the
   // popover passed no `onItemSelect`, so the only effect of a click was a
   // silent mark-read (and only when already unread). Messages open the chat
-  // widget in place; everything else (synced emails, notifications, requests)
-  // deep-links into the full /outreach Inbox tab — that surface owns the
-  // detail sheet + inline render — and closes the overlay. The InboxRow's own
-  // onSelect path still marks the clicked notification/email read on the way.
+  // widget in place; a notification that carries a `data.url` deep-link jumps
+  // straight to its target (badge → gamification, certificate → /verify/:n,
+  // assignment → /tools?tab=my-learning); everything else (synced emails,
+  // requests, link-less notifications) deep-links into the full /outreach Inbox
+  // tab. The InboxRow's own onSelect path still marks the clicked
+  // notification/email read on the way.
   const handleItemSelect = useCallback(
     (item: HubItem) => {
+      const deepLink =
+        item.kind === "notification" && typeof item.data?.url === "string"
+          ? item.data.url
+          : null;
       if (item.kind === "message" && item.conversationId) {
         hub.openMessage(item.conversationId);
+      } else if (deepLink) {
+        navigate(deepLink);
       } else {
         const params = new URLSearchParams({ tab: "inbox", item: item.id });
         navigate(`/outreach?${params.toString()}`);

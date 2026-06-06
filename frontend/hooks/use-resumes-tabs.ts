@@ -4,7 +4,7 @@
 //   - /resumes                (Resumes.tsx)        — My Resumes / Available / Sourced
 //   - /resumes/:id            (ResumeDetail)       — strip-only header
 //   - /resumes/edit/:id       (ResumeEditPage)     — via EntityEditShell
-//   - /resumes/create/:id     (ResumeCreatePage)   — via EntityEditShell
+//   (resume CREATE retired → Studio document canvas, #1912/#1915)
 //
 // Self-gates each tab on role via persona.ts `visibleTo` (SA-bypass). The
 // list returned is already filtered, so consumers don't carry around the

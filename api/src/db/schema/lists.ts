@@ -73,6 +73,9 @@ export const LIST_ITEM_ENTITY_TYPES = [
   // wishlist heart — saved courses live in the caller's canonical
   // `kind = 'wishlist'` list.
   "course",
+  // A published voice clone (studio_voice_clones.id) — the voice
+  // marketplace wishlist heart.
+  "voice_clone",
 ] as const;
 export type ListItemEntityType = (typeof LIST_ITEM_ENTITY_TYPES)[number];
 
