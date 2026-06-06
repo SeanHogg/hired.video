@@ -28,14 +28,13 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
-import { sendPushToUser } from "../services/push/web-push.js";
+import { NotificationService } from "../services/notifications/notification-service.js";
 
 const {
   serviceOfferings,
   serviceInquiries,
   userProfiles,
   users,
-  notifications,
 } = schema;
 
 export const serviceRoutes = new Hono<AppEnv>();
@@ -47,20 +46,6 @@ function uid(c: any): string | null {
 // ---------------------------------------------------------------------------
 // Helper: create an in-app notification for a user
 // ---------------------------------------------------------------------------
-async function notify(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-  type: string,
-  title: string,
-  message: string,
-  data?: Record<string, unknown>,
-) {
-  await db
-    .insert(notifications)
-    .values({ userId, type, title, message, data: data ?? null } as any)
-    .catch(() => undefined);
-}
-
 // ===========================================================================
 // Routes
 // ===========================================================================
@@ -399,11 +384,16 @@ serviceRoutes.post("/:serviceId/inquire", async (c) => {
     orderType === "purchase"
       ? `${buyerName} purchased your service "${service.title}"`
       : `${buyerName} sent an inquiry about "${service.title}"`;
-  await notify(db, service.userId, "service_inquiry", notifTitle, notifMsg, {
-    inquiryId: row.id,
-    serviceId: service.id,
+  // Persist + push in one pass through the consolidated pipeline.
+  await NotificationService.notify({
+    userId: service.userId,
+    type: "service_inquiry",
+    title: notifTitle,
+    message: notifMsg,
+    url: "/services/inquiries",
+    refType: "service_inquiry",
+    refId: row.id,
   });
-  await sendPushToUser(service.userId, { title: notifTitle, body: notifMsg, url: "/services/inquiries" });
 
   return c.json(success(row), 201);
 });
@@ -447,10 +437,15 @@ serviceRoutes.patch("/inquiries/:id", async (c) => {
   const statusLabel = body.status === "accepted" ? "accepted" : body.status === "completed" ? "completed" : "declined";
   const notifTitle = `Inquiry ${statusLabel}: ${service?.title ?? "your service"}`;
   const notifMsg = `Your inquiry was ${statusLabel}.`;
-  await notify(db, inquiry.fromUserId, "service_inquiry", notifTitle, notifMsg, {
-    inquiryId: inquiry.id,
+  await NotificationService.notify({
+    userId: inquiry.fromUserId,
+    type: "service_inquiry",
+    title: notifTitle,
+    message: notifMsg,
+    url: "/services/my-requests",
+    refType: "service_inquiry",
+    refId: inquiry.id,
   });
-  await sendPushToUser(inquiry.fromUserId, { title: notifTitle, body: notifMsg, url: "/services/my-requests" });
 
   return c.json(success(updated), 200);
 });

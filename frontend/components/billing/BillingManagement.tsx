@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, FileText, AlertCircle, DollarSign, RotateCcw } from "lucide-react";
+import { CreditCard, FileText, AlertCircle, DollarSign, RotateCcw, GraduationCap } from "lucide-react";
 
-import { billingService, type PaymentMethod, type Invoice, type SubscriptionSummary } from "@/lib/services/billing-service";
+import { billingService, type PaymentMethod, type Invoice, type SubscriptionSummary, type CoursePurchase } from "@/lib/services/billing-service";
 import { PaymentMethodSetup } from "./PaymentMethodSetup";
 import { BillingAddressSection } from "./BillingAddressSection";
 import { RefundRequestModal } from "./RefundRequestModal";
@@ -23,6 +24,7 @@ export function BillingManagement() {
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [coursePurchases, setCoursePurchases] = useState<CoursePurchase[]>([]);
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([]);
   const [cancellationRequests, setCancellationRequests] = useState<CancellationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,6 +61,9 @@ export function BillingManagement() {
         } else if (activeTab === "invoices") {
           const invs = await billingService.getInvoices();
           if (isMounted) setInvoices(invs);
+        } else if (activeTab === "courses") {
+          const purchases = await billingService.getCoursePurchases();
+          if (isMounted) setCoursePurchases(purchases);
         } else if (activeTab === "refunds") {
           const [refunds, cancellations] = await Promise.all([
             refundService.getRefundRequests(),
@@ -124,6 +129,7 @@ export function BillingManagement() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="courses">My Courses</TabsTrigger>
           <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="refunds">Refunds & Cancellations</TabsTrigger>
@@ -186,6 +192,45 @@ export function BillingManagement() {
 
         </TabsContent>
 
+
+        <TabsContent value="courses" className="space-y-4">
+          {coursePurchases.length === 0 ? (
+            <Alert>
+              <GraduationCap className="h-4 w-4" />
+              <AlertDescription>
+                No course purchases yet.{" "}
+                <Link to="/search?category=courses" className="underline">
+                  Browse courses
+                </Link>
+                .
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-3">
+              {coursePurchases.map((p) => (
+                <Card key={p.id}>
+                  <CardContent className="flex items-center justify-between p-4 gap-4">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {p.courseTitle}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"} • $
+                        {(p.totalCents / 100).toFixed(2)}
+                      </div>
+                    </div>
+                    {p.enrollmentId && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/learn/${p.enrollmentId}`}>Continue learning</Link>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
 
         <TabsContent value="payment-methods" className="space-y-4">
           <PaymentMethodSetup

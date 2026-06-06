@@ -354,6 +354,18 @@ export function createGeneralContext(
 ): GeneralContext {
   const actions: GeneralAIAction[] = [];
 
+  // Learning surfaces lead with learning-specific quick actions so the brain
+  // offers "recommend courses / make a study plan / explain this / quiz me"
+  // instead of generic career prompts (#LMS — route + context aware).
+  if (contextType === "course-author") {
+    actions.push("outline-course", "write-lesson", "explain-concept", "ask-question");
+    return finishGeneralContext(contextType, userRole, actions);
+  }
+  if (contextType === "course-learn" || contextType === "learning") {
+    actions.push("recommend-courses", "create-study-plan", "explain-concept", "quiz-me");
+    return finishGeneralContext(contextType, userRole, actions);
+  }
+
   // Add role-specific general actions
   if (userRole === "job_seeker" || !userRole) {
     actions.push(
@@ -386,14 +398,23 @@ export function createGeneralContext(
     );
   }
 
-  const availableAPIs = getAPIsForContext(contextType);
+  return finishGeneralContext(contextType, userRole, actions);
+}
 
+/** Shared tail for createGeneralContext — assembles the GeneralContext from a
+ *  resolved action list. Kept separate so the learning-surface branches and
+ *  the role-based path don't duplicate the assembly. */
+function finishGeneralContext(
+  contextType: GeneralContext["contextType"],
+  userRole: string | undefined,
+  actions: GeneralAIAction[],
+): GeneralContext {
   return {
     contextType,
     pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
-    availableAPIs,
+    availableAPIs: getAPIsForContext(contextType),
     availableActions: actions,
   };
 }
@@ -541,6 +562,14 @@ export function getActionLabel(action: string): string {
     "get-help": "Get Help",
     "explain-feature": "Explain Feature",
     "provide-tips": "Provide Tips",
+
+    // Learning actions
+    "recommend-courses": "Recommend Courses",
+    "create-study-plan": "Create a Study Plan",
+    "explain-concept": "Explain This Concept",
+    "quiz-me": "Quiz Me",
+    "outline-course": "Outline a Course",
+    "write-lesson": "Draft a Lesson",
   };
 
   return labels[action] || action;

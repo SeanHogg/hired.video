@@ -26,7 +26,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -167,6 +167,34 @@ courseCheckoutRoutes.post("/:id/confirm-payment", async (c) => {
   } as never).where(eq(courseCheckouts.id, checkout.id));
 
   return c.json(success({ enrollmentId }), 200);
+});
+
+// GET /api/course-checkout/mine — the caller's paid course purchases, joined
+// with the course title, for the billing "My courses" receipts view. Course
+// purchases live in this separate ledger (not subscription invoices), so this
+// is the only place they surface. Registered before /:id so "mine" isn't
+// captured as a checkout id.
+courseCheckoutRoutes.get("/mine", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: courseCheckouts.id,
+      courseId: courseCheckouts.courseId,
+      courseTitle: courses.title,
+      courseSlug: courses.slug,
+      totalCents: courseCheckouts.totalCents,
+      status: courseCheckouts.status,
+      paidAt: courseCheckouts.paidAt,
+      enrollmentId: courseCheckouts.enrollmentId,
+      createdAt: courseCheckouts.createdAt,
+    })
+    .from(courseCheckouts)
+    .innerJoin(courses, eq(courses.id, courseCheckouts.courseId))
+    .where(and(eq(courseCheckouts.userId, userId), eq(courseCheckouts.status, "paid")))
+    .orderBy(desc(courseCheckouts.paidAt));
+  return c.json(success(rows), 200);
 });
 
 courseCheckoutRoutes.get("/:id", async (c) => {

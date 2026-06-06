@@ -366,7 +366,15 @@ export type GeneralAIAction =
   // Affiliate actions
   | "marketing-tips"
   | "referral-strategies"
-  | "commission-info";
+  | "commission-info"
+  // Learning surfaces (course-learn / learning / wishlist) — #LMS
+  | "recommend-courses"
+  | "create-study-plan"
+  | "explain-concept"
+  | "quiz-me"
+  // Course authoring surface
+  | "outline-course"
+  | "write-lesson";
 
 // ============================================================================
 // UNION TYPE FOR ALL CONTEXTS

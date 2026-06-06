@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buildShareAction } from "@/lib/card-share-action";
 import { buildImageUrl } from "@/lib/utils";
+import WishlistButton from "@/components/wishlist/WishlistButton";
 
 export interface CourseMarketplaceItem {
   id: string;
@@ -75,6 +76,13 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
         >
           <Share2 className="h-3.5 w-3.5" />
         </Button>
+        {/* Self-gating — renders nothing for signed-out viewers. */}
+        <WishlistButton
+          entityType="course"
+          entityId={item.id}
+          variant="outline"
+          className="absolute bottom-2 left-2 h-7 w-7 bg-background/90 hover:bg-background"
+        />
       </div>
       <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
         <h3 className="font-semibold leading-tight line-clamp-2">{item.title}</h3>

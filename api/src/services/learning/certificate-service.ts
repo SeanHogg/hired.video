@@ -17,6 +17,7 @@
 import { and, eq } from "drizzle-orm";
 import type { getDb } from "../../db/index.js";
 import { schema } from "../../db/index.js";
+import { NotificationService } from "../notifications/notification-service.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -123,6 +124,17 @@ export class CertificateService {
         recipientName: payload.recipientName,
       } as never)
       .returning();
+    // Surface in the notification center (+ push). Best-effort — never blocks
+    // cert issuance.
+    await NotificationService.notify({
+      userId: row.user.id,
+      type: "certificate",
+      title: "Certificate earned 🎓",
+      message: `You earned a verifiable certificate for "${row.course.title}".`,
+      url: `/verify/${certNumber}`,
+      refType: "certificate",
+      refId: created?.id,
+    }).catch(() => undefined);
     return { certificate: created, newlyIssued: true };
   }
 

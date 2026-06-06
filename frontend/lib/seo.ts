@@ -837,6 +837,15 @@ export const PAGE_SEO: Record<string, SEOData> = {
       isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
     },
   },
+  "/wishlist": {
+    title: "My Wishlist — Saved Courses — hired.video",
+    description:
+      "Courses you've saved to come back to. Tap the heart on any course to add it to your wishlist and enroll when you're ready.",
+    keywords: "saved courses, course wishlist, bookmarked courses, learning wishlist",
+    ogTitle: "My Wishlist — hired.video",
+    ogDescription: "Your saved courses on hired.video.",
+    ogImage: "https://hired.video/og-image.svg",
+  },
   "/learning": {
     title: "Built-in Learning Content Library — AI, RAG, Must-Have Skills (No Separate License) — hired.video",
     description:

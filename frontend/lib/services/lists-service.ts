@@ -11,8 +11,32 @@ export const LIST_ENTITY_TYPES = [
   // A pipeline entry — a candidate-on-a-job kanban row. Lets recruiters
   // bookmark sourced candidates from the kanban without losing job context.
   "pipeline_entry",
+  // A published course — backs the marketplace wishlist heart.
+  "course",
 ] as const;
 export type ListEntityType = (typeof LIST_ENTITY_TYPES)[number];
+
+// The PublicCourseCard shape returned by /api/lists/wishlist/courses. Mirrors
+// the marketplace feed card so the My-Wishlist page reuses the same card.
+export interface WishlistCourseCard {
+  id: string;
+  type: "course";
+  title: string;
+  slug: string;
+  summary: string | null;
+  coverImageUrl: string | null;
+  category: string | null;
+  tags: string[];
+  difficulty: "beginner" | "intermediate" | "advanced" | null;
+  estimatedMinutes: number | null;
+  priceCents: number | null;
+  issuesCertificate: boolean;
+  enrollmentCount: number;
+  averageRating: number | null;
+  ratingCount: number;
+  publishedAt: string | null;
+  author: { id: string; name: string; avatarUrl: string | null; slug: string };
+}
 
 export interface List {
   id: string;
@@ -127,5 +151,40 @@ export const listsService = {
     await apiClient.delete(
       `/api/lists/${listId}/items?entityType=${entityType}&entityId=${entityId}`,
     );
+  },
+
+  // ── Wishlist (the one canonical per-user heart list) ─────────────────────
+
+  /** Toggle an entity in the caller's wishlist. Returns the new state. */
+  async toggleWishlist(
+    entityType: ListEntityType,
+    entityId: string,
+  ): Promise<boolean> {
+    const res = await apiClient.post<{ wishlisted: boolean }>(
+      "/api/lists/wishlist/toggle",
+      { entityType, entityId },
+    );
+    return res.data?.wishlisted ?? false;
+  },
+
+  /** The set of wishlisted entity ids for one type — hydrates hearts across
+   *  a whole grid in one round-trip. */
+  async wishlistIds(entityType: ListEntityType): Promise<string[]> {
+    const res = await apiClient.get<{ ids: string[] }>(
+      `/api/lists/wishlist/ids?entityType=${entityType}`,
+      undefined,
+      { suppressErrorEvent: true },
+    );
+    return res.data?.ids ?? [];
+  },
+
+  /** Wishlisted courses, enriched into marketplace card shape. */
+  async wishlistCourses(): Promise<WishlistCourseCard[]> {
+    const res = await apiClient.get<WishlistCourseCard[]>(
+      "/api/lists/wishlist/courses",
+      undefined,
+      { suppressErrorEvent: true },
+    );
+    return res.data ?? [];
   },
 };

@@ -21,7 +21,7 @@ import {
 } from "./rules.js";
 import { RedemptionEngine, type RedemptionOutcome } from "./redemption-engine.js";
 import { buildTremendousClient } from "../../services/tremendous/client.js";
-import { sendPushToUser } from "../../services/push/web-push.js";
+import { NotificationService } from "../../services/notifications/notification-service.js";
 
 export interface AwardArgs {
   userId: string;
@@ -84,17 +84,21 @@ export class GamificationService {
             metadata: { badgeSlug: slug, badgeName: badge.name, repeatable: badge.isRepeatable },
           });
         }
-        // #1656 — PWA push for badge unlocks. Best-effort: missing
-        // VAPID config (dev) returns false and no-ops; failed deliveries
-        // are dropped silently inside `sendPushToUser`. Owner only — no
-        // fanout to followers. Awarded badges that pre-existed (once-
-        // per-user re-runs) return `awarded === null`; skip the push
-        // there so users don't re-receive the same alert.
+        // #1656 — badge-unlock alert. Routed through NotificationService so
+        // it both PERSISTS to the notification center AND fans out the PWA
+        // push (best-effort; missing VAPID in dev no-ops). Owner only — no
+        // fanout to followers. Awarded badges that pre-existed (once-per-user
+        // re-runs) return `awarded === null`; skip there so users don't
+        // re-receive the same alert.
         if (awarded) {
-          await sendPushToUser(userId, {
+          await NotificationService.notify({
+            userId,
+            type: "badge",
             title: "Badge unlocked",
-            body: badge.name,
+            message: badge.name,
             url: "/services/creator/dashboard?tab=gamification",
+            refType: "badge",
+            refId: badge.id,
           }).catch(() => undefined);
         }
       },

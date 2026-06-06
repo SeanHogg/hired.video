@@ -76,6 +76,9 @@ export const PAGE_META_RULES: PageMetaRule[] = [
   { test: /^\/learn(\/|$)/, contextType: "course-learn", seoKey: "/learning" },
   { test: /^\/learning(\/|$)/, contextType: "learning", seoKey: "/learning" },
 
+  // Saved-items / wishlist — a learning-discovery surface.
+  { test: /^\/wishlist(\/|$)/, contextType: "learning", seoKey: "/wishlist" },
+
   // Interview practice
   { test: /^\/interview(\/|$)/, contextType: "interview-practice", seoKey: "/interview" },
 

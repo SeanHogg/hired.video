@@ -19,6 +19,7 @@ import type { getDb } from "../../db/index.js";
 import { schema } from "../../db/index.js";
 import { CohortService } from "./cohort-service.js";
 import { invalidateCohortAnalyticsCache } from "./cohort-analytics.js";
+import { NotificationService } from "../notifications/notification-service.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -59,13 +60,17 @@ export class AssignmentService {
   async createAssignment(actorUserId: string, cohortId: string, input: CreateAssignmentInput) {
     await this.cohorts.getManageable(actorUserId, cohortId);
 
-    // Subject must exist (avoids assigning a phantom course/path).
+    // Subject must exist (avoids assigning a phantom course/path). Grab the
+    // title for the learner notification.
+    let subjectTitle = "training";
     if (input.subjectType === "course") {
-      const [c] = await this.db.select({ id: courses.id }).from(courses).where(eq(courses.id, input.subjectId)).limit(1);
+      const [c] = await this.db.select({ id: courses.id, title: courses.title }).from(courses).where(eq(courses.id, input.subjectId)).limit(1);
       if (!c) throw new AssignmentSubjectNotFoundError();
+      subjectTitle = c.title;
     } else {
-      const [p] = await this.db.select({ id: learningPaths.id }).from(learningPaths).where(eq(learningPaths.id, input.subjectId)).limit(1);
+      const [p] = await this.db.select({ id: learningPaths.id, title: learningPaths.title }).from(learningPaths).where(eq(learningPaths.id, input.subjectId)).limit(1);
       if (!p) throw new AssignmentSubjectNotFoundError();
+      subjectTitle = p.title;
     }
 
     const [assignment] = await this.db
@@ -82,19 +87,40 @@ export class AssignmentService {
       } as never)
       .returning();
 
-    await this.fanOutEnrollments(cohortId, input.memberId ?? null, input.subjectType, input.subjectId);
+    const targetedUserIds = await this.fanOutEnrollments(cohortId, input.memberId ?? null, input.subjectType, input.subjectId);
     invalidateCohortAnalyticsCache(cohortId);
+
+    // Notify each targeted learner ("assigned to you"), best-effort. Persists
+    // to the notification center + pushes through the consolidated pipeline.
+    const dueSuffix = input.dueAt
+      ? ` — due ${new Date(input.dueAt).toLocaleDateString()}`
+      : "";
+    await Promise.allSettled(
+      targetedUserIds.map((userId) =>
+        NotificationService.notify({
+          userId,
+          type: "assignment",
+          title: "New training assigned",
+          message: `${subjectTitle}${dueSuffix}`,
+          url: "/tools?tab=my-learning",
+          refType: "learning_assignment",
+          refId: assignment?.id,
+        }),
+      ),
+    );
+
     return assignment;
   }
 
   /** Materialise enrollments for the targeted member(s). Idempotent via
-   *  onConflictDoNothing against the per-(user,subject) unique indexes. */
+   *  onConflictDoNothing against the per-(user,subject) unique indexes.
+   *  Returns the targeted user ids so the caller can notify them. */
   private async fanOutEnrollments(
     cohortId: string,
     memberId: string | null,
     subjectType: "course" | "path",
     subjectId: string,
-  ): Promise<void> {
+  ): Promise<string[]> {
     let userIds: string[];
     if (memberId) {
       const [m] = await this.db
@@ -106,7 +132,7 @@ export class AssignmentService {
     } else {
       userIds = await this.cohorts.activeMemberUserIds(cohortId);
     }
-    if (userIds.length === 0) return;
+    if (userIds.length === 0) return [];
 
     if (subjectType === "course") {
       const inserted = await this.db
@@ -135,6 +161,7 @@ export class AssignmentService {
           .catch(() => undefined);
       }
     }
+    return userIds;
   }
 
   async listAssignments(actorUserId: string, cohortId: string) {

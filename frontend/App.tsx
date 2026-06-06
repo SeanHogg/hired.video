@@ -186,6 +186,7 @@ const CoursePublicDetail = lazy(() => import("./pages/marketplace/CoursePublicDe
 const CourseLearner = lazy(() => import("./pages/CourseLearner"));
 const CourseCheckout = lazy(() => import("./pages/CourseCheckout"));
 const CourseReviewQueue = lazy(() => import("./pages/CourseReviewQueue"));
+const Wishlist = lazy(() => import("./pages/Wishlist"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
@@ -1009,6 +1010,8 @@ const App = () => (
                       <Route path="/marketplace/templates/:templateId" element={<MarketplaceTemplatePreview />} />
                       <Route path="/marketplace/voices/:voiceCloneId" element={<VoicePublicDetail />} />
                       <Route path="/courses/:authorSlug/:courseSlug" element={<CoursePublicDetail />} />
+                      {/* Saved-items surface — courses the user hearted. */}
+                      <Route path="/wishlist" element={<Wishlist />} />
                       {/* Learner playback surface — opened from a course
                           page's Continue-learning CTA. Authed-only;
                           self-gates on the requester owning the

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { courseService, type EnrollmentRow } from "@/lib/services/course-service";
 import { listMyAssignments, joinCohortByCode, type LearnerAssignment } from "@/lib/courses/courses-api";
+import LearningGoalCard from "@/components/learning/LearningGoalCard";
 import { BookOpen, CalendarClock, AlertTriangle, CheckCircle2, ArrowRight } from "lucide-react";
 
 function dueLabel(dueAt: string | null): { text: string; overdue: boolean } | null {
@@ -85,6 +86,10 @@ export default function MyLearningPanel() {
           Educator or employer? Manage classrooms &amp; assign training →
         </Link>
       </p>
+
+      {/* Learning-goal onboarding wedge — capture intent + recommend courses.
+          Self-gates: shows the capture prompt until a goal is set. */}
+      <LearningGoalCard source="onboarding" />
 
       {/* Assigned to you */}
       <section className="space-y-3">

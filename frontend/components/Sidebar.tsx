@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Store,
+  Heart,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -358,6 +359,23 @@ export default function Sidebar({
                       </div>
                     </div>
                   )}
+                </Link>
+
+                {/* Wishlist — saved courses */}
+                <Link
+                  to="/wishlist"
+                  className={cn(
+                    "flex items-center text-sm rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
+                    isMenuItemActive({ href: "/wishlist", exactMatch: false })
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                  )}
+                  onClick={onClose}
+                  title={collapsed ? t("labels.wishlist", { defaultValue: "Wishlist" }) : undefined}
+                >
+                  <Heart className="h-4 w-4" />
+                  {!collapsed && t("labels.wishlist", { defaultValue: "Wishlist" })}
                 </Link>
 
                 {/* Settings */}

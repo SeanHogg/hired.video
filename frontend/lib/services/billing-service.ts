@@ -34,6 +34,18 @@ export interface PaymentMethod {
   isDefault: boolean;
 }
 
+export interface CoursePurchase {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  courseSlug: string;
+  totalCents: number;
+  status: string;
+  paidAt: string | null;
+  enrollmentId: string | null;
+  createdAt: string;
+}
+
 export interface Invoice {
   id: string;
   number: string;
@@ -103,6 +115,15 @@ export const billingService = {
       "/api/Billing/invoices",
     );
     return res.data;
+  },
+
+  /** The caller's paid course purchases (separate ledger from subscription
+   *  invoices). Powers the billing "My courses" receipts view. */
+  async getCoursePurchases(): Promise<CoursePurchase[]> {
+    const res: ApiSuccessResponse<CoursePurchase[]> = await apiClient.get(
+      "/api/course-checkout/mine",
+    );
+    return res.data ?? [];
   },
 
   /**

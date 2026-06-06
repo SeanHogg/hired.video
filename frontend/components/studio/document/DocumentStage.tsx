@@ -52,6 +52,7 @@ import {
   setBlockMode,
   setOrientation,
   setPageSize,
+  updateBlock,
 } from "@/lib/studio/editor-v2/document-edit";
 
 interface DocumentStageProps {
@@ -221,6 +222,9 @@ export default function DocumentStage({
               onDetach={() =>
                 commitState(setBlockMode(state, pageId, block.id, "absolute"))
               }
+              onCommitText={(text) =>
+                commitState(updateBlock(state, pageId, block.id, { text }))
+              }
             />
           ))}
         </div>
@@ -255,6 +259,9 @@ export default function DocumentStage({
                 }}
                 onReflow={() =>
                   commitState(setBlockMode(state, pageId, block.id, "flow"))
+                }
+                onCommitText={(text) =>
+                  commitState(updateBlock(state, pageId, block.id, { text }))
                 }
               />
             </div>
@@ -298,6 +305,7 @@ function DocumentBlockView({
   onDelete,
   onDetach,
   onReflow,
+  onCommitText,
 }: {
   block: DocumentBlock;
   selected: boolean;
@@ -308,6 +316,7 @@ function DocumentBlockView({
   onDelete: () => void;
   onDetach?: () => void;
   onReflow?: () => void;
+  onCommitText?: (text: string) => void;
 }) {
   return (
     <div
@@ -348,7 +357,7 @@ function DocumentBlockView({
           </button>
         </div>
       )}
-      <BlockBody block={block} entityContent={entityContent} />
+      <BlockBody block={block} entityContent={entityContent} onCommitText={onCommitText} />
     </div>
   );
 }
@@ -356,10 +365,15 @@ function DocumentBlockView({
 function BlockBody({
   block,
   entityContent,
+  onCommitText,
 }: {
   block: DocumentBlock;
   entityContent?: ResumeContent | null;
+  onCommitText?: (text: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(block.text ?? "");
+
   if (block.kind === "divider") {
     return <hr className="my-2 border-slate-300" />;
   }
@@ -367,8 +381,36 @@ function BlockBody({
     return <div className="h-8" aria-hidden="true" />;
   }
   if (block.kind === "text") {
+    // Double-click to edit inline — a first slice of "the canvas is the form"
+    // (#1916). Commits on blur; full per-field section editing lands with the
+    // declarative field schema.
+    if (editing && onCommitText) {
+      return (
+        <textarea
+          value={draft}
+          autoFocus
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            setEditing(false);
+            onCommitText(draft);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full resize-y rounded border border-brand-purple/40 bg-white p-1 text-sm leading-relaxed text-slate-700 outline-none"
+          rows={3}
+        />
+      );
+    }
     return (
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+      <p
+        className="cursor-text whitespace-pre-wrap text-sm leading-relaxed text-slate-700"
+        onDoubleClick={(e) => {
+          if (!onCommitText) return;
+          e.stopPropagation();
+          setDraft(block.text ?? "");
+          setEditing(true);
+        }}
+        title={onCommitText ? "Double-click to edit" : undefined}
+      >
         {block.text || "Text block"}
       </p>
     );

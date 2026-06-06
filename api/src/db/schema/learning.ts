@@ -394,3 +394,41 @@ export const learningAssignments = pgTable(
 
 export type LearningAssignment = typeof learningAssignments.$inferSelect;
 export type NewLearningAssignment = typeof learningAssignments.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// learning_goals — a learner's stated objective ("I want to learn RAG"),
+// captured in the onboarding funnel and on the learner home. Drives course
+// recommendations + gives the AI brain a durable signal of intent. Distinct
+// from cohort assignments (someone else assigning work): a goal is the
+// learner's own north-star. Multiple active goals are allowed.
+// ---------------------------------------------------------------------------
+export const LEARNING_GOAL_STATUSES = [
+  "active",
+  "completed",
+  "paused",
+  "archived",
+] as const;
+export type LearningGoalStatus = (typeof LEARNING_GOAL_STATUSES)[number];
+
+export const learningGoals = pgTable(
+  "learning_goals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    goalText: text("goal_text").notNull(),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    // 'onboarding' | 'manual' — where the goal was captured. Lets us measure
+    // onboarding-funnel conversion separately from goals added later.
+    source: varchar("source", { length: 16 }).default("manual").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_learning_goals_user").on(t.userId, t.status),
+  ],
+);
+
+export type LearningGoal = typeof learningGoals.$inferSelect;
+export type NewLearningGoal = typeof learningGoals.$inferInsert;

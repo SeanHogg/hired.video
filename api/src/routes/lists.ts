@@ -21,6 +21,7 @@ import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { LIST_ITEM_ENTITY_TYPES, type ListItemEntityType } from "../db/schema/lists.js";
+import { getOrSetCached, invalidateCachedKey } from "../utils/edge-cache.js";
 
 export const listsRoutes = new Hono<AppEnv>();
 
@@ -476,6 +477,204 @@ listsRoutes.delete("/:id/items", async (c) => {
     );
 
   return c.json(success({ deleted: true }), 200);
+});
+
+// ─── Wishlist (the one canonical per-user heart list) ─────────────────────
+//
+// A wishlist is just a `lists` row with kind = 'wishlist'. We expose a thin
+// facade over the generic items machinery so cards/detail pages get a
+// one-tap heart toggle without the consumer needing to know the list id.
+// The partial unique index (migration 0198) guarantees one per owner, so
+// get-or-create is race-safe (the loser's INSERT trips the index → re-select).
+
+function wishlistIdsCacheKey(userId: string, entityType: string): string {
+  return `wishlist:ids:${userId}:${entityType}`;
+}
+
+async function findWishlist(userId: string) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(schema.lists)
+    .where(and(eq(schema.lists.ownerUserId, userId), eq(schema.lists.kind, "wishlist")))
+    .limit(1);
+  return row ?? null;
+}
+
+async function getOrCreateWishlist(userId: string) {
+  const existing = await findWishlist(userId);
+  if (existing) return existing;
+  const db = getDb();
+  try {
+    const [created] = await db
+      .insert(schema.lists)
+      .values({
+        ownerUserId: userId,
+        companyId: null,
+        title: "Wishlist",
+        isPrivate: true,
+        kind: "wishlist",
+      } as any)
+      .returning();
+    return created;
+  } catch {
+    // Lost a create race — the unique index rejected us. Re-read the winner.
+    const row = await findWishlist(userId);
+    if (!row) throw new Error("Failed to create wishlist");
+    return row;
+  }
+}
+
+const WishlistToggleSchema = z.object({
+  entityType: z.enum(LIST_ITEM_ENTITY_TYPES),
+  entityId: UuidLikeSchema,
+});
+
+// POST /api/lists/wishlist/toggle — add/remove an entity from the caller's
+// wishlist. Returns the resulting state so the heart can render optimistically.
+listsRoutes.post("/wishlist/toggle", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = WishlistToggleSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  }
+  const { entityType, entityId } = parsed.data;
+
+  const exists = await entityExists(entityType, entityId);
+  if (!exists) return c.json(error("NOT_FOUND", `${entityType} not found`), 404);
+
+  const db = getDb();
+  const wishlist = await getOrCreateWishlist(userId);
+
+  const [present] = await db
+    .select({ id: schema.listItems.id })
+    .from(schema.listItems)
+    .where(
+      and(
+        eq(schema.listItems.listId, wishlist.id),
+        eq(schema.listItems.entityType, entityType),
+        eq(schema.listItems.entityId, entityId),
+      ),
+    )
+    .limit(1);
+
+  let wishlisted: boolean;
+  if (present) {
+    await db.delete(schema.listItems).where(eq(schema.listItems.id, present.id));
+    wishlisted = false;
+  } else {
+    await db
+      .insert(schema.listItems)
+      .values({ listId: wishlist.id, entityType, entityId, addedByUserId: userId } as any)
+      .onConflictDoNothing();
+    wishlisted = true;
+  }
+
+  await db
+    .update(schema.lists)
+    .set({ updatedAt: new Date() } as any)
+    .where(eq(schema.lists.id, wishlist.id));
+
+  invalidateCachedKey(wishlistIdsCacheKey(userId, entityType));
+  return c.json(success({ wishlisted }), 200);
+});
+
+// GET /api/lists/wishlist/ids?entityType=course — the set of wishlisted entity
+// ids for one type. Drives heart-state hydration across a whole grid in one
+// round-trip. Cached read-through per (user, type); invalidated on toggle.
+listsRoutes.get("/wishlist/ids", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const entityType = c.req.query("entityType");
+  if (!entityType || !(LIST_ITEM_ENTITY_TYPES as readonly string[]).includes(entityType)) {
+    return c.json(error("VALIDATION_ERROR", "Valid entityType is required"), 400);
+  }
+
+  const ids = await getOrSetCached<string[]>({
+    key: wishlistIdsCacheKey(userId, entityType),
+    ttlSeconds: 300,
+    loader: async () => {
+      const wishlist = await findWishlist(userId);
+      if (!wishlist) return [];
+      const db = getDb();
+      const rows = await db
+        .select({ entityId: schema.listItems.entityId })
+        .from(schema.listItems)
+        .where(
+          and(
+            eq(schema.listItems.listId, wishlist.id),
+            eq(schema.listItems.entityType, entityType),
+          ),
+        );
+      return rows.map((r) => r.entityId);
+    },
+    revive: (raw) => (Array.isArray(raw) ? (raw as string[]) : null),
+  });
+
+  return c.json(success({ ids }), 200);
+});
+
+// GET /api/lists/wishlist/courses — wishlisted courses, enriched into the same
+// PublicCourseCard shape the marketplace feed uses. One join, owner-scoped.
+listsRoutes.get("/wishlist/courses", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const wishlist = await findWishlist(userId);
+  if (!wishlist) return c.json(success([] as unknown[]), 200);
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      course: schema.courses,
+      author: { id: schema.users.id, name: schema.users.name },
+      authorProfile: {
+        avatarUrl: schema.userProfiles.avatarUrl,
+        customUrlSlug: schema.userProfiles.customUrlSlug,
+      },
+      addedAt: schema.listItems.addedAt,
+    })
+    .from(schema.listItems)
+    .innerJoin(schema.courses, eq(schema.courses.id, schema.listItems.entityId))
+    .innerJoin(schema.users, eq(schema.courses.userId, schema.users.id))
+    .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.users.id))
+    .where(
+      and(
+        eq(schema.listItems.listId, wishlist.id),
+        eq(schema.listItems.entityType, "course"),
+      ),
+    )
+    .orderBy(desc(schema.listItems.addedAt));
+
+  const items = rows.map((r) => ({
+    id: r.course.id,
+    type: "course" as const,
+    title: r.course.title,
+    slug: r.course.slug,
+    summary: r.course.summary,
+    coverImageUrl: r.course.coverImageUrl,
+    category: r.course.category,
+    tags: r.course.tags,
+    difficulty: r.course.difficulty,
+    estimatedMinutes: r.course.estimatedMinutes,
+    priceCents: r.course.priceVisible ? r.course.priceCents : null,
+    issuesCertificate: r.course.issuesCertificate,
+    enrollmentCount: r.course.enrollmentCount,
+    averageRating: r.course.averageRating,
+    ratingCount: r.course.ratingCount,
+    publishedAt: r.course.publishedAt,
+    author: {
+      id: r.author.id,
+      name: r.author.name,
+      avatarUrl: r.authorProfile?.avatarUrl ?? null,
+      slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+    },
+  }));
+  return c.json(success(items), 200);
 });
 
 // ─── Polymorphic entity validation ───────────────────────────────────────

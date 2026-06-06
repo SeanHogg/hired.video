@@ -19,12 +19,12 @@ import {
   makeFilter,
   makeOscillator,
   nextPatchId,
+  type SynthPatch,
 } from "../synth-patch";
 import {
   coercePatch,
   serializeSynthPreset,
 } from "../synth-preset";
-import type { SynthPatch } from "../synth-patch";
 
 // Default patch elements get freshly-minted unique ids on every
 // makeDefaultPatch() call, so structural comparisons strip ids first.

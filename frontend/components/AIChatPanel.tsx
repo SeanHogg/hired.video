@@ -661,6 +661,14 @@ export default function AIChatPanel() {
       "career-advice": "I need some career advice",
       "interview-prep": "Help me prepare for an interview",
       "get-help": "I need help with something",
+
+      // Learning actions
+      "recommend-courses": "Recommend courses to help me reach my learning goal",
+      "create-study-plan": "Build me a study plan to learn this",
+      "explain-concept": "Explain this concept in simple terms",
+      "quiz-me": "Quiz me on what I'm learning to check my understanding",
+      "outline-course": "Help me outline a course on this topic",
+      "write-lesson": "Help me draft a lesson for this course",
     };
 
     return prompts[action] || `Help me with ${action.replace(/-/g, " ")}`;
