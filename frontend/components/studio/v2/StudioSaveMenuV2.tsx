@@ -128,6 +128,17 @@ interface StudioSaveMenuV2Props {
    *  pass `canPublishToYouTube`; the menu derives from
    *  `publishDestinationsFor(mediaKind)` and looks up handlers by id. */
   publishHandlers?: PublishHandlers;
+  /** Project-lifecycle rows (clone / delete / templates) rendered as a
+   *  "More" group at the bottom of the dropdown — supplied by
+   *  `useProjectChrome().items`. When absent the group doesn't render.
+   *  Consolidates what used to be a separate `…` overflow trigger into
+   *  this one Save cluster. */
+  moreItems?: React.ReactNode;
+  /** The modal surfaces that pair with `moreItems`
+   *  (`useProjectChrome().dialogs`). Rendered OUTSIDE the dropdown content
+   *  because Radix unmounts content children on close — an item click that
+   *  opens a dialog would otherwise tear the dialog down with the menu. */
+  moreDialogs?: React.ReactNode;
   className?: string;
 }
 
@@ -143,6 +154,8 @@ export default function StudioSaveMenuV2({
   onExport,
   exporting,
   publishHandlers,
+  moreItems,
+  moreDialogs,
   className,
 }: StudioSaveMenuV2Props) {
   const { toast } = useToast();
@@ -289,8 +302,26 @@ export default function StudioSaveMenuV2({
               />
             );
           })}
+
+          {/* More — project-lifecycle + template actions (clone / delete /
+              publish-as-template). Folded into this dropdown so the header
+              shows ONE Save cluster instead of a separate `…` trigger. The
+              group self-hides when the host supplies nothing (e.g. an
+              unsaved draft). */}
+          {moreItems && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                More
+              </DropdownMenuLabel>
+              {moreItems}
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {/* Dialogs that pair with `moreItems` live outside the dropdown so
+          they survive the menu closing on item click (see prop docs). */}
+      {moreDialogs}
     </div>
   );
 }

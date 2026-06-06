@@ -29,7 +29,6 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Eye,
   ChevronUp,
   ChevronDown,
   Play,
@@ -119,7 +118,7 @@ import Game3DPropertiesPanel from "@/components/studio/game/world-3d/Game3DPrope
 import ChallengesPanel from "@/components/studio/game/world-3d/ChallengesPanel";
 import AIAgentPanel from "@/components/studio/game/world-3d/AIAgentPanel";
 import InviteDialog from "@/components/studio/game/world-3d/InviteDialog";
-import LayoutPresetMenu from "@/components/studio/nle/LayoutPresetMenu";
+import PreviewLayoutGroup from "@/components/studio/nle/PreviewLayoutGroup";
 import type { LayoutBindings } from "@/lib/studio/editor-v2/use-layout-preset";
 import { downloadRobloxFile } from "@/lib/studio/game/roblox-export";
 import GamePropertiesPanel, {
@@ -210,7 +209,7 @@ import { isSuperAdminFromToken } from "@/lib/auth-claims";
 import AudioEmptyHint from "@/components/studio/v2/AudioEmptyHint";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveMenuV2 from "@/components/studio/v2/StudioSaveMenuV2";
-import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
+import { useProjectChrome } from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import type { VideoScript } from "@/types/video-script";
@@ -3683,9 +3682,10 @@ function EditorHeader({
   saving: boolean;
   playback: ReturnType<typeof usePreviewPlayback>;
   /** Workspace-layout dropdown handler (#349). The header mounts the
-   *  LayoutPresetMenu but defers the actual state flip to the parent
-   *  so setLeftTab + setAdvancedTimelineOpen stay co-located with the
-   *  rest of the editor's state. */
+   *  PreviewLayoutGroup (Preview + layout split-button) but defers the
+   *  actual state flip to the parent so setLeftTab +
+   *  setAdvancedTimelineOpen stay co-located with the rest of the
+   *  editor's state. */
   onApplyLayoutBindings: (bindings: LayoutBindings) => void;
   persistedProjectId: string | null;
   persistedProject: StudioProject | null;
@@ -3740,6 +3740,14 @@ function EditorHeader({
     const r = Math.floor(s % 60);
     return `${m}:${r.toString().padStart(2, "0")}`;
   };
+  // Project-lifecycle + template actions (clone / delete / publish-as-
+  // template) — folded into the Save dropdown's "More" group instead of a
+  // standalone `…` overflow trigger. Self-gates to empty slots for unsaved
+  // drafts. The dialogs render outside the dropdown (see hook docs).
+  const projectChrome = useProjectChrome({
+    project: persistedProject,
+    getVideoScript,
+  });
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
       <div className="flex flex-1 items-center gap-2">
@@ -3834,23 +3842,20 @@ function EditorHeader({
             reachable via the ← Back arrow). Putting them on the per-
             project header conflated "make ANOTHER project" with "do
             something to THIS project".
-            Preview self-hides for non-Timeline-authoring kinds — the
-            `PreviewOverlay` it opens renders Timeline-shaped playback
-            which doesn't apply to game (uses GameStage's Playtest
-            toggle) or image (no playback). Closes the duplicate-button
-            half of the user's report on the memory-match game where
-            the header Preview AND the canvas Playtest both surfaced. */}
-        {usesTimelineChrome && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1"
-            onClick={onOpenPreview}
-          >
-            <Eye className="h-4 w-4" />
-            Preview
-          </Button>
-        )}
+            Preview + workspace-layout are one joined button group
+            (PreviewLayoutGroup) — the Preview action and the layout-mode
+            dropdown read as a single control instead of two adjacent
+            "Preview"-labelled buttons. The Preview half self-gates: it
+            renders only for Timeline-authoring kinds (the `PreviewOverlay`
+            it opens is Timeline-shaped playback, which doesn't apply to
+            game — uses GameStage's Playtest toggle — or image — no
+            playback), collapsing the group to just the layout dropdown for
+            those kinds. Layout presets apply to every kind, so the
+            dropdown always renders. */}
+        <PreviewLayoutGroup
+          onApplyLayout={onApplyLayoutBindings}
+          onOpenPreview={usesTimelineChrome ? onOpenPreview : undefined}
+        />
         {/* Game-kind Playtest — same slot the video editor uses for
             Preview, mounting only when the project is game-kind. Was
             previously a canvas overlay; moved here to match the
@@ -3931,19 +3936,6 @@ function EditorHeader({
             Roblox
           </Button>
         )}
-        {/* Single overflow `…` for project + template actions (clone,
-            delete, publish-as-template, my-published-templates).
-            Self-gates: returns null when no project has been persisted
-            yet. `getVideoScript` lets the publish flow project canvas
-            state into a v1 VideoScript only at publish-time (#637). */}
-        <ProjectChromeMenu
-          project={persistedProject}
-          getVideoScript={getVideoScript}
-        />
-        {/* Workspace layout presets (#349) — the menu is presentational;
-            the parent applies the chosen bindings to its leftTab +
-            advancedTimelineOpen setters. */}
-        <LayoutPresetMenu onApply={onApplyLayoutBindings} />
         {/* SuperAdmin "Embed" (#1860) — self-gates on the optional handler,
             which the parent only binds for SuperAdmins on a saved project. */}
         {onEmbedOnPage && (
@@ -3993,6 +3985,8 @@ function EditorHeader({
               ? { "course-lesson": onPublishAsCourseLesson }
               : {}),
           }}
+          moreItems={projectChrome.items}
+          moreDialogs={projectChrome.dialogs}
         />
       </div>
     </header>
