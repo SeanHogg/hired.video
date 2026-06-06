@@ -253,12 +253,22 @@ export default defineConfig(({ mode }) => {
           clientsClaim: true,
         },
       }),
-      visualizer({
-        filename: "dist/stats.html",
-        open: false,
-        gzipSize: true,
-        brotliSize: true,
-      }),
+      // Bundle analyzer — opt-in only. gzip+brotli-sizing every chunk and
+      // retaining per-module metadata is memory- and CPU-heavy, and on a
+      // 6.4k-module bundle it contributed to the CI build's heap pressure
+      // (the OOM that raised NODE_OPTIONS in ci.yml). The stats.html it
+      // emits is excluded from precache and unused by deploys, so run it
+      // only when explicitly analyzing: `ANALYZE=true npm run build`.
+      ...(process.env.ANALYZE === "true"
+        ? [
+            visualizer({
+              filename: "dist/stats.html",
+              open: false,
+              gzipSize: true,
+              brotliSize: true,
+            }),
+          ]
+        : []),
     ],
     resolve: {
       alias: {
