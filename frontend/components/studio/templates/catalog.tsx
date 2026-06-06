@@ -64,6 +64,10 @@ export type ContentTemplate =
   | "basic"
   | "profile"
   | "resume"
+  // Paged WYSIWYG resume DOCUMENT (#1912) — mediaKind "document". Distinct
+  // from the video "resume" template above (mediaKind "video"). Opens the
+  // <DocumentStage> print canvas instead of the timeline.
+  | "resume_doc"
   | "personal_brand"
   | "skills_demo"
   | "code_walkthrough"
@@ -313,6 +317,24 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // and require user input in BasicIntake before Generate fires (#494).
     defaultPrompt: "",
     firstTabLabel: "Description",
+    IntakeForm: BasicIntake,
+  },
+  {
+    // Paged resume DOCUMENT (#1912) — opens the <DocumentStage> print
+    // canvas (Letter/Legal × orientation). mediaKind "document" routes the
+    // create→edit→save loop through the document runtime, not the timeline.
+    id: "resume_doc",
+    label: "Resume (Document)",
+    desc: "Design a print-ready resume on the canvas — drag in sections, set Letter/Legal & orientation, export PDF.",
+    icon: FileText,
+    importMode: "none",
+    purpose: "resume",
+    category: "showcase",
+    mediaKind: "document",
+    audiences: ["job_seeker"],
+    defaultName: "New Resume",
+    defaultPrompt: "",
+    firstTabLabel: "Document",
     IntakeForm: BasicIntake,
   },
   {

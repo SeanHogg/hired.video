@@ -107,10 +107,6 @@ export function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
 }
 
-export function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v));
-}
-
 // ── factories ───────────────────────────────────────────────────────────────
 
 export function makeOscillator(overrides: Partial<OscillatorSpec> = {}): OscillatorSpec {

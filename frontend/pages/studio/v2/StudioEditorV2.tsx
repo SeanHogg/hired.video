@@ -138,6 +138,11 @@ import FramesRail from "@/components/studio/animation/FramesRail";
 import CadStage from "@/components/studio/cad/CadStage";
 import Cad3DStage from "@/components/studio/cad-3d/Cad3DStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
+import DocumentStage from "@/components/studio/document/DocumentStage";
+import {
+  type DocumentState,
+  createBlankDocumentState,
+} from "@/lib/studio/editor-v2/document-state";
 import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer, makeVectorLayer, makeTextLayer } from "@shared/image-state";
 import { spillLayersIfNeeded } from "@/lib/studio/drawing/layer-r2-spill";
@@ -477,6 +482,23 @@ export default function StudioEditorV2() {
     reset: resetCad3DHistory,
   } = cad3DHistory;
   const [cad3DStateHydrated, setCad3DStateHydrated] = useState(false);
+  // Document runtime state (#1912) — paged WYSIWYG resume / job / article /
+  // blog. Same parallel-history pattern as the other non-Timeline runtimes;
+  // shape in `editor-v2/document-state.ts`.
+  const documentHistory = useCanvasHistory<DocumentState>(() =>
+    createBlankDocumentState("resume", () => crypto.randomUUID()),
+  );
+  const {
+    state: documentState,
+    setState: setDocumentState,
+    commit: documentCommit,
+    reset: resetDocumentHistory,
+    undo: documentUndo,
+    redo: documentRedo,
+    canUndo: documentCanUndo,
+    canRedo: documentCanRedo,
+  } = documentHistory;
+  const [documentStateHydrated, setDocumentStateHydrated] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -1153,6 +1175,21 @@ export default function StudioEditorV2() {
       setCad3DStateHydrated(true);
     },
     unhydrate: () => setCad3DStateHydrated(false),
+  });
+
+  // Document hydration (#1912). Persisted column is `documentState`; seeded
+  // as a blank resume document for a fresh draft. Same pattern as the other
+  // non-Timeline runtimes.
+  useKindHydration<DocumentState>({
+    active: currentMediaKind === "document",
+    hydrated: documentStateHydrated,
+    serverState: persistedProject?.documentState as DocumentState | null | undefined,
+    seed: () => createBlankDocumentState("resume", () => crypto.randomUUID()),
+    hydrate: (next) => {
+      resetDocumentHistory(next);
+      setDocumentStateHydrated(true);
+    },
+    unhydrate: () => setDocumentStateHydrated(false),
   });
 
   // Game uses the null-sentinel hydration pattern instead of a
@@ -2539,6 +2576,7 @@ export default function StudioEditorV2() {
         gameState,
         cadState,
         cad3dState: cad3DState,
+        documentState,
       });
       const res = await studioService.saveDraft({
         name: title,
@@ -3164,6 +3202,15 @@ export default function StudioEditorV2() {
                           className="absolute inset-0"
                         />
                       ) : null,
+                      document: documentStateHydrated ? (
+                        <DocumentStage
+                          state={documentState}
+                          setState={setDocumentState}
+                          commit={documentCommit}
+                          zoom={zoom}
+                          entityContent={null}
+                        />
+                      ) : null,
                       timeline: (
                   <div className="relative">
                   {/* ONE renderer for both edit + playback: `<CanvasStage>`
@@ -3291,7 +3338,14 @@ export default function StudioEditorV2() {
                             canUndo: animationCanUndo,
                             canRedo: animationCanRedo,
                           }
-                        : { undo, redo, canUndo, canRedo }
+                        : currentMediaKind === "document"
+                          ? {
+                              undo: documentUndo,
+                              redo: documentRedo,
+                              canUndo: documentCanUndo,
+                              canRedo: documentCanRedo,
+                            }
+                          : { undo, redo, canUndo, canRedo }
                   }
                   clipboard={clipboard}
                 />

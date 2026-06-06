@@ -25,7 +25,6 @@ import { Mic, Square, Play, Trash2, Loader2, Download, CheckCircle2 } from "luci
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
 import { audioBufferToWav } from "@/lib/audio/wav";
 import {
   renderPlayedNotesToBuffer,
@@ -41,6 +40,7 @@ import {
   OctaveShifter,
   buildKeys,
   useComputerKeyboard,
+  type KeyDef,
 } from "./Keyboard";
 
 interface VoiceHandle {
