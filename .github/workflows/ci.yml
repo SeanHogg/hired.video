@@ -97,6 +97,12 @@ jobs:
         run: cd frontend && npm run build
         env:
           VITE_BUILD_DATE: ${{ env.BUILD_DATE }}
+          # Vite/Rollup peaks past Node's ~2 GB default old-space limit
+          # while minifying the 6.4k-module bundle (OOM'd at ~2090 MB in
+          # the "rendering chunks" phase). ubuntu-latest has 16 GB, so
+          # lift the ceiling to 6 GB. The bundle bloat itself (eagerly
+          # imported BLOG_POSTS etc.) is tracked in the gap register.
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v5
