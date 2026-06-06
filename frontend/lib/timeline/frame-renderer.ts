@@ -486,7 +486,58 @@ async function createMediaElement(
     v.onerror = () => reject(new Error(`Video failed to load: ${src.filename}`));
     v.src = playbackUrl;
   });
+  // MediaRecorder-produced WebM (screen / webcam captures) carries no
+  // Duration element, so `v.duration` is `Infinity` at HAVE_METADATA.
+  // That breaks per-frame `seekTo` clamping (Math.min(Infinity, t) = t,
+  // so a seek can land past the real EOF and never fire `seeked`, hanging
+  // the render). Force the browser to demux to EOF and emit the real
+  // duration before the encode loop starts. Runs once per source at
+  // preload, not per frame.
+  await repairInfiniteDuration(v);
   return v;
+}
+
+/**
+ * Resolve a `<video>` whose `duration` is `Infinity`/`NaN` (the classic
+ * MediaRecorder-WebM symptom) to a finite duration. Seeking past the end
+ * makes the demuxer scan to EOF and emit `durationchange` with the real
+ * value; we then reset to 0 so the first real seek starts clean. Bounded
+ * by a timeout so a source that never resolves a duration can't stall
+ * preload — the render then falls back to the unclamped seek path, no
+ * worse than before this repair existed.
+ */
+function repairInfiniteDuration(v: HTMLVideoElement): Promise<void> {
+  if (Number.isFinite(v.duration) && v.duration > 0) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      v.removeEventListener("durationchange", onChange);
+      v.removeEventListener("seeked", onChange);
+      clearTimeout(timer);
+      // Rewind so per-frame seeks start from a known position. Guard in a
+      // try — setting currentTime can throw on a still-degenerate source.
+      try {
+        v.currentTime = 0;
+      } catch {
+        /* leave as-is; seekTo will re-seek anyway */
+      }
+      resolve();
+    };
+    const onChange = () => {
+      if (Number.isFinite(v.duration)) finish();
+    };
+    v.addEventListener("durationchange", onChange);
+    v.addEventListener("seeked", onChange);
+    const timer = setTimeout(finish, 5000);
+    try {
+      // Large but finite sentinel — far past any real clip length.
+      v.currentTime = 1e7;
+    } catch {
+      finish();
+    }
+  });
 }
 
 /**
@@ -499,11 +550,21 @@ function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
   const target = Math.max(0, Math.min(video.duration || time, time));
   if (Math.abs(video.currentTime - target) < 1 / 120) return Promise.resolve();
   return new Promise<void>((resolve) => {
-    const onSeeked = () => {
-      video.removeEventListener("seeked", onSeeked);
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener("seeked", done);
+      clearTimeout(timer);
       resolve();
     };
-    video.addEventListener("seeked", onSeeked);
+    video.addEventListener("seeked", done);
+    // Safety net: a `seeked` event can fail to fire for a non-keyframe
+    // target on a cue-less stream (e.g. MediaRecorder WebM). Resolve
+    // anyway after a bound so the compose loop draws the current decoded
+    // frame and advances instead of hanging the whole render. Seeks
+    // normally settle in <100 ms, so this never trips in the common path.
+    const timer = setTimeout(done, 3000);
     video.currentTime = target;
   });
 }
