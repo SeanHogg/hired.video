@@ -33,6 +33,12 @@ export const lists = pgTable(
       onDelete: "cascade",
     }),
     title: varchar("title", { length: 255 }).notNull(),
+    // 'custom' = a user-created list. 'wishlist' = the single canonical
+    // per-user wishlist that backs the heart-toggle affordance on cards /
+    // detail pages. Exactly one wishlist row per owner is enforced by a
+    // partial unique index (see migration 0198) so the get-or-create helper
+    // can rely on it. Wishlists are always personal (companyId = null).
+    kind: varchar("kind", { length: 16 }).default("custom").notNull(),
     isPrivate: boolean("is_private").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -63,6 +69,10 @@ export const LIST_ITEM_ENTITY_TYPES = [
   // bookmark a sourced candidate from the kanban without losing the
   // job-context the entry carries (notes, tags, stage history).
   "pipeline_entry",
+  // A published course (courses.id). Backs the course-marketplace
+  // wishlist heart — saved courses live in the caller's canonical
+  // `kind = 'wishlist'` list.
+  "course",
 ] as const;
 export type ListItemEntityType = (typeof LIST_ITEM_ENTITY_TYPES)[number];
 

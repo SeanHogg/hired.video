@@ -515,6 +515,22 @@ async function entityExists(entityType: ListItemEntityType, entityId: string): P
         .limit(1);
       return Boolean(row);
     }
+    case "pipeline_entry": {
+      const [row] = await db
+        .select({ id: schema.jobPipelineEntries.id })
+        .from(schema.jobPipelineEntries)
+        .where(eq(schema.jobPipelineEntries.id, entityId))
+        .limit(1);
+      return Boolean(row);
+    }
+    case "course": {
+      const [row] = await db
+        .select({ id: schema.courses.id })
+        .from(schema.courses)
+        .where(eq(schema.courses.id, entityId))
+        .limit(1);
+      return Boolean(row);
+    }
   }
 }
 

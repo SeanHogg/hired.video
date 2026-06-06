@@ -24,6 +24,19 @@ import {
   coercePatch,
   serializeSynthPreset,
 } from "../synth-preset";
+import type { SynthPatch } from "../synth-patch";
+
+// Default patch elements get freshly-minted unique ids on every
+// makeDefaultPatch() call, so structural comparisons strip ids first.
+function withoutIds(patch: SynthPatch) {
+  const drop = <T extends { id: string }>(xs: T[]) => xs.map(({ id: _id, ...rest }) => rest);
+  return {
+    ...patch,
+    oscillators: drop(patch.oscillators),
+    filters: drop(patch.filters),
+    effects: drop(patch.effects),
+  };
+}
 
 describe("synth-patch model", () => {
   it("default patch is playable — one+ oscillator, valid master gain, full ADSR", () => {
@@ -84,9 +97,10 @@ describe("synth preset round-trip", () => {
 
 describe("synth preset defensive parsing", () => {
   it("non-object input → full default patch", () => {
-    expect(coercePatch(null)).toEqual(makeDefaultPatch());
-    expect(coercePatch("nope")).toEqual(makeDefaultPatch());
-    expect(coercePatch(42)).toEqual(makeDefaultPatch());
+    const def = withoutIds(makeDefaultPatch());
+    expect(withoutIds(coercePatch(null))).toEqual(def);
+    expect(withoutIds(coercePatch("nope"))).toEqual(def);
+    expect(withoutIds(coercePatch(42))).toEqual(def);
   });
 
   it("partial patch (only oscillators) fills the rest from defaults", () => {
@@ -101,9 +115,8 @@ describe("synth preset defensive parsing", () => {
     expect(parsed.oscillators[0].pan).toBe(def.oscillators[0].pan);
     // Missing sections come straight from defaults — same values, but
     // freshly-minted (unique) ids, so compare id-agnostically.
-    const stripId = <T extends { id: string }>(xs: T[]) => xs.map(({ id: _id, ...rest }) => rest);
-    expect(stripId(parsed.filters)).toEqual(stripId(def.filters));
-    expect(stripId(parsed.effects)).toEqual(stripId(def.effects));
+    expect(withoutIds(parsed).filters).toEqual(withoutIds(def).filters);
+    expect(withoutIds(parsed).effects).toEqual(withoutIds(def).effects);
     expect(parsed.master).toEqual(def.master);
     expect(parsed.adsr).toEqual(def.adsr);
   });
