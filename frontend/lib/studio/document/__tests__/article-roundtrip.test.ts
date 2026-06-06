@@ -5,8 +5,8 @@
  * Run: vitest run lib/studio/document/__tests__/article-roundtrip.test.ts
  */
 import { describe, it, expect } from "vitest";
-import { createBlankDocumentState } from "@/lib/studio/editor-v2/document-state";
-import type { DocumentBlock } from "@/lib/studio/editor-v2/document-state";
+import { createBlankDocumentState } from "../../editor-v2/document-state";
+import type { DocumentBlock } from "../../editor-v2/document-state";
 import { documentToArticle } from "../document-to-article";
 import { articleToDocumentState } from "../document-from-article";
 

@@ -40,6 +40,7 @@ import {
   UserPlus,
   Download,
   Code2,
+  Upload,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -139,6 +140,8 @@ import CadStage from "@/components/studio/cad/CadStage";
 import Cad3DStage from "@/components/studio/cad-3d/Cad3DStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import DocumentStage from "@/components/studio/document/DocumentStage";
+import DocumentLeftPanel from "@/components/studio/document/DocumentLeftPanel";
+import ResumeUploadSheet from "@/components/ResumeUploadSheet";
 import {
   type DocumentState,
   createBlankDocumentState,
@@ -510,6 +513,8 @@ export default function StudioEditorV2() {
   // owned by the resume row. Seeded blank for a fresh draft; fetched from the
   // resume row when DocumentState.entityId is set; persisted back on save.
   const [documentEntityContent, setDocumentEntityContent] = useState<ResumeData | null>(null);
+  // "Upload existing resume" sheet (right rail, document/resume kind).
+  const [resumeUploadOpen, setResumeUploadOpen] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -3018,6 +3023,22 @@ export default function StudioEditorV2() {
               </div>
             </CollapsiblePanel>
           )}
+          {/* Document kind — left rail hosts templates + the draggable
+              section palette + page setup (replaces the on-canvas toolbar). */}
+          {currentMediaKind === "document" && documentStateHydrated && (
+            <CollapsiblePanel
+              side="left"
+              label={t("studio.editor.panelTools")}
+              storageKey="studio.v2.panel.left"
+              expandedClassName="w-64"
+            >
+              <DocumentLeftPanel
+                state={documentState}
+                setState={setDocumentState}
+                commit={documentCommit}
+              />
+            </CollapsiblePanel>
+          )}
           {usesTimelineChrome && (
           <CollapsiblePanel
             side="left"
@@ -3800,9 +3821,39 @@ export default function StudioEditorV2() {
               )}
             </CollapsiblePanel>
           )}
+          {/* Document (resume) — "Upload existing resume" below the AI panel.
+              Reuses the shared <ResumeUploadSheet>; on success the parsed
+              resume opens on the canvas via the ?editResume round-trip. */}
+          {currentMediaKind === "document" && documentState.entityKind === "resume" && (
+            <CollapsiblePanel
+              side="right"
+              label="Upload"
+              storageKey="studio.v2.panel.right.upload"
+              expandedClassName="w-72"
+              defaultOpen={false}
+            >
+              <div className="p-3 text-sm">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Import an existing résumé (PDF / DOCX / TXT) to fill the canvas.
+                </p>
+                <Button size="sm" className="w-full" onClick={() => setResumeUploadOpen(true)}>
+                  <Upload className="mr-1.5 h-4 w-4" />
+                  {t("actions.uploadResumeAction")}
+                </Button>
+              </div>
+            </CollapsiblePanel>
+          )}
           </div>
         </div>
       </div>
+      <ResumeUploadSheet
+        open={resumeUploadOpen}
+        onOpenChange={setResumeUploadOpen}
+        onSuccess={(response) => {
+          setResumeUploadOpen(false);
+          navigate(`/studio?editResume=${response.id}`);
+        }}
+      />
       {/* Save as Course Lesson — see [AttachToCourseDialog](../../components/creator/AttachToCourseDialog.tsx)
           and the SaveMenuV2 publish-handler wiring above. Self-fetches the
           user's courses; renders a "Create a course" CTA when the list is

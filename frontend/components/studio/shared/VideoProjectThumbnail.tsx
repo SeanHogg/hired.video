@@ -43,12 +43,16 @@ import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
 import type { StudioProject } from "@/lib/services/studio-service";
 import SceneThumbnail from "./SceneThumbnail";
 import WaveformThumbnail from "./WaveformThumbnail";
-import { mediaKindHasVideo } from "@shared/media-kinds";
+import { mediaKindHasAudio, mediaKindHasVideo } from "@shared/media-kinds";
 import { firstLayerPixels, type ImageState } from "@shared/image-state";
 import type { GameState } from "@shared/game-state";
 import { firstFramePixels, type AnimationState } from "@shared/animation-state";
+import type { CadState } from "@shared/cad-state";
+import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
 import GameStateThumbnail from "@/components/studio/game/GameStateThumbnail";
 import DrawingPlaceholderThumbnail from "@/components/studio/drawing/DrawingPlaceholderThumbnail";
+import DocumentPlaceholderThumbnail from "@/components/studio/document/DocumentPlaceholderThumbnail";
+import CadPlaceholderThumbnail from "@/components/studio/cad/CadPlaceholderThumbnail";
 import { cn } from "@/lib/utils";
 
 export interface VideoProjectThumbnailProps {
@@ -142,9 +146,39 @@ export default function VideoProjectThumbnail({
     );
   }
 
-  // Audio-only Timeline kinds (podcast, voice) — kind is the canonical
-  // signal, regardless of whether the project has v-track clips yet.
-  if (!mediaKindHasVideo(mediaKind)) {
+  // Document projects (#1912) render a paper-sheet preview keyed off the
+  // live DocumentState's section blocks — never the audio waveform the kind
+  // used to fall through to (the bug this branch fixes).
+  if (mediaKind === "document") {
+    const documentState = (project.documentState as DocumentState | null | undefined) ?? null;
+    return (
+      <div className={cn("h-full w-full", className)}>
+        <DocumentPlaceholderThumbnail documentState={documentState} />
+      </div>
+    );
+  }
+
+  // CAD projects (#930) render a drafting-grid preview. 2D drawings read off
+  // `cadState` sheet dims; 3D models show an isometric cube. Also previously
+  // mis-rendered as an audio waveform.
+  if (mediaKind === "cad" || mediaKind === "cad_3d") {
+    const cadState = (project.cadState as CadState | null | undefined) ?? null;
+    return (
+      <div className={cn("h-full w-full", className)}>
+        <CadPlaceholderThumbnail
+          variant={mediaKind === "cad_3d" ? "3d" : "2d"}
+          widthMm={cadState?.widthMm ?? null}
+          heightMm={cadState?.heightMm ?? null}
+        />
+      </div>
+    );
+  }
+
+  // Audio-only kinds (podcast, voice) — the waveform is the right cue ONLY
+  // for kinds that produce audio but no visible frames. Static visual kinds
+  // (document / cad) are handled above; gating on `hasAudio && !hasVideo`
+  // (not just `!hasVideo`) keeps them out of this branch.
+  if (mediaKindHasAudio(mediaKind) && !mediaKindHasVideo(mediaKind)) {
     return (
       <div className={cn("h-full w-full", className)}>
         <WaveformThumbnail seed={project.id} mediaKind={mediaKind} />

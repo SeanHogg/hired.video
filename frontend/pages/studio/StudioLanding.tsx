@@ -39,6 +39,7 @@ import {
 import { projectVisibilityVisual } from "@/lib/studio/visibility";
 import { Button } from "@/components/ui/button";
 import HeaderSearch from "@/components/HeaderSearch";
+import Pagination, { usePaginatedList } from "@/components/Pagination";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { useToast } from "@/hooks/use-toast";
@@ -1005,7 +1006,9 @@ function StudioContentTable({
   onShowDetails: (project: StudioProject) => void;
   onRequestDelete: (project: StudioProject) => void;
 }) {
+  const { pageItems, paginationProps } = usePaginatedList(projects, 12);
   return (
+    <div>
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
@@ -1018,7 +1021,7 @@ function StudioContentTable({
           </tr>
         </thead>
         <tbody>
-          {projects.map((project) => {
+          {pageItems.map((project) => {
             const { Icon: VisibilityIcon, label: visibilityLabel } =
               projectVisibilityVisual(project.isPublic);
             return (
@@ -1084,6 +1087,8 @@ function StudioContentTable({
           })}
         </tbody>
       </table>
+    </div>
+    <Pagination {...paginationProps} />
     </div>
   );
 }
@@ -1222,7 +1227,9 @@ function TemplateTable({
   onPickOwned: (template: StudioTemplate) => void;
   onPreviewOwned: (template: StudioTemplate) => void;
 }) {
+  const { pageItems, paginationProps } = usePaginatedList(rows, 12);
   return (
+    <div>
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
@@ -1234,7 +1241,7 @@ function TemplateTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {pageItems.map((row) => {
             // Inline-narrow the discriminated union into one normalized
             // cell shape so the row markup is written once.
             const cells =
@@ -1294,6 +1301,8 @@ function TemplateTable({
           })}
         </tbody>
       </table>
+    </div>
+    <Pagination {...paginationProps} />
     </div>
   );
 }

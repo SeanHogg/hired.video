@@ -14,7 +14,7 @@ import {
   type DocumentBlock,
   type DocumentState,
   createBlankDocumentState,
-} from "@/lib/studio/editor-v2/document-state";
+} from "../editor-v2/document-state";
 
 export function articleToDocumentState(
   article: { id: string; title: string; bodyMd: string },

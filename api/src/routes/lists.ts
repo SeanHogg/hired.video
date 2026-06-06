@@ -641,18 +641,42 @@ listsRoutes.get("/wishlist/enriched", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Valid enrichable entityType is required"), 400);
   }
 
-  const items = await getOrSetCached<unknown[]>({
+  const items = await loadEnrichedWishlist(
+    userId,
+    entityType as (typeof WISHLIST_ENRICHABLE_TYPES)[number],
+  );
+  return c.json(success(items), 200);
+});
+
+// GET /api/lists/wishlist/courses — back-compat alias for clients precached by
+// the service worker BEFORE the endpoint was generalised to `/wishlist/enriched`
+// (the SW aggressively precaches JS, so old bundles linger after a rename).
+// Delegates to the shared loader — no logic duplication. Safe to remove once
+// no cached client references it.
+listsRoutes.get("/wishlist/courses", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const items = await loadEnrichedWishlist(userId, "course");
+  return c.json(success(items), 200);
+});
+
+// Cached read-through enrichment for one wishlist type. Shared by the
+// `/wishlist/enriched` endpoint and the `/wishlist/courses` back-compat alias.
+async function loadEnrichedWishlist(
+  userId: string,
+  entityType: (typeof WISHLIST_ENRICHABLE_TYPES)[number],
+): Promise<unknown[]> {
+  return getOrSetCached<unknown[]>({
     key: wishlistEnrichedCacheKey(userId, entityType),
     ttlSeconds: 300,
     loader: async () => {
       const wishlist = await findWishlist(userId);
       if (!wishlist) return [];
-      return enrichWishlist(wishlist.id, entityType as (typeof WISHLIST_ENRICHABLE_TYPES)[number]);
+      return enrichWishlist(wishlist.id, entityType);
     },
     revive: (raw) => (Array.isArray(raw) ? raw : null),
   });
-  return c.json(success(items), 200);
-});
+}
 
 async function enrichWishlist(
   listId: string,

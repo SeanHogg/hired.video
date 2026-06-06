@@ -157,6 +157,27 @@ export function addBlock(
   };
 }
 
+/** Insert a block immediately BEFORE `beforeId` (drop-at-cursor). When
+ *  `beforeId` is null or not found, appends — so it degrades to `addBlock`. */
+export function insertBlockAt(
+  state: DocumentState,
+  pageId: string,
+  preset: DocumentBlockPreset,
+  beforeId: string | null,
+): { state: DocumentState; blockId: string } {
+  const block = makeBlock(preset);
+  return {
+    state: mapPage(state, pageId, (p) => {
+      const idx = beforeId ? p.blocks.findIndex((b) => b.id === beforeId) : -1;
+      if (idx < 0) return { ...p, blocks: [...p.blocks, block] };
+      const blocks = [...p.blocks];
+      blocks.splice(idx, 0, block);
+      return { ...p, blocks };
+    }),
+    blockId: block.id,
+  };
+}
+
 export function removeBlock(
   state: DocumentState,
   pageId: string,

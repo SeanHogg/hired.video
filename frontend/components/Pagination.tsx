@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -198,3 +198,40 @@ export const usePagination = (totalItems: number, initialItemsPerPage = 12) => {
     handleTotalItemsChange,
   };
 };
+
+/**
+ * Client-side list pagination — slices an in-memory array into the current
+ * page and hands back ready-to-spread `<Pagination>` props. Wraps
+ * `usePagination` and auto-clamps the page when the list shrinks (filter
+ * change / deletion) so a stale page never renders an empty slice.
+ *
+ * DRY anchor for any table/grid that pages a fully-loaded array — callers
+ * render `pageItems` and drop `<Pagination {...paginationProps} />` below.
+ * `<Pagination>` self-hides when there's a single page, so short lists show
+ * no controls.
+ */
+export function usePaginatedList<T>(items: T[], initialItemsPerPage = 12) {
+  const total = items.length;
+  const { currentPage, itemsPerPage, setCurrentPage, handleItemsPerPageChange } =
+    usePagination(total, initialItemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
+  const page = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages, setCurrentPage]);
+
+  const start = (page - 1) * itemsPerPage;
+  const pageItems = items.slice(start, start + itemsPerPage);
+
+  return {
+    pageItems,
+    paginationProps: {
+      currentPage: page,
+      totalItems: total,
+      itemsPerPage,
+      onPageChange: setCurrentPage,
+      onItemsPerPageChange: handleItemsPerPageChange,
+    } satisfies PaginationProps,
+  };
+}

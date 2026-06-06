@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { createBlankDocumentState } from "../document-state";
 import {
   addBlock,
+  insertBlockAt,
   removeBlock,
   updateBlock,
   moveBlock,
@@ -58,6 +59,31 @@ describe("removeBlock / updateBlock", () => {
     const added = addBlock(s, pid, textPreset);
     s = updateBlock(added.state, pid, added.blockId, { text: "Hello" });
     expect(s.pages[0].blocks[0].text).toBe("Hello");
+  });
+});
+
+describe("insertBlockAt (drop-at-cursor)", () => {
+  it("inserts before the given block id", () => {
+    let s = blankDoc();
+    const pid = firstPageId(s);
+    s = addBlock(s, pid, { kind: "text", label: "A" }).state;
+    s = addBlock(s, pid, { kind: "text", label: "B" }).state;
+    const [, b] = s.pages[0].blocks;
+    const { state, blockId } = insertBlockAt(s, pid, { kind: "divider", label: "D" }, b.id);
+    const ids = state.pages[0].blocks.map((x) => x.id);
+    // new block sits immediately before B
+    expect(ids.indexOf(blockId)).toBe(ids.indexOf(b.id) - 1);
+    expect(state.pages[0].blocks).toHaveLength(3);
+  });
+
+  it("appends when beforeId is null or unknown", () => {
+    let s = blankDoc();
+    const pid = firstPageId(s);
+    s = addBlock(s, pid, { kind: "text", label: "A" }).state;
+    const r1 = insertBlockAt(s, pid, { kind: "divider", label: "D" }, null);
+    expect(r1.state.pages[0].blocks[r1.state.pages[0].blocks.length - 1].id).toBe(r1.blockId);
+    const r2 = insertBlockAt(s, pid, { kind: "divider", label: "D" }, "nope");
+    expect(r2.state.pages[0].blocks[r2.state.pages[0].blocks.length - 1].id).toBe(r2.blockId);
   });
 });
 

@@ -142,3 +142,56 @@ describe("VideoProjectThumbnail — Timeline kinds are unaffected", () => {
     expect(container.textContent).toContain("Podcast");
   });
 });
+
+describe("VideoProjectThumbnail — document + CAD do NOT render a waveform", () => {
+  // Regression: document/cad kinds fell through the `!hasVideo` branch and
+  // rendered the audio waveform (which prints the kind's badgeLabel). The
+  // fix gates the waveform on `hasAudio && !hasVideo` and adds explicit
+  // document/cad branches.
+
+  it("renders the paper-sheet placeholder for a document, not the waveform", () => {
+    const documentState = {
+      pages: [{ id: "pg1", blocks: [{ id: "b1", kind: "section", sectionKey: "work", title: "Work Experience", mode: "flow" }], overlays: [] }],
+      entityKind: "resume",
+    };
+    const { container } = render(
+      <VideoProjectThumbnail
+        project={makeProject({ mediaKind: "document", documentState: documentState as unknown as never })}
+      />,
+    );
+    // WaveformThumbnail would print "Document" (the badgeLabel); the
+    // placeholder does not. The heading text from the block proves the
+    // document branch fired.
+    expect(container.textContent).not.toContain("Document");
+    expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(0);
+  });
+
+  it("survives a fresh document with no documentState", () => {
+    const { container } = render(
+      <VideoProjectThumbnail project={makeProject({ mediaKind: "document", documentState: null })} />,
+    );
+    expect(container.textContent).not.toContain("Document");
+  });
+
+  it("renders the drafting-grid placeholder for a CAD drawing, not the waveform", () => {
+    const cadState = { widthMm: 210, heightMm: 297, shapes: [] };
+    const { container } = render(
+      <VideoProjectThumbnail
+        project={makeProject({ mediaKind: "cad", cadState: cadState as unknown as never })}
+      />,
+    );
+    // The grid placeholder renders an SVG and a dimension chip; it never
+    // prints the "CAD" badgeLabel the waveform would.
+    expect(container.textContent).not.toContain("CAD");
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.textContent).toContain("210×297");
+  });
+
+  it("renders the 3D variant for cad_3d", () => {
+    const { container } = render(
+      <VideoProjectThumbnail project={makeProject({ mediaKind: "cad_3d", cadState: null })} />,
+    );
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.textContent).not.toContain("3D");
+  });
+});

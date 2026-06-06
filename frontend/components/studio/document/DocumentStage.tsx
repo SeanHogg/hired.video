@@ -16,48 +16,27 @@
  * the generalized DeclarativeResumeRenderer, inline field editing (#1916),
  * interactive media overlays (#1913), and a left-rail drag-drop palette.
  */
-import { useState } from "react";
-import {
-  AlignLeft,
-  ArrowDown,
-  ArrowUp,
-  Maximize2,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { AlignLeft, ArrowDown, ArrowUp, Maximize2, Trash2 } from "lucide-react";
 import type { ResumeData } from "@/types/resume";
 import SectionEditor from "@/components/studio/document/SectionEditor";
 import { resumeSectionSchema } from "@/lib/studio/document/resume-field-schema";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
   type DocumentBlock,
   type DocumentState,
   pageDimensions,
-  documentSupportsPageMode,
-  PAGE_SIZES,
-  type PageSize,
 } from "@/lib/studio/editor-v2/document-state";
 import {
   blockPresetsForEntity,
-  addBlock,
   firstPageId,
+  insertBlockAt,
   moveBlock,
-  newId,
   removeBlock,
   setBlockMode,
-  setOrientation,
-  setPageSize,
   updateBlock,
 } from "@/lib/studio/editor-v2/document-edit";
-import { applyDocumentTemplate } from "@/lib/studio/editor-v2/document-templates";
-import DocumentTemplatePicker from "@/components/studio/document/DocumentTemplatePicker";
+import { DOCUMENT_BLOCK_DRAG_MIME } from "@/components/studio/document/DocumentLeftPanel";
 
 interface DocumentStageProps {
   state: DocumentState;
@@ -110,8 +89,6 @@ export default function DocumentStage({
   const pageId = firstPageId(state);
   const { width, height } = pageDimensions(state);
   const page = state.pages[0];
-  const canSetPageMode = documentSupportsPageMode(state.entityKind);
-  const blockPresets = blockPresetsForEntity(state.entityKind);
 
   const commitState = (next: DocumentState) => {
     setState(() => next);
@@ -121,91 +98,33 @@ export default function DocumentStage({
   const flowBlocks = page?.blocks.filter((b) => b.mode === "flow") ?? [];
   const absoluteBlocks = page?.blocks.filter((b) => b.mode === "absolute") ?? [];
 
+  // ── Auto-pagination by height ──
+  // The sheet GROWS to fit its content (no clipping); we measure the rendered
+  // height and draw a page-break guide + "Page N" label every print-page
+  // height, so the user sees page 1 / 2 / 3 even though authoring is one
+  // continuous flow. The browser's @page handles the real breaks on print/PDF.
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [pageCount, setPageCount] = useState(1);
+  useLayoutEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    // scrollHeight is the unscaled layout height (transform: scale doesn't
+    // affect it), so it's the true content height in page px.
+    const n = Math.max(1, Math.ceil(el.scrollHeight / height));
+    setPageCount((prev) => (prev === n ? prev : n));
+  });
+
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* ── Stage toolbar ── */}
-      <div className="flex flex-wrap items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="default">
-              <Plus className="mr-1 h-4 w-4" />
-              Add block
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="max-h-80 overflow-y-auto">
-            {blockPresets.map((preset) => (
-              <DropdownMenuItem
-                key={preset.label}
-                onSelect={() => {
-                  const { state: next, blockId } = addBlock(state, pageId, preset);
-                  commitState(next);
-                  setSelectedBlockId(blockId);
-                }}
-              >
-                {preset.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Design template gallery — self-gates to nothing for entities with
-            no design library (article / blog). Applying one swaps the page's
-            flow blocks + theme; content is untouched. */}
-        <DocumentTemplatePicker
-          entityKind={state.entityKind}
-          currentThemeKey={state.theme.themeKey}
-          onApply={(option) =>
-            commitState(applyDocumentTemplate(state, option, () => newId("blk")))
-          }
-        />
-
-        {/* Page geometry — resume only (other entities are locked Letter
-            portrait; the control self-gates via documentSupportsPageMode). */}
-        {canSetPageMode && (
-          <>
-            <div className="mx-1 h-5 w-px bg-border" />
-            <select
-              value={state.pageSize}
-              onChange={(e) =>
-                commitState(setPageSize(state, e.target.value as PageSize))
-              }
-              aria-label="Page size"
-              className="h-8 rounded-md border border-border bg-background px-2 text-sm"
-            >
-              {PAGE_SIZES.map((s) => (
-                <option key={s} value={s}>
-                  {s.toUpperCase()}
-                </option>
-              ))}
-            </select>
-            <div className="flex items-center rounded-md border border-border">
-              <Button
-                size="sm"
-                variant={state.orientation === "portrait" ? "default" : "ghost"}
-                className="rounded-r-none"
-                onClick={() => commitState(setOrientation(state, "portrait"))}
-              >
-                Portrait
-              </Button>
-              <Button
-                size="sm"
-                variant={state.orientation === "landscape" ? "default" : "ghost"}
-                className="rounded-l-none"
-                onClick={() => commitState(setOrientation(state, "landscape"))}
-              >
-                Landscape
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── The page sheet (true print size × zoom) ── */}
+      {/* ── The page sheet (true print width × zoom; grows in height, with
+            per-page break guides). The authoring toolbar lives in the editor
+            footer (<DocumentToolbar>), not here. ── */}
       <div
-        className="relative origin-top overflow-hidden bg-white text-slate-900 shadow-xl ring-1 ring-black/10"
+        ref={sheetRef}
+        className="relative origin-top bg-white text-slate-900 shadow-xl ring-1 ring-black/10"
         style={{
           width,
-          height,
+          minHeight: height,
           transform: `scale(${zoom})`,
           fontFamily:
             state.theme.fontFamily === "serif"
@@ -215,39 +134,93 @@ export default function DocumentStage({
                 : "Inter, system-ui, sans-serif",
         }}
         onClick={() => setSelectedBlockId(null)}
+        onDragOver={(e) => {
+          // Accept palette drags (DocumentLeftPanel section chips).
+          if (e.dataTransfer.types.includes(DOCUMENT_BLOCK_DRAG_MIME)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDrop={(e) => {
+          const raw = e.dataTransfer.getData(DOCUMENT_BLOCK_DRAG_MIME);
+          if (!raw) return;
+          e.preventDefault();
+          const preset = blockPresetsForEntity(state.entityKind)[Number(raw)];
+          if (!preset) return;
+          // Drop-at-cursor: insert before the first flow block whose vertical
+          // midpoint is below the drop point; append when dropped past the end.
+          const dropY = e.clientY;
+          let beforeId: string | null = null;
+          const sheet = sheetRef.current;
+          if (sheet) {
+            const els = sheet.querySelectorAll<HTMLElement>("[data-doc-flow-id]");
+            for (const el of Array.from(els)) {
+              const r = el.getBoundingClientRect();
+              if (dropY < r.top + r.height / 2) {
+                beforeId = el.dataset.docFlowId ?? null;
+                break;
+              }
+            }
+          }
+          const { state: next, blockId } = insertBlockAt(state, pageId, preset, beforeId);
+          commitState(next);
+          setSelectedBlockId(blockId);
+        }}
         role="presentation"
       >
+        {/* Page-break guides — one dashed line + "Page N" label per print page
+            boundary. pointer-events-none so they don't intercept block clicks. */}
+        {Array.from({ length: pageCount }).map((_, i) => (
+          <div
+            key={`page-label-${i}`}
+            className="pointer-events-none absolute right-3 text-[10px] font-medium uppercase tracking-wide text-slate-300"
+            style={{ top: i * height + 8 }}
+          >
+            Page {i + 1}
+          </div>
+        ))}
+        {Array.from({ length: Math.max(0, pageCount - 1) }).map((_, i) => (
+          <div
+            key={`page-break-${i}`}
+            className="pointer-events-none absolute inset-x-0 border-t border-dashed border-slate-300"
+            style={{ top: (i + 1) * height }}
+          />
+        ))}
+
         {/* Flow plane — ordered, top-to-bottom. */}
         <div className="flex flex-col gap-4 p-12">
           {flowBlocks.length === 0 && (
             <div className="rounded-md border-2 border-dashed border-slate-200 py-16 text-center text-sm text-slate-400">
-              Empty page — use “Add block” to start building.
+              Empty page — use “Add block” in the footer to start building.
             </div>
           )}
           {flowBlocks.map((block) => (
-            <DocumentBlockView
-              key={block.id}
-              block={block}
-              selected={selectedBlockId === block.id}
-              entityContent={entityContent}
-              onContentChange={onContentChange}
-              onSelect={(e) => {
-                e.stopPropagation();
-                setSelectedBlockId(block.id);
-              }}
-              onMoveUp={() => commitState(moveBlock(state, pageId, block.id, "up"))}
-              onMoveDown={() => commitState(moveBlock(state, pageId, block.id, "down"))}
-              onDelete={() => {
-                commitState(removeBlock(state, pageId, block.id));
-                setSelectedBlockId(null);
-              }}
-              onDetach={() =>
-                commitState(setBlockMode(state, pageId, block.id, "absolute"))
-              }
-              onCommitText={(text) =>
-                commitState(updateBlock(state, pageId, block.id, { text }))
-              }
-            />
+            // data-doc-flow-id lets the drop handler locate the insertion point
+            // by comparing the cursor Y to each block's midpoint.
+            <div key={block.id} data-doc-flow-id={block.id}>
+              <DocumentBlockView
+                block={block}
+                selected={selectedBlockId === block.id}
+                entityContent={entityContent}
+                onContentChange={onContentChange}
+                onSelect={(e) => {
+                  e.stopPropagation();
+                  setSelectedBlockId(block.id);
+                }}
+                onMoveUp={() => commitState(moveBlock(state, pageId, block.id, "up"))}
+                onMoveDown={() => commitState(moveBlock(state, pageId, block.id, "down"))}
+                onDelete={() => {
+                  commitState(removeBlock(state, pageId, block.id));
+                  setSelectedBlockId(null);
+                }}
+                onDetach={() =>
+                  commitState(setBlockMode(state, pageId, block.id, "absolute"))
+                }
+                onCommitText={(text) =>
+                  commitState(updateBlock(state, pageId, block.id, { text }))
+                }
+              />
+            </div>
           ))}
         </div>
 
