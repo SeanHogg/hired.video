@@ -68,6 +68,11 @@ export type CanvasRuntimeSurfaces = {
    *  reader pacing; runtime owns its own state shape
    *  (`InteractiveComicState` in `shared/interactive-comic-state.ts`). */
   interactive_comic?: ReactNode;
+  /** Document runtime surface (#1912). Mounted when
+   *  `mediaKind === "document"`. Paged WYSIWYG resume / job / article / blog;
+   *  runtime owns its own state shape (`DocumentState` in
+   *  `frontend/lib/studio/editor-v2/document-state.ts`). */
+  document?: ReactNode;
 };
 
 interface CanvasRouterProps {
@@ -98,6 +103,9 @@ export default function CanvasRouter({
   }
   if (mediaKind === "interactive_comic" && surfaces.interactive_comic !== undefined) {
     return surfaces.interactive_comic;
+  }
+  if (mediaKind === "document" && surfaces.document !== undefined) {
+    return surfaces.document;
   }
   return surfaces.timeline;
 }

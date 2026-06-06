@@ -41,6 +41,12 @@ import type { ImageState } from "@shared/image-state";
 import type { AnimationState } from "@shared/animation-state";
 import { createBlankCad3DState } from "@shared/cad-3d-state";
 import { createBlankInteractiveComicState } from "@shared/interactive-comic-state";
+import {
+  type DocumentState,
+  type DocumentEntityKind,
+  createBlankDocumentState,
+} from "./editor-v2/document-state";
+import { newId } from "./editor-v2/document-edit";
 
 /** Discriminated payload — exactly ONE state-shaped field is set per
  *  result; the shape mirrors what `saveDraft` accepts on the wire.
@@ -66,6 +72,9 @@ export interface TemplateSeedPayload {
   cad3dState?: import("@shared/cad-3d-state").Cad3DState;
   /** Interactive comic branching graph for `mediaKind: "interactive_comic"` (#929). */
   interactiveComicState?: import("@shared/interactive-comic-state").InteractiveComicState;
+  /** Document state for `mediaKind: "document"` (#1912) — resume / job /
+   *  article / blog paged WYSIWYG canvas. */
+  documentState?: DocumentState;
 }
 
 /**
@@ -117,11 +126,17 @@ export function seedTemplate(template: TemplateDef): TemplateSeedPayload {
         name,
         timelineSpec: canvasStateToTimeline(seedCanvasFromTemplate(template.id)),
       };
-    case "document":
-      // Document templates seed a blank DocumentState via the DocumentStage
-      // build (#1912); the seed shape lands there. Unreachable today: no
-      // document templates exist in the catalog yet.
-      throw new Error("document mediaKind template seed not yet wired — see gap #1912");
+    case "document": {
+      // Document runtime (#1912) — seed a blank DocumentState. The entity
+      // axis (resume / job / article / blog) defaults to resume until the
+      // catalog carries a per-template `documentEntityKind` (#1917); the
+      // template id will select it then.
+      const entityKind: DocumentEntityKind = "resume";
+      return {
+        name,
+        documentState: createBlankDocumentState(entityKind, () => newId("page")),
+      };
+    }
     default:
       // Exhaustiveness guard — TS errors here if a new MediaKind is
       // added to `MEDIA_KINDS` without a matching branch above. Runtime

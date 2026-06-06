@@ -30,6 +30,7 @@ import type { GameState } from "@shared/game-state";
 import type { CadState } from "@shared/cad-state";
 import type { Cad3DState } from "@shared/cad-3d-state";
 import type { InteractiveComicState } from "@shared/interactive-comic-state";
+import type { DocumentState } from "./document-state";
 
 /** Runtime-state snapshot — the editor's live per-kind state at the
  *  moment of save. Each field may be null when the kind isn't active. */
@@ -41,6 +42,7 @@ export interface RuntimeSnapshot {
   cadState: CadState | null;
   cad3dState?: Cad3DState | null;
   interactiveComicState?: InteractiveComicState | null;
+  documentState?: DocumentState | null;
 }
 
 /** Per-mediaKind save-draft payload slice. Keys mirror `studioService.saveDraft`'s
@@ -56,6 +58,7 @@ export interface RuntimePayloadSlice {
   cadState?: CadState;
   cad3dState?: Cad3DState;
   interactiveComicState?: InteractiveComicState;
+  documentState?: DocumentState;
 }
 
 /** Build the payload slice for the active mediaKind. The runtime owns
@@ -113,10 +116,12 @@ export function runtimeStatePayload(
         timelineSpec: canvasStateToTimeline(snapshot.canvasState),
       };
     case "document":
-      // Paged document runtime — its persistence (document_state column,
-      // RuntimeSnapshot.documentState) lands with the DocumentStage build
-      // (#1912). Unreachable today: no document projects can be created yet.
-      throw new Error("document mediaKind persistence not yet wired — see gap #1912");
+      // Paged document runtime (#1912) — persists its DocumentState to the
+      // `document_state` JSONB column (storage kind "scene", like the other
+      // non-Timeline runtimes).
+      return snapshot.documentState
+        ? { kind: "scene", documentState: snapshot.documentState }
+        : { kind: "scene" };
     default:
       // Exhaustiveness guard — TS errors here if MEDIA_KINDS gains a
       // new entry without a matching branch above. Runtime throw is

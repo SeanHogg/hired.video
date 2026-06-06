@@ -270,6 +270,10 @@ export const StudioProjectSchema = z.object({
   // pattern is total. Removes the foot-gun where a future comic-only
   // field silently round-trips to nothing.
   comicState: z.unknown().nullish(),
+  // Document runtime state for mediaKind='document' projects (#1912).
+  // Same parallel-column pattern. Validated client-side by <DocumentStage>;
+  // server stores verbatim. See document-state.ts.
+  documentState: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
@@ -358,6 +362,7 @@ const MediaKindFields = {
   animationState: z.unknown().nullish(),
   cadState: z.unknown().nullish(),
   comicState: z.unknown().nullish(),
+  documentState: z.unknown().nullish(),
 } as const;
 
 export const ResumeVideoSchema = z.object({
@@ -824,6 +829,9 @@ export const studioService = {
        *  Phase 2). Sent by `<Cad3DStage>` on save; same parallel-column
        *  pattern. See `shared/cad-3d-state.ts`. */
       cad3dState?: unknown;
+      /** Document runtime state for mediaKind='document' projects (#1912).
+       *  Sent by `<DocumentStage>` on save; same parallel-column pattern. */
+      documentState?: unknown;
       // SEO patch — sent only by the "Details" drawer; omit-vs-empty
       // matters server-side (omitted = preserve, empty string = clear).
       metaDescription?: string;
@@ -849,6 +857,7 @@ export const studioService = {
       ...(args.animationState !== undefined ? { animationState: args.animationState } : {}),
       ...(args.cadState !== undefined ? { cadState: args.cadState } : {}),
       ...(args.cad3dState !== undefined ? { cad3dState: args.cad3dState } : {}),
+      ...(args.documentState !== undefined ? { documentState: args.documentState } : {}),
       ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
       ...(args.slug !== undefined ? { slug: args.slug } : {}),
       ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),

@@ -10,6 +10,8 @@
 // SynthComposer).
 
 import { useEffect, useMemo, useRef } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NOTE_FREQUENCIES } from "@/lib/audio/synth-engine";
 
@@ -116,6 +118,44 @@ export function useComputerKeyboard(
       window.removeEventListener("keyup", onUp);
     };
   }, [keysByHotkey, onNoteOn, onNoteOff]);
+}
+
+/** Octave-paging control shared by every composer toolbar — keeps the
+ *  "C{n}–C{n+3}" readout + clamp logic in one place. */
+export function OctaveShifter({
+  startOctave,
+  onChange,
+}: {
+  startOctave: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onChange(Math.max(MIN_OCTAVE, startOctave - 1))}
+        disabled={startOctave <= MIN_OCTAVE}
+        title="Shift octave down"
+      >
+        <ChevronLeft className="h-3 w-3" />
+      </Button>
+      <span className="text-[10px] font-mono text-muted-foreground px-1">
+        C{startOctave}–C{startOctave + VISIBLE_OCTAVES}
+      </span>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onChange(Math.min(MAX_OCTAVE, startOctave + 1))}
+        disabled={startOctave >= MAX_OCTAVE}
+        title="Shift octave up"
+      >
+        <ChevronRight className="h-3 w-3" />
+      </Button>
+    </div>
+  );
 }
 
 // ── renderer ────────────────────────────────────────────────────────────────

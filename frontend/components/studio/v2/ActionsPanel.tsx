@@ -634,7 +634,7 @@ function descriptionFor(id: ActionId | null): string {
     case "ai-headshot":
       return "Generate a professional headshot. Download or drop on the canvas.";
     case "original-music":
-      return "Compose original music — step sequencer OR live piano. The result replaces the current music track.";
+      return "Compose original music — step sequencer, live piano, OR the full synth (oscillator stack + filter & effect racks + presets). The result replaces the current music track.";
     case "captions":
       return "Author captions for the composition.";
     case "accessibility":
