@@ -319,6 +319,29 @@ export interface PublishVideoRequest {
   privacyStatus?: "public" | "private" | "unlisted";
 }
 
+// ─── Publication records (#1896) ────────────────────────────────────────────
+// "Where has this project been published?" — one record per destination,
+// mirroring the api `PublicationRecord` (publication-service.ts). `destination`
+// is a shared `PublishDestinationId`; `externalUrl` is the view/preview link
+// (YouTube watch URL, LinkedIn post, on-platform /v/ link).
+
+export const StudioPublicationSchema = z.object({
+  destination: z.string(),
+  externalId: z.string().nullish(),
+  externalUrl: z.string().nullish(),
+  status: z.enum(["published", "failed", "pending"]),
+  publishedAt: z.string(),
+  updatedAt: z.string(),
+});
+export type StudioPublication = z.infer<typeof StudioPublicationSchema>;
+
+export const YouTubePublishResultSchema = z.object({
+  youtubeVideoId: z.string(),
+  youtubeUrl: z.string(),
+  publication: StudioPublicationSchema,
+});
+export type YouTubePublishResult = z.infer<typeof YouTubePublishResultSchema>;
+
 // ─── Published video types ───────────────────────────────────────────────────
 
 // mediaKind + parallel-runtime state shared across every video-typed
@@ -642,6 +665,58 @@ export const studioService = {
       "/api/studio/publish",
       { projectId, ...request, ...(resumeId ? { resumeId } : {}) },
       StudioProjectSchema,
+    );
+  },
+
+  /**
+   * Upload the project's rendered video to the caller's connected YouTube
+   * channel (#1896). The project must already be rendered (have a linked
+   * video); the editor calls this after ensureRendered(). Returns the watch
+   * URL + the recorded publication. Throws with `context.serverCode ===
+   * "YOUTUBE_NOT_CONNECTED"` when the user hasn't linked a channel.
+   */
+  async publishToYouTube(
+    projectId: string,
+    request: PublishVideoRequest,
+  ): Promise<ApiSuccessResponse<YouTubePublishResult>> {
+    return apiClient.post(
+      `/api/studio/projects/${projectId}/publish/youtube`,
+      request,
+      YouTubePublishResultSchema,
+    );
+  },
+
+  /**
+   * List the destinations a project has been published to (one per
+   * destination, with view URLs). Drives the editor's "Published to" surfaces.
+   */
+  async getPublications(
+    projectId: string,
+  ): Promise<ApiSuccessResponse<StudioPublication[]>> {
+    return apiClient.get(
+      `/api/studio/projects/${projectId}/publications`,
+      z.array(StudioPublicationSchema),
+    );
+  },
+
+  /**
+   * Record a publication for a client-completed publish flow (notably
+   * LinkedIn, whose upload finishes in the browser). Server-completed flows
+   * (profile, YouTube) record their own.
+   */
+  async recordPublication(
+    projectId: string,
+    record: {
+      destination: string;
+      externalId?: string | null;
+      externalUrl?: string | null;
+      status?: "published" | "failed" | "pending";
+    },
+  ): Promise<ApiSuccessResponse<StudioPublication>> {
+    return apiClient.post(
+      `/api/studio/projects/${projectId}/publications`,
+      record,
+      StudioPublicationSchema,
     );
   },
 

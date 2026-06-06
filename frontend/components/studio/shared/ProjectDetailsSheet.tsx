@@ -12,7 +12,7 @@
  */
 
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { BarChart3, Loader2, Megaphone, MessageSquare, Plus, Tag } from "lucide-react";
+import { BarChart3, Loader2, Megaphone, MessageSquare, Plus, Send, Tag } from "lucide-react";
 
 import EntityDetailsSheet, {
   type EntityDetailsSection,
@@ -24,9 +24,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useEntityDetailsPermission } from "@/hooks/use-entity-details-permission";
+import PublishedToList from "@/components/studio/v2/PublishedToList";
 import {
   studioService,
   type StudioProject,
+  type StudioPublication,
   type VideoCampaign,
 } from "@/lib/services/studio-service";
 import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
@@ -52,6 +54,17 @@ interface Props {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   noTrigger?: boolean;
+  /** Publication records (#1896) — where this project has been published.
+   *  Supplied by the editor's shared `usePublications` so the drawer and the
+   *  Save menu read the same list (DRY). When omitted/empty the "Published"
+   *  tab self-hides. */
+  publications?: StudioPublication[];
+  /** Re-publish a destination from the drawer's full history. */
+  onRepublish?: (destination: string) => void;
+  /** Destination currently re-publishing — spins that row. */
+  republishing?: string | null;
+  /** Re-read the publication list (after a re-publish fired from here). */
+  onRefreshPublications?: () => void;
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -79,6 +92,10 @@ export default function ProjectDetailsSheet({
   open,
   onOpenChange,
   noTrigger,
+  publications,
+  onRepublish,
+  republishing,
+  onRefreshPublications,
 }: Props) {
   const { toast } = useToast();
   const perms = useEntityDetailsPermission({
@@ -271,8 +288,46 @@ export default function ProjectDetailsSheet({
   const playable = isPublicArtifact(project);
   const mediaKind = effectiveMediaKind(project);
   const kindLabel = MEDIA_KIND_UI[mediaKind].badgeLabel.toLowerCase();
+  const livePublications = (publications ?? []).filter(
+    (p) => p.status === "published",
+  );
 
   const sections: EntityDetailsSection[] = [
+    // "Published" — full history of where the project has gone live, with
+    // View links + Re-publish. Self-gates: the tab only appears once there's
+    // at least one live publication. Same `PublishedToList` the Save menu's
+    // compact section uses (DRY) — this surface just renders the `full`
+    // variant with timestamps. (#1896)
+    ...(livePublications.length > 0
+      ? ([
+          {
+            key: "published",
+            label: "Published",
+            icon: Send,
+            render: () => (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Where this {kindLabel} is live. Open any destination, or
+                  re-publish to push your latest edits.
+                </p>
+                <PublishedToList
+                  publications={livePublications}
+                  variant="full"
+                  onRepublish={
+                    onRepublish
+                      ? (dest) => {
+                          onRepublish(dest);
+                          onRefreshPublications?.();
+                        }
+                      : undefined
+                  }
+                  republishing={republishing}
+                />
+              </div>
+            ),
+          },
+        ] satisfies EntityDetailsSection[])
+      : []),
     {
       key: "metrics",
       label: "Metrics",

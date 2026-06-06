@@ -132,7 +132,16 @@ function rangeKeysFor(field: FilterField): { min: string; max: string } {
   return field.rangeKeys ?? { min: `${field.key}Min`, max: `${field.key}Max` };
 }
 
-export default function HeaderSearch() {
+export interface HeaderSearchProps {
+  /** Fired on every keystroke with the live query. Lets a host page use the
+   *  one global search box as a live filter for its own sections (Studio
+   *  landing) without a second search input. Enter still navigates to the
+   *  context's search page as usual. Absent → header search behaves as the
+   *  pure global-nav search it is everywhere else. */
+  onQueryChange?: (query: string) => void;
+}
+
+export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -335,7 +344,10 @@ export default function HeaderSearch() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onQueryChange?.(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}

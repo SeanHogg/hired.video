@@ -11,6 +11,7 @@ import Pagination from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
 import { Button } from "@/components/ui/button";
 import AddToListMenu from "@/components/lists/AddToListMenu";
+import type { ViewMode } from "@/components/ViewModeToggle";
 import { useAuth } from "@/lib/auth";
 import { useConnectionStatuses } from "@/lib/use-connection-statuses";
 import { createRolePermissions } from "@/lib/role-utils";
@@ -22,7 +23,7 @@ interface DiscoverPeopleGridProps {
   people: PublicUser[];
   isLoading: boolean;
   error: string | null;
-  viewMode: "grid" | "list";
+  viewMode: ViewMode;
   /** When the parent has filtered by a list, the empty-state copy
    *  switches from "no people found" to "no people in this list". */
   isFilteredByList?: boolean;

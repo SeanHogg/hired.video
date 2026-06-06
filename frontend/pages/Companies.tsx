@@ -36,7 +36,7 @@ import HeaderSearch from "@/components/HeaderSearch";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
 import { COMPANIES_HUB_DEFAULT_TAB, COMPANIES_HUB_TABS } from "@/hooks/use-companies-tabs";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
-import ViewModeToggle from "@/components/ViewModeToggle";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import {
   Card,
   CardDescription,
@@ -120,7 +120,7 @@ export default function Companies() {
       location: urlLocation || undefined,
     }));
   }, [urlQuery, urlIndustry, urlSize, urlLocation]);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [companies, setCompanies] = useState<Company[]>([]);
   // Lists filter — same pattern as People/Jobs/Resumes.
   const listIdFromUrl = searchParams.get("list_id");

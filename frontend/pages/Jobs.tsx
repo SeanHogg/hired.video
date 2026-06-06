@@ -118,7 +118,7 @@ import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
 import { useJobsTabs } from "@/hooks/use-jobs-tabs";
-import ViewModeToggle from "@/components/ViewModeToggle";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { recruitService } from "@/lib/services/recruit-service";
 
 // Schemas
@@ -283,7 +283,7 @@ export default function Jobs() {
     setSearchParams(params);
   };
 
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   // Lists filter — same pattern as People page. Null = no filter; Set = restrict.
   const listIdFromUrl = searchParams.get("list_id");

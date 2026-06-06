@@ -44,6 +44,19 @@ import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
 import type { Timeline } from "../../../shared/timeline.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
 import { OptionalUrlSchema, UuidLikeSchema } from "../../../shared/validation.js";
+import {
+  listPublications,
+  recordPublication,
+  removePublication,
+  type PublicationStatus,
+} from "../services/studio/publication-service.js";
+import {
+  publishVideoToYouTube,
+  PublishVideoError,
+  type PublishVideoErrorKind,
+} from "../services/youtube/publishVideoUseCase.js";
+import { youtubeOAuthConfig } from "../services/youtube/youtubeOAuth.js";
+import { PUBLISH_DESTINATIONS } from "../../../shared/media-kinds.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns, resumeInformation } = schema;
 
@@ -2804,8 +2817,190 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
     ? (await db.select().from(videos).where(eq(videos.id, row.videoId)).limit(1))[0] ?? null
     : null;
 
-  return c.json(ok(toProjectDto(updated, linkedVideo)));
+  const dto = toProjectDto(updated, linkedVideo);
+
+  // Record (or clear) the on-platform "profile" publication so the editor's
+  // "Published to" list reflects where the project actually lives. The view
+  // URL is the public /v/<slug|id> link the share-menu also uses.
+  if (isPublish) {
+    await recordPublication({
+      projectId,
+      destination: "profile",
+      externalUrl: `/v/${dto.slug || projectId}`,
+      status: "published",
+    }).catch(() => undefined);
+  } else if (isUnpublish) {
+    await removePublication(projectId, "profile").catch(() => undefined);
+  }
+
+  return c.json(ok(dto));
 });
+
+// ─── Publication records (#1896) ─────────────────────────────────────────────
+// "Where has this project been published?" — one row per destination, served
+// to the editor's Save menu + Details drawer. See publication-service.ts.
+
+const VALID_DESTINATIONS = new Set(PUBLISH_DESTINATIONS.map((d) => d.id));
+const PUBLICATION_STATUSES = ["published", "failed", "pending"] as const;
+
+// Map a YouTube publish use-case error to an HTTP envelope. Mirrors the map
+// in routes/youtube.ts; `NOT_CONNECTED` lets the client offer "connect in
+// Settings" instead of a generic failure toast.
+const YT_PUBLISH_ERROR_HTTP: Record<
+  PublishVideoErrorKind,
+  { status: 400 | 401 | 404 | 409 | 502; code: string }
+> = {
+  VIDEO_NOT_FOUND:       { status: 404, code: "NOT_FOUND" },
+  VIDEO_NOT_READY:       { status: 409, code: "VIDEO_NOT_READY" },
+  ACCOUNT_NOT_CONNECTED: { status: 409, code: "YOUTUBE_NOT_CONNECTED" },
+  AUTH_FAILED:           { status: 401, code: "YOUTUBE_AUTH" },
+  MEDIA_FETCH_FAILED:    { status: 502, code: "MEDIA_FETCH_FAILED" },
+  UPLOAD_FAILED:         { status: 502, code: "YOUTUBE_UPLOAD_FAILED" },
+};
+
+// List a project's publication records (one per destination). Cached read.
+studioRoutes.get("/projects/:projectId/publications", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+  const [row] = await db
+    .select({ id: studioProjects.id, userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, row.userId, row.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+  return c.json(ok(await listPublications(projectId)));
+});
+
+// Generic publication recorder — used by client-completed publish flows
+// (notably LinkedIn, whose multi-step upload finishes in the browser) to
+// persist where the project landed. Server-completed flows (profile,
+// YouTube) record their own publications inline.
+studioRoutes.post("/projects/:projectId/publications", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    destination: z.string().refine((d) => VALID_DESTINATIONS.has(d as any), "Unknown destination"),
+    externalId: z.string().max(512).nullish(),
+    externalUrl: OptionalUrlSchema,
+    status: z.enum(PUBLICATION_STATUSES).optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid publication", parsed.error.flatten()), 400);
+  }
+
+  const db = getDb();
+  const [row] = await db
+    .select({ id: studioProjects.id, userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, row.userId, row.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+
+  const record = await recordPublication({
+    projectId,
+    destination: parsed.data.destination,
+    externalId: parsed.data.externalId ?? null,
+    externalUrl: parsed.data.externalUrl || null,
+    status: (parsed.data.status ?? "published") as PublicationStatus,
+  });
+  return c.json(ok(record), 201);
+});
+
+// Real YouTube upload for the V2 editor. The project must already have a
+// rendered + linked video (videoId) — the editor calls this after
+// ensureRendered(). Uploads the compiled MP4 via the YouTube Data API,
+// persists the youtube id/url onto the video row, and records the
+// publication. Gated on Pro + a connected YouTube channel.
+studioRoutes.post(
+  "/projects/:projectId/publish/youtube",
+  requirePro("YouTube Publishing"),
+  async (c) => {
+    const user = c.var.user;
+    const projectId = c.req.param("projectId");
+    const body = await c.req.json().catch(() => null);
+    const parsed = z.object({
+      title: z.string().min(1).max(100),
+      description: z.string().max(5000).default(""),
+      privacyStatus: z.enum(["public", "private", "unlisted"]).default("unlisted"),
+      tags: z.array(z.string()).max(50).optional(),
+    }).safeParse(body);
+    if (!parsed.success) {
+      return c.json(fail("VALIDATION_ERROR", "Invalid publish metadata", parsed.error.flatten()), 400);
+    }
+
+    const db = getDb();
+    const [project] = await db
+      .select({
+        id: studioProjects.id,
+        userId: studioProjects.userId,
+        companyId: studioProjects.companyId,
+        videoId: studioProjects.videoId,
+      })
+      .from(studioProjects)
+      .where(eq(studioProjects.id, projectId))
+      .limit(1);
+    if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+    try {
+      await assertCanWrite(user.sub, project.userId, project.companyId ?? null);
+    } catch (e) {
+      if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+      throw e;
+    }
+    if (!project.videoId) {
+      return c.json(fail("VIDEO_NOT_READY", "Render the video before publishing to YouTube."), 409);
+    }
+
+    try {
+      // The use case matches the video by (id, ownerUserId); the video row
+      // mirrors the project's owner, so we scope to the project owner — not
+      // the (possibly delegated) actor.
+      const result = await publishVideoToYouTube({
+        userId: project.userId,
+        videoId: project.videoId,
+        meta: {
+          title: parsed.data.title,
+          description: parsed.data.description,
+          privacy: parsed.data.privacyStatus,
+          tags: parsed.data.tags,
+        },
+        oauthConfig: youtubeOAuthConfig(c.env),
+      });
+
+      const publication = await recordPublication({
+        projectId,
+        destination: "youtube",
+        externalId: result.youtubeVideoId,
+        externalUrl: result.youtubeUrl,
+        status: "published",
+      });
+
+      return c.json(ok({ ...result, publication }));
+    } catch (err) {
+      if (err instanceof PublishVideoError) {
+        const { status, code } = YT_PUBLISH_ERROR_HTTP[err.kind];
+        // Deliberately DON'T record a failed publication: the recorder
+        // upserts on (project, destination), so writing a failure would
+        // clobber the URL of a prior successful publish to the same channel.
+        return c.json(fail(code, err.message), status);
+      }
+      throw err;
+    }
+  },
+);
 
 // ─── PATCH /projects/:projectId/visibility ───────────────────────────────────
 // Toggle a published video between public and unlisted.

@@ -53,9 +53,10 @@ import {
 } from "@/lib/studio/visual-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import { studioService, type StudioProject, type StudioPublication } from "@/lib/services/studio-service";
 import { NotFoundError } from "@/lib/errors";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -177,6 +178,7 @@ import type { ImageGenResult } from "@/lib/services/image-gen-engine";
 import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
+import { usePublications } from "@/lib/studio/editor-v2/use-publications";
 import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
 import { useCanvasClipboard } from "@/lib/studio/editor-v2/use-canvas-clipboard";
 import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts";
@@ -1049,6 +1051,11 @@ export default function StudioEditorV2() {
   }, [leftBottomOpen]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const playback = usePreviewPlayback(state);
+  // "Where has this project been published" (#1896) — one fetch shared by the
+  // Save menu + Details drawer; refreshed after each successful publish.
+  const { publications, refresh: refreshPublications } =
+    usePublications(persistedProjectId);
+  const [republishing, setRepublishing] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
@@ -2343,24 +2350,65 @@ export default function StudioEditorV2() {
     return result ?? null;
   }
 
+  // A "View" toast action that opens the published URL. Absolute links
+  // (YouTube / LinkedIn) open in a new tab; the on-platform /v/ link opens
+  // in-app. Returns undefined for an empty URL so the toast omits the action.
+  function viewAction(url: string | null | undefined) {
+    if (!url) return undefined;
+    return (
+      <ToastAction
+        altText="View where it was published"
+        onClick={() => window.open(url, url.startsWith("http") ? "_blank" : "_self")}
+      >
+        View
+      </ToastAction>
+    );
+  }
+
   async function handlePublishToYouTube() {
     const project = await ensureRendered();
     if (!project) return;
+    setRepublishing("youtube");
     try {
-      const res = await studioService.publishVideo(project.id, {
+      // Real upload to the user's connected YouTube channel (#1896). The
+      // server pulls the rendered MP4, uploads via the Data API, persists
+      // the watch URL, and records the publication — so re-publishing the
+      // same project updates the same record (one row per destination).
+      const res = await studioService.publishToYouTube(project.id, {
         title,
         description: "",
         privacyStatus: project.isPublic ? "public" : "unlisted",
       });
-      if (!res.data) throw new Error("Publish failed");
-      setPersistedProject(res.data);
-      toast({ title: t("messages.publishedYouTubeTitle"), description: t("studio.editor.videoLiveDesc") });
-    } catch (err) {
+      const url = res.data?.youtubeUrl;
+      await refreshPublications();
       toast({
-        title: t("messages.publishFailedTitle"),
-        description: err instanceof Error ? err.message : t("errors.unknownError"),
-        variant: "destructive",
+        title: t("messages.publishedYouTubeTitle"),
+        description: url ? "Your video is live on YouTube." : t("studio.editor.videoLiveDesc"),
+        action: viewAction(url),
       });
+    } catch (err) {
+      const code = (err as any)?.context?.serverCode ?? (err as any)?.code;
+      if (code === "YOUTUBE_NOT_CONNECTED") {
+        // Distinct, actionable path: send the user to Settings to link a
+        // channel rather than a generic "publish failed".
+        toast({
+          title: "Connect YouTube first",
+          description: "Link your YouTube channel in Settings, then publish.",
+          action: (
+            <ToastAction altText="Open settings" onClick={() => navigate("/settings")}>
+              Settings
+            </ToastAction>
+          ),
+        });
+      } else {
+        toast({
+          title: t("messages.publishFailedTitle"),
+          description: err instanceof Error ? err.message : t("errors.unknownError"),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setRepublishing(null);
     }
   }
 
@@ -2387,6 +2435,12 @@ export default function StudioEditorV2() {
       );
       if (res.data) {
         setPersistedProject(res.data);
+        // Server records / clears the "profile" publication on this status
+        // flip; reflect it in the shared list.
+        await refreshPublications();
+        const profileUrl = !isOnProfile
+          ? `/v/${res.data.slug || targetId}`
+          : null;
         toast({
           title: isOnProfile
             ? t("studio.editor.removedFromProfileTitle")
@@ -2394,6 +2448,7 @@ export default function StudioEditorV2() {
           description: isOnProfile
             ? t("studio.editor.removedFromProfileDesc")
             : t("studio.editor.publishedProfileDesc"),
+          action: viewAction(profileUrl),
         });
       }
     } catch (err) {
@@ -2409,6 +2464,29 @@ export default function StudioEditorV2() {
     const project = await ensureRendered();
     if (!project) return;
     setLinkedInPublishOpen(true);
+  }
+
+  // Re-publish a destination from the "Published to" list. Maps the
+  // destination id back to its publish handler (the same ones the Save
+  // menu's publish rows fire), so the list reuses the canonical flow rather
+  // than a parallel path. Unknown / unsupported destinations no-op.
+  function handleRepublish(destination: string) {
+    switch (destination) {
+      case "youtube":
+        void handlePublishToYouTube();
+        break;
+      case "linkedin":
+        void handlePublishToLinkedIn();
+        break;
+      case "profile":
+        // Profile re-publish is a no-op when already live; the handler
+        // toggles, so only fire it when the project isn't currently on the
+        // profile (otherwise it would UN-publish).
+        if (persistedProject?.status !== "Published") void handlePublishToProfile();
+        break;
+      default:
+        break;
+    }
   }
 
   // ───── Save / publish
@@ -2627,6 +2705,10 @@ export default function StudioEditorV2() {
               : undefined
           }
           usesTimelineChrome={usesTimelineChrome}
+          publications={publications}
+          onRepublish={handleRepublish}
+          republishing={republishing}
+          onPublicationsChange={refreshPublications}
         />
         {missingProject && (
           <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
@@ -3625,9 +3707,26 @@ export default function StudioEditorV2() {
                     .filter(Boolean)
                     .join(". ")
                     .slice(0, 200)}
-                  onPublished={() => {
+                  onPublished={(postId) => {
                     setLinkedInPublishOpen(false);
-                    toast({ title: "Published to LinkedIn!" });
+                    // LinkedIn's upload finishes in the browser, so record the
+                    // publication from here (server-completed flows record
+                    // their own). #1896.
+                    const postUrl = `https://www.linkedin.com/feed/update/${postId}`;
+                    if (persistedProjectId) {
+                      void studioService
+                        .recordPublication(persistedProjectId, {
+                          destination: "linkedin",
+                          externalId: postId,
+                          externalUrl: postUrl,
+                        })
+                        .then(() => refreshPublications())
+                        .catch(() => undefined);
+                    }
+                    toast({
+                      title: "Published to LinkedIn!",
+                      action: viewAction(postUrl),
+                    });
                   }}
                 />
               </Suspense>
@@ -3674,6 +3773,10 @@ function EditorHeader({
   onToggleAnimationPlay,
   onOpenInvite,
   onExportRoblox,
+  publications,
+  onRepublish,
+  republishing,
+  onPublicationsChange,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -3734,6 +3837,14 @@ function EditorHeader({
    *  shared gate (#936) so non-Timeline kinds (game / image) don't see
    *  scene-shaped controls that don't apply to their runtime. */
   usesTimelineChrome: boolean;
+  /** Publication records (#1896) — passed through to the Save menu's
+   *  "Published to" section and the Details drawer. */
+  publications: StudioPublication[];
+  onRepublish: (destination: string) => void;
+  republishing: string | null;
+  /** Re-read the publication list — handed to the Details drawer so its
+   *  full-history surface refreshes after a publish triggered elsewhere. */
+  onPublicationsChange: () => void;
 }) {
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
@@ -3784,6 +3895,10 @@ function EditorHeader({
           <ProjectDetailsSheet
             project={persistedProject}
             onChange={onProjectChange}
+            publications={publications}
+            onRepublish={onRepublish}
+            republishing={republishing}
+            onRefreshPublications={onPublicationsChange}
           />
         )}
       </div>
@@ -3985,6 +4100,9 @@ function EditorHeader({
               ? { "course-lesson": onPublishAsCourseLesson }
               : {}),
           }}
+          publications={publications}
+          onRepublish={onRepublish}
+          republishing={republishing}
           moreItems={projectChrome.items}
           moreDialogs={projectChrome.dialogs}
         />

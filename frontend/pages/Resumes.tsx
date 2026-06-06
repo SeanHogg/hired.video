@@ -84,7 +84,7 @@ import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import EntityVersionHistoryDialog from "@/components/EntityVersionHistoryDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
-import ViewModeToggle from "@/components/ViewModeToggle";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { downloadResume } from "@/lib/resume-download";
@@ -223,7 +223,7 @@ export default function Resumes() {
       return next;
     });
   }, [urlQuery, urlPrivacy, urlIsMaster]);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   // Lists filter — same pattern as People/Jobs.
   const listIdFromUrl = searchParams.get("list_id");
   const [listMembership, setListMembership] = useState<Set<string> | null>(null);

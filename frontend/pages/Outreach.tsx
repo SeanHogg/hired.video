@@ -29,6 +29,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import { type ViewMode } from "@/components/ViewModeToggle";
 import { usePagination } from "@/components/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -159,11 +160,11 @@ export default function Outreach() {
 
   // Search, view mode, and pagination for content tabs
   const [templatesSearch, setTemplatesSearch] = useState("");
-  const [templatesViewMode, setTemplatesViewMode] = useState<"grid" | "list">("grid");
+  const [templatesViewMode, setTemplatesViewMode] = useState<ViewMode>("grid");
   const [campaignsSearch, setCampaignsSearch] = useState("");
-  const [campaignsViewMode, setCampaignsViewMode] = useState<"grid" | "list">("grid");
+  const [campaignsViewMode, setCampaignsViewMode] = useState<ViewMode>("grid");
   const [contactsSearch, setContactsSearch] = useState("");
-  const [contactsViewMode, setContactsViewMode] = useState<"grid" | "list">("grid");
+  const [contactsViewMode, setContactsViewMode] = useState<ViewMode>("grid");
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);

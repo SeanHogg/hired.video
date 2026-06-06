@@ -52,17 +52,24 @@ interface MediaKindBadgeProps {
   /** Size variant — `sm` for in-thumbnail overlays, `md` for inline use
    *  next to a title row. */
   size?: "sm" | "md";
+  /** Render the chip even for `video`. Surfaces that label EVERY item by
+   *  type (the Studio "My content" list) set this; the default keeps the
+   *  video self-gate so video-heavy carousels don't gain redundant chips. */
+  alwaysShow?: boolean;
 }
 
 export default function MediaKindBadge({
   mediaKind,
   className,
   size = "sm",
+  alwaysShow = false,
 }: MediaKindBadgeProps) {
   // Self-gate: the chooser today is overwhelmingly video, so a "Video"
   // chip on every card adds noise without information. Other kinds DO
   // surface because they're the new + rare case the user needs to notice.
-  if (mediaKind === "video") return null;
+  // `alwaysShow` opts a surface out of the gate when every item must be
+  // typed.
+  if (mediaKind === "video" && !alwaysShow) return null;
   const visual = KIND_VISUAL[mediaKind];
   const label = MEDIA_KIND_UI[mediaKind].badgeLabel;
   const sizing =

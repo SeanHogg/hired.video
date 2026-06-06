@@ -30,7 +30,6 @@ import {
   Eye,
   Globe,
   Pencil,
-  Search,
   ShoppingBag,
   Sparkles,
   Trash2,
@@ -40,7 +39,8 @@ import {
 import { projectVisibilityVisual } from "@/lib/studio/visibility";
 import { Button } from "@/components/ui/button";
 import HeaderSearch from "@/components/HeaderSearch";
-import { Input } from "@/components/ui/input";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
@@ -118,6 +118,12 @@ type TemplateRow =
   | { kind: "builtin"; template: TemplateDef }
   | { kind: "owned"; owned: OwnedTemplate };
 
+// The three layout modes every Studio section offers, in display order.
+// Shared so the Templates + My-content toggles stay identical (DRY) — and
+// the canonical set the "all content surfaces adopt this toggle" gap
+// (#1919) standardizes on.
+const SECTION_VIEW_MODES: ViewMode[] = ["scroll", "grid", "table"];
+
 export default function StudioLanding() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -135,6 +141,18 @@ export default function StudioLanding() {
   // templates-section filters above (a published template isn't the
   // same as a public project).
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all");
+  // Per-section layout mode (Scroll | Grid | Table), persisted to
+  // localStorage via `useViewMode` so the choice survives reloads.
+  const [templatesView, setTemplatesView] = useViewMode(
+    "studio.templates",
+    "scroll",
+    SECTION_VIEW_MODES,
+  );
+  const [contentView, setContentView] = useViewMode(
+    "studio.content",
+    "grid",
+    SECTION_VIEW_MODES,
+  );
   // User's own published templates + claimed/purchased licensed templates.
   // Single source of truth feeding the unified Templates section — both
   // the "All" merged view and the dedicated Created/Purchased filters.
@@ -292,15 +310,19 @@ export default function StudioLanding() {
 
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
+    const q = query.trim().toLowerCase();
     const filtered = projects.filter((p) => {
-      if (visibilityFilter === "public") return p.isPublic === true;
-      if (visibilityFilter === "private") return p.isPublic !== true;
+      if (visibilityFilter === "public" && p.isPublic !== true) return false;
+      if (visibilityFilter === "private" && p.isPublic === true) return false;
+      // The single primary search filters this section too (#1917) — match
+      // on title so typing in the header narrows "My content" live.
+      if (q && !p.title.toLowerCase().includes(q)) return false;
       return true;
     });
     return filtered.sort((a, b) =>
       b.updateDateTime.localeCompare(a.updateDateTime),
     );
-  }, [projects, visibilityFilter]);
+  }, [projects, visibilityFilter, query]);
 
   // Total count BEFORE visibility filter applies — drives the "no
   // matches" vs "no projects yet" branch in the empty state.
@@ -461,8 +483,12 @@ export default function StudioLanding() {
             users routinely missed it there). Page title + description are
             dropped — the chooser body labels itself with the "Templates"
             and "My projects" section headings below. */}
+        {/* Single primary search — the global header search doubles as the
+            live filter for both sections below via `onQueryChange` (#1917),
+            so there's no separate per-section search box. Enter still runs
+            the global "search everything" navigation. */}
         <div className="min-w-0 flex-1">
-          <HeaderSearch />
+          <HeaderSearch onQueryChange={setQuery} />
         </div>
         <div className="flex items-center gap-3">
           {/* Wizard launcher — opens the 3-step "create your first video"
@@ -487,16 +513,11 @@ export default function StudioLanding() {
               Pick a preset — every kind the studio supports ships its own templates — or reuse one you've published or purchased.
             </p>
           </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search templates"
-              className="h-9 pl-9"
-            />
-          </div>
+          <ViewModeToggle
+            value={templatesView}
+            onChange={setTemplatesView}
+            modes={SECTION_VIEW_MODES}
+          />
         </div>
 
         {/* Type + Use-for filter rows — shared with the New-project
@@ -516,6 +537,7 @@ export default function StudioLanding() {
           loading={userTemplatesLoading}
           useForFilter={useForFilter}
           kindFilter={kindFilter}
+          viewMode={templatesView}
           onPickBuiltin={openTemplate}
           onPreviewBuiltin={previewTemplate}
           onPickOwned={openStudioTemplate}
@@ -532,8 +554,15 @@ export default function StudioLanding() {
             "My projects" (was "My videos" pre-#894) because the studio
             now hosts every media kind, not just video. */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-medium">My projects</h2>
-          <WorkspaceSwitcher />
+          <h2 className="text-lg font-medium">My content</h2>
+          <div className="flex items-center gap-3">
+            <ViewModeToggle
+              value={contentView}
+              onChange={setContentView}
+              modes={SECTION_VIEW_MODES}
+            />
+            <WorkspaceSwitcher />
+          </div>
         </div>
         {/* Visibility axis — gates the grid below by `isPublic`. Reuses
             the templates-section FilterPillRow so the visual matches
@@ -588,18 +617,14 @@ export default function StudioLanding() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {sortedProjects.map((project) => (
-              <StudioVideoCard
-                key={project.id}
-                project={project}
-                onOpen={() => openProject(project.id)}
-                onShowDetails={() => setDetailsProject(project)}
-                onRenamed={patchProject}
-                onRequestDelete={() => setDeletingProject(project)}
-              />
-            ))}
-          </div>
+          <StudioContentView
+            projects={sortedProjects}
+            viewMode={contentView}
+            onOpen={openProject}
+            onShowDetails={setDetailsProject}
+            onRenamed={patchProject}
+            onRequestDelete={setDeletingProject}
+          />
         )}
       </section>
       <ProjectDetailsSheet
@@ -746,12 +771,13 @@ function StudioVideoCard({
           <VisibilityIcon className="h-3 w-3" />
           {visibilityLabel}
         </button>
-        {/* Kind badge — bottom-left, mirrors the template-card position
-            so the chooser + "My projects" grid read symmetric. Self-hides
-            when `mediaKind === "video"` — the StudioProject DTO defaults
-            to 'video' for every pre-#894 row. */}
+        {/* Kind badge — bottom-left, mirrors the template-card position so
+            the chooser + "My content" grid read symmetric. `alwaysShow` so
+            EVERY item is typed (including video) per the "each content needs
+            a type pill" requirement (#1917). */}
         <MediaKindBadge
           mediaKind={project.mediaKind ?? "video"}
+          alwaysShow
           className="absolute bottom-2 left-2 z-10"
         />
         {/* Hover overlay — Edit pill takes the user straight into the
@@ -842,6 +868,161 @@ function StudioVideoCard({
 }
 
 /**
+ * My-content view switcher — Scroll / Grid / Table over the user's studio
+ * projects. Scroll + Grid reuse `StudioVideoCard`; Table is a dense rows
+ * view. The active mode is chosen by the section's `<ViewModeToggle>` and
+ * persisted via `useViewMode`.
+ */
+function StudioContentView({
+  projects,
+  viewMode,
+  onOpen,
+  onShowDetails,
+  onRenamed,
+  onRequestDelete,
+}: {
+  projects: StudioProject[];
+  viewMode: ViewMode;
+  onOpen: (id: string) => void;
+  onShowDetails: (project: StudioProject) => void;
+  onRenamed: (next: StudioProject) => void;
+  onRequestDelete: (project: StudioProject) => void;
+}) {
+  if (viewMode === "table") {
+    return (
+      <StudioContentTable
+        projects={projects}
+        onOpen={onOpen}
+        onShowDetails={onShowDetails}
+        onRequestDelete={onRequestDelete}
+      />
+    );
+  }
+  const cards = projects.map((project) => (
+    <StudioVideoCard
+      key={project.id}
+      project={project}
+      onOpen={() => onOpen(project.id)}
+      onShowDetails={() => onShowDetails(project)}
+      onRenamed={onRenamed}
+      onRequestDelete={() => onRequestDelete(project)}
+    />
+  ));
+  if (viewMode === "scroll") {
+    return (
+      <HorizontalScroller itemCount={projects.length}>
+        {projects.map((project, i) => (
+          <div key={project.id} className="w-72 shrink-0 snap-start">
+            {cards[i]}
+          </div>
+        ))}
+      </HorizontalScroller>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      {cards}
+    </div>
+  );
+}
+
+/** Dense table view of "My content" — one row per project with type chip,
+ *  visibility, last-updated, and Edit / Details / Delete actions. */
+function StudioContentTable({
+  projects,
+  onOpen,
+  onShowDetails,
+  onRequestDelete,
+}: {
+  projects: StudioProject[];
+  onOpen: (id: string) => void;
+  onShowDetails: (project: StudioProject) => void;
+  onRequestDelete: (project: StudioProject) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">Name</th>
+            <th className="px-3 py-2 font-medium">Type</th>
+            <th className="px-3 py-2 font-medium">Visibility</th>
+            <th className="px-3 py-2 font-medium">Updated</th>
+            <th className="px-3 py-2 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map((project) => {
+            const { Icon: VisibilityIcon, label: visibilityLabel } =
+              projectVisibilityVisual(project.isPublic);
+            return (
+              <tr
+                key={project.id}
+                className="border-b border-border last:border-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpen(project.id)}
+                    className="font-medium hover:text-brand-purple"
+                  >
+                    {project.title}
+                  </button>
+                </td>
+                <td className="px-3 py-2">
+                  <MediaKindBadge
+                    mediaKind={project.mediaKind ?? "video"}
+                    alwaysShow
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <VisibilityIcon className="h-3.5 w-3.5" />
+                    {visibilityLabel}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {new Date(project.updateDateTime).toLocaleDateString()}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onOpen(project.id)}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onShowDetails(project)}
+                    >
+                      <Globe className="mr-1 h-3.5 w-3.5" />
+                      Details
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRequestDelete(project)}
+                      aria-label={`Delete ${project.title}`}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
  * Single carousel that renders the consolidated Templates section —
  * built-in catalog rows and user-owned rows live side-by-side in one
  * horizontal scroller, gated by the same filter pills above. Owned rows
@@ -853,6 +1034,7 @@ function UnifiedTemplateCarousel({
   loading,
   useForFilter,
   kindFilter,
+  viewMode,
   onPickBuiltin,
   onPreviewBuiltin,
   onPickOwned,
@@ -862,6 +1044,7 @@ function UnifiedTemplateCarousel({
   loading: boolean;
   useForFilter: TemplateUseForFilter;
   kindFilter: TemplateKindFilter;
+  viewMode: ViewMode;
   onPickBuiltin: (id: string) => void;
   onPreviewBuiltin: (id: ContentTemplate) => void;
   onPickOwned: (template: StudioTemplate) => void;
@@ -906,34 +1089,146 @@ function UnifiedTemplateCarousel({
       </div>
     );
   }
+  const rowKey = (row: TemplateRow) =>
+    row.kind === "builtin"
+      ? `builtin:${row.template.id}`
+      : `owned:${row.owned.provenance}:${row.owned.template.id}`;
+  const renderCard = (row: TemplateRow) =>
+    row.kind === "builtin" ? (
+      <BuiltinTemplateCard
+        template={row.template}
+        onPick={onPickBuiltin}
+        onPreview={onPreviewBuiltin}
+      />
+    ) : (
+      <OwnedTemplateCard
+        owned={row.owned}
+        onPick={onPickOwned}
+        onPreview={onPreviewOwned}
+      />
+    );
+
+  if (viewMode === "table") {
+    return (
+      <TemplateTable
+        rows={rows}
+        onPickBuiltin={onPickBuiltin}
+        onPreviewBuiltin={onPreviewBuiltin}
+        onPickOwned={onPickOwned}
+        onPreviewOwned={onPreviewOwned}
+      />
+    );
+  }
+  if (viewMode === "grid") {
+    return (
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {rows.map((row) => (
+          <div key={rowKey(row)}>{renderCard(row)}</div>
+        ))}
+      </div>
+    );
+  }
   return (
     <HorizontalScroller itemCount={rows.length}>
-      {rows.map((row) =>
-        row.kind === "builtin" ? (
-          <div
-            key={`builtin:${row.template.id}`}
-            className="w-60 shrink-0 snap-start"
-          >
-            <BuiltinTemplateCard
-              template={row.template}
-              onPick={onPickBuiltin}
-              onPreview={onPreviewBuiltin}
-            />
-          </div>
-        ) : (
-          <div
-            key={`owned:${row.owned.provenance}:${row.owned.template.id}`}
-            className="w-60 shrink-0 snap-start"
-          >
-            <OwnedTemplateCard
-              owned={row.owned}
-              onPick={onPickOwned}
-              onPreview={onPreviewOwned}
-            />
-          </div>
-        ),
-      )}
+      {rows.map((row) => (
+        <div key={rowKey(row)} className="w-60 shrink-0 snap-start">
+          {renderCard(row)}
+        </div>
+      ))}
     </HorizontalScroller>
+  );
+}
+
+/**
+ * Dense table view of the Templates section. Same rows + handlers as the
+ * scroller/grid; one row per template with kind chip + Use/Preview actions.
+ */
+function TemplateTable({
+  rows,
+  onPickBuiltin,
+  onPreviewBuiltin,
+  onPickOwned,
+  onPreviewOwned,
+}: {
+  rows: TemplateRow[];
+  onPickBuiltin: (id: string) => void;
+  onPreviewBuiltin: (id: ContentTemplate) => void;
+  onPickOwned: (template: StudioTemplate) => void;
+  onPreviewOwned: (template: StudioTemplate) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">Name</th>
+            <th className="px-3 py-2 font-medium">Type</th>
+            <th className="px-3 py-2 font-medium">Source</th>
+            <th className="px-3 py-2 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            // Inline-narrow the discriminated union into one normalized
+            // cell shape so the row markup is written once.
+            const cells =
+              row.kind === "builtin"
+                ? {
+                    key: `builtin:${row.template.id}`,
+                    name: row.template.label,
+                    mediaKind: row.template.mediaKind,
+                    source: "Starter",
+                    canPreview: true,
+                    onUse: () => onPickBuiltin(row.template.id),
+                    onPreview: () => onPreviewBuiltin(row.template.id),
+                  }
+                : {
+                    key: `owned:${row.owned.provenance}:${row.owned.template.id}`,
+                    name: row.owned.template.name,
+                    mediaKind: row.owned.template.mediaKind,
+                    source: PROVENANCE_BADGE[row.owned.provenance].label,
+                    canPreview: row.owned.template.visibility !== "private",
+                    onUse: () => onPickOwned(row.owned.template),
+                    onPreview: () => onPreviewOwned(row.owned.template),
+                  };
+            return (
+              <tr
+                key={cells.key}
+                className="border-b border-border last:border-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={cells.onUse}
+                    className="font-medium hover:text-brand-purple"
+                  >
+                    {cells.name}
+                  </button>
+                </td>
+                <td className="px-3 py-2">
+                  <MediaKindBadge mediaKind={cells.mediaKind} alwaysShow />
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">{cells.source}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={cells.onUse}>
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      Use
+                    </Button>
+                    {cells.canPreview && (
+                      <Button variant="ghost" size="sm" onClick={cells.onPreview}>
+                        <Eye className="mr-1 h-3.5 w-3.5" />
+                        Preview
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

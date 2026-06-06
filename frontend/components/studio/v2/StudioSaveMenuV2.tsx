@@ -36,9 +36,6 @@ import {
   Check,
   Download,
   Loader2,
-  Share2,
-  Upload,
-  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,50 +47,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
+import PublishedToList from "@/components/studio/v2/PublishedToList";
+import { destinationIcon } from "@/lib/studio/publish-destination-meta";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import type { StudioPublication } from "@/lib/services/studio-service";
 import {
   MEDIA_KIND_UI,
   publishDestinationsFor,
   type MediaKind,
   type PublishDestinationId,
 } from "@shared/media-kinds";
-
-/** Icon mapping per publish destination — kept here (next to the only
- *  consumer) rather than in @shared/media-kinds because lucide is a
- *  frontend-only dep. ONE record drives the menu visual. */
-const DESTINATION_ICON: Record<PublishDestinationId, React.ComponentType<{ className?: string }>> = {
-  youtube:                Upload,
-  linkedin:               Share2,
-  profile:                UserCheck,
-  rss:                    Upload,
-  "apple-podcasts":       Upload,
-  "spotify-creators":     Upload,
-  "voice-marketplace":    Share2,
-  "profile-audio-embed":  UserCheck,
-  giphy:                  Share2,
-  tenor:                  Share2,
-  "r2-host":              Share2,
-  // Game (#927) — itch.io / GitHub Pages / embed on hired.video.
-  "itch-io":              Upload,
-  "github-pages":         Upload,
-  "game-web-embed":       Share2,
-  // Comic (#929) — hired.video reader is the canonical surface;
-  // Webtoon / Tapas are platform-specific distribution channels.
-  "comic-reader":         UserCheck,
-  "webtoon-feed":         Upload,
-  "tapas-feed":           Upload,
-  // Image (#932) — profile-gallery is the in-app surface; asset-library
-  // is the closed-loop interop drop (#933 — image lands in user's R2
-  // assets, importable into any other studio project).
-  "profile-gallery":      UserCheck,
-  "asset-library":        UserCheck,
-  // CAD (#930) — same shape as image's gallery + asset-library.
-  "cad-gallery":          UserCheck,
-  "cad-asset-library":    UserCheck,
-  // Training / e-learning (#160) — opens a course/lesson picker.
-  "course-lesson":        Upload,
-};
 
 type PublishHandlers = Partial<Record<PublishDestinationId, () => void>>;
 
@@ -128,6 +92,17 @@ interface StudioSaveMenuV2Props {
    *  pass `canPublishToYouTube`; the menu derives from
    *  `publishDestinationsFor(mediaKind)` and looks up handlers by id. */
   publishHandlers?: PublishHandlers;
+  /** Where this project has already been published (#1896). Drives the
+   *  "Published to" section at the top of the dropdown — each row links to
+   *  the live destination + offers Re-publish. Self-gates: the section
+   *  hides when empty. The editor fetches these once via `usePublications`
+   *  and shares them with the Details drawer (DRY). */
+  publications?: StudioPublication[];
+  /** Re-publish a destination from the "Published to" list. Called with the
+   *  destination id; the editor maps it back to the right publish handler. */
+  onRepublish?: (destination: string) => void;
+  /** Destination id currently re-publishing — spins that row. */
+  republishing?: string | null;
   /** Project-lifecycle rows (clone / delete / templates) rendered as a
    *  "More" group at the bottom of the dropdown — supplied by
    *  `useProjectChrome().items`. When absent the group doesn't render.
@@ -154,6 +129,9 @@ export default function StudioSaveMenuV2({
   onExport,
   exporting,
   publishHandlers,
+  publications,
+  onRepublish,
+  republishing,
   moreItems,
   moreDialogs,
   className,
@@ -212,6 +190,27 @@ export default function StudioSaveMenuV2({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
+          {/* "Published to" — where this project already lives, with View
+              links + Re-publish. Self-gates: PublishedToList returns null
+              when there are no live publications, so drafts / never-published
+              projects don't see an empty section. Wrapped so the divider only
+              shows alongside it. */}
+          {publications && publications.some((p) => p.status === "published") && (
+            <>
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Published to
+              </DropdownMenuLabel>
+              <div className="px-1 pb-1">
+                <PublishedToList
+                  publications={publications}
+                  variant="compact"
+                  onRepublish={onRepublish}
+                  republishing={republishing}
+                />
+              </div>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Export
           </DropdownMenuLabel>
@@ -295,7 +294,7 @@ export default function StudioSaveMenuV2({
             return (
               <PublishItem
                 key={dest.id}
-                icon={DESTINATION_ICON[dest.id]}
+                icon={destinationIcon(dest.id)}
                 label={baseLabel}
                 onClick={publishHandlers?.[dest.id]}
                 hasVideo={hasVideo}

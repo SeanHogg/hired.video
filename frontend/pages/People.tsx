@@ -107,7 +107,7 @@ import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
-import ViewModeToggle from "@/components/ViewModeToggle";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { UserRole } from "@shared/user-roles";
 import { visibleTo } from "@/lib/persona";
@@ -196,7 +196,7 @@ export default function People() {
       location: urlLocation || undefined,
     }));
   }, [urlQuery, urlRole, urlSkills, urlOpenToWork, urlLocation]);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [people, setPeople] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Lists filter: when ?list_id=X is on the URL, restrict displayed people to
