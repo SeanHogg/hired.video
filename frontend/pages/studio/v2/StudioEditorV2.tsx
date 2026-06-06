@@ -146,6 +146,9 @@ import {
 import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeData } from "@/types/resume";
 import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
+import { printDocument } from "@/lib/studio/document/print-document";
+import { articleService } from "@/lib/services/article-service";
+import { documentToArticle } from "@/lib/studio/document/document-to-article";
 import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
 import { type ImageState, createBlankImageState, findLayer as findImageLayer, makeVectorLayer, makeTextLayer } from "@shared/image-state";
 import { spillLayersIfNeeded } from "@/lib/studio/drawing/layer-r2-spill";
@@ -2284,6 +2287,19 @@ export default function StudioEditorV2() {
    *  on demand (flattenImage for image kind, renderTimeline for the
    *  Timeline kinds). */
   async function handleExport() {
+    // Document export is a browser print → Save as PDF of the read-only
+    // DocumentView (#1912), not a Blob render — "preview === render === print".
+    if (currentMediaKind === "document") {
+      const ok = printDocument(documentState, documentEntityContent, title);
+      if (!ok) {
+        toast({
+          title: "Couldn't open the print view",
+          description: "Allow pop-ups for this site, then try Export again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     setExporting(true);
     try {
       const blob = await exportProjectByKind({
@@ -2608,20 +2624,61 @@ export default function StudioEditorV2() {
       // write the edited content to the resume — creating the row on first
       // save — and stamp its id onto DocumentState so reads re-bind. The
       // DocumentState (layout/structure) itself persists via the slice below.
+      // Document content persistence (#1916/#1920/#1914) — entity-aware. The
+      // DocumentState (layout) persists via the slice below regardless; here we
+      // sync the document's CONTENT into its entity row so the document also
+      // exists in that entity's system (resume / articles).
       let documentStateForSave = documentState;
-      if (currentMediaKind === "document" && documentEntityContent) {
+      if (currentMediaKind === "document") {
         try {
-          if (documentState.entityId) {
-            await resumeService.updateResumeData(documentState.entityId, {
-              data: documentEntityContent,
-            });
-          } else {
-            const createdResume = await resumeService.createResume({
-              title,
-              data: documentEntityContent,
-            });
-            documentStateForSave = { ...documentState, entityId: createdResume.id };
-            setDocumentState(() => documentStateForSave);
+          if (documentState.entityKind === "resume" && documentEntityContent) {
+            // Resume: content lives in `resume_information`. Snapshot the canvas
+            // LAYOUT onto `content.meta.documentLayout` (ResumeMetaSchema is
+            // `.catchall`) so /resumes/:id renders it via <DocumentView>.
+            const contentForSave = {
+              ...documentEntityContent,
+              meta: {
+                ...((documentEntityContent.meta ?? {}) as Record<string, unknown>),
+                documentLayout: documentState,
+              },
+            } as ResumeData;
+            if (documentState.entityId) {
+              await resumeService.updateResumeData(documentState.entityId, {
+                data: contentForSave,
+              });
+            } else {
+              const createdResume = await resumeService.createResume({
+                title,
+                data: contentForSave,
+                isMaster: true,
+                isActive: true,
+              });
+              documentStateForSave = { ...documentState, entityId: createdResume.id };
+              setDocumentState(() => documentStateForSave);
+            }
+          } else if (
+            documentState.entityKind === "article" ||
+            documentState.entityKind === "blog"
+          ) {
+            // Article / blog (#1914): the canvas blocks are the source; derive a
+            // title + markdown body and upsert an `articles` row so the
+            // document enters the articles system (draft).
+            const { title: derivedTitle, bodyMd } = documentToArticle(documentState);
+            const articleTitle = derivedTitle || title;
+            if (documentState.entityId) {
+              await articleService.update(documentState.entityId, {
+                title: articleTitle,
+                bodyMd,
+              });
+            } else {
+              const createdArticle = await articleService.create({
+                title: articleTitle,
+                bodyMd,
+                kind: "article",
+              });
+              documentStateForSave = { ...documentState, entityId: createdArticle.id };
+              setDocumentState(() => documentStateForSave);
+            }
           }
         } catch (err) {
           toast({

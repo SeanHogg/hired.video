@@ -11,6 +11,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import type { ResumeData } from "@/types/resume";
 import {
+  BASICS_FIELDS,
   resumeSectionSchema,
   type ResumeSectionSchema,
   type SectionFieldDef,
@@ -34,6 +35,10 @@ function writeItems(content: ResumeData, sectionKey: string, items: Item[]): Res
 }
 
 export default function SectionEditor({ sectionKey, content, onChange }: SectionEditorProps) {
+  // `basics` is an object, not an array — render the object editor.
+  if (sectionKey === "basics") {
+    return <BasicsEditor content={content} onChange={onChange} />;
+  }
   const schema = resumeSectionSchema(sectionKey);
   if (!schema) return null;
   const items = itemsFor(content, sectionKey);
@@ -164,6 +169,38 @@ function FieldInput({
         placeholder={field.type === "date" ? "YYYY-MM" : undefined}
         className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
       />
+    </div>
+  );
+}
+
+/** Object editor for the resume `basics` (name / title / contact / summary) —
+ *  the header block. Distinct from the array-based section editor; writes the
+ *  whole `basics` object back through `onChange`. */
+function BasicsEditor({
+  content,
+  onChange,
+}: {
+  content: ResumeData;
+  onChange: (next: ResumeData) => void;
+}) {
+  const basics = ((content as unknown as Record<string, unknown>).basics ??
+    {}) as Record<string, unknown>;
+  const setField = (key: string, value: unknown) => {
+    onChange({
+      ...(content as object),
+      basics: { ...basics, [key]: value },
+    } as unknown as ResumeData);
+  };
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {BASICS_FIELDS.map((field) => (
+        <FieldInput
+          key={field.key}
+          field={field}
+          value={basics[field.key]}
+          onChange={(v) => setField(field.key, v)}
+        />
+      ))}
     </div>
   );
 }

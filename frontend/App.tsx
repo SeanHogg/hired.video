@@ -198,6 +198,19 @@ function LegacyViewerRedirect() {
   return <Navigate to={`/resumes/${id}${qs ? "?" + qs : ""}`} replace />;
 }
 
+// Resume editing moved into the Studio document canvas (#1912/#1915). The
+// legacy /resumes/edit/:id form route redirects, opening that resume on the
+// canvas via the ?editResume deep-link (StudioLanding fetches its content).
+function ResumeEditRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return (
+    <Navigate
+      to={`/studio?editResume=${encodeURIComponent(id ?? "")}`}
+      replace
+    />
+  );
+}
+
 // Creator profiles live on /people/:id under the Services tab now —
 // they're People with a Creator badge, not a separate surface.
 function CreatorPublicProfileRedirect() {
@@ -231,7 +244,6 @@ function ServicesPitchDeckRedirect() {
   return <Navigate to={`/people/pitch-decks/${id}`} replace />;
 }
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
-const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
 const StudioProjectRoute = lazy(() =>
   import("./pages/studio/Studio").then((mod) => ({ default: mod.StudioProjectRoute })),
@@ -741,7 +753,7 @@ const App = () => (
                       />
                       <Route
                         path="/resumes/edit/:id"
-                        element={<ResumeEditPage />}
+                        element={<ResumeEditRedirect />}
                       />
                       <Route path="/resumes/VIEWER/:id" element={<LegacyViewerRedirect />} />
                       <Route path="/resumes/sample" element={<LegacySampleRedirect />} />

@@ -62,6 +62,7 @@ const FREE_CONTENT_PRESETS: DocumentBlockPreset[] = [
  * same way the read-only resume does.
  */
 export const RESUME_BLOCK_PRESETS: DocumentBlockPreset[] = [
+  { kind: "section", label: "Header", sectionKey: "basics", layout: "compact" },
   { kind: "section", label: "Work Experience", sectionKey: "work", layout: "timeline" },
   { kind: "section", label: "Education", sectionKey: "education", layout: "timeline" },
   { kind: "section", label: "Skills", sectionKey: "skills", layout: "grid" },

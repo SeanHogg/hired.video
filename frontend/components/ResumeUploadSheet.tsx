@@ -13,7 +13,8 @@ import type { ResumeUploadResponse } from "@/types/resume";
 interface ResumeUploadSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called after a successful upload — receives the response. If omitted, navigates to /resumes/edit/:id */
+  /** Called after a successful upload — receives the response. If omitted,
+   *  opens the resume on the Studio document canvas (#1915). */
   onSuccess?: (response: ResumeUploadResponse) => void;
   /** Pre-fill the dropzone when the sheet opens. Lets parents collect a file
    *  via their own drag-drop affordance (e.g. ResumeEmptyDropzone) and hand
@@ -34,7 +35,7 @@ export default function ResumeUploadSheet({
     if (onSuccess) {
       onSuccess(response);
     } else {
-      navigate(`/resumes/edit/${response.id}`);
+      navigate(`/studio?editResume=${response.id}`);
     }
   };
 

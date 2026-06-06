@@ -58,6 +58,10 @@ import TemplateCatalogFilters, {
 import { CategoryPill, FilterPillRow } from "@/components/studio/shared/FilterPills";
 import { slugToBuiltinId, studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import { resumeService } from "@/lib/services/resume-service";
+import { articleService } from "@/lib/services/article-service";
+import { createResumeDocumentState } from "@/lib/studio/editor-v2/document-state";
+import { articleToDocumentState } from "@/lib/studio/document/document-from-article";
 import {
   studioTemplatesService,
   type LicensedStudioTemplate,
@@ -204,6 +208,68 @@ export default function StudioLanding() {
         { replace: true },
       );
     };
+
+    // Open an EXISTING resume on the document canvas (#1915 — resume edit
+    // moved into the studio). Fetch the resume, seed a document bound to its
+    // id with blocks for every populated section, and mint the project.
+    const editResumeId = searchParams.get("editResume");
+    if (editResumeId) {
+      void (async () => {
+        try {
+          const resume = await resumeService.getResumeById(editResumeId);
+          const content = (resume.content ?? {}) as Record<string, unknown>;
+          const populated = Object.keys(content).filter(
+            (k) => Array.isArray(content[k]) && (content[k] as unknown[]).length > 0,
+          );
+          const docState = createResumeDocumentState(
+            editResumeId,
+            populated,
+            () => crypto.randomUUID(),
+          );
+          const created = await create({
+            kind: "document",
+            documentState: docState,
+            name: resume.title || "Resume",
+          });
+          navigateToProject(created);
+        } catch (err) {
+          toast({
+            title: "Couldn't open resume",
+            description: err instanceof Error ? err.message : "Unknown error",
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
+    }
+
+    // Open an EXISTING article/blog on the document canvas (#1914) — fetch it,
+    // convert its markdown body to blocks, and mint a document bound to its id.
+    const editArticleId = searchParams.get("editArticle");
+    if (editArticleId) {
+      void (async () => {
+        try {
+          const article = await articleService.getMine(editArticleId);
+          const docState = articleToDocumentState(
+            { id: article.id, title: article.title, bodyMd: article.bodyMd },
+            () => crypto.randomUUID(),
+          );
+          const created = await create({
+            kind: "document",
+            documentState: docState,
+            name: article.title || "Article",
+          });
+          navigateToProject(created);
+        } catch (err) {
+          toast({
+            title: "Couldn't open article",
+            description: err instanceof Error ? err.message : "Unknown error",
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
+    }
 
     const contentTemplateSlug = searchParams.get("contentTemplate");
     if (contentTemplateSlug) {

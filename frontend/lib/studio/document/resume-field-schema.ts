@@ -48,6 +48,17 @@ function schema(
   return { sectionKey, label, itemNoun, fields, newItem: () => blank(fields) };
 }
 
+/** `basics` is an OBJECT (not an array) — name / title / contact / summary.
+ *  `SectionEditor` special-cases it; the fields drive that object editor. */
+export const BASICS_FIELDS: SectionFieldDef[] = [
+  { key: "name", label: "Full name", type: "text" },
+  { key: "label", label: "Title", type: "text" },
+  { key: "email", label: "Email", type: "text" },
+  { key: "phone", label: "Phone", type: "text" },
+  { key: "url", label: "Website", type: "text" },
+  { key: "summary", label: "Summary", type: "textarea" },
+];
+
 const WORK_FIELDS: SectionFieldDef[] = [
   { key: "position", label: "Title", type: "text" },
   { key: "name", label: "Company", type: "text" },
@@ -70,6 +81,10 @@ const EDUCATION_FIELDS: SectionFieldDef[] = [
  *  offers inline editing only for sections present here; others fall back to
  *  the read-only summary. */
 export const RESUME_SECTION_SCHEMAS: Record<string, ResumeSectionSchema> = {
+  // `basics` is object-shaped — its presence here makes the block editable
+  // (the gate checks `resumeSectionSchema`); SectionEditor renders the object
+  // editor from BASICS_FIELDS rather than the array item list.
+  basics: schema("basics", "Basics", "field", BASICS_FIELDS),
   work: schema("work", "Work Experience", "role", WORK_FIELDS),
   education: schema("education", "Education", "school", EDUCATION_FIELDS),
   volunteer: schema("volunteer", "Volunteer", "role", [

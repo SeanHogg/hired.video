@@ -46,6 +46,7 @@ import {
 } from "@/lib/studio/editor-v2/canvas-state";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
 import { comicSpecToCanvas } from "@/lib/studio/editor-v2/comic-spec-to-canvas";
+import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
 import { seedTemplate } from "@/lib/studio/template-dispatch";
 import {
   getTemplate,
@@ -68,7 +69,12 @@ export type CreateStudioDraftInput =
    *  project server-side and land users on `/studio/<real-id>` instead
    *  of the legacy `/studio/new` sentinel. Optional `subjects` pre-links
    *  source entities (resume / job / company) on the first save. */
-  | { kind: "blank"; name?: string; subjects?: StudioSubject[] };
+  | { kind: "blank"; name?: string; subjects?: StudioSubject[] }
+  /** Document project (#1912) created from a fully-formed `DocumentState` —
+   *  used to open an EXISTING entity (e.g. a resume) on the paged canvas with
+   *  `documentState.entityId` already bound. Distinct from `template` (which
+   *  seeds a fresh blank document via the catalog). */
+  | { kind: "document"; documentState: DocumentState; name?: string };
 
 interface Opts {
   /** Fires once after a successful save, BEFORE navigate. Useful for
@@ -130,6 +136,14 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           ...(seed.gameState !== undefined ? { gameState: seed.gameState } : {}),
           ...(seed.imageState !== undefined ? { imageState: seed.imageState } : {}),
           ...(seed.animationState !== undefined ? { animationState: seed.animationState } : {}),
+          // Non-Timeline seed fields were previously dropped here, so a
+          // cad / cad_3d / document template's seeded state was lost on
+          // create and the editor had to re-seed blank. Carry them through
+          // so a template that ships pre-arranged content (e.g. a document
+          // design template's blocks) persists from first save.
+          ...(seed.cadState !== undefined ? { cadState: seed.cadState } : {}),
+          ...(seed.cad3dState !== undefined ? { cad3dState: seed.cad3dState } : {}),
+          ...(seed.documentState !== undefined ? { documentState: seed.documentState } : {}),
         });
         return finalise(res.data);
       }
@@ -163,6 +177,19 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           kind: projectKind,
           mediaKind: "comic",
           timelineSpec,
+        });
+        return finalise(res.data);
+      }
+      if (input.kind === "document") {
+        // Open an existing entity on the paged canvas — the DocumentState
+        // already carries `entityId` so the editor fetches + writes back that
+        // row's content. Storage `kind: "scene"` (non-Timeline runtime) +
+        // mediaKind "document" → <CanvasRouter> mounts <DocumentStage>.
+        const res = await studioService.saveDraft({
+          name: input.name || "New document",
+          kind: "scene",
+          mediaKind: "document",
+          documentState: input.documentState,
         });
         return finalise(res.data);
       }

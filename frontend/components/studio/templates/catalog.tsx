@@ -73,6 +73,10 @@ export type ContentTemplate =
   // Distinct from the "job_ad" VIDEO template below; opens <DocumentStage>
   // with the job design templates instead of the timeline.
   | "job_doc"
+  // Article / blog DOCUMENTS (#1914) — mediaKind "document". Authored from
+  // free-content blocks on the paged canvas.
+  | "article_doc"
+  | "blog_doc"
   | "personal_brand"
   | "skills_demo"
   | "code_walkthrough"
@@ -483,6 +487,45 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     documentEntityKind: "job",
     audiences: ["recruiter", "employer"],
     defaultName: "New Job Posting",
+    defaultPrompt: "",
+    firstTabLabel: "Document",
+    IntakeForm: BasicIntake,
+  },
+  {
+    // Article DOCUMENT (#1914) — mediaKind "document", entity "article".
+    // Authored from free-content blocks (text / image / divider) on the
+    // paged canvas; persists via the document runtime. Distinct from the
+    // creator article editor.
+    id: "article_doc",
+    label: "Article (Document)",
+    desc: "Write an article on the canvas — text, images, and dividers on a print-ready page; export PDF.",
+    icon: ScrollText,
+    importMode: "none",
+    purpose: "basic",
+    category: "showcase",
+    mediaKind: "document",
+    documentEntityKind: "article",
+    audiences: ["creator"],
+    defaultName: "New Article",
+    defaultPrompt: "",
+    firstTabLabel: "Document",
+    IntakeForm: BasicIntake,
+  },
+  {
+    // Blog post DOCUMENT (#1914) — mediaKind "document", entity "blog".
+    // Same free-content authoring as article; the entity axis differs so the
+    // save / publish target can diverge later.
+    id: "blog_doc",
+    label: "Blog Post (Document)",
+    desc: "Draft a blog post on the canvas — free-form text and images on a page; export PDF.",
+    icon: BookOpen,
+    importMode: "none",
+    purpose: "basic",
+    category: "showcase",
+    mediaKind: "document",
+    documentEntityKind: "blog",
+    audiences: ["creator"],
+    defaultName: "New Blog Post",
     defaultPrompt: "",
     firstTabLabel: "Document",
     IntakeForm: BasicIntake,

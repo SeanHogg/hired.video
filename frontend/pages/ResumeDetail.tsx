@@ -24,6 +24,9 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import DocumentView from "@/components/studio/document/DocumentView";
+import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
+import type { ResumeData } from "@/types/resume";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import MetadataModal from "@/components/MetadataModal";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
@@ -523,7 +526,7 @@ export default function ResumeDetail() {
                     variant="outline"
                     size="sm"
                     className="h-7 px-2"
-                    onClick={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onClick={() => navigate(`/studio?editResume=${resume.id}`)}
                     aria-label={t("labels.resumeDetail.editResume")}
                     title={t("labels.resumeDetail.editResume")}
                   >
@@ -680,7 +683,7 @@ export default function ResumeDetail() {
                     isActive={resume.isActive}
                     isMaster={resume.isMaster}
                     parentId={resume.parentId}
-                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onEdit={() => navigate(`/studio?editResume=${resume.id}`)}
                     onRename={perms.canRename ? () => setRenameOpen(true) : undefined}
                     onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.content.metaData || [] })}
                     onShare={() => setShareOpen(true)}
@@ -746,15 +749,33 @@ export default function ResumeDetail() {
           {resume && (
             <div className="flex">
               <div className="flex-1 min-w-0">
-                <DeclarativeResumeRenderer
-                  resume={resume}
-                  descriptor={descriptor}
-                  videoSlot={<VideoSlot items={videoItems} />}
-                  isOwner={isOwner}
-                  onEditSection={(key) =>
-                    navigate(`/resumes/edit/${resume.id}?section=${encodeURIComponent(key)}`)
-                  }
-                />
+                {(() => {
+                  // If the resume was authored on the Studio document canvas,
+                  // render its saved LAYOUT read-only (preview === render ===
+                  // view, #1912). Falls back to the declarative template
+                  // renderer for resumes without a canvas layout.
+                  const layout = (
+                    resume.content?.meta as Record<string, unknown> | undefined
+                  )?.documentLayout as DocumentState | undefined;
+                  return layout ? (
+                    <div className="flex justify-center py-6">
+                      <DocumentView
+                        state={layout}
+                        content={resume.content as unknown as ResumeData}
+                      />
+                    </div>
+                  ) : (
+                    <DeclarativeResumeRenderer
+                      resume={resume}
+                      descriptor={descriptor}
+                      videoSlot={<VideoSlot items={videoItems} />}
+                      isOwner={isOwner}
+                      onEditSection={() =>
+                        navigate(`/studio?editResume=${resume.id}`)
+                      }
+                    />
+                  );
+                })()}
                 <div className="px-4 sm:px-6 pb-8">
                   <SkillNetwork
                     resumeData={resume.content}

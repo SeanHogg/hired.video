@@ -31,7 +31,6 @@ import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import WatchFeaturedVideoButton from "@/components/WatchFeaturedVideoButton";
-import ResumeBuilder from "@/components/ResumeBuilder";
 import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import ResumeUploadSheet from "@/components/ResumeUploadSheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -94,7 +93,6 @@ import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Resume,
-  CreateResumeRequest,
   UpdateResumeRequest,
   ResumeUploadResponse,
   ResumeWithOwnership,
@@ -130,7 +128,7 @@ export default function Resumes() {
   const navigate = useNavigate();
 
   // State management
-  const [view, setView] = useState<"list" | "builder" | "viewer">("list");
+  const [view, setView] = useState<"list" | "viewer">("list");
   const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
@@ -399,35 +397,9 @@ export default function Resumes() {
   };
 
   const handleUploadSuccess = (response: ResumeUploadResponse) => {
-    // Navigate directly to edit mode after upload
-    navigate(`/resumes/edit/${response.id}`);
-  };
-
-  const handleCreateResume = async (request: CreateResumeRequest) => {
-    try {
-      // Create via service; include slug if provided
-      const created = await resumeService.createResume({
-        title: request.title,
-        data: request.content as any,
-        privacy: request.privacy,
-        isMaster: request.isMaster,
-        isActive: request.isActive,
-      });
-
-      // If a slug was provided, update it using the edit flow to apply slug post-create
-      if (request.slug && created?.id) {
-        await resumeService.updateResumeData(created.id, { data: request.content as any, slug: request.slug });
-      }
-
-      setSuccessMessage(t("messages.resumeCreatedSuccess"));
-      setView("list");
-      loadResumes({ notifyExtension: true });
-      setTimeout(() => setSuccessMessage(null), 5000);
-    } catch (e) {
-      console.error("Failed to create resume", e);
-      setSuccessMessage(t("messages.failedCreateResumeMessage"));
-      setTimeout(() => setSuccessMessage(null), 5000);
-    }
+    // Open the uploaded resume on the Studio document canvas (#1915 — resume
+    // editing moved into the studio).
+    navigate(`/studio?editResume=${response.id}`);
   };
 
   const handleUpdateResume = (request: UpdateResumeRequest) => {
@@ -1331,7 +1303,7 @@ export default function Resumes() {
                     variations={childrenByParentId.get(resume.id)}
                     ownership={resume.ownership}
                     onView={() => handleResumeView(resume.id)}
-                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onEdit={() => navigate(`/studio?editResume=${resume.id}`)}
                     onRename={() => setRenameDialog({ open: true, target: resume })}
                     onAddMedia={() => handleAddMedia(resume)}
                     onCreateVariation={() => handleCreateVariation(resume.id)}
@@ -1723,32 +1695,18 @@ export default function Resumes() {
     </>
   );
 
-  // Builder / viewer modes take over the page; the list flips into shell mode.
-  if (view === "builder" || view === "viewer") {
+  // Viewer mode takes over the page; the list flips into shell mode. The
+  // legacy in-page "builder" was removed — resume create/edit live in the
+  // Studio document canvas now (#1915).
+  if (view === "viewer") {
     return (
       <AppShell bgClassName="bg-background">
         <div className="p-4 md:p-6">
           <div>
-            {/* Keep the hub-level tab strip visible even in the in-page
-                viewer / builder modes — the user is still "inside" the
-                Resumes section and shouldn't lose that context. */}
+            {/* Keep the hub-level tab strip visible in viewer mode — the user
+                is still "inside" the Resumes section. */}
             <EntityHubTabStrip entity="resume" />
             {successAlert}
-            {view === "builder" && (
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <h1 className="text-2xl sm:text-3xl font-bold">{t("headings.createResumeHeading")}</h1>
-                  <Button
-                    variant="outline"
-                    onClick={() => setView("list")}
-                    className="w-full sm:w-auto min-h-[44px]"
-                  >
-                    {t("actions.backToResumes")}
-                  </Button>
-                </div>
-                <ResumeBuilder onSave={handleCreateResume} onCancel={() => setView("list")} />
-              </div>
-            )}
             {view === "viewer" && selectedResume && (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-center justify-between">

@@ -355,9 +355,9 @@ function PeopleDetailContent() {
 
   const handleSubmitToJob = () => toast.info(t("messages.submitToJobComingSoon"));
 
-  const handleSectionEdit = (key: string) => {
+  const handleSectionEdit = () => {
     if (!masterResume) return;
-    navigate(`/resumes/edit/${masterResume.id}?section=${encodeURIComponent(key)}`);
+    navigate(`/studio?editResume=${masterResume.id}`);
   };
 
   // ---------------------------------------------------------------------

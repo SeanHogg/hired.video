@@ -295,16 +295,37 @@ export interface DocumentState {
   entityId: string | null;
 }
 
-/** Default flow blocks a fresh document of `entityKind` opens with. Resume
- *  starts with its core sections so "create resume" lands on a ready-to-fill
- *  document, not a blank page; other entities start empty until their block
- *  models land (#1914). */
-function defaultBlocksFor(
-  entityKind: DocumentEntityKind,
+// Canonical resume section order + per-section title/layout — the single
+// source the document seed uses for which blocks a resume opens with.
+const RESUME_SECTION_META: ReadonlyArray<{ key: string; title: string; layout: string }> = [
+  { key: "work", title: "Work Experience", layout: "timeline" },
+  { key: "education", title: "Education", layout: "timeline" },
+  { key: "skills", title: "Skills", layout: "grid" },
+  { key: "projects", title: "Projects", layout: "cards" },
+  { key: "volunteer", title: "Volunteer", layout: "timeline" },
+  { key: "certificates", title: "Certificates", layout: "list" },
+  { key: "awards", title: "Awards", layout: "list" },
+  { key: "publications", title: "Publications", layout: "list" },
+  { key: "languages", title: "Languages", layout: "compact" },
+  { key: "interests", title: "Interests", layout: "compact" },
+  { key: "references", title: "References", layout: "list" },
+];
+
+/** Core sections a NEW resume opens with so "create resume" lands ready-to-fill. */
+const RESUME_CORE_SECTIONS: ReadonlySet<string> = new Set([
+  "work",
+  "education",
+  "skills",
+  "projects",
+]);
+
+/** Build the resume's flow blocks: a Header (basics) block + a section block
+ *  for each key in `includeKeys`, in canonical order. */
+function resumeBlocks(
   idFactory: () => string,
+  includeKeys: ReadonlySet<string>,
 ): DocumentBlock[] {
-  if (entityKind !== "resume") return [];
-  const section = (sectionKey: string, title: string, layout: string): DocumentBlock => ({
+  const mk = (sectionKey: string, title: string, layout: string): DocumentBlock => ({
     id: idFactory(),
     kind: "section",
     sectionKey,
@@ -313,11 +334,30 @@ function defaultBlocksFor(
     mode: "flow",
   });
   return [
-    section("work", "Work Experience", "timeline"),
-    section("education", "Education", "timeline"),
-    section("skills", "Skills", "grid"),
-    section("projects", "Projects", "cards"),
+    mk("basics", "Header", "compact"),
+    ...RESUME_SECTION_META.filter((m) => includeKeys.has(m.key)).map((m) =>
+      mk(m.key, m.title, m.layout),
+    ),
   ];
+}
+
+/** Default flow blocks a fresh document of `entityKind` opens with. Resume
+ *  starts with its core sections; other entities start empty until their block
+ *  models land (#1914). */
+function defaultBlocksFor(
+  entityKind: DocumentEntityKind,
+  idFactory: () => string,
+): DocumentBlock[] {
+  if (entityKind === "resume") return resumeBlocks(idFactory, RESUME_CORE_SECTIONS);
+  if (entityKind === "article" || entityKind === "blog") {
+    // Article / blog (#1914) author free-content blocks (no section model yet).
+    // Seed a title + body text block so a new doc opens ready-to-write.
+    return [
+      { id: idFactory(), kind: "text", title: "Title", text: "Title", mode: "flow" },
+      { id: idFactory(), kind: "text", title: "Body", text: "Start writing…", mode: "flow" },
+    ];
+  }
+  return [];
 }
 
 /** Blank single-page document seeded for a fresh draft of the given entity. */
@@ -334,5 +374,32 @@ export function createBlankDocumentState(
     pages: [{ id: idFactory(), blocks: defaultBlocksFor(entityKind, idFactory), overlays: [] }],
     entityKind,
     entityId: null,
+  };
+}
+
+/**
+ * Document seeded to EDIT an existing resume on the canvas (#1915). Binds
+ * `entityId` (so the editor fetches + writes back that resume's content) and
+ * seeds blocks for the core sections PLUS every section that already has
+ * content (`populatedSectionKeys`) — so nothing in the resume is hidden.
+ * Content itself is NOT copied in (it stays in the resume row, loaded via
+ * `entityId`); this is layout only.
+ */
+export function createResumeDocumentState(
+  entityId: string,
+  populatedSectionKeys: readonly string[],
+  idFactory: () => string,
+): DocumentState {
+  const include = new Set<string>(RESUME_CORE_SECTIONS);
+  for (const k of populatedSectionKeys) include.add(k);
+  return {
+    schemaVersion: DOCUMENT_STATE_VERSION,
+    pageSize: "letter",
+    orientation: "portrait",
+    columns: 12,
+    theme: { ...DEFAULT_DOCUMENT_THEME },
+    pages: [{ id: idFactory(), blocks: resumeBlocks(idFactory, include), overlays: [] }],
+    entityKind: "resume",
+    entityId,
   };
 }
