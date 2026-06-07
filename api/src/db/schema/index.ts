@@ -85,3 +85,4 @@ export * from "./gapPass4.js";
 export * from "./peopleOps.js";
 export * from "./peopleOpsExt.js";
 export * from "./screening.js";
+export * from "./resumeFeedback.js";

@@ -25,6 +25,7 @@ import {
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
 import DocumentView from "@/components/studio/document/DocumentView";
+import ResumeDocumentView from "@/components/studio/document/ResumeDocumentView";
 
 export type DocumentViewMode = "continuous" | "paged";
 
@@ -82,7 +83,28 @@ interface DocumentPagedViewProps {
   className?: string;
 }
 
-export default function DocumentPagedView({
+export default function DocumentPagedView(props: DocumentPagedViewProps) {
+  // Resume documents render through the declarative template engine — the SAME
+  // renderer `/resumes/:id` uses (columns, themes, hero, per-section layout) —
+  // so the studio preview matches the published resume exactly. DocumentView's
+  // generic single-column block render is only for non-resume documents
+  // (articles / blogs / free-form). The continuous/paged windowing modes don't
+  // apply to the declarative render (a responsive flow, not a fixed sheet), so
+  // the resume branch is a separate component and the windowing hooks below
+  // never run for it (keeps rules-of-hooks clean).
+  if (props.state.entityKind === "resume") {
+    return (
+      <div className={cn("flex w-full justify-center overflow-auto", props.className)}>
+        <div className="w-full max-w-5xl">
+          <ResumeDocumentView state={props.state} content={props.content} />
+        </div>
+      </div>
+    );
+  }
+  return <DocumentPagedSheet {...props} />;
+}
+
+function DocumentPagedSheet({
   state,
   content,
   mode,

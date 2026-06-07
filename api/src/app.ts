@@ -27,6 +27,7 @@ import { accountRoutes } from "./routes/account.js";
 import { workforceRoutes } from "./routes/workforce.js";
 import { userRoutes } from "./routes/users.js";
 import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
+import { resumeFeedbackRoutes } from "./routes/resume-feedback.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { jobPipelineRoutes } from "./routes/jobpipeline.js";
 import { pipelineShareRoutes, pipelinePublicRoutes } from "./routes/pipeline-share.js";
@@ -468,6 +469,12 @@ export function createApp() {
   // intended behavior.
   const EVENTS_PUBLIC_ROUTE = /^\/api\/events(?:\/(?:slug\/[^/]+|[^/]+))?(?:$|\?)/;
 
+  // Resume-feedback share link: a peer/coach opens GET /api/resume-feedback/link/:token
+  // before (or without) signing in. Optional auth so the handler can claim the
+  // link for an authenticated visitor; the share token is the access grant.
+  // All other resume-feedback routes stay authenticated via the default branch.
+  const RESUME_FEEDBACK_LINK_ROUTE = /^\/api\/resume-feedback\/link\/[^/]+(?:$|\?)/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -496,6 +503,7 @@ export function createApp() {
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return "optional-auth";
+    if (method === "GET" && RESUME_FEEDBACK_LINK_ROUTE.test(path)) return "optional-auth";
     if (
       method === "GET" &&
       (USER_PROFILE_ROUTE.test(path) ||
@@ -601,6 +609,7 @@ export function createApp() {
   app.post("/api/resumes", createResumeHandler);
   app.post("/api/resumes/", createResumeHandler);
   app.route("/api/resumes", resumeRoutes);
+  app.route("/api/resume-feedback", resumeFeedbackRoutes); // career coaching & resume feedback (#1939)
   app.route("/api/vendor-sync", vendorSyncRoutes);
   app.route("/api/resume", resumeRoastRoutes); // roast must be before catch-all in resumeRoutes
   app.route("/api/resume", resumeRoutes); // legacy resume endpoints

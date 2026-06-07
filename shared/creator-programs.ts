@@ -8,7 +8,7 @@
  * and category derivation never drift between the two.
  */
 
-export const CREATOR_PROGRAMS = ["video", "voice", "services", "articles", "courses", "templates", "bookings"] as const;
+export const CREATOR_PROGRAMS = ["video", "voice", "services", "articles", "courses", "templates", "bookings", "coaching"] as const;
 export type CreatorProgram = (typeof CREATOR_PROGRAMS)[number];
 
 export const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
@@ -19,6 +19,7 @@ export const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
   courses: "program_courses_terms",
   templates: "program_templates_terms",
   bookings: "program_bookings_terms",
+  coaching: "program_coaching_terms",
 };
 
 // Marketplace search-facet category written into `creator_profiles.categories`
@@ -32,6 +33,7 @@ export const PROGRAM_CATEGORY: Record<CreatorProgram, string> = {
   courses: "courses",
   templates: "templates",
   bookings: "bookings",
+  coaching: "career_coaching",
 };
 
 export function isCreatorProgram(p: unknown): p is CreatorProgram {
@@ -46,10 +48,11 @@ export type CreatorProgramFlags = {
   coursesActive?: boolean | null;
   templatesActive?: boolean | null;
   bookingsActive?: boolean | null;
+  coachingActive?: boolean | null;
 };
 
 export type CreatorProgramFlagColumn =
-  | "videoActive" | "voiceActive" | "servicesActive" | "articlesActive" | "coursesActive" | "templatesActive" | "bookingsActive";
+  | "videoActive" | "voiceActive" | "servicesActive" | "articlesActive" | "coursesActive" | "templatesActive" | "bookingsActive" | "coachingActive";
 
 export function programFlagColumn(program: CreatorProgram): CreatorProgramFlagColumn {
   return program === "video" ? "videoActive"
@@ -58,7 +61,8 @@ export function programFlagColumn(program: CreatorProgram): CreatorProgramFlagCo
     : program === "articles" ? "articlesActive"
     : program === "courses" ? "coursesActive"
     : program === "templates" ? "templatesActive"
-    : "bookingsActive";
+    : program === "bookings" ? "bookingsActive"
+    : "coachingActive";
 }
 
 export function activeFlagsToPrograms(flags: CreatorProgramFlags): CreatorProgram[] {
@@ -70,6 +74,7 @@ export function activeFlagsToPrograms(flags: CreatorProgramFlags): CreatorProgra
   if (flags.coursesActive) out.push("courses");
   if (flags.templatesActive) out.push("templates");
   if (flags.bookingsActive) out.push("bookings");
+  if (flags.coachingActive) out.push("coaching");
   return out;
 }
 
@@ -82,5 +87,5 @@ export function programsToCategories(programs: readonly CreatorProgram[]): strin
 export function deriveIsActive(flags: CreatorProgramFlags): boolean {
   return !!(flags.videoActive || flags.voiceActive || flags.servicesActive
     || flags.articlesActive || flags.coursesActive || flags.templatesActive
-    || flags.bookingsActive);
+    || flags.bookingsActive || flags.coachingActive);
 }

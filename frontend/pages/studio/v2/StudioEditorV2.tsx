@@ -156,7 +156,7 @@ import {
 import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeData, ResumeUploadResponse } from "@/types/resume";
 import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
-import { printDocument } from "@/lib/studio/document/print-document";
+import { exportDocument } from "@/lib/studio/document/export-document";
 import { articleService } from "@/lib/services/article-service";
 import { documentToArticle } from "@/lib/studio/document/document-to-article";
 import AttachToCourseDialog from "@/components/creator/AttachToCourseDialog";
@@ -2390,7 +2390,7 @@ export default function StudioEditorV2() {
     // Document export is a browser print → Save as PDF of the read-only
     // DocumentView (#1912), not a Blob render — "preview === render === print".
     if (currentMediaKind === "document") {
-      const ok = printDocument(documentState, documentEntityContent, title);
+      const ok = await exportDocument(documentState, documentEntityContent, title);
       if (!ok) {
         toast({
           title: "Couldn't open the print view",

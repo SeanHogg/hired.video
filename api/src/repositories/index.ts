@@ -72,6 +72,10 @@ import {
   CommunityResourcesRepository,
   type ICommunityResourcesRepository,
 } from "./communityResourcesRepository.js";
+import {
+  ResumeFeedbackRepository,
+  type IResumeFeedbackRepository,
+} from "./resumeFeedbackRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -125,6 +129,8 @@ export interface Repos {
   coffeeRequests: ICoffeeRequestsRepository;
   // location-scoped user-submitted resource directory (migration 0191)
   communityResources: ICommunityResourcesRepository;
+  // resume feedback & career coaching reviews (migration 0200)
+  resumeFeedback: IResumeFeedbackRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -160,6 +166,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     events: new EventsRepository(db, now),
     coffeeRequests: new CoffeeRequestsRepository(db, now),
     communityResources: new CommunityResourcesRepository(db, now),
+    resumeFeedback: new ResumeFeedbackRepository(db, now),
   };
 }
 
@@ -198,6 +205,7 @@ export type {
   IEventsRepository,
   ICoffeeRequestsRepository,
   ICommunityResourcesRepository,
+  IResumeFeedbackRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
@@ -268,3 +276,13 @@ export type {
   CommunityResourceDirectoryFilter,
   ReviewResourcePatch,
 } from "./communityResourcesRepository.js";
+export type {
+  ResumeReviewRow,
+  ResumeReviewInsert,
+  ResumeReviewPatch,
+  ResumeReviewAnnotationRow,
+  ResumeReviewAnnotationInsert,
+  ResumeReviewAnnotationPatch,
+  ResumeContentSlice,
+  AnnotationCounts,
+} from "./resumeFeedbackRepository.js";

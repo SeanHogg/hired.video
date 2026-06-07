@@ -62,6 +62,9 @@ export const creatorProfiles = pgTable(
     coursesActive: boolean("courses_active").default(false).notNull(),
     templatesActive: boolean("templates_active").default(false).notNull(),
     bookingsActive: boolean("bookings_active").default(false).notNull(),
+    // Career-coaching / resume-feedback program. When active the creator can
+    // be booked to review a shared resume (see resume_reviews, source='coaching').
+    coachingActive: boolean("coaching_active").default(false).notNull(),
 
     // Opt-in state
     isActive: boolean("is_active").default(false).notNull(),

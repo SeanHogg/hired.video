@@ -83,6 +83,14 @@ export const resumeVersions = pgTable("resume_versions", {
   label: varchar("label", { length: 120 }),
   resumeData: jsonb("resume_data").notNull(),
   isAutosave: boolean("is_autosave").default(false).notNull(),
+  // ── Reviewer-proposed draft (resume feedback / coaching) ──
+  // Non-null `proposedByUserId` marks this version as a reviewer-submitted
+  // draft (not an owner snapshot). `reviewId` links it to its review and
+  // `proposalStatus` tracks the owner's decision. All null for normal
+  // owner-authored snapshots. (#1946 — see shared/resume-feedback.ts.)
+  proposedByUserId: uuid("proposed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  reviewId: uuid("review_id"),
+  proposalStatus: varchar("proposal_status", { length: 16 }), // proposed | accepted | rejected
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

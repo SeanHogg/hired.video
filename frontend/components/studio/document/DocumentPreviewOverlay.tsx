@@ -11,7 +11,7 @@ import { Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ResumeData } from "@/types/resume";
 import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
-import { printDocument } from "@/lib/studio/document/print-document";
+import { exportDocument } from "@/lib/studio/document/export-document";
 import DocumentPagedView, {
   DocumentViewModeToggle,
   type DocumentViewMode,
@@ -54,7 +54,7 @@ export default function DocumentPreviewOverlay({
             variant="secondary"
             size="sm"
             className="h-8 gap-1"
-            onClick={() => printDocument(state, content ?? null, title)}
+            onClick={() => void exportDocument(state, content ?? null, title)}
           >
             <Printer className="h-4 w-4" /> Print / PDF
           </Button>

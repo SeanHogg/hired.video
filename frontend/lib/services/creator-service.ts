@@ -5,6 +5,7 @@ import {
   FileText,
   GraduationCap,
   LayoutTemplate,
+  MessageSquareText,
   Mic,
   Video,
 } from "lucide-react";
@@ -47,6 +48,7 @@ export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   courses: "Courses",
   templates: "Templates",
   bookings: "1:1 Sessions",
+  coaching: "Resume Coaching",
 };
 
 // SSoT for the program → icon mapping. Imported by both the owner's
@@ -60,6 +62,7 @@ export const CREATOR_PROGRAM_ICON: Record<CreatorProgram, ComponentType<{ classN
   courses: GraduationCap,
   templates: LayoutTemplate,
   bookings: Calendar,
+  coaching: MessageSquareText,
 };
 
 // Per-program "home" — where a creator goes to actually do the work after
@@ -87,6 +90,10 @@ export const CREATOR_PROGRAM_HOME: Record<CreatorProgram, string> = {
   // templates" until a dedicated manager ships.
   templates: "/search?category=templates",
   bookings: "/bookings",
+  // Resume coaching is delivered inside the shared resume's studio review
+  // surface (#1947); until that frontend lands, the offerings page is the
+  // closest "manage my coaching" home.
+  coaching: "/services/offerings#my-services",
 };
 
 export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
@@ -97,6 +104,7 @@ export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
   courses: "Author courses with optional certifications. Studio-built lessons + SCORM export. Sell once, earn 95%.",
   templates: "Publish resume, job, and studio templates to the marketplace. Buyers fork your designs; you earn 95% of every sale.",
   bookings: "Offer bookable 1:1 sessions (30 / 60 / 90 / 120 min). Configure availability, take payments, and let your audience self-serve a magic-link reservation.",
+  coaching: "Give resume feedback as a service. Clients share a resume; you add sticky notes, highlights, suggested edits, and a proposed draft they accept into their resume.",
 };
 
 export interface CreatorProfile {
