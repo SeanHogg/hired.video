@@ -78,19 +78,15 @@ export const RESUME_BLOCK_PRESETS: DocumentBlockPreset[] = [
 ];
 
 /**
- * Job-posting section blocks. Section keys + default layouts mirror the
- * declarative job template (`frontend/types/job-template.ts`) so a section
- * dropped here renders the same way the read-only job posting does.
+ * Job-posting section blocks. Section keys match the job field schemas in
+ * `document-field-schema.ts` so a section dropped here is field-editable inline
+ * and writes back to the bound job's content.
  */
 export const JOB_BLOCK_PRESETS: DocumentBlockPreset[] = [
-  { kind: "section", label: "About this role", sectionKey: "description", layout: "prose" },
+  { kind: "section", label: "Overview", sectionKey: "overview", layout: "prose" },
   { kind: "section", label: "What you'll do", sectionKey: "responsibilities", layout: "list" },
   { kind: "section", label: "Requirements", sectionKey: "requirements", layout: "list" },
-  { kind: "section", label: "Qualifications", sectionKey: "qualifications", layout: "list" },
-  { kind: "section", label: "Skills", sectionKey: "skills", layout: "grid" },
-  { kind: "section", label: "Benefits", sectionKey: "benefits", layout: "cards" },
-  { kind: "section", label: "About the company", sectionKey: "company", layout: "prose" },
-  { kind: "section", label: "Apply", sectionKey: "apply", layout: "compact" },
+  { kind: "section", label: "Compensation & details", sectionKey: "details", layout: "compact" },
   ...FREE_CONTENT_PRESETS,
 ];
 

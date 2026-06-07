@@ -11,10 +11,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import DocumentView from "@/components/studio/document/DocumentView";
 import {
+  type DocumentEntityContent,
   type DocumentState,
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
-import type { ResumeData } from "@/types/resume";
 
 function escapeHtml(s: string): string {
   return s.replace(
@@ -28,7 +28,7 @@ function escapeHtml(s: string): string {
  *  blocked so the caller can surface a hint. */
 export function printDocument(
   state: DocumentState,
-  content: ResumeData | null,
+  content: DocumentEntityContent | null,
   title = "Document",
 ): boolean {
   const markup = renderToStaticMarkup(

@@ -13,12 +13,14 @@
 import { printDocument } from "@/lib/studio/document/print-document";
 import { downloadResume } from "@/lib/resume-download";
 import { descriptorFromResumeDocument } from "@/lib/studio/document/resume-document-descriptor";
-import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
-import type { ResumeData } from "@/types/resume";
+import type {
+  DocumentEntityContent,
+  DocumentState,
+} from "@/lib/studio/editor-v2/document-state";
 
 export async function exportDocument(
   state: DocumentState,
-  content: ResumeData | null,
+  content: DocumentEntityContent | null,
   title?: string,
 ): Promise<boolean> {
   if (state.entityKind === "resume" && state.entityId) {

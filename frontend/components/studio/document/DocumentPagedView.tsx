@@ -21,6 +21,7 @@ import { ChevronLeft, ChevronRight, FileText, Files } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResumeData } from "@/types/resume";
 import {
+  type DocumentEntityContent,
   type DocumentState,
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
@@ -75,7 +76,7 @@ export function DocumentViewModeToggle({
 
 interface DocumentPagedViewProps {
   state: DocumentState;
-  content?: ResumeData | null;
+  content?: DocumentEntityContent | null;
   mode: DocumentViewMode;
   /** Optional fixed scale. When omitted the view fits-to-width of its
    *  container (capped at 1× so the sheet never upscales past print size). */
@@ -99,9 +100,9 @@ export default function DocumentPagedView(props: DocumentPagedViewProps) {
  *  hero, per-section layout); other documents use the generic block render.
  *  Rendered identically into the measuring node, the continuous sheet, and each
  *  paged window so pagination measures exactly what paints. */
-function documentBody(state: DocumentState, content?: ResumeData | null) {
+function documentBody(state: DocumentState, content?: DocumentEntityContent | null) {
   return state.entityKind === "resume" ? (
-    <ResumeDocumentView state={state} content={content} />
+    <ResumeDocumentView state={state} content={content as ResumeData | null | undefined} />
   ) : (
     <DocumentView state={state} content={content} forPrint />
   );

@@ -211,6 +211,20 @@ function ResumeEditRedirect() {
   );
 }
 
+// Job editing moved into the Studio document canvas (#1914) — the legacy
+// /jobs/edit/:id form route redirects, opening that job on the canvas via the
+// ?editJob deep-link (StudioLanding seeds the doc + the editor fetches the job
+// content). Screening setup lives on its own /jobs/:id/screening route.
+function JobEditRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return (
+    <Navigate
+      to={`/studio?editJob=${encodeURIComponent(id ?? "")}`}
+      replace
+    />
+  );
+}
+
 // Creator profiles live on /people/:id under the Services tab now —
 // they're People with a Creator badge, not a separate surface.
 function CreatorPublicProfileRedirect() {
@@ -257,7 +271,9 @@ const PublicVideoResume = lazy(() => import("./pages/PublicVideoResume"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 // JobUploadPage removed - functionality consolidated into JobCreatePage
 const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
-const JobEditPage = lazy(() => import("./pages/JobEditPage"));
+// Job editing now redirects into the Studio (JobEditRedirect); the dedicated
+// screening route hosts the structured screening builder.
+const JobScreeningPage = lazy(() => import("./pages/JobScreeningPage"));
 const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const JobEmbed = lazy(() => import("./pages/JobEmbed"));
 const TemplatesReview = lazy(() => import("./pages/admin/TemplatesReview"));
@@ -768,7 +784,8 @@ const App = () => (
                         path="/jobs/create/:id"
                         element={<JobCreatePage />}
                       />
-                      <Route path="/jobs/edit/:id" element={<JobEditPage />} />
+                      <Route path="/jobs/edit/:id" element={<JobEditRedirect />} />
+                      <Route path="/jobs/:id/screening" element={<JobScreeningPage />} />
                       <Route path="/jobs/:id/apply" element={<JobApplicationPage />} />
                       {/* #412 — public job embed renderer (iframe-friendly). */}
                       <Route path="/jobs/embed/:id" element={<JobEmbed />} />

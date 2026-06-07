@@ -102,7 +102,7 @@ export interface EntityEditShellProps {
    *  with the user's last-visited tab highlighted (sessionStorage). */
   hubEntity?: EntityHubKind;
 
-  /** Editor body (CompanyBuilder, JobEditForm, ResumeBuilder, …). */
+  /** Editor body (CompanyBuilder, JobScreeningCard, ResumeBuilder, …). */
   children: ReactNode;
 }
 

@@ -10,6 +10,7 @@ import {
   ExternalLink,
   ArrowLeft,
   MoreVertical,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -362,12 +363,20 @@ export default function JobDetail() {
                   label="Listen to this job"
                 />
                 {permissions.canEdit ? (
-                  <Button asChild>
-                    <Link to={`/jobs/edit/${job.id}`}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Job
-                    </Link>
-                  </Button>
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link to={`/jobs/${job.id}/screening`}>
+                        <ClipboardCheck className="h-4 w-4 mr-2" />
+                        Screening
+                      </Link>
+                    </Button>
+                    <Button asChild>
+                      <Link to={`/jobs/edit/${job.id}`}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Job
+                      </Link>
+                    </Button>
+                  </>
                 ) : (
                   <>
                     {/* Apply now — primary action for candidates. Links out

@@ -9,8 +9,10 @@
 import { useEffect, useState } from "react";
 import { Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ResumeData } from "@/types/resume";
-import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
+import type {
+  DocumentEntityContent,
+  DocumentState,
+} from "@/lib/studio/editor-v2/document-state";
 import { exportDocument } from "@/lib/studio/document/export-document";
 import DocumentPagedView, {
   DocumentViewModeToggle,
@@ -19,7 +21,7 @@ import DocumentPagedView, {
 
 interface DocumentPreviewOverlayProps {
   state: DocumentState;
-  content?: ResumeData | null;
+  content?: DocumentEntityContent | null;
   title?: string;
   onClose: () => void;
 }

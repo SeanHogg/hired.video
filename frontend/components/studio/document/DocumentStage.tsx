@@ -18,12 +18,13 @@
  */
 import { useLayoutEffect, useRef, useState } from "react";
 import { AlignLeft, ArrowDown, ArrowUp, Maximize2, Trash2 } from "lucide-react";
-import type { ResumeData } from "@/types/resume";
 import SectionEditor from "@/components/studio/document/SectionEditor";
-import { resumeSectionSchema } from "@/lib/studio/document/resume-field-schema";
+import { documentSectionSchema } from "@/lib/studio/document/document-field-schema";
 import { cn } from "@/lib/utils";
 import {
   type DocumentBlock,
+  type DocumentEntityContent,
+  type DocumentEntityKind,
   type DocumentState,
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
@@ -51,24 +52,24 @@ interface DocumentStageProps {
   setState: (updater: (prev: DocumentState) => DocumentState) => void;
   commit: () => void;
   zoom: number;
-  /** The bound entity's content (resume today). Section blocks render it —
+  /** The bound entity's content (resume / job …). Section blocks render it —
    *  editable when `onContentChange` is supplied, read-only summary otherwise.
    *  null while a fresh draft has no content yet. */
-  entityContent?: ResumeData | null;
+  entityContent?: DocumentEntityContent | null;
   /** When supplied, section blocks become inline-editable (#1916) and edits
    *  flow back through here; the host owns persistence. */
-  onContentChange?: (next: ResumeData) => void;
+  onContentChange?: (next: DocumentEntityContent) => void;
 }
 
 /** Compact display lines for a section block — a primary label per item.
  *  Lightweight by design; full-fidelity rendering is the renderer
  *  generalization tracked in #1912. */
 function sectionItemLabels(
-  content: ResumeData | null | undefined,
+  content: DocumentEntityContent | null | undefined,
   sectionKey: string | undefined,
 ): string[] {
   if (!content || !sectionKey) return [];
-  const rows = (content as unknown as Record<string, unknown>)[sectionKey];
+  const rows = (content as Record<string, unknown>)[sectionKey];
   if (!Array.isArray(rows)) return [];
   return rows.slice(0, 6).map((row) => {
     const r = row as Record<string, unknown>;
@@ -222,6 +223,7 @@ export default function DocumentStage({
             <div key={block.id} data-doc-flow-id={block.id}>
               <DocumentBlockView
                 block={block}
+                entityKind={state.entityKind}
                 selected={selectedBlockId === block.id}
                 entityContent={entityContent}
                 theme={theme}
@@ -265,6 +267,7 @@ export default function DocumentStage({
             >
               <DocumentBlockView
                 block={block}
+                entityKind={state.entityKind}
                 selected={selectedBlockId === block.id}
                 entityContent={entityContent}
                 theme={theme}
@@ -318,6 +321,7 @@ export default function DocumentStage({
 
 function DocumentBlockView({
   block,
+  entityKind,
   selected,
   entityContent,
   theme,
@@ -331,10 +335,11 @@ function DocumentBlockView({
   onCommitText,
 }: {
   block: DocumentBlock;
+  entityKind: DocumentEntityKind;
   selected: boolean;
-  entityContent?: ResumeData | null;
+  entityContent?: DocumentEntityContent | null;
   theme: ResolvedDocumentTheme;
-  onContentChange?: (next: ResumeData) => void;
+  onContentChange?: (next: DocumentEntityContent) => void;
   onSelect: (e: React.MouseEvent) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -384,6 +389,7 @@ function DocumentBlockView({
       )}
       <BlockBody
         block={block}
+        entityKind={entityKind}
         entityContent={entityContent}
         theme={theme}
         onContentChange={onContentChange}
@@ -395,15 +401,17 @@ function DocumentBlockView({
 
 function BlockBody({
   block,
+  entityKind,
   entityContent,
   theme,
   onContentChange,
   onCommitText,
 }: {
   block: DocumentBlock;
-  entityContent?: ResumeData | null;
+  entityKind: DocumentEntityKind;
+  entityContent?: DocumentEntityContent | null;
   theme: ResolvedDocumentTheme;
-  onContentChange?: (next: ResumeData) => void;
+  onContentChange?: (next: DocumentEntityContent) => void;
   onCommitText?: (text: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -475,8 +483,9 @@ function BlockBody({
       >
         {block.title ?? block.sectionKey ?? "Section"}
       </h3>
-      {onContentChange && entityContent && resumeSectionSchema(block.sectionKey) ? (
+      {onContentChange && entityContent && documentSectionSchema(entityKind, block.sectionKey) ? (
         <SectionEditor
+          entityKind={entityKind}
           sectionKey={block.sectionKey as string}
           content={entityContent}
           onChange={onContentChange}
@@ -494,7 +503,7 @@ function SectionSummary({
   content,
   sectionKey,
 }: {
-  content?: ResumeData | null;
+  content?: DocumentEntityContent | null;
   sectionKey: string | undefined;
 }) {
   const labels = sectionItemLabels(content, sectionKey);

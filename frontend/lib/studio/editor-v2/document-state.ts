@@ -241,6 +241,17 @@ export interface DocumentPage {
 export const DOCUMENT_ENTITY_KINDS = ["resume", "article", "job", "blog"] as const;
 export type DocumentEntityKind = (typeof DOCUMENT_ENTITY_KINDS)[number];
 
+/**
+ * The bound entity's CONTENT the document renders + edits — a loose record so
+ * the renderer/editor stay entity-agnostic (resume = JSON-Resume `ResumeData`;
+ * job = the flat `JobDocumentContent`; article/blog author free blocks). Each
+ * entity's typed shape is narrowed at its service boundary; on the canvas it's
+ * driven declaratively by `document-field-schema.ts`. Never embedded in the
+ * DocumentState — it lives in the entity row (see the structure-vs-content note
+ * at the top of this file).
+ */
+export type DocumentEntityContent = Record<string, unknown>;
+
 // ── Per-entity capabilities (single SSoT) ────────────────────────────────────
 //
 // Not every entity exposes every canvas affordance. This one record is the
@@ -346,14 +357,37 @@ function resumeBlocks(
   ];
 }
 
+// Canonical job-posting section order + heading — the single source the job
+// document seed uses for which blocks a job opens with. Keys match the job
+// section schemas in `document-field-schema.ts`.
+const JOB_SECTION_META: ReadonlyArray<{ key: string; title: string; layout: string }> = [
+  { key: "overview", title: "Overview", layout: "prose" },
+  { key: "responsibilities", title: "What you'll do", layout: "list" },
+  { key: "requirements", title: "Requirements", layout: "list" },
+  { key: "details", title: "Compensation & details", layout: "compact" },
+];
+
+/** Build the job's flow blocks: one section block per JOB_SECTION_META entry. */
+function jobBlocks(idFactory: () => string): DocumentBlock[] {
+  return JOB_SECTION_META.map((m) => ({
+    id: idFactory(),
+    kind: "section",
+    sectionKey: m.key,
+    title: m.title,
+    layout: m.layout,
+    mode: "flow",
+  }));
+}
+
 /** Default flow blocks a fresh document of `entityKind` opens with. Resume
- *  starts with its core sections; other entities start empty until their block
- *  models land (#1914). */
+ *  starts with its core sections; job opens with its posting sections; article
+ *  / blog start with free-content blocks until their section models land. */
 function defaultBlocksFor(
   entityKind: DocumentEntityKind,
   idFactory: () => string,
 ): DocumentBlock[] {
   if (entityKind === "resume") return resumeBlocks(idFactory, RESUME_CORE_SECTIONS);
+  if (entityKind === "job") return jobBlocks(idFactory);
   if (entityKind === "article" || entityKind === "blog") {
     // Article / blog (#1914) author free-content blocks (no section model yet).
     // Seed a title + body text block so a new doc opens ready-to-write.
@@ -405,6 +439,29 @@ export function createResumeDocumentState(
     theme: { ...DEFAULT_DOCUMENT_THEME },
     pages: [{ id: idFactory(), blocks: resumeBlocks(idFactory, include), overlays: [] }],
     entityKind: "resume",
+    entityId,
+  };
+}
+
+/**
+ * Document seeded to EDIT an existing job posting on the canvas (#1914). Binds
+ * `entityId` (so the editor fetches + writes back that job's content) and seeds
+ * the standard posting sections. Content itself is NOT copied in (it lives in
+ * the job row, loaded via `entityId`); this is layout only. Jobs are always
+ * Letter portrait (`DOCUMENT_ENTITY_CAPABILITIES`).
+ */
+export function createJobDocumentState(
+  entityId: string,
+  idFactory: () => string,
+): DocumentState {
+  return {
+    schemaVersion: DOCUMENT_STATE_VERSION,
+    pageSize: "letter",
+    orientation: "portrait",
+    columns: 12,
+    theme: { ...DEFAULT_DOCUMENT_THEME },
+    pages: [{ id: idFactory(), blocks: jobBlocks(idFactory), overlays: [] }],
+    entityKind: "job",
     entityId,
   };
 }

@@ -61,7 +61,11 @@ import { slugToBuiltinId, studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { articleService } from "@/lib/services/article-service";
-import { createResumeDocumentState } from "@/lib/studio/editor-v2/document-state";
+import { jobService } from "@/lib/services/job-service";
+import {
+  createJobDocumentState,
+  createResumeDocumentState,
+} from "@/lib/studio/editor-v2/document-state";
 import {
   applyDocumentTemplate,
   resumeTemplateOption,
@@ -314,6 +318,40 @@ export default function StudioLanding() {
         } catch (err) {
           toast({
             title: "Couldn't open article",
+            description: err instanceof Error ? err.message : "Unknown error",
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
+    }
+
+    // Open an EXISTING job posting on the document canvas (#1914 — job edit
+    // moved into the studio). Reuse the linked project if present; otherwise
+    // seed a job document bound to the job id and mint it WITH the subject link
+    // so the next edit reuses it. Content is fetched by the editor via entityId.
+    const editJobId = searchParams.get("editJob");
+    if (editJobId) {
+      void (async () => {
+        try {
+          const subject: StudioSubject = { kind: "job", id: editJobId };
+          const existing = await findExistingDocProject(subject);
+          if (existing) {
+            navigateToProject(existing);
+            return;
+          }
+          const job = await jobService.getJobById(editJobId);
+          const docState = createJobDocumentState(editJobId, () => crypto.randomUUID());
+          const created = await create({
+            kind: "document",
+            documentState: docState,
+            name: job.title || "Job Posting",
+            subjects: [subject],
+          });
+          navigateToProject(created);
+        } catch (err) {
+          toast({
+            title: "Couldn't open job",
             description: err instanceof Error ? err.message : "Unknown error",
             variant: "destructive",
           });
@@ -600,6 +638,7 @@ export default function StudioLanding() {
     searchParams.has("projectId") ||
     searchParams.has("editResume") ||
     searchParams.has("editArticle") ||
+    searchParams.has("editJob") ||
     searchParams.has("subject") ||
     searchParams.has("capture") ||
     searchParams.has("new");

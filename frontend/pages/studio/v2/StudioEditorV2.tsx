@@ -42,6 +42,7 @@ import {
   Code2,
   Eye,
   History,
+  ClipboardCheck,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -145,6 +146,8 @@ import DocumentLeftPanel from "@/components/studio/document/DocumentLeftPanel";
 import ResumeUpload from "@/components/ResumeUpload";
 import EntityVersionHistoryDialog from "@/components/EntityVersionHistoryDialog";
 import {
+  type DocumentEntityContent,
+  type DocumentEntityKind,
   type DocumentState,
   createBlankDocumentState,
   createResumeDocumentState,
@@ -154,6 +157,13 @@ import {
   resumeTemplateOption,
 } from "@/lib/studio/editor-v2/document-templates";
 import { resumeService } from "@/lib/services/resume-service";
+import { jobService } from "@/lib/services/job-service";
+import {
+  contentToCreateJob,
+  emptyJobContent,
+  jobItemToContent,
+  type JobDocumentContent,
+} from "@/lib/studio/document/job-content";
 import type { ResumeData, ResumeUploadResponse } from "@/types/resume";
 import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
 import { exportDocument } from "@/lib/studio/document/export-document";
@@ -253,6 +263,15 @@ function serverCodeOf(err: unknown): string | undefined {
   const e = err as { context?: { serverCode?: unknown }; code?: unknown };
   const code = e.context?.serverCode ?? e.code;
   return typeof code === "string" ? code : undefined;
+}
+
+/** Blank bound-content for a fresh document draft of the given entity kind —
+ *  resume → empty JSON-Resume, job → default job posting, article/blog author
+ *  free blocks so they carry no field-bound content. */
+function emptyDocumentContent(kind: DocumentEntityKind): DocumentEntityContent {
+  if (kind === "job") return emptyJobContent() as unknown as DocumentEntityContent;
+  if (kind === "resume") return getEmptyResumeData() as unknown as DocumentEntityContent;
+  return {};
 }
 
 export default function StudioEditorV2() {
@@ -520,7 +539,8 @@ export default function StudioEditorV2() {
   // separately from DocumentState (which is layout/structure) — content is
   // owned by the resume row. Seeded blank for a fresh draft; fetched from the
   // resume row when DocumentState.entityId is set; persisted back on save.
-  const [documentEntityContent, setDocumentEntityContent] = useState<ResumeData | null>(null);
+  const [documentEntityContent, setDocumentEntityContent] =
+    useState<DocumentEntityContent | null>(null);
   // In-editor résumé Version History dialog (#1935).
   const [resumeVersionHistoryOpen, setResumeVersionHistoryOpen] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
@@ -1217,19 +1237,32 @@ export default function StudioEditorV2() {
     unhydrate: () => setDocumentStateHydrated(false),
   });
 
-  // Document content fetch/seed (#1920). Once the document runtime hydrates,
-  // load the bound resume's content (so section blocks render real data), or
-  // seed a blank ResumeData for a fresh draft with no entity row yet.
+  // Document content fetch/seed (#1920/#1914). Once the document runtime
+  // hydrates, load the bound entity's content (so section blocks render real
+  // data), or seed a blank record for a fresh draft with no entity row yet.
+  // Entity-aware: resume → resume_information; job → the job row.
   useEffect(() => {
     if (currentMediaKind !== "document" || !documentStateHydrated) return;
     let cancelled = false;
     (async () => {
       const entityId = documentState.entityId;
+      if (entityId && documentState.entityKind === "job") {
+        try {
+          const j = await jobService.getJobById(entityId);
+          if (cancelled) return;
+          setDocumentEntityContent(jobItemToContent(j) as DocumentEntityContent);
+          return;
+        } catch {
+          // fall through to a blank doc if the job can't be read
+        }
+      }
       if (entityId && documentState.entityKind === "resume") {
         try {
           const r = await resumeService.getResumeById(entityId);
           if (cancelled) return;
-          setDocumentEntityContent(mapContentToResumeData(r.content));
+          setDocumentEntityContent(
+            mapContentToResumeData(r.content) as unknown as DocumentEntityContent,
+          );
           // Re-skin an UN-THEMED stub to the resume's chosen design template
           // (`content.meta.template`) so the canvas + preview match the
           // read-only /resumes/:id view's template + font. A stub (minted by a
@@ -1258,7 +1291,9 @@ export default function StudioEditorV2() {
           // fall through to a blank doc if the resume can't be read
         }
       }
-      if (!cancelled) setDocumentEntityContent((prev) => prev ?? getEmptyResumeData());
+      if (!cancelled) {
+        setDocumentEntityContent((prev) => prev ?? emptyDocumentContent(documentState.entityKind));
+      }
     })();
     return () => {
       cancelled = true;
@@ -1285,7 +1320,7 @@ export default function StudioEditorV2() {
         () => crypto.randomUUID(),
       );
       resetDocumentHistory(docState);
-      setDocumentEntityContent(content);
+      setDocumentEntityContent(content as unknown as DocumentEntityContent);
     },
     [resetDocumentHistory],
   );
@@ -2756,6 +2791,18 @@ export default function StudioEditorV2() {
               documentStateForSave = { ...documentState, entityId: createdResume.id };
               setDocumentState(() => documentStateForSave);
             }
+          } else if (documentState.entityKind === "job" && documentEntityContent) {
+            // Job (#1914): the canvas content IS the job posting record (the
+            // editable fields plus passthrough publishing config). Write it back
+            // to the job row — creating it on the first save of a fresh draft.
+            const jobContent = documentEntityContent as unknown as JobDocumentContent;
+            if (documentState.entityId) {
+              await jobService.updateJob(documentState.entityId, jobContent);
+            } else {
+              const createdJob = await jobService.createJob(contentToCreateJob(jobContent));
+              documentStateForSave = { ...documentState, entityId: createdJob.id };
+              setDocumentState(() => documentStateForSave);
+            }
           } else if (
             documentState.entityKind === "article" ||
             documentState.entityKind === "blog"
@@ -3960,6 +4007,36 @@ export default function StudioEditorV2() {
               </div>
             </CollapsiblePanel>
           )}
+          {/* Document (job) — screening setup lives on its own owner-only route
+              (a structured builder, #1918, not the paged canvas). Surfaced here
+              so attaching a video screening stays one click from authoring the
+              posting. Shown once the job has a row (entityId set). */}
+          {currentMediaKind === "document" &&
+            documentState.entityKind === "job" &&
+            documentState.entityId && (
+              <CollapsiblePanel
+                side="right"
+                label="Screening"
+                storageKey="studio.v2.panel.right.job-screening"
+                expandedClassName="w-72"
+                defaultOpen={false}
+              >
+                <div className="p-3 text-sm">
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Attach a video screening interview candidates complete when they apply.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/jobs/${documentState.entityId}/screening`)}
+                  >
+                    <ClipboardCheck className="mr-1.5 h-4 w-4" />
+                    Screening setup
+                  </Button>
+                </div>
+              </CollapsiblePanel>
+            )}
           </div>
         </div>
       </div>

@@ -3,7 +3,8 @@
 // Used by:
 //   - /jobs                   (Jobs.tsx)            — Jobs / Saved / Applications / Alerts / My Postings / Candidates
 //   - /jobs/:id               (JobDetail)           — strip-only header
-//   - /jobs/edit/:id          (JobEditPage)         — via EntityEditShell
+//   - /jobs/edit/:id          (→ Studio editJob)    — redirects to the canvas
+//   - /jobs/:id/screening     (JobScreeningPage)    — via EntityEditShell
 //   - /jobs/create(/:id)      (JobCreatePage)       — via EntityEditShell
 //   - /jobs/:id/apply         (JobApplicationPage)  — strip-only header
 //

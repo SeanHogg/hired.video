@@ -10,9 +10,10 @@
  * `renderToStaticMarkup` (no external stylesheet to carry across).
  */
 import type { CSSProperties } from "react";
-import type { ResumeData } from "@/types/resume";
 import {
   type DocumentBlock,
+  type DocumentEntityContent,
+  type DocumentEntityKind,
   type DocumentState,
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
@@ -21,20 +22,20 @@ import {
   type ResolvedDocumentTheme,
 } from "@/lib/studio/editor-v2/document-theme";
 import {
-  resumeSectionSchema,
+  documentSectionSchema,
   type SectionFieldDef,
-} from "@/lib/studio/document/resume-field-schema";
+} from "@/lib/studio/document/document-field-schema";
 
 interface DocumentViewProps {
   state: DocumentState;
-  content?: ResumeData | null;
+  content?: DocumentEntityContent | null;
   /** Print mode drops the on-screen page shadow/ring (the print sheet is the
    *  paper itself). */
   forPrint?: boolean;
 }
 
-function rec(content: ResumeData | null | undefined): Record<string, unknown> {
-  return (content ?? {}) as unknown as Record<string, unknown>;
+function rec(content: DocumentEntityContent | null | undefined): Record<string, unknown> {
+  return (content ?? {}) as Record<string, unknown>;
 }
 
 export default function DocumentView({ state, content, forPrint }: DocumentViewProps) {
@@ -61,7 +62,7 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
   return (
     <div style={pageStyle}>
       {flowBlocks.map((b) => (
-        <BlockView key={b.id} block={b} content={content} theme={theme} />
+        <BlockView key={b.id} block={b} entityKind={state.entityKind} content={content} theme={theme} />
       ))}
       {absoluteBlocks.map((b) => {
         const box = b.box ?? { x: 0.1, y: 0.1, width: 0.4, height: 0.2, z: 1 };
@@ -76,7 +77,7 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
               zIndex: box.z,
             }}
           >
-            <BlockView block={b} content={content} theme={theme} />
+            <BlockView block={b} entityKind={state.entityKind} content={content} theme={theme} />
           </div>
         );
       })}
@@ -109,11 +110,13 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
 
 function BlockView({
   block,
+  entityKind,
   content,
   theme,
 }: {
   block: DocumentBlock;
-  content?: ResumeData | null;
+  entityKind: DocumentEntityKind;
+  content?: DocumentEntityContent | null;
   theme: ResolvedDocumentTheme;
 }) {
   if (block.kind === "divider") {
@@ -132,18 +135,23 @@ function BlockView({
       <img src={block.imageUrl} alt="" style={{ maxWidth: "100%", borderRadius: 4 }} />
     ) : null;
   }
-  // section / component
+  // section / component — render by the schema's shape (array list vs single
+  // object). Resume `basics` keeps its bespoke contact-header render.
   if (block.sectionKey === "basics") {
     return <BasicsView content={content} theme={theme} />;
   }
-  return <SectionView block={block} content={content} theme={theme} />;
+  const schema = documentSectionSchema(entityKind, block.sectionKey);
+  if (schema?.shape === "object") {
+    return <ObjectSectionView block={block} schema={schema} content={content} theme={theme} />;
+  }
+  return <SectionView block={block} entityKind={entityKind} content={content} theme={theme} />;
 }
 
 function BasicsView({
   content,
   theme,
 }: {
-  content?: ResumeData | null;
+  content?: DocumentEntityContent | null;
   theme: ResolvedDocumentTheme;
 }) {
   const basics = (rec(content).basics ?? {}) as Record<string, unknown>;
@@ -172,36 +180,129 @@ function BasicsView({
   );
 }
 
-function SectionView({
+function SectionHeading({
+  title,
+  theme,
+}: {
+  title: string;
+  theme: ResolvedDocumentTheme;
+}) {
+  const deco = theme.headingDecoration;
+  return (
+    <h2
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        textTransform: deco.textTransform,
+        letterSpacing: deco.letterSpacing,
+        color: theme.accent,
+        borderBottom: deco.borderBottom,
+        paddingBottom: deco.paddingBottom,
+        margin: "0 0 8px",
+      }}
+    >
+      {title}
+    </h2>
+  );
+}
+
+/** Read-only render of an OBJECT section (jobs: a slice of the flat record).
+ *  Renders each non-empty field by type: textarea → prose, list → bullets,
+ *  image → image, select → its option label, text/number → a meta line. */
+function ObjectSectionView({
   block,
+  schema,
   content,
   theme,
 }: {
   block: DocumentBlock;
-  content?: ResumeData | null;
+  schema: import("@/lib/studio/document/document-field-schema").DocumentSectionSchema;
+  content?: DocumentEntityContent | null;
   theme: ResolvedDocumentTheme;
 }) {
-  const schema = resumeSectionSchema(block.sectionKey);
+  const obj = schema.objectPath
+    ? ((rec(content)[schema.objectPath] ?? {}) as Record<string, unknown>)
+    : rec(content);
+  const rendered = schema.fields
+    .map((f) => renderObjectField(f, obj[f.key], theme))
+    .filter(Boolean);
+  if (rendered.length === 0) return null;
+  return (
+    <section style={{ marginBottom: theme.sectionGap }}>
+      <SectionHeading title={block.title ?? schema.label} theme={theme} />
+      {rendered}
+    </section>
+  );
+}
+
+function renderObjectField(
+  field: SectionFieldDef,
+  value: unknown,
+  theme: ResolvedDocumentTheme,
+): React.ReactNode {
+  if (field.type === "textarea") {
+    const v = typeof value === "string" ? value : "";
+    return v ? (
+      <p key={field.key} style={{ fontSize: 12.5, lineHeight: 1.5, margin: "4px 0", whiteSpace: "pre-wrap" }}>
+        {v}
+      </p>
+    ) : null;
+  }
+  if (field.type === "list") {
+    const arr = Array.isArray(value) ? (value as unknown[]) : [];
+    if (arr.length === 0) return null;
+    return (
+      <ul key={field.key} style={{ margin: "4px 0", paddingLeft: 18 }}>
+        {arr.map((x, i) => (
+          <li key={i} style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+            {String(x)}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (field.type === "image") {
+    const url = typeof value === "string" ? value : "";
+    return url ? (
+      <img key={field.key} src={url} alt="" style={{ maxWidth: "100%", borderRadius: 4, margin: "4px 0" }} />
+    ) : null;
+  }
+  if (field.type === "select") {
+    const v = value === undefined || value === null ? "" : String(value);
+    const label = field.options?.find((o) => o.value === v)?.label;
+    return label ? (
+      <div key={field.key} style={{ fontSize: 12, color: theme.muted }}>
+        {field.label}: {label}
+      </div>
+    ) : null;
+  }
+  // text / number / date
+  const v = field.type === "number" ? (typeof value === "number" ? String(value) : "") : (typeof value === "string" ? value : "");
+  return v ? (
+    <div key={field.key} style={{ fontSize: 12.5, color: theme.heading, margin: "2px 0" }}>
+      {field.label}: {v}
+    </div>
+  ) : null;
+}
+
+function SectionView({
+  block,
+  entityKind,
+  content,
+  theme,
+}: {
+  block: DocumentBlock;
+  entityKind: DocumentEntityKind;
+  content?: DocumentEntityContent | null;
+  theme: ResolvedDocumentTheme;
+}) {
+  const schema = documentSectionSchema(entityKind, block.sectionKey);
   const rows = rec(content)[block.sectionKey ?? ""];
   const items = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
   if (items.length === 0) return null;
-  const deco = theme.headingDecoration;
   return (
     <section style={{ marginBottom: theme.sectionGap }}>
-      <h2
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          textTransform: deco.textTransform,
-          letterSpacing: deco.letterSpacing,
-          color: theme.accent,
-          borderBottom: deco.borderBottom,
-          paddingBottom: deco.paddingBottom,
-          margin: "0 0 8px",
-        }}
-      >
-        {block.title ?? block.sectionKey}
-      </h2>
+      <SectionHeading title={block.title ?? block.sectionKey ?? "Section"} theme={theme} />
       {items.map((item, i) => (
         <ItemView
           key={(item.id as string) ?? i}
