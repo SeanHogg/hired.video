@@ -25,13 +25,25 @@ import type {
 
 interface ResumeUploadProps {
   onUploadSuccess: (response: ResumeUploadResponse) => void;
-  onCancel: () => void;
+  /** Optional — when omitted (e.g. the upload form is embedded inline rather
+   *  than in a sheet/modal), the "Cancel" button is hidden since there's
+   *  nothing to dismiss. */
+  onCancel?: () => void;
   /** When true, renders without the Card wrapper (for use inside sheets/modals) */
   compact?: boolean;
   /** Pre-fill the dropzone with a file the caller already collected (e.g. from
    *  a drag-drop on a parent empty state). Used when the user dragged a file
    *  directly onto a list-empty state and we open the sheet pre-loaded. */
   initialFile?: File | null;
+  /** When true, hides the new-resume metadata fields (name / privacy / master)
+   *  and shows just the dropzone + a convert button. Use when the upload is
+   *  embedded into an existing editor where the user has already selected the
+   *  resume — surfacing those fields makes it look like they're creating a new
+   *  one. The title is auto-derived from the file; privacy defaults to private
+   *  and the first upload is still auto-promoted to master server-side. */
+  minimal?: boolean;
+  /** Override the primary button label (default "Upload Resume"). */
+  submitLabel?: string;
 }
 
 // Helper function to create empty resume data
@@ -64,6 +76,8 @@ export default function ResumeUpload({
   onCancel,
   compact = false,
   initialFile = null,
+  minimal = false,
+  submitLabel,
 }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(initialFile);
@@ -410,7 +424,10 @@ export default function ResumeUpload({
           )}
         </div>
 
-        {/* Resume Settings */}
+        {/* Resume Settings — hidden in `minimal` mode (inline editor import),
+            where the user has already picked the resume and these new-resume
+            fields would imply a fresh one. Title auto-derives from the file. */}
+        {!minimal && (
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="resume-name">Resume Name</Label>
@@ -465,6 +482,7 @@ export default function ResumeUpload({
             </p>
           )}
         </div>
+        )}
 
         {/* Upload Progress */}
         {isUploading && (
@@ -502,13 +520,15 @@ export default function ResumeUpload({
             ) : (
               <>
                 <Upload className="mr-2 h-4 w-4" />
-                Upload Resume
+                {submitLabel ?? "Upload Resume"}
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={onCancel} disabled={isUploading}>
-            Cancel
-          </Button>
+          {onCancel && (
+            <Button variant="outline" onClick={onCancel} disabled={isUploading}>
+              Cancel
+            </Button>
+          )}
         </div>
     </div>
   );

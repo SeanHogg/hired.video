@@ -158,6 +158,7 @@ export function applyDocumentTemplate(
   return {
     ...state,
     theme: { ...option.theme },
+    templateId: option.id,
     pages: state.pages.map((p, i) => (i === 0 ? { ...p, blocks } : p)),
   };
 }

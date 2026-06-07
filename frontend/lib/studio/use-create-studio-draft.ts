@@ -73,8 +73,15 @@ export type CreateStudioDraftInput =
   /** Document project (#1912) created from a fully-formed `DocumentState` —
    *  used to open an EXISTING entity (e.g. a resume) on the paged canvas with
    *  `documentState.entityId` already bound. Distinct from `template` (which
-   *  seeds a fresh blank document via the catalog). */
-  | { kind: "document"; documentState: DocumentState; name?: string };
+   *  seeds a fresh blank document via the catalog). Pass `subjects` to LINK the
+   *  project to the source entity so a later "edit" can find-and-reopen this
+   *  project instead of minting a duplicate (#1882). */
+  | {
+      kind: "document";
+      documentState: DocumentState;
+      name?: string;
+      subjects?: StudioSubject[];
+    };
 
 interface Opts {
   /** Fires once after a successful save, BEFORE navigate. Useful for
@@ -190,6 +197,11 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           kind: "scene",
           mediaKind: "document",
           documentState: input.documentState,
+          // Link the source entity (resume / article) so the next edit finds
+          // and reopens THIS project rather than minting a duplicate (#1882).
+          ...(input.subjects && input.subjects.length > 0
+            ? { subjects: input.subjects }
+            : {}),
         });
         return finalise(res.data);
       }

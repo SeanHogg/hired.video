@@ -17,6 +17,10 @@ import {
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
 import {
+  resolveDocumentTheme,
+  type ResolvedDocumentTheme,
+} from "@/lib/studio/editor-v2/document-theme";
+import {
   resumeSectionSchema,
   type SectionFieldDef,
 } from "@/lib/studio/document/resume-field-schema";
@@ -29,12 +33,6 @@ interface DocumentViewProps {
   forPrint?: boolean;
 }
 
-const FONT_STACK: Record<string, string> = {
-  serif: "Georgia, 'Times New Roman', serif",
-  mono: "ui-monospace, 'SFMono-Regular', Menlo, monospace",
-  sans: "Inter, system-ui, -apple-system, sans-serif",
-};
-
 function rec(content: ResumeData | null | undefined): Record<string, unknown> {
   return (content ?? {}) as unknown as Record<string, unknown>;
 }
@@ -42,14 +40,14 @@ function rec(content: ResumeData | null | undefined): Record<string, unknown> {
 export default function DocumentView({ state, content, forPrint }: DocumentViewProps) {
   const { width, height } = pageDimensions(state);
   const page = state.pages[0];
-  const fontFamily = FONT_STACK[state.theme.fontFamily] ?? FONT_STACK.sans;
+  const theme = resolveDocumentTheme(state.theme);
 
   const pageStyle: CSSProperties = {
     width,
     minHeight: height,
     background: "#fff",
-    color: "#0f172a",
-    fontFamily,
+    color: theme.text,
+    fontFamily: theme.fontFamily,
     padding: 48,
     boxSizing: "border-box",
     position: "relative",
@@ -63,7 +61,7 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
   return (
     <div style={pageStyle}>
       {flowBlocks.map((b) => (
-        <BlockView key={b.id} block={b} content={content} />
+        <BlockView key={b.id} block={b} content={content} theme={theme} />
       ))}
       {absoluteBlocks.map((b) => {
         const box = b.box ?? { x: 0.1, y: 0.1, width: 0.4, height: 0.2, z: 1 };
@@ -78,7 +76,7 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
               zIndex: box.z,
             }}
           >
-            <BlockView block={b} content={content} />
+            <BlockView block={b} content={content} theme={theme} />
           </div>
         );
       })}
@@ -112,12 +110,14 @@ export default function DocumentView({ state, content, forPrint }: DocumentViewP
 function BlockView({
   block,
   content,
+  theme,
 }: {
   block: DocumentBlock;
   content?: ResumeData | null;
+  theme: ResolvedDocumentTheme;
 }) {
   if (block.kind === "divider") {
-    return <hr style={{ border: 0, borderTop: "1px solid #cbd5e1", margin: "12px 0" }} />;
+    return <hr style={{ border: 0, borderTop: `1px solid ${theme.accentBorder}`, margin: "12px 0" }} />;
   }
   if (block.kind === "spacer") return <div style={{ height: 24 }} />;
   if (block.kind === "text") {
@@ -134,24 +134,32 @@ function BlockView({
   }
   // section / component
   if (block.sectionKey === "basics") {
-    return <BasicsView content={content} />;
+    return <BasicsView content={content} theme={theme} />;
   }
-  return <SectionView block={block} content={content} />;
+  return <SectionView block={block} content={content} theme={theme} />;
 }
 
-function BasicsView({ content }: { content?: ResumeData | null }) {
+function BasicsView({
+  content,
+  theme,
+}: {
+  content?: ResumeData | null;
+  theme: ResolvedDocumentTheme;
+}) {
   const basics = (rec(content).basics ?? {}) as Record<string, unknown>;
   const str = (k: string) => (typeof basics[k] === "string" ? (basics[k] as string) : "");
   const contactBits = [str("email"), str("phone"), str("url")].filter(Boolean);
   if (!str("name") && contactBits.length === 0 && !str("summary")) return null;
   return (
-    <header style={{ marginBottom: 14 }}>
-      {str("name") && <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>{str("name")}</h1>}
+    <header style={{ marginBottom: theme.sectionGap }}>
+      {str("name") && (
+        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: theme.heading }}>{str("name")}</h1>
+      )}
       {str("label") && (
-        <div style={{ fontSize: 14, color: "#475569", marginTop: 2 }}>{str("label")}</div>
+        <div style={{ fontSize: 14, color: theme.accent, marginTop: 2 }}>{str("label")}</div>
       )}
       {contactBits.length > 0 && (
-        <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+        <div style={{ fontSize: 12, color: theme.muted, marginTop: 6 }}>
           {contactBits.join("  ·  ")}
         </div>
       )}
@@ -167,32 +175,40 @@ function BasicsView({ content }: { content?: ResumeData | null }) {
 function SectionView({
   block,
   content,
+  theme,
 }: {
   block: DocumentBlock;
   content?: ResumeData | null;
+  theme: ResolvedDocumentTheme;
 }) {
   const schema = resumeSectionSchema(block.sectionKey);
   const rows = rec(content)[block.sectionKey ?? ""];
   const items = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
   if (items.length === 0) return null;
+  const deco = theme.headingDecoration;
   return (
-    <section style={{ marginBottom: 14 }}>
+    <section style={{ marginBottom: theme.sectionGap }}>
       <h2
         style={{
           fontSize: 12,
           fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "#1e293b",
-          borderBottom: "1px solid #cbd5e1",
-          paddingBottom: 3,
+          textTransform: deco.textTransform,
+          letterSpacing: deco.letterSpacing,
+          color: theme.accent,
+          borderBottom: deco.borderBottom,
+          paddingBottom: deco.paddingBottom,
           margin: "0 0 8px",
         }}
       >
         {block.title ?? block.sectionKey}
       </h2>
       {items.map((item, i) => (
-        <ItemView key={(item.id as string) ?? i} item={item} fields={schema?.fields ?? []} />
+        <ItemView
+          key={(item.id as string) ?? i}
+          item={item}
+          fields={schema?.fields ?? []}
+          theme={theme}
+        />
       ))}
     </section>
   );
@@ -201,9 +217,11 @@ function SectionView({
 function ItemView({
   item,
   fields,
+  theme,
 }: {
   item: Record<string, unknown>;
   fields: SectionFieldDef[];
+  theme: ResolvedDocumentTheme;
 }) {
   // Heuristic faithful render from the schema: first text field = bold primary;
   // remaining text/date fields = a muted meta line; list fields = bullets;
@@ -221,9 +239,9 @@ function ItemView({
     .join("  ·  ");
 
   return (
-    <div style={{ marginBottom: 10 }}>
-      {primary && <div style={{ fontSize: 13, fontWeight: 600 }}>{primary}</div>}
-      {meta && <div style={{ fontSize: 12, color: "#64748b" }}>{meta}</div>}
+    <div style={{ marginBottom: theme.entryGap }}>
+      {primary && <div style={{ fontSize: 13, fontWeight: 600, color: theme.heading }}>{primary}</div>}
+      {meta && <div style={{ fontSize: 12, color: theme.muted }}>{meta}</div>}
       {proseFields.map((f) =>
         val(f.key) ? (
           <p key={f.key} style={{ fontSize: 12.5, lineHeight: 1.5, margin: "4px 0", whiteSpace: "pre-wrap" }}>

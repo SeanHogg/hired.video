@@ -286,6 +286,11 @@ export interface DocumentState {
    */
   columns: number;
   theme: DocumentTheme;
+  /** Id of the design template last applied (`DocumentTemplateOption.id`), so
+   *  the picker can mark the ACTIVE card unambiguously — themeKey alone is
+   *  ambiguous (several templates share a palette). Undefined = bespoke /
+   *  never-templated layout. */
+  templateId?: string;
   pages: DocumentPage[];
 
   // ── Content binding ──

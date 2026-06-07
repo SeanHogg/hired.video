@@ -24,8 +24,15 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
-import DocumentView from "@/components/studio/document/DocumentView";
+import DocumentPagedView, {
+  DocumentViewModeToggle,
+  type DocumentViewMode,
+} from "@/components/studio/document/DocumentPagedView";
 import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
+import {
+  applyDocumentTemplate,
+  documentTemplatesForEntity,
+} from "@/lib/studio/editor-v2/document-templates";
 import type { ResumeData } from "@/types/resume";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import MetadataModal from "@/components/MetadataModal";
@@ -187,6 +194,16 @@ export default function ResumeDetail() {
   const [studioVideos, setStudioVideos] = useState<ResumeVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [descriptor, setDescriptor] = useState<ResumeTemplateDescriptor>(DEFAULT_DESCRIPTOR);
+  // For canvas-authored resumes (those with a saved `documentLayout`), the
+  // template dropdown re-skins the LAYOUT via `applyDocumentTemplate`. Tracked
+  // separately from `descriptor` (which drives the declarative renderer) and
+  // set only on an explicit user pick, so the saved layout renders verbatim on
+  // first load and only re-skins when the user switches templates (#1883).
+  const [layoutTemplateOverrideId, setLayoutTemplateOverrideId] = useState<string | null>(null);
+  // Paged review mode for canvas resumes — default to the two-up flip spread so
+  // a multi-page resume shows "1 + 2" with page flipping (the same preview
+  // canvas the studio editor uses).
+  const [docViewMode, setDocViewMode] = useState<DocumentViewMode>("paged");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -324,6 +341,10 @@ export default function ResumeDetail() {
 
   const applyPreset = (preset: ResumeTemplateDescriptor) => {
     setDescriptor(preset);
+    // Canvas resumes re-skin their saved layout to the picked template; the id
+    // is shared between the declarative preset and the document-template option
+    // (both derive from TEMPLATE_PRESETS).
+    setLayoutTemplateOverrideId(preset.id);
     setEditorText(JSON.stringify(preset, null, 2));
     setEditorError(null);
   };
@@ -751,29 +772,58 @@ export default function ResumeDetail() {
               <div className="flex-1 min-w-0">
                 {(() => {
                   // If the resume was authored on the Studio document canvas,
-                  // render its saved LAYOUT read-only (preview === render ===
-                  // view, #1912). Falls back to the declarative template
-                  // renderer for resumes without a canvas layout.
-                  const layout = (
+                  // render its saved LAYOUT read-only through the SAME paged
+                  // preview canvas the editor uses (preview === render === view,
+                  // #1912). Falls back to the declarative template renderer for
+                  // resumes without a canvas layout.
+                  const baseLayout = (
                     resume.content?.meta as Record<string, unknown> | undefined
                   )?.documentLayout as DocumentState | undefined;
-                  return layout ? (
-                    <div className="flex justify-center py-6">
-                      <DocumentView
+                  if (!baseLayout) {
+                    return (
+                      <DeclarativeResumeRenderer
+                        resume={resume}
+                        descriptor={descriptor}
+                        videoSlot={<VideoSlot items={videoItems} />}
+                        isOwner={isOwner}
+                        onEditSection={() =>
+                          navigate(`/studio?editResume=${resume.id}`)
+                        }
+                      />
+                    );
+                  }
+                  // Re-skin the saved layout when the user picks a different
+                  // template from the dropdown (#1883) — template switching now
+                  // actually changes the rendered design.
+                  let layout = baseLayout;
+                  if (
+                    layoutTemplateOverrideId &&
+                    layoutTemplateOverrideId !== baseLayout.templateId
+                  ) {
+                    const option = documentTemplatesForEntity("resume").find(
+                      (o) => o.id === layoutTemplateOverrideId,
+                    );
+                    if (option) {
+                      layout = applyDocumentTemplate(
+                        baseLayout,
+                        option,
+                        () => crypto.randomUUID(),
+                      );
+                    }
+                  }
+                  return (
+                    <div className="flex flex-col items-center gap-3 py-6">
+                      <DocumentViewModeToggle
+                        value={docViewMode}
+                        onChange={setDocViewMode}
+                      />
+                      <DocumentPagedView
                         state={layout}
                         content={resume.content as unknown as ResumeData}
+                        mode={docViewMode}
+                        className="w-full"
                       />
                     </div>
-                  ) : (
-                    <DeclarativeResumeRenderer
-                      resume={resume}
-                      descriptor={descriptor}
-                      videoSlot={<VideoSlot items={videoItems} />}
-                      isOwner={isOwner}
-                      onEditSection={() =>
-                        navigate(`/studio?editResume=${resume.id}`)
-                      }
-                    />
                   );
                 })()}
                 <div className="px-4 sm:px-6 pb-8">

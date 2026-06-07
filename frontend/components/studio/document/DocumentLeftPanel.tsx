@@ -22,7 +22,10 @@ import {
   setOrientation,
   setPageSize,
 } from "@/lib/studio/editor-v2/document-edit";
-import { applyDocumentTemplate } from "@/lib/studio/editor-v2/document-templates";
+import {
+  applyDocumentTemplate,
+  documentTemplatesForEntity,
+} from "@/lib/studio/editor-v2/document-templates";
 import DocumentTemplatePicker from "@/components/studio/document/DocumentTemplatePicker";
 
 /** dataTransfer MIME for a dragged palette preset — the value is the preset's
@@ -40,6 +43,9 @@ export default function DocumentLeftPanel({ state, setState, commit }: DocumentL
   const pageId = firstPageId(state);
   const presets = blockPresetsForEntity(state.entityKind);
   const canSetPageMode = documentSupportsPageMode(state.entityKind);
+  const activeTemplate = state.templateId
+    ? documentTemplatesForEntity(state.entityKind).find((o) => o.id === state.templateId)
+    : undefined;
   const commitState = (next: DocumentState) => {
     setState(() => next);
     commit();
@@ -54,11 +60,20 @@ export default function DocumentLeftPanel({ state, setState, commit }: DocumentL
         </h3>
         <DocumentTemplatePicker
           entityKind={state.entityKind}
-          currentThemeKey={state.theme.themeKey}
+          currentTemplateId={state.templateId}
           onApply={(option) =>
             commitState(applyDocumentTemplate(state, option, () => newId("blk")))
           }
         />
+        {/* Surface which template is applied so the choice is visible after the
+            picker closes. */}
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {activeTemplate ? (
+            <>Using <span className="font-medium text-foreground">{activeTemplate.name}</span></>
+          ) : (
+            "Custom layout"
+          )}
+        </p>
       </section>
 
       {/* Block / section palette — drag onto the page, or click to append. */}

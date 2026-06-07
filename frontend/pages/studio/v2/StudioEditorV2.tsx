@@ -40,7 +40,7 @@ import {
   UserPlus,
   Download,
   Code2,
-  Upload,
+  Eye,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -141,13 +141,14 @@ import Cad3DStage from "@/components/studio/cad-3d/Cad3DStage";
 import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import DocumentStage from "@/components/studio/document/DocumentStage";
 import DocumentLeftPanel from "@/components/studio/document/DocumentLeftPanel";
-import ResumeUploadSheet from "@/components/ResumeUploadSheet";
+import ResumeUpload from "@/components/ResumeUpload";
 import {
   type DocumentState,
   createBlankDocumentState,
+  createResumeDocumentState,
 } from "@/lib/studio/editor-v2/document-state";
 import { resumeService } from "@/lib/services/resume-service";
-import type { ResumeData } from "@/types/resume";
+import type { ResumeData, ResumeUploadResponse } from "@/types/resume";
 import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
 import { printDocument } from "@/lib/studio/document/print-document";
 import { articleService } from "@/lib/services/article-service";
@@ -224,6 +225,7 @@ import { PageEmbedDialog } from "@/components/studio/PageEmbedDialog";
 import { isSuperAdminFromToken } from "@/lib/auth-claims";
 import AudioEmptyHint from "@/components/studio/v2/AudioEmptyHint";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
+import DocumentPreviewOverlay from "@/components/studio/document/DocumentPreviewOverlay";
 import StudioSaveMenuV2 from "@/components/studio/v2/StudioSaveMenuV2";
 import { useProjectChrome } from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
@@ -513,8 +515,6 @@ export default function StudioEditorV2() {
   // owned by the resume row. Seeded blank for a fresh draft; fetched from the
   // resume row when DocumentState.entityId is set; persisted back on save.
   const [documentEntityContent, setDocumentEntityContent] = useState<ResumeData | null>(null);
-  // "Upload existing resume" sheet (right rail, document/resume kind).
-  const [resumeUploadOpen, setResumeUploadOpen] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -1098,6 +1098,7 @@ export default function StudioEditorV2() {
     }
   }, [leftBottomOpen]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [docPreviewOpen, setDocPreviewOpen] = useState(false);
   const playback = usePreviewPlayback(state);
   // "Where has this project been published" (#1920) — one fetch shared by the
   // Save menu + Details drawer; refreshed after each successful publish.
@@ -1233,6 +1234,31 @@ export default function StudioEditorV2() {
     // documentState.entityId is the binding signal; entityKind is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, documentStateHydrated, documentState.entityId]);
+
+  // Inline "upload existing résumé" success path (#1915). The user is already
+  // in the resume editor — uploading converts the file and renders it on the
+  // CURRENT canvas in place, rather than opening a new resume via navigation.
+  // Reuses the same document-state builder as the ?editResume deep-link so the
+  // section blocks are identical regardless of entry point. Rebinding
+  // `entityId` re-fires the content effect above, which refetches the canonical
+  // content; we set it eagerly here too so the canvas fills without a flash.
+  const handleResumeUploaded = useCallback(
+    (response: ResumeUploadResponse) => {
+      const content = response.content as unknown as Record<string, unknown>;
+      const populated = Object.keys(content).filter(
+        (k) => Array.isArray(content[k]) && (content[k] as unknown[]).length > 0,
+      );
+      const docState = createResumeDocumentState(
+        response.id,
+        populated,
+        () => crypto.randomUUID(),
+      );
+      resetDocumentHistory(docState);
+      setDocumentEntityContent(response.content);
+      toast({ title: "Résumé imported", description: response.message });
+    },
+    [resetDocumentHistory, toast],
+  );
 
   // Game uses the null-sentinel hydration pattern instead of a
   // separate boolean flag — `gameState !== null` IS the hydration
@@ -2846,6 +2872,9 @@ export default function StudioEditorV2() {
                 : state.scenes.some((s) => s.widgets.length > 0)
           }
           onOpenPreview={() => setPreviewOpen(true)}
+          onOpenDocumentPreview={
+            currentMediaKind === "document" ? () => setDocPreviewOpen(true) : undefined
+          }
           mediaKind={currentMediaKind}
           gameEngine={gameState?.engine ?? null}
           gamePlaying={gamePlaying}
@@ -3821,39 +3850,35 @@ export default function StudioEditorV2() {
               )}
             </CollapsiblePanel>
           )}
-          {/* Document (resume) — "Upload existing resume" below the AI panel.
-              Reuses the shared <ResumeUploadSheet>; on success the parsed
-              resume opens on the canvas via the ?editResume round-trip. */}
+          {/* Document (resume) — inline "Upload existing resume" below the AI
+              panel. The user has already selected the resume they're editing,
+              so this isn't a "create new" flow: dropping a file converts it and
+              renders it on the CURRENT canvas in place (no slide-out, no
+              navigation). Reuses the shared <ResumeUpload> form. */}
           {currentMediaKind === "document" && documentState.entityKind === "resume" && (
             <CollapsiblePanel
               side="right"
               label="Upload"
               storageKey="studio.v2.panel.right.upload"
-              expandedClassName="w-72"
+              expandedClassName="w-80"
               defaultOpen={false}
             >
               <div className="p-3 text-sm">
-                <p className="mb-2 text-xs text-muted-foreground">
+                <p className="mb-3 text-xs text-muted-foreground">
                   Import an existing résumé (PDF / DOCX / TXT) to fill the canvas.
                 </p>
-                <Button size="sm" className="w-full" onClick={() => setResumeUploadOpen(true)}>
-                  <Upload className="mr-1.5 h-4 w-4" />
-                  {t("actions.uploadResumeAction")}
-                </Button>
+                <ResumeUpload
+                  compact
+                  minimal
+                  submitLabel="Convert & import"
+                  onUploadSuccess={handleResumeUploaded}
+                />
               </div>
             </CollapsiblePanel>
           )}
           </div>
         </div>
       </div>
-      <ResumeUploadSheet
-        open={resumeUploadOpen}
-        onOpenChange={setResumeUploadOpen}
-        onSuccess={(response) => {
-          setResumeUploadOpen(false);
-          navigate(`/studio?editResume=${response.id}`);
-        }}
-      />
       {/* Save as Course Lesson — see [AttachToCourseDialog](../../components/creator/AttachToCourseDialog.tsx)
           and the SaveMenuV2 publish-handler wiring above. Self-fetches the
           user's courses; renders a "Create a course" CTA when the list is
@@ -3885,6 +3910,14 @@ export default function StudioEditorV2() {
           state={state}
           playback={playback}
           onClose={() => setPreviewOpen(false)}
+        />
+      )}
+      {docPreviewOpen && currentMediaKind === "document" && (
+        <DocumentPreviewOverlay
+          state={documentState}
+          content={documentEntityContent}
+          title={title}
+          onClose={() => setDocPreviewOpen(false)}
         />
       )}
       {/* 3D-world Invite dialog — modal mounted at the editor root so
@@ -3991,6 +4024,7 @@ function EditorHeader({
   getVideoScript,
   hasContent,
   onOpenPreview,
+  onOpenDocumentPreview,
   onExport,
   exporting,
   onPublishToYouTube,
@@ -4031,6 +4065,10 @@ function EditorHeader({
   getVideoScript: () => unknown;
   hasContent: boolean;
   onOpenPreview: () => void;
+  /** Document-kind preview (resume). Opens the fullscreen read-only
+   *  `<DocumentPreviewOverlay>`; undefined for non-document kinds so the
+   *  button self-gates. */
+  onOpenDocumentPreview?: () => void;
   onExport: () => void;
   exporting: boolean;
   onPublishToYouTube: () => void;
@@ -4202,6 +4240,20 @@ function EditorHeader({
             playback), collapsing the group to just the layout dropdown for
             those kinds. Layout presets apply to every kind, so the
             dropdown always renders. */}
+        {/* Document-kind Preview — opens the fullscreen read-only paged
+            review (resume). Self-gates on the callback, which the parent only
+            binds for the document mediaKind. */}
+        {onOpenDocumentPreview && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={onOpenDocumentPreview}
+          >
+            <Eye className="h-4 w-4" />
+            Preview
+          </Button>
+        )}
         <PreviewLayoutGroup
           onApplyLayout={onApplyLayoutBindings}
           onOpenPreview={usesTimelineChrome ? onOpenPreview : undefined}

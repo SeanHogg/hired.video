@@ -30,15 +30,16 @@ import {
 
 interface DocumentTemplatePickerProps {
   entityKind: DocumentEntityKind;
-  /** The document's current theme key — used to mark the matching card as
-   *  active so the user sees which design is applied. */
-  currentThemeKey: string;
+  /** The id of the template currently applied (`DocumentState.templateId`) —
+   *  used to mark the active card. Unambiguous, unlike matching by themeKey
+   *  (several templates share a palette). */
+  currentTemplateId?: string;
   onApply: (option: DocumentTemplateOption) => void;
 }
 
 export default function DocumentTemplatePicker({
   entityKind,
-  currentThemeKey,
+  currentTemplateId,
   onApply,
 }: DocumentTemplatePickerProps) {
   const [open, setOpen] = useState(false);
@@ -68,7 +69,7 @@ export default function DocumentTemplatePicker({
             <TemplateOptionCard
               key={option.id}
               option={option}
-              active={option.theme.themeKey === currentThemeKey}
+              active={option.id === currentTemplateId}
               onUse={() => {
                 onApply(option);
                 setOpen(false);

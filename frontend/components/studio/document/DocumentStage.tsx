@@ -28,6 +28,10 @@ import {
   pageDimensions,
 } from "@/lib/studio/editor-v2/document-state";
 import {
+  resolveDocumentTheme,
+  type ResolvedDocumentTheme,
+} from "@/lib/studio/editor-v2/document-theme";
+import {
   blockPresetsForEntity,
   firstPageId,
   insertBlockAt,
@@ -37,6 +41,10 @@ import {
   updateBlock,
 } from "@/lib/studio/editor-v2/document-edit";
 import { DOCUMENT_BLOCK_DRAG_MIME } from "@/components/studio/document/DocumentLeftPanel";
+import DocumentPagedView, {
+  DocumentViewModeToggle,
+  type DocumentViewMode,
+} from "@/components/studio/document/DocumentPagedView";
 
 interface DocumentStageProps {
   state: DocumentState;
@@ -86,9 +94,13 @@ export default function DocumentStage({
   onContentChange,
 }: DocumentStageProps) {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  // "One Page" = the editable continuous authoring sheet; "Individual Pages" =
+  // a read-only two-up book spread for reviewing how the resume paginates.
+  const [viewMode, setViewMode] = useState<DocumentViewMode>("continuous");
   const pageId = firstPageId(state);
   const { width, height } = pageDimensions(state);
   const page = state.pages[0];
+  const theme = resolveDocumentTheme(state.theme);
 
   const commitState = (next: DocumentState) => {
     setState(() => next);
@@ -116,22 +128,32 @@ export default function DocumentStage({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* ── The page sheet (true print width × zoom; grows in height, with
+      {/* View-mode toggle — One Page (editable continuous sheet) vs Individual
+          Pages (read-only two-up flip spread). Self-contained here so the
+          stage owns its own display mode. */}
+      <DocumentViewModeToggle value={viewMode} onChange={setViewMode} />
+
+      {viewMode === "paged" ? (
+        <DocumentPagedView
+          state={state}
+          content={entityContent}
+          mode="paged"
+          className="w-full"
+        />
+      ) : (
+      /* ── The page sheet (true print width × zoom; grows in height, with
             per-page break guides). The authoring toolbar lives in the editor
-            footer (<DocumentToolbar>), not here. ── */}
+            footer (<DocumentToolbar>), not here. ── */
       <div
         ref={sheetRef}
-        className="relative origin-top bg-white text-slate-900 shadow-xl ring-1 ring-black/10"
+        className="relative origin-top shadow-xl ring-1 ring-black/10"
         style={{
           width,
           minHeight: height,
           transform: `scale(${zoom})`,
-          fontFamily:
-            state.theme.fontFamily === "serif"
-              ? "Georgia, serif"
-              : state.theme.fontFamily === "mono"
-                ? "ui-monospace, monospace"
-                : "Inter, system-ui, sans-serif",
+          background: "#fff",
+          color: theme.text,
+          fontFamily: theme.fontFamily,
         }}
         onClick={() => setSelectedBlockId(null)}
         onDragOver={(e) => {
@@ -202,6 +224,7 @@ export default function DocumentStage({
                 block={block}
                 selected={selectedBlockId === block.id}
                 entityContent={entityContent}
+                theme={theme}
                 onContentChange={onContentChange}
                 onSelect={(e) => {
                   e.stopPropagation();
@@ -244,6 +267,7 @@ export default function DocumentStage({
                 block={block}
                 selected={selectedBlockId === block.id}
                 entityContent={entityContent}
+                theme={theme}
                 onContentChange={onContentChange}
                 onSelect={(e) => {
                   e.stopPropagation();
@@ -287,6 +311,7 @@ export default function DocumentStage({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
@@ -295,6 +320,7 @@ function DocumentBlockView({
   block,
   selected,
   entityContent,
+  theme,
   onContentChange,
   onSelect,
   onMoveUp,
@@ -307,6 +333,7 @@ function DocumentBlockView({
   block: DocumentBlock;
   selected: boolean;
   entityContent?: ResumeData | null;
+  theme: ResolvedDocumentTheme;
   onContentChange?: (next: ResumeData) => void;
   onSelect: (e: React.MouseEvent) => void;
   onMoveUp?: () => void;
@@ -358,6 +385,7 @@ function DocumentBlockView({
       <BlockBody
         block={block}
         entityContent={entityContent}
+        theme={theme}
         onContentChange={onContentChange}
         onCommitText={onCommitText}
       />
@@ -368,11 +396,13 @@ function DocumentBlockView({
 function BlockBody({
   block,
   entityContent,
+  theme,
   onContentChange,
   onCommitText,
 }: {
   block: DocumentBlock;
   entityContent?: ResumeData | null;
+  theme: ResolvedDocumentTheme;
   onContentChange?: (next: ResumeData) => void;
   onCommitText?: (text: string) => void;
 }) {
@@ -433,7 +463,16 @@ function BlockBody({
   // TS narrows entityContent + onContentChange to non-null in the edit branch.
   return (
     <div>
-      <h3 className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-semibold uppercase tracking-wide text-slate-800">
+      <h3
+        className="mb-1 pb-0.5 text-sm font-semibold"
+        style={{
+          color: theme.accent,
+          textTransform: theme.headingDecoration.textTransform,
+          letterSpacing: theme.headingDecoration.letterSpacing,
+          borderBottom: theme.headingDecoration.borderBottom,
+          paddingBottom: theme.headingDecoration.paddingBottom,
+        }}
+      >
         {block.title ?? block.sectionKey ?? "Section"}
       </h3>
       {onContentChange && entityContent && resumeSectionSchema(block.sectionKey) ? (

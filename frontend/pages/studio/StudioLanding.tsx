@@ -68,8 +68,9 @@ import {
   type LicensedStudioTemplate,
   type StudioTemplate,
 } from "@/lib/services/studio-templates-service";
-import { parseStudioSubject } from "@shared/studio-subject";
+import { parseStudioSubject, type StudioSubject } from "@shared/studio-subject";
 import { MEDIA_KIND_UI } from "@shared/media-kinds";
+import StudioLoadingShell from "./StudioLoadingShell";
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
@@ -210,13 +211,35 @@ export default function StudioLanding() {
       );
     };
 
+    // Reopen the EXISTING studio document project linked to this entity, if
+    // one was already created — so "Edit" lands straight in the editor instead
+    // of minting a duplicate project on every click (#1882). Returns null when
+    // none exists yet (first-ever edit).
+    const findExistingDocProject = async (
+      subject: StudioSubject,
+    ): Promise<StudioProject | null> => {
+      try {
+        const res = await studioService.getProjects(subject);
+        return (res.data ?? []).find((p) => p.mediaKind === "document") ?? null;
+      } catch {
+        return null;
+      }
+    };
+
     // Open an EXISTING resume on the document canvas (#1915 — resume edit
-    // moved into the studio). Fetch the resume, seed a document bound to its
-    // id with blocks for every populated section, and mint the project.
+    // moved into the studio). Reuse the linked project if present; otherwise
+    // seed a document bound to the resume id (blocks for every populated
+    // section) and mint it WITH the subject link so the next edit reuses it.
     const editResumeId = searchParams.get("editResume");
     if (editResumeId) {
       void (async () => {
         try {
+          const subject: StudioSubject = { kind: "resume", id: editResumeId };
+          const existing = await findExistingDocProject(subject);
+          if (existing) {
+            navigateToProject(existing);
+            return;
+          }
           const resume = await resumeService.getResumeById(editResumeId);
           const content = (resume.content ?? {}) as Record<string, unknown>;
           const populated = Object.keys(content).filter(
@@ -231,6 +254,7 @@ export default function StudioLanding() {
             kind: "document",
             documentState: docState,
             name: resume.title || "Resume",
+            subjects: [subject],
           });
           navigateToProject(created);
         } catch (err) {
@@ -244,12 +268,19 @@ export default function StudioLanding() {
       return;
     }
 
-    // Open an EXISTING article/blog on the document canvas (#1914) — fetch it,
-    // convert its markdown body to blocks, and mint a document bound to its id.
+    // Open an EXISTING article/blog on the document canvas (#1914) — reuse the
+    // linked project if present, else convert its markdown to blocks and mint a
+    // document bound to its id with the subject link.
     const editArticleId = searchParams.get("editArticle");
     if (editArticleId) {
       void (async () => {
         try {
+          const subject: StudioSubject = { kind: "article", id: editArticleId };
+          const existing = await findExistingDocProject(subject);
+          if (existing) {
+            navigateToProject(existing);
+            return;
+          }
           const article = await articleService.getMine(editArticleId);
           const docState = articleToDocumentState(
             { id: article.id, title: article.title, bodyMd: article.bodyMd },
@@ -259,6 +290,7 @@ export default function StudioLanding() {
             kind: "document",
             documentState: docState,
             name: article.title || "Article",
+            subjects: [subject],
           });
           navigateToProject(created);
         } catch (err) {
@@ -541,6 +573,19 @@ export default function StudioLanding() {
     );
     setDetailsProject((cur) => (cur && cur.id === next.id ? next : cur));
   }
+
+  // A redirect deep-link is in flight (the mount effect above mints/finds a
+  // project then `navigate(..., {replace:true})`). Show the loading shell, not
+  // the chooser, so "Edit resume" goes straight to the editor without flashing
+  // the project picker (#1882).
+  const redirecting =
+    searchParams.has("projectId") ||
+    searchParams.has("editResume") ||
+    searchParams.has("editArticle") ||
+    searchParams.has("subject") ||
+    searchParams.has("capture") ||
+    searchParams.has("new");
+  if (redirecting) return <StudioLoadingShell />;
 
   return (
     <AppShell>
