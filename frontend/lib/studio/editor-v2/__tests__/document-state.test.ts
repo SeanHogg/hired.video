@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   createBlankDocumentState,
+  createJobDocumentState,
   createResumeDocumentState,
   documentSupportsPageMode,
   pageDimensions,
@@ -75,9 +76,24 @@ describe("createBlankDocumentState", () => {
     }
   });
 
-  it("seeds job with no blocks (section model is the co-developed track)", () => {
+  it("seeds a job with its posting sections", () => {
     const s = createBlankDocumentState("job", counter());
-    expect(s.pages[0].blocks).toEqual([]);
+    expect(s.entityKind).toBe("job");
+    const keys = s.pages[0].blocks.map((b) => b.sectionKey);
+    expect(keys).toEqual(["overview", "responsibilities", "requirements", "details"]);
+    expect(s.pages[0].blocks.every((b) => b.kind === "section" && b.mode === "flow")).toBe(true);
+  });
+});
+
+describe("createJobDocumentState", () => {
+  it("binds entityId and seeds the posting sections", () => {
+    const s = createJobDocumentState("job-123", counter());
+    expect(s.entityId).toBe("job-123");
+    expect(s.entityKind).toBe("job");
+    expect(s.pageSize).toBe("letter");
+    expect(s.orientation).toBe("portrait");
+    const keys = s.pages[0].blocks.map((b) => b.sectionKey);
+    expect(keys).toEqual(["overview", "responsibilities", "requirements", "details"]);
   });
 });
 

@@ -156,6 +156,7 @@ describe("seedTemplate", () => {
           cadState?: unknown;
           cad3dState?: unknown;
           interactiveComicState?: unknown;
+          documentState?: unknown;
         };
         const hasSomePayload =
           result.timelineSpec !== undefined ||
@@ -164,7 +165,8 @@ describe("seedTemplate", () => {
           r.animationState !== undefined ||
           r.cadState !== undefined ||
           r.cad3dState !== undefined ||
-          r.interactiveComicState !== undefined;
+          r.interactiveComicState !== undefined ||
+          r.documentState !== undefined;
         expect(hasSomePayload).toBe(true);
       });
     }

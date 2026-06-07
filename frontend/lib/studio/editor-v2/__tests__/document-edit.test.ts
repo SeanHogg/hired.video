@@ -24,9 +24,12 @@ function counter() {
   let n = 0;
   return () => `id${++n}`;
 }
-// A blank job doc has no seeded blocks — the cleanest base for block tests.
+// A single-page doc with NO blocks — the cleanest base for the block-mutation
+// tests (every entity now seeds starter blocks, so we clear them here to test
+// the pure helpers in isolation).
 function blankDoc() {
-  return createBlankDocumentState("job", counter());
+  const s = createBlankDocumentState("job", counter());
+  return { ...s, pages: s.pages.map((p) => ({ ...p, blocks: [] })) };
 }
 const textPreset = { kind: "text" as const, label: "Text" };
 
