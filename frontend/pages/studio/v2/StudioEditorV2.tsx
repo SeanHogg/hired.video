@@ -1235,13 +1235,15 @@ export default function StudioEditorV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, documentStateHydrated, documentState.entityId]);
 
-  // Inline "upload existing résumé" success path (#1915). The user is already
-  // in the resume editor — uploading converts the file and renders it on the
-  // CURRENT canvas in place, rather than opening a new resume via navigation.
-  // Reuses the same document-state builder as the ?editResume deep-link so the
-  // section blocks are identical regardless of entry point. Rebinding
-  // `entityId` re-fires the content effect above, which refetches the canonical
-  // content; we set it eagerly here too so the canvas fills without a flash.
+  // Inline "upload existing résumé" success path (#1915 / #1935). The user is
+  // already in the resume editor — the upload OVERWRITES the open résumé's
+  // content in place (ResumeUpload `targetResumeId`), so `response.id` is the
+  // same bound entity (a blank, unsaved draft has no entityId, so it falls back
+  // to creating one). Either way we rebuild the canvas here: reuse the same
+  // document-state builder as the ?editResume deep-link so the section blocks
+  // are identical regardless of entry point, and set the parsed content
+  // directly (the content effect above only refetches on an entityId CHANGE,
+  // which an overwrite doesn't trigger).
   const handleResumeUploaded = useCallback(
     (response: ResumeUploadResponse) => {
       const content = response.content as unknown as Record<string, unknown>;
@@ -3871,6 +3873,7 @@ export default function StudioEditorV2() {
                   compact
                   minimal
                   submitLabel="Convert & import"
+                  targetResumeId={documentState.entityId ?? undefined}
                   onUploadSuccess={handleResumeUploaded}
                 />
               </div>

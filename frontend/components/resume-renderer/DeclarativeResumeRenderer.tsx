@@ -715,6 +715,9 @@ function renderSectionBody(
   theme: ThemeStyles,
   density: { section: string; entry: string },
 ): React.ReactNode {
+  // A resume with null/undefined content (malformed row, fresh draft) must not
+  // crash the render — every section reads off `data`.
+  if (!data) return null;
   const layout = section.layout;
 
   switch (key) {

@@ -88,7 +88,12 @@ export default function ItemSkillBadges({
   const evidence = useMemo<SkillEvidence[]>(() => {
     if (!itemId || !content) return [];
     const all = (content.skillEvidence ?? []) as SkillEvidence[];
-    return all.filter((e) => e.referenceId === itemId);
+    // Require a usable string `skillName` — a malformed evidence row (missing
+    // name) would otherwise crash the later `.toLowerCase()` calls and blank
+    // the whole resume render.
+    return all.filter(
+      (e) => e.referenceId === itemId && typeof e.skillName === "string" && e.skillName.trim() !== "",
+    );
   }, [itemId, content?.skillEvidence]);
 
   const enrichedSkillsByName = useMemo(() => {
@@ -206,7 +211,9 @@ function SkillSubgraphDialog({
   // Compute the slice once per render — cheap because the resume content
   // is already in memory and the filtering is O(skills + evidence + items).
   const focused = useMemo(() => {
-    const allEvidence = (content.skillEvidence ?? []) as SkillEvidence[];
+    const allEvidence = ((content.skillEvidence ?? []) as SkillEvidence[]).filter(
+      (e) => typeof e.skillName === "string" && e.skillName.trim() !== "",
+    );
     const items = listResolvableItems(content);
     const itemIndex = indexResolvedItems(items);
     const focusedItem = itemIndex.get(itemId);

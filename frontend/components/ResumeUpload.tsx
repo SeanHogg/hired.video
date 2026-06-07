@@ -44,6 +44,11 @@ interface ResumeUploadProps {
   minimal?: boolean;
   /** Override the primary button label (default "Upload Resume"). */
   submitLabel?: string;
+  /** When set, the upload OVERWRITES this existing resume's content in place
+   *  (parse → PUT) instead of minting a new resume row. Use when the user has
+   *  already opened a resume and is importing a file into it. When omitted the
+   *  component creates a brand-new resume (the /resumes + empty-state flow). */
+  targetResumeId?: string;
 }
 
 // Helper function to create empty resume data
@@ -78,6 +83,7 @@ export default function ResumeUpload({
   initialFile = null,
   minimal = false,
   submitLabel,
+  targetResumeId,
 }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(initialFile);
@@ -293,13 +299,31 @@ export default function ResumeUpload({
   };
 
   const handleUpload = async () => {
-    if (!file || !name.trim()) return;
+    // In overwrite mode the title is irrelevant (we keep the existing one), so
+    // only the create flow requires a name.
+    if (!file || (!targetResumeId && !name.trim())) return;
 
     setIsUploading(true);
     setError(null);
     setUploadProgress(0);
 
     try {
+      // Overwrite-in-place: the user already opened this resume, so parse the
+      // file to structured content and PUT it onto the SAME row — no new
+      // resume is minted. `parseResumeFromFile` handles JSON-Resume (structure
+      // preserved) and PDF/DOCX/text (server AI parse) uniformly.
+      if (targetResumeId) {
+        const { data } = await resumeService.parseResumeFromFile(file);
+        await resumeService.updateResumeData(targetResumeId, { data });
+        onUploadSuccess({
+          id: targetResumeId,
+          content: data,
+          message: name.trim() || file.name,
+          confidence: 0.8,
+        });
+        return;
+      }
+
       // If it's a JSON Resume export, parse structure client-side and
       // send as `parsedContent` — preserves dates + highlights exactly
       // as authored, skipping the lossy text->AI roundtrip.
@@ -509,7 +533,7 @@ export default function ResumeUpload({
         <div className="flex gap-3">
           <Button
             onClick={handleUpload}
-            disabled={!file || !name.trim() || isUploading}
+            disabled={!file || isUploading || (!targetResumeId && !name.trim())}
             className="flex-1"
           >
             {isUploading ? (

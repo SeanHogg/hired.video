@@ -8,6 +8,7 @@ import { Eye, Loader2, Store } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
+import ErrorBoundary from "@/components/ErrorBoundary";
 import CreatorPitchAside from "@/components/marketplace/CreatorPitchAside";
 import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell";
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
@@ -154,9 +155,14 @@ export default function MarketplaceTemplatePreview() {
   // <TemplatePlayer/>, which mounts the unified <StudioPlayer/> behind a
   // press-play overlay so visitors can watch the template walk through
   // its scenes before adopting it.
+  // Isolate the preview render: a malformed resume (bad skillEvidence row,
+  // null content, etc.) crashes only the preview pane — not the whole page —
+  // and the developer view surfaces the exact error inline (#1885).
   const wrappedPreview =
     meta.kind === "resume" ? (
-      <TemplatePreview meta={meta} resume={previewResume} />
+      <ErrorBoundary level="component">
+        <TemplatePreview meta={meta} resume={previewResume} />
+      </ErrorBoundary>
     ) : (
       <div className="w-full px-4 py-6">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
