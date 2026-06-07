@@ -84,24 +84,27 @@ interface DocumentPagedViewProps {
 }
 
 export default function DocumentPagedView(props: DocumentPagedViewProps) {
-  // Resume documents render through the declarative template engine — the SAME
-  // renderer `/resumes/:id` uses (columns, themes, hero, per-section layout) —
-  // so the studio preview matches the published resume exactly. DocumentView's
-  // generic single-column block render is only for non-resume documents
-  // (articles / blogs / free-form). The continuous/paged windowing modes don't
-  // apply to the declarative render (a responsive flow, not a fixed sheet), so
-  // the resume branch is a separate component and the windowing hooks below
-  // never run for it (keeps rules-of-hooks clean).
-  if (props.state.entityKind === "resume") {
-    return (
-      <div className={cn("flex w-full justify-center overflow-auto", props.className)}>
-        <div className="w-full max-w-5xl">
-          <ResumeDocumentView state={props.state} content={props.content} />
-        </div>
-      </div>
-    );
-  }
+  // Every entity renders through the SAME fixed-sheet windowing path so the
+  // view honours the page geometry (`pageDimensions` → portrait/landscape),
+  // the view mode (continuous one-page sheet vs paged two-up spread), and
+  // fit-to-width centering. The only per-entity difference is which body
+  // component fills the sheet — resolved in `DocumentPagedSheet` by
+  // `entityKind` (resume → the declarative renderer `/resumes/:id` uses;
+  // everything else → the generic block `DocumentView`).
   return <DocumentPagedSheet {...props} />;
+}
+
+/** The body that fills the print sheet, by entity kind. Resume uses the SAME
+ *  declarative renderer the published `/resumes/:id` page uses (columns, theme,
+ *  hero, per-section layout); other documents use the generic block render.
+ *  Rendered identically into the measuring node, the continuous sheet, and each
+ *  paged window so pagination measures exactly what paints. */
+function documentBody(state: DocumentState, content?: ResumeData | null) {
+  return state.entityKind === "resume" ? (
+    <ResumeDocumentView state={state} content={content} />
+  ) : (
+    <DocumentView state={state} content={content} forPrint />
+  );
 }
 
 function DocumentPagedSheet({
@@ -169,7 +172,7 @@ function DocumentPagedSheet({
       style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}
     >
       <div ref={measureRef} style={{ width }}>
-        <DocumentView state={state} content={content} forPrint />
+        {documentBody(state, content)}
       </div>
     </div>
   );
@@ -185,7 +188,7 @@ function DocumentPagedSheet({
             style={{ width, transform: `scale(${scale})`, transformOrigin: "top left" }}
             className="shadow-xl ring-1 ring-black/10"
           >
-            <DocumentView state={state} content={content} forPrint />
+            {documentBody(state, content)}
           </div>
         </div>
       </div>
@@ -220,7 +223,7 @@ function DocumentPagedSheet({
                 height={height}
                 pageIndex={pageIndex}
               >
-                <DocumentView state={state} content={content} forPrint />
+                {documentBody(state, content)}
               </PageWindow>
             ))}
           </div>
