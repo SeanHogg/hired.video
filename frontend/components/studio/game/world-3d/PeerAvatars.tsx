@@ -16,6 +16,7 @@ import { useFrame } from "@react-three/fiber";
 import { Group } from "three";
 import { Html } from "@react-three/drei";
 import type { RemotePeer } from "@/lib/studio/game/use-game-room";
+import { AvatarFigure, colorForId } from "./PlayerAvatar";
 
 interface PeerAvatarsProps {
   peers: Map<string, RemotePeer>;
@@ -51,11 +52,9 @@ function PeerAvatar({ peer }: { peer: RemotePeer }) {
 
   return (
     <group ref={groupRef}>
-      {/* Capsule body, ~same proportions as the player controller. */}
-      <mesh position={[0, 0, 0]} castShadow>
-        <capsuleGeometry args={[0.4, 1.2, 8, 16]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
+      {/* Shared blocky figure — same look the local player sees in
+          third-person view (DRY: one avatar across local + peers). */}
+      <AvatarFigure color={color} />
       <Html position={[0, 1.4, 0]} center distanceFactor={10}>
         <span
           className="select-none rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white shadow"
@@ -66,15 +65,4 @@ function PeerAvatar({ peer }: { peer: RemotePeer }) {
       </Html>
     </group>
   );
-}
-
-/** Deterministic hue from a userId — same friend, same color across
- *  sessions. Tiny djb2 hash → HSL palette. */
-function colorForId(userId: string): string {
-  let hash = 5381;
-  for (let i = 0; i < userId.length; i++) {
-    hash = ((hash << 5) + hash + userId.charCodeAt(i)) & 0xffffffff;
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 70%, 55%)`;
 }

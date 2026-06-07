@@ -49,6 +49,13 @@ interface Scene3DProps {
    *  left-clicks with the pointer locked and the camera-forward
    *  raycast lands on an authored entity. */
   onShootHit?: (entityId: string) => void;
+  /** Play-mode camera framing — `"first"` (eyes) or `"third"`
+   *  (orbit behind a visible avatar). Forwarded to PlayerController;
+   *  the host owns the toggle. */
+  cameraView?: "first" | "third";
+  /** Local player's avatar color (third-person body). Derived from the
+   *  player's id by the host so it matches their remote-peer figure. */
+  playerColor?: string;
 }
 
 export default function Scene3D({
@@ -61,6 +68,8 @@ export default function Scene3D({
   peers,
   onBroadcastPosition,
   onShootHit,
+  cameraView = "first",
+  playerColor,
 }: Scene3DProps) {
   const sunDirRef = useRef(world.lighting.sun.direction);
   // Convert "direction the light shines toward" into a light position
@@ -154,6 +163,8 @@ export default function Scene3D({
             respawnNonce={respawnNonce}
             onBroadcastPosition={onBroadcastPosition}
             onShootHit={onShootHit}
+            cameraView={cameraView}
+            playerColor={playerColor}
           />
         )}
 

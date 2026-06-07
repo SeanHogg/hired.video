@@ -18,15 +18,22 @@
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { CapsuleCollider, RigidBody, useRapier } from "@react-three/rapier";
-import type { RapierRigidBody } from "@react-three/rapier";
+import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from "@react-three/rapier";
 import { PointerLockControls } from "@react-three/drei";
-import { Raycaster, Vector2, Vector3, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
+import { Group, Raycaster, Vector2, Vector3, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
 import type { World3DTransform } from "@shared/game-state";
+import { AvatarFigure } from "./PlayerAvatar";
 
 const WALK_SPEED = 6; // m/s — slightly slower than a real-world run
 const JUMP_IMPULSE = 6; // m/s upward velocity on jump
 const GROUND_CHECK_DISTANCE = 0.15; // raycast distance below the capsule
+const EYE_HEIGHT = 0.7; // camera/head offset above the capsule center
+// Third-person rig — the camera orbits this far behind the player's
+// head along the look direction, raised slightly so the avatar sits in
+// the lower-center of frame (the over-the-shoulder Roblox default).
+const THIRD_PERSON_DISTANCE = 5;
+const THIRD_PERSON_HEIGHT = 1.2;
+const CAMERA_WALL_PADDING = 0.4; // keep the camera off walls it backs into
 
 interface PlayerControllerProps {
   spawn: World3DTransform;
@@ -50,6 +57,15 @@ interface PlayerControllerProps {
    *  sessions can be replayed without permanently mutating the
    *  authored gameState). */
   onShootHit?: (entityId: string) => void;
+  /** Camera framing for play mode. `"first"` keeps the camera at the
+   *  player's eyes (the body is hidden); `"third"` orbits the camera
+   *  behind a visible avatar. The host owns the toggle so the choice
+   *  survives respawns without re-mounting the controller. */
+  cameraView?: "first" | "third";
+  /** Avatar body color — only used in third-person. Derived from the
+   *  player's id by the host so it matches the player's remote-peer
+   *  capsule (one color per player everywhere). */
+  playerColor?: string;
 }
 
 export default function PlayerController({
@@ -57,8 +73,11 @@ export default function PlayerController({
   respawnNonce = 0,
   onBroadcastPosition,
   onShootHit,
+  cameraView = "first",
+  playerColor = "#38bdf8",
 }: PlayerControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
+  const avatarRef = useRef<Group | null>(null);
   const camera = useThree((s) => s.camera) as ThreePerspectiveCamera;
   const scene = useThree((s) => s.scene);
   const keysRef = useRef<Set<string>>(new Set());
@@ -187,8 +206,61 @@ export default function PlayerController({
       body.setLinvel({ x: velocity.x, y: JUMP_IMPULSE, z: velocity.z }, true);
     }
 
-    // Camera follows the capsule's "head" (top of the capsule).
-    camera.position.set(translation.x, translation.y + 0.7, translation.z);
+    // ─── Camera framing ──────────────────────────────────────────────
+    // The head is the pivot for both views. `camForward` is the look
+    // direction PointerLockControls writes into the camera rotation;
+    // first-person sits the camera AT the head, third-person pulls it
+    // back ALONG that direction so the avatar stays centered in frame.
+    const headX = translation.x;
+    const headY = translation.y + EYE_HEIGHT;
+    const headZ = translation.z;
+
+    if (cameraView === "third") {
+      // Use the FULL look direction (with pitch) so looking up/down
+      // orbits the camera vertically — `camForward` above was flattened
+      // for movement and would pin the camera to a fixed height.
+      const lookDir = new Vector3();
+      camera.getWorldDirection(lookDir);
+
+      // Desired camera = behind the head along the look direction,
+      // raised a little. Cast a ray from the head toward that point so
+      // the camera doesn't punch through a wall behind the player —
+      // clamp the pull-back distance to the nearest obstruction.
+      let dist = THIRD_PERSON_DISTANCE;
+      const backRay = new rapier.Ray(
+        { x: headX, y: headY, z: headZ },
+        { x: -lookDir.x, y: -lookDir.y, z: -lookDir.z },
+      );
+      const wallHit = world.castRay(
+        backRay,
+        THIRD_PERSON_DISTANCE,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        body, // ignore the player's own collider
+      );
+      if (wallHit) {
+        dist = Math.max(0.5, wallHit.timeOfImpact - CAMERA_WALL_PADDING);
+      }
+      camera.position.set(
+        headX - lookDir.x * dist,
+        headY + THIRD_PERSON_HEIGHT - lookDir.y * dist,
+        headZ - lookDir.z * dist,
+      );
+
+      // Face the avatar along the camera's heading (yaw only) so it
+      // turns with the look direction. Object forward is -Z, hence the
+      // negated atan2 args.
+      const avatar = avatarRef.current;
+      if (avatar) {
+        avatar.position.set(translation.x, translation.y, translation.z);
+        avatar.rotation.set(0, Math.atan2(-camForward.x, -camForward.z), 0);
+      }
+    } else {
+      // First-person — camera at the head, body hidden.
+      camera.position.set(headX, headY, headZ);
+    }
 
     // Broadcast this frame's position to the multiplayer room.
     // useGameRoom throttles internally — safe to call every frame.
@@ -214,6 +286,15 @@ export default function PlayerController({
         {/* Capsule — half-height 0.6, radius 0.4 → total height 2.0 */}
         <CapsuleCollider args={[0.6, 0.4]} />
       </RigidBody>
+      {/* Local avatar — only shown in third-person (you'd see the
+          inside of your own head in first-person). Positioned +
+          oriented from the Rapier body each frame in `useFrame`; it's
+          NOT a child of the RigidBody so it can yaw to the look
+          direction independently of the rotation-locked body. Same
+          blocky figure remote peers render (DRY). */}
+      <group ref={avatarRef} visible={cameraView === "third"}>
+        <AvatarFigure color={playerColor} />
+      </group>
       {/* PointerLockControls — clicking the canvas locks the mouse +
           drives camera rotation. drei wires the lock + escape lifecycle
           so the host doesn't need a listener. */}

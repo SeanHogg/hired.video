@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Gamepad2 } from "lucide-react";
+import { Gamepad2, Video, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   GameState,
@@ -42,6 +42,7 @@ import { useGameRoom } from "@/lib/studio/game/use-game-room";
 import { saveCachedGameState } from "@/lib/studio/game/game-state-cache";
 import { useAuth } from "@/lib/auth";
 import Scene3D from "./world-3d/Scene3D";
+import { colorForId } from "./world-3d/PlayerAvatar";
 import ChallengeHUD from "./world-3d/ChallengeHUD";
 import DropPlacer, { type DropPlacerHandler } from "./world-3d/DropPlacer";
 import { ENTITY_DRAG_MIME } from "./world-3d/EntityPaletteLeft";
@@ -97,6 +98,11 @@ export default function GameStage3D({
   // selection → gameSelection (StudioEditorV2), invite → header
   // (StudioEditorV2). What's left here is canvas-local only.
   const [respawnNonce, setRespawnNonce] = useState(0);
+  /** Play-mode camera framing. First-person on entry (the original
+   *  behavior); players toggle to third-person — which shows a visible
+   *  avatar — with the on-canvas button or the `V` key. Kept here (not
+   *  in the controller) so the choice survives respawns. */
+  const [cameraView, setCameraView] = useState<"first" | "third">("first");
   /** Play-mode destroyed-entity set (gap #1661 — Roblox-style break).
    *  Shot entities are removed from the rendered scene without
    *  touching the authored `gameState`. Resets when the player
@@ -264,6 +270,27 @@ export default function GameStage3D({
     return () => window.removeEventListener("keydown", onKey);
   }, [mode, selectedEntityId, gameState, onChange, selectEntity]);
 
+  // ─── Camera-view toggle (play mode) ───────────────────────────────────
+  // `V` flips first/third person. Ignored while typing into a field.
+  // Single seam — the on-canvas button calls the same setter.
+  useEffect(() => {
+    if (mode !== "play") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "KeyV") return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      setCameraView((v) => (v === "first" ? "third" : "first"));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode]);
+
+  /** Local player's avatar color — same deterministic hue their remote
+   *  peers render, so the player looks identical to themselves and to
+   *  others (DRY: one color source). Falls back to a default when the
+   *  player isn't signed in. */
+  const playerColor = user ? colorForId(user.id) : undefined;
+
   // ─── Click-to-place ───────────────────────────────────────────────────
   /** Place a primitive-kind entity at a raycast position. */
   const placePrimitive = useCallback(
@@ -377,6 +404,8 @@ export default function GameStage3D({
             peers={room.peers}
             onBroadcastPosition={room.broadcastPosition}
             onShootHit={handleShootHit}
+            cameraView={cameraView}
+            playerColor={playerColor}
           />
           {/* Invisible — registers a pure raycast helper via the
               shared ref. The outer drop handler reads the dataTransfer
@@ -415,7 +444,7 @@ export default function GameStage3D({
                 <Gamepad2 className="h-4 w-4 text-fuchsia-300" />
                 <span className="text-[11px] font-semibold text-white">
                   Playtest · click canvas to lock pointer · WASD to move · Space to
-                  jump · Esc to release
+                  jump · V to switch view · Esc to release
                 </span>
               </div>
             )}
@@ -426,6 +455,28 @@ export default function GameStage3D({
               title="Teleport back to spawn"
             >
               ↻ Respawn
+            </button>
+            {/* Camera-view toggle — same setter as the `V` key. Label
+                shows the view you'll switch TO. */}
+            <button
+              type="button"
+              onClick={() => setCameraView((v) => (v === "first" ? "third" : "first"))}
+              className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-full bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-fuchsia-500"
+              title={
+                cameraView === "first"
+                  ? "Switch to third-person view (V)"
+                  : "Switch to first-person view (V)"
+              }
+            >
+              {cameraView === "first" ? (
+                <>
+                  <User className="h-3.5 w-3.5" /> Third-person
+                </>
+              ) : (
+                <>
+                  <Video className="h-3.5 w-3.5" /> First-person
+                </>
+              )}
             </button>
           </>
         )}

@@ -273,6 +273,21 @@ export default [
     },
   },
 
+  // react-three-fiber surface (3D world game studio). R3F renders
+  // three.js objects through lowercase intrinsic JSX elements
+  // (<mesh>, <boxGeometry>, <ambientLight>, …) whose props
+  // (`args`, `position`, `castShadow`, `attach`, `intensity`, …) are
+  // not DOM attributes — so `react/no-unknown-property` flags every
+  // one as "unknown". The rule is simply not applicable to R3F's
+  // reconciler. Disable it for this folder; every other component in
+  // the app still gets the rule.
+  {
+    files: ["components/studio/game/world-3d/**/*.{ts,tsx}"],
+    rules: {
+      "react/no-unknown-property": "off",
+    },
+  },
+
   // Script files (Node.js environment)
   {
     files: ["scripts/**/*.{js,mjs,ts}"],
