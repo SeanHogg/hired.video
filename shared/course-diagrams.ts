@@ -24,7 +24,7 @@
 // XML that an `<img>` renders as a broken image — e.g. "Tokens & the
 // context window", "Haiku — fast & cheap". Same module, same purpose, no
 // 7th copy of escapeXml.
-import { escapeXmlText as esc } from "./course-cover";
+import { escapeXmlText as esc } from "./course-cover.js";
 
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 

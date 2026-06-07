@@ -58,6 +58,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { createRolePermissions, formatRoleForDisplay, getRoleDisplayLabel, roleUtils } from "@/lib/role-utils";
 import { dashboardService } from "@/lib/services/dashboard-service";
+import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
 import {
   recruiterService,
   type AddToTalentPoolRequest,
@@ -355,9 +356,9 @@ function PeopleDetailContent() {
 
   const handleSubmitToJob = () => toast.info(t("messages.submitToJobComingSoon"));
 
-  const handleSectionEdit = () => {
+  const handleSectionEdit = async () => {
     if (!masterResume) return;
-    navigate(`/studio?editResume=${masterResume.id}`);
+    navigate(await resumeEditorPath(masterResume.id));
   };
 
   // ---------------------------------------------------------------------
