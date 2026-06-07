@@ -243,6 +243,16 @@ function comicSeedFor(genre: ComicGenre): CanvasState {
   };
 }
 
+/** Seed comic pages for an interactive-comic ("Comic+") template by reusing
+ *  a fitting linear-comic genre. Interactive comics author the same pages as
+ *  the linear kind (#929) — the branch graph rides on top in
+ *  `interactiveComicState`, seeded blank by `template-dispatch`. Falls back
+ *  to the first genre if the id is unknown so the seed is never empty. */
+function comicSeedForGenreId(genreId: string): CanvasState {
+  const genre = COMIC_GENRES.find((g) => g.id === genreId) ?? COMIC_GENRES[0];
+  return comicSeedFor(genre);
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Per-template seeds. Each one returns a 1080p / 30fps canvas; the
 // scene count + widget mix is just a starting layout — the user is
@@ -1391,4 +1401,12 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
       (g) => [`comic_${g.id}` as ContentTemplate, () => comicSeedFor(g)],
     ),
   ),
+
+  // ─── Interactive comic ("Comic+") seeds (#929 / mediaKind === "interactive_comic") ──
+  // Open with real comic pages instead of a blank canvas by reusing a
+  // fitting genre's narrative beats; the branching graph is seeded blank
+  // by `template-dispatch` and authored in the editor.
+  icomic_branching_pitch: () => comicSeedForGenreId("hero"),
+  icomic_choose_path: () => comicSeedForGenreId("adventure"),
+  icomic_case_study: () => comicSeedForGenreId("slice"),
 };

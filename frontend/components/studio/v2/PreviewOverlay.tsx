@@ -17,6 +17,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import type { CtaHotzone } from "@shared/cta-hotzones";
 import CanvasStatePreview from "./CanvasStatePreview";
 import PlaybackControls from "./PlaybackControls";
 
@@ -27,12 +28,23 @@ export interface PreviewOverlayProps {
    *  doesn't reset progress. */
   playback: ReturnType<typeof usePreviewPlayback>;
   onClose: () => void;
+  /** CTA hot-zones to keep clickable in fullscreen — forwarded straight
+   *  to <CanvasStatePreview/>, which renders them aligned to the stage.
+   *  Without this the baked CTA pixels show but aren't interactive in
+   *  the expanded player (the inline player still worked). Omit on the
+   *  editor preview where the project has no published hot-zones. */
+  ctaHotzones?: CtaHotzone[];
+  /** Forwarded to the CTA overlay for cta-click analytics. Omit on
+   *  editor previews. */
+  analyticsProjectId?: string;
 }
 
 export default function PreviewOverlay({
   state,
   playback,
   onClose,
+  ctaHotzones,
+  analyticsProjectId,
 }: PreviewOverlayProps) {
   // Auto-play on mount, pause on unmount. We deliberately omit
   // `playback` from deps — every effect re-run would re-trigger play()
@@ -72,7 +84,12 @@ export default function PreviewOverlay({
       </header>
 
       <div className="relative z-10 flex flex-1 items-center justify-center overflow-hidden p-6">
-        <CanvasStatePreview state={state} playback={playback} />
+        <CanvasStatePreview
+          state={state}
+          playback={playback}
+          ctaHotzones={ctaHotzones}
+          analyticsProjectId={analyticsProjectId}
+        />
       </div>
 
       {/* Shared <PlaybackControls/> — same component the public watch

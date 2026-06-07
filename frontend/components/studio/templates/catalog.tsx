@@ -131,6 +131,15 @@ export type ContentTemplate =
   | "comic_retro80s"
   | "comic_webtoon"
   | "comic_adventure"
+  // ─── Interactive comic / "Comic+" (#929 / mediaKind === "interactive_comic") ──
+  // Branching comics — the reader chooses a path through the story and the
+  // graph rides in `interactiveComicState`. Same ComicIntake + comic page
+  // seeds as the linear kind; the branch graph is seeded blank and authored
+  // in the editor. These give the catalog's "Comic+" Type pill real entries
+  // (it was a dead end before — see Consolidated Gap Register).
+  | "icomic_branching_pitch"
+  | "icomic_choose_path"
+  | "icomic_case_study"
   // ─── Image / drawing canvas (#932 / mediaKind === "image") ───────────
   // Single-frame Photoshop-shaped raster authoring. Each entry seeds
   // the DrawingStage with a starter canvas of the right dimensions for
@@ -157,6 +166,14 @@ export type ContentTemplate =
   | "cad-part-drawing"
   | "cad-electrical-schematic"
   | "cad-blueprint"
+  // ─── 3D modelling (#930 follow-on / mediaKind === "cad_3d") ───────────
+  // Three.js primitive-solid modelling. Each opens `<Cad3DStage>` on a
+  // blank scene seeded by `createBlankCad3DState()` (template-dispatch);
+  // the user builds from the primitive palette. These give the catalog's
+  // "3D" Type pill real entries (it was a dead end before — see register).
+  | "cad3d_part"
+  | "cad3d_massing"
+  | "cad3d_product"
   // ─── IAB display ad templates (#1041) ─────────────────────────────────
   // mediaKind === "image" — each opens DrawingStage seeded at the IAB
   // banner's official dimensions. Sizes pulled from `video-formats.ts`
@@ -1149,6 +1166,57 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     IntakeForm: BasicIntake,
   },
 
+  // ─── 3D modelling templates (#930 follow-on — mediaKind "cad_3d") ──────
+  // Each opens `<Cad3DStage>` on a blank scene (seeded by
+  // `createBlankCad3DState()` in template-dispatch). Like the 2D CAD
+  // cards, Phase-1 entries ship empty — the user builds from the
+  // primitive-solid palette; AI-generated starter geometry is a follow-on.
+  {
+    id: "cad3d_part",
+    label: "Mechanical part (3D)",
+    desc: "Blank 3D scene · mm units — model a part from primitive solids, export STL / STEP.",
+    icon: Wrench,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad_3d",
+    audiences: ["cad_user", "developer"],
+    defaultName: "3D part",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "cad3d_massing",
+    label: "Architectural massing",
+    desc: "Blank 3D scene · m units — block out a building massing study from extruded volumes.",
+    icon: Building2,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad_3d",
+    audiences: ["cad_user", "designer", "founder"],
+    defaultName: "Massing study",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+  {
+    id: "cad3d_product",
+    label: "Product concept",
+    desc: "Blank 3D scene — rough a product concept from primitives, render a PNG for the pitch.",
+    icon: Frame,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "showcase",
+    mediaKind: "cad_3d",
+    audiences: ["cad_user", "designer"],
+    defaultName: "Product concept",
+    defaultPrompt: "",
+    firstTabLabel: "Setup",
+    IntakeForm: BasicIntake,
+  },
+
   // ─── Advertising templates (#1041 / `category: "ads"`) ────────────────
   // Single bucket for every paid-media format the studio supports —
   // display banners (mediaKind="image"), social-video ad specs
@@ -1377,6 +1445,58 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
   // template ids, default names, default prompts and stage names stay
   // in sync with one source of truth (DRY rule).
   ...COMIC_GENRES.map(comicGenreToTemplate),
+
+  // ─── Interactive comic / "Comic+" templates (#929) ────────────────────
+  // mediaKind "interactive_comic" — branching stories. They reuse the
+  // ComicIntake form and seed real comic pages (via `comicSeedFor` in
+  // template-seeds.ts), with a blank branch graph seeded on top by
+  // template-dispatch. Hand-authored (not genre-generated) because the
+  // distinguishing axis here is narrative *structure*, not genre.
+  {
+    id: "icomic_branching_pitch",
+    label: "Branching career pitch",
+    desc: "Let the reader choose which of your strengths to explore — each path is its own short comic.",
+    icon: BookOpen,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "comic",
+    mediaKind: "interactive_comic",
+    audiences: ["illustrator", "job_seeker", "creator", "founder", "recruiter"],
+    defaultName: "Branching pitch",
+    defaultPrompt: "Turn my career story into a branching comic — the reader picks which strength to dig into, each choice opening its own panel path.",
+    firstTabLabel: "Comic",
+    IntakeForm: ComicIntake,
+  },
+  {
+    id: "icomic_choose_path",
+    label: "Choose-your-path story",
+    desc: "A classic choose-your-own-adventure — readers pick the route through your story.",
+    icon: BookOpen,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "comic",
+    mediaKind: "interactive_comic",
+    audiences: ["illustrator", "creator", "job_seeker"],
+    defaultName: "Choose your path",
+    defaultPrompt: "Write a choose-your-own-adventure comic where the reader's choices branch the story toward different endings.",
+    firstTabLabel: "Comic",
+    IntakeForm: ComicIntake,
+  },
+  {
+    id: "icomic_case_study",
+    label: "Interactive case study",
+    desc: "A recruiter picks a scenario and sees how you'd handle it — branch per decision.",
+    icon: BookOpen,
+    importMode: "none",
+    purpose: "personal_brand",
+    category: "comic",
+    mediaKind: "interactive_comic",
+    audiences: ["job_seeker", "recruiter", "founder"],
+    defaultName: "Interactive case study",
+    defaultPrompt: "Turn a project win into an interactive case-study comic — the reader chooses a decision point and the panels branch to show how I handled it.",
+    firstTabLabel: "Comic",
+    IntakeForm: ComicIntake,
+  },
 ];
 
 /** Map a `ComicGenre` to a `TemplateDef`. Keeps the catalog DRY — one

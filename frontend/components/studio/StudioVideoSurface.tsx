@@ -735,15 +735,17 @@ function PublicStudioCanvas({
           className={`overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
         >
           <div className="relative w-full" style={{ aspectRatio }}>
-            <CanvasStatePreview state={canvasState} playback={playback} />
-            {/* CTA-hotzones overlay — visible when the playhead enters
-                any zone's [startSec, endSec). Self-fires the cta-click
-                analytics call off `analyticsProjectId`. Pauses playback
-                on click so the user isn't bounced mid-frame. */}
-            <CtaHotzonesOverlay
-              hotzones={hotzones ?? []}
-              currentTimeSec={playback.playhead}
-              onActivate={() => playback.pause()}
+            {/* CTA hot-zones now ride INSIDE <CanvasStatePreview/> (the
+                single on-screen renderer) so they stay clickable + aligned
+                to the stage in every layout — including the fullscreen
+                <PreviewOverlay/> below, which previously baked the CTA
+                pixels but never made them interactive. The overlay
+                self-gates (null outside any zone window) and self-fires
+                the cta-click analytics off `analyticsProjectId`. */}
+            <CanvasStatePreview
+              state={canvasState}
+              playback={playback}
+              ctaHotzones={hotzones ?? []}
               analyticsProjectId={analyticsProjectId}
             />
             {!started && (
@@ -783,6 +785,8 @@ function PublicStudioCanvas({
             state={canvasState}
             playback={playback}
             onClose={() => setExpanded(false)}
+            ctaHotzones={hotzones ?? []}
+            analyticsProjectId={analyticsProjectId}
           />
         )}
       </>

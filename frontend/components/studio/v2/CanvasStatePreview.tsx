@@ -22,6 +22,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import BrandWatermark from "@/components/studio/shared/BrandWatermark";
+import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
+import type { CtaHotzone } from "@shared/cta-hotzones";
 import { emptyScene, type CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { PreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { cn } from "@/lib/utils";
@@ -37,12 +39,27 @@ export interface CanvasStatePreviewProps {
    *  zoom from its measured size — caller controls aspect via the
    *  wrapping element. */
   className?: string;
+  /** CTA hot-zones authored on the project's Timeline. Rendered as
+   *  clickable anchors INSIDE the stage-sized box so they stay aligned
+   *  with the baked CTA pixels in every layout — inline (box matches
+   *  canvas aspect) AND fullscreen (stage letterboxed inside a larger
+   *  box). Owned here, the single on-screen renderer, so no consumer
+   *  (inline surface, fullscreen PreviewOverlay, marketplace) can mount
+   *  the canvas without its clickable CTAs. Omit on surfaces with no
+   *  CTAs — the overlay self-gates to null. */
+  ctaHotzones?: CtaHotzone[];
+  /** Studio project id forwarded to the CTA overlay so it self-fires the
+   *  cta-click analytics call. Omit on editor previews (shouldn't count
+   *  toward the owner's CTR). */
+  analyticsProjectId?: string;
 }
 
 export default function CanvasStatePreview({
   state,
   playback,
   className,
+  ctaHotzones,
+  analyticsProjectId,
 }: CanvasStatePreviewProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -108,6 +125,19 @@ export default function CanvasStatePreview({
           currentTimeSec={playback.activeSceneElapsed}
           selection={{ kind: "scene", sceneId: activeScene.id }}
           defaultFontId={state.fontFamily}
+        />
+        {/* CTA hot-zones — clickable anchors over the baked CTA pixels.
+            Mounted INSIDE this stage-sized box (not the outer fitting
+            container) so the fractional positions line up with the
+            rendered frame even when it's letterboxed inside a larger
+            fullscreen container. Self-gates to null when there are no
+            zones or the playhead is outside every zone window; pauses
+            playback on click so the viewer isn't bounced mid-frame. */}
+        <CtaHotzonesOverlay
+          hotzones={ctaHotzones ?? []}
+          currentTimeSec={playback.playhead}
+          onActivate={() => playback.pause()}
+          analyticsProjectId={analyticsProjectId}
         />
         {/* BrandWatermark self-gates (returns null for Pro users who've
             opted out via project state). Positioned bottom-right of the
