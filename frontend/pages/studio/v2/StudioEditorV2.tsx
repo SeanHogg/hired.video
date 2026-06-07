@@ -1250,7 +1250,7 @@ export default function StudioEditorV2() {
         try {
           const j = await jobService.getJobById(entityId);
           if (cancelled) return;
-          setDocumentEntityContent(jobItemToContent(j) as DocumentEntityContent);
+          setDocumentEntityContent(jobItemToContent(j) as unknown as DocumentEntityContent);
           return;
         } catch {
           // fall through to a blank doc if the job can't be read
@@ -2776,7 +2776,7 @@ export default function StudioEditorV2() {
                 ...((documentEntityContent.meta ?? {}) as Record<string, unknown>),
                 documentLayout: documentState,
               },
-            } as ResumeData;
+            } as unknown as ResumeData;
             if (documentState.entityId) {
               await resumeService.updateResumeData(documentState.entityId, {
                 data: contentForSave,
