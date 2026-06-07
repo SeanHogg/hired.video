@@ -33,6 +33,9 @@ import { ToolCard } from "@/components/ToolCard";
 import { getCatalogTool } from "@/data/tools-catalog";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { useCardRenderer } from "@/lib/card-factory";
 import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useAuth, USER_ROLES } from "@/lib/auth";
@@ -156,7 +159,11 @@ export default function UnifiedSearch({
   const urlSortBy = searchParams.get("sortBy") ?? "";
   const urlHasMedia = searchParams.get("hasMedia") ?? "";
 
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useViewMode(
+    "search.browse",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     page: 1,
     limit: 20,
@@ -329,6 +336,70 @@ export default function UnifiedSearch({
   const handleView = (item: any) => {
     const href = entityHref(item);
     if (href) navigate(href);
+  };
+
+  // Human label for a heterogeneous result's `type` — used by the Table
+  // view's Type column. Falls back to the raw type string so a new kind
+  // still renders something sensible before it gets a localised label.
+  const typeLabel = (type: string): string => {
+    switch (type) {
+      case "voice":
+        return t("search.category.voices", "Voice");
+      case "service":
+        return t("search.category.services", "Service");
+      case "course":
+        return t("search.category.courses", "Course");
+      case "template":
+        return t("search.category.templates", "Template");
+      case "tool":
+        return t("search.category.tools", "Tool");
+      case "resume":
+        return t("search.category.resumes", "Resume");
+      case "job":
+        return t("search.category.jobs", "Job");
+      case "company":
+        return t("search.category.companies", "Company");
+      case "people":
+        return t("search.category.people", "Person");
+      case "video":
+        return t("search.category.media", "Media");
+      case "article":
+        return t("search.category.articles", "Article");
+      case "guide":
+        return t("search.category.guides", "Guide");
+      case "faq":
+        return t("search.category.faqs", "FAQ");
+      default:
+        return type;
+    }
+  };
+
+  // Best-effort title for a result regardless of its source shape.
+  const itemTitle = (item: any): string =>
+    (item.name as string) || (item.title as string) || "";
+
+  // Best-effort secondary column for the Table view — price/category when
+  // a type carries one, else an em-dash so the column stays aligned.
+  const itemSecondary = (item: any): string => {
+    if (typeof item.priceLabel === "string" && item.priceLabel) {
+      return item.priceLabel;
+    }
+    if (typeof item.priceCents === "number") {
+      return `$${(item.priceCents / 100).toFixed(2)}`;
+    }
+    if (typeof item.price === "number") {
+      return `$${item.price.toFixed(2)}`;
+    }
+    if (typeof item.category === "string" && item.category) {
+      return item.category;
+    }
+    if (typeof item.profession === "string" && item.profession) {
+      return item.profession;
+    }
+    if (typeof item.company === "string" && item.company) {
+      return item.company;
+    }
+    return "—";
   };
 
   const handleShare = (item: any) => console.log("Share item:", item.id);
@@ -538,6 +609,67 @@ export default function UnifiedSearch({
     ? filteredItems.length
     : searchResults?.total || 0;
 
+  // One card definition shared by the Scroll and Grid views so the
+  // heterogeneous type → card switch lives in a single place (DRY). The
+  // Table view renders its own dense rows instead.
+  const renderResultCard = (item: any, index: number): React.ReactNode => {
+    if (item.type === "voice") {
+      return <VoiceMarketplaceCard key={item.id} item={item as any} />;
+    }
+    if (item.type === "service") {
+      return (
+        <ServiceMarketplaceCard
+          key={item.id}
+          item={item as ServiceMarketplaceItem}
+        />
+      );
+    }
+    if (item.type === "course") {
+      return (
+        <CourseMarketplaceCard
+          key={item.id}
+          item={item as CourseMarketplaceItem}
+        />
+      );
+    }
+    if (item.type === "template" && (item.meta || item.descriptor)) {
+      return (
+        <TemplateCard
+          key={item.id}
+          meta={item.meta}
+          descriptor={item.descriptor}
+        />
+      );
+    }
+    if (item.type === "tool") {
+      const catalogEntry = getCatalogTool(item.id);
+      if (catalogEntry) {
+        return <ToolCard key={item.id} tool={catalogEntry} />;
+      }
+    }
+    if (
+      item.type === "article" ||
+      item.type === "guide" ||
+      item.type === "faq"
+    ) {
+      return <ContentCard key={item.id} item={item as any} />;
+    }
+    return allSectionRenderer(item, index);
+  };
+
+  // Build the card list for Grid/Scroll once, including the page-1 promo
+  // slot, so both modes stay identical.
+  const resultCards: React.ReactNode[] = paginatedItems.map((item, index) =>
+    renderResultCard(item, index),
+  );
+  if (promoCard && currentPage === 1) {
+    resultCards.splice(
+      Math.min(2, resultCards.length),
+      0,
+      <React.Fragment key="creator-promo">{promoCard}</React.Fragment>,
+    );
+  }
+
   return (
     <>
       {/* Search + filters control */}
@@ -556,12 +688,12 @@ export default function UnifiedSearch({
               onSearch={handleSearch}
               onFilterChange={handleFilterChange}
               onClearFilters={handleClearFilters}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
             />
 
-            {/* Category chips row — SearchBar above already hosts the
-             * grid/list view-mode toggle and Advanced filters. */}
+            {/* Category chips row + the shared Scroll/Grid/Table toggle.
+             * SearchBar's own legacy grid/list toggle is intentionally not
+             * wired here — UnifiedSearch owns the canonical browse-mode
+             * control so /search matches the Studio landing pattern. */}
             <div className="flex items-center gap-2">
               <div className="flex gap-2 flex-1 justify-start overflow-x-auto pb-2 sm:pb-0 sm:flex-wrap">
                 {CATEGORIES.map((category) => (
@@ -579,6 +711,12 @@ export default function UnifiedSearch({
                   </Button>
                 ))}
               </div>
+              <ViewModeToggle
+                value={viewMode}
+                onChange={setViewMode}
+                modes={BROWSE_VIEW_MODES}
+                className="flex-shrink-0"
+              />
             </div>
           </div>
         </div>
@@ -630,162 +768,29 @@ export default function UnifiedSearch({
             </div>
           ) : filteredItems.length > 0 ? (
             <>
-              {viewMode === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {(() => {
-                  const cards = paginatedItems.map((item, index) => {
-                    if ((item as any).type === "voice") {
-                      return (
-                        <VoiceMarketplaceCard
-                          key={item.id}
-                          item={item as any}
-                        />
-                      );
-                    }
-                    if ((item as any).type === "service") {
-                      return (
-                        <ServiceMarketplaceCard
-                          key={item.id}
-                          item={item as ServiceMarketplaceItem}
-                        />
-                      );
-                    }
-                    if ((item as any).type === "course") {
-                      return (
-                        <CourseMarketplaceCard
-                          key={item.id}
-                          item={item as CourseMarketplaceItem}
-                        />
-                      );
-                    }
-                    if (
-                      (item as any).type === "template" &&
-                      ((item as any).meta || (item as any).descriptor)
-                    ) {
-                      return (
-                        <TemplateCard
-                          key={item.id}
-                          meta={(item as any).meta}
-                          descriptor={(item as any).descriptor}
-                        />
-                      );
-                    }
-                    if (item.type === "tool") {
-                      const catalogEntry = getCatalogTool(item.id);
-                      if (catalogEntry) {
-                        return <ToolCard key={item.id} tool={catalogEntry} />;
-                      }
-                    }
-                    if (
-                      item.type === "article" ||
-                      item.type === "guide" ||
-                      item.type === "faq"
-                    ) {
-                      return <ContentCard key={item.id} item={item as any} />;
-                    }
-                    return allSectionRenderer(item, index);
-                  });
-                  // Slot the marketplace promo into the first row (page 1) so
-                  // it presents as a result card, not a sidebar ad.
-                  if (promoCard && currentPage === 1) {
-                    cards.splice(
-                      Math.min(2, cards.length),
-                      0,
-                      <React.Fragment key="creator-promo">{promoCard}</React.Fragment>,
-                    );
-                  }
-                  return cards;
-                  })()}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {paginatedItems.map((item) => (
+              {viewMode === "table" ? (
+                <SearchResultsTable
+                  items={paginatedItems}
+                  typeLabel={typeLabel}
+                  itemTitle={itemTitle}
+                  itemSecondary={itemSecondary}
+                  hrefFor={entityHref}
+                  onView={handleView}
+                />
+              ) : viewMode === "scroll" ? (
+                <HorizontalScroller itemCount={resultCards.length}>
+                  {resultCards.map((card, i) => (
                     <div
-                      key={item.id}
-                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors overflow-hidden"
+                      key={(card as any)?.key ?? i}
+                      className="w-72 shrink-0 snap-start"
                     >
-                      <div className="flex items-start gap-4 min-w-0">
-                        <div className="flex-shrink-0">
-                          {item.type === "people" && item.avatar && (
-                            <img
-                              src={item.avatar}
-                              alt={item.name}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          )}
-                          {item.type === "company" && (item as any).logo && (
-                            <img
-                              src={(item as any).logo}
-                              alt={(item as any).name}
-                              className="w-12 h-12 rounded-lg object-cover"
-                            />
-                          )}
-                          {(item.type === "resume" || item.type === "job") && (
-                            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                              {item.type === "resume" ? (
-                                <User className="w-6 h-6 text-primary" />
-                              ) : (
-                                <Briefcase className="w-6 h-6 text-primary" />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-lg truncate">
-                                {entityHref(item) ? (
-                                  <Link
-                                    to={entityHref(item)!}
-                                    className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
-                                  >
-                                    {item.name ?? item.title ?? ""}
-                                  </Link>
-                                ) : (
-                                  <button
-                                    onClick={() => handleView(item)}
-                                    className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
-                                  >
-                                    {item.name ?? item.title ?? ""}
-                                  </button>
-                                )}
-                              </h3>
-                              <p className="text-muted-foreground truncate">
-                                {item.title}
-                              </p>
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-words">
-                                {item.summary}
-                              </p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleView(item)}
-                              className="min-h-[44px] flex-shrink-0"
-                            >
-                              {t("actions.view")}
-                            </Button>
-                          </div>
-                          <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                            {item.company && <span>{item.company}</span>}
-                            {"location" in item && item.location && (
-                              <span>{item.location}</span>
-                            )}
-                            {user &&
-                              (item.userId === user.id ||
-                                (item as any).isOwner === true) && (
-                                <span className="flex items-center gap-1">
-                                  <Eye className="w-3 h-3" />
-                                  {t("metrics.viewsCount", {
-                                    count: item.views,
-                                  })}
-                                </span>
-                              )}
-                          </div>
-                        </div>
-                      </div>
+                      {card}
                     </div>
                   ))}
+                </HorizontalScroller>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {resultCards}
                 </div>
               )}
 
@@ -852,5 +857,99 @@ export default function UnifiedSearch({
         }}
       />
     </>
+  );
+}
+
+/**
+ * Dense table for the heterogeneous search feed. Search results span voices,
+ * services, courses, templates, tools, resumes, jobs, companies, people, etc.,
+ * so the columns are deliberately generic: Name/Title, a human Type label, a
+ * best-effort secondary field (price / category / company), and a View action
+ * that reuses each result's detail-page route. Styling mirrors the shared
+ * browse-table pattern (see ResumeOwnedTable on the Resumes page) so every
+ * surface's Table view looks identical.
+ */
+function SearchResultsTable({
+  items,
+  typeLabel,
+  itemTitle,
+  itemSecondary,
+  hrefFor,
+  onView,
+}: {
+  items: any[];
+  typeLabel: (type: string) => string;
+  itemTitle: (item: any) => string;
+  itemSecondary: (item: any) => string;
+  hrefFor: (item: any) => string | null;
+  onView: (item: any) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.type", "Type")}</th>
+            <th className="px-3 py-2 font-medium">
+              {t("labels.details", "Details")}
+            </th>
+            <th className="px-3 py-2 text-right font-medium">
+              {t("labels.actions", "Actions")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const href = hrefFor(item);
+            const title = itemTitle(item);
+            return (
+              <tr
+                key={item.id}
+                className="border-b border-border last:border-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2">
+                  {href ? (
+                    <Link
+                      to={href}
+                      className="font-medium hover:text-brand-purple"
+                    >
+                      {title}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onView(item)}
+                      className="font-medium hover:text-brand-purple"
+                    >
+                      {title}
+                    </button>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {typeLabel(item.type)}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {itemSecondary(item)}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onView(item)}
+                    >
+                      <Eye className="mr-1 h-3.5 w-3.5" />
+                      {t("actions.view", "View")}
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -24,8 +24,12 @@ import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { ToolCard } from "@/components/ToolCard";
+import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
 import { ToolsLearningGrid } from "@/components/ToolsLearningGrid";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import LearningPanel from "@/components/courses/LearningPanel";
 import ClassroomsPanel from "@/components/courses/ClassroomsPanel";
 import {
@@ -33,6 +37,7 @@ import {
   audienceForRole,
   isToolInAudience,
   type ToolAudience,
+  type ToolCatalogEntry,
   type ToolCategory,
   type ToolTier,
 } from "@/data/tools-catalog";
@@ -95,6 +100,16 @@ export default function Tools() {
   // SEO for tools page
   useSEO(location.pathname);
   useDefaultBreadcrumbs();
+
+  // Layout switcher for the AI-tools catalog list (Scroll / Grid / Table),
+  // matching the Studio landing pattern. Persisted per-surface so the
+  // choice survives reloads. Scoped to the default "tools" tab; the
+  // learning + classrooms tabs render their own panels.
+  const [viewMode, setViewMode] = useViewMode(
+    "tools.browse",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Gate at 2 chars via the shared hook so single-keystroke ?q=A
@@ -214,6 +229,13 @@ export default function Tools() {
     tierFilter !== "all" ||
     audienceFilter !== "for_me" ||
     categoryFilter !== "all";
+
+  // Single card renderer shared by the Grid and Scroll layouts so the
+  // card JSX lives in exactly one place (ToolCard). The scroll track
+  // wraps each in a fixed-width snap cell at the call site.
+  const renderToolCard = (tool: ToolCatalogEntry) => (
+    <ToolCard key={tool.id} tool={tool} />
+  );
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -640,17 +662,35 @@ export default function Tools() {
               </div>
             )}
 
-            {/* Unified Tools Grid */}
+            {/* Unified Tools list — Scroll / Grid / Table. The layout
+                switcher sits in the list header (consistent with the
+                Studio landing + Resumes browse pages) and is scoped to
+                this AI-tools catalog. */}
             <div className="mb-8 sm:mb-12">
+              <div className="mb-3 flex items-center justify-end">
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  modes={BROWSE_VIEW_MODES}
+                />
+              </div>
               {filteredTools.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
                   <p>{t("messages.tools.noMatch")}</p>
                 </div>
+              ) : viewMode === "table" ? (
+                <ToolsTable tools={filteredTools} />
+              ) : viewMode === "scroll" ? (
+                <HorizontalScroller itemCount={filteredTools.length}>
+                  {filteredTools.map((tool) => (
+                    <div key={tool.id} className="w-72 shrink-0 snap-start">
+                      {renderToolCard(tool)}
+                    </div>
+                  ))}
+                </HorizontalScroller>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {filteredTools.map((tool) => (
-                    <ToolCard key={tool.id} tool={tool} />
-                  ))}
+                  {filteredTools.map((tool) => renderToolCard(tool))}
                 </div>
               )}
             </div>
@@ -659,6 +699,70 @@ export default function Tools() {
           </div>
         </div>
     </AppShell>
+  );
+}
+
+/**
+ * Dense table layout for the AI-tools catalog — the Table view of the
+ * /tools browse switcher. Mirrors the ResumeOwnedTable idiom (border,
+ * muted header, hover rows, ghost-button action cell) so the browse
+ * surfaces stay visually consistent. Each row deep-links to the tool's
+ * canonical href.
+ */
+function ToolsTable({ tools }: { tools: ToolCatalogEntry[] }) {
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
+            <th className="px-3 py-2 font-medium">
+              {t("labels.category", "Category")}
+            </th>
+            <th className="px-3 py-2 font-medium">
+              {t("labels.description", "Description")}
+            </th>
+            <th className="px-3 py-2 text-right font-medium">
+              {t("labels.actions", "Actions")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {tools.map((tool) => (
+            <tr
+              key={tool.id}
+              className="border-b border-border last:border-0 hover:bg-muted/30"
+            >
+              <td className="px-3 py-2">
+                <Link
+                  to={tool.href}
+                  className="font-medium hover:text-brand-purple"
+                >
+                  {tool.title}
+                </Link>
+              </td>
+              <td className="px-3 py-2">
+                <ToolCategoryBadge category={tool.category} />
+              </td>
+              <td className="max-w-md px-3 py-2 text-muted-foreground">
+                <span className="line-clamp-1">{tool.description}</span>
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex items-center justify-end gap-2">
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to={tool.href}>
+                      {t("actions.open", "Open")}
+                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

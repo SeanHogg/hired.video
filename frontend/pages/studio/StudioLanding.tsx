@@ -38,7 +38,10 @@ import { projectVisibilityVisual } from "@/lib/studio/visibility";
 import { Button } from "@/components/ui/button";
 import HeaderSearch from "@/components/HeaderSearch";
 import Pagination, { usePaginatedList } from "@/components/Pagination";
-import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import ViewModeToggle, {
+  BROWSE_VIEW_MODES,
+  type ViewMode,
+} from "@/components/ViewModeToggle";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { useToast } from "@/hooks/use-toast";
@@ -137,11 +140,6 @@ type TemplateRow =
   | { kind: "builtin"; template: TemplateDef }
   | { kind: "owned"; owned: OwnedTemplate };
 
-// The three layout modes every Studio section offers, in display order.
-// Shared so the Templates + My-content toggles stay identical (DRY) — and
-// the canonical set the "all content surfaces adopt this toggle" gap
-// (#1919) standardizes on.
-const SECTION_VIEW_MODES: ViewMode[] = ["scroll", "grid", "table"];
 
 export default function StudioLanding() {
   const navigate = useNavigate();
@@ -165,12 +163,12 @@ export default function StudioLanding() {
   const [templatesView, setTemplatesView] = useViewMode(
     "studio.templates",
     "scroll",
-    SECTION_VIEW_MODES,
+    BROWSE_VIEW_MODES,
   );
   const [contentView, setContentView] = useViewMode(
     "studio.content",
     "grid",
-    SECTION_VIEW_MODES,
+    BROWSE_VIEW_MODES,
   );
   // User's own published templates + claimed/purchased licensed templates.
   // Single source of truth feeding the unified Templates section — both
@@ -649,7 +647,7 @@ export default function StudioLanding() {
           <ViewModeToggle
             value={templatesView}
             onChange={setTemplatesView}
-            modes={SECTION_VIEW_MODES}
+            modes={BROWSE_VIEW_MODES}
           />
         </div>
 
@@ -692,7 +690,7 @@ export default function StudioLanding() {
             <ViewModeToggle
               value={contentView}
               onChange={setContentView}
-              modes={SECTION_VIEW_MODES}
+              modes={BROWSE_VIEW_MODES}
             />
             <WorkspaceSwitcher />
           </div>

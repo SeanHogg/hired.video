@@ -23,6 +23,9 @@ import {
 import { toast } from "sonner";
 import AddFirstServiceCTA from "@/components/services/AddFirstServiceCTA";
 import YourProgramsPanel from "@/components/creator/YourProgramsPanel";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -106,6 +109,11 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateServiceInput>(defaultForm);
+  const [viewMode, setViewMode] = useViewMode(
+    "services.creator",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
 
   // providesServices is only used by openCreate's first-time opt-in path;
   // load it once so the toggle doesn't fire when the user already has it on.
@@ -148,6 +156,93 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
   }
 
   useImperativeHandle(ref, () => ({ openCreate }), [openCreate]);
+
+  // Single card definition shared by the Scroll and Grid views so the full
+  // handler wiring lives in one place (the Table renders its own dense rows
+  // below). Scroll wraps each card in a fixed-width snap track item.
+  const renderServiceCard = (s: ServiceOffering) => (
+    <Card key={s.id} className={!s.isActive ? "opacity-60" : undefined}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold truncate">{s.title}</h3>
+              {s.category && (
+                <Badge variant="secondary" className="text-xs">
+                  <Tag className="h-3 w-3 mr-1" />
+                  {s.category}
+                </Badge>
+              )}
+              {!s.isActive && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Inactive
+                </Badge>
+              )}
+            </div>
+            {s.description && (
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                {s.description}
+              </p>
+            )}
+            <div className="flex items-center gap-4 mt-2 text-sm flex-wrap">
+              <span className="flex items-center gap-1 font-medium text-violet-600">
+                <DollarSign className="h-3.5 w-3.5" />
+                {formatPrice(s.priceCents)}
+              </span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                {s.priceVisible ? (
+                  <>
+                    <Eye className="h-3.5 w-3.5" /> Price visible
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="h-3.5 w-3.5" /> Price on inquiry
+                  </>
+                )}
+              </span>
+              {s.deliveryDays && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" />
+                  {s.deliveryDays}d delivery
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title={s.isActive ? "Deactivate" : "Activate"}
+              onClick={() => handleToggleActive(s)}
+            >
+              {s.isActive ? (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => openEdit(s)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={() => handleDelete(s.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   function openEdit(s: ServiceOffering) {
     setEditingId(s.id);
@@ -224,89 +319,36 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
             <AddFirstServiceCTA onClick={openCreate} loading={saving} />
           ) : (
             <div className="space-y-3">
-              {services.map((s) => (
-                <Card key={s.id} className={!s.isActive ? "opacity-60" : undefined}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold truncate">{s.title}</h3>
-                          {s.category && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Tag className="h-3 w-3 mr-1" />
-                              {s.category}
-                            </Badge>
-                          )}
-                          {!s.isActive && (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">
-                              Inactive
-                            </Badge>
-                          )}
-                        </div>
-                        {s.description && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {s.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 mt-2 text-sm">
-                          <span className="flex items-center gap-1 font-medium text-violet-600">
-                            <DollarSign className="h-3.5 w-3.5" />
-                            {formatPrice(s.priceCents)}
-                          </span>
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            {s.priceVisible ? (
-                              <>
-                                <Eye className="h-3.5 w-3.5" /> Price visible
-                              </>
-                            ) : (
-                              <>
-                                <EyeOff className="h-3.5 w-3.5" /> Price on inquiry
-                              </>
-                            )}
-                          </span>
-                          {s.deliveryDays && (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5" />
-                              {s.deliveryDays}d delivery
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title={s.isActive ? "Deactivate" : "Activate"}
-                          onClick={() => handleToggleActive(s)}
-                        >
-                          {s.isActive ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEdit(s)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDelete(s.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              {/* Layout switcher — Scroll / Grid / Table, mirroring the Studio
+                  landing + Resumes browse surfaces. Persisted under
+                  `services.creator`. */}
+              <div className="flex items-center justify-end">
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  modes={BROWSE_VIEW_MODES}
+                />
+              </div>
+              {viewMode === "table" ? (
+                <ServicesTable
+                  services={services}
+                  onToggleActive={handleToggleActive}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                />
+              ) : viewMode === "scroll" ? (
+                <HorizontalScroller itemCount={services.length}>
+                  {services.map((s) => (
+                    <div key={s.id} className="w-72 shrink-0 snap-start">
+                      {renderServiceCard(s)}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                  ))}
+                </HorizontalScroller>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {services.map((s) => renderServiceCard(s))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -451,3 +493,111 @@ const OfferingsPanel = forwardRef<OfferingsPanelHandle, Props>(function Offering
 });
 
 export default OfferingsPanel;
+
+/**
+ * Dense Table view of the creator's services — the third browse layout
+ * alongside Scroll and Grid. One row per service with name, price,
+ * category, status badge and Toggle-active / Edit / Delete actions
+ * (reusing the same handlers the cards use).
+ */
+function ServicesTable({
+  services,
+  onToggleActive,
+  onEdit,
+  onDelete,
+}: {
+  services: ServiceOffering[];
+  onToggleActive: (s: ServiceOffering) => void;
+  onEdit: (s: ServiceOffering) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">Name</th>
+            <th className="px-3 py-2 font-medium">Price</th>
+            <th className="px-3 py-2 font-medium">Category</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 text-right font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {services.map((s) => (
+            <tr
+              key={s.id}
+              className="border-b border-border last:border-0 hover:bg-muted/30"
+            >
+              <td className="px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => onEdit(s)}
+                  className="font-medium hover:text-brand-purple"
+                >
+                  {s.title}
+                </button>
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {formatPrice(s.priceCents)}
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {s.category ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Tag className="h-3.5 w-3.5" />
+                    {s.category}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {s.isActive ? (
+                  <Badge variant="default" className="gap-1 bg-green-600">
+                    <CheckCircle className="h-3 w-3" />
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 text-muted-foreground">
+                    <AlertCircle className="h-3 w-3" />
+                    Inactive
+                  </Badge>
+                )}
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onToggleActive(s)}
+                    title={s.isActive ? "Deactivate" : "Activate"}
+                  >
+                    {s.isActive ? (
+                      <Eye className="mr-1 h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOff className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    {s.isActive ? "Active" : "Inactive"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(s)}>
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(s.id)}
+                    aria-label={`Delete ${s.title}`}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
