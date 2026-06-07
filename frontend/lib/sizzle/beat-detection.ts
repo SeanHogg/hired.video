@@ -158,16 +158,26 @@ function slidingMedian(values: number[], windowSize: number): number[] {
 }
 
 /**
- * Decode a Blob/File into an AudioBuffer using a transient
- * AudioContext. Convenience wrapper so callers don't repeat the
- * arrayBuffer + decodeAudioData boilerplate.
+ * Decode a Blob/File into an AudioBuffer. Convenience wrapper so callers
+ * don't repeat the arrayBuffer + decodeAudioData boilerplate.
+ *
+ * Uses an `OfflineAudioContext` rather than a live `AudioContext`: decoding
+ * needs no audio device, and opening a device-backed context just to decode
+ * grabs (and, on some browsers, leaks) an output-device handle that re-emits
+ * "The AudioContext encountered an error from the audio device or the WebAudio
+ * renderer" — see live-audio-context.ts. `decodeAudioData` resamples to the
+ * context's sampleRate, which is harmless here since `detectBeats` derives all
+ * onset times in seconds from `audio.sampleRate`. Same decode-only idiom as
+ * audio-mixer.ts.
  */
 export async function decodeAudioToBuffer(blob: Blob): Promise<AudioBuffer> {
-  const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-  try {
-    const arr = await blob.arrayBuffer();
-    return await ctx.decodeAudioData(arr.slice(0));
-  } finally {
-    if (typeof ctx.close === "function") ctx.close();
-  }
+  const Offline =
+    window.OfflineAudioContext ||
+    (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext })
+      .webkitOfflineAudioContext;
+  // length/sampleRate are placeholders — decodeAudioData ignores the host
+  // context's buffer geometry and decodes the full source.
+  const ctx = new Offline(1, 1, 44100);
+  const arr = await blob.arrayBuffer();
+  return await ctx.decodeAudioData(arr.slice(0));
 }

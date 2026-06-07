@@ -475,6 +475,17 @@ export function createApp() {
   // All other resume-feedback routes stay authenticated via the default branch.
   const RESUME_FEEDBACK_LINK_ROUTE = /^\/api\/resume-feedback\/link\/[^/]+(?:$|\?)/;
 
+  // Reviews are public-read: the polymorphic reviews router documents its
+  // list (`/:subjectType/:subjectId`), aggregate, and threaded comments
+  // GETs as public, and those handlers never read c.var.user. Without a
+  // carve-out they fell through to authMiddleware and 401'd anonymous
+  // visitors (e.g. a logged-out shopper browsing a course's reviews).
+  // Route through optional auth so a present JWT is still attached — the
+  // `/me` GET resolves the caller's own review and 401s itself when
+  // anonymous. GET-only: every write (POST/PUT/DELETE) stays authenticated
+  // via the default branch.
+  const REVIEWS_PUBLIC_ROUTE = /^\/api\/reviews(?:\/|$)/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -511,6 +522,7 @@ export function createApp() {
         ADS_CONFIG_ROUTE.test(path) ||
         PUBLIC_RESUME_DETAIL_ROUTE.test(path) ||
         LOCATIONS_REFERENCE_ROUTE.test(path) ||
+        REVIEWS_PUBLIC_ROUTE.test(path) ||
         EVENTS_PUBLIC_ROUTE.test(path))
     ) {
       return "optional-auth";

@@ -20,8 +20,7 @@ import CourseMarketplaceCard, {
   type CourseMarketplaceItem,
 } from "@/components/CourseMarketplaceCard";
 import { UnenrollButton } from "@/components/courses/UnenrollButton";
-import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
-import { useViewMode } from "@/lib/hooks/useViewMode";
+import { type ViewMode } from "@/components/ViewModeToggle";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
 import Pagination, { usePaginatedList } from "@/components/Pagination";
 import LearningGoalCard from "@/components/learning/LearningGoalCard";
@@ -41,12 +40,18 @@ import { useAuth } from "@/lib/auth";
 interface LearningPanelProps {
   /** Cap on how many published courses to fetch for the library. */
   limit?: number;
+  /** Active layout mode — controlled by the parent so the toggle can live
+   *  next to the global search in PageHeader rather than in this panel. */
+  view: ViewMode;
+  /** Layout-mode setter, paired with `view`. */
+  onViewChange: (next: ViewMode) => void;
 }
 
 /** Layout modes the Learning surface offers — Scroll (carousel) / Card
  *  (grid) / Table (dense rows). Shared with every other browse surface via
- *  `<ViewModeToggle>`; "Card" maps to the toggle's `grid` mode. */
-const LEARNING_VIEW_MODES: ViewMode[] = ["scroll", "grid", "table"];
+ *  `<ViewModeToggle>`; "Card" maps to the toggle's `grid` mode. Exported so
+ *  the parent (Tools.tsx) can drive the lifted toggle with the same set. */
+export const LEARNING_VIEW_MODES: ViewMode[] = ["scroll", "grid", "table"];
 
 type LearningStatus = "in_progress" | "not_started" | "available" | "completed";
 
@@ -123,20 +128,25 @@ function ctaLabel(item: LearningItem): string {
  * and "My Learning" (your enrolled + assigned training) tabs into one:
  *   • Main  — a single unified list (assigned + self-enrolled + library,
  *             deduped), in-progress first, rendered as Scroll / Card / Table.
- *   • Right — your learning goal + join-a-classroom (the old My Learning
- *             sidebar, with the educator "manage classrooms" link folded in).
+ *             The layout toggle is lifted to the page header (next to search).
+ *   • Right — create actions (author / record / browse), your learning goal,
+ *             and join-a-classroom (the old My Learning sidebar, with the
+ *             educator "manage classrooms" link folded in).
  *
  * Read-only over existing endpoints (`/api/courses/public`,
  * `/api/courses/me/enrollments`, learner assignments) — no new server read.
  */
-export default function LearningPanel({ limit = 50 }: LearningPanelProps = {}) {
+export default function LearningPanel({
+  limit = 50,
+  view,
+  onViewChange,
+}: LearningPanelProps) {
   const { isAuthenticated } = useAuth();
   const [library, setLibrary] = useState<PublicCourseCard[]>([]);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
   const [assignments, setAssignments] = useState<LearnerAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [cohortFilter, setCohortFilter] = useState<string | null>(null);
-  const [view, setView] = useViewMode("tools.learning", "grid", LEARNING_VIEW_MODES);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -292,72 +302,49 @@ export default function LearningPanel({ limit = 50 }: LearningPanelProps = {}) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* ── Main: unified learning list ──────────────────────────────── */}
       <div className="space-y-5 lg:col-span-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-brand-purple" />
-              Learning
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Your in-progress training, assigned courses, and the built-in
-              content library — SCORM 1.2, xAPI tracked, with HMAC-signed
-              verifiable certificates. No separate license required.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Link to="/services/creator/courses">
-              <Button variant="outline" size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Author a course
-              </Button>
-            </Link>
-            <Link to="/studio?contentTemplate=course-lesson-explainer">
-              <Button variant="outline" size="sm">
-                <Video className="mr-1 h-4 w-4" /> Record a video lesson
-              </Button>
-            </Link>
-            <Link to="/search?category=courses">
-              <Button variant="outline" size="sm">
-                Browse marketplace <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <GraduationCap className="h-6 w-6 text-brand-purple" />
+            Learning
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            Your in-progress training, assigned courses, and the built-in
+            content library — SCORM 1.2, xAPI tracked, with HMAC-signed
+            verifiable certificates. No separate license required.
+          </p>
         </div>
 
-        {/* Toolbar: classroom filter (self-gates on membership) + view toggle. */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {cohorts.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
+        {/* Classroom filter — self-gates on membership; the layout toggle now
+            lives in the page header next to the global search. */}
+        {cohorts.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCohortFilter(null)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                cohortFilter === null
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "hover:bg-muted"
+              }`}
+            >
+              All
+            </button>
+            {cohorts.map((name) => (
               <button
+                key={name}
                 type="button"
-                onClick={() => setCohortFilter(null)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  cohortFilter === null
+                onClick={() => setCohortFilter(name)}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${
+                  cohortFilter === name
                     ? "bg-primary text-primary-foreground border-transparent"
                     : "hover:bg-muted"
                 }`}
               >
-                All
+                <Users className="h-3 w-3" /> {name}
               </button>
-              {cohorts.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setCohortFilter(name)}
-                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${
-                    cohortFilter === name
-                      ? "bg-primary text-primary-foreground border-transparent"
-                      : "hover:bg-muted"
-                  }`}
-                >
-                  <Users className="h-3 w-3" /> {name}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span />
-          )}
-          <ViewModeToggle value={view} onChange={setView} modes={LEARNING_VIEW_MODES} />
-        </div>
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <Card>
@@ -652,8 +639,9 @@ function LearningEmptyState({ cohortFiltered }: { cohortFiltered: boolean }) {
   );
 }
 
-/** Right column: learning goal (self-gating onboarding wedge) + join-a-
- *  classroom. Lifted verbatim from the retired My Learning tab. */
+/** Right column: create actions (author / record / browse) + learning goal
+ *  (self-gating onboarding wedge) + join-a-classroom. The goal + join cards
+ *  were lifted verbatim from the retired My Learning tab. */
 function LearningSidebar({ onJoined }: { onJoined: () => void }) {
   const [joinCode, setJoinCode] = useState("");
   const [joinMsg, setJoinMsg] = useState<string | null>(null);
@@ -679,6 +667,31 @@ function LearningSidebar({ onJoined }: { onJoined: () => void }) {
 
   return (
     <div className="space-y-6">
+      {/* Create actions — author a course, record a lesson, or browse the
+          marketplace. Relocated here from the main list header. */}
+      <Card>
+        <CardContent className="p-4 space-y-2">
+          <Link to="/services/creator/courses" className="block">
+            <Button variant="outline" size="sm" className="w-full justify-start">
+              <Plus className="mr-1 h-4 w-4" /> Author a course
+            </Button>
+          </Link>
+          <Link
+            to="/studio?contentTemplate=course-lesson-explainer"
+            className="block"
+          >
+            <Button variant="outline" size="sm" className="w-full justify-start">
+              <Video className="mr-1 h-4 w-4" /> Record a video lesson
+            </Button>
+          </Link>
+          <Link to="/search?category=courses" className="block">
+            <Button variant="outline" size="sm" className="w-full justify-between">
+              Browse marketplace <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
       {/* Self-gates: shows the capture prompt until a goal is set. */}
       <LearningGoalCard source="onboarding" />
 

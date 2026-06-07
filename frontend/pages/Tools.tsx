@@ -30,7 +30,7 @@ import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
-import LearningPanel from "@/components/courses/LearningPanel";
+import LearningPanel, { LEARNING_VIEW_MODES } from "@/components/courses/LearningPanel";
 import ClassroomsPanel from "@/components/courses/ClassroomsPanel";
 import {
   TOOLS_CATALOG,
@@ -109,6 +109,16 @@ export default function Tools() {
     "tools.browse",
     "grid",
     BROWSE_VIEW_MODES,
+  );
+
+  // Learning sub-tab's layout switcher. Lifted up here (instead of living
+  // inside LearningPanel) so the toggle can render next to the global search
+  // in PageHeader's actions slot, while the panel below consumes the same
+  // controlled state. Same persisted key as before so the choice survives.
+  const [learningView, setLearningView] = useViewMode(
+    "tools.learning",
+    "grid",
+    LEARNING_VIEW_MODES,
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -560,10 +570,19 @@ export default function Tools() {
               ]}
               activeTabKey={tabParam}
               search={<HeaderSearch />}
+              actions={
+                tabParam === "learning" ? (
+                  <ViewModeToggle
+                    value={learningView}
+                    onChange={setLearningView}
+                    modes={LEARNING_VIEW_MODES}
+                  />
+                ) : undefined
+              }
             />
 
             {tabParam === "learning" ? (
-              <LearningPanel />
+              <LearningPanel view={learningView} onViewChange={setLearningView} />
             ) : tabParam === "classrooms" ? (
               <ClassroomsPanel />
             ) : (
