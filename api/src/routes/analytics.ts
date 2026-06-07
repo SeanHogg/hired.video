@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, avg, count, desc, eq, gte, lt, sql } from "drizzle-orm";
-import { z } from "zod";
+import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -342,6 +342,7 @@ import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/arti
 import { buildArtifactMetrics, lookupArtifactOwner } from "../services/analytics/artifactAnalytics.js";
 import { ARTIFACT_KINDS, type ArtifactKind } from "../../../shared/artifact-views.js";
 import { hashClientIp } from "./resumes.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 
 const beaconSchema = z.object({
   artifactKind: z.enum(ARTIFACT_KINDS as unknown as [ArtifactKind, ...ArtifactKind[]]),
@@ -405,8 +406,11 @@ analyticsRoutes.get("/artifacts/:kind/:id", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const ownerUserId = await lookupArtifactOwner(kind, id);
-  const isSuperAdmin = (c.var as any).user?.role === "super_admin";
-  if (!isSuperAdmin && ownerUserId !== uid) {
+  // Owner-or-super-admin. Use the canonical predicate — the JWT payload
+  // has no singular `role` field (it carries `roles[]` + `isSuperAdmin`),
+  // so the old `user.role === "super_admin"` check silently never matched
+  // and 403'd even genuine super-admins.
+  if (!isSuperAdmin(c.var.user) && ownerUserId !== uid) {
     return c.json(error("FORBIDDEN", "Only the artifact owner can read stats"), 403);
   }
 

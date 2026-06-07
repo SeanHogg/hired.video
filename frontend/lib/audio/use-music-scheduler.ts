@@ -3,9 +3,12 @@
  *
  * Every studio play surface (V1 VideoPreview live, V2 usePreviewPlayback,
  * V2 PreviewOverlay via the same hook, /v/:id via VideoPreview) routes
- * through this — per the DRY rule there is exactly ONE AudioContext
- * lifecycle + scheduler call site in the editor codebase. Add a new play
- * surface? Just call this hook with the right clip list.
+ * through this — per the DRY rule there is exactly ONE scheduler call site
+ * in the editor codebase. The live device-backed AudioContext itself comes
+ * from the shared `acquireSharedAudioContext()` owner (live-audio-context.ts),
+ * which all interactive audio surfaces share so idle device handles can't
+ * linger and re-emit the WebAudio device error. Add a new play surface? Just
+ * call this hook with the right clip list.
  *
  * Music clips, voiceover clips, scene audio — anything with a
  * `{track, startSec, endSec, volume}` shape rides on the same lane.
@@ -31,6 +34,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AudioClip } from "@/types/video-script";
 import { scheduleClipsToDestination, type ClipScheduleHandle } from "@/lib/audio/clip-scheduler";
+import { acquireSharedAudioContext } from "@/lib/audio/live-audio-context";
 
 export interface UseMusicSchedulerInput {
   /** True while the play surface is actively playing. False pauses /
@@ -58,6 +62,7 @@ export function useMusicScheduler({
   playheadRef,
 }: UseMusicSchedulerInput): void {
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioReleaseRef = useRef<(() => void) | null>(null);
   const audioMasterRef = useRef<GainNode | null>(null);
   const audioHandleRef = useRef<ClipScheduleHandle | null>(null);
   const audioClipsKeyRef = useRef<string>("");
@@ -91,7 +96,11 @@ export function useMusicScheduler({
       audioHandleRef.current = null;
       audioMasterRef.current?.disconnect();
       audioMasterRef.current = null;
-      audioCtxRef.current?.close().catch(() => {});
+      // Release our hold on the shared context rather than closing it
+      // directly — the shared owner reclaims the device once every consumer
+      // has released (see live-audio-context.ts).
+      audioReleaseRef.current?.();
+      audioReleaseRef.current = null;
       audioCtxRef.current = null;
       audioClipsKeyRef.current = "";
     }
@@ -106,7 +115,7 @@ export function useMusicScheduler({
 
     (async () => {
       try {
-        const ctx = new AudioContext();
+        const { ctx, release } = acquireSharedAudioContext();
         if (ctx.state === "suspended") {
           try {
             await ctx.resume();
@@ -134,10 +143,11 @@ export function useMusicScheduler({
         if (cancelled) {
           handle.stop();
           master.disconnect();
-          ctx.close().catch(() => {});
+          release();
           return;
         }
         audioCtxRef.current = ctx;
+        audioReleaseRef.current = release;
         audioMasterRef.current = master;
         audioHandleRef.current = handle;
         audioClipsKeyRef.current = debouncedClipsKey;
@@ -173,7 +183,8 @@ export function useMusicScheduler({
       audioHandleRef.current = null;
       audioMasterRef.current?.disconnect();
       audioMasterRef.current = null;
-      audioCtxRef.current?.close().catch(() => {});
+      audioReleaseRef.current?.();
+      audioReleaseRef.current = null;
       audioCtxRef.current = null;
     };
   }, []);

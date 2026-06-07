@@ -8,7 +8,7 @@
 // `buildShareAction` helper so the copy-link + toast UX is identical to
 // every other entity card.
 
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye, Share2 } from "lucide-react";
@@ -84,7 +84,14 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold leading-tight truncate">{resolved.name}</h3>
+              <h3 className="font-semibold leading-tight truncate">
+                <Link
+                  to={`/marketplace/templates/${resolved.slug}`}
+                  className="hover:text-primary transition-colors"
+                >
+                  {resolved.name}
+                </Link>
+              </h3>
               {/* Self-gates: renders nothing for non-first-party templates. */}
               <FirstPartyBadge meta={resolved} />
             </div>

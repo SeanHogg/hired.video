@@ -276,7 +276,27 @@ function renderObjectField(
       </div>
     ) : null;
   }
-  // text / number / date
+  if (field.type === "multiselect") {
+    const arr = Array.isArray(value) ? (value as unknown[]).map(String) : [];
+    const labels = (field.options ?? [])
+      .filter((o) => arr.includes(o.value))
+      .map((o) => o.label);
+    return labels.length > 0 ? (
+      <div key={field.key} style={{ fontSize: 12, color: theme.muted }}>
+        {field.label}: {labels.join(", ")}
+      </div>
+    ) : null;
+  }
+  // A "title" field renders as the section's prominent heading, not a meta line.
+  if (field.key === "title") {
+    const v = typeof value === "string" ? value : "";
+    return v ? (
+      <div key={field.key} style={{ fontSize: 18, fontWeight: 700, color: theme.heading, margin: "2px 0 6px" }}>
+        {v}
+      </div>
+    ) : null;
+  }
+  // text / number / date / day
   const v = field.type === "number" ? (typeof value === "number" ? String(value) : "") : (typeof value === "string" ? value : "");
   return v ? (
     <div key={field.key} style={{ fontSize: 12.5, color: theme.heading, margin: "2px 0" }}>

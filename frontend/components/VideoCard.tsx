@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Play, Eye, Clock, User, Briefcase, Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -184,7 +185,9 @@ export default function VideoCard({
         <div className="p-4">
           <div className="space-y-2">
             <h3 className="font-semibold text-sm line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-              {title}
+              <Link to={`/v/${id}`} onClick={(e) => e.stopPropagation()}>
+                {title}
+              </Link>
             </h3>
 
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

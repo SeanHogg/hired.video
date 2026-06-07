@@ -66,7 +66,9 @@ export default function ServiceMarketplaceCard({ item }: { item: ServiceMarketpl
         </Button>
       </div>
       <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
-        <h3 className="font-semibold leading-tight line-clamp-2">{item.title}</h3>
+        <h3 className="font-semibold leading-tight line-clamp-2">
+          <Link to={ctaHref} className="hover:text-primary transition-colors">{item.title}</Link>
+        </h3>
         {item.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
         )}

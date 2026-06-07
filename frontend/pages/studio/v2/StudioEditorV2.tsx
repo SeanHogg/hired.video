@@ -2798,7 +2798,10 @@ export default function StudioEditorV2() {
             const jobContent = documentEntityContent as unknown as JobDocumentContent;
             if (documentState.entityId) {
               await jobService.updateJob(documentState.entityId, jobContent);
-            } else {
+            } else if (jobContent.title.trim()) {
+              // First save of a fresh job_doc draft — create the row (strict
+              // CreateJobSchema needs title + description). Skip until a title
+              // exists so an empty draft persists as a document without a 422.
               const createdJob = await jobService.createJob(contentToCreateJob(jobContent));
               documentStateForSave = { ...documentState, entityId: createdJob.id };
               setDocumentState(() => documentStateForSave);

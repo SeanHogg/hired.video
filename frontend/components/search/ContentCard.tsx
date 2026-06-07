@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Newspaper, BookOpen, HelpCircle, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +68,9 @@ export default function ContentCard({ item }: { item: ContentItem }) {
                 {meta.label}
               </Badge>
               <CardTitle className="text-base leading-snug line-clamp-2">
-                {title}
+                <Link to={href} className="hover:text-primary transition-colors">
+                  {title}
+                </Link>
               </CardTitle>
             </div>
           </div>

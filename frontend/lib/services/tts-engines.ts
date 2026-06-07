@@ -50,6 +50,7 @@ import {
   stopSpeaking as webStop,
 } from "./browser-tts";
 import type { TTSVoice } from "./studio-features-service";
+import { acquireSharedAudioContext } from "@/lib/audio/live-audio-context";
 
 // ---------------------------------------------------------------------------
 // Engine identity + descriptors
@@ -321,6 +322,13 @@ export interface EngineSpeakOptions {
 }
 
 let activeWebAudioCtx: AudioContext | null = null;
+// Release handle for the shared live context held during PCM playback. The
+// context used to be created here and never closed — it leaked the audio
+// device handle and re-emitted "The AudioContext encountered an error from the
+// audio device or the WebAudio renderer" on unrelated pages long after the
+// studio session ended. We now borrow the shared context and release it the
+// moment playback stops.
+let releaseWebAudioCtx: (() => void) | null = null;
 let activeWebAudioSource: AudioBufferSourceNode | null = null;
 let activeBoundaryTimer: ReturnType<typeof setInterval> | null = null;
 // Shared GainNode for the WebGPU engines' Web Audio playback chain.
@@ -356,6 +364,10 @@ function clearWebAudio() {
     clearInterval(activeBoundaryTimer);
     activeBoundaryTimer = null;
   }
+  // Release the shared live context so its device handle doesn't linger.
+  releaseWebAudioCtx?.();
+  releaseWebAudioCtx = null;
+  activeWebAudioCtx = null;
 }
 
 /** Play a Float32Array of PCM samples and return a cancel function. */
@@ -371,9 +383,9 @@ function playPcm(
 ): () => void {
   try {
     clearWebAudio();
-    if (!activeWebAudioCtx) {
-      activeWebAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
+    const acquired = acquireSharedAudioContext();
+    activeWebAudioCtx = acquired.ctx;
+    releaseWebAudioCtx = acquired.release;
     const ctx = activeWebAudioCtx;
     const buf = ctx.createBuffer(1, pcm.length, sampleRate);
     buf.getChannelData(0).set(pcm);

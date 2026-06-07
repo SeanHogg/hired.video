@@ -9,18 +9,24 @@
  * derivations — that scatter is the symptom this hook closes.
  *
  * Owner-only rule: the [🌐 Details] drawer is gated to the artifact
- * owner (admin / super-admin preserved for support, same pattern as
- * every other permission hook). Recruiters and employers do NOT see
- * the drawer on someone else's resume/company/etc. — the per-entity
- * hooks expose a wider `canViewStats` for inline surfaces (e.g.
- * ResumeCard score chips), but the globe drawer is the strict surface
- * and this aggregator enforces the tighter rule. Jobs are the
- * exception: the "owner" of a job posting is the whole company team
- * (backend-stamped `viewerCanManage`), so we delegate to `canEdit`.
+ * owner (super-admin preserved for support, same pattern as every
+ * other permission hook). Recruiters and employers do NOT see the
+ * drawer on someone else's resume/company/etc. — the per-entity hooks
+ * expose a wider `canViewStats` for inline surfaces (e.g. ResumeCard
+ * score chips), but the globe drawer is the strict surface and this
+ * aggregator enforces the tighter rule. Jobs are the exception: the
+ * "owner" of a job posting is the whole company team (backend-stamped
+ * `viewerCanManage`), so we delegate to `canEdit`.
+ *
+ * Super-admin only (NOT plain admin): the stats endpoint that backs
+ * this drawer (`GET /api/analytics/artifacts/:kind/:id`) is gated to
+ * owner-or-super-admin server-side, so granting the button to a plain
+ * admin just surfaces a button that 403s. The two gates must stay in
+ * lockstep.
  *
  * Adding a new artifact kind: extend EntityDetailsPermissionArgs with
  * the new kind + its row shape, then add a `case` here that returns
- * `{ canViewStats: <hook>.isOwner || adminLike }`. No drawer site
+ * `{ canViewStats: <hook>.isOwner || canViewAsAdmin }`. No drawer site
  * changes.
  */
 
@@ -64,8 +70,10 @@ export function useEntityDetailsPermission(
   // rules-of-hooks contract. Each per-entity hook accepts a null entity
   // and returns an all-false permissions object in that case, so feeding
   // a non-matching entity is safe.
-  const { isAdmin, isSuperAdmin } = usePermissions();
-  const adminLike = isAdmin || isSuperAdmin;
+  // Super-admin only — must match the owner-or-super-admin gate on the
+  // backing stats endpoint (see the header comment). Plain admins are
+  // intentionally excluded so we never render a button that 403s.
+  const { isSuperAdmin: canViewAsAdmin } = usePermissions();
 
   const resume = useResumePermissions(args.kind === "resume" ? args.entity : null);
   const job = useJobPermissions(args.kind === "job" ? args.entity ?? null : null);
@@ -77,13 +85,13 @@ export function useEntityDetailsPermission(
   const video = useStudioTemplatePermissions(args.kind === "video" ? (args.entity as any) : null);
 
   switch (args.kind) {
-    case "resume": return { canViewStats: resume.isOwner || adminLike };
-    case "job": return { canViewStats: job.canEdit || adminLike };
-    case "company": return { canViewStats: company.isOwner || adminLike };
-    case "profile": return { canViewStats: profile.isOwner || adminLike };
-    case "article": return { canViewStats: article.isOwner || adminLike };
-    case "studio_template": return { canViewStats: template.isOwner || adminLike };
-    case "service": return { canViewStats: service.isOwner || adminLike };
-    case "video": return { canViewStats: video.isOwner || adminLike };
+    case "resume": return { canViewStats: resume.isOwner || canViewAsAdmin };
+    case "job": return { canViewStats: job.canEdit || canViewAsAdmin };
+    case "company": return { canViewStats: company.isOwner || canViewAsAdmin };
+    case "profile": return { canViewStats: profile.isOwner || canViewAsAdmin };
+    case "article": return { canViewStats: article.isOwner || canViewAsAdmin };
+    case "studio_template": return { canViewStats: template.isOwner || canViewAsAdmin };
+    case "service": return { canViewStats: service.isOwner || canViewAsAdmin };
+    case "video": return { canViewStats: video.isOwner || canViewAsAdmin };
   }
 }

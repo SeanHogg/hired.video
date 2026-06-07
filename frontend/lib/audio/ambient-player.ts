@@ -5,6 +5,8 @@
  * from note patterns and oscillator synthesis.
  */
 
+import { acquireSharedAudioContext } from "@/lib/audio/live-audio-context";
+
 // ─── Preset definitions ────────────────────────────────────────────────────
 
 type WaveType = "sine" | "triangle" | "sawtooth" | "square";
@@ -118,6 +120,9 @@ export class AmbientPlayer {
   private volume = 0.6;
   private _playing = false;
   private _ownsContext = true;
+  // Release handle for the shared live context when we own it (the `play()`
+  // preview path). Null while playing to an externally-owned export context.
+  private _releaseCtx: (() => void) | null = null;
 
   get playing() { return this._playing; }
 
@@ -131,7 +136,9 @@ export class AmbientPlayer {
     this.volume = volume;
     this._playing = true;
     this._ownsContext = true;
-    this.ctx = new AudioContext();
+    const { ctx, release } = acquireSharedAudioContext();
+    this.ctx = ctx;
+    this._releaseCtx = release;
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = def.masterGain * volume;
     this.masterGain.connect(this.ctx.destination);
@@ -166,7 +173,11 @@ export class AmbientPlayer {
     this.padOscillators = [];
     this.padGains = [];
     if (this.masterGain) { this.masterGain.disconnect(); this.masterGain = null; }
-    if (this.ctx && this._ownsContext) { this.ctx.close().catch(() => {}); }
+    // When we own the context it's the shared live context — release our hold
+    // instead of closing it directly. The export path (`playToDestination`)
+    // doesn't own it, so we leave that caller's context untouched.
+    if (this._ownsContext) { this._releaseCtx?.(); }
+    this._releaseCtx = null;
     this.ctx = null;
     this._ownsContext = true;
     this.stepIndex = 0;

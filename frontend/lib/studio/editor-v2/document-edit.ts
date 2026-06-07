@@ -86,7 +86,9 @@ export const JOB_BLOCK_PRESETS: DocumentBlockPreset[] = [
   { kind: "section", label: "Overview", sectionKey: "overview", layout: "prose" },
   { kind: "section", label: "What you'll do", sectionKey: "responsibilities", layout: "list" },
   { kind: "section", label: "Requirements", sectionKey: "requirements", layout: "list" },
-  { kind: "section", label: "Compensation & details", sectionKey: "details", layout: "compact" },
+  { kind: "section", label: "Compensation", sectionKey: "compensation", layout: "compact" },
+  { kind: "section", label: "Role details", sectionKey: "details", layout: "compact" },
+  { kind: "section", label: "Publishing & apply", sectionKey: "publishing", layout: "compact" },
   ...FREE_CONTENT_PRESETS,
 ];
 

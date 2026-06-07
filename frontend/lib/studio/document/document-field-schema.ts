@@ -24,19 +24,39 @@
  */
 import { newId } from "@/lib/studio/editor-v2/document-edit";
 import type { DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
+import {
+  DISPLAY_PRIVACY_OPTIONS,
+  EMPLOYMENT_TYPE_OPTIONS,
+  JOB_STATUS_OPTIONS,
+  WORK_SETTING_OPTIONS,
+} from "@/lib/constants/enums";
 
 export type FieldType =
   | "text"
   | "textarea"
+  // Month-precision text (resume dates are "YYYY-MM").
   | "date"
+  // Full-date picker (`<input type="date">`, "YYYY-MM-DD") — job go-live / expiry.
+  | "day"
   | "list"
   | "number"
   | "select"
+  // Multiple enum values → number[] (job employment types).
+  | "multiselect"
   | "image";
 
 export interface FieldOption {
   value: string;
   label: string;
+}
+
+/** Adapt a canonical numeric `*_OPTIONS` enum list (the single source in
+ *  `constants/enums.ts`) to the string-valued `FieldOption` the schema uses;
+ *  fields flag `numeric` so the editor coerces the value back to a number. */
+function enumFieldOptions(
+  opts: readonly { value: number; label: string }[],
+): FieldOption[] {
+  return opts.map((o) => ({ value: String(o.value), label: o.label }));
 }
 
 export interface SectionFieldDef {
@@ -193,21 +213,10 @@ const RESUME_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
 //
 // A job is a FLAT record (`JobDocumentContent`), so every section is an object
 // section writing distinct keys of the content root (`objectPath` omitted). The
-// enum selects mirror the values the legacy job form used (`WorkSetting` /
-// `JobStatus` in `@/lib/constants/enums`) and store as numbers (`numeric`).
-
-const WORK_SETTING_OPTIONS: FieldOption[] = [
-  { value: "0", label: "On-site" },
-  { value: "1", label: "Remote" },
-  { value: "2", label: "Hybrid" },
-];
-
-const JOB_STATUS_OPTIONS: FieldOption[] = [
-  { value: "0", label: "Draft" },
-  { value: "1", label: "Open" },
-  { value: "2", label: "Closed" },
-  { value: "3", label: "Paused" },
-];
+// enum selects/multiselects reuse the canonical `*_OPTIONS` lists from
+// `constants/enums.ts` (single source) and store as numbers (`numeric`).
+// `seniority` + `industry` are NOT exposed yet (their numeric taxonomy isn't a
+// canonical option list — see gap #1953); they ride through as passthrough.
 
 const JOB_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
   overview: objectSchema("overview", "Overview", [
@@ -221,12 +230,21 @@ const JOB_SECTION_SCHEMAS: Record<string, DocumentSectionSchema> = {
   requirements: objectSchema("requirements", "Requirements", [
     { key: "requirements", label: "Requirements", type: "list" },
   ]),
-  details: objectSchema("details", "Compensation & details", [
-    { key: "workSetting", label: "Work setting", type: "select", numeric: true, options: WORK_SETTING_OPTIONS },
-    { key: "status", label: "Status", type: "select", numeric: true, options: JOB_STATUS_OPTIONS },
+  compensation: objectSchema("compensation", "Compensation", [
     { key: "salary", label: "Salary (annual)", type: "number" },
     { key: "bonus", label: "Bonus", type: "number" },
     { key: "equity", label: "Equity %", type: "number" },
+  ]),
+  details: objectSchema("details", "Role details", [
+    { key: "employmentType", label: "Employment type", type: "multiselect", numeric: true, options: enumFieldOptions(EMPLOYMENT_TYPE_OPTIONS) },
+    { key: "workSetting", label: "Work setting", type: "select", numeric: true, options: enumFieldOptions(WORK_SETTING_OPTIONS) },
+    { key: "status", label: "Status", type: "select", numeric: true, options: enumFieldOptions(JOB_STATUS_OPTIONS) },
+    { key: "hiringTarget", label: "Openings", type: "number" },
+  ]),
+  publishing: objectSchema("publishing", "Publishing & apply", [
+    { key: "privacy_ShowJob", label: "Visibility", type: "select", numeric: true, options: enumFieldOptions(DISPLAY_PRIVACY_OPTIONS) },
+    { key: "goLiveDate", label: "Go-live date", type: "day" },
+    { key: "expirationDate", label: "Expires", type: "day" },
     { key: "atsApplyUrl", label: "Application URL", type: "text" },
   ]),
 };

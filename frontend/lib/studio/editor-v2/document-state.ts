@@ -364,7 +364,9 @@ const JOB_SECTION_META: ReadonlyArray<{ key: string; title: string; layout: stri
   { key: "overview", title: "Overview", layout: "prose" },
   { key: "responsibilities", title: "What you'll do", layout: "list" },
   { key: "requirements", title: "Requirements", layout: "list" },
-  { key: "details", title: "Compensation & details", layout: "compact" },
+  { key: "compensation", title: "Compensation", layout: "compact" },
+  { key: "details", title: "Role details", layout: "compact" },
+  { key: "publishing", title: "Publishing & apply", layout: "compact" },
 ];
 
 /** Build the job's flow blocks: one section block per JOB_SECTION_META entry. */

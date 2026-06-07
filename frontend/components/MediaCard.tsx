@@ -5,7 +5,7 @@ import CardActions from "@/components/ui/CardActions";
 import { formatDate, cn } from "@/lib/utils";
 import { MetaType, type ResumeSectionMeta } from "@/types/resume";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 // Extended type for media with user information
 interface MediaWithUser extends ResumeSectionMeta {
@@ -94,27 +94,35 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
   const MediaIcon = getMediaIcon();
   const videoId = getYouTubeVideoId();
 
-  // Navigation handler for media preview and actions
+  // Resolve the single destination this media card points at, so the
+  // card-level click, the footer "View"/"Play" action, and the title
+  // hyperlink all route through one source of truth (DRY). The resume
+  // section anchor wins, then the owner's profile, then the raw media
+  // URL as an external fallback.
+  const userSlug = (media as MediaWithUser).userSlug || (media as MediaWithUser).slug;
+  const navTarget: { href: string; external: boolean } | null = resumeId
+    ? {
+        href: media.referenceId
+          ? `/resumes/${resumeId}#${media.referenceId}`
+          : `/resumes/${resumeId}`,
+        external: false,
+      }
+    : media.userId
+      ? { href: `/people/${userSlug || media.userId}`, external: false }
+      : media.url
+        ? { href: media.url, external: true }
+        : null;
+
+  // Navigation handler for media preview and actions. Internal targets
+  // navigate in-app; when there's no concrete route we defer to onView
+  // (e.g. a preview modal) before falling back to opening the raw URL.
   const handleNavigateToResume = () => {
-    if (resumeId) {
-      // Navigate to resume with section anchor if we have referenceId
-      const url = media.referenceId
-        ? `/resumes/${resumeId}#${media.referenceId}`
-        : `/resumes/${resumeId}`;
-      navigate(url);
-    } else if (media.userId) {
-      // If we have userId but no resumeId, navigate to user's profile page
-      // The profile page will show their active resume
-      // Try to use slug if available, fallback to userId
-      const userSlug = (media as MediaWithUser).userSlug || (media as MediaWithUser).slug;
-      navigate(`/people/${userSlug || media.userId}`);
+    if (navTarget && !navTarget.external) {
+      navigate(navTarget.href);
     } else if (onView) {
       onView();
-    } else {
-      // Fallback to opening media URL directly
-      if (media.url) {
-        window.open(media.url, "_blank");
-      }
+    } else if (navTarget?.external) {
+      window.open(navTarget.href, "_blank");
     }
   };
 
@@ -211,7 +219,24 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
         {/* Title and Description */}
         <div className="space-y-2">
           <h3 className="font-semibold text-base line-clamp-2 leading-tight group-hover:text-primary transition-colors">
-            {media.name}
+            {navTarget ? (
+              navTarget.external ? (
+                <a
+                  href={navTarget.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {media.name}
+                </a>
+              ) : (
+                <Link to={navTarget.href} onClick={(e) => e.stopPropagation()}>
+                  {media.name}
+                </Link>
+              )
+            ) : (
+              media.name
+            )}
           </h3>
 
           {media.description && (

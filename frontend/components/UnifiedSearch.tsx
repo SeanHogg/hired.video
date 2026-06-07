@@ -20,7 +20,7 @@ import {
 import { useState } from "react";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ActionsModal from "@/components/ActionsModal";
 import SearchBar from "@/components/SearchBar";
 import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
@@ -313,14 +313,22 @@ export default function UnifiedSearch({
     setActionsModal({ isOpen: true, item });
   const handleCloseActions = () => setActionsModal({ isOpen: false, item: null });
 
+  // Single map from a search result to its detail-page route, shared by the
+  // card-level "View" click and the list-view title hyperlink so the two can
+  // never drift. Returns null when a result has no concrete destination.
+  const entityHref = (item: any): string | null => {
+    if (item.type === "resume") return `/resumes/${item.id}`;
+    if (item.type === "job") return `/jobs/${item.id}`;
+    if (item.type === "company") return `/companies/${item.id}`;
+    if (item.type === "people") return `/people/${item.slug || item.id}`;
+    if (item.type === "video") return `/v/${item.id}`;
+    if (item.href) return item.href as string;
+    return null;
+  };
+
   const handleView = (item: any) => {
-    if (item.type === "resume") navigate(`/resumes/${item.id}`);
-    else if (item.type === "job") navigate(`/jobs/${item.id}`);
-    else if (item.type === "company") navigate(`/companies/${item.id}`);
-    else if (item.type === "people")
-      navigate(`/people/${item.slug || item.id}`);
-    else if (item.type === "video") navigate(`/v/${item.id}`);
-    else if (item.href) navigate(item.href);
+    const href = entityHref(item);
+    if (href) navigate(href);
   };
 
   const handleShare = (item: any) => console.log("Share item:", item.id);
@@ -726,12 +734,21 @@ export default function UnifiedSearch({
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-lg truncate">
-                                <button
-                                  onClick={() => handleView(item)}
-                                  className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
-                                >
-                                  {item.name ?? item.title ?? ""}
-                                </button>
+                                {entityHref(item) ? (
+                                  <Link
+                                    to={entityHref(item)!}
+                                    className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
+                                  >
+                                    {item.name ?? item.title ?? ""}
+                                  </Link>
+                                ) : (
+                                  <button
+                                    onClick={() => handleView(item)}
+                                    className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
+                                  >
+                                    {item.name ?? item.title ?? ""}
+                                  </button>
+                                )}
                               </h3>
                               <p className="text-muted-foreground truncate">
                                 {item.title}

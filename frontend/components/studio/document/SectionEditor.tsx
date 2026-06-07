@@ -14,6 +14,8 @@
  *     content root (the flat job record).
  */
 import { Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import MediaPicker from "@/components/shared/MediaPicker";
 import type { DocumentEntityContent, DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
 import {
   documentSectionSchema,
@@ -248,6 +250,59 @@ function FieldInput({
     );
   }
 
+  if (field.type === "multiselect") {
+    const arr = Array.isArray(value) ? (value as unknown[]) : [];
+    const selected = (optValue: string) => arr.some((x) => String(x) === optValue);
+    const toggle = (optValue: string) => {
+      const raw: unknown = field.numeric ? Number(optValue) : optValue;
+      onChange(
+        selected(optValue)
+          ? arr.filter((x) => String(x) !== optValue)
+          : [...arr, raw],
+      );
+    };
+    return (
+      <div className="col-span-2">
+        {labelEl}
+        <div className="flex flex-wrap gap-1.5">
+          {(field.options ?? []).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={(e) => {
+                stop(e);
+                toggle(opt.value);
+              }}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-xs transition",
+                selected(opt.value)
+                  ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
+                  : "border-slate-200 text-slate-500 hover:border-slate-300",
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field.type === "day") {
+    return (
+      <div>
+        {labelEl}
+        <input
+          type="date"
+          value={typeof value === "string" ? value : ""}
+          onClick={stop}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
+        />
+      </div>
+    );
+  }
+
   if (field.type === "number") {
     return (
       <div>
@@ -268,7 +323,7 @@ function FieldInput({
   if (field.type === "image") {
     const url = typeof value === "string" ? value : "";
     return (
-      <div className="col-span-2">
+      <div className="col-span-2" onClick={stop} role="presentation">
         {labelEl}
         {url ? (
           <div className="flex items-start gap-2">
@@ -277,26 +332,30 @@ function FieldInput({
               alt=""
               className="h-16 w-28 rounded border border-slate-200 object-cover"
             />
-            <button
-              type="button"
-              onClick={(e) => {
-                stop(e);
-                onChange("");
-              }}
-              className="text-xs text-slate-400 hover:text-red-600"
-            >
-              Remove
-            </button>
+            <div className="flex flex-col gap-1">
+              <MediaPicker
+                accept="image"
+                title={`Choose ${field.label.toLowerCase()}`}
+                triggerLabel="Replace"
+                onPick={(asset) => onChange(asset.url)}
+              />
+              <button
+                type="button"
+                onClick={() => onChange("")}
+                className="text-xs text-slate-400 hover:text-red-600"
+              >
+                Remove
+              </button>
+            </div>
           </div>
-        ) : null}
-        <input
-          type="text"
-          value={url}
-          onClick={stop}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://… image URL"
-          className="mt-1 w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-        />
+        ) : (
+          <MediaPicker
+            accept="image"
+            title={`Choose ${field.label.toLowerCase()}`}
+            triggerLabel={`Add ${field.label.toLowerCase()}`}
+            onPick={(asset) => onChange(asset.url)}
+          />
+        )}
       </div>
     );
   }

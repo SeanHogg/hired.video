@@ -13,6 +13,7 @@
 
 "use client";
 
+import { Link } from "react-router-dom";
 import { Mic, Play, Pause, ShoppingCart, Check, Globe2, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,7 +92,14 @@ export default function VoiceMarketplaceCard({ item }: Props) {
               <Mic className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-semibold text-sm truncate">{item.name}</h3>
+              <h3 className="font-semibold text-sm truncate">
+                <Link
+                  to={`/marketplace/voices/${item.voiceCloneId}`}
+                  className="hover:text-primary transition-colors"
+                >
+                  {item.name}
+                </Link>
+              </h3>
               <p className="text-xs text-muted-foreground truncate">
                 {item.summary || "AI voice"}
               </p>

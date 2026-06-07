@@ -85,7 +85,9 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
         />
       </div>
       <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
-        <h3 className="font-semibold leading-tight line-clamp-2">{item.title}</h3>
+        <h3 className="font-semibold leading-tight line-clamp-2">
+          <Link to={href} className="hover:text-primary transition-colors">{item.title}</Link>
+        </h3>
         {item.summary && (
           <p className="text-sm text-muted-foreground line-clamp-2">{item.summary}</p>
         )}

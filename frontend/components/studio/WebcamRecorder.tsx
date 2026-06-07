@@ -14,6 +14,7 @@ import {
   applyBackgroundReplacement,
   type BackgroundReplacement,
 } from "@/lib/studio/webcam/background-removal";
+import { acquireSharedAudioContext } from "@/lib/audio/live-audio-context";
 import {
   Camera,
   Video,
@@ -217,6 +218,7 @@ export function WebcamRecorder({
   const startTimeRef = useRef<number>(0);
 
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioCtxReleaseRef = useRef<(() => void) | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioAnimFrameRef = useRef<number | null>(null);
 
@@ -260,7 +262,11 @@ export function WebcamRecorder({
       audioAnimFrameRef.current = null;
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
+      // Release our hold on the shared live context (the analyser tap never
+      // connects to the destination, so this is silent) rather than closing
+      // it directly.
+      audioCtxReleaseRef.current?.();
+      audioCtxReleaseRef.current = null;
       audioContextRef.current = null;
     }
     analyserRef.current = null;
@@ -318,13 +324,14 @@ export function WebcamRecorder({
       if (audioTracks.length === 0) return;
 
       try {
-        const ctx = new AudioContext();
+        const { ctx, release } = acquireSharedAudioContext();
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
 
         audioContextRef.current = ctx;
+        audioCtxReleaseRef.current = release;
         analyserRef.current = analyser;
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);

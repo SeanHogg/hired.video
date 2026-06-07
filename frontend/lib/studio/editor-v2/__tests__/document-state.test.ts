@@ -80,7 +80,14 @@ describe("createBlankDocumentState", () => {
     const s = createBlankDocumentState("job", counter());
     expect(s.entityKind).toBe("job");
     const keys = s.pages[0].blocks.map((b) => b.sectionKey);
-    expect(keys).toEqual(["overview", "responsibilities", "requirements", "details"]);
+    expect(keys).toEqual([
+      "overview",
+      "responsibilities",
+      "requirements",
+      "compensation",
+      "details",
+      "publishing",
+    ]);
     expect(s.pages[0].blocks.every((b) => b.kind === "section" && b.mode === "flow")).toBe(true);
   });
 });
@@ -93,7 +100,14 @@ describe("createJobDocumentState", () => {
     expect(s.pageSize).toBe("letter");
     expect(s.orientation).toBe("portrait");
     const keys = s.pages[0].blocks.map((b) => b.sectionKey);
-    expect(keys).toEqual(["overview", "responsibilities", "requirements", "details"]);
+    expect(keys).toEqual([
+      "overview",
+      "responsibilities",
+      "requirements",
+      "compensation",
+      "details",
+      "publishing",
+    ]);
   });
 });
 

@@ -12,10 +12,14 @@ import EntityEditShell from "@/components/EntityEditShell";
 import { JobScreeningCard } from "@/components/jobs/JobScreeningCard";
 import { jobService } from "@/lib/services/job-service";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
+import { usePageChrome } from "@/lib/seo";
 import { toast } from "sonner";
 
 export default function JobScreeningPage() {
   const { id } = useParams<{ id: string }>();
+  // SEO + breadcrumb JSON-LD (route-derived; owner-only page falls back to the
+  // /jobs base entry). Satisfies the require-page-chrome contract.
+  usePageChrome();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const permissions = useJobPermissions(job);

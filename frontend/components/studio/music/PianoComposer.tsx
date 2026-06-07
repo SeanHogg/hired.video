@@ -33,6 +33,7 @@ import {
   type Waveform,
   type PlayedNote,
 } from "@/lib/audio/synth-engine";
+import { acquireSharedAudioContext } from "@/lib/audio/live-audio-context";
 import { WaveformPicker } from "./WaveformPicker";
 import { AdsrControls } from "./AdsrControls";
 import {
@@ -72,6 +73,7 @@ export default function PianoComposer({ onMusicReady }: Props) {
 
   // ── Live audio + recording ────────────────────────────────────────────
   const ctxRef = useRef<AudioContext | null>(null);
+  const ctxReleaseRef = useRef<(() => void) | null>(null);
   const masterFilterRef = useRef<BiquadFilterNode | null>(null);
   const voicesRef = useRef<Map<string, VoiceHandle>>(new Map());
   const [activeNotes, setActiveNotes] = useState<Set<string>>(new Set());
@@ -87,9 +89,9 @@ export default function PianoComposer({ onMusicReady }: Props) {
 
   const ensureContext = useCallback(() => {
     if (ctxRef.current) return ctxRef.current;
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
+    const { ctx, release } = acquireSharedAudioContext();
     ctxRef.current = ctx;
+    ctxReleaseRef.current = release;
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
     filter.frequency.value = filterCutoff;
@@ -179,7 +181,12 @@ export default function PianoComposer({ onMusicReady }: Props) {
   useEffect(() => () => {
     voicesRef.current.forEach((v) => { try { v.osc.stop(); } catch { /* already stopped */ } });
     voicesRef.current.clear();
-    ctxRef.current?.close().catch(() => {});
+    masterFilterRef.current?.disconnect();
+    masterFilterRef.current = null;
+    // Release our hold on the shared live context rather than closing it.
+    ctxReleaseRef.current?.();
+    ctxReleaseRef.current = null;
+    ctxRef.current = null;
   }, []);
 
   // ── Recording controls ────────────────────────────────────────────────
