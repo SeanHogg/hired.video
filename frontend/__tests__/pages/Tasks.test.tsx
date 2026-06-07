@@ -166,20 +166,21 @@ describe('Tasks Page', () => {
       // Act
       renderTasksPage();
 
-      // Assert - Check for view toggle buttons
+      // Assert - the view-axis segmented control renders icon-only links
+      // whose accessible name comes from the aria-label.
       await waitFor(() => {
-        expect(screen.getByText('Kanban')).toBeInTheDocument();
-        expect(screen.getByText('Calendar')).toBeInTheDocument();
-        expect(screen.getByText('List')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Kanban' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Calendar' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'List' })).toBeInTheDocument();
       });
 
       // Test view switching
-      fireEvent.click(screen.getByText('Calendar'));
+      fireEvent.click(screen.getByRole('link', { name: 'Calendar' }));
       await waitFor(() => {
         expect(screen.getByTestId('calendar-view')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('List'));
+      fireEvent.click(screen.getByRole('link', { name: 'List' }));
       await waitFor(() => {
         expect(screen.getByTestId('list-view')).toBeInTheDocument();
       });

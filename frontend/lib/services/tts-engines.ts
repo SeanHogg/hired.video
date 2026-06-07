@@ -404,6 +404,17 @@ function playPcm(
         clearInterval(activeBoundaryTimer);
         activeBoundaryTimer = null;
       }
+      // Release the shared live context on natural end so it doesn't linger
+      // and re-emit the device error on a later page. Guard on identity: a
+      // superseding utterance calls clearWebAudio() → src.stop(), which also
+      // fires THIS handler — but by then activeWebAudioSource is the new src,
+      // so we must not release the context the new utterance just acquired.
+      if (activeWebAudioSource === src) {
+        releaseWebAudioCtx?.();
+        releaseWebAudioCtx = null;
+        activeWebAudioCtx = null;
+        activeWebAudioSource = null;
+      }
       onEnd?.();
     };
     src.start();

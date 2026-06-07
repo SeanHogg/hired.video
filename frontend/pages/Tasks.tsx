@@ -81,6 +81,7 @@ const EventDiscoveryPanel = lazy(() =>
 import { TimesheetTab } from "@/components/timesheet/TimesheetTab";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { cn } from "@/lib/utils";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
   Sheet,
@@ -1226,8 +1227,6 @@ export default function Tasks() {
       <div className="p-4 md:p-6">
           <div className="space-y-6">
             <PageHeader
-              tabs={taskTabs}
-              activeTabKey={currentView}
               search={<HeaderSearch />}
               actions={
                 <>
@@ -1280,6 +1279,35 @@ export default function Tasks() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+
+                  {/* View-axis segmented control (List / Calendar / Kanban).
+                      Lives next to "Add task" instead of the PageHeader tab
+                      strip; each segment is a router Link so the view stays
+                      URL-driven (`?tab=`). */}
+                  <div className="flex items-center rounded-md border">
+                    {taskTabs.map((tab, i) => {
+                      const active = currentView === tab.key;
+                      const Icon = tab.icon;
+                      return (
+                        <Button
+                          key={tab.key}
+                          asChild
+                          variant={active ? "default" : "ghost"}
+                          size="sm"
+                          className={cn(
+                            i === 0 && "rounded-r-none",
+                            i === taskTabs.length - 1 && "rounded-l-none",
+                            i > 0 && i < taskTabs.length - 1 && "rounded-none",
+                          )}
+                          aria-pressed={active}
+                        >
+                          <Link to={tab.to ?? "/tasks"} aria-label={tab.label} title={tab.label}>
+                            {Icon && <Icon className="h-4 w-4" />}
+                          </Link>
+                        </Button>
+                      );
+                    })}
+                  </div>
 
                   <Button
                     className="gap-2"
