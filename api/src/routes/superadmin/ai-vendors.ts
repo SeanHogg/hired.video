@@ -19,6 +19,7 @@ import {
   type InferenceProfile,
   type LLMUseCase,
 } from "../../services/adapters/providers.js";
+import { auditModelCatalog } from "../../services/adapters/model-catalog-audit.js";
 
 export const aiVendorRoutes = new Hono<AppEnv>();
 
@@ -71,60 +72,10 @@ aiVendorRoutes.get("/models", async (c) => {
 // USE_CASE_PROFILES sets ask for, joined with the live gateway catalog
 // when configured. SA can spot "we still ask for `google/gemma-4-31b-
 // it:free` but the gateway no longer carries it" without diffing source
-// files. Returns an array of `{ model, useCases[], availableInGateway }`.
+// files. Detection logic is shared with the daily drift alarm (#1938) via
+// `auditModelCatalog`, so the on-demand view and the cron can't diverge.
 aiVendorRoutes.get("/catalog-audit", async (c) => {
-  const apiKey = c.env?.BUILDERFORCE_API_KEY?.trim();
-  // Walk every profile + fallback chain and collect (model → useCase[]).
-  const modelToUseCases = new Map<string, Set<LLMUseCase>>();
-  for (const useCase of Object.keys(USE_CASE_PROFILES) as LLMUseCase[]) {
-    const profile = USE_CASE_PROFILES[useCase];
-    const models = [profile.model, ...(profile.fallbacks ?? []).map((f) => f.model)];
-    for (const m of models) {
-      let set = modelToUseCases.get(m);
-      if (!set) {
-        set = new Set();
-        modelToUseCases.set(m, set);
-      }
-      set.add(useCase);
-    }
-  }
-
-  let gatewayCatalog: Set<string> | null = null;
-  if (apiKey) {
-    try {
-      const sdk = new BuilderforceClient({ apiKey, baseUrl: c.env?.BUILDERFORCE_GATEWAY_URL });
-      const models = await sdk.models.list();
-      // The SDK returns either `{ data: [...] }` or a bare array depending
-      // on version — handle both without locking onto either shape.
-      const list = Array.isArray(models) ? models : (models as any)?.data ?? [];
-      gatewayCatalog = new Set(
-        (list as Array<{ id?: string; model?: string }>)
-          .map((m) => m.id ?? m.model ?? "")
-          .filter(Boolean),
-      );
-    } catch {
-      // Surface as "unknown" — the rows still ship with availability=null
-      // so the SA console can render "gateway unreachable, retry".
-      gatewayCatalog = null;
-    }
-  }
-
-  const rows = Array.from(modelToUseCases.entries())
-    .map(([model, useCases]) => ({
-      model,
-      useCases: Array.from(useCases).sort(),
-      availableInGateway:
-        gatewayCatalog === null ? null : gatewayCatalog.has(model),
-    }))
-    .sort((a, b) => a.model.localeCompare(b.model));
-
-  return c.json(
-    success({
-      gatewayChecked: gatewayCatalog !== null,
-      models: rows,
-      auditedAt: new Date().toISOString(),
-    }),
-  );
+  return c.json(success(await auditModelCatalog(c.env)));
 });
 
 // GET /usage — gateway's per-tenant aggregated cost reporting. Cross-

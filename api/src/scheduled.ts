@@ -13,7 +13,8 @@
 
 import { and, asc, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
-import { getEmailProvider } from "./services/adapters/email.js";
+import { getEmailProvider, sendGenericEmail } from "./services/adapters/email.js";
+import { auditModelCatalog, formatModelDriftEmailHtml } from "./services/adapters/model-catalog-audit.js";
 import { scrapeAllActiveSources } from "./services/job/scraper.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/company/recruiter-match.js";
 import { workers as registeredWorkers } from "./workers/registry.js";
@@ -562,6 +563,13 @@ export function isFraudSweepWindow(d: Date): boolean {
   return d.getUTCHours() === 4 && d.getUTCMinutes() >= 30;
 }
 
+/** True inside the daily 05:15–05:20 UTC window — the LLM model-catalog drift
+ *  check (#1938). One /5 tick per day; sits clear of the seed/retention/fraud
+ *  windows above. */
+export function isModelCatalogDriftWindow(d: Date): boolean {
+  return d.getUTCHours() === 5 && d.getUTCMinutes() >= 15 && d.getUTCMinutes() < 20;
+}
+
 /** True inside the monthly close window: 1st of month, 00:00–04:00 UTC. */
 export function isMonthlyCloseWindow(d: Date): boolean {
   return d.getUTCDate() === 1 && d.getUTCHours() < 4;
@@ -622,6 +630,53 @@ async function processArticleEngagementPayout(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// #1938 LLM model-catalog drift alarm
+// ---------------------------------------------------------------------------
+// Once a day, diff every model our USE_CASE_PROFILES chains ask for against
+// the live gateway catalog and email the maintainer when a pinned model has
+// gone retired — the guard that would have caught #1937 (claude-3-haiku
+// retiring out from under the paid terminal) before it 503'd tailoring.
+async function processModelCatalogDrift(): Promise<void> {
+  if (!isModelCatalogDriftWindow(new Date())) return;
+  try {
+    const env = (globalThis as any).__ENV ?? {};
+    const audit = await auditModelCatalog(env);
+
+    if (!audit.gatewayChecked) {
+      console.warn("[scheduled] model-catalog drift: gateway unconfigured/unreachable — skipped");
+      return;
+    }
+    if (audit.missing.length === 0) {
+      console.log(`[scheduled] model-catalog drift: all ${audit.models.length} configured models resolvable`);
+      return;
+    }
+    // Alert ONLY on partial drift. If EVERY configured model reads missing the
+    // cause is almost certainly a catalog-format mismatch in the matcher, not
+    // a 100%-simultaneous retirement — emailing that daily would train the
+    // maintainer to ignore the alarm. Targeted retirement (the #1937 shape:
+    // 1–2 models gone, the rest fine) is exactly the partial case.
+    if (audit.missing.length >= audit.models.length) {
+      console.warn(
+        `[scheduled] model-catalog drift: ALL ${audit.models.length} models read missing — ` +
+          "likely a catalog-format mismatch, not retirement; not alerting",
+      );
+      return;
+    }
+
+    console.error("[scheduled] model-catalog drift detected:", audit.missing);
+    const recipient = env.SUPERADMIN_EMAIL ?? "seanhogg@gmail.com";
+    const subject = `[hired.video] LLM model drift: ${audit.missing.length} configured model(s) missing from the gateway`;
+    await sendGenericEmail(recipient, subject, formatModelDriftEmailHtml(audit), "hired.video model-catalog monitor")
+      .catch((err) => {
+        console.error("[scheduled] model-catalog drift email failed:", err);
+        return false;
+      });
+  } catch (err) {
+    console.error("[scheduled] model-catalog drift check failed:", err);
+  }
+}
+
 /** Tick rotation — distributes the always-running sweeps across the /5
  *  cron cadence so a single invocation doesn't blow the Cloudflare
  *  Worker CPU budget. The old behaviour ran all nine sweeps every
@@ -664,6 +719,7 @@ export async function runScheduled(): Promise<void> {
     processCounterRecompute(),
     processPayoutRelease(),
     processArticleEngagementPayout(),
+    processModelCatalogDrift(),
   ];
   if (isQuarterTick(now)) sweeps.push(processRegisteredWorkers());
   if (isHalfTick(now))    sweeps.push(scrapeAllActiveSources());

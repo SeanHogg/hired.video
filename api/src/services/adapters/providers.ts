@@ -84,7 +84,7 @@ export type LLMUseCase =
   // 3D world game-builder agent (gap #1638). Multi-turn tool-using
   // agent that calls the world-3d mutation tools to build the game
   // from natural-language prompts. Needs a model with strong tool-use
-  // + reasoning; defaults to anthropic/claude-3.5-sonnet which the
+  // + reasoning; defaults to anthropic/claude-sonnet-4-6 which the
   // gateway resolves to the latest tool-calling-capable variant.
   | "studio_game_agent"
   | "default";
@@ -129,7 +129,7 @@ const FREE_TIER_FALLBACK_POOL = [
 
 /** Paid-tier terminal fallback pool for user-interactive use cases.
  *  Cerebras Llama 3.1-8B (sub-200ms TTFT, cheap) is the fast path;
- *  Anthropic Claude 3 Haiku (already `studio_script`'s primary) is the
+ *  Anthropic Claude Haiku 4.5 (already `studio_script`'s primary) is the
  *  second vendor so the paid layer has the same cross-vendor diversity
  *  we already give the free layer. Closes gap #525 Part B; widened
  *  2026-05-21 (gap #888) after a tailor 503 (`correlationId
@@ -140,8 +140,18 @@ const FREE_TIER_FALLBACK_POOL = [
  *  to the use cases in INTERACTIVE_USE_CASES below. */
 const PAID_TERMINAL_POOL = [
   "cerebras/llama3.1-8b",
-  "anthropic/claude-3-haiku",
+  "anthropic/claude-haiku-4-5",
 ] as const;
+
+/** A `:free`-tier model string (OpenRouter free pool). Single predicate so
+ *  the dispatch-timeout policy (llm-client.ts) and the free-attempt cap below
+ *  agree on what "free" means. */
+const isFreeModel = (model: string): boolean => model.endsWith(":free");
+
+/** Max `:free` models a user-blocking interactive flow will try before the
+ *  paid terminal. Bounds worst-case free-pool-congestion wall-clock (each free
+ *  attempt can burn the 25s per-attempt cap in llm-client.ts) — see #1939. */
+const MAX_FREE_ATTEMPTS_INTERACTIVE = 2;
 
 /** Use cases that should never bottom out at the free pool — when every
  *  free model fails, eat the paid call rather than 503 the user.
@@ -159,7 +169,7 @@ const PAID_TERMINAL_POOL = [
  *  tailor, autofill), and the free chain was producing unusable
  *  extracts often enough that users complained — promoting it to a
  *  premium primary + paid terminal is worth the per-click cost. */
-const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase>([
+export const INTERACTIVE_USE_CASES: ReadonlySet<LLMUseCase> = new Set<LLMUseCase>([
   "career_360",
   "chat",
   "interview_analyze",
@@ -195,16 +205,40 @@ function withFallbackChain(useCase: LLMUseCase, profile: UseCaseProfile): UseCas
     .filter((m) => !seen.has(m))
     .map(cloneForChain);
   freePool.forEach((p) => seen.add(p.model));
-  const paidTerminal = INTERACTIVE_USE_CASES.has(useCase)
+  const interactive = INTERACTIVE_USE_CASES.has(useCase);
+  const paidTerminal = interactive
     ? PAID_TERMINAL_POOL.filter((m) => !seen.has(m)).map(cloneForChain)
     : [];
   paidTerminal.forEach((p) => seen.add(p.model));
-  return { ...profile, fallbacks: [...explicit, ...freePool, ...paidTerminal] };
+
+  let chain = [...explicit, ...freePool, ...paidTerminal];
+
+  // #1939 — cap the number of `:free` models a user-blocking flow will walk
+  // before reaching the paid terminal. When the OpenRouter free pool is
+  // congested every free attempt burns the full 25s per-attempt cap
+  // (correlationId llm-71b468dd: 4 free timeouts ≈ 100s before the paid
+  // terminal was even tried). Keep at most MAX_FREE_ATTEMPTS_INTERACTIVE free
+  // models across the WHOLE flattened chain (primary + fallbacks), preserving
+  // order; paid entries are always kept so the cross-vendor safety net
+  // survives the cap. Non-interactive / high-volume pipelines keep the full
+  // free pool — a deterministic 503 + retry-next-tick is cheaper there than a
+  // paid call per item.
+  if (interactive) {
+    let freeKept = isFreeModel(profile.model) ? 1 : 0;
+    chain = chain.filter((p) => {
+      if (!isFreeModel(p.model)) return true;
+      if (freeKept >= MAX_FREE_ATTEMPTS_INTERACTIVE) return false;
+      freeKept += 1;
+      return true;
+    });
+  }
+
+  return { ...profile, fallbacks: chain };
 }
 
 const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   studio_script: {
-    model: "anthropic/claude-3-haiku",
+    model: "anthropic/claude-haiku-4-5",
     temperature: 0.7,
     fallbacks: [
       { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.7 },
@@ -226,7 +260,7 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   interview_questions: { model: "google/gemma-4-31b-it:free", temperature: 0.6 },
   interview_analyze: { model: "openai/gpt-oss-120b:free", temperature: 0.3 },
   interview_answer_score: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
-  video_pitch_script: { model: "anthropic/claude-3-haiku", temperature: 0.7 },
+  video_pitch_script: { model: "anthropic/claude-haiku-4-5", temperature: 0.7 },
   autofill: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.2 },
   skill_extract: { model: "qwen/qwen3-coder:free", temperature: 0.0 },
   linkedin_post: { model: "google/gemma-4-31b-it:free", temperature: 0.8 },
@@ -243,7 +277,7 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
     // Tool-use intensive — needs a model that reliably emits structured
     // function calls. Sonnet is the default; the gateway will substitute
     // on cooldown / outage and the route surfaces resolvedModel.
-    model: "anthropic/claude-3.5-sonnet",
+    model: "anthropic/claude-sonnet-4-6",
     temperature: 0.4,
     maxTokens: 4096,
     fallbacks: [
@@ -257,7 +291,7 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // best JSON-from-markdown quality, free Qwen primary fallback, and
   // withFallbackChain auto-pads the rest of the free pool.
   job_parser: {
-    model: "anthropic/claude-3-haiku",
+    model: "anthropic/claude-haiku-4-5",
     temperature: 0.0,
     fallbacks: [
       { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.0 },
@@ -294,10 +328,10 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // Scorecard bias linter (#1385). Short input + strict JSON output; the
   // gemma 4 instruct family hits the sweet spot of cheap + structured.
   article_moderation: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },
-  course_generation: { model: "anthropic/claude-3-haiku", temperature: 0.5 },
+  course_generation: { model: "anthropic/claude-haiku-4-5", temperature: 0.5 },
   // Re-rank a small keyword-recall candidate set against a learner's goal
   // (#1926). Tiny structured output (ordered ids) — cheap haiku, low temp.
-  course_recommend: { model: "anthropic/claude-3-haiku", temperature: 0.2, maxTokens: 300 },
+  course_recommend: { model: "anthropic/claude-haiku-4-5", temperature: 0.2, maxTokens: 300 },
   scorecard_bias_check: {
     model: "google/gemma-4-26b-a4b-it:free",
     temperature: 0.1,

@@ -52,14 +52,36 @@ function transportErrorContext(cause: string): Record<string, unknown> {
   };
 }
 
+/** Cap on the non-JSON body snippet we attach to an error report — enough to
+ *  carry the Cloudflare ray id / error-page title without bloating the report. */
+const MAX_NONJSON_BODY_SNIPPET = 1024;
+
 /**
- * Context for a response the server DID send but whose body wasn't valid JSON
- * (e.g. an HTML 502/504 from the edge, a truncated gateway page). Carrying the
- * real HTTP status keeps these from collapsing into NetworkError's default 500
- * in the report — the actual edge status is the actionable bit.
+ * Read a response body as JSON. Reads the raw text first so that, when the body
+ * ISN'T valid JSON (an HTML 502/504 from the edge, a truncated gateway page),
+ * we can attach the real HTTP status + a capped snippet of the ACTUAL body to
+ * the NetworkError. That snippet (Cloudflare ray id, gateway error-page title)
+ * is the single most diagnostic bit for an edge/gateway failure — without it
+ * these collapse into an opaque "Invalid JSON response" with a fabricated 500,
+ * leaving the emailed error report with nothing to act on. Single source of
+ * truth for "parse the body, or fail with diagnostics" so handleResponse /
+ * getRaw / requestRaw can't drift on what context a non-JSON failure carries.
  */
-function nonJsonResponseContext(response: Response): Record<string, unknown> {
-  return { httpStatus: response.status, statusText: response.statusText };
+async function readJsonBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new NetworkError(
+      "Invalid JSON response",
+      error instanceof Error ? error : undefined,
+      {
+        httpStatus: response.status,
+        statusText: response.statusText,
+        bodyText: text.slice(0, MAX_NONJSON_BODY_SNIPPET),
+      },
+    );
+  }
 }
 
 /**
@@ -580,19 +602,8 @@ export class ApiClient {
       url: response.url,
     });
 
-    let responseData: unknown;
-
-    try {
-      responseData = await response.json();
-      console.log("ApiClient.handleResponse: Raw response data", responseData);
-    } catch (error) {
-      console.error("ApiClient.handleResponse: Failed to parse JSON", error);
-      throw new NetworkError(
-        "Invalid JSON response",
-        error instanceof Error ? error : undefined,
-        nonJsonResponseContext(response),
-      );
-    }
+    const responseData = await readJsonBody(response);
+    console.log("ApiClient.handleResponse: Raw response data", responseData);
 
     // Handle HTTP error status codes
     if (!response.ok) {
@@ -860,7 +871,7 @@ export class ApiClient {
 
     const url = this.createUrl(endpoint);
     const emulationToken = _emulationTokenGetter() ?? "";
-    const key = `${url} ${emulationToken}`;
+    const key = `${url} ${emulationToken}`;
 
     const existing = this.inFlightGets.get(key);
     if (existing) {
@@ -1043,15 +1054,7 @@ export class ApiClient {
       const response = await this.executeRequest(url, { method: "GET" });
       lastRequestId = response.headers.get("x-request-id") ?? undefined;
 
-      try {
-        responseData = await response.json();
-      } catch (error) {
-        throw new NetworkError(
-          "Invalid JSON response",
-          error instanceof Error ? error : undefined,
-          nonJsonResponseContext(response),
-        );
-      }
+      responseData = await readJsonBody(response);
 
       recordLogEntryResponse(logId, response.status, responseData, startTime);
 
@@ -1123,16 +1126,7 @@ export class ApiClient {
       const response = await this.executeRequest(url, processedConfig);
       lastRequestId = response.headers.get("x-request-id") ?? undefined;
 
-      let responseData: unknown;
-      try {
-        responseData = await response.json();
-      } catch (error) {
-        throw new NetworkError(
-          "Invalid JSON response",
-          error instanceof Error ? error : undefined,
-          nonJsonResponseContext(response),
-        );
-      }
+      const responseData = await readJsonBody(response);
 
       recordLogEntryResponse(logId, response.status, responseData, startTime);
 

@@ -78,6 +78,45 @@ describe("api-client loose error-envelope handling", () => {
     });
   });
 
+  it("captures the body snippet + real status when the response isn't JSON (edge 502/504)", async () => {
+    // An HTML error page from the Cloudflare edge — the `.json()` parse fails.
+    // The NetworkError must carry the real HTTP status + a snippet of the body
+    // (the ray id / page title) instead of collapsing to a fabricated 500 with
+    // nothing to debug from. Regression for gap #1936.
+    const htmlBody =
+      "<html><head><title>502 Bad Gateway</title></head><body>cloudflare ray 8f3a1bcdef</body></html>";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(htmlBody, { status: 502, statusText: "Bad Gateway", headers: { "Content-Type": "text/html" } }),
+    );
+
+    const events: ApiErrorEvent[] = [];
+    const handler = (e: Event) => events.push((e as CustomEvent<ApiErrorEvent>).detail);
+    window.addEventListener(API_ERROR_EVENT, handler as EventListener);
+
+    const client = new ApiClient({ baseUrl: "https://api.hired.video" });
+
+    let caught: unknown;
+    try {
+      await client.get("/api/resumes/public", undefined, { retries: 0 });
+    } catch (err) {
+      caught = err;
+    }
+
+    window.removeEventListener(API_ERROR_EVENT, handler as EventListener);
+
+    expect(caught).toBeInstanceOf(NetworkError);
+    expect((caught as NetworkError).message).toBe("Invalid JSON response");
+    expect((caught as NetworkError).context).toMatchObject({
+      httpStatus: 502,
+      statusText: "Bad Gateway",
+    });
+    expect(String((caught as NetworkError).context?.bodyText)).toContain("cloudflare ray 8f3a1bcdef");
+
+    // The dispatched event shows the true edge status, not NetworkError's 500.
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(502);
+  });
+
   it("reports a thrown fetch() (no HTTP response) as a transport failure, not a 500", async () => {
     // Regression for the misleading error reports: when fetch() itself throws
     // (offline, DNS, TLS, CORS preflight, connection refused) the browser never
