@@ -62,9 +62,15 @@ import { resumeService } from "@/lib/services/resume-service";
 import { articleService } from "@/lib/services/article-service";
 import { jobService } from "@/lib/services/job-service";
 import {
+  type DocumentState,
   createJobDocumentState,
   createResumeDocumentState,
 } from "@/lib/studio/editor-v2/document-state";
+import {
+  DOCUMENT_AUTHORING,
+  STUDIO_EDIT_PARAMS,
+  type DocumentAuthoringKind,
+} from "@/lib/studio/studio-authoring";
 import {
   applyDocumentTemplate,
   resumeTemplateOption,
@@ -227,130 +233,91 @@ export default function StudioLanding() {
     const findExistingDocProject = (subject: StudioSubject) =>
       studioService.findDocumentProject(subject);
 
-    // Open an EXISTING resume on the document canvas (#1915 — resume edit
-    // moved into the studio). Reuse the linked project if present; otherwise
-    // seed a document bound to the resume id (blocks for every populated
-    // section) and mint it WITH the subject link so the next edit reuses it.
-    const editResumeId = searchParams.get("editResume");
-    if (editResumeId) {
-      void (async () => {
-        try {
-          const subject: StudioSubject = { kind: "resume", id: editResumeId };
-          const existing = await findExistingDocProject(subject);
-          if (existing) {
-            navigateToProject(existing);
-            return;
-          }
-          const resume = await resumeService.getResumeById(editResumeId);
+    // Open an EXISTING document entity (resume / job / article) on the canvas
+    // (#1914/#1915). Registry-driven — ONE flow for every kind (DRY, see
+    // [studio-authoring.ts](../../lib/studio/studio-authoring.ts)): reuse the
+    // linked project if present (#1882), else build the entity's DocumentState,
+    // bind the subject, and mint a `kind:"document"` project. Per-kind logic is
+    // only the `load(id)` that fetches the row + seeds its doc state; adding a
+    // new document entity = one entry here + one DOCUMENT_AUTHORING entry.
+    const docEditHandlers: Array<{
+      kind: DocumentAuthoringKind;
+      load: (id: string) => Promise<{ name: string; documentState: DocumentState }>;
+    }> = [
+      {
+        kind: "resume",
+        load: async (id) => {
+          const resume = await resumeService.getResumeById(id);
           const content = (resume.content ?? {}) as Record<string, unknown>;
           const populated = Object.keys(content).filter(
             (k) => Array.isArray(content[k]) && (content[k] as unknown[]).length > 0,
           );
-          let docState = createResumeDocumentState(
-            editResumeId,
-            populated,
-            () => crypto.randomUUID(),
+          let documentState = createResumeDocumentState(id, populated, () =>
+            crypto.randomUUID(),
           );
-          // Seed the canvas with the resume's CHOSEN design template
-          // (`content.meta.template`) so the editor + its preview render with
-          // the SAME theme/font/sections the read-only /resumes/:id view uses.
-          // Without this the first edit always opened on the blank DEFAULT
-          // theme, ignoring the user's selected template (e.g. "Risk &
-          // Consulting — Asphalt"). The template id is shared between the
-          // declarative descriptor and the document-template option (both
-          // derive from TEMPLATE_PRESETS), so this matches the detail view's
-          // `applyDocumentTemplate` re-skin exactly.
-          const templateId = (
-            content.meta as Record<string, unknown> | undefined
-          )?.template as string | undefined;
+          // Seed the resume's CHOSEN design template (`content.meta.template`)
+          // so the canvas + preview match the read-only /resumes/:id view's
+          // theme/font/sections (else the first edit opens on the blank default).
+          const templateId = (content.meta as Record<string, unknown> | undefined)
+            ?.template as string | undefined;
           const option = resumeTemplateOption(templateId);
           if (option) {
-            docState = applyDocumentTemplate(
-              docState,
-              option,
-              () => crypto.randomUUID(),
+            documentState = applyDocumentTemplate(documentState, option, () =>
+              crypto.randomUUID(),
             );
           }
-          const created = await create({
-            kind: "document",
-            documentState: docState,
-            name: resume.title || "Resume",
-            subjects: [subject],
-          });
-          navigateToProject(created);
-        } catch (err) {
-          toast({
-            title: "Couldn't open resume",
-            description: err instanceof Error ? err.message : "Unknown error",
-            variant: "destructive",
-          });
-        }
-      })();
-      return;
-    }
-
-    // Open an EXISTING article/blog on the document canvas (#1914) — reuse the
-    // linked project if present, else convert its markdown to blocks and mint a
-    // document bound to its id with the subject link.
-    const editArticleId = searchParams.get("editArticle");
-    if (editArticleId) {
-      void (async () => {
-        try {
-          const subject: StudioSubject = { kind: "article", id: editArticleId };
-          const existing = await findExistingDocProject(subject);
-          if (existing) {
-            navigateToProject(existing);
-            return;
-          }
-          const article = await articleService.getMine(editArticleId);
-          const docState = articleToDocumentState(
-            { id: article.id, title: article.title, bodyMd: article.bodyMd },
-            () => crypto.randomUUID(),
-          );
-          const created = await create({
-            kind: "document",
-            documentState: docState,
-            name: article.title || "Article",
-            subjects: [subject],
-          });
-          navigateToProject(created);
-        } catch (err) {
-          toast({
-            title: "Couldn't open article",
-            description: err instanceof Error ? err.message : "Unknown error",
-            variant: "destructive",
-          });
-        }
-      })();
-      return;
-    }
-
-    // Open an EXISTING job posting on the document canvas (#1914 — job edit
-    // moved into the studio). Reuse the linked project if present; otherwise
-    // seed a job document bound to the job id and mint it WITH the subject link
-    // so the next edit reuses it. Content is fetched by the editor via entityId.
-    const editJobId = searchParams.get("editJob");
-    if (editJobId) {
-      void (async () => {
-        try {
-          const subject: StudioSubject = { kind: "job", id: editJobId };
-          const existing = await findExistingDocProject(subject);
-          if (existing) {
-            navigateToProject(existing);
-            return;
-          }
-          const job = await jobService.getJobById(editJobId);
-          const docState = createJobDocumentState(editJobId, () => crypto.randomUUID());
-          const created = await create({
-            kind: "document",
-            documentState: docState,
+          return { name: resume.title || "Resume", documentState };
+        },
+      },
+      {
+        kind: "job",
+        load: async (id) => {
+          const job = await jobService.getJobById(id);
+          return {
             name: job.title || "Job Posting",
+            documentState: createJobDocumentState(id, () => crypto.randomUUID()),
+          };
+        },
+      },
+      {
+        kind: "article",
+        load: async (id) => {
+          const article = await articleService.getMine(id);
+          return {
+            name: article.title || "Article",
+            documentState: articleToDocumentState(
+              { id: article.id, title: article.title, bodyMd: article.bodyMd },
+              () => crypto.randomUUID(),
+            ),
+          };
+        },
+      },
+    ];
+    for (const handler of docEditHandlers) {
+      const editId = searchParams.get(DOCUMENT_AUTHORING[handler.kind].editParam);
+      if (!editId) continue;
+      void (async () => {
+        try {
+          const subject: StudioSubject = {
+            kind: DOCUMENT_AUTHORING[handler.kind].subjectKind,
+            id: editId,
+          };
+          const existing = await findExistingDocProject(subject);
+          if (existing) {
+            navigateToProject(existing);
+            return;
+          }
+          const { name, documentState } = await handler.load(editId);
+          const created = await create({
+            kind: "document",
+            documentState,
+            name,
             subjects: [subject],
           });
           navigateToProject(created);
         } catch (err) {
           toast({
-            title: "Couldn't open job",
+            title: "Couldn't open content",
             description: err instanceof Error ? err.message : "Unknown error",
             variant: "destructive",
           });
@@ -635,9 +602,7 @@ export default function StudioLanding() {
   // the project picker (#1882).
   const redirecting =
     searchParams.has("projectId") ||
-    searchParams.has("editResume") ||
-    searchParams.has("editArticle") ||
-    searchParams.has("editJob") ||
+    STUDIO_EDIT_PARAMS.some((p) => searchParams.has(p)) ||
     searchParams.has("subject") ||
     searchParams.has("capture") ||
     searchParams.has("new");

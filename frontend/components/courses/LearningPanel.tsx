@@ -1,96 +1,307 @@
-import { useEffect, useState } from "react";
-import { GraduationCap, Loader2, ArrowRight, Plus, Video, Play } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  GraduationCap,
+  Loader2,
+  ArrowRight,
+  Plus,
+  Video,
+  Play,
+  BookOpen,
+  AlertTriangle,
+  Users,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import CourseMarketplaceCard, {
   type CourseMarketplaceItem,
 } from "@/components/CourseMarketplaceCard";
 import { UnenrollButton } from "@/components/courses/UnenrollButton";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
+import Pagination, { usePaginatedList } from "@/components/Pagination";
+import LearningGoalCard from "@/components/learning/LearningGoalCard";
 import {
   courseService,
   type EnrollmentRow,
+  type CourseEnrollment,
   type PublicCourseCard,
 } from "@/lib/services/course-service";
+import {
+  listMyAssignments,
+  joinCohortByCode,
+  type LearnerAssignment,
+} from "@/lib/courses/courses-api";
 import { useAuth } from "@/lib/auth";
 
 interface LearningPanelProps {
-  /** Cap on how many courses to fetch. Default 50 matches the legacy
-   *  per-profile cap in ProfileCoursesPanel. */
+  /** Cap on how many published courses to fetch for the library. */
   limit?: number;
-  /** When true, hide the section-level intro copy (used by surfaces that
-   *  already render their own heading above the grid). */
-  hideIntro?: boolean;
+}
+
+/** Layout modes the Learning surface offers — Scroll (carousel) / Card
+ *  (grid) / Table (dense rows). Shared with every other browse surface via
+ *  `<ViewModeToggle>`; "Card" maps to the toggle's `grid` mode. */
+const LEARNING_VIEW_MODES: ViewMode[] = ["scroll", "grid", "table"];
+
+type LearningStatus = "in_progress" | "not_started" | "available" | "completed";
+
+/** Default sort puts in-progress training first, then anything queued/assigned
+ *  but not started, then the browsable library, with finished courses last. */
+const STATUS_RANK: Record<LearningStatus, number> = {
+  in_progress: 0,
+  not_started: 1,
+  available: 2,
+  completed: 3,
+};
+
+/**
+ * One row in the unified learning list. Collapses three sources into a single
+ * learner-facing item: cohort assignments, self-enrolments (with live
+ * progress), and the published course library (browsable "available" items).
+ * A course that is assigned *and* started shows up once, carrying both its
+ * classroom cue and its progress bar.
+ */
+interface LearningItem {
+  key: string;
+  courseId: string | null;
+  title: string;
+  summary: string | null;
+  href: string;
+  status: LearningStatus;
+  passed: boolean;
+  passedLessons: number | null;
+  totalLessons: number | null;
+  pct: number;
+  /** Rich marketplace card payload — only set for browsable library items
+   *  (not enrolled, not assigned) so the grid reuses CourseMarketplaceCard. */
+  card: CourseMarketplaceItem | null;
+  assigned: boolean;
+  cohortName: string | null;
+  subjectType: "course" | "path";
+  required: boolean;
+  due: { text: string; overdue: boolean } | null;
+}
+
+function dueLabel(dueAt: string | null): { text: string; overdue: boolean } | null {
+  if (!dueAt) return null;
+  const due = new Date(dueAt);
+  const now = new Date();
+  const overdue = now > due;
+  const days = Math.round((due.getTime() - now.getTime()) / 86_400_000);
+  const text = overdue
+    ? `Overdue by ${Math.abs(days)}d`
+    : days === 0
+      ? "Due today"
+      : `Due in ${days}d`;
+  return { text, overdue };
+}
+
+/** An enrolment counts as started once a lesson has been passed or any lesson
+ *  sits in_progress — drives the Start-vs-Continue CTA and the in-progress
+ *  sort bucket. */
+function hasStarted(enrollment: CourseEnrollment, passedLessons: number): boolean {
+  return (
+    passedLessons > 0 ||
+    Object.values(enrollment.progress ?? {}).some((p) => p?.status === "in_progress")
+  );
+}
+
+function ctaLabel(item: LearningItem): string {
+  if (item.status === "available") return "View course";
+  if (item.passed) return "Review";
+  if (item.status === "in_progress") return "Continue";
+  return "Start";
 }
 
 /**
- * Renders the platform's learning content library — every published course
- * across the platform. Used by the Tools / Learning surface to compete
- * with LinkedIn Learning's separately-licensed content library: ours is
- * bundled into every plan (including Free).
+ * Tools → Learning surface. Consolidates the old "Learning" (browse library)
+ * and "My Learning" (your enrolled + assigned training) tabs into one:
+ *   • Main  — a single unified list (assigned + self-enrolled + library,
+ *             deduped), in-progress first, rendered as Scroll / Card / Table.
+ *   • Right — your learning goal + join-a-classroom (the old My Learning
+ *             sidebar, with the educator "manage classrooms" link folded in).
  *
- * The grid is intentionally generic — it reuses CourseMarketplaceCard so
- * cards look identical to the `/search?category=courses` marketplace. The
- * fetch path is `GET /api/courses/public` (already DI-refactored).
+ * Read-only over existing endpoints (`/api/courses/public`,
+ * `/api/courses/me/enrollments`, learner assignments) — no new server read.
  */
-export default function LearningPanel({ limit = 50, hideIntro = false }: LearningPanelProps = {}) {
+export default function LearningPanel({ limit = 50 }: LearningPanelProps = {}) {
   const { isAuthenticated } = useAuth();
-  const [items, setItems] = useState<PublicCourseCard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [library, setLibrary] = useState<PublicCourseCard[]>([]);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[]>([]);
+  const [assignments, setAssignments] = useState<LearnerAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [cohortFilter, setCohortFilter] = useState<string | null>(null);
+  const [view, setView] = useViewMode("tools.learning", "grid", LEARNING_VIEW_MODES);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
     setLoading(true);
-    courseService
-      .listPublished(limit)
-      .then((rows) => {
-        if (!cancelled) setItems(rows);
-      })
-      .catch(() => {
-        if (!cancelled) setItems([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [limit]);
+    const [lib, enr, asg] = await Promise.all([
+      courseService.listPublished(limit).catch(() => [] as PublicCourseCard[]),
+      isAuthenticated
+        ? courseService.listMyEnrollments().catch(() => [] as EnrollmentRow[])
+        : Promise.resolve([] as EnrollmentRow[]),
+      isAuthenticated
+        ? listMyAssignments().catch(() => [] as LearnerAssignment[])
+        : Promise.resolve([] as LearnerAssignment[]),
+    ]);
+    setLibrary(lib);
+    setEnrollments(enr);
+    setAssignments(asg);
+    setLoading(false);
+  }, [limit, isAuthenticated]);
 
-  // Authed users see a "Continue learning" rail across the top with every
-  // course they've enrolled in. Self-fetches; unauth viewers skip.
-  // `enrollmentsToken` bumps after an unenroll so the rail refreshes.
-  const [enrollmentsToken, setEnrollmentsToken] = useState(0);
   useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    courseService
-      .listMyEnrollments()
-      .then((rows) => {
-        if (!cancelled) setEnrollments(rows);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, enrollmentsToken]);
-  const refreshEnrollments = () => setEnrollmentsToken((t) => t + 1);
+    void load();
+  }, [load]);
+
+  // Merge the three sources into one in-progress-first list. Library courses
+  // the viewer is already enrolled in (or assigned) collapse into the richer
+  // enrolled/assigned item so a course never appears twice.
+  const items = useMemo<LearningItem[]>(() => {
+    const byEnrollment = new Map<string, EnrollmentRow>();
+    for (const r of enrollments) byEnrollment.set(r.enrollment.id, r);
+    const libraryById = new Map<string, PublicCourseCard>();
+    for (const c of library) libraryById.set(c.id, c);
+
+    const claimedEnrollments = new Set<string>();
+    const claimedCourses = new Set<string>();
+    const result: LearningItem[] = [];
+
+    // 1) Assigned training (cohort assignments). Carries the classroom cue.
+    for (const a of assignments) {
+      const enr = a.enrollmentId ? byEnrollment.get(a.enrollmentId) : undefined;
+      if (enr) claimedEnrollments.add(enr.enrollment.id);
+      const courseId = a.subjectType === "course" ? a.subjectId : null;
+      if (courseId) claimedCourses.add(courseId);
+      const lib = courseId ? libraryById.get(courseId) : undefined;
+      const passedLessons = enr?.passedLessons ?? null;
+      const totalLessons = enr?.totalLessons ?? null;
+      const pct =
+        enr && enr.totalLessons > 0
+          ? Math.round((enr.passedLessons / enr.totalLessons) * 100)
+          : 0;
+      const status: LearningStatus = a.passed
+        ? "completed"
+        : enr && hasStarted(enr.enrollment, enr.passedLessons)
+          ? "in_progress"
+          : "not_started";
+      result.push({
+        key: a.assignmentId,
+        courseId,
+        title: a.title,
+        summary: lib?.summary ?? null,
+        href: a.enrollmentId
+          ? `/learn/${a.enrollmentId}`
+          : lib
+            ? `/courses/${lib.author.slug}/${lib.slug}`
+            : "/tools?tab=learning",
+        status,
+        passed: a.passed,
+        passedLessons,
+        totalLessons,
+        pct,
+        card: null,
+        assigned: true,
+        cohortName: a.cohortName,
+        subjectType: a.subjectType,
+        required: a.required,
+        due: dueLabel(a.dueAt),
+      });
+    }
+
+    // 2) Self-enrolments not already represented by an assignment.
+    for (const r of enrollments) {
+      if (claimedEnrollments.has(r.enrollment.id)) continue;
+      claimedCourses.add(r.course.id);
+      const pct =
+        r.totalLessons > 0 ? Math.round((r.passedLessons / r.totalLessons) * 100) : 0;
+      const status: LearningStatus = r.enrollment.passed
+        ? "completed"
+        : hasStarted(r.enrollment, r.passedLessons)
+          ? "in_progress"
+          : "not_started";
+      result.push({
+        key: r.enrollment.id,
+        courseId: r.course.id,
+        title: r.course.title,
+        summary: r.course.summary,
+        href: `/learn/${r.enrollment.id}`,
+        status,
+        passed: r.enrollment.passed,
+        passedLessons: r.passedLessons,
+        totalLessons: r.totalLessons,
+        pct,
+        card: null,
+        assigned: false,
+        cohortName: null,
+        subjectType: "course",
+        required: false,
+        due: null,
+      });
+    }
+
+    // 3) The browsable library — every published course the viewer hasn't
+    //    enrolled in / been assigned yet.
+    for (const c of library) {
+      if (claimedCourses.has(c.id)) continue;
+      result.push({
+        key: `lib:${c.id}`,
+        courseId: c.id,
+        title: c.title,
+        summary: c.summary,
+        href: `/courses/${c.author.slug}/${c.slug}`,
+        status: "available",
+        passed: false,
+        passedLessons: null,
+        totalLessons: null,
+        pct: 0,
+        card: c as CourseMarketplaceItem,
+        assigned: false,
+        cohortName: null,
+        subjectType: "course",
+        required: false,
+        due: null,
+      });
+    }
+
+    // Stable sort: in-progress → not started → available → completed.
+    return result
+      .map((item, i) => ({ item, i }))
+      .sort((a, b) => STATUS_RANK[a.item.status] - STATUS_RANK[b.item.status] || a.i - b.i)
+      .map(({ item }) => item);
+  }, [library, enrollments, assignments]);
+
+  // Distinct classrooms the learner has training from — drives the filter,
+  // which only appears once they belong to at least one classroom.
+  const cohorts = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of assignments) if (a.cohortName) set.add(a.cohortName);
+    return [...set];
+  }, [assignments]);
+
+  const visibleItems = cohortFilter
+    ? items.filter((i) => i.cohortName === cohortFilter)
+    : items;
 
   return (
-    <div>
-      {!hideIntro && (
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* ── Main: unified learning list ──────────────────────────────── */}
+      <div className="space-y-5 lg:col-span-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <GraduationCap className="h-6 w-6 text-brand-purple" />
-              Learning Content Library
+              Learning
             </h2>
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Built-in courses on AI, RAG, and must-have skills — SCORM 1.2,
-              xAPI tracked, with HMAC-signed verifiable certificates. No
-              separate license required.
+              Your in-progress training, assigned courses, and the built-in
+              content library — SCORM 1.2, xAPI tracked, with HMAC-signed
+              verifiable certificates. No separate license required.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -111,150 +322,397 @@ export default function LearningPanel({ limit = 50, hideIntro = false }: Learnin
             </Link>
           </div>
         </div>
-      )}
 
-      {/* "Continue learning" rail — only renders when the authed user
-          has at least one enrollment. Shared component decides its own
-          visibility (returns null when empty) per the DRY rule. */}
-      {enrollments.length > 0 && (
-        <ContinueLearningRail
-          enrollments={enrollments}
-          onEnrollmentChange={refreshEnrollments}
-        />
-      )}
+        {/* Toolbar: classroom filter (self-gates on membership) + view toggle. */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {cohorts.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCohortFilter(null)}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  cohortFilter === null
+                    ? "bg-primary text-primary-foreground border-transparent"
+                    : "hover:bg-muted"
+                }`}
+              >
+                All
+              </button>
+              {cohorts.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setCohortFilter(name)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${
+                    cohortFilter === name
+                      ? "bg-primary text-primary-foreground border-transparent"
+                      : "hover:bg-muted"
+                  }`}
+                >
+                  <Users className="h-3 w-3" /> {name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          <ViewModeToggle value={view} onChange={setView} modes={LEARNING_VIEW_MODES} />
+        </div>
 
-      {loading ? (
-        <Card>
-          <CardContent className="p-8 flex items-center justify-center text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading courses…
-          </CardContent>
-        </Card>
-      ) : items.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground space-y-4">
-          <GraduationCap className="h-8 w-8 mx-auto opacity-60" />
-          <div>
-            <p className="font-medium mb-1">No published courses yet</p>
-            <p className="text-sm max-w-xl mx-auto">
-              Platform-seeded courses on AI, RAG, and must-have skills will
-              appear here once the seed migration runs. Employer-authored
-              internal training and creator-published courses surface
-              alongside them.
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <Link to="/services/creator/courses">
-              <Button>
-                <Plus className="mr-1 h-4 w-4" /> Author the first course
-              </Button>
-            </Link>
-            <Link to="/studio?contentTemplate=course-lesson-explainer">
-              <Button variant="outline">
-                <Video className="mr-1 h-4 w-4" /> Or record a lesson in Studio
-              </Button>
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((c) => (
-            <CourseMarketplaceCard key={c.id} item={c as CourseMarketplaceItem} />
-          ))}
-        </div>
-      )}
+        {loading ? (
+          <Card>
+            <CardContent className="p-8 flex items-center justify-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading courses…
+            </CardContent>
+          </Card>
+        ) : visibleItems.length === 0 ? (
+          <LearningEmptyState cohortFiltered={cohortFilter !== null} />
+        ) : (
+          <LearningItemsView items={visibleItems} view={view} onChanged={load} />
+        )}
+      </div>
+
+      {/* ── Right: goal + join a classroom ───────────────────────────── */}
+      <LearningSidebar onJoined={load} />
     </div>
   );
 }
 
-/** Per-enrollment "Continue learning" card. The progress bar is derived
- *  from `enrollment.passed` + the enrollment's `progress` JSONB (count
- *  of passed lessons over total — we don't have total here, so we show a
- *  100/0 bar for passed/in-progress; a future iteration can compute the
- *  real percentage if we add `progressPct` to the listMyEnrollments
- *  response). */
-function ContinueLearningRail({
-  enrollments,
-  onEnrollmentChange,
+/** Switches the unified list between Scroll / Card / Table. Scroll + Card
+ *  share `renderItemCard`; Table is a dense rows view. */
+function LearningItemsView({
+  items,
+  view,
+  onChanged,
 }: {
-  enrollments: EnrollmentRow[];
-  onEnrollmentChange: () => void;
+  items: LearningItem[];
+  view: ViewMode;
+  onChanged: () => void;
 }) {
-  const incomplete = enrollments.filter((r) => !r.enrollment.passed);
-  const completed = enrollments.filter((r) => r.enrollment.passed);
+  if (view === "table") {
+    return <LearningTable items={items} />;
+  }
+
+  const card = (item: LearningItem) =>
+    item.card ? (
+      <CourseMarketplaceCard item={item.card} />
+    ) : (
+      <EnrolledLearningCard item={item} onChanged={onChanged} />
+    );
+
+  if (view === "scroll") {
+    return (
+      <HorizontalScroller itemCount={items.length}>
+        {items.map((item) => (
+          <div key={item.key} className="w-72 shrink-0 snap-start">
+            {card(item)}
+          </div>
+        ))}
+      </HorizontalScroller>
+    );
+  }
+
   return (
-    <div className="mb-8 space-y-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Continue learning
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {incomplete.map((r) => (
-          <EnrollmentCard
-            key={r.enrollment.id}
-            row={r}
-            onUnenrolled={onEnrollmentChange}
-          />
-        ))}
-        {completed.map((r) => (
-          <EnrollmentCard
-            key={r.enrollment.id}
-            row={r}
-            onUnenrolled={onEnrollmentChange}
-          />
-        ))}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <div key={item.key}>{card(item)}</div>
+      ))}
+    </div>
+  );
+}
+
+/** Progress-oriented card for enrolled/assigned items (browsable library
+ *  items use the richer CourseMarketplaceCard instead). */
+function EnrolledLearningCard({
+  item,
+  onChanged,
+}: {
+  item: LearningItem;
+  onChanged: () => void;
+}) {
+  const hasProgress = item.totalLessons != null && item.totalLessons > 0;
+  return (
+    <Card
+      className={`h-full flex flex-col hover:border-primary/40 transition-colors ${
+        item.due?.overdue && !item.passed ? "border-destructive/50" : ""
+      }`}
+    >
+      <CardContent className="p-4 flex flex-col flex-1 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h4 className="font-semibold text-sm truncate">{item.title}</h4>
+            {item.summary && (
+              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                {item.summary}
+              </p>
+            )}
+          </div>
+          <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {item.assigned && item.cohortName && (
+            <Badge variant="secondary" className="gap-1 font-normal">
+              <Users className="h-3 w-3" /> {item.cohortName}
+            </Badge>
+          )}
+          {item.required && (
+            <Badge variant="outline" className="font-normal">
+              Required
+            </Badge>
+          )}
+        </div>
+
+        <div className="mt-auto space-y-3">
+          <div className="text-xs text-muted-foreground">
+            {item.passed
+              ? `Completed · ${item.passedLessons ?? 0} of ${item.totalLessons ?? 0} lessons`
+              : hasProgress
+                ? `${item.passedLessons} of ${item.totalLessons} lessons · ${item.pct}%`
+                : item.subjectType === "path"
+                  ? "Learning path"
+                  : "Not started"}
+            {item.due && !item.passed && (
+              <span className={item.due.overdue ? "text-destructive" : ""}>
+                {" · "}
+                {item.due.overdue && (
+                  <AlertTriangle className="inline h-3.5 w-3.5 mr-0.5 -mt-0.5" />
+                )}
+                {item.due.text}
+              </span>
+            )}
+          </div>
+          {hasProgress && (
+            <Progress value={item.passed ? 100 : item.pct} className="h-1.5" />
+          )}
+          <div className="flex items-center gap-2">
+            <Link to={item.href} className="flex-1">
+              <Button
+                size="sm"
+                variant={item.passed ? "outline" : "default"}
+                className="w-full"
+              >
+                <Play className="h-3.5 w-3.5 mr-1" />
+                {ctaLabel(item)}
+              </Button>
+            </Link>
+            {/* Self-enrolled (not assigned) course rows can be left from here;
+                assigned training can't be unenrolled by the learner, so the
+                button is omitted. UnenrollButton self-gates on passed —
+                returns null for completed/cert-issued rows so the Review CTA
+                stretches full width via flex-1. */}
+            {!item.assigned && item.courseId && (
+              <UnenrollButton
+                courseId={item.courseId}
+                courseTitle={item.title}
+                isPassed={item.passed}
+                onUnenrolled={onChanged}
+              />
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Dense table view over the unified learning list — one row per item with
+ *  status/progress, classroom cues, due date, and the same CTA. */
+function LearningTable({ items }: { items: LearningItem[] }) {
+  const { pageItems, paginationProps } = usePaginatedList(items, 12);
+  return (
+    <div>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Course</th>
+              <th className="px-3 py-2 font-medium">Progress</th>
+              <th className="px-3 py-2 font-medium">Classroom</th>
+              <th className="px-3 py-2 font-medium">Due</th>
+              <th className="px-3 py-2 text-right font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map((item) => {
+              const hasProgress = item.totalLessons != null && item.totalLessons > 0;
+              return (
+                <tr
+                  key={item.key}
+                  className="border-b border-border last:border-0 hover:bg-muted/30"
+                >
+                  <td className="px-3 py-2">
+                    <Link to={item.href} className="font-medium hover:text-brand-purple">
+                      {item.title}
+                    </Link>
+                    {item.required && (
+                      <Badge variant="outline" className="ml-2 font-normal">
+                        Required
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {item.status === "available" ? (
+                      <span className="text-xs">Available</span>
+                    ) : item.passed ? (
+                      <span className="text-xs">Completed</span>
+                    ) : hasProgress ? (
+                      <span className="flex items-center gap-2">
+                        <Progress value={item.pct} className="h-1.5 w-20" />
+                        <span className="text-xs">{item.pct}%</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs">
+                        {item.subjectType === "path" ? "Learning path" : "Not started"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {item.cohortName ? (
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <Users className="h-3 w-3" /> {item.cohortName}
+                      </span>
+                    ) : (
+                      <span className="text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {item.due && !item.passed ? (
+                      <span
+                        className={`text-xs ${item.due.overdue ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {item.due.overdue && (
+                          <AlertTriangle className="inline h-3.5 w-3.5 mr-0.5 -mt-0.5" />
+                        )}
+                        {item.due.text}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex justify-end">
+                      <Button
+                        asChild
+                        size="sm"
+                        variant={item.passed || item.status === "available" ? "outline" : "default"}
+                      >
+                        <Link to={item.href}>
+                          {ctaLabel(item)}
+                          {item.status !== "available" && !item.passed && (
+                            <ArrowRight className="h-4 w-4 ml-1" />
+                          )}
+                        </Link>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <Pagination {...paginationProps} />
+    </div>
+  );
+}
+
+function LearningEmptyState({ cohortFiltered }: { cohortFiltered: boolean }) {
+  if (cohortFiltered) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No training from this classroom yet.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground space-y-4">
+      <GraduationCap className="h-8 w-8 mx-auto opacity-60" />
+      <div>
+        <p className="font-medium mb-1">No courses yet</p>
+        <p className="text-sm max-w-xl mx-auto">
+          Platform-seeded courses on AI, RAG, and must-have skills appear here,
+          alongside employer-authored internal training and creator-published
+          courses. Join a classroom or author the first course to get started.
+        </p>
+      </div>
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        <Link to="/services/creator/courses">
+          <Button>
+            <Plus className="mr-1 h-4 w-4" /> Author the first course
+          </Button>
+        </Link>
+        <Link to="/studio?contentTemplate=course-lesson-explainer">
+          <Button variant="outline">
+            <Video className="mr-1 h-4 w-4" /> Or record a lesson in Studio
+          </Button>
+        </Link>
       </div>
     </div>
   );
 }
 
-function EnrollmentCard({
-  row,
-  onUnenrolled,
-}: {
-  row: EnrollmentRow;
-  onUnenrolled: () => void;
-}) {
-  const { enrollment, course, totalLessons, passedLessons } = row;
-  const passed = enrollment.passed;
-  // #1462 — exact percentage now that listMyEnrollments annotates totals.
-  const pct = totalLessons > 0 ? Math.round((passedLessons / totalLessons) * 100) : 0;
-  const hasStarted = passedLessons > 0
-    || Object.values(enrollment.progress ?? {}).some((p) => p?.status === "in_progress");
+/** Right column: learning goal (self-gating onboarding wedge) + join-a-
+ *  classroom. Lifted verbatim from the retired My Learning tab. */
+function LearningSidebar({ onJoined }: { onJoined: () => void }) {
+  const [joinCode, setJoinCode] = useState("");
+  const [joinMsg, setJoinMsg] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+
+  const handleJoin = async () => {
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    setJoinMsg(null);
+    try {
+      const res = await joinCohortByCode(joinCode.trim());
+      setJoinMsg(
+        `Joined "${res.cohort.name}". Any assigned training now appears in your list.`,
+      );
+      setJoinCode("");
+      onJoined();
+    } catch (e) {
+      setJoinMsg(e instanceof Error ? e.message : "Could not join with that code.");
+    } finally {
+      setJoining(false);
+    }
+  };
+
   return (
-    <Card className="hover:border-primary/40 transition-colors">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h4 className="font-semibold text-sm truncate">{course.title}</h4>
-            {course.summary && (
-              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{course.summary}</p>
-            )}
-          </div>
-          <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {passed
-            ? `Completed · ${passedLessons} of ${totalLessons} lessons`
-            : totalLessons > 0
-              ? `${passedLessons} of ${totalLessons} lessons · ${pct}%`
-              : "Not started"}
-        </div>
-        <Progress value={passed ? 100 : pct} className="h-1.5" />
-        <div className="flex items-center gap-2">
-          <Link to={`/learn/${enrollment.id}`} className="flex-1">
-            <Button size="sm" variant={passed ? "outline" : "default"} className="w-full">
-              <Play className="h-3.5 w-3.5 mr-1" />
-              {passed ? "Review" : hasStarted ? "Continue" : "Start"}
+    <div className="space-y-6">
+      {/* Self-gates: shows the capture prompt until a goal is set. */}
+      <LearningGoalCard source="onboarding" />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <BookOpen className="h-4 w-4" /> Join a classroom
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Got a join code from an educator or employer? Enter it to receive
+            their assigned training.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="e.g. H7K2MNPQ"
+              className="max-w-[200px] font-mono tracking-wider"
+              maxLength={16}
+            />
+            <Button onClick={handleJoin} disabled={joining || !joinCode.trim()}>
+              {joining ? "Joining…" : "Join"}
             </Button>
-          </Link>
-          {/* Self-gates on passed — returns null for completed/cert-issued rows
-              so the Review CTA stretches the full width via flex-1 above. */}
-          <UnenrollButton
-            courseId={course.id}
-            courseTitle={course.title}
-            isPassed={passed}
-            onUnenrolled={onUnenrolled}
-          />
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+          {joinMsg && <p className="text-sm text-muted-foreground">{joinMsg}</p>}
+          <p className="text-sm border-t pt-3">
+            <Link to="/tools?tab=classrooms" className="text-primary underline">
+              Educator or employer? Manage classrooms &amp; assign training →
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

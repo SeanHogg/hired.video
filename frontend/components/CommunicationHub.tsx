@@ -54,7 +54,7 @@ function AuthenticatedCommunicationHub() {
   // silent mark-read (and only when already unread). Messages open the chat
   // widget in place; a notification that carries a `data.url` deep-link jumps
   // straight to its target (badge → gamification, certificate → /verify/:n,
-  // assignment → /tools?tab=my-learning); everything else (synced emails,
+  // assignment → /tools?tab=learning); everything else (synced emails,
   // requests, link-less notifications) deep-links into the full /outreach Inbox
   // tab. The InboxRow's own onSelect path still marks the clicked
   // notification/email read on the way.

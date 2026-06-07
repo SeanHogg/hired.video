@@ -102,7 +102,7 @@ export class AssignmentService {
           type: "assignment",
           title: "New training assigned",
           message: `${subjectTitle}${dueSuffix}`,
-          url: "/tools?tab=my-learning",
+          url: "/tools?tab=learning",
           refType: "learning_assignment",
           refId: assignment?.id,
         }),

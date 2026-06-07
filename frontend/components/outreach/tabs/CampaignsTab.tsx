@@ -30,6 +30,7 @@ import {
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
 import { SearchInput } from "@/components/outreach/shared/SearchInput";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
 import {
   EmailCampaignStatus,
   type EmailCampaignDTO,
@@ -81,7 +82,7 @@ export function CampaignsTab({
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Campaigns</h2>
         <div className="flex items-center gap-2">
-          <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
           <Button onClick={onCreateVideoCampaign}>
             <Plus className="h-4 w-4 mr-2" />
             New Video Campaign
@@ -177,13 +178,7 @@ export function CampaignsTab({
               · videos, IAB banners, social-ad creatives
             </span>
           </h3>
-          <div
-            className={
-              viewMode === "grid"
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                : "flex flex-col gap-4"
-            }
-          >
+          <ViewModeList viewMode={viewMode}>
             {filteredCampaigns.video.map((vc) => (
               <Card
                 key={vc.id}
@@ -278,7 +273,7 @@ export function CampaignsTab({
                 )}
               </Card>
             ))}
-          </div>
+          </ViewModeList>
         </>
       )}
 
@@ -287,13 +282,7 @@ export function CampaignsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2 mt-6">
             <Mail className="h-4 w-4" /> Email Campaigns
           </h3>
-          <div
-            className={
-              viewMode === "grid"
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                : "flex flex-col gap-4"
-            }
-          >
+          <ViewModeList viewMode={viewMode}>
             {filteredCampaigns.email.map((campaign) => (
               <Card
                 key={campaign.id}
@@ -354,7 +343,7 @@ export function CampaignsTab({
                 )}
               </Card>
             ))}
-          </div>
+          </ViewModeList>
         </>
       )}
 

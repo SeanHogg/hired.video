@@ -27,7 +27,6 @@ import { ToolCard } from "@/components/ToolCard";
 import { ToolsLearningGrid } from "@/components/ToolsLearningGrid";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import LearningPanel from "@/components/courses/LearningPanel";
-import MyLearningPanel from "@/components/courses/MyLearningPanel";
 import ClassroomsPanel from "@/components/courses/ClassroomsPanel";
 import {
   TOOLS_CATALOG,
@@ -107,17 +106,23 @@ export default function Tools() {
   const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
   const categoryFilter = parseCategoryFilter(searchParams.get("category"));
   // Sub-tab on /tools:
-  //   "tools"       — default AI-tool grid
-  //   "learning"    — built-in Learning Content Library (browse), competes
-  //                   with LinkedIn Learning by being bundled into every plan
-  //   "my-learning" — the learner's enrolled + assigned training (#1889)
-  //   "classrooms"  — educator/employer cohort hub + progress roll-up (#1890)
+  //   "tools"      — default AI-tool grid
+  //   "learning"   — consolidated learning home: your in-progress + assigned
+  //                  training AND the built-in Content Library in one unified,
+  //                  in-progress-first list (Scroll / Card / Table), plus a
+  //                  goal + join-classroom sidebar. Competes with LinkedIn
+  //                  Learning by being bundled into every plan.
+  //   "classrooms" — educator/employer cohort hub + progress roll-up (#1890)
+  // The old "my-learning" tab (#1889) was folded into "learning"; the param
+  // is still honoured as an alias so existing links/notifications resolve.
   // Learning + plans live under /tools (no separate sidebar item).
   const rawTab = searchParams.get("tab");
   const tabParam =
-    rawTab === "learning" || rawTab === "my-learning" || rawTab === "classrooms"
-      ? rawTab
-      : "tools";
+    rawTab === "learning" || rawTab === "my-learning"
+      ? "learning"
+      : rawTab === "classrooms"
+        ? "classrooms"
+        : "tools";
 
   // #1401 — outside the default Tools grid the AI-tool filter params
   // (audience / tier / category) are irrelevant; the chip rows that set
@@ -529,7 +534,6 @@ export default function Tools() {
               tabs={[
                 { key: "tools", label: t("labels.tools.tabTools"), icon: Wrench, to: "/tools" },
                 { key: "learning", label: t("labels.tools.tabLearning"), icon: GraduationCap, to: "/tools?tab=learning" },
-                { key: "my-learning", label: t("labels.tools.tabMyLearning"), icon: GraduationCap, to: "/tools?tab=my-learning" },
                 { key: "classrooms", label: t("labels.tools.tabClassrooms"), icon: Users, to: "/tools?tab=classrooms" },
               ]}
               activeTabKey={tabParam}
@@ -538,8 +542,6 @@ export default function Tools() {
 
             {tabParam === "learning" ? (
               <LearningPanel />
-            ) : tabParam === "my-learning" ? (
-              <MyLearningPanel />
             ) : tabParam === "classrooms" ? (
               <ClassroomsPanel />
             ) : (

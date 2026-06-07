@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   Store,
   Heart,
+  Palette,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -62,8 +63,8 @@ export default function Sidebar({
       icon: TrendingUp,
       exactMatch: false,
     },
+    { name: t("labels.studio"), href: "/studio", icon: Palette, exactMatch: false },
     { name: t("labels.resumes"), href: "/resumes", icon: FileText, exactMatch: false },
-    { name: t("labels.studio"), href: "/studio", icon: Video, exactMatch: false },
     { name: t("labels.jobs"), href: "/jobs", icon: Briefcase, exactMatch: false },
     {
       name: t("labels.companies"),

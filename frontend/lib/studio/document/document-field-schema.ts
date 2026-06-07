@@ -38,7 +38,10 @@ export type FieldType =
   | "date"
   // Full-date picker (`<input type="date">`, "YYYY-MM-DD") — job go-live / expiry.
   | "day"
+  // One value per line ⇄ string[] (resume highlights).
   | "list"
+  // Free-text tag pills ⇄ string[] (tags / keywords) — type-and-enter.
+  | "chips"
   | "number"
   | "select"
   // Multiple enum values → number[] (job employment types).

@@ -15,6 +15,7 @@ import {
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
 import { SearchInput } from "@/components/outreach/shared/SearchInput";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
 import type { ExternalContactDTO } from "@/types/communication";
 
 export interface ContactsTabProps {
@@ -54,7 +55,7 @@ export function ContactsTab({
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">External Contacts</h2>
         <div className="flex items-center gap-2">
-          <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
           <Button onClick={onCreate}>
             <Plus className="h-4 w-4 mr-2" />
             Add Contact
@@ -71,13 +72,7 @@ export function ContactsTab({
         }}
       />
 
-      <div
-        className={
-          viewMode === "grid"
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            : "flex flex-col gap-4"
-        }
-      >
+      <ViewModeList viewMode={viewMode}>
         {paginatedContacts.map((contact) => (
           <Card
             key={contact.id}
@@ -171,7 +166,7 @@ export function ContactsTab({
             )}
           </Card>
         ))}
-      </div>
+      </ViewModeList>
 
       {filteredContacts.length > 0 && (
         <Pagination

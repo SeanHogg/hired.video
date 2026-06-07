@@ -23,6 +23,7 @@ import {
   ExternalLink,
   Calendar,
   Edit,
+  Eye,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -118,7 +119,9 @@ import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader from "@/components/PageHeader";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
 import { useJobsTabs } from "@/hooks/use-jobs-tabs";
-import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { recruitService } from "@/lib/services/recruit-service";
 
 // Schemas
@@ -283,7 +286,11 @@ export default function Jobs() {
     setSearchParams(params);
   };
 
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useViewMode(
+    "jobs.browse",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   // Lists filter — same pattern as People page. Null = no filter; Set = restrict.
   const listIdFromUrl = searchParams.get("list_id");
@@ -666,6 +673,50 @@ export default function Jobs() {
         : undefined,
     });
 
+    // One card definition shared by the Scroll and Grid views so the full
+    // handler wiring lives in a single place (Table renders its own dense
+    // rows below).
+    const renderJobCard = (job: JobSummary) => {
+      const jobMetadata = {
+        id: job.id,
+        slug: (job as any).slug || "",
+        title: job.title,
+        company: job.company,
+        companyId: (job as any).companyId || "",
+        location: job.location,
+        description: (job as any).description || "",
+        salary:
+          job.salaryMin && job.salaryMax
+            ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
+            : undefined,
+        employmentType: job.employmentType,
+        experienceLevel: (job as any).experienceLevel || "entry",
+        postedDate: job.postedDate || "",
+        isRemote: job.isRemote || false,
+        status: "active" as const,
+        privacy: "public" as const,
+        views: (job as any).views || 0,
+        applications: (job as any).applications || 0,
+        createdAt: (job as any).createdAt || "",
+        updatedAt: (job as any).updatedAt || "",
+        summary: (job as any).summary || "",
+        userId: (job as any).userId || "",
+      };
+      return (
+        <JobCard
+          key={job.id}
+          job={jobMetadata}
+          extraMenuItems={
+            <AddToListMenu
+              entityType="job"
+              entityId={job.id}
+              entityLabel={job.title}
+            />
+          }
+          {...jobMenuHandlersFor({ id: job.id, title: job.title })}
+        />
+      );
+    };
 
     return (
       <AppShell bgClassName="bg-background">
@@ -707,7 +758,11 @@ export default function Jobs() {
                           value={geoFilter}
                           onChange={handleGeoFilterChange}
                         />
-                        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                        <ViewModeToggle
+                          value={viewMode}
+                          onChange={setViewMode}
+                          modes={BROWSE_VIEW_MODES}
+                        />
                         <ListsButton entityType="job" />
                       </>
                     )}
@@ -822,52 +877,21 @@ export default function Jobs() {
                       </Button>
                     </div>
                   ) : (
-                    <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                      {displayedJobs.map((job) => {
-                        const jobMetadata = {
-                          id: job.id,
-                          slug: (job as any).slug || "",
-                          title: job.title,
-                          company: job.company,
-                          companyId: (job as any).companyId || "",
-                          location: job.location,
-                          description: (job as any).description || "",
-                          salary:
-                            job.salaryMin && job.salaryMax
-                              ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
-                              : undefined,
-                          employmentType: job.employmentType,
-                          experienceLevel:
-                            (job as any).experienceLevel || "entry",
-                          postedDate: job.postedDate || "",
-                          isRemote: job.isRemote || false,
-                          status: "active" as const,
-                          privacy: "public" as const,
-                          views: (job as any).views || 0,
-                          applications: (job as any).applications || 0,
-                          createdAt: (job as any).createdAt || "",
-                          updatedAt: (job as any).updatedAt || "",
-                          summary: (job as any).summary || "",
-                          userId: (job as any).userId || "",
-                        };
-
-                        return (
-                          <JobCard
-                            key={job.id}
-                            job={jobMetadata}
-                            layout={viewMode === "list" ? "horizontal" : "vertical"}
-                            extraMenuItems={
-                              <AddToListMenu
-                                entityType="job"
-                                entityId={job.id}
-                                entityLabel={job.title}
-                              />
-                            }
-                            {...jobMenuHandlersFor({ id: job.id, title: job.title })}
-                          />
-                        );
-                      })}
-                    </div>
+                    viewMode === "table" ? (
+                      <JobsTable jobs={displayedJobs} />
+                    ) : viewMode === "scroll" ? (
+                      <HorizontalScroller itemCount={displayedJobs.length}>
+                        {displayedJobs.map((job) => (
+                          <div key={job.id} className="w-72 shrink-0 snap-start">
+                            {renderJobCard(job)}
+                          </div>
+                        ))}
+                      </HorizontalScroller>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {displayedJobs.map((job) => renderJobCard(job))}
+                      </div>
+                    )
                   )}
 
                   {/* Pagination */}
@@ -1606,5 +1630,90 @@ export default function Jobs() {
           </div>
 </div>
 </AppShell>
+  );
+}
+
+// Dense rows-and-columns view for the Jobs browse surface — mirrors
+// ResumeOwnedTable so the Scroll / Grid / Table trio stays visually
+// consistent across browse pages. The job link reuses JobCard's default
+// navigation target (`/jobs/:id`).
+function JobsTable({ jobs }: { jobs: JobSummary[] }) {
+  const { t } = useTranslation();
+  const { formatDate } = useTimeAgo();
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">{t("labels.title", "Title")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.company", "Company")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.location", "Location")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.type", "Type")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.posted", "Posted")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.actions", "Actions")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => (
+            <tr
+              key={job.id}
+              className="border-b border-border last:border-0 hover:bg-muted/30"
+            >
+              <td className="px-3 py-2">
+                <Link
+                  to={`/jobs/${job.id}`}
+                  className="font-medium hover:text-brand-purple"
+                >
+                  {job.title}
+                </Link>
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {job.company || "—"}
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  {job.isRemote ? (
+                    <>
+                      <Building2 className="h-3.5 w-3.5" />
+                      {t("labels.remote", "Remote")}
+                    </>
+                  ) : job.location ? (
+                    <>
+                      <MapPin className="h-3.5 w-3.5" />
+                      {job.location}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {job.employmentType ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {job.employmentType}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {job.postedDate ? formatDate(job.postedDate) : "—"}
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to={`/jobs/${job.id}`}>
+                      <Eye className="mr-1 h-3.5 w-3.5" />
+                      {t("actions.view", "View")}
+                    </Link>
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

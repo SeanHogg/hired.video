@@ -1,10 +1,10 @@
 /**
  * SectionEditor — inline, field-bound editing of a document section on the
- * canvas (#1916, "the canvas is the form"). Driven entirely by the declarative
- * `document-field-schema.ts`, so it handles every editable section of every
- * entity (resume / job …) with one component. Edits produce a fresh content
- * record via `onChange`; the host owns persistence (write-back to the entity
- * row on save).
+ * canvas (#1916, "the canvas is the form"). Driven by the declarative
+ * `document-field-schema.ts` + the shared [FieldGroupEditor](../fields/FieldGroupEditor.tsx)
+ * engine, so it handles every editable section of every entity (resume / job …)
+ * with one component. Edits produce a fresh content record via `onChange`; the
+ * host owns persistence (write-back to the entity row on save).
  *
  * Two shapes (from the schema):
  *   • "array"  — a list of items (resume work / education …); add/remove
@@ -14,13 +14,11 @@
  *     content root (the flat job record).
  */
 import { Plus, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import MediaPicker from "@/components/shared/MediaPicker";
+import { FieldGroupEditor } from "@/components/studio/fields/FieldGroupEditor";
 import type { DocumentEntityContent, DocumentEntityKind } from "@/lib/studio/editor-v2/document-state";
 import {
   documentSectionSchema,
   type DocumentSectionSchema,
-  type SectionFieldDef,
 } from "@/lib/studio/document/document-field-schema";
 
 interface SectionEditorProps {
@@ -75,8 +73,8 @@ function ArrayEditor({
 }) {
   const items = itemsFor(content, schema.sectionKey);
 
-  const setItem = (idx: number, patch: Item) => {
-    const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+  const setItem = (idx: number, key: string, value: unknown) => {
+    const next = items.map((it, i) => (i === idx ? { ...it, [key]: value } : it));
     onChange(writeItems(content, schema.sectionKey, next));
   };
   const addItem = () => {
@@ -107,16 +105,12 @@ function ArrayEditor({
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-          <div className="grid grid-cols-2 gap-2 pr-6">
-            {schema.fields.map((field) => (
-              <FieldInput
-                key={field.key}
-                field={field}
-                value={item[field.key]}
-                onChange={(v) => setItem(idx, { [field.key]: v })}
-              />
-            ))}
-          </div>
+          <FieldGroupEditor
+            fields={schema.fields}
+            values={item}
+            onChange={(key, value) => setItem(idx, key, value)}
+            className="pr-6"
+          />
         </div>
       ))}
       <button
@@ -156,222 +150,5 @@ function ObjectEditor({
       onChange({ ...root, [key]: value });
     }
   };
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {schema.fields.map((field) => (
-        <FieldInput
-          key={field.key}
-          field={field}
-          value={obj[field.key]}
-          onChange={(v) => setField(field.key, v)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function FieldInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: SectionFieldDef;
-  value: unknown;
-  onChange: (next: unknown) => void;
-}) {
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
-  const labelEl = (
-    <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">
-      {field.label}
-    </label>
-  );
-
-  if (field.type === "list") {
-    // One value per line ⇄ string[].
-    const lines = Array.isArray(value) ? (value as string[]).join("\n") : "";
-    return (
-      <div className="col-span-2">
-        {labelEl}
-        <textarea
-          value={lines}
-          rows={3}
-          onClick={stop}
-          onChange={(e) =>
-            onChange(
-              e.target.value
-                .split("\n")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            )
-          }
-          placeholder="One per line"
-          className="w-full resize-y rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-        />
-      </div>
-    );
-  }
-
-  if (field.type === "textarea") {
-    return (
-      <div className="col-span-2">
-        {labelEl}
-        <textarea
-          value={typeof value === "string" ? value : ""}
-          rows={2}
-          onClick={stop}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full resize-y rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-        />
-      </div>
-    );
-  }
-
-  if (field.type === "select") {
-    const current =
-      value === undefined || value === null ? "" : String(value);
-    return (
-      <div>
-        {labelEl}
-        <select
-          value={current}
-          onClick={stop}
-          onChange={(e) =>
-            onChange(field.numeric ? Number(e.target.value) : e.target.value)
-          }
-          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-        >
-          {(field.options ?? []).map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
-
-  if (field.type === "multiselect") {
-    const arr = Array.isArray(value) ? (value as unknown[]) : [];
-    const selected = (optValue: string) => arr.some((x) => String(x) === optValue);
-    const toggle = (optValue: string) => {
-      const raw: unknown = field.numeric ? Number(optValue) : optValue;
-      onChange(
-        selected(optValue)
-          ? arr.filter((x) => String(x) !== optValue)
-          : [...arr, raw],
-      );
-    };
-    return (
-      <div className="col-span-2">
-        {labelEl}
-        <div className="flex flex-wrap gap-1.5">
-          {(field.options ?? []).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={(e) => {
-                stop(e);
-                toggle(opt.value);
-              }}
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-xs transition",
-                selected(opt.value)
-                  ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-                  : "border-slate-200 text-slate-500 hover:border-slate-300",
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (field.type === "day") {
-    return (
-      <div>
-        {labelEl}
-        <input
-          type="date"
-          value={typeof value === "string" ? value : ""}
-          onClick={stop}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-        />
-      </div>
-    );
-  }
-
-  if (field.type === "number") {
-    return (
-      <div>
-        {labelEl}
-        <input
-          type="number"
-          value={typeof value === "number" ? value : ""}
-          onClick={stop}
-          onChange={(e) =>
-            onChange(e.target.value === "" ? undefined : Number(e.target.value))
-          }
-          className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-        />
-      </div>
-    );
-  }
-
-  if (field.type === "image") {
-    const url = typeof value === "string" ? value : "";
-    return (
-      <div className="col-span-2" onClick={stop} role="presentation">
-        {labelEl}
-        {url ? (
-          <div className="flex items-start gap-2">
-            <img
-              src={url}
-              alt=""
-              className="h-16 w-28 rounded border border-slate-200 object-cover"
-            />
-            <div className="flex flex-col gap-1">
-              <MediaPicker
-                accept="image"
-                title={`Choose ${field.label.toLowerCase()}`}
-                triggerLabel="Replace"
-                onPick={(asset) => onChange(asset.url)}
-              />
-              <button
-                type="button"
-                onClick={() => onChange("")}
-                className="text-xs text-slate-400 hover:text-red-600"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <MediaPicker
-            accept="image"
-            title={`Choose ${field.label.toLowerCase()}`}
-            triggerLabel={`Add ${field.label.toLowerCase()}`}
-            onPick={(asset) => onChange(asset.url)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // text / date
-  return (
-    <div>
-      {labelEl}
-      <input
-        type="text"
-        value={typeof value === "string" ? value : ""}
-        onClick={stop}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={field.type === "date" ? "YYYY-MM" : undefined}
-        className="w-full rounded border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-brand-purple"
-      />
-    </div>
-  );
+  return <FieldGroupEditor fields={schema.fields} values={obj} onChange={setField} />;
 }

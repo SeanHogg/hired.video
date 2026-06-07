@@ -35,7 +35,8 @@ import { toast } from "sonner";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { usePagination } from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
-import DiscoverPeopleGrid from "@/components/DiscoverPeopleGrid";
+import DiscoverPeopleGrid, { PeopleTable } from "@/components/DiscoverPeopleGrid";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import type { SearchFilters } from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Badge } from "@/components/ui/badge";
@@ -107,7 +108,8 @@ import PageHeader from "@/components/PageHeader";
 import { usePeopleTabs } from "@/hooks/use-people-tabs";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { writeEntityHubActiveTab } from "@/components/EntityHubTabStrip";
-import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { UserRole } from "@shared/user-roles";
 import { visibleTo } from "@/lib/persona";
@@ -196,7 +198,11 @@ export default function People() {
       location: urlLocation || undefined,
     }));
   }, [urlQuery, urlRole, urlSkills, urlOpenToWork, urlLocation]);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useViewMode(
+    "people.browse",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
   const [people, setPeople] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Lists filter: when ?list_id=X is on the URL, restrict displayed people to
@@ -844,7 +850,11 @@ export default function People() {
                       </Link>
                     </Button>
                     {(activeTab === "browse" || activeTab === "connections") && (
-                      <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                      <ViewModeToggle
+                        value={viewMode}
+                        onChange={setViewMode}
+                        modes={BROWSE_VIEW_MODES}
+                      />
                     )}
                     {(activeTab === "browse" || activeTab === "connections") && isRecruiterOrEmployer && (
                       <ListsButton entityType="person" />
@@ -860,28 +870,51 @@ export default function People() {
               {activeTab === "connections" && (
                 <div className="space-y-6">
                   {("tracked" in peopleData ? peopleData.tracked.length > 0 : false) ? (
-                    <div className={viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" : "flex flex-col gap-4"}>
-                      {("tracked" in peopleData ? peopleData.tracked : []).map(
-                        (person: UserWithOwnership) => (
-                          <PeopleCard
-                            key={person.id}
-                            person={person}
-                            connectionStatus={
-                              user ? getConnectionStatus(user.id, person.id) : "none"
-                            }
-                            layout={viewMode === "list" ? "horizontal" : "vertical"}
-                            showOwnership
-                            onTrack={handleTrackPerson}
-                            onUntrack={handleUntrackPerson}
-                            onConnect={handleConnect}
-                            onMessage={handleMessage}
-                            onAcceptConnection={handleAcceptConnection}
-                            onRejectConnection={handleRejectConnection}
-                            onActions={() => handleCardActions(person.id)}
-                          />
-                        ),
-                      )}
-                    </div>
+                    (() => {
+                      const tracked =
+                        "tracked" in peopleData ? peopleData.tracked : [];
+                      // One card definition shared by the Scroll and Grid views
+                      // so the full handler wiring lives in a single place
+                      // (Table renders its own dense rows via PeopleTable).
+                      const renderConnectionCard = (person: UserWithOwnership) => (
+                        <PeopleCard
+                          key={person.id}
+                          person={person}
+                          connectionStatus={
+                            user ? getConnectionStatus(user.id, person.id) : "none"
+                          }
+                          layout="vertical"
+                          showOwnership
+                          onTrack={handleTrackPerson}
+                          onUntrack={handleUntrackPerson}
+                          onConnect={handleConnect}
+                          onMessage={handleMessage}
+                          onAcceptConnection={handleAcceptConnection}
+                          onRejectConnection={handleRejectConnection}
+                          onActions={() => handleCardActions(person.id)}
+                        />
+                      );
+                      return viewMode === "table" ? (
+                        <PeopleTable people={tracked} />
+                      ) : viewMode === "scroll" ? (
+                        <HorizontalScroller itemCount={tracked.length}>
+                          {tracked.map((person: UserWithOwnership) => (
+                            <div
+                              key={person.id}
+                              className="w-72 shrink-0 snap-start"
+                            >
+                              {renderConnectionCard(person)}
+                            </div>
+                          ))}
+                        </HorizontalScroller>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                          {tracked.map((person: UserWithOwnership) =>
+                            renderConnectionCard(person),
+                          )}
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="text-center py-12">
                       <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />

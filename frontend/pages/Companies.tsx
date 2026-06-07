@@ -9,10 +9,12 @@ import {
   Search,
   Eye,
   Trophy,
+  MapPin,
+  Briefcase,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
 import TeamLeaderboardPanel from "@/components/companies/TeamLeaderboardPanel";
@@ -36,7 +38,9 @@ import HeaderSearch from "@/components/HeaderSearch";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
 import { COMPANIES_HUB_DEFAULT_TAB, COMPANIES_HUB_TABS } from "@/hooks/use-companies-tabs";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
-import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import {
   Card,
   CardDescription,
@@ -59,6 +63,7 @@ export default function Companies() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   // 2-char threshold via the shared hook so single-keystroke ?q=A
   // doesn't fire /api/companies/public. Header search owns the visible
@@ -120,7 +125,11 @@ export default function Companies() {
       location: urlLocation || undefined,
     }));
   }, [urlQuery, urlIndustry, urlSize, urlLocation]);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useViewMode(
+    "companies.browse",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
   const [companies, setCompanies] = useState<Company[]>([]);
   // Lists filter — same pattern as People/Jobs/Resumes.
   const listIdFromUrl = searchParams.get("list_id");
@@ -280,6 +289,62 @@ export default function Companies() {
     const companiesData = getCompaniesForUser();
     const trackedCompanyCount = companiesData.tracked.length;
 
+    // The valid, displayable companies for the browse tab — shared by every
+    // layout (Scroll / Grid / Table) so filtering + the metadata projection
+    // live in one place.
+    const browseCompanies = displayedCompanies.filter((company) =>
+      isValidCompanyName(company.name),
+    );
+
+    // One card definition shared by the Scroll and Grid views so the full
+    // handler wiring lives in a single place (Table renders its own dense
+    // rows below).
+    const renderCompanyCard = (company: Company) => {
+      const companyMetadata = {
+        id: company.id || "",
+        slug: (company as any).slug || "",
+        name: company.name || "",
+        logo: company.logo || "",
+        description: (company as any).description || "",
+        tagline: company.tagline || "",
+        industry: company.industry || "",
+        size: company.size || "",
+        location: company.location || "",
+        website: (company as any).website || "",
+        founded: (company as any).founded || "",
+        followersCount: (company as any).followersCount || 0,
+        jobsCount: (company as any).jobCount || 0,
+        isPublic: (company as any).isPublic || true,
+        status: (company.status as any) || "active",
+        visibility: (company.visibility as any) || "public",
+        createdAt: company.createdAt || "",
+        updatedAt: company.updatedAt || "",
+        teamMembers: (company as any).teamMembers || [],
+        onboardingProgress: company.onboardingProgress || 0,
+        views: (company as any).views || 0,
+        followers: (company as any).followers || 0,
+        jobCount: (company as any).jobCount || 0,
+        activeJobCount: (company as any).activeJobCount || 0,
+        userId: (company as any).userId || "",
+        ownership: "tracked" as const,
+      };
+      return (
+        <CompanyCard
+          key={company.id}
+          company={companyMetadata}
+          onTrack={handleFollowCompany}
+          onUntrack={handleUnfollowCompany}
+          extraMenuItems={
+            <AddToListMenu
+              entityType="company"
+              entityId={company.id ?? ""}
+              entityLabel={company.name ?? t("labels.companies.entityFallback")}
+            />
+          }
+        />
+      );
+    };
+
     const renderBrowseBody = () => (
       <div className="space-y-6">
         <div>
@@ -309,62 +374,22 @@ export default function Companies() {
               </p>
               <Button onClick={() => setSearchFilters({})}>{t("actions.clearFilters")}</Button>
             </div>
+          ) : viewMode === "table" ? (
+            <CompaniesTable
+              companies={browseCompanies}
+              onView={(id) => navigate(`/companies/${id}`)}
+            />
+          ) : viewMode === "scroll" ? (
+            <HorizontalScroller itemCount={browseCompanies.length}>
+              {browseCompanies.map((company) => (
+                <div key={company.id} className="w-72 shrink-0 snap-start">
+                  {renderCompanyCard(company)}
+                </div>
+              ))}
+            </HorizontalScroller>
           ) : (
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                  : "flex flex-col gap-4"
-              }
-            >
-              {displayedCompanies
-                .filter((company) => isValidCompanyName(company.name))
-                .map((company) => {
-                  const companyMetadata = {
-                    id: company.id || "",
-                    slug: (company as any).slug || "",
-                    name: company.name || "",
-                    logo: company.logo || "",
-                    description: (company as any).description || "",
-                    tagline: company.tagline || "",
-                    industry: company.industry || "",
-                    size: company.size || "",
-                    location: company.location || "",
-                    website: (company as any).website || "",
-                    founded: (company as any).founded || "",
-                    followersCount: (company as any).followersCount || 0,
-                    jobsCount: (company as any).jobCount || 0,
-                    isPublic: (company as any).isPublic || true,
-                    status: (company.status as any) || "active",
-                    visibility: (company.visibility as any) || "public",
-                    createdAt: company.createdAt || "",
-                    updatedAt: company.updatedAt || "",
-                    teamMembers: (company as any).teamMembers || [],
-                    onboardingProgress: company.onboardingProgress || 0,
-                    views: (company as any).views || 0,
-                    followers: (company as any).followers || 0,
-                    jobCount: (company as any).jobCount || 0,
-                    activeJobCount: (company as any).activeJobCount || 0,
-                    userId: (company as any).userId || "",
-                    ownership: "tracked" as const,
-                  };
-                  return (
-                    <CompanyCard
-                      key={company.id}
-                      company={companyMetadata}
-                      layout={viewMode === "list" ? "horizontal" : "vertical"}
-                      onTrack={handleFollowCompany}
-                      onUntrack={handleUnfollowCompany}
-                      extraMenuItems={
-                        <AddToListMenu
-                          entityType="company"
-                          entityId={company.id ?? ""}
-                          entityLabel={company.name ?? t("labels.companies.entityFallback")}
-                        />
-                      }
-                    />
-                  );
-                })}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {browseCompanies.map((company) => renderCompanyCard(company))}
             </div>
           )}
 
@@ -446,7 +471,11 @@ export default function Companies() {
           value={geoFilter}
           onChange={handleGeoFilterChange}
         />
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        <ViewModeToggle
+          value={viewMode}
+          onChange={setViewMode}
+          modes={BROWSE_VIEW_MODES}
+        />
         <ListsButton entityType="company" />
       </>
     );
@@ -459,7 +488,11 @@ export default function Companies() {
             {t("actions.companies.add")}
           </Link>
         </Button>
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        <ViewModeToggle
+          value={viewMode}
+          onChange={setViewMode}
+          modes={BROWSE_VIEW_MODES}
+        />
       </>
     );
 
@@ -718,5 +751,90 @@ export default function Companies() {
           </div>
 </div>
 </AppShell>
+  );
+}
+
+/**
+ * Dense Table view of the browsed companies — the third browse layout
+ * alongside Scroll and Grid. One row per company with industry, location,
+ * size, open-role count and a View action. Pagination is owned by the
+ * parent (shared `<Pagination>` below), so this renders exactly the rows
+ * it's handed.
+ */
+function CompaniesTable({
+  companies,
+  onView,
+}: {
+  companies: Company[];
+  onView: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
+            <th className="px-3 py-2 font-medium">{t("fields.industry.label", "Industry")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.location", "Location")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.companies.size", "Size")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.companies.openRoles", "Open roles")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.actions", "Actions")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {companies.map((company) => {
+            const id = company.id ?? "";
+            const openRoles = (company as any).activeJobCount ?? (company as any).jobCount ?? 0;
+            return (
+              <tr
+                key={id}
+                className="border-b border-border last:border-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onView(id)}
+                    className="font-medium hover:text-brand-purple"
+                  >
+                    {company.name}
+                  </button>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {company.industry || "—"}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {company.location ? (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {company.location}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {company.size || "—"}
+                </td>
+                <td className="px-3 py-2 text-right text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    {openRoles}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => onView(id)}>
+                      <Eye className="mr-1 h-3.5 w-3.5" />
+                      {t("actions.view", "View")}
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

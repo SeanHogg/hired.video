@@ -23,6 +23,8 @@ import {
   Target,
   Power,
   UserCheck,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -83,7 +85,9 @@ import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import EntityVersionHistoryDialog from "@/components/EntityVersionHistoryDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
-import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import { useViewMode } from "@/lib/hooks/useViewMode";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
@@ -222,7 +226,11 @@ export default function Resumes() {
       return next;
     });
   }, [urlQuery, urlPrivacy, urlIsMaster]);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useViewMode(
+    "resumes.mine",
+    "grid",
+    BROWSE_VIEW_MODES,
+  );
   // Lists filter — same pattern as People/Jobs.
   const listIdFromUrl = searchParams.get("list_id");
   const [listMembership, setListMembership] = useState<Set<string> | null>(null);
@@ -1253,6 +1261,67 @@ export default function Resumes() {
     </Alert>
   ) : null;
 
+  // One card definition shared by the Scroll and Grid views so the full
+  // handler wiring lives in a single place (Table renders its own dense
+  // rows below).
+  const renderResumeCard = (resume: (typeof paginatedOwnedResumes)[number]) => (
+    <ResumeCard
+      key={resume.id}
+      id={resume.id}
+      slug={resume.slug}
+      userId={resume.userId}
+      name={resume.title}
+      title={resume.title}
+      summary={resume.summary}
+      createdAt={resume.createdAt}
+      views={resume.viewCount}
+      scores={resume.scores}
+      sentimentScore={resume.sentimentScore}
+      privacy={resume.privacy}
+      isMaster={resume.isMaster}
+      isActive={resume.isActive}
+      parentId={resume.parentId}
+      parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
+      diffPercent={resume.diffPercent}
+      variations={childrenByParentId.get(resume.id)}
+      ownership={resume.ownership}
+      onView={() => handleResumeView(resume.id)}
+      onEdit={async () => navigate(await resumeEditorPath(resume.id))}
+      onRename={() => setRenameDialog({ open: true, target: resume })}
+      onAddMedia={() => handleAddMedia(resume)}
+      onCreateVariation={() => handleCreateVariation(resume.id)}
+      onSetActive={() => handleSetActiveResume(resume.id)}
+      onShare={() => handleShare(resume)}
+      onCopyLink={() => handleCopyLink(resume)}
+      onShowQR={() => setQrDialog({ open: true, target: resume })}
+      onDownload={(format) => handleDownload(resume, format)}
+      onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
+      onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
+      onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
+      onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+      isArchived={!!resume.archivedAt}
+      onArchive={async () => {
+        await resumeService.archiveResume(resume.id);
+        await loadResumes({ notifyExtension: true });
+      }}
+      onUnarchive={async () => {
+        await resumeService.unarchiveResume(resume.id);
+        await loadResumes({ notifyExtension: true });
+      }}
+      onViewVersionHistory={() => setVersionHistoryFor({ id: resume.id, title: resume.title })}
+      onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
+      onScoreClick={(toolIds) => openToolHistory({ id: resume.id, title: resume.title }, toolIds)}
+      onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
+      extraMenuItems={
+        <AddToListMenu
+          entityType="resume"
+          entityId={resume.id}
+          entityLabel={resume.title}
+        />
+      }
+    />
+  );
+
   const renderMineBody = () => (
     <div className="space-y-6">
       {successAlert}
@@ -1271,71 +1340,34 @@ export default function Resumes() {
                   {t("labels.resumes.count", { count: ownedCount })}
                 </div>
               </div>
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
-                    : "space-y-4"
-                }
-              >
-                {paginatedOwnedResumes.map((resume) => (
-                  <ResumeCard
-                    key={resume.id}
-                    id={resume.id}
-                    slug={resume.slug}
-                    userId={resume.userId}
-                    name={resume.title}
-                    title={resume.title}
-                    summary={resume.summary}
-                    createdAt={resume.createdAt}
-                    views={resume.viewCount}
-                    scores={resume.scores}
-                    sentimentScore={resume.sentimentScore}
-                    privacy={resume.privacy}
-                    isMaster={resume.isMaster}
-                    isActive={resume.isActive}
-                    parentId={resume.parentId}
-                    parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
-                    diffPercent={resume.diffPercent}
-                    variations={childrenByParentId.get(resume.id)}
-                    ownership={resume.ownership}
-                    onView={() => handleResumeView(resume.id)}
-                    onEdit={async () => navigate(await resumeEditorPath(resume.id))}
-                    onRename={() => setRenameDialog({ open: true, target: resume })}
-                    onAddMedia={() => handleAddMedia(resume)}
-                    onCreateVariation={() => handleCreateVariation(resume.id)}
-                    onSetActive={() => handleSetActiveResume(resume.id)}
-                    onShare={() => handleShare(resume)}
-                    onCopyLink={() => handleCopyLink(resume)}
-                    onShowQR={() => setQrDialog({ open: true, target: resume })}
-                    onDownload={(format) => handleDownload(resume, format)}
-                    onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
-                    onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
-                    onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
-                    onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
-                    isArchived={!!resume.archivedAt}
-                    onArchive={async () => {
-                      await resumeService.archiveResume(resume.id);
-                      await loadResumes({ notifyExtension: true });
-                    }}
-                    onUnarchive={async () => {
-                      await resumeService.unarchiveResume(resume.id);
-                      await loadResumes({ notifyExtension: true });
-                    }}
-                    onViewVersionHistory={() => setVersionHistoryFor({ id: resume.id, title: resume.title })}
-                    onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
-                    onScoreClick={(toolIds) => openToolHistory({ id: resume.id, title: resume.title }, toolIds)}
-                    onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
-                    extraMenuItems={
-                      <AddToListMenu
-                        entityType="resume"
-                        entityId={resume.id}
-                        entityLabel={resume.title}
-                      />
-                    }
-                  />
-                ))}
-              </div>
+              {viewMode === "table" ? (
+                <ResumeOwnedTable
+                  resumes={paginatedOwnedResumes}
+                  onView={(id) => handleResumeView(id)}
+                  onEdit={async (id) => navigate(await resumeEditorPath(id))}
+                  onDelete={(resume) =>
+                    setTimeout(
+                      () => setDeleteDialog({ open: true, target: resume }),
+                      0,
+                    )
+                  }
+                />
+              ) : viewMode === "scroll" ? (
+                <HorizontalScroller itemCount={paginatedOwnedResumes.length}>
+                  {paginatedOwnedResumes.map((resume) => (
+                    <div
+                      key={resume.id}
+                      className="w-72 shrink-0 snap-start"
+                    >
+                      {renderResumeCard(resume)}
+                    </div>
+                  ))}
+                </HorizontalScroller>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {paginatedOwnedResumes.map((resume) => renderResumeCard(resume))}
+                </div>
+              )}
             </div>
           </div>
           <Pagination
@@ -1379,7 +1411,11 @@ export default function Resumes() {
         <Plus className="h-4 w-4 mr-2" />
         {t("headings.createResumeHeading")}
       </Button>
-      <ViewModeToggle value={viewMode} onChange={setViewMode} />
+      <ViewModeToggle
+        value={viewMode}
+        onChange={setViewMode}
+        modes={BROWSE_VIEW_MODES}
+      />
       <ListsButton entityType="resume" />
       {/* #154 — Include archived. Off by default. Toggling refetches via
           the includeArchived useEffect dep. */}
@@ -1738,5 +1774,118 @@ export default function Resumes() {
       <EntityHubShell entity="resume" tabs={resumeTabs} defaultTab={RESUMES_HUB_DEFAULT_TAB} />
       {dialogs}
     </>
+  );
+}
+
+/**
+ * Dense Table view of the owner's resumes — the third browse layout
+ * alongside Scroll and Grid. One row per resume with status badges,
+ * privacy, view count, created date and View / Edit / Delete actions.
+ * Pagination is owned by the parent (shared `<Pagination>` below), so
+ * this renders exactly the rows it's handed.
+ */
+function ResumeOwnedTable({
+  resumes,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  resumes: ResumeWithOwnership[];
+  onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onDelete: (resume: ResumeWithOwnership) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.status", "Status")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.privacy", "Privacy")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.views", "Views")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.created", "Created")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.actions", "Actions")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {resumes.map((resume) => {
+            const isPublic = resume.privacy === "public";
+            return (
+              <tr
+                key={resume.id}
+                className="border-b border-border last:border-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onView(resume.id)}
+                    className="font-medium hover:text-brand-purple"
+                  >
+                    {resume.title}
+                  </button>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {resume.isMaster && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Star className="h-3 w-3" />
+                        {t("labels.resumes.master", "Master")}
+                      </Badge>
+                    )}
+                    {resume.isActive && (
+                      <Badge variant="outline" className="gap-1">
+                        <Power className="h-3 w-3" />
+                        {t("labels.resumes.active", "Active")}
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    {isPublic ? (
+                      <Globe className="h-3.5 w-3.5" />
+                    ) : (
+                      <Lock className="h-3.5 w-3.5" />
+                    )}
+                    {isPublic
+                      ? t("labels.public", "Public")
+                      : t("labels.private", "Private")}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right text-muted-foreground">
+                  {resume.viewCount ?? 0}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {formatDate(resume.createdAt)}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => onView(resume.id)}>
+                      <Eye className="mr-1 h-3.5 w-3.5" />
+                      {t("actions.view", "View")}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onEdit(resume.id)}>
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      {t("actions.edit", "Edit")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(resume)}
+                      aria-label={`Delete ${resume.title}`}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

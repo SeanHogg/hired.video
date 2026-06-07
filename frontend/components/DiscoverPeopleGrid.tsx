@@ -7,14 +7,19 @@
  * a prop-drilled boolean.
  */
 
+import { Eye, MapPin } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import Pagination from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
+import { HorizontalScroller } from "@/components/HorizontalScroller";
 import { Button } from "@/components/ui/button";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import type { ViewMode } from "@/components/ViewModeToggle";
 import { useAuth } from "@/lib/auth";
 import { useConnectionStatuses } from "@/lib/use-connection-statuses";
 import { createRolePermissions } from "@/lib/role-utils";
+import { getPersonRoleLabel } from "@/lib/person-display";
 import type { PublicUser } from "@/lib/services/user-service";
 import type { UserMetadata } from "@/types/people";
 
@@ -83,6 +88,55 @@ export default function DiscoverPeopleGrid({
     visiblePeople.map((p) => p.id),
   );
 
+  // No inline display-name / initials / role derivation — PeopleCard routes
+  // through lib/person-display.ts (#1657). The DTO from /api/users/people
+  // already guarantees non-empty fullName + firstName + lastName (server-side
+  // fallback in toPublicUserCardDto), so this mapper is now a thin shape
+  // coercion only.
+  const toMetadata = (person: PublicUser): UserMetadata => ({
+    ...(person as unknown as UserMetadata),
+    // Empty string flows through — PeopleCard guards the location chip on a
+    // truthy value instead of rendering fabricated copy (#1659).
+    location: person.location || "",
+    visibility: "public",
+    status: "active",
+    lastActiveAt: person.updatedAt || person.createdAt || "",
+    profileViews: (person as { profileViews?: number }).profileViews ?? 0,
+    connectionCount: 0,
+    followerCount: 0,
+    emailConfirmed: person.emailConfirmed || false,
+    isPro: person.isPro || false,
+    companyName: person.currentCompany || "",
+    currentPosition: person.currentRole || "",
+  });
+
+  // One card definition shared by the Scroll and Grid views so the full
+  // handler wiring lives in a single place (Table renders its own dense
+  // rows below).
+  const renderPersonCard = (person: PublicUser) => (
+    <PeopleCard
+      key={person.id}
+      person={toMetadata(person)}
+      connectionStatus={connectionStatuses[person.id] ?? "none"}
+      layout="vertical"
+      onConnect={onConnect}
+      onMessage={onMessage}
+      onAcceptConnection={onAcceptConnection}
+      onRejectConnection={onRejectConnection}
+      onAddToTalentPool={onAddToTalentPool}
+      onActions={() => onCardActions(person.id)}
+      extraMenuItems={
+        isRecruiterOrEmployer ? (
+          <AddToListMenu
+            entityType="person"
+            entityId={person.id}
+            entityLabel={person.fullName ?? "person"}
+          />
+        ) : undefined
+      }
+    />
+  );
+
   return (
     <div>
       {isLoading ? (
@@ -107,63 +161,19 @@ export default function DiscoverPeopleGrid({
           </p>
           <Button onClick={onClearFilters}>Clear Filters</Button>
         </div>
+      ) : viewMode === "table" ? (
+        <PeopleTable people={visiblePeople} />
+      ) : viewMode === "scroll" ? (
+        <HorizontalScroller itemCount={visiblePeople.length}>
+          {visiblePeople.map((person) => (
+            <div key={person.id} className="w-72 shrink-0 snap-start">
+              {renderPersonCard(person)}
+            </div>
+          ))}
+        </HorizontalScroller>
       ) : (
-        <div
-          className={
-            viewMode === "grid"
-              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              : "flex flex-col gap-4"
-          }
-        >
-          {visiblePeople.map((person) => {
-            // No inline display-name / initials / role derivation —
-            // PeopleCard routes through lib/person-display.ts (#1657).
-            // The DTO from /api/users/people already guarantees
-            // non-empty fullName + firstName + lastName (server-side
-            // fallback in toPublicUserCardDto), so this mapper is now
-            // a thin shape coercion only.
-            const personMetadata: UserMetadata = {
-              ...(person as unknown as UserMetadata),
-              // Empty string flows through — PeopleCard guards the
-              // location chip on truthy value instead of rendering
-              // fabricated "Location not specified" copy (#1659).
-              location: person.location || "",
-              visibility: "public",
-              status: "active",
-              lastActiveAt: person.updatedAt || person.createdAt || "",
-              profileViews: (person as { profileViews?: number }).profileViews ?? 0,
-              connectionCount: 0,
-              followerCount: 0,
-              emailConfirmed: person.emailConfirmed || false,
-              isPro: person.isPro || false,
-              companyName: person.currentCompany || "",
-              currentPosition: person.currentRole || "",
-            };
-
-            return (
-              <PeopleCard
-                key={person.id}
-                person={personMetadata}
-                connectionStatus={connectionStatuses[person.id] ?? "none"}
-                layout={viewMode === "list" ? "horizontal" : "vertical"}
-                onConnect={onConnect}
-                onMessage={onMessage}
-                onAcceptConnection={onAcceptConnection}
-                onRejectConnection={onRejectConnection}
-                onAddToTalentPool={onAddToTalentPool}
-                onActions={() => onCardActions(person.id)}
-                extraMenuItems={
-                  isRecruiterOrEmployer ? (
-                    <AddToListMenu
-                      entityType="person"
-                      entityId={person.id}
-                      entityLabel={person.fullName ?? "person"}
-                    />
-                  ) : undefined
-                }
-              />
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {visiblePeople.map((person) => renderPersonCard(person))}
         </div>
       )}
 
@@ -176,6 +186,99 @@ export default function DiscoverPeopleGrid({
           onItemsPerPageChange={onItemsPerPageChange}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Structural minimum a Table row needs — kept narrow so both the browse
+ * feed's `PublicUser` and the Connections tab's `UserWithOwnership` satisfy
+ * it without a cast.
+ */
+export interface PersonTableRow {
+  id?: string | null;
+  slug?: string | null;
+  fullName?: string | null;
+  headline?: string | null;
+  role?: string | number | null;
+  location?: string | null;
+  currentCompany?: string | null;
+}
+
+/**
+ * Dense Table view of the people feed — the third browse layout alongside
+ * Scroll and Grid. One row per person with name, headline, role, location
+ * and company, plus a View-profile action. Pagination is owned by the
+ * parent, so this renders exactly the rows it's handed. Exported so the
+ * People page's Connections tab can reuse the identical layout.
+ */
+export function PeopleTable({ people }: { people: PersonTableRow[] }) {
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.headline", "Headline")}</th>
+            <th className="px-3 py-2 font-medium">{t("fields.industry.label", "Role")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.location", "Location")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.company", "Company")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.actions", "Actions")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {people.map((person) => {
+            const profileHref = `/people/${person.slug || person.id || ""}`;
+            return (
+              <tr
+                key={person.id}
+                className="border-b border-border last:border-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2">
+                  <Link
+                    to={profileHref}
+                    className="font-medium hover:text-brand-purple"
+                  >
+                    {person.fullName || t("labels.unnamed", "Unnamed")}
+                  </Link>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {person.headline || "—"}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {person.role != null && person.role !== ""
+                    ? getPersonRoleLabel(person.role, t)
+                    : "—"}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {person.location ? (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {person.location}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {person.currentCompany || "—"}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={profileHref}>
+                        <Eye className="mr-1 h-3.5 w-3.5" />
+                        {t("actions.view", "View")}
+                      </Link>
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

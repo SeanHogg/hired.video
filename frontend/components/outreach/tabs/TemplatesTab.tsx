@@ -17,6 +17,7 @@ import {
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
 import { SearchInput } from "@/components/outreach/shared/SearchInput";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
+import { ViewModeList, SCROLL_GRID_LIST_MODES } from "@/components/ViewModeList";
 import {
   EmailTemplateCategory,
   EmailTemplateTargetRole,
@@ -60,7 +61,7 @@ export function TemplatesTab({
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Email Templates</h2>
         <div className="flex items-center gap-2">
-          <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          <ViewModeToggle value={viewMode} onChange={onViewModeChange} modes={SCROLL_GRID_LIST_MODES} />
           <Button onClick={onCreate}>
             <Plus className="h-4 w-4 mr-2" />
             New Template
@@ -77,13 +78,7 @@ export function TemplatesTab({
         }}
       />
 
-      <div
-        className={
-          viewMode === "grid"
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            : "flex flex-col gap-4"
-        }
-      >
+      <ViewModeList viewMode={viewMode}>
         {paginatedTemplates.map((template) => (
           <Card
             key={template.id}
@@ -174,7 +169,7 @@ export function TemplatesTab({
             )}
           </Card>
         ))}
-      </div>
+      </ViewModeList>
 
       {filteredTemplates.length > 0 && (
         <Pagination

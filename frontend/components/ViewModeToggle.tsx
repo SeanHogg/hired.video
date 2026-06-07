@@ -16,6 +16,15 @@ import { cn } from "@/lib/utils";
  */
 export type ViewMode = "scroll" | "grid" | "table" | "list";
 
+/**
+ * The canonical Scroll / Grid / Table trio every browse surface offers
+ * (Studio landing, Resumes, Jobs, People, Companies, Tools, Search,
+ * Services). Shared so the toggle, ordering, and persisted-mode validation
+ * stay identical across pages — pass it to both `<ViewModeToggle modes>`
+ * and `useViewMode(..., modes)`.
+ */
+export const BROWSE_VIEW_MODES: ViewMode[] = ["scroll", "grid", "table"];
+
 /** Per-mode icon + a11y label — one record so the button row stays uniform
  *  and adding a mode is a single entry. */
 const MODE_META: Record<ViewMode, { Icon: typeof Grid; label: string }> = {

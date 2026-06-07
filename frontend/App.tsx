@@ -1054,11 +1054,11 @@ const App = () => (
                           self-gates on the requester owning the
                           enrollment row (API 404s otherwise). */}
                       <Route path="/learn/:enrollmentId" element={<CourseLearner />} />
-                      {/* Learner home (#1889) + educator classrooms (#1890)
-                          live as tabs on /tools (?tab=my-learning /
-                          ?tab=classrooms), not standalone routes. These
-                          redirects keep old/deep links working. */}
-                      <Route path="/learning/me" element={<Navigate to="/tools?tab=my-learning" replace />} />
+                      {/* Learner home (#1889, folded into ?tab=learning) +
+                          educator classrooms (#1890) live as tabs on /tools,
+                          not standalone routes. These redirects keep
+                          old/deep links working. */}
+                      <Route path="/learning/me" element={<Navigate to="/tools?tab=learning" replace />} />
                       <Route path="/learning/cohorts" element={<Navigate to="/tools?tab=classrooms" replace />} />
                       {/* Paid-course checkout. The public course detail
                           page catches a 402 PAYMENT_REQUIRED from
