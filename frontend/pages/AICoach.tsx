@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useAI } from "@/lib/ai-context";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
@@ -24,8 +24,10 @@ export default function AICoach() {
   // Snapshot the prompt the visitor clicked so it auto-sends after login.
   const { restored, snapshot, clear } = usePendingToolInput<{ prompt: string }>();
 
-  // SEO for AI Coach page
+  // SEO for AI Coach page — meta resolves from the central PAGE_SEO
+  // registry entry for /ai-coach (gap #1968).
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "AI Career Coach", url: "/ai-coach" }]);
 
   // Auto-open AI chat when page loads; pre-fill from ?q= param if present,
   // or from a saved prompt the visitor picked before signing in.

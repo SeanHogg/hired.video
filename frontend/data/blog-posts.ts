@@ -1861,6 +1861,968 @@ BLOG_POSTS.push({
   ],
 });
 
+// ── Creator Studio: Podcast resume ─────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-make-a-podcast-episode-in-hired-video-studio",
+  title: "How to Make a Podcast Episode in hired.video Studio (Step-by-Step)",
+  description:
+    "Record, script, and publish a podcast-style audio episode in hired.video Studio — using the teleprompter, AI voiceover, and multi-track audio editing without leaving the browser.",
+  publishedAt: "2026-05-08",
+  updatedAt: "2026-05-12",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "studio",
+  toolName: "Studio",
+  toolUrl: "/studio",
+  keywords:
+    "how to make a podcast, podcast resume, audio resume, podcast editor browser, record podcast online, AI voiceover podcast, podcast studio no download",
+  heroAlt: "Studio timeline showing two audio tracks and a waveform editor",
+  category: "Creator Studio",
+  sections: [
+    {
+      heading: "What the Podcast Media Kind Is For",
+      body: "hired.video Studio is no longer video-only. The studio document carries a `mediaKind` — video, podcast, voice, or animation — and the podcast kind switches the editor into an audio-first layout: waveform tracks instead of a visual canvas, chapter markers instead of scenes, and an export that produces a clean MP3 rather than an MP4.\n\nA podcast episode is the right format when your message is better heard than watched: a career-story episode for your profile, a subject-matter explainer that demonstrates expertise, or an interview you host as a Creator. Because the same document model backs every media kind, you can start from a video script and convert it to a podcast without re-typing a word.",
+    },
+    {
+      heading: "Step 1: Open Studio and Choose the Podcast Kind",
+      body: "Open [Studio](/studio) and create a new document. In the new-document picker, choose **Podcast**. The editor loads the audio layout: a transport bar, one or more audio tracks, and a script pane on the left.\n\nIf you already have a video draft you'd rather narrate as audio, open it and switch its media kind from the document settings — the script and chapter structure carry over, and the visual layers are simply hidden from the audio export.",
+    },
+    {
+      heading: "Step 2: Write or Paste Your Script",
+      body: "Type your episode into the script pane, broken into chapters. Each chapter becomes a marker on the timeline so listeners (and you, while editing) can jump between segments.\n\nKeep chapters short — 60 to 120 seconds of spoken audio each. A 10-minute episode is roughly 1,300–1,500 spoken words. The teleprompter reads from this pane while you record, so write the way you talk: short sentences, one idea per line.",
+    },
+    {
+      heading: "Step 3: Record, or Generate AI Voiceover",
+      body: "You have two ways to get audio onto the track:\n\n**Record yourself.** Click record, read from the teleprompter, and Studio captures a track in the browser. Re-record any chapter individually without touching the rest — the chapter markers make it a clean swap.\n\n**Generate AI voiceover.** If you're audio-shy or want a consistent narrator, select a chapter and generate text-to-speech from the script. This is the same TTS engine used for video voiceover; it runs against your script text so updates stay in sync.\n\nMost creators mix both: AI voiceover for intros, outros, and ad-style segments; their own voice for the parts that need authenticity.",
+    },
+    {
+      heading: "Step 4: Edit, Add a Second Track, and Export",
+      body: "Trim silences and stumbles directly on the waveform. Add a second track for intro music or a bed under your narration, and set its level so it sits behind your voice. Studio renders the mix in the browser using the same ffmpeg.wasm pipeline as video export — no server round-trip, no upload of your raw audio.\n\nWhen you're happy, export to MP3. Publish it to your profile as an audio resume, attach it to a Creator post, or download it for an external podcast host. The whole loop — script to published episode — happens in one tab.",
+    },
+  ],
+  faq: [
+    {
+      question: "Do I need to download any software to record a podcast?",
+      answer:
+        "No. Studio records, edits, and exports entirely in the browser. Recording uses your device microphone via the browser, and the final mix is rendered client-side with ffmpeg.wasm, so your raw audio never has to be uploaded to render an episode.",
+    },
+    {
+      question: "Can I convert an existing video draft into a podcast?",
+      answer:
+        "Yes. Because every Studio document shares one underlying model with a mediaKind axis, you can switch a video document to the podcast kind. The script and chapter structure carry over; the visual layers are simply excluded from the audio-only export.",
+    },
+    {
+      question: "Is AI voiceover required?",
+      answer:
+        "No — it's optional. You can record entirely in your own voice, generate every chapter with AI voiceover, or mix the two. The teleprompter works either way so you stay on script while recording.",
+    },
+  ],
+});
+
+// ── Creator Studio: Comic / animation ──────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-make-an-animated-comic-resume-in-hired-video-studio",
+  title: "How to Make an Animated Comic Resume in hired.video Studio",
+  description:
+    "Turn your career story into a panel-by-panel animated comic in hired.video Studio using the animation media kind — keyframes, layers, and a browser-rendered video export.",
+  publishedAt: "2026-05-16",
+  updatedAt: "2026-05-18",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "studio",
+  toolName: "Studio",
+  toolUrl: "/studio",
+  keywords:
+    "animated resume, comic resume, motion resume, animation studio browser, keyframe animation online, creative resume, animated video resume",
+  heroAlt: "Studio canvas showing animated comic panels with a keyframe timeline",
+  category: "Creator Studio",
+  sections: [
+    {
+      heading: "When a Comic Beats a Talking Head",
+      body: "For most roles, a 60-second talking-head video resume is the highest-leverage asset you can make. But for design, illustration, motion, marketing, and brand roles, a hiring manager wants to *see* your aesthetic, not just hear you describe it. An animated comic resume is the format that puts your craft on the page.\n\nStudio's animation media kind gives you a layered canvas with a keyframe timeline. You build panels, place layers (background, character, text balloons), and animate properties — position, scale, opacity — across time. The output is a short rendered video you can publish to your profile or attach to an application.",
+    },
+    {
+      heading: "Step 1: Start an Animation Document",
+      body: "Open [Studio](/studio), create a new document, and choose the **Animation** kind. The editor loads a canvas plus a keyframe timeline. Set your aspect ratio first — square (1:1) reads well in a feed, 16:9 plays cleanly as an embedded video.\n\nThink in panels the way a comic does: 4–8 panels, each a single beat of your story. Sketch the beats before you build — \"intro,\" \"the project,\" \"the result,\" \"the ask\" — so you're animating to a script rather than improvising.",
+    },
+    {
+      heading: "Step 2: Build Layers and Speech Balloons",
+      body: "Each panel is a stack of layers. Add a background, a character or illustration, and text layers for captions and speech balloons. Studio's layer model is the same one the video canvas uses, so anything you can place in a video scene — shapes, images, text, fonts — works here too.\n\nKeep text short. A comic balloon that takes more than two seconds to read breaks the pacing. Let the visuals carry the story and use captions to anchor the key facts (your name, the metric, the role you want).",
+    },
+    {
+      heading: "Step 3: Animate with Keyframes",
+      body: "Select a layer, move the playhead, and set keyframes on the properties you want to animate. Slide a character in from off-canvas, fade a caption up, pop a balloon with a quick scale-up. Studio interpolates between keyframes so two keyframes per property is usually enough for a clean move.\n\nFavor a handful of confident moves over constant motion. The most effective comic resumes hold each panel long enough to read, then transition with one deliberate animation rather than animating everything at once.",
+    },
+    {
+      heading: "Step 4: Render in the Browser and Publish",
+      body: "Export renders the animation to video client-side with the same ffmpeg.wasm pipeline as every other Studio media kind — no upload, no server queue. Add an audio track first if you want narration or a music bed; AI voiceover works here exactly as it does for video.\n\nPublish the rendered clip to your profile, attach it to a creative application, or post it as a Creator. For design and motion roles, a comic resume is often the single asset that gets you remembered in a stack of PDFs.",
+    },
+  ],
+  faq: [
+    {
+      question: "Do I need to be an illustrator to make a comic resume?",
+      answer:
+        "No. You can build panels from shapes, text, and imported images. Strong illustration helps for illustration roles specifically, but the format works with simple layered graphics — the storytelling structure matters more than the drawing.",
+    },
+    {
+      question: "What's the difference between the animation kind and a video?",
+      answer:
+        "Both export to video, but the animation kind is built around a keyframe timeline and a layered canvas for synthetic motion, where the video kind is built around recorded scenes and a teleprompter. Use animation when you're creating motion from layers; use video when you're recording yourself.",
+    },
+    {
+      question: "Where does the rendering happen?",
+      answer:
+        "In your browser. Studio uses ffmpeg.wasm to render the final video client-side, so your assets don't have to be uploaded to a render farm and there's no per-render infrastructure cost.",
+    },
+  ],
+});
+
+// ── Creator Studio: 3D World / game ────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-build-a-3d-world-resume-in-hired-video-studio",
+  title: "How to Build a 3D World Resume in hired.video Studio",
+  description:
+    "Use the 3D World game studio in hired.video to build an explorable, interactive resume scene with Three.js-powered objects and physics — no game-engine install required.",
+  publishedAt: "2026-05-22",
+  updatedAt: "2026-05-24",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "studio",
+  toolName: "Studio",
+  toolUrl: "/studio",
+  keywords:
+    "3D resume, interactive resume, game resume, three.js resume, 3d world builder browser, interactive portfolio, playable resume",
+  heroAlt: "3D World studio editor showing a scene with placed objects and a physics inspector",
+  category: "Creator Studio",
+  sections: [
+    {
+      heading: "The Playable Resume",
+      body: "The boldest format hired.video Studio supports is a 3D World — an explorable scene a recruiter can walk through. It's overkill for an accounting role and exactly right for a game developer, a 3D artist, a technical artist, or an XR engineer who needs to prove they can ship interactive 3D.\n\nUnder the hood, the 3D World studio is a `mediaKind: \"game\"` document with an `engine: \"world-3d\"` discriminator, built on Three.js and React Three Fiber with a Rapier physics layer. You place objects, wire up interactions, and the result runs in any modern browser — no Unity or Unreal install, no plugin.",
+    },
+    {
+      heading: "Step 1: Create a 3D World Document",
+      body: "Open [Studio](/studio), create a new document, and choose the **3D World** game type. The editor loads a 3D viewport, an object palette, and an inspector. (The older 2D game templates still exist — they're now badged \"Mini-game\" — but a 3D World is the full scene-based engine.)\n\nStart with a simple ground plane and a spawn point. Resist the urge to build a whole level. The goal is a short, guided walk that tells your story, not an open-world game.",
+    },
+    {
+      heading: "Step 2: Place Objects and Add Physics",
+      body: "Drag objects from the palette into the scene: platforms, props, text panels, and trigger zones. Each object has a transform (position, rotation, scale) you set in the inspector. Add a Rapier physics body to objects that should collide or fall — the engine handles the simulation so a dropped prop lands on the floor without you writing a physics loop.\n\nUse text panels as the narrative spine: a panel at the entrance with your name and headline, panels along the path describing each project, a panel at the end with what you're looking for. The player reads the resume by moving through it.",
+    },
+    {
+      heading: "Step 3: Wire Interactions",
+      body: "Trigger zones turn the scene from a diorama into an experience. Attach an interaction to a zone so that stepping into it reveals a project panel, plays a sound, or advances the camera. Keep interactions discoverable — a recruiter exploring your world for the first time shouldn't have to guess a hidden mechanic to see your work.\n\nA good pattern: a linear path with optional side rooms. The main path tells your core story in 60–90 seconds of walking; the side rooms hold deep-dive panels for recruiters who want more.",
+    },
+    {
+      heading: "Step 4: Publish and Share the Link",
+      body: "A 3D World publishes as a playable, link-shareable experience that runs in the browser. Because Studio runs cross-origin-isolated for its runtime, the scene loads with its assets self-hosted and plays without a download.\n\nShare the link in your application, on your profile, or in a Creator post. For interactive-3D roles, a playable world is the portfolio piece — it proves, in the most direct way possible, that you can ship the exact thing the job is asking for.",
+    },
+  ],
+  faq: [
+    {
+      question: "Do I need to know how to code to build a 3D World?",
+      answer:
+        "No. You place objects, set transforms in the inspector, and wire interactions through trigger zones — all visually. Coding knowledge lets you push further, but the core build is a drag-place-and-configure workflow.",
+    },
+    {
+      question: "What's the difference between a 3D World and a Mini-game?",
+      answer:
+        "A 3D World is a full scene-based engine — `mediaKind: \"game\"` with the `world-3d` engine — built on Three.js, React Three Fiber, and Rapier physics. The 2D game templates are now badged \"Mini-game\" and are simpler, sprite-based experiences. For a resume scene a recruiter explores in 3D, use the 3D World.",
+    },
+    {
+      question: "Does a recruiter need to install anything to view it?",
+      answer:
+        "No. The world runs in any modern browser via WebGL. You share a link; they click and explore. No game engine, no plugin, no download.",
+    },
+  ],
+});
+
+// ── Creator Studio: Video resume quickstart ────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-make-a-video-resume-in-hired-video-studio",
+  title: "How to Make a Video Resume in hired.video Studio (60-Second Method)",
+  description:
+    "Record a polished 60-second video resume in hired.video Studio using the teleprompter, scene-by-scene retakes, AI voiceover, and browser-side render — start to publish in one tab.",
+  publishedAt: "2026-04-30",
+  updatedAt: "2026-05-06",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "studio",
+  toolName: "Studio",
+  toolUrl: "/studio",
+  keywords:
+    "how to make a video resume, video resume studio, teleprompter resume, record video resume online, AI voiceover resume, video CV, 60 second video resume",
+  heroAlt: "Studio video editor with a teleprompter overlay and a scene timeline",
+  category: "Creator Studio",
+  sections: [
+    {
+      heading: "Why Studio Beats Recording on Your Phone",
+      body: "You can record a video resume on your phone, but you'll fight three things: staying on script, fixing the one scene where you stumbled, and getting clean audio. hired.video Studio solves all three in the browser — a teleprompter that scrolls your script, scene-by-scene retakes so one bad take doesn't cost you the whole video, and audio leveling on export.\n\nThe whole loop — script, record, edit, render, publish — happens in one tab. Render runs client-side with ffmpeg.wasm, so there's no upload-and-wait.",
+    },
+    {
+      heading: "Step 1: Script It in Scenes",
+      body: "Open [Studio](/studio), create a video document, and write your script broken into scenes. The proven 60-second shape is: hook (one specific claim), name and role, one story (problem, action, result), and a close that names the role you want.\n\nKeep each scene to one idea. Scenes are the unit you'll re-record, so a tight scene break means a clean retake. Aim for 60–90 seconds total — 130–180 spoken words.",
+    },
+    {
+      heading: "Step 2: Record with the Teleprompter",
+      body: "Turn on the teleprompter and it scrolls your script over the camera preview while you record, so you keep eye contact instead of reading off to the side. Record scene by scene. If you fumble scene 3, re-record just scene 3 — the rest stays untouched.\n\nLook at the lens, not your own image. Sit one step more formal than the company's day-to-day. Record each scene a few times and keep the take that sounds conversational, not memorized.",
+    },
+    {
+      heading: "Step 3: Polish — Voiceover, Trims, Music",
+      body: "If you'd rather not be on camera for part of the video, generate AI voiceover from your script for those scenes. Trim dead air at the head and tail of each scene. Add a quiet music bed if it fits your tone, set its level under your voice, and export handles the leveling.\n\nDon't over-edit. A video resume that's visibly cut every two seconds reads as anxious. Two or three clean scene transitions beat a dozen jump cuts.",
+    },
+    {
+      heading: "Step 4: Render and Publish",
+      body: "Export renders the final MP4 in your browser. Publish it to your profile as your video resume, attach it to applications, or grab the public `/v/<id>` link to share anywhere.\n\nUpdate it when your headline metric goes stale or your role changes — for most people that's once every 12–18 months. Re-recording one scene is cheap, so keeping it current is easy.",
+    },
+  ],
+  faq: [
+    {
+      question: "How long should a video resume be?",
+      answer:
+        "60–90 seconds. Longer videos don't get watched to the end; shorter ones don't have room for a story. Front-load your strongest, most specific claim in the first three seconds so the recruiter decides to keep watching.",
+    },
+    {
+      question: "Can I re-record just one part?",
+      answer:
+        "Yes. Studio records scene by scene, so you can re-record a single scene without redoing the whole video. That's the biggest advantage over recording one continuous take on your phone.",
+    },
+    {
+      question: "Do I have to upload my footage to render?",
+      answer:
+        "No. Studio renders the final video client-side with ffmpeg.wasm, so your raw footage doesn't need to be uploaded to a server to produce the finished MP4.",
+    },
+  ],
+});
+
+// ── Learning: launch a course / SCORM ──────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-launch-a-course-and-upload-scorm-on-hired-video",
+  title: "How to Launch a Course (and Upload SCORM) on hired.video",
+  description:
+    "Publish a course on hired.video as a Creator or employer — structure modules, upload SCORM 1.2 packages, track completion with the built-in xAPI LRS, and issue verifiable certificates.",
+  publishedAt: "2026-05-10",
+  updatedAt: "2026-05-14",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "courses",
+  toolName: "Courses",
+  toolUrl: "/services/creator/courses",
+  keywords:
+    "launch online course, upload SCORM, SCORM 1.2 hosting, xAPI LRS, course authoring, sell a course, learning management, verifiable certificate course",
+  heroAlt: "Course builder showing modules, a SCORM package upload, and a completion-tracking panel",
+  category: "Learning",
+  sections: [
+    {
+      heading: "Who Can Author a Course",
+      body: "Course authoring on hired.video is open to Creators and employers — the same eligibility check (`resolveAuthorEligibility`) gates both course and classroom authoring. Students are job seekers in a learning mode; you don't need a separate \"instructor\" account to publish.\n\nA course is the right surface when you have structured, self-paced material: an onboarding curriculum, a certification prep track, or a skills course you sell. If you'd rather run a live, cohort-based class with assignments, see the classroom guide — they share infrastructure but solve different jobs.",
+    },
+    {
+      heading: "Step 1: Create the Course and Add Modules",
+      body: "From the Creator dashboard open [Courses](/services/creator/courses) and create a new course. Give it a title, description, and the audience it's for. Then add modules — each module is a unit of the curriculum, and modules hold lessons.\n\nStructure the path before you fill it. A learner should be able to read your module list and understand the arc: foundations, then application, then assessment. Order matters because learning paths support prerequisites — later modules can require earlier ones.",
+    },
+    {
+      heading: "Step 2: Upload a SCORM 1.2 Package",
+      body: "If you've authored content in a tool like Articulate Storyline, iSpring, or Adobe Captivate, export it as a SCORM 1.2 package (a .zip) and upload it as a lesson. hired.video runs a built-in SCORM 1.2 runtime, so the package's completion, score, and bookmarking calls are captured natively — no third-party LMS needed.\n\nSCORM is the right choice when your content is interactive (branching scenarios, embedded quizzes, drag-and-drop). For straightforward video or text lessons, you don't need SCORM at all — author them directly as lessons.",
+    },
+    {
+      heading: "Step 3: Track Completion with the xAPI LRS",
+      body: "Beyond SCORM, hired.video includes an xAPI Learning Record Store. Statements (\"learner X completed activity Y\") are recorded to the LRS, giving you a durable, queryable record of who did what — across SCORM packages, native lessons, and learning-path nodes.\n\nThis is what lets completion mean something. When a learner finishes the required path, the LRS has the evidence, which is the foundation for issuing a certificate that a third party can actually trust.",
+    },
+    {
+      heading: "Step 4: Issue a Verifiable Certificate",
+      body: "On completion, hired.video can issue a certificate signed with an HMAC so its authenticity can be verified later. A holder shares the certificate; a verifier checks the signature and confirms it was genuinely issued for that learner and that course — it can't be forged by editing a PDF.\n\nCertificates plug into gamification too: completing learning awards points and can unlock badges, which keeps learners moving through the path. Publish the course, set its price (or make it free), and learners enroll, progress, and earn a credential that holds up to scrutiny.",
+    },
+  ],
+  faq: [
+    {
+      question: "Do I need an external LMS to host SCORM?",
+      answer:
+        "No. hired.video has a built-in SCORM 1.2 runtime, so you upload your SCORM .zip as a lesson and the platform captures completion, score, and bookmarking directly. There's also an xAPI LRS for statement-level tracking across all lesson types.",
+    },
+    {
+      question: "Are the certificates actually verifiable?",
+      answer:
+        "Yes. Certificates are signed with an HMAC, so a verifier can confirm the certificate was genuinely issued for a specific learner and course. That makes it tamper-evident — unlike a plain PDF, it can't be forged by editing the text.",
+    },
+    {
+      question: "Can employers author courses too, or only Creators?",
+      answer:
+        "Both. Course and classroom authoring share one eligibility check, so Creators and employers can both publish. This is what lets a company stand up an onboarding or compliance curriculum on the same surface a Creator uses to sell a skills course.",
+    },
+  ],
+});
+
+// ── Learning: run a classroom cohort ───────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-run-a-classroom-cohort-as-an-educator",
+  title: "How to Run a Classroom Cohort as an Educator on hired.video",
+  description:
+    "Set up a cohort, enroll students, hand out learning assignments, and track classroom analytics on hired.video — the educator workflow that turns a self-paced course into a live class.",
+  publishedAt: "2026-05-19",
+  updatedAt: "2026-05-21",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "classrooms",
+  toolName: "Classrooms",
+  toolUrl: "/tools?tab=classrooms",
+  keywords:
+    "run a cohort, classroom cohort, educator tools, cohort based course, learning assignments, classroom analytics, teach online cohort",
+  heroAlt: "Classroom dashboard showing cohort members, assignments, and completion analytics",
+  category: "Learning",
+  sections: [
+    {
+      heading: "Cohorts vs Self-Paced Courses",
+      body: "A self-paced course is a learner alone with the material. A classroom cohort is a *group* moving through material together on a schedule, with an educator handing out assignments and watching progress. Cohorts add accountability and pace — the two things that most improve completion rates.\n\nOn hired.video, an educator is a Creator or employer; a student is a job seeker in learning mode. Neither is a new role — the cohort layer sits on top of the accounts you already have. You'll find your classrooms as a tab on the Tools page at [/tools?tab=classrooms](/tools?tab=classrooms), and students see their side under the learning tab.",
+    },
+    {
+      heading: "Step 1: Create a Classroom",
+      body: "Open [Classrooms](/tools?tab=classrooms) and create a cohort. Give it a name, a description, and the course or learning path it's built around. The cohort is the container — it holds members and the assignments you'll give them.\n\nDecide the shape up front: a fixed-start cohort where everyone begins together, or a rolling cohort students join as they enroll. Fixed-start cohorts get the strongest peer accountability; rolling cohorts are easier to operate at scale.",
+    },
+    {
+      heading: "Step 2: Enroll Students",
+      body: "Add members to the cohort. Membership is tracked explicitly, and access throughout the classroom is gated by the same `canActFor` permission seam the rest of the platform uses — so an educator acts on their own cohort and can't reach into someone else's.\n\nKeep cohorts small enough to give attention. The accountability that makes cohorts work depends on the educator actually seeing each student's progress; that breaks down past a certain size, so split a large intake into multiple cohorts rather than one giant room.",
+    },
+    {
+      heading: "Step 3: Hand Out Learning Assignments",
+      body: "Assignments are the educator's lever. Assign a module, a lesson, or a whole path to the cohort with a due date. Students see the assignment in their learning tab; you see who's completed it.\n\nAssignments are the bridge between content and pace. A self-paced course says \"here's the material.\" An assignment says \"finish module 2 by Friday\" — and that single change is what moves a cohort through the curriculum together instead of drifting apart.",
+    },
+    {
+      heading: "Step 4: Watch the Analytics",
+      body: "The classroom surfaces cached cohort analytics — completion rates, who's behind, where students stall. Use it to intervene early: a student who hasn't started by the second due date needs a nudge before they disengage entirely.\n\nBecause completion flows through the same xAPI LRS that backs courses, the analytics are grounded in real records, not self-reports. When the cohort finishes, the same certificate machinery that powers self-paced courses issues verifiable credentials to your students.",
+    },
+  ],
+  faq: [
+    {
+      question: "Is 'educator' a separate account type?",
+      answer:
+        "No. An educator is a Creator or employer, and a student is a job seeker in a learning mode. The cohort layer sits on top of existing accounts — there's no new role to sign up for.",
+    },
+    {
+      question: "Where do I find my classrooms?",
+      answer:
+        "Classrooms live as a tab on the Tools page at /tools?tab=classrooms, not as a separate sidebar item. Students see their enrolled learning under /tools?tab=learning.",
+    },
+    {
+      question: "How is access controlled between cohorts?",
+      answer:
+        "Through the platform's canActFor permission check. An educator acts only on their own cohort's members and assignments and can't reach into a cohort they don't own, which keeps student data scoped to the right classroom.",
+    },
+  ],
+});
+
+// ── Learning: earn a verifiable certificate ────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-earn-a-verifiable-certificate-on-hired-video",
+  title: "How to Earn a Verifiable Certificate on hired.video (and Prove It's Real)",
+  description:
+    "Complete a course or learning path on hired.video to earn an HMAC-signed certificate anyone can verify — plus how to share it so an employer can confirm it's genuine.",
+  publishedAt: "2026-05-27",
+  updatedAt: "2026-05-29",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "courses",
+  toolName: "Courses",
+  toolUrl: "/courses",
+  keywords:
+    "verifiable certificate, online certificate verification, HMAC certificate, course completion certificate, prove certification, credential verification, learning certificate",
+  heroAlt: "A completion certificate next to a verification screen confirming a valid signature",
+  category: "Learning",
+  sections: [
+    {
+      heading: "Why 'Verifiable' Is the Word That Matters",
+      body: "Anyone can make a certificate in a word processor. The problem isn't producing one — it's getting an employer to believe it. A verifiable certificate solves exactly that: it carries a cryptographic signature so a third party can confirm it was genuinely issued, for you, for that specific course, and hasn't been altered.\n\nhired.video signs every certificate with an HMAC. That's what separates a credential a hiring manager will trust from a PDF anyone could fake.",
+    },
+    {
+      heading: "Step 1: Complete the Required Path",
+      body: "Enroll in a [course](/courses) or learning path and finish what it requires. Completion isn't a self-checkbox — your progress is recorded to the platform's xAPI Learning Record Store as you go, including SCORM lesson results and learning-path nodes.\n\nIf the path has prerequisites, earlier modules unlock later ones, so you complete them in order. When the LRS has recorded that you've met the requirements, you're eligible for the certificate.",
+    },
+    {
+      heading: "Step 2: Receive the Signed Certificate",
+      body: "On completion, hired.video issues your certificate signed with an HMAC. The signature is bound to your identity and the specific course — change a single character of the certificate's content and the signature no longer matches.\n\nEarning it also feeds gamification: completing learning awards points and can unlock badges, so the credential is one of several rewards for finishing.",
+    },
+    {
+      heading: "Step 3: Share It So an Employer Can Verify",
+      body: "When you share the certificate, the recipient can run it through verification: the verifier recomputes the signature over the certificate's contents and confirms it matches what hired.video issued. A genuine certificate passes; a tampered or fabricated one fails.\n\nThat's the whole point. You don't ask the employer to take your word for it — you hand them something they can independently check in seconds. Link it on your profile, attach it to an application, or send it directly to a hiring manager.",
+    },
+  ],
+  faq: [
+    {
+      question: "What makes the certificate 'verifiable' rather than just a PDF?",
+      answer:
+        "It's signed with an HMAC. A verifier recomputes the signature over the certificate's contents and checks it against what hired.video issued. If anything was altered — the name, the course, the date — the signature won't match, so tampering is detectable.",
+    },
+    {
+      question: "How does the platform know I actually completed the course?",
+      answer:
+        "Your progress is recorded to an xAPI Learning Record Store as you work through lessons, SCORM packages, and learning-path nodes. The certificate is issued against those records, not a self-reported checkbox.",
+    },
+    {
+      question: "Can I put the certificate on my profile?",
+      answer:
+        "Yes. You can surface it on your profile, attach it to applications, or send the verifiable link directly to an employer who can confirm its authenticity independently.",
+    },
+  ],
+});
+
+// ── Recruiting ops: take-home assignments ──────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-run-take-home-assignments-without-losing-candidates",
+  title: "How to Run Take-Home Assignments Without Losing Good Candidates",
+  description:
+    "A practical guide to fair, predictive take-home assignments: scope them to two hours, pay for longer ones, score with a rubric, and use blind review to keep bias out of the evaluation.",
+  publishedAt: "2026-05-03",
+  updatedAt: "2026-05-07",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "scorecards",
+  toolName: "Scorecards",
+  toolUrl: "/people/scorecards",
+  keywords:
+    "take home assignment hiring, work sample test, fair take home, take home rubric, predictive hiring assessment, reduce hiring bias, structured evaluation",
+  heroAlt: "A take-home brief alongside a structured scoring rubric",
+  category: "Recruiting Ops",
+  sections: [
+    {
+      heading: "Why Take-Homes Win — and Where They Backfire",
+      body: "Work samples are among the most predictive hiring signals there is: watching someone do a slice of the actual job beats inferring it from a conversation. But take-homes backfire when they're disrespectful of the candidate's time — a 10-hour unpaid project from a strong candidate with three offers in flight is a project they'll simply decline.\n\nThe fix isn't to abandon take-homes; it's to scope them honestly and evaluate them rigorously. A two-hour, tightly-scoped assignment scored against a rubric gives you the predictive signal without the candidate attrition.",
+    },
+    {
+      heading: "Rule 1: Scope to Two Hours (and Pay for More)",
+      body: "Design the assignment to take a focused candidate about two hours, and say so in the brief. State a time box explicitly: \"Spend no more than two hours; we evaluate what you can do in that window, not how many hours you're willing to give us.\"\n\nIf the role genuinely needs a deeper sample, pay for it. A paid project converts a take-home from an imposition into a paid trial, and the candidates worth hiring respond well to being valued. The unpaid 10-hour project is the single biggest reason strong candidates drop out of pipelines.",
+    },
+    {
+      heading: "Rule 2: Make It Resemble the Real Job",
+      body: "The assignment should be a slice of the work the person will actually do — not a brain-teaser, not a trick. For an engineer, a small bug fix or feature in a representative codebase. For a marketer, a campaign brief for a real (or realistic) product. For a designer, a constrained redesign with a stated goal.\n\nResemblance is what makes the sample predictive. The closer the take-home is to day-one work, the more its result tells you about day-one performance — and the more candidates feel the process was fair.",
+    },
+    {
+      heading: "Rule 3: Score with a Rubric, Before You See the Name",
+      body: "Decide what good looks like *before* you read a single submission. Write a rubric with the dimensions you care about — correctness, clarity, judgment, communication — and the levels for each. Then score every submission against that same rubric.\n\nWhere possible, review blind: strip the candidate's name and identifying details so you're scoring the work, not the person. On hired.video you record those structured scores on a [scorecard](/people/scorecards), so every reviewer evaluates the same dimensions and you can compare candidates on the merits instead of on gut feel.",
+    },
+    {
+      heading: "Rule 4: Close the Loop With Feedback",
+      body: "Candidates invest real effort in a take-home. The minimum return is a clear, timely decision; the gold standard is a sentence of specific feedback. It costs you little and it's the difference between a rejected candidate who badmouths your process and one who refers a friend next quarter.\n\nFeedback also forces discipline on your side: if you can't articulate why a submission scored where it did, your rubric wasn't specific enough. Closing the loop makes the next round of assignments sharper.",
+    },
+  ],
+  faq: [
+    {
+      question: "How long should a take-home assignment take?",
+      answer:
+        "Design it for about two focused hours and state that time box in the brief. If the role truly needs a deeper sample, pay the candidate for their time. Long unpaid take-homes are the leading cause of strong candidates dropping out of a pipeline.",
+    },
+    {
+      question: "How do I keep take-home evaluation fair?",
+      answer:
+        "Write a rubric before you read any submissions, score every candidate against the same dimensions, and review blind where you can by stripping names and identifying details. Recording structured scores on a scorecard keeps every reviewer on the same criteria.",
+    },
+    {
+      question: "Should take-homes look like the real job?",
+      answer:
+        "Yes. The most predictive assignments are a representative slice of day-one work, not abstract puzzles. Resemblance to the real job both improves the signal and makes candidates feel the process is fair.",
+    },
+  ],
+});
+
+// ── Recruiting ops: structured scorecards & blind review ───────────────
+BLOG_POSTS.push({
+  slug: "structured-scorecards-and-blind-review-to-reduce-hiring-bias",
+  title: "Structured Scorecards and Blind Review: How to Reduce Hiring Bias",
+  description:
+    "Replace gut-feel interviews with structured scorecards and blind review. Define the dimensions before you interview, score consistently, and aggregate decisions to keep bias out of hiring.",
+  publishedAt: "2026-05-13",
+  updatedAt: "2026-05-16",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "scorecards",
+  toolName: "Scorecards",
+  toolUrl: "/people/scorecards",
+  keywords:
+    "structured interview scorecard, blind review hiring, reduce hiring bias, interview rubric, structured hiring, evidence based hiring, fair interview process",
+  heroAlt: "An interview scorecard with rated dimensions and an aggregated decision panel",
+  category: "Recruiting Ops",
+  sections: [
+    {
+      heading: "Why Unstructured Interviews Mislead You",
+      body: "The unstructured interview — a free-flowing chat that ends in a thumbs up or down — is one of the worst-performing tools in hiring, and one of the most popular. It measures rapport, similarity, and confidence far more than it measures competence. It's also where bias hides best: when criteria are implicit, \"culture fit\" becomes a euphemism for \"reminds me of me.\"\n\nStructured scorecards fix this by making the criteria explicit, identical across candidates, and recorded. You stop comparing vibes and start comparing evidence on the same axes.",
+    },
+    {
+      heading: "Step 1: Define the Dimensions Before the First Interview",
+      body: "Before you talk to anyone, decide what the role actually requires and turn it into 4–6 scoreable dimensions — for example: problem-solving, role-specific skill, collaboration, communication. For each dimension, write what a 1 looks like and what a 5 looks like, so two interviewers reading the same answer land on a similar score.\n\nDefine these once per role and reuse them for every candidate. The moment the criteria are fixed up front, you've removed the biggest source of inconsistency: each interviewer inventing their own bar mid-conversation.",
+    },
+    {
+      heading: "Step 2: Ask Every Candidate the Same Core Questions",
+      body: "Structure means consistency. Each interviewer covers the same core questions for their assigned dimensions, so candidates are compared on the same evidence rather than on whatever happened to come up. You can still follow threads — but everyone hits the same anchor questions.\n\nThis is what makes scores comparable. If candidate A was asked about a hard trade-off and candidate B wasn't, their \"judgment\" scores aren't measuring the same thing. Same questions, same rubric, comparable scores.",
+    },
+    {
+      heading: "Step 3: Review Blind Where You Can",
+      body: "Bias often enters before the interview even starts — from a name, a photo, a school. Strip identifying details from work samples and written submissions so reviewers score the work, not the person. For live interviews, full blinding isn't possible, but you can still anonymize take-home reviews and resume screens.\n\nBlind review is most powerful on the artifacts: code samples, writing tests, design exercises. Score the artifact against the rubric first, attach the name second.",
+    },
+    {
+      heading: "Step 4: Score Independently, Then Aggregate",
+      body: "Have interviewers record their scores on the [scorecard](/people/scorecards) *before* the debrief, independently. Anchoring is real: the first loud opinion in a room drags everyone toward it. Independent scores first, discussion second.\n\nThen aggregate. Look at the scores across dimensions and across interviewers, and make the decision on the pattern in the evidence — not on who argued hardest in the room. A candidate who scores consistently well across independent reviewers on the dimensions that matter is a far safer bet than one who won a debate. Structured, recorded, aggregated decisions are also your best defense if a hiring decision is ever questioned.",
+    },
+  ],
+  faq: [
+    {
+      question: "What is a structured scorecard?",
+      answer:
+        "A pre-defined set of dimensions for a role — each with explicit rating levels — that every interviewer scores every candidate against. It replaces a gut-feel thumbs up/down with consistent, comparable evidence recorded the same way for everyone.",
+    },
+    {
+      question: "Does blind review work for live interviews?",
+      answer:
+        "Full blinding isn't possible once you're face to face, but you can anonymize the artifacts — take-home submissions, code samples, writing tests, resume screens — and score those against the rubric before attaching a name. That's where blind review has the most leverage.",
+    },
+    {
+      question: "Why score before the debrief?",
+      answer:
+        "To avoid anchoring. The first strong opinion in a debrief pulls everyone toward it. Recording independent scores first, then discussing, keeps each interviewer's read intact so the aggregate reflects real consensus rather than the loudest voice.",
+    },
+  ],
+});
+
+// ── Recruiting ops: retained vs contingency + warm intros ──────────────
+BLOG_POSTS.push({
+  slug: "retained-vs-contingency-search-and-the-power-of-warm-intros",
+  title: "Retained vs Contingency Search — and Why Warm Intros Beat Both",
+  description:
+    "Understand the difference between retained and contingency recruiting, when each makes sense, and why a warm introduction outperforms cold outreach for the roles that matter most.",
+  publishedAt: "2026-05-20",
+  updatedAt: "2026-05-23",
+  readingTime: 8,
+  author: "hired.video",
+  toolSlug: "recruiter-agent",
+  toolName: "AI Recruiter Agent",
+  toolUrl: "/for-recruiters",
+  keywords:
+    "retained vs contingency search, retained search, contingency recruiting, executive search fees, warm intro hiring, recruiter fee structures, sourcing strategy",
+  heroAlt: "A comparison chart of retained vs contingency search with a warm-intro path highlighted",
+  category: "Recruiting Ops",
+  sections: [
+    {
+      heading: "The Two Classic Models",
+      body: "**Contingency search** means the recruiter is paid only if their candidate is hired — typically a percentage of first-year salary, collected on placement. It's low-commitment for the employer: no placement, no fee. Recruiters work many roles at once and move fast on the easy-to-fill ones.\n\n**Retained search** means the employer pays the recruiter in installments to run a dedicated search, hired or not — usually a third up front, a third at a milestone, a third on placement. The recruiter commits real time to a single role and works it exhaustively. Retained is the model for senior, scarce, or confidential roles.",
+    },
+    {
+      heading: "When to Use Contingency",
+      body: "Contingency fits roles with a deep, accessible talent pool and a clear spec — individual contributors, mid-level managers, high-volume hiring. You're paying for reach and speed, and you only pay on success, so the downside is capped.\n\nThe trade-off: a contingency recruiter juggling 20 roles gives each one a fraction of their attention, and races other recruiters to submit the same candidates. You get breadth and speed, not depth. For roles where any qualified hire is a good hire, that's exactly the right trade.",
+    },
+    {
+      heading: "When to Use Retained",
+      body: "Retained fits roles where a bad hire is expensive and a long vacancy is worse — executives, rare specialists, confidential replacements. Because the recruiter is paid to run the search regardless of outcome, they invest in mapping the whole market, approaching passive candidates, and managing a discreet process.\n\nThe up-front fee aligns incentives: the recruiter isn't racing to submit fast, they're working to find the *right* person. For a VP or a niche technical leader, paying for that depth beats hoping a contingency recruiter happens to surface the one candidate who fits.",
+    },
+    {
+      heading: "Why Warm Intros Outperform Both",
+      body: "For the roles that matter most, the highest-converting source isn't either fee model — it's a warm introduction. A candidate introduced by someone they trust arrives pre-vetted, more responsive, and more likely to accept. Warm intros convert at multiples of cold outreach and shorten the trust-building that normally takes several rounds.\n\nThe practical move is to mine your existing network before (or alongside) engaging a search firm: who do your strong employees know? Who has a former colleague who'd be perfect? A single warm intro to the right person can outperform weeks of either retained or contingency sourcing — and it costs you nothing but the ask.",
+    },
+    {
+      heading: "Combine the Models",
+      body: "These aren't mutually exclusive. A common high-performing pattern: work your warm network for the obvious fits, run contingency for the breadth roles, and reserve retained for the one or two searches where depth and discretion are non-negotiable.\n\nTooling helps you run all three. hired.video's [AI Recruiter Agent](/for-recruiters) turns a plain-English brief into a ranked shortlist with personalized outreach, so even the cold portion of your sourcing starts warmer — every message references the candidate's actual background instead of a template, which is the next best thing to a referral.",
+    },
+  ],
+  faq: [
+    {
+      question: "What's the core difference between retained and contingency search?",
+      answer:
+        "Payment timing and commitment. Contingency pays the recruiter only on a successful placement, so they work many roles fast. Retained pays in installments to run a dedicated search whether or not it results in a hire, so the recruiter commits deep attention to one role — the model for senior, scarce, or confidential positions.",
+    },
+    {
+      question: "Why do warm introductions convert better than cold outreach?",
+      answer:
+        "Trust transfers. A candidate introduced by someone they already trust is more responsive, arrives pre-vetted, and is more likely to accept. That shortcuts several rounds of trust-building, which is why a single warm intro often outperforms weeks of cold sourcing for high-stakes roles.",
+    },
+    {
+      question: "Can I use more than one model at once?",
+      answer:
+        "Yes, and most effective teams do — warm network for the obvious fits, contingency for breadth roles, and retained for the one or two searches where depth and discretion are essential. Tooling like the AI Recruiter Agent makes even the cold portion warmer with personalized, background-aware outreach.",
+    },
+  ],
+});
+
+// ── People Ops (CHRO): effective 1:1s ──────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-run-effective-one-on-ones",
+  title: "How to Run Effective 1:1s (and Actually Track the Follow-Through)",
+  description:
+    "A manager's guide to 1:1s that build trust and surface problems early — the cadence, the agenda, who owns the conversation, and how to track action items so nothing falls through.",
+  publishedAt: "2026-05-06",
+  updatedAt: "2026-05-09",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "one-on-ones",
+  toolName: "1:1s",
+  toolUrl: "/people/one-on-ones",
+  keywords:
+    "effective one on ones, 1:1 meeting agenda, manager one on ones, 1:1 template, employee one on ones, people management, 1:1 action items",
+  heroAlt: "A 1:1 view showing a shared agenda, talking points, and tracked action items",
+  category: "People Ops",
+  sections: [
+    {
+      heading: "The 1:1 Is the Employee's Meeting, Not Yours",
+      body: "The most common 1:1 failure mode is a manager using the time as a status update — a verbal stand-up that the chat tool already covers. A great 1:1 is the *employee's* meeting: their agenda, their concerns, their growth. Your job is to listen, unblock, and coach, not to collect a progress report.\n\nReframing the meeting this way changes everything. When the report owns the agenda, the conversation drifts toward the things that actually matter — blockers, career direction, friction with the team — which are exactly the signals you'd otherwise learn about too late.",
+    },
+    {
+      heading: "Cadence: Weekly, 30 Minutes, Protected",
+      body: "For most reports, weekly is the right default — frequent enough to catch problems while they're small. Thirty minutes is usually plenty if it's focused. The non-negotiable is that you *protect* the time: cancelling 1:1s when you're busy sends the message that the person is optional, and that's precisely when they most need the time.\n\nIf weekly is genuinely too much for a senior, autonomous report, biweekly can work — but never skip silently. A reliably-kept 1:1 is one of the strongest trust signals a manager sends.",
+    },
+    {
+      heading: "A Simple, Durable Agenda",
+      body: "You don't need an elaborate template. A durable structure: (1) how are you doing — genuinely, not the reflexive \"fine\"; (2) what's blocking you that I can help with; (3) progress and priorities; (4) growth and career; (5) feedback, both directions.\n\nKeep a shared, running agenda the report can add to between meetings. On hired.video's [1:1s](/people/one-on-ones), the agenda and talking points live in one place both people can see, so the conversation builds on the last one instead of starting cold every week.",
+    },
+    {
+      heading: "Capture Action Items — or the 1:1 Leaks",
+      body: "The fastest way to erode trust is to agree to something in a 1:1 and then forget it. Every 1:1 should end with explicit action items and an owner for each. On hired.video, those action items are tracked as tasks tied to the conversation, so they carry forward and you can open the next 1:1 by closing the loop on the last one.\n\n\"Last week you raised X and I said I'd do Y — here's where that landed\" is the single highest-trust sentence a manager can open with. It only works if the system remembered, which is why capturing items beats relying on memory.",
+    },
+    {
+      heading: "What to Listen For",
+      body: "Beyond the agenda, 1:1s are your early-warning system. Listen for the quiet signals: a normally engaged person going flat, repeated frustration with the same blocker, a report who's stopped talking about growth. These show up in 1:1s weeks before they show up in performance — if you're listening for them.\n\nThe 1:1 is where retention is won or lost. People rarely leave over a single event; they leave over a slow accumulation of unaddressed friction. The manager who surfaces and acts on that friction in the 1:1 is the manager whose team stays.",
+    },
+  ],
+  faq: [
+    {
+      question: "How often should I hold 1:1s?",
+      answer:
+        "Weekly for most reports, 30 minutes, and protect the time — don't cancel when you're busy, since that's often when the report most needs it. Biweekly can work for senior, autonomous reports, but never skip silently.",
+    },
+    {
+      question: "Whose meeting is the 1:1?",
+      answer:
+        "The employee's. The most common failure is a manager turning it into a status update. Let the report own the agenda and use your time to listen, unblock, and coach — that's what surfaces the blockers and career concerns you'd otherwise learn about too late.",
+    },
+    {
+      question: "How do I keep 1:1 commitments from being forgotten?",
+      answer:
+        "Capture explicit action items with an owner at the end of every 1:1 and track them. On hired.video, 1:1 action items are tracked as tasks tied to the conversation, so they carry forward and you can open the next meeting by closing the loop on the last one.",
+    },
+  ],
+});
+
+// ── People Ops (CHRO): build an org chart ──────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-build-an-org-chart-that-stays-accurate",
+  title: "How to Build an Org Chart That Stays Accurate",
+  description:
+    "Build a live org chart on hired.video that reflects who actually reports to whom — including external and placeholder roles — and keeps itself current as your roster changes.",
+  publishedAt: "2026-05-24",
+  updatedAt: "2026-05-26",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "roster",
+  toolName: "People Roster",
+  toolUrl: "/people/roster",
+  keywords:
+    "build an org chart, org chart software, reporting structure, company org chart, people operations, org chart that updates, headcount roster",
+  heroAlt: "An org chart rendered from a live people roster with reporting lines",
+  category: "People Ops",
+  sections: [
+    {
+      heading: "Why Most Org Charts Are Wrong",
+      body: "The typical org chart is a slide deck someone updated nine months ago. It's wrong the day after it's made, because reorgs, hires, and departures don't trigger a deck edit. A stale org chart is worse than none — it gives people false confidence about who owns what.\n\nThe fix is to derive the org chart from a live source of truth rather than maintaining it as a separate artifact. On hired.video, that source is the people roster: build the roster once, and the chart renders from it.",
+    },
+    {
+      heading: "Start From the Roster, Not a Blank Canvas",
+      body: "hired.video's People Operations product anchors on the [people roster](/people/roster), which materializes from your company role associations. People who are already linked to your company show up automatically — you don't re-enter them. The roster is the SSoT; the org chart is a view of it.\n\nThis is the key inversion. Instead of drawing boxes and hoping they match reality, you maintain the roster (which you have reasons to keep current anyway — it drives 1:1s, goals, and team health) and the chart stays accurate as a byproduct.",
+    },
+    {
+      heading: "Handle the Messy Real-World Cases",
+      body: "Real org charts have gaps the clean version ignores. hired.video's roster models them with an identity link that can be a real user, a pending invite, an external person, or a placeholder. That means you can chart:\n\n- An **open req** — a placeholder box for a role you're hiring, so the chart shows the intended structure.\n- An **external contractor or advisor** who reports into the team but isn't an employee.\n- A **pending hire** who's been invited but hasn't joined yet.\n\nMost org-chart tools force everyone into \"employee.\" Modeling these explicitly is what keeps the chart honest about how the team actually works.",
+    },
+    {
+      heading: "Set Reporting Lines and Keep It Live",
+      body: "With the roster populated, set each person's manager to establish reporting lines, and the chart assembles itself. When someone joins, leaves, or moves teams, you update the roster — and because the chart is a view of the roster, it updates too. There's no second artifact to remember to edit.\n\nA note on billing: the roster derives who's billable from the data, and adding a placeholder or external person to your chart doesn't silently bump your seat count. You can model the full org honestly without a surprise on your invoice.",
+    },
+  ],
+  faq: [
+    {
+      question: "Why do org charts go stale so fast?",
+      answer:
+        "Because they're usually maintained as a separate artifact — a slide or a diagram — that nobody updates when the team changes. Deriving the chart from a live roster fixes this: you keep the roster current for other reasons, and the chart stays accurate as a byproduct.",
+    },
+    {
+      question: "Can I show open roles and external people on the chart?",
+      answer:
+        "Yes. hired.video's roster models each person via an identity link that can be a real user, a pending invite, an external person, or a placeholder. So you can chart open reqs, contractors, advisors, and pending hires explicitly instead of forcing everyone into 'employee.'",
+    },
+    {
+      question: "Does adding people to the chart increase my bill?",
+      answer:
+        "The roster derives who's billable from the data, and adding a placeholder or external person to model your structure doesn't automatically bump your seat count. You can represent the full org honestly without an unexpected charge.",
+    },
+  ],
+});
+
+// ── People Ops (CHRO): team health signals ─────────────────────────────
+BLOG_POSTS.push({
+  slug: "team-health-signals-every-manager-should-watch",
+  title: "Team Health Signals Every Manager Should Watch (Before People Quit)",
+  description:
+    "The early-warning signals of a team in trouble — engagement drift, 1:1 cancellations, goal stalls — and how to read them on hired.video's team health view before they become resignations.",
+  publishedAt: "2026-05-29",
+  updatedAt: "2026-06-01",
+  readingTime: 7,
+  author: "hired.video",
+  toolSlug: "team-health",
+  toolName: "Team Health",
+  toolUrl: "/people/team-health",
+  keywords:
+    "team health signals, employee engagement, prevent attrition, manager dashboard, team morale, retention signals, people analytics",
+  heroAlt: "A team health dashboard showing engagement trends and risk indicators by person",
+  category: "People Ops",
+  sections: [
+    {
+      heading: "Resignations Are Lagging Indicators",
+      body: "By the time someone gives notice, the decision was made weeks or months earlier. The resignation is a lagging indicator; the signals that predicted it were visible all along. The managers who keep their best people aren't luckier — they read the leading indicators and act while there's still something to act on.\n\nThe goal of a team-health view isn't a vanity dashboard. It's to surface the quiet drift — the things that don't show up in a status report — early enough to do something about it.",
+    },
+    {
+      heading: "Signal 1: Engagement Drift",
+      body: "The clearest early signal is a change in someone's normal pattern. A person who used to volunteer ideas going quiet. A consistently positive report whose tone flattens. Participation tailing off in places they used to show up. None of these is damning on its own — but a sustained drop from someone's own baseline is the canary.\n\nWatch the *delta*, not the absolute level. A naturally reserved person being reserved is nothing; a normally vocal person going silent is everything. Baseline-relative reads are what separate signal from noise.",
+    },
+    {
+      heading: "Signal 2: 1:1 and Goal Stalls",
+      body: "Two concrete, trackable signals: cancelled 1:1s and stalled goals. When a report starts pushing or skipping 1:1s — or when you do — the most important conversation channel is closing exactly when it matters. And a goal that hasn't moved in weeks is either blocked, deprioritized, or abandoned, and any of those is worth a conversation.\n\nBecause hired.video ties 1:1s, goals, and the roster together, the [team health](/people/team-health) view can surface these as structured signals rather than something you have to notice by accident across five different tools.",
+    },
+    {
+      heading: "Signal 3: Workload and Recognition Imbalance",
+      body: "Two imbalances quietly burn people out. The first is workload: the person who's always the one carrying the launch, covering the on-call, absorbing the overflow. The second is recognition: high contribution that goes unacknowledged. Either one, sustained, leads to resentment and then departure.\n\nThese are harder to see from a status report and easier to see from patterns over time — who's consistently overcommitted, whose wins aren't being named. A team-health view that aggregates over weeks makes the pattern visible while you can still rebalance.",
+    },
+    {
+      heading: "From Signal to Action",
+      body: "A signal is only useful if it changes what you do. When the team-health view flags a person, the move is almost always the same: a real conversation in the next 1:1. Name what you're seeing, ask open questions, and listen. Most of the time the problem is addressable — a blocker you can clear, a recognition gap you can close, a workload you can rebalance — *if* you catch it early.\n\nThe managers who retain their teams treat the team-health view as a prompt to have conversations, not a scoreboard. The dashboard's only job is to make sure the conversation happens before the resignation letter does.",
+    },
+  ],
+  faq: [
+    {
+      question: "What are the earliest signs someone might leave?",
+      answer:
+        "Changes from a person's own baseline: a normally vocal report going quiet, flattening tone, cancelled 1:1s, and stalled goals. These leading indicators show up weeks before a resignation, which is itself a lagging indicator of a decision already made.",
+    },
+    {
+      question: "Why watch the delta instead of the absolute level?",
+      answer:
+        "Because people differ. A naturally reserved person being reserved is noise; a normally vocal person going silent is signal. Reading each person relative to their own baseline is what separates a real warning from a personality trait.",
+    },
+    {
+      question: "What should I do when the team-health view flags someone?",
+      answer:
+        "Have a real conversation in the next 1:1 — name what you're seeing, ask open questions, and listen. The view is a prompt to talk early, not a scoreboard. Most issues are addressable if you catch them before the decision to leave is made.",
+    },
+  ],
+});
+
+// ── Events: host a hiring event ────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-host-a-hiring-event-on-hired-video",
+  title: "How to Host a Hiring Event on hired.video",
+  description:
+    "Create, promote, and manage a hiring event on hired.video — set the details, share a public page, collect RSVPs, and run the day from one manage view.",
+  publishedAt: "2026-05-11",
+  updatedAt: "2026-05-13",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "events",
+  toolName: "Events",
+  toolUrl: "/events/new",
+  keywords:
+    "host a hiring event, recruiting event, virtual career fair, event RSVP, create an event, hiring meetup, talent event",
+  heroAlt: "An event creation form next to a public event page with an RSVP button",
+  category: "Events",
+  sections: [
+    {
+      heading: "Why Run an Event Instead of Posting a Job",
+      body: "A job post is passive — you wait for applicants. An event is active — you create a moment people show up for. Career fairs, virtual info sessions, hiring meetups, and AMAs convert interest into a shortlist faster than a static listing, because attendance is itself a signal of intent.\n\nEvents also build employer brand. The candidates who attend your info session arrive warmer to every role you post afterward, because they've already met you. On hired.video, an event is a first-class object with its own public page, RSVP flow, and management view.",
+    },
+    {
+      heading: "Step 1: Create the Event",
+      body: "Open [Create Event](/events/new) and fill the essentials: title, description, date and time, format (in-person or virtual), and location or meeting link. Write the description for the candidate — what they'll get out of attending, who should come, what to expect.\n\nA clear, specific title outperforms a clever one. \"Backend Engineering Hiring AMA — Tuesday 1pm PT\" tells someone exactly whether to show up; \"Join us for an exciting evening!\" doesn't.",
+    },
+    {
+      heading: "Step 2: Share the Public Page",
+      body: "Each event gets a public page at its own URL (`/events/<id-or-slug>`) that anyone can view and RSVP to — no account required to see it. Share that link in job posts, on your company page, in outreach, and on social. The page is the canonical home for the event; everything points to it.\n\nBecause the page is public and shareable, it doubles as a marketing asset. A well-written event page surfaces in search and gives candidates a clean, branded place to commit.",
+    },
+    {
+      heading: "Step 3: Manage RSVPs and Run the Day",
+      body: "As people RSVP, manage the event from its [manage view](/events/new) (`/events/<id>/manage`): see who's coming, send updates, and prepare for the headcount. On the day, run the session from the same place — the manage view is your operational home for the event.\n\nAfter the event, follow up fast. The attendees who showed up are your warmest top-of-funnel; a same-day follow-up while the conversation is fresh converts far better than a generic blast a week later.",
+    },
+  ],
+  faq: [
+    {
+      question: "Can candidates RSVP without a hired.video account?",
+      answer:
+        "Each event has a public page at its own URL that anyone can view, so candidates can find and read about the event without signing up. The public page is the shareable home for the event that you point all your promotion toward.",
+    },
+    {
+      question: "Where do I manage an event once it's live?",
+      answer:
+        "From the event's manage view at /events/<id>/manage. That's where you see RSVPs, send updates, and run the day. The public-facing page at /events/<id-or-slug> is what candidates see.",
+    },
+    {
+      question: "What kinds of events work best for hiring?",
+      answer:
+        "Anything that creates a moment to show up for: virtual info sessions, hiring AMAs, career fairs, and meetups. They convert interest faster than a static job post because attendance signals intent — and they warm candidates to every role you post afterward.",
+    },
+  ],
+});
+
+// ── Bookings / coaching sessions ───────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-book-a-coaching-session-on-hired-video",
+  title: "How to Book a Career Coaching Session on hired.video",
+  description:
+    "Find a coach, book a session, and get the most out of career coaching on hired.video — including resume feedback and the difference between a one-off session and ongoing coaching.",
+  publishedAt: "2026-06-02",
+  updatedAt: "2026-06-04",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "bookings",
+  toolName: "Bookings",
+  toolUrl: "/bookings",
+  keywords:
+    "book a coaching session, career coaching, resume feedback, career coach booking, mock interview coaching, hire a career coach, coaching session online",
+  heroAlt: "A bookings page showing available coaching slots and a session type selector",
+  category: "Coaching",
+  sections: [
+    {
+      heading: "When Coaching Is Worth It",
+      body: "A coaching session is worth it when you're stuck on something specific and a second set of expert eyes would unstick you faster than another week of guessing. The highest-ROI uses: a resume that isn't getting callbacks, interview prep before a round that matters, a career pivot you can't see the path through, or salary-negotiation strategy on a live offer.\n\nCoaching is targeted, not generic. The best sessions start with a concrete problem — \"I have a final round on Thursday and I keep stumbling on the systems-design portion\" — rather than \"help me with my career.\"",
+    },
+    {
+      heading: "Step 1: Find a Coach and Book a Slot",
+      body: "Open [Bookings](/bookings) to see coaches and their available session types and times. Pick the session that matches your need — resume review, mock interview, career strategy — and choose an open slot. Booking reserves the time and confirms the session.\n\nWhen you book, write a sentence or two about what you want from the session. A coach who knows your goal before the call walks in prepared, and you spend the session on the work instead of on context-setting.",
+    },
+    {
+      heading: "Step 2: Prepare So the Session Pays Off",
+      body: "A coaching session is short; preparation is what makes it count. Before the call: have your materials ready (resume, job description, the offer), write down your two or three most important questions, and decide what a successful session looks like to you.\n\nFor a resume review, hired.video also has a dedicated resume-feedback workflow where a reviewer can leave inline annotations — sticky notes, highlights, and comments — and even propose suggested edits as a draft, all kept separate from your resume so they never print. Pairing a live coaching session with written annotations gives you both the conversation and a durable record to act on afterward.",
+    },
+    {
+      heading: "Step 3: One-Off vs Ongoing Coaching",
+      body: "A single session is right for a specific, bounded problem — review this resume, prep for this interview. Ongoing coaching is right for a longer arc: a career change, a leadership-skills push, a months-long job search where you want consistent accountability.\n\nStart with one session. If it delivers and you have a longer journey ahead, ask the coach about a recurring arrangement. The first session also tells you whether this is the right coach for you — fit matters as much as credentials, and one session is a low-cost way to find out.",
+    },
+  ],
+  faq: [
+    {
+      question: "Where do I book a coaching session?",
+      answer:
+        "On the Bookings page, where you can see coaches, their session types, and available times. Pick the session that matches your need — resume review, mock interview, or career strategy — choose an open slot, and add a note about your goal so the coach arrives prepared.",
+    },
+    {
+      question: "Can I get written resume feedback as well as a live session?",
+      answer:
+        "Yes. hired.video has a dedicated resume-feedback workflow where a reviewer leaves inline annotations — sticky notes, highlights, and comments — and can propose suggested edits as a draft. Those annotations are kept separate from your resume so they never print, giving you a durable record to act on alongside the live conversation.",
+    },
+    {
+      question: "Should I book one session or ongoing coaching?",
+      answer:
+        "Start with one. A single session suits a specific problem like reviewing a resume or prepping for an interview. If you're facing a longer arc — a career change or a months-long search — ask about ongoing coaching after the first session, which also lets you confirm the coach is the right fit.",
+    },
+  ],
+});
+
+// ── Company reviews: how to leave one ──────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-leave-a-company-review-that-helps",
+  title: "How to Leave a Company Review That Actually Helps People",
+  description:
+    "Write a fair, specific company review on hired.video — rate the six sub-axes honestly, give actionable pros and cons, and earn a verified-employee badge so your review carries weight.",
+  publishedAt: "2026-06-03",
+  updatedAt: "2026-06-05",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "company-reviews",
+  toolName: "Company Reviews",
+  toolUrl: "/companies",
+  keywords:
+    "leave a company review, write employer review, glassdoor alternative review, verified employee review, company culture review, honest employer review",
+  heroAlt: "A company review form with six sub-axis rating sliders and pros/cons fields",
+  category: "Job Search Strategy",
+  sections: [
+    {
+      heading: "Why Your Review Matters More Than You Think",
+      body: "Company reviews are how the next candidate decides whether to accept an offer, negotiate, or walk away. A specific, honest review can save someone from a bad fit or steer someone great toward a hidden gem. A lazy one — five stars, no detail, or a one-star revenge post — just adds noise.\n\nhired.video reviews are bound to authenticated accounts, one per user per company, and rated across six sub-axes rather than a single star. That structure exists so reviews stay useful and hard to game. Your job as a reviewer is to fill that structure with honest specifics.",
+    },
+    {
+      heading: "Rate All Six Axes Honestly",
+      body: "Open the company on [Companies](/companies) and leave a review rated across the six axes: culture, leadership, work-life balance, compensation, career growth, and diversity & inclusion. Resist the urge to make them all match. Most real workplaces are uneven — great culture with brutal hours, or strong pay with no growth path.\n\nThe *shape* of your ratings is the most useful thing you give a future candidate. A company that's a 5 on culture and a 2 on work-life balance tells a far more honest story than a flat 3.5 across the board. Rate each axis on its own merits.",
+    },
+    {
+      heading: "Write Pros, Cons, and Advice That Are Specific",
+      body: "Specificity is everything. \"Good culture\" helps no one; \"weekly cross-team demos meant I always knew what other teams were building\" helps a lot. For each of pros, cons, and advice to management, give concrete examples a reader can picture.\n\nKeep it about patterns, not people. \"My manager was bad\" is a grievance; \"managers here have wide spans and limited time for coaching\" is a structural insight a candidate can use. The most valuable reviews describe how the place actually works, not a single bad day.",
+    },
+    {
+      heading: "Earn the Verified-Employee Badge",
+      body: "A review carries far more weight when readers know it's from a real employee. On hired.video you can earn a verified-employee badge by matching your corporate email domain at review time. Verified reviews are the ones candidates trust most.\n\nVerification also protects the system: because reviews are account-bound and sub-axis ratings are stored as auditable numeric values, the platform can detect suspicious bursts and drift. Leaving a genuine, verified, specific review is the single most useful thing you can do for the next person weighing an offer from your company.",
+    },
+  ],
+  faq: [
+    {
+      question: "What makes a company review actually useful?",
+      answer:
+        "Specificity and honest unevenness. Rate all six sub-axes on their own merits rather than making them match, and back each rating with concrete pros, cons, and advice a reader can picture. The shape of your ratings and real examples help far more than a flat star count.",
+    },
+    {
+      question: "How do I get my review to carry more weight?",
+      answer:
+        "Earn the verified-employee badge by matching your corporate email domain at review time. Verified reviews are the ones candidates trust most, and because reviews are account-bound and sub-axis ratings are auditable, the system can flag suspicious activity.",
+    },
+    {
+      question: "Should I write about my specific manager?",
+      answer:
+        "Focus on patterns over people. 'My manager was bad' is a grievance; 'managers here have wide spans and little time for coaching' is a structural insight a candidate can act on. Describe how the place works, not a single bad day.",
+    },
+  ],
+});
+
+// ── References: how to ask ──────────────────────────────────────────────
+BLOG_POSTS.push({
+  slug: "how-to-ask-for-a-reference-and-share-it",
+  title: "How to Ask for a Reference (and Share It So It Counts)",
+  description:
+    "Ask for a strong reference the right way, collect them on hired.video, and share a clean reference link with employers — including who to ask, what to give them, and timing.",
+  publishedAt: "2026-06-04",
+  updatedAt: "2026-06-06",
+  readingTime: 6,
+  author: "hired.video",
+  toolSlug: "references",
+  toolName: "References",
+  toolUrl: "/references",
+  keywords:
+    "how to ask for a reference, job reference request, professional references, reference list, share references, who to ask for a reference, reference letter",
+  heroAlt: "A references page listing collected references with a secure share link",
+  category: "Job Search Strategy",
+  sections: [
+    {
+      heading: "Who to Ask — and Who Not To",
+      body: "The best reference is someone who managed you closely, recently, and can speak to specific results — a former direct manager beats a skip-level, who beats a peer, who beats a title-impressive name who barely worked with you. Recency and proximity matter more than seniority. A recent manager who can describe exactly what you shipped is worth more than a VP who vaguely remembers you.\n\nAvoid: anyone you're unsure will be enthusiastic, anyone you parted with on bad terms, and your current manager if your search is confidential. A lukewarm reference is worse than one fewer reference.",
+    },
+    {
+      heading: "How to Ask (the Right Way)",
+      body: "Ask early, ask directly, and make it easy to say yes — or no. \"Would you be comfortable being a *strong* reference for me?\" gives them a graceful out if they're hesitant, and you want that out: a reluctant yes becomes a tepid call.\n\nWhen they agree, hand them what they need: the roles you're targeting, a short reminder of the work you did together and the results, and the timing. A reference who's reminded of the specific project you partnered on gives a far more compelling endorsement than one reaching back through a foggy memory.",
+    },
+    {
+      heading: "Collect Them in One Place",
+      body: "Don't keep your references scattered across your inbox and a Google Doc. On hired.video's [References](/references) page you collect them in one place — who they are, how they know you, and what they can speak to — so when an employer asks, you're not scrambling to remember contact details.\n\nHaving them organized also means you can tailor which references you surface for which role. A reference who can speak to your leadership is the one to lead with for a management role; a reference who saw your technical depth leads for an IC role.",
+    },
+    {
+      heading: "Share a Clean, Controlled Link",
+      body: "When an employer asks for references, you can share a reference link rather than pasting a list into an email. hired.video generates a shareable references link (at `/references/shared/<token>`) so the employer sees a clean, professional view — and you control what's shared rather than exposing your references' contact details in a forwarded thread.\n\nA tokenized link also means you can share references at the right moment in the process — typically once an offer is close — without those contacts being passed around indiscriminately. Give your references a heads-up that a call may come, and the loop closes cleanly.",
+    },
+  ],
+  faq: [
+    {
+      question: "Who makes the best reference?",
+      answer:
+        "Someone who managed you closely and recently and can speak to specific results — usually a former direct manager. Recency and proximity matter more than seniority; a recent manager who can describe what you shipped beats a senior name who barely worked with you.",
+    },
+    {
+      question: "How should I ask someone to be a reference?",
+      answer:
+        "Ask early and directly, and phrase it so they can decline gracefully — 'would you be comfortable being a strong reference for me?' Then make it easy: remind them of the work you did together, the results, and the roles you're targeting so their endorsement is specific.",
+    },
+    {
+      question: "How do I share my references with an employer?",
+      answer:
+        "On hired.video you can collect references in one place and share a tokenized link (at /references/shared/<token>) instead of pasting contact details into an email. That gives the employer a clean view, keeps your references' details controlled, and lets you share at the right moment in the process.",
+    },
+  ],
+});
+
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((p) => p.slug === slug);
 }

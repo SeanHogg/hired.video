@@ -8,6 +8,7 @@ import {
   UserRound,
   Sparkles,
   RotateCcw,
+  Scissors,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -120,6 +121,20 @@ export default function VideoBestPractices() {
                 <CardContent>
                   <p className="text-muted-foreground">
                     The hired.video Studio offers AI voiceover with text-to-speech so you can generate a professional narration even if you're camera-shy. Use the built-in teleprompter to stay on script without memorizing, and start from one of our templates to structure your message. These tools help you produce a polished video in a fraction of the time.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Scissors className="h-5 w-5 text-primary" />
+                    Edit on the Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Studio includes a full timeline editor, so you can do more than record a single take. Record your video scene by scene and re-record just the one scene you fumbled instead of starting over. Trim dead air from the head and tail of each clip, add a second track for a music bed or narration, and arrange everything on the timeline. The final video renders right in your browser, so there's no upload-and-wait — script, edit, and export all happen in one tab.
                   </p>
                 </CardContent>
               </Card>

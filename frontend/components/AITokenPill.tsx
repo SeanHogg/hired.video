@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Zap, Crown, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -20,6 +21,7 @@ interface AITokenPillProps {
 }
 
 export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps) {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const budget = useTokenBudget();
 
@@ -50,7 +52,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
                 to="/pricing"
                 onClick={onNavigate}
                 className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
-                aria-label="AI tokens — see plans"
+                aria-label={t("tokenPill.ariaSeePlans")}
               >
                 <Zap className="h-4 w-4 text-muted-foreground" />
                 <span className="absolute top-1 right-1 h-2 w-2 rounded-full ring-2 ring-background bg-emerald-500" />
@@ -59,10 +61,12 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
             <TooltipContent side="right" className="max-w-xs">
               <div className="space-y-1 text-xs">
                 <div className="font-medium">
-                  {formatTokens(FREE_AI_MONTHLY_TOKENS)} free AI tokens / month
+                  {t("tokenPill.freeTokensPerMonth", {
+                    tokens: formatTokens(FREE_AI_MONTHLY_TOKENS),
+                  })}
                 </div>
                 <div className="text-muted-foreground">
-                  Sign up to use AI tools. See plans for more capacity.
+                  {t("tokenPill.signUpPrompt")}
                 </div>
               </div>
             </TooltipContent>
@@ -75,21 +79,23 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
         to="/pricing"
         onClick={onNavigate}
         className="block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
-        aria-label="AI tokens — see plans"
+        aria-label={t("tokenPill.ariaSeePlans")}
       >
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5 text-xs font-medium">
             <Zap className="h-3.5 w-3.5 text-primary" />
-            <span>AI tokens</span>
+            <span>{t("tokenPill.title")}</span>
           </div>
           <span className="text-xs tabular-nums text-muted-foreground">
-            {formatTokens(FREE_AI_MONTHLY_TOKENS)} free / mo
+            {t("tokenPill.freePerMo", {
+              tokens: formatTokens(FREE_AI_MONTHLY_TOKENS),
+            })}
           </span>
         </div>
         <Progress value={0} className="h-1.5" />
         <div className="flex items-center justify-between mt-1.5 text-[11px] text-muted-foreground">
-          <span>0% used</span>
-          <span className="font-medium text-primary">See plans →</span>
+          <span>{t("tokenPill.percentUsed", { percent: 0 })}</span>
+          <span className="font-medium text-primary">{t("tokenPill.seePlans")}</span>
         </div>
       </Link>
     );
@@ -152,7 +158,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
               to={href}
               onClick={handleClick}
               className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
-              aria-label="AI tokens"
+              aria-label={t("tokenPill.title")}
             >
               <Zap className="h-4 w-4 text-muted-foreground" />
               <span
@@ -167,31 +173,39 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
             {aiLimitHit ? (
               <div className="space-y-1 text-xs">
                 <div className="font-medium text-red-700 dark:text-red-300">
-                  AI usage limit reached
+                  {t("tokenPill.limitReached")}
                 </div>
                 <div className="text-muted-foreground">
-                  Upgrade your plan to keep using AI tools.
+                  {t("tokenPill.upgradePrompt")}
                 </div>
               </div>
             ) : isUnlimited ? (
               <div className="space-y-1 text-xs">
-                <div className="font-medium">Unlimited tokens (Admin)</div>
+                <div className="font-medium">{t("tokenPill.unlimitedAdmin")}</div>
                 <div className="text-muted-foreground">
-                  {formatTokens(monthlyUsed)} used this month
+                  {t("tokenPill.usedThisMonth", {
+                    tokens: formatTokens(monthlyUsed),
+                  })}
                 </div>
               </div>
             ) : (
               <div className="space-y-1 text-xs">
                 <div className="font-medium">
-                  {formatTokens(totalAvailable)} tokens left
+                  {t("tokenPill.tokensLeftLong", {
+                    tokens: formatTokens(totalAvailable),
+                  })}
                 </div>
                 <div className="text-muted-foreground">
-                  {formatTokens(monthlyUsed)} of {formatTokens(monthlyLimit)}{" "}
-                  used this month
+                  {t("tokenPill.ofUsedThisMonth", {
+                    used: formatTokens(monthlyUsed),
+                    limit: formatTokens(monthlyLimit),
+                  })}
                 </div>
                 {packBalance > 0 && (
                   <div className="text-muted-foreground">
-                    + {formatTokens(packBalance)} from packs
+                    {t("tokenPill.fromPacks", {
+                      tokens: formatTokens(packBalance),
+                    })}
                   </div>
                 )}
               </div>
@@ -208,16 +222,16 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
         to="/pricing"
         onClick={handleClick}
         className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 hover:bg-red-100/70 dark:hover:bg-red-950/50 transition-colors"
-        aria-label="AI usage limit reached — upgrade"
+        aria-label={t("tokenPill.ariaLimitUpgrade")}
       >
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
           <span className="text-sm font-medium text-red-900 dark:text-red-200">
-            AI limit reached
+            {t("tokenPill.limitReachedShort")}
           </span>
         </div>
         <span className="text-[11px] font-semibold text-red-700 dark:text-red-300">
-          Upgrade →
+          {t("tokenPill.upgrade")}
         </span>
       </Link>
     );
@@ -233,11 +247,11 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
         <div className="flex items-center gap-2">
           <Crown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            Unlimited tokens
+            {t("tokenPill.unlimited")}
           </span>
         </div>
         <span className="text-[11px] tabular-nums text-amber-800/80 dark:text-amber-200/70">
-          {formatTokens(monthlyUsed)} used
+          {t("tokenPill.usedShort", { tokens: formatTokens(monthlyUsed) })}
         </span>
       </Link>
     );
@@ -255,7 +269,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
             ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50 hover:bg-amber-100/70 dark:hover:bg-amber-950/50"
             : "bg-muted/40 border-border hover:bg-muted",
       )}
-      aria-label="AI token budget"
+      aria-label={t("tokenPill.ariaBudget")}
     >
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5 text-xs font-medium">
@@ -271,7 +285,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
               )}
             />
           )}
-          <span>AI tokens</span>
+          <span>{t("tokenPill.title")}</span>
         </div>
         <span
           className={cn(
@@ -281,7 +295,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
               : "text-muted-foreground",
           )}
         >
-          {formatTokens(totalAvailable)} left
+          {t("tokenPill.leftShort", { tokens: formatTokens(totalAvailable) })}
         </span>
       </div>
 
@@ -300,14 +314,14 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
         </span>
         {isExhausted ? (
           <span className="font-medium text-red-700 dark:text-red-300">
-            Buy more →
+            {t("tokenPill.buyMore")}
           </span>
         ) : packBalance > 0 ? (
           <span className="tabular-nums">
-            +{formatTokens(packBalance)} packs
+            {t("tokenPill.packsShort", { tokens: formatTokens(packBalance) })}
           </span>
         ) : resetLabel ? (
-          <span>Resets {resetLabel}</span>
+          <span>{t("tokenPill.resets", { date: resetLabel })}</span>
         ) : null}
       </div>
     </Link>

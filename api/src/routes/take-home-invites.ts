@@ -19,6 +19,30 @@ import { getDb, schema } from "../db/index.js";
 
 export const takeHomeInvitesRoutes = new Hono<AppEnv>();
 
+const DAY_MS = 86_400_000;
+
+/** Mint a take-home invite token. Uses `crypto.randomUUID` when present,
+ *  else a time+random fallback. Always prefixed `th-` and hex-only after
+ *  the prefix, fitting the 64-char `invite_token` column. Pure given its
+ *  RNG source, so it round-trips through the by-token lookup. */
+export function generateInviteToken(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `th-${crypto.randomUUID().replace(/-/g, "")}`
+    : `th-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Resolve the absolute expiry instant for an invite issued `now` that
+ *  lives `expiresInDays` days. Pure: same inputs → same Date. */
+export function computeExpiresAt(expiresInDays: number, now: number = Date.now()): Date {
+  return new Date(now + expiresInDays * DAY_MS);
+}
+
+/** An invite is expired once its expiry instant is strictly before `now`.
+ *  Mirrors the `< Date.now()` guard on the public by-token read. */
+export function isInviteExpired(expiresAt: Date, now: number = Date.now()): boolean {
+  return expiresAt.getTime() < now;
+}
+
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
@@ -38,11 +62,8 @@ takeHomeInvitesRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid invite payload", parsed.error.flatten()), 400);
   }
   const db = getDb();
-  const inviteToken =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? `th-${crypto.randomUUID().replace(/-/g, "")}`
-      : `th-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-  const expiresAt = new Date(Date.now() + parsed.data.expiresInDays * 86_400_000);
+  const inviteToken = generateInviteToken();
+  const expiresAt = computeExpiresAt(parsed.data.expiresInDays);
   const [row] = await db
     .insert(schema.takeHomeInvites)
     .values({
@@ -65,7 +86,7 @@ takeHomeInvitesRoutes.get("/by-token/:token", async (c) => {
     .where(eq(schema.takeHomeInvites.inviteToken, c.req.param("token")))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Invite not found"), 404);
-  if (row.expiresAt.getTime() < Date.now()) {
+  if (isInviteExpired(row.expiresAt)) {
     return c.json(error("EXPIRED", "This invite link has expired"), 410);
   }
   return c.json(success({ invite: row }), 200);

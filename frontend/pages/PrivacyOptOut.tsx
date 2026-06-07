@@ -14,19 +14,24 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ShieldCheck, ExternalLink, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { settingsService } from "@/lib/services/settings-service";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
 export default function PrivacyOptOut() {
+  const location = useLocation();
+  useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Do Not Sell or Share My Personal Information", url: "/privacy/opt-out" }]);
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const { rejectOptional, preferences } = useCookiePreferences();
@@ -84,7 +89,8 @@ export default function PrivacyOptOut() {
   };
 
   return (
-    <main className="py-12 space-y-6">
+    <AppShell bgClassName="bg-background">
+      <main className="px-4 py-12 space-y-6 max-w-3xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold">Do Not Sell or Share My Personal Information</h1>
         <p className="text-muted-foreground mt-2">
@@ -204,6 +210,7 @@ export default function PrivacyOptOut() {
           </p>
         </CardContent>
       </Card>
-    </main>
+      </main>
+    </AppShell>
   );
 }

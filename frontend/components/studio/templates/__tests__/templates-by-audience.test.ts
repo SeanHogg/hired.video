@@ -41,16 +41,21 @@ describe("templatesForAudience", () => {
   });
 
   it("illustrator audience surfaces every comic + drawing-image template", () => {
-    const ids = templatesForAudience("illustrator").map((t) => t.id);
+    const ids = new Set(templatesForAudience("illustrator").map((t) => t.id));
     // Every comic_* and drawing-style image template should be tagged
     // illustrator. Ad-banner image templates (`ad_*`) intentionally
     // target designer / marketer audiences, NOT illustrator — they're
     // image-kind only because the runtime renders pixels, not because
-    // an illustrator's workflow produces them.
-    const expectedFromCatalog = TEMPLATE_CATALOG.filter(
+    // an illustrator's workflow produces them. This is a coverage
+    // (subset) check, not exact equality: other kinds — e.g.
+    // `interactive_comic` (Comic+) — may ALSO serve illustrators but are
+    // audience-tagged per-template (a Comic+ case study targets
+    // recruiters, not illustrators), so the illustrator set is a
+    // superset of the comic + drawing-image guarantee.
+    const mustBeIllustrator = TEMPLATE_CATALOG.filter(
       (t) => t.mediaKind === "comic" || (t.mediaKind === "image" && !t.id.startsWith("ad_")),
-    ).map((t) => t.id);
-    expect(ids.sort()).toEqual(expectedFromCatalog.sort());
+    );
+    for (const t of mustBeIllustrator) expect(ids.has(t.id)).toBe(true);
   });
 });
 

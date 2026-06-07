@@ -120,6 +120,40 @@ export const ACTIONS = {
 
   // 3D world play (gap #1635 — challenge completions earn points)
   PLAY_GAME_CHALLENGE: "play.game.challenge",
+
+  // ── New surfaces (gap #1966) ────────────────────────────────────────
+
+  // Events. Eligible for all scoring roles — anyone can host or attend.
+  // An `EventBadge` UI component already exists to surface these.
+  EVENT_CREATED: "event.created",
+  EVENT_REGISTERED: "event.registered",
+  EVENT_ATTENDED: "event.attended",
+
+  // Bookings / sessions (host completes a session; guest books one).
+  BOOKING_SESSION_COMPLETED: "booking.session.completed",
+  BOOKING_SESSION_BOOKED: "booking.session.booked",
+
+  // Articles (author publishes).
+  ARTICLE_PUBLISHED: "article.published",
+
+  // References (one user gives, the subject receives).
+  REFERENCE_GIVEN: "reference.given",
+  REFERENCE_RECEIVED: "reference.received",
+
+  // Company reviews (a user posts a review of a company).
+  COMPANY_REVIEW_POSTED: "company_review.posted",
+
+  // Educator / cohort / student (learning cohort layer, #1886-#1890).
+  COHORT_CREATED: "cohort.created",
+  COHORT_STUDENT_JOINED: "cohort.student.joined",
+  COHORT_ASSIGNMENT_COMPLETED: "cohort.assignment.completed",
+
+  // Creative-studio "create" kinds — distinct from the play.game.challenge
+  // *consumption* action above. Publishing an authored game / comic /
+  // podcast earns a creator badge.
+  STUDIO_GAME_PUBLISHED: "studio.game.published",
+  STUDIO_COMIC_PUBLISHED: "studio.comic.published",
+  STUDIO_PODCAST_PUBLISHED: "studio.podcast.published",
 } as const;
 
 export type ActionKey = (typeof ACTIONS)[keyof typeof ACTIONS];
@@ -321,6 +355,160 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
     source: "game",
   },
 
+  // ── Events (gap #1966) ──────────────────────────────────────────────
+  // Hosting is the higher-effort action; attendance is the lighter one.
+  // Available to every scoring role.
+  [ACTIONS.EVENT_CREATED]: {
+    key: ACTIONS.EVENT_CREATED,
+    label: "Created an event",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 50,
+    category: "earn",
+    dailyCapPoints: 200,
+    source: "event",
+  },
+  [ACTIONS.EVENT_REGISTERED]: {
+    key: ACTIONS.EVENT_REGISTERED,
+    label: "Registered for an event",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 10,
+    category: "earn",
+    dailyCapPoints: 50,
+    source: "event",
+  },
+  [ACTIONS.EVENT_ATTENDED]: {
+    key: ACTIONS.EVENT_ATTENDED,
+    label: "Attended an event",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 25,
+    category: "earn",
+    dailyCapPoints: 100,
+    source: "event",
+  },
+
+  // ── Bookings / sessions (gap #1966) ─────────────────────────────────
+  // Completing a hosted session is the marketplace-quality signal worth
+  // the larger payout; booking one is the lighter demand-side action.
+  [ACTIONS.BOOKING_SESSION_COMPLETED]: {
+    key: ACTIONS.BOOKING_SESSION_COMPLETED,
+    label: "Completed a booked session",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 75,
+    category: "earn",
+    dailyCapPoints: 300,
+    source: "booking",
+  },
+  [ACTIONS.BOOKING_SESSION_BOOKED]: {
+    key: ACTIONS.BOOKING_SESSION_BOOKED,
+    label: "Booked a session",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 20,
+    category: "earn",
+    dailyCapPoints: 100,
+    source: "booking",
+  },
+
+  // ── Articles (gap #1966) ────────────────────────────────────────────
+  [ACTIONS.ARTICLE_PUBLISHED]: {
+    key: ACTIONS.ARTICLE_PUBLISHED,
+    label: "Published an article",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 75,
+    category: "earn",
+    dailyCapPoints: 225,
+    source: "article",
+  },
+
+  // ── References (gap #1966) ──────────────────────────────────────────
+  // Giving a reference is effortful (and helps another user), so it pays
+  // more than passively receiving one.
+  [ACTIONS.REFERENCE_GIVEN]: {
+    key: ACTIONS.REFERENCE_GIVEN,
+    label: "Gave a reference",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 40,
+    category: "earn",
+    dailyCapPoints: 160,
+    source: "reference",
+  },
+  [ACTIONS.REFERENCE_RECEIVED]: {
+    key: ACTIONS.REFERENCE_RECEIVED,
+    label: "Received a reference",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 20,
+    category: "earn",
+    dailyCapPoints: 100,
+    source: "reference",
+  },
+
+  // ── Company reviews (gap #1966) ─────────────────────────────────────
+  [ACTIONS.COMPANY_REVIEW_POSTED]: {
+    key: ACTIONS.COMPANY_REVIEW_POSTED,
+    label: "Posted a company review",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 25,
+    category: "earn",
+    dailyCapPoints: 75, // keep low-effort review spam from farming points
+    source: "company_review",
+  },
+
+  // ── Educator / cohort / student (gap #1966) ─────────────────────────
+  // Mirrors the learning-loop intent: creating a cohort (educator),
+  // a student joining, and a student completing an assignment.
+  [ACTIONS.COHORT_CREATED]: {
+    key: ACTIONS.COHORT_CREATED,
+    label: "Created a learning cohort",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 100,
+    category: "earn",
+    source: "cohort",
+  },
+  [ACTIONS.COHORT_STUDENT_JOINED]: {
+    key: ACTIONS.COHORT_STUDENT_JOINED,
+    label: "Joined a learning cohort",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 20,
+    category: "earn",
+    source: "cohort",
+  },
+  [ACTIONS.COHORT_ASSIGNMENT_COMPLETED]: {
+    key: ACTIONS.COHORT_ASSIGNMENT_COMPLETED,
+    label: "Completed a cohort assignment",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 50,
+    category: "earn",
+    dailyCapPoints: 200,
+    source: "cohort",
+  },
+
+  // ── Creative studio "create" kinds (gap #1966) ──────────────────────
+  // Publishing an authored game / comic / podcast. Larger payout than
+  // play.game.challenge because authoring is the higher-effort act.
+  [ACTIONS.STUDIO_GAME_PUBLISHED]: {
+    key: ACTIONS.STUDIO_GAME_PUBLISHED,
+    label: "Published a game",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 150,
+    category: "earn",
+    source: "studio",
+  },
+  [ACTIONS.STUDIO_COMIC_PUBLISHED]: {
+    key: ACTIONS.STUDIO_COMIC_PUBLISHED,
+    label: "Published a comic",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 150,
+    category: "earn",
+    source: "studio",
+  },
+  [ACTIONS.STUDIO_PODCAST_PUBLISHED]: {
+    key: ACTIONS.STUDIO_PODCAST_PUBLISHED,
+    label: "Published a podcast",
+    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    points: 150,
+    category: "earn",
+    source: "studio",
+  },
+
   // ── Recruiter catalog ───────────────────────────────────────────────
   [ACTIONS.CANDIDATE_SOURCED]: {
     key: ACTIONS.CANDIDATE_SOURCED,
@@ -429,6 +617,22 @@ export const STREAK_SIGNAL_ACTIONS: ReadonlySet<ActionKey> = new Set<ActionKey>(
   ACTIONS.CERTIFICATE_EARNED,
   ACTIONS.LEARNING_PATH_COMPLETED,
   ACTIONS.COURSE_PUBLISHED,
+  // new surfaces (gap #1966) — each is an active-day signal
+  ACTIONS.EVENT_CREATED,
+  ACTIONS.EVENT_REGISTERED,
+  ACTIONS.EVENT_ATTENDED,
+  ACTIONS.BOOKING_SESSION_COMPLETED,
+  ACTIONS.BOOKING_SESSION_BOOKED,
+  ACTIONS.ARTICLE_PUBLISHED,
+  ACTIONS.REFERENCE_GIVEN,
+  ACTIONS.REFERENCE_RECEIVED,
+  ACTIONS.COMPANY_REVIEW_POSTED,
+  ACTIONS.COHORT_CREATED,
+  ACTIONS.COHORT_STUDENT_JOINED,
+  ACTIONS.COHORT_ASSIGNMENT_COMPLETED,
+  ACTIONS.STUDIO_GAME_PUBLISHED,
+  ACTIONS.STUDIO_COMIC_PUBLISHED,
+  ACTIONS.STUDIO_PODCAST_PUBLISHED,
   // recruiter
   ACTIONS.CANDIDATE_SOURCED,
   ACTIONS.CANDIDATE_SUBMITTED,

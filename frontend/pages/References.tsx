@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   referencesService,
   type ReferenceContact,
@@ -24,10 +24,8 @@ import {
 export default function References(): JSX.Element {
   const location = useLocation();
   const { toast } = useToast();
-  useSEO(location.pathname, {
-    title: "Reference Management · hired.video",
-    description: "Manage confidential references and share NDA-gated reference packets selectively.",
-  });
+  useSEO(location.pathname);
+  useBreadcrumbs([{ name: "References", url: "/references" }]);
 
   const [contacts, setContacts] = useState<ReferenceContact[]>([]);
   const [shares, setShares] = useState<ReferenceShare[]>([]);

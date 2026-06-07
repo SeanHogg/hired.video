@@ -119,6 +119,75 @@ export function evaluateBadges(input: BadgeEvaluationInput): string[] {
       break;
     }
 
+    // ─── Events (gap #1966) ───────────────────────────────────────────
+    case "event.created": {
+      considerBadge("event_host_first", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "event.attended":
+    case "event.registered": {
+      considerBadge("event_attendee_first", input.totalEarnsForAction >= 1);
+      break;
+    }
+
+    // ─── Bookings / sessions (gap #1966) ──────────────────────────────
+    case "booking.session.completed": {
+      considerBadge("session_host_first", input.totalEarnsForAction >= 1);
+      considerBadge("session_host_10", input.totalEarnsForAction >= 10);
+      break;
+    }
+    case "booking.session.booked": {
+      considerBadge("session_booked_first", input.totalEarnsForAction >= 1);
+      break;
+    }
+
+    // ─── Articles (gap #1966) ─────────────────────────────────────────
+    case "article.published": {
+      considerBadge("first_article", input.totalEarnsForAction >= 1);
+      considerBadge("articles_10", input.totalEarnsForAction >= 10);
+      break;
+    }
+
+    // ─── References (gap #1966) ───────────────────────────────────────
+    case "reference.given": {
+      considerBadge("reference_given_first", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "reference.received": {
+      considerBadge("reference_received_first", input.totalEarnsForAction >= 1);
+      break;
+    }
+
+    // ─── Company reviews (gap #1966) ──────────────────────────────────
+    case "company_review.posted": {
+      considerBadge("first_company_review", input.totalEarnsForAction >= 1);
+      break;
+    }
+
+    // ─── Educator / cohort / student (gap #1966) ──────────────────────
+    case "cohort.created": {
+      considerBadge("educator_first_cohort", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "cohort.student.joined": {
+      considerBadge("student_enrolled", input.totalEarnsForAction >= 1);
+      break;
+    }
+    case "cohort.assignment.completed": {
+      considerBadge("first_assignment_completed", input.totalEarnsForAction >= 1);
+      break;
+    }
+
+    // ─── Creative studio "create" kinds (gap #1966) ───────────────────
+    // A single creator badge keyed off any of the three publish actions
+    // — distinct from the play.game.challenge consumption badge path.
+    case "studio.game.published":
+    case "studio.comic.published":
+    case "studio.podcast.published": {
+      considerBadge("studio_creator_first", input.totalEarnsForAction >= 1);
+      break;
+    }
+
     default:
       // Streak badges are awarded by the streak engine via the
       // milestone path — not this evaluator.

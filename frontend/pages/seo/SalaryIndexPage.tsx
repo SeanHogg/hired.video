@@ -45,12 +45,9 @@ export default function SalaryIndexPage() {
   const [data, setData] = useState<SalaryIndex | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useSEO(location.pathname, {
-    title: "Salary Guides by Role & City — hired.video",
-    description:
-      "Browse salary data for hundreds of roles and cities. Real ranges from active job listings on hired.video, updated continuously.",
-    canonical: "https://hired.video/salary",
-  });
+  // Meta (incl. pinned canonical) lives in the central PAGE_SEO entry for
+  // /salary (gap #1968).
+  useSEO(location.pathname);
   useBreadcrumbs([
     { name: "Jobs", url: "/jobs" },
     { name: "Salary Guides", url: "/salary" },

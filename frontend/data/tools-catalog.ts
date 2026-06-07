@@ -772,6 +772,32 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Take Assessment",
     showOnHome: false,
   },
+  {
+    // /tools/comp-analyzer (#1676) — annualizes base + bonus + equity +
+    // sign-on into one comparable total-comp number. Universal (anyone
+    // comparing offers), but pitched at senior / executive candidates.
+    id: "comp-analyzer",
+    href: "/tools/comp-analyzer",
+    title: "Comp Analyzer",
+    description:
+      "Break a total-comp offer — base, bonus, vested equity, and sign-on — into one comparable annualized number.",
+    tier: "free",
+    category: "Salary",
+    icon: Calculator,
+    iconBgClassName: "bg-green-100",
+    iconColorClassName: "text-brand-green",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "Total", label: "Comp", valueClassName: "text-green-600" },
+      { value: "Offer", label: "Compare", valueClassName: "text-green-600" },
+    ],
+    features: [
+      "Annualizes base + bonus + equity + sign-on",
+      "Compare offers on total comp, not base salary",
+      "Built for senior + executive candidates",
+    ],
+    ctaLabel: "Analyze Comp",
+  },
 ];
 
 export function getToolsForHome(): ToolCatalogEntry[] {

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface LegalLinksProps {
   className?: string;
@@ -11,10 +12,11 @@ export default function LegalLinks({
   linkClassName = "text-muted-foreground hover:text-foreground transition-colors",
   orientation = "horizontal",
 }: LegalLinksProps) {
+  const { t } = useTranslation();
   const links = [
-    { to: "/privacy-policy", label: "Privacy Policy" },
-    { to: "/terms-of-service", label: "Terms of Service" },
-    { to: "/cookies", label: "Cookie Policy" },
+    { to: "/privacy-policy", label: t("labels.privacyPolicy") },
+    { to: "/terms-of-service", label: t("labels.termsOfService") },
+    { to: "/cookies", label: t("labels.cookiePolicy") },
   ];
 
   const containerClass =

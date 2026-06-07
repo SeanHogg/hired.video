@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Coins, Flame, Lock, ShieldCheck, Trophy } from "lucide-react";
 import {
@@ -48,6 +49,7 @@ function fmt(n: number): string {
 }
 
 export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const effectiveRole = useEffectiveRole();
   const enabled = isPointsEligibleRole(effectiveRole);
@@ -85,18 +87,18 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
                 to="/rewards"
                 onClick={onNavigate}
                 className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
-                aria-label="Points and badges"
+                aria-label={t("pointsPill.ariaPointsBadges")}
               >
                 <Trophy className="h-4 w-4 text-muted-foreground" />
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right" className="max-w-xs">
               <div className="space-y-1 text-xs">
-                <div className="font-medium">Earn points + badges</div>
+                <div className="font-medium">{t("pointsPill.earnTitle")}</div>
                 <div className="text-muted-foreground">
                   {totalBadges > 0
-                    ? `${totalBadges} badges to unlock — sign up to start earning.`
-                    : "Sign up to start earning."}
+                    ? t("pointsPill.badgesToUnlock", { n: totalBadges })
+                    : t("pointsPill.signUpToEarn")}
                 </div>
               </div>
             </TooltipContent>
@@ -109,27 +111,29 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
         to="/rewards"
         onClick={onNavigate}
         className="block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
-        aria-label="Points and badges"
+        aria-label={t("pointsPill.ariaPointsBadges")}
       >
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5 text-xs font-medium">
             <Coins className="h-3.5 w-3.5 text-primary" />
-            <span>Points</span>
+            <span>{t("pointsPill.title")}</span>
           </div>
           <span className="text-[11px] font-semibold text-primary">
-            Learn more →
+            {t("pointsPill.learnMore")}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
             <Trophy className="h-3 w-3" />
             <span className="tabular-nums">
-              {totalBadges > 0 ? `${totalBadges} badges to earn` : "Badges to earn"}
+              {totalBadges > 0
+                ? t("pointsPill.badgesToEarn", { n: totalBadges })
+                : t("pointsPill.badgesToEarnEmpty")}
             </span>
           </span>
           <span className="flex items-center gap-1">
             <Flame className="h-3 w-3" />
-            <span>Streaks</span>
+            <span>{t("pointsPill.streaks")}</span>
           </span>
         </div>
       </Link>
@@ -150,16 +154,16 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
                 to="/admin/points"
                 onClick={onNavigate}
                 className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
-                aria-label="Points admin"
+                aria-label={t("pointsPill.ariaPointsAdmin")}
               >
                 <ShieldCheck className="h-4 w-4 text-muted-foreground" />
               </Link>
             </TooltipTrigger>
             <TooltipContent side="right" className="max-w-xs">
               <div className="space-y-1 text-xs">
-                <div className="font-medium">Points admin</div>
+                <div className="font-medium">{t("pointsPill.adminTitle")}</div>
                 <div className="text-muted-foreground">
-                  Review fraud queue, redemptions, and per-user balances.
+                  {t("pointsPill.adminDesc")}
                 </div>
               </div>
             </TooltipContent>
@@ -172,25 +176,25 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
         to="/admin/points"
         onClick={onNavigate}
         className="block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors"
-        aria-label="Points admin"
+        aria-label={t("pointsPill.ariaPointsAdmin")}
       >
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5 text-xs font-medium">
             <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            <span>Points admin</span>
+            <span>{t("pointsPill.adminTitle")}</span>
           </div>
           <span className="text-[11px] font-semibold text-primary">
-            Open →
+            {t("pointsPill.open")}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
             <Trophy className="h-3 w-3" />
-            <span>Fraud · redemptions</span>
+            <span>{t("pointsPill.fraudRedemptions")}</span>
           </span>
           <span className="flex items-center gap-1">
             <Flame className="h-3 w-3" />
-            <span>Balances</span>
+            <span>{t("pointsPill.balances")}</span>
           </span>
         </div>
       </Link>
@@ -224,7 +228,7 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
               to="/points"
               onClick={onNavigate}
               className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
-              aria-label="Your points"
+              aria-label={t("pointsPill.ariaYourPoints")}
             >
               {suspended ? (
                 <Lock className="h-4 w-4 text-amber-500" />
@@ -243,23 +247,33 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
             {suspended ? (
               <div className="space-y-1 text-xs">
                 <div className="font-medium text-amber-700 dark:text-amber-300">
-                  Points paused
+                  {t("pointsPill.paused")}
                 </div>
                 <div className="text-muted-foreground">
-                  {data.suspendedReason ?? "Under review."}
+                  {data.suspendedReason ?? t("pointsPill.underReview")}
                 </div>
               </div>
             ) : (
               <div className="space-y-1 text-xs">
-                <div className="font-medium">{fmt(data.balance)} points</div>
+                <div className="font-medium">
+                  {t("pointsPill.pointsCount", { points: fmt(data.balance) })}
+                </div>
                 <div className="text-muted-foreground">
-                  {data.streak.current}-day streak
-                  {nextStreak != null && ` · ${nextStreak - data.streak.current} to ${nextStreak}-day`}
+                  {t("pointsPill.dayStreak", { n: data.streak.current })}
+                  {nextStreak != null &&
+                    ` · ${t("pointsPill.toMilestoneDay", {
+                      remaining: nextStreak - data.streak.current,
+                      milestone: nextStreak,
+                    })}`}
                 </div>
                 {earnedCount > 0 && (
                   <div className="text-muted-foreground">
-                    {earnedCount} of {data.badges.length} badges
-                    {latestBadge && ` · latest: ${latestBadge.name}`}
+                    {t("pointsPill.ofBadges", {
+                      earned: earnedCount,
+                      total: data.badges.length,
+                    })}
+                    {latestBadge &&
+                      ` · ${t("pointsPill.latestBadge", { name: latestBadge.name })}`}
                   </div>
                 )}
               </div>
@@ -276,16 +290,16 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
         to="/points"
         onClick={onNavigate}
         className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 hover:bg-amber-100/70 dark:hover:bg-amber-950/50 transition-colors"
-        aria-label="Points paused for review"
+        aria-label={t("pointsPill.ariaPausedReview")}
       >
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
-            Points paused
+            {t("pointsPill.paused")}
           </span>
         </div>
         <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-          Review →
+          {t("pointsPill.review")}
         </span>
       </Link>
     );
@@ -298,12 +312,12 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
       className={cn(
         "block px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted transition-colors",
       )}
-      aria-label="Your points and streak"
+      aria-label={t("pointsPill.ariaYourPointsStreak")}
     >
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5 text-xs font-medium">
           <Coins className="h-3.5 w-3.5 text-primary" />
-          <span>Points</span>
+          <span>{t("pointsPill.title")}</span>
         </div>
         <span className="text-xs tabular-nums font-semibold">
           {fmt(data.balance)}
@@ -318,11 +332,16 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
               streakActive ? "text-orange-500" : "text-muted-foreground",
             )}
           />
-          <span className="tabular-nums">{data.streak.current}d streak</span>
+          <span className="tabular-nums">
+            {t("pointsPill.dStreakShort", { n: data.streak.current })}
+          </span>
         </span>
         {nextStreak != null && (
           <span className="tabular-nums">
-            {nextStreak - data.streak.current} to {nextStreak}
+            {t("pointsPill.toMilestoneShort", {
+              remaining: nextStreak - data.streak.current,
+              milestone: nextStreak,
+            })}
           </span>
         )}
       </div>
@@ -341,9 +360,11 @@ export function PointsPill({ collapsed = false, onNavigate }: PointsPillProps) {
             ) : (
               <Trophy className="h-3 w-3" />
             )}
-            <span className="tabular-nums">{earnedCount} badges</span>
+            <span className="tabular-nums">
+              {t("pointsPill.badgesCount", { n: earnedCount })}
+            </span>
           </span>
-          <span className="text-[10px]">View →</span>
+          <span className="text-[10px]">{t("pointsPill.view")}</span>
         </div>
       )}
     </Link>

@@ -14,6 +14,12 @@ import {
   Star,
   FileText,
   Eye,
+  Clapperboard,
+  Headphones,
+  Gamepad2,
+  GraduationCap,
+  Users,
+  ClipboardCheck,
 } from "lucide-react";
 
 import DiscoverPreview from "@/components/DiscoverPreview";
@@ -282,6 +288,114 @@ function HomeMarketingPage() {
                   className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
                 >
                   Plus: built-in Learning Library — AI, RAG, prompt engineering, must-have skills. No separate license.
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Creator Studio — one canvas, every media kind. Surfaces the
+                multi-kind studio story (video/NLE, podcast, comic, game,
+                animation) the tool grid above doesn't carry. Links into
+                the live /studio surface. Only shippable kinds are pitched
+                (image / cad / 3d-model are roadmap — KIND_MARKETING). */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-4">
+                {t("marketing.home.studioTitle")}
+              </h2>
+              <p className="text-center text-muted-foreground mb-12 max-w-3xl mx-auto">
+                {t("marketing.home.studioSubtitle")}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[
+                  {
+                    icon: Clapperboard,
+                    iconColor: "text-brand-purple",
+                    border: "border-brand-purple/20 hover:border-brand-purple/40",
+                    title: t("marketing.home.studio.video.title"),
+                    desc: t("marketing.home.studio.video.desc"),
+                  },
+                  {
+                    icon: Headphones,
+                    iconColor: "text-violet-600",
+                    border: "border-violet-500/20 hover:border-violet-500/40",
+                    title: t("marketing.home.studio.audio.title"),
+                    desc: t("marketing.home.studio.audio.desc"),
+                  },
+                  {
+                    icon: Gamepad2,
+                    iconColor: "text-fuchsia-600",
+                    border: "border-fuchsia-500/20 hover:border-fuchsia-500/40",
+                    title: t("marketing.home.studio.interactive.title"),
+                    desc: t("marketing.home.studio.interactive.desc"),
+                  },
+                ].map(({ icon: Icon, iconColor, border, title, desc }) => (
+                  <Card key={title} className={`${border} transition-colors`}>
+                    <CardHeader>
+                      <Icon className={`h-10 w-10 ${iconColor} mb-4`} />
+                      <CardTitle className="text-lg">{title}</CardTitle>
+                      <CardDescription>{desc}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+              <div className="mt-10 text-center">
+                <Link to="/studio">
+                  <Button variant="outline">
+                    {t("marketing.home.studioCta")}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Whole-platform strip — the home page is candidate-first, so
+                this single block plants the flag that hired.video also
+                carries Learning, People Operations, and structured
+                recruiting. Deep-links to the Features page for the full
+                story rather than expanding the home surface. */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-4">
+                {t("marketing.home.platformTitle")}
+              </h2>
+              <p className="text-center text-muted-foreground mb-12 max-w-3xl mx-auto">
+                {t("marketing.home.platformSubtitle")}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  {
+                    icon: GraduationCap,
+                    iconColor: "text-brand-blue",
+                    title: t("marketing.home.platform.learning.title"),
+                    desc: t("marketing.home.platform.learning.desc"),
+                  },
+                  {
+                    icon: Users,
+                    iconColor: "text-emerald-600",
+                    title: t("marketing.home.platform.peopleOps.title"),
+                    desc: t("marketing.home.platform.peopleOps.desc"),
+                  },
+                  {
+                    icon: ClipboardCheck,
+                    iconColor: "text-amber-600",
+                    title: t("marketing.home.platform.recruiting.title"),
+                    desc: t("marketing.home.platform.recruiting.desc"),
+                  },
+                ].map(({ icon: Icon, iconColor, title, desc }) => (
+                  <div key={title} className="flex items-start gap-3">
+                    <Icon className={`h-8 w-8 ${iconColor} shrink-0 mt-0.5`} />
+                    <div>
+                      <p className="font-semibold">{title}</p>
+                      <p className="text-sm text-muted-foreground">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-10 text-center">
+                <Link
+                  to="/features"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                >
+                  {t("marketing.home.platformCta")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

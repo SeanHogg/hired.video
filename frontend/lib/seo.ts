@@ -210,6 +210,64 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
+  // Owner reference management (#1677). Confidential, selectively-shared
+  // references for the senior-exec audience — moved here from an inline
+  // useSEO override on References.tsx (gap #1968).
+  "/references": {
+    title: "Reference Management · hired.video",
+    description:
+      "Manage confidential references and share NDA-gated reference packets selectively.",
+  },
+  // AI Career Coach handoff surface (route /ai-coach, alias /chat). Was
+  // relying on DEFAULT_SEO via a bare useSEO(pathname) call — now has a
+  // real registry entry (gap #1968).
+  "/ai-coach": {
+    title: "AI Career Coach: Interview Prep, Resume Review & Career Guidance — hired.video",
+    description:
+      "Chat with your personal AI career coach for interview practice, resume feedback, salary negotiation, and networking strategy — personalized to your profile and target role.",
+    keywords:
+      "AI career coach, AI interview prep, resume review AI, career guidance, salary negotiation, networking advice, AI CHRO",
+  },
+  // Programmatic salary SEO index (/salary). Static meta moved off the
+  // inline useSEO override on SalaryIndexPage (gap #1968). Canonical is
+  // pinned so the index doesn't fight the /salary/:role leaf pages.
+  "/salary": {
+    title: "Salary Guides by Role & City — hired.video",
+    description:
+      "Browse salary data for hundreds of roles and cities. Real ranges from active job listings on hired.video, updated continuously.",
+    canonical: "https://hired.video/salary",
+  },
+  // Location sitemap landing (/sitemap/locations). Static meta moved off
+  // the inline useSEO override on SitemapLocations.tsx (gap #1968).
+  "/sitemap/locations": {
+    title: "All Locations — Jobs Worldwide · hired.video",
+    description:
+      "Browse jobs and career resources by country, state, province, and city. Comprehensive sitemap of every region we cover.",
+    ogTitle: "Hired.video — Browse Jobs by Location",
+    ogDescription:
+      "Find jobs and career resources in every country, state, and major city. Click through to local employers, relocation guides, and open roles.",
+  },
+  // Competitor comparison (/vs-competitors). Static meta moved off the
+  // inline useSEO override on Competitors.tsx (gap #1968). structuredData
+  // stays a runtime override on the page since it's built by
+  // buildComparisonStructuredData() (no static literal to inline here).
+  "/vs-competitors": {
+    title:
+      "vs Competition (2026): LOXO, LinkedIn Recruiter & Learning, Greenhouse, Bullhorn, HireVue, VidCruiter, Synthesia, HeyGen, Articulate, Canva & CapCut — hired.video",
+    description:
+      "Side-by-side comparison of hired.video against the recruiting (LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue, VidCruiter), AI-studio (Synthesia, HeyGen, Canva, CapCut), and L&D (LinkedIn Learning, Articulate 360) categories. Pricing, ATS, recruiting CRM, AI video resumes + multi-format AI Studio with WebGPU AI presenter avatars and multi-language voice-cloned dubbing, voice cloning + 95/5 voice marketplace, SCORM 1.2 + xAPI + verifiable certificates with WCAG 2.2 accessibility audit, staffing-agency back-office (timesheets + placement billing + QuickBooks / Xero / Gusto / Helcim connectors + per-placement P&L), installable PWA for mobile parity, built-in AI / RAG / must-have-skills learning content library, gamification with gift-card cashout, in-video lead capture, two-way calendar sync, learning pathways, public API — what's included and what costs extra in 2026.",
+    keywords:
+      "hired.video vs LOXO, hired.video vs LinkedIn Recruiter, hired.video vs LinkedIn Learning, hired.video vs Synthesia, hired.video vs Articulate, LinkedIn Learning alternative, LOXO alternative, LinkedIn Recruiter alternative, Greenhouse alternative, Bullhorn alternative, HireVue alternative, VidCruiter alternative, Synthesia alternative, HeyGen alternative, Articulate 360 alternative, Canva alternative, CapCut alternative, ATS comparison 2026, AI video resume platform comparison, recruiting CRM comparison, all-in-one recruiting software, AI studio comparison, SCORM authoring comparison, video resume + LMS combined, built-in learning library, SCORM AI RAG courses",
+  },
+  // CCPA / CPRA "Do Not Sell or Share" self-service page (#1149). Indexed
+  // so the legally-required opt-out is discoverable (gap #1968/#1969).
+  "/privacy/opt-out": {
+    title: "Do Not Sell or Share My Personal Information — hired.video",
+    description:
+      "Exercise your CCPA / CPRA right to opt out of the sale or sharing of your personal information for targeted advertising. Self-service, signed in or anonymous.",
+    keywords:
+      "do not sell my personal information, CCPA opt out, CPRA opt out, do not share, privacy opt out, global privacy control",
+  },
   // Candidate screening — recruiter authoring surface + the candidate-facing
   // magic-link portal (the dynamic /screening/:token route resolves to this
   // base key, same pattern as /interview).

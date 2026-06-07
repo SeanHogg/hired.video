@@ -11,14 +11,9 @@ import { LocationsSitemap } from "@/components/landing/LocationsSitemap";
 export default function SitemapLocations(): JSX.Element {
   const location = useLocation();
   useDefaultBreadcrumbs();
-  useSEO(location.pathname, {
-    title: "All Locations — Jobs Worldwide · hired.video",
-    description:
-      "Browse jobs and career resources by country, state, province, and city. Comprehensive sitemap of every region we cover.",
-    ogTitle: "Hired.video — Browse Jobs by Location",
-    ogDescription:
-      "Find jobs and career resources in every country, state, and major city. Click through to local employers, relocation guides, and open roles.",
-  });
+  // Meta lives in the central PAGE_SEO entry for /sitemap/locations
+  // (gap #1968).
+  useSEO(location.pathname);
 
   return (
     <AppShell bgClassName="bg-background">

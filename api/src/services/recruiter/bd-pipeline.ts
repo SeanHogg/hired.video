@@ -40,6 +40,47 @@ export interface NewDealInput {
   notes?: string | null;
 }
 
+/** The subset of a pipeline stage that decides deal-close semantics. */
+export interface StageCloseFlags {
+  isClosedWon: boolean;
+  isClosedLost: boolean;
+}
+
+/**
+ * Compute the deal patch produced by moving a deal onto `stageKey`.
+ * Always restamps stage + activity; additionally stamps `closedAt` +
+ * `isWon` when the destination stage is terminal:
+ *   • closed-won  → closedAt set, isWon = true
+ *   • closed-lost → closedAt set, isWon = false
+ *   • open stage  → closedAt/isWon left untouched (deal stays in pipeline)
+ *
+ * `stage` is null when the recruiter moves to a stageKey that has no row
+ * (e.g. a stale client) — treated as a non-terminal move. Pure given an
+ * injected `now`; `moveDealToStage()` delegates here so the close rule
+ * lives in one testable place rather than inline among the DB updates.
+ */
+export function computeStageClosePatch(
+  stageKey: string,
+  pipelineKey: string,
+  stage: StageCloseFlags | null | undefined,
+  now: Date,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
+    stageKey,
+    pipelineKey,
+    lastActivityAt: now,
+    updatedAt: now,
+  };
+  if (stage?.isClosedWon) {
+    patch.closedAt = now;
+    patch.isWon = true;
+  } else if (stage?.isClosedLost) {
+    patch.closedAt = now;
+    patch.isWon = false;
+  }
+  return patch;
+}
+
 export class RecruiterBdPipelineService {
   // -- Stages ----------------------------------------------------------------
   async ensureDefaultPipeline(recruiterUserId: string): Promise<void> {
@@ -246,19 +287,12 @@ export class RecruiterBdPipelineService {
       )
       .limit(1);
 
-    const patch: Record<string, unknown> = {
-      stageKey: args.stageKey,
-      pipelineKey: args.pipelineKey ?? "default",
-      lastActivityAt: new Date(),
-      updatedAt: new Date(),
-    };
-    if (stage?.isClosedWon) {
-      patch.closedAt = new Date();
-      patch.isWon = true;
-    } else if (stage?.isClosedLost) {
-      patch.closedAt = new Date();
-      patch.isWon = false;
-    }
+    const patch = computeStageClosePatch(
+      args.stageKey,
+      args.pipelineKey ?? "default",
+      stage,
+      new Date(),
+    );
 
     const [row] = await db
       .update(recruiterDeals)

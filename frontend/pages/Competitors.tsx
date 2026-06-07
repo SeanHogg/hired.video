@@ -107,13 +107,10 @@ const FAQS = [
 
 export default function Competitors() {
   const location = useLocation();
+  // Title / description / keywords come from the central PAGE_SEO entry
+  // for /vs-competitors (gap #1968). structuredData stays a runtime
+  // override because it's assembled by buildComparisonStructuredData().
   useSEO(location.pathname, {
-    title:
-      "vs Competition (2026): LOXO, LinkedIn Recruiter & Learning, Greenhouse, Bullhorn, HireVue, VidCruiter, Synthesia, HeyGen, Articulate, Canva & CapCut — hired.video",
-    description:
-      "Side-by-side comparison of hired.video against the recruiting (LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue, VidCruiter), AI-studio (Synthesia, HeyGen, Canva, CapCut), and L&D (LinkedIn Learning, Articulate 360) categories. Pricing, ATS, recruiting CRM, AI video resumes + multi-format AI Studio with WebGPU AI presenter avatars and multi-language voice-cloned dubbing, voice cloning + 95/5 voice marketplace, SCORM 1.2 + xAPI + verifiable certificates with WCAG 2.2 accessibility audit, staffing-agency back-office (timesheets + placement billing + QuickBooks / Xero / Gusto / Helcim connectors + per-placement P&L), installable PWA for mobile parity, built-in AI / RAG / must-have-skills learning content library, gamification with gift-card cashout, in-video lead capture, two-way calendar sync, learning pathways, public API — what's included and what costs extra in 2026.",
-    keywords:
-      "hired.video vs LOXO, hired.video vs LinkedIn Recruiter, hired.video vs LinkedIn Learning, hired.video vs Synthesia, hired.video vs Articulate, LinkedIn Learning alternative, LOXO alternative, LinkedIn Recruiter alternative, Greenhouse alternative, Bullhorn alternative, HireVue alternative, VidCruiter alternative, Synthesia alternative, HeyGen alternative, Articulate 360 alternative, Canva alternative, CapCut alternative, ATS comparison 2026, AI video resume platform comparison, recruiting CRM comparison, all-in-one recruiting software, AI studio comparison, SCORM authoring comparison, video resume + LMS combined, built-in learning library, SCORM AI RAG courses",
     structuredData: buildComparisonStructuredData(),
   });
   useBreadcrumbs([

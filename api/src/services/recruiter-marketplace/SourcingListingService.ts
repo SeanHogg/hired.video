@@ -28,7 +28,7 @@ const EMPTY_CONFIG: SourcingConfig = {
   terms: null,
 };
 
-function rowToConfig(row: typeof schema.jobSourcingListings.$inferSelect | undefined): SourcingConfig {
+export function rowToConfig(row: typeof schema.jobSourcingListings.$inferSelect | undefined): SourcingConfig {
   if (!row) return EMPTY_CONFIG;
   return {
     acceptsBids: row.acceptsBids,
@@ -151,24 +151,70 @@ export interface PlaceBidInput {
   durationDays: number;
 }
 
+export type BidRejectReason = "NOT_OPEN" | "DEADLINE_PASSED" | "OWN_JOB" | "BID_EXISTS";
+
 export type PlaceBidResult =
   | { ok: true; bid: typeof schema.boardBids.$inferSelect }
-  | { ok: false; reason: "NOT_OPEN" | "DEADLINE_PASSED" | "OWN_JOB" | "BID_EXISTS" };
+  | { ok: false; reason: BidRejectReason };
+
+/**
+ * Pure gate for whether a recruiter may place a bid on a sourcing listing.
+ * Returns `null` when the bid is allowed, or the blocking reason code.
+ *
+ * Order matters — own-job is checked first (you can never bid your own
+ * requisition), then the listing must be open to bids, then the deadline
+ * (if any) must not have passed, then there must be no live pending bid
+ * from this bidder. `placeBid()` delegates here so the rule lives in one
+ * testable place instead of being inlined among the DB round-trips.
+ */
+export function evaluateBidEligibility(args: {
+  jobOwnerId: string | null;
+  bidderId: string;
+  acceptsBids: boolean;
+  deadline: Date | string | null;
+  hasExistingPendingBid: boolean;
+  now?: Date;
+}): BidRejectReason | null {
+  if (args.jobOwnerId === args.bidderId) return "OWN_JOB";
+  if (!args.acceptsBids) return "NOT_OPEN";
+  if (args.deadline != null) {
+    const deadline = args.deadline instanceof Date ? args.deadline : new Date(args.deadline);
+    if (deadline < (args.now ?? new Date())) return "DEADLINE_PASSED";
+  }
+  if (args.hasExistingPendingBid) return "BID_EXISTS";
+  return null;
+}
+
+/**
+ * Pick the winning bid from a set of pending bids: the lowest sourcing fee
+ * (cheapest to the company) wins; ties break to the earliest-submitted bid
+ * (first-come). Ignores any bid that is not `pending`. Returns null when no
+ * pending bid exists. Pure — the acceptance side-effects (auto-reject losers,
+ * snapshot winner) happen in `acceptBid()`.
+ */
+export function selectWinningBid<
+  T extends { status: string; bidAmount: number | string; createdAt: Date | string },
+>(bids: readonly T[]): T | null {
+  const pending = bids.filter((b) => b.status === "pending");
+  if (pending.length === 0) return null;
+  return pending.reduce((best, b) => {
+    const a = Number(b.bidAmount);
+    const bestAmt = Number(best.bidAmount);
+    if (a < bestAmt) return b;
+    if (a > bestAmt) return best;
+    // Tie on amount → earlier createdAt wins.
+    return new Date(b.createdAt).getTime() < new Date(best.createdAt).getTime() ? b : best;
+  });
+}
 
 export async function placeBid(input: PlaceBidInput, jobOwnerId: string | null): Promise<PlaceBidResult> {
   const db = getDb();
-
-  if (jobOwnerId === input.bidderId) return { ok: false, reason: "OWN_JOB" };
 
   const [config] = await db
     .select()
     .from(schema.jobSourcingListings)
     .where(eq(schema.jobSourcingListings.jobId, input.jobId))
     .limit(1);
-  if (!config?.acceptsBids) return { ok: false, reason: "NOT_OPEN" };
-  if (config.deadline && new Date(config.deadline) < new Date()) {
-    return { ok: false, reason: "DEADLINE_PASSED" };
-  }
 
   const [existing] = await db
     .select({ id: schema.boardBids.id })
@@ -181,7 +227,15 @@ export async function placeBid(input: PlaceBidInput, jobOwnerId: string | null):
       ),
     )
     .limit(1);
-  if (existing) return { ok: false, reason: "BID_EXISTS" };
+
+  const reason = evaluateBidEligibility({
+    jobOwnerId,
+    bidderId: input.bidderId,
+    acceptsBids: !!config?.acceptsBids,
+    deadline: config?.deadline ?? null,
+    hasExistingPendingBid: !!existing,
+  });
+  if (reason) return { ok: false, reason };
 
   const [bid] = await db
     .insert(schema.boardBids)

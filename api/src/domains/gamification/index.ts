@@ -310,6 +310,140 @@ export class GamificationService {
     });
   }
 
+  // ── New-surface helpers (gap #1966) ────────────────────────────────
+  //
+  // Each dedups on the natural entity id so a re-fire of the same
+  // publish / register / complete event collapses to one ledger row.
+
+  async onEventCreated(args: AwardArgs & { eventId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.EVENT_CREATED, {
+      ...args,
+      refId: args.eventId,
+      refType: "event",
+    });
+  }
+
+  /** Registration earns once per (user, event); attendance dedups on the
+   *  same event id under a distinct action so both can fire. */
+  async onEventRegistered(args: AwardArgs & { eventId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.EVENT_REGISTERED, {
+      ...args,
+      refId: args.eventId,
+      refType: "event",
+    });
+  }
+
+  async onEventAttended(args: AwardArgs & { eventId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.EVENT_ATTENDED, {
+      ...args,
+      refId: args.eventId,
+      refType: "event",
+    });
+  }
+
+  /** Host earns for completing a session; refId = booking id. */
+  async onSessionCompleted(args: AwardArgs & { bookingId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.BOOKING_SESSION_COMPLETED, {
+      ...args,
+      refId: args.bookingId,
+      refType: "booking",
+    });
+  }
+
+  /** Guest earns for booking a session; refId = booking id under a
+   *  distinct action so both sides of one booking can earn. */
+  async onSessionBooked(args: AwardArgs & { bookingId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.BOOKING_SESSION_BOOKED, {
+      ...args,
+      refId: args.bookingId,
+      refType: "booking",
+    });
+  }
+
+  async onArticlePublished(args: AwardArgs & { articleId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.ARTICLE_PUBLISHED, {
+      ...args,
+      refId: args.articleId,
+      refType: "article",
+    });
+  }
+
+  async onReferenceGiven(args: AwardArgs & { referenceId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.REFERENCE_GIVEN, {
+      ...args,
+      refId: args.referenceId,
+      refType: "reference",
+    });
+  }
+
+  /** The subject of a reference earns when one lands on their profile.
+   *  Caller passes the subject's userId as `userId`. */
+  async onReferenceReceived(args: AwardArgs & { referenceId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.REFERENCE_RECEIVED, {
+      ...args,
+      refId: args.referenceId,
+      refType: "reference",
+    });
+  }
+
+  async onCompanyReviewPosted(args: AwardArgs & { reviewId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.COMPANY_REVIEW_POSTED, {
+      ...args,
+      refId: args.reviewId,
+      refType: "company_review",
+    });
+  }
+
+  async onCohortCreated(args: AwardArgs & { cohortId: string }): Promise<AwardOutcome> {
+    return this.award(ACTIONS.COHORT_CREATED, {
+      ...args,
+      refId: args.cohortId,
+      refType: "learning_cohort",
+    });
+  }
+
+  /** A student joining a cohort earns once per (student, cohort). Caller
+   *  passes the student's userId. RefId combines cohort + member so a
+   *  re-join after leaving doesn't re-pay. */
+  async onCohortStudentJoined(
+    args: AwardArgs & { cohortId: string; memberId: string },
+  ): Promise<AwardOutcome> {
+    return this.award(ACTIONS.COHORT_STUDENT_JOINED, {
+      ...args,
+      refId: `cohort:${args.cohortId}:${args.memberId}`,
+      refType: "cohort_member",
+    });
+  }
+
+  async onCohortAssignmentCompleted(
+    args: AwardArgs & { assignmentId: string; memberId: string },
+  ): Promise<AwardOutcome> {
+    return this.award(ACTIONS.COHORT_ASSIGNMENT_COMPLETED, {
+      ...args,
+      refId: `assignment:${args.assignmentId}:${args.memberId}`,
+      refType: "learning_assignment",
+    });
+  }
+
+  /** Creative-studio publish. `mediaKind` selects the action so a game,
+   *  comic, and podcast each map to their own catalog rule (all share the
+   *  `studio_creator_first` badge). RefId = project id. */
+  async onStudioCreatePublished(
+    args: AwardArgs & { projectId: string; mediaKind: "game" | "comic" | "podcast" },
+  ): Promise<AwardOutcome> {
+    const action =
+      args.mediaKind === "game"
+        ? ACTIONS.STUDIO_GAME_PUBLISHED
+        : args.mediaKind === "comic"
+          ? ACTIONS.STUDIO_COMIC_PUBLISHED
+          : ACTIONS.STUDIO_PODCAST_PUBLISHED;
+    return this.award(action, {
+      ...args,
+      refId: args.projectId,
+      refType: "studio_project",
+    });
+  }
+
   // ── Recruiter helpers ──────────────────────────────────────────────
 
   onCandidateSourced(args: AwardArgs & { candidateId: string }): Promise<AwardOutcome> {

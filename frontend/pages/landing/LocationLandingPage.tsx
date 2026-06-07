@@ -77,6 +77,11 @@ export default function LocationLandingPage(): JSX.Element {
   }, [resolved]);
 
   useDefaultBreadcrumbs();
+  // Runtime SEO override is intentional here (gap #1968): the title /
+  // description are derived from the resolved location (country / state /
+  // city names fetched from /api/locations/resolve), so they can't live
+  // as a static literal in PAGE_SEO. The static `/in/:country` registry
+  // entry is the fallback used before `resolved` arrives.
   useSEO(
     location.pathname,
     resolved
