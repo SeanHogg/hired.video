@@ -86,6 +86,7 @@ import { useHeaderFilters } from "@/lib/header-filters";
 import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
+import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
 import { downloadResume } from "@/lib/resume-download";
 import { useAuth } from "@/lib/auth";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -568,10 +569,6 @@ export default function Resumes() {
     open: false,
     target: null,
   });
-
-  const handleEdit = (item: ResumeWithOwnership) => {
-    navigate(`/resumes/${item.id}`);
-  };
 
   const handleDownload = async (item: ResumeWithOwnership, format: "pdf" | "word" | "json" | "text") => {
     try {
@@ -1303,7 +1300,7 @@ export default function Resumes() {
                     variations={childrenByParentId.get(resume.id)}
                     ownership={resume.ownership}
                     onView={() => handleResumeView(resume.id)}
-                    onEdit={() => navigate(`/studio?editResume=${resume.id}`)}
+                    onEdit={async () => navigate(await resumeEditorPath(resume.id))}
                     onRename={() => setRenameDialog({ open: true, target: resume })}
                     onAddMedia={() => handleAddMedia(resume)}
                     onCreateVariation={() => handleCreateVariation(resume.id)}

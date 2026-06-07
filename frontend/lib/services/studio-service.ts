@@ -786,6 +786,26 @@ export const studioService = {
   },
 
   /**
+   * Resolve the canvas `document`-kind project linked to a subject, if one
+   * exists yet (#1882). A resume / article / blog authored on the document
+   * canvas has exactly one such project; this is the single seam for "find
+   * the existing canvas doc" so the studio-landing redirect and the entity
+   * "Edit" buttons stay in lockstep. Returns null on first-ever edit (no doc
+   * project yet) or on any fetch error, so callers fall back to the
+   * `?editResume=`/`?editArticle=` bootstrap that mints one.
+   */
+  async findDocumentProject(
+    subject: { kind: string; id: string },
+  ): Promise<StudioProject | null> {
+    try {
+      const res = await this.getProjects(subject);
+      return (res.data ?? []).find((p) => p.mediaKind === "document") ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Save (create or update) a draft project. Pass `subjects` to
    * replace-all the project's entity links; omit it to leave existing
    * links untouched (e.g. when only the script changed). Pass

@@ -149,6 +149,10 @@ import {
   createBlankDocumentState,
   createResumeDocumentState,
 } from "@/lib/studio/editor-v2/document-state";
+import {
+  applyDocumentTemplate,
+  resumeTemplateOption,
+} from "@/lib/studio/editor-v2/document-templates";
 import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeData, ResumeUploadResponse } from "@/types/resume";
 import { getEmptyResumeData, mapContentToResumeData } from "@/lib/resume-shape";
@@ -1224,7 +1228,31 @@ export default function StudioEditorV2() {
       if (entityId && documentState.entityKind === "resume") {
         try {
           const r = await resumeService.getResumeById(entityId);
-          if (!cancelled) setDocumentEntityContent(mapContentToResumeData(r.content));
+          if (cancelled) return;
+          setDocumentEntityContent(mapContentToResumeData(r.content));
+          // Re-skin an UN-THEMED stub to the resume's chosen design template
+          // (`content.meta.template`) so the canvas + preview match the
+          // read-only /resumes/:id view's template + font. A stub (minted by a
+          // prior "Edit" click but never saved with a template) carries no
+          // `templateId`; a doc the user actually themed does — so this only
+          // ever fires on a blank stub and never clobbers canvas edits.
+          const templateId = (
+            (r.content as Record<string, unknown> | undefined)?.meta as
+              | Record<string, unknown>
+              | undefined
+          )?.template as string | undefined;
+          if (!documentState.templateId) {
+            const option = resumeTemplateOption(templateId);
+            if (option) {
+              resetDocumentHistory(
+                applyDocumentTemplate(
+                  documentState,
+                  option,
+                  () => crypto.randomUUID(),
+                ),
+              );
+            }
+          }
           return;
         } catch {
           // fall through to a blank doc if the resume can't be read

@@ -61,6 +61,7 @@ import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
 import { useUgcSeo } from "@/lib/seo-ugc";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
+import { resumeEditorPath } from "@/lib/studio/resume-editor-link";
 import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
 import TextNarrator from "@/components/audio/TextNarrator";
@@ -549,7 +550,7 @@ export default function ResumeDetail() {
                     variant="outline"
                     size="sm"
                     className="h-7 px-2"
-                    onClick={() => navigate(`/studio?editResume=${resume.id}`)}
+                    onClick={async () => navigate(await resumeEditorPath(resume.id))}
                     aria-label={t("labels.resumeDetail.editResume")}
                     title={t("labels.resumeDetail.editResume")}
                   >
@@ -706,7 +707,7 @@ export default function ResumeDetail() {
                     isActive={resume.isActive}
                     isMaster={resume.isMaster}
                     parentId={resume.parentId}
-                    onEdit={() => navigate(`/studio?editResume=${resume.id}`)}
+                    onEdit={async () => navigate(await resumeEditorPath(resume.id))}
                     onRename={perms.canRename ? () => setRenameOpen(true) : undefined}
                     onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.content.metaData || [] })}
                     onShare={() => setShareOpen(true)}
@@ -788,8 +789,8 @@ export default function ResumeDetail() {
                         descriptor={descriptor}
                         videoSlot={<VideoSlot items={videoItems} />}
                         isOwner={isOwner}
-                        onEditSection={() =>
-                          navigate(`/studio?editResume=${resume.id}`)
+                        onEditSection={async () =>
+                          navigate(await resumeEditorPath(resume.id))
                         }
                       />
                     );

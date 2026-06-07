@@ -124,7 +124,12 @@ export default function EntityMedia({
     fetcher
       .then((res) => {
         if (cancelled) return;
-        setItems(res.data ?? []);
+        // Drop `document`-kind projects: a canvas document IS the entity
+        // itself (the resume / article authored on the document canvas),
+        // not a media attachment, so it must never show in the attachments
+        // rail. Without this the resume's own studio document rendered as a
+        // bogus "Document" tile alongside real videos/images.
+        setItems((res.data ?? []).filter((p) => p.mediaKind !== "document"));
       })
       .catch(() => {
         if (cancelled) return;

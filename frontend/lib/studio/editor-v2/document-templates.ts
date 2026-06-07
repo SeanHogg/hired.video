@@ -140,6 +140,22 @@ export function documentTemplatesForEntity(
 }
 
 /**
+ * Resolve the design template a resume has selected (`content.meta.template`)
+ * to its document option, or null when unset / unknown. Shared seam so the
+ * studio-landing seed AND the editor's stub re-skin agree on how a resume's
+ * stored template id maps to a `DocumentTemplateOption` (#1883 follow-up — the
+ * canvas must render the SAME template/font the read-only /resumes/:id view
+ * uses). The id is shared between the declarative descriptor and the document
+ * option (both derive from TEMPLATE_PRESETS).
+ */
+export function resumeTemplateOption(
+  templateId: string | null | undefined,
+): DocumentTemplateOption | null {
+  if (!templateId) return null;
+  return documentTemplatesForEntity("resume").find((o) => o.id === templateId) ?? null;
+}
+
+/**
  * Apply a design template to a document: swap the page-0 flow blocks for the
  * template's sections (fresh ids via `idFactory`) and adopt its theme. Overlays,
  * `entityId`, `entityKind`, page geometry, and bound content are preserved —

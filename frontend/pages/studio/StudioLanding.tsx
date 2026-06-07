@@ -62,6 +62,10 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import { resumeService } from "@/lib/services/resume-service";
 import { articleService } from "@/lib/services/article-service";
 import { createResumeDocumentState } from "@/lib/studio/editor-v2/document-state";
+import {
+  applyDocumentTemplate,
+  resumeTemplateOption,
+} from "@/lib/studio/editor-v2/document-templates";
 import { articleToDocumentState } from "@/lib/studio/document/document-from-article";
 import {
   studioTemplatesService,
@@ -214,17 +218,11 @@ export default function StudioLanding() {
     // Reopen the EXISTING studio document project linked to this entity, if
     // one was already created — so "Edit" lands straight in the editor instead
     // of minting a duplicate project on every click (#1882). Returns null when
-    // none exists yet (first-ever edit).
-    const findExistingDocProject = async (
-      subject: StudioSubject,
-    ): Promise<StudioProject | null> => {
-      try {
-        const res = await studioService.getProjects(subject);
-        return (res.data ?? []).find((p) => p.mediaKind === "document") ?? null;
-      } catch {
-        return null;
-      }
-    };
+    // none exists yet (first-ever edit). Shared seam:
+    // `studioService.findDocumentProject` (the resume "Edit" buttons resolve
+    // the same project to skip the `?editResume=` redirect entirely).
+    const findExistingDocProject = (subject: StudioSubject) =>
+      studioService.findDocumentProject(subject);
 
     // Open an EXISTING resume on the document canvas (#1915 — resume edit
     // moved into the studio). Reuse the linked project if present; otherwise
@@ -245,11 +243,31 @@ export default function StudioLanding() {
           const populated = Object.keys(content).filter(
             (k) => Array.isArray(content[k]) && (content[k] as unknown[]).length > 0,
           );
-          const docState = createResumeDocumentState(
+          let docState = createResumeDocumentState(
             editResumeId,
             populated,
             () => crypto.randomUUID(),
           );
+          // Seed the canvas with the resume's CHOSEN design template
+          // (`content.meta.template`) so the editor + its preview render with
+          // the SAME theme/font/sections the read-only /resumes/:id view uses.
+          // Without this the first edit always opened on the blank DEFAULT
+          // theme, ignoring the user's selected template (e.g. "Risk &
+          // Consulting — Asphalt"). The template id is shared between the
+          // declarative descriptor and the document-template option (both
+          // derive from TEMPLATE_PRESETS), so this matches the detail view's
+          // `applyDocumentTemplate` re-skin exactly.
+          const templateId = (
+            content.meta as Record<string, unknown> | undefined
+          )?.template as string | undefined;
+          const option = resumeTemplateOption(templateId);
+          if (option) {
+            docState = applyDocumentTemplate(
+              docState,
+              option,
+              () => crypto.randomUUID(),
+            );
+          }
           const created = await create({
             kind: "document",
             documentState: docState,
