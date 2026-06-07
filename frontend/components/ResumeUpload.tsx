@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { resumeService, type Resume } from "@/lib/services/resume-service";
+import { confirmDialog } from "@/lib/dialogs";
 import type {
   ResumePrivacy,
   ResumeUploadResponse,
@@ -303,6 +304,22 @@ export default function ResumeUpload({
     // only the create flow requires a name.
     if (!file || (!targetResumeId && !name.trim())) return;
 
+    // Overwrite-in-place REPLACES the open résumé's content and the editor's
+    // Undo does NOT cover entity content — so confirm first, and reassure the
+    // user the current version is snapshotted (restorable from Version History)
+    // before we proceed.
+    if (targetResumeId) {
+      const proceed = await confirmDialog({
+        title: "Replace this résumé?",
+        description:
+          "Importing this file replaces the current résumé's content. The editor's Undo won't revert this, but the current version is saved to Version History first, so you can restore it from the Resumes page.",
+        confirmText: "Replace résumé",
+        cancelText: "Cancel",
+        destructive: true,
+      });
+      if (!proceed) return;
+    }
+
     setIsUploading(true);
     setError(null);
     setUploadProgress(0);
@@ -313,6 +330,16 @@ export default function ResumeUpload({
       // resume is minted. `parseResumeFromFile` handles JSON-Resume (structure
       // preserved) and PDF/DOCX/text (server AI parse) uniformly.
       if (targetResumeId) {
+        // Snapshot the current content BEFORE overwriting so the user can
+        // revert (the PUT does not auto-version). Best-effort — a snapshot
+        // failure shouldn't block the import the user explicitly confirmed.
+        try {
+          await resumeService.createVersion(targetResumeId, {
+            label: "Before résumé import",
+          });
+        } catch (snapshotErr) {
+          console.warn("Pre-import résumé snapshot failed:", snapshotErr);
+        }
         const { data } = await resumeService.parseResumeFromFile(file);
         await resumeService.updateResumeData(targetResumeId, { data });
         onUploadSuccess({
@@ -506,6 +533,20 @@ export default function ResumeUpload({
             </p>
           )}
         </div>
+        )}
+
+        {/* Overwrite warning — only when importing INTO an already-open résumé
+            (targetResumeId). Persistent so the user sees it before acting; the
+            confirm dialog repeats it on submit. */}
+        {targetResumeId && file && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              This replaces the current résumé's content. The current version is
+              saved to Version History first (restorable from the Resumes page);
+              the editor's Undo won't revert it.
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Upload Progress */}
