@@ -78,6 +78,41 @@ describe("api-client loose error-envelope handling", () => {
     });
   });
 
+  it("reports a thrown fetch() (no HTTP response) as a transport failure, not a 500", async () => {
+    // Regression for the misleading error reports: when fetch() itself throws
+    // (offline, DNS, TLS, CORS preflight, connection refused) the browser never
+    // got a response. NetworkError hardcodes statusCode 500, so previously the
+    // emailed report read as a server crash. It must instead surface status 0 /
+    // NETWORK_UNREACHABLE with the real browser cause folded into the message.
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+
+    const events: ApiErrorEvent[] = [];
+    const handler = (e: Event) => events.push((e as CustomEvent<ApiErrorEvent>).detail);
+    window.addEventListener(API_ERROR_EVENT, handler as EventListener);
+
+    const client = new ApiClient({ baseUrl: "https://api.hired.video" });
+
+    let caught: unknown;
+    try {
+      await client.get("/api/resumes/public", undefined, { retries: 0 });
+    } catch (err) {
+      caught = err;
+    }
+
+    window.removeEventListener(API_ERROR_EVENT, handler as EventListener);
+
+    expect(caught).toBeInstanceOf(NetworkError);
+    expect((caught as NetworkError).context).toMatchObject({
+      transport: true,
+      cause: "Failed to fetch",
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(0);
+    expect(events[0].code).toBe("NETWORK_UNREACHABLE");
+    expect(events[0].message).toBe("Network request failed: Failed to fetch");
+  });
+
   it("falls back to the raw response body on truly-unrecognized error shapes", async () => {
     // JSON-but-not-error-envelope payload exercises the default branch of
     // handleErrorResponse — the body is preserved on context.responseBody

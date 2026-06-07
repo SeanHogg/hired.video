@@ -35,6 +35,34 @@ import {
 } from "@shared/errors/apiErrorEvent";
 
 /**
+ * Context stamped on a NetworkError when `fetch()` itself threw — i.e. the
+ * browser never received an HTTP response at all (offline, DNS, TLS, a CORS
+ * preflight rejection, connection refused, or the client-side timeout abort).
+ * `cause` is the raw browser error message ("Failed to fetch" / "Load failed" /
+ * "timeout") — the single most diagnostic field. `online` snapshots
+ * navigator.onLine so an offline user is obvious in the emailed report.
+ * `transport: true` is the flag eventFieldsFromError keys on so these are NOT
+ * mislabeled as an HTTP 500 (NetworkError.statusCode hardcodes 500).
+ */
+function transportErrorContext(cause: string): Record<string, unknown> {
+  return {
+    transport: true,
+    cause,
+    online: typeof navigator !== "undefined" ? navigator.onLine : undefined,
+  };
+}
+
+/**
+ * Context for a response the server DID send but whose body wasn't valid JSON
+ * (e.g. an HTML 502/504 from the edge, a truncated gateway page). Carrying the
+ * real HTTP status keeps these from collapsing into NetworkError's default 500
+ * in the report — the actual edge status is the actionable bit.
+ */
+function nonJsonResponseContext(response: Response): Record<string, unknown> {
+  return { httpStatus: response.status, statusText: response.statusText };
+}
+
+/**
  * Dispatch an API error event on `window`. Automatically stamps the event
  * with an ISO timestamp. Frontend-only — lives here (not in shared/)
  * because `window` / `CustomEvent` are DOM-only types and the API
@@ -65,6 +93,25 @@ function eventFieldsFromError(
   // otherwise fall back to AppError's class-default (e.g. NetworkError = 500).
   // Without this, a 402 QUOTA_EXCEEDED reads as 500 in the dev toast.
   const httpStatus = typeof ctx.httpStatus === "number" ? ctx.httpStatus : undefined;
+
+  // Transport failures — fetch() itself threw, so the browser never received an
+  // HTTP response. NetworkError hardcodes statusCode 500, which makes these
+  // read identically to a genuine server crash in the dev toast AND the emailed
+  // error report. They are NOT the same: a transport failure means the API was
+  // unreachable (offline, DNS, TLS, CORS preflight, connection refused). Report
+  // them as status 0 ("no response") under a distinct code, and fold the real
+  // browser cause into the message so the maintainer can tell the two apart at a
+  // glance instead of chasing a phantom backend 500.
+  if (ctx.transport === true) {
+    const cause = typeof ctx.cause === "string" ? ctx.cause : undefined;
+    return {
+      status: 0,
+      code: "NETWORK_UNREACHABLE",
+      message: cause ? `${error.message}: ${cause}` : error.message,
+      details: error.context,
+    };
+  }
+
   return {
     status: httpStatus ?? error.statusCode,
     code: serverCode ?? error.code,
@@ -511,12 +558,14 @@ export class ApiClient {
       clearTimeout(timeoutId);
 
       if (error instanceof Error && error.name === "AbortError") {
-        throw new NetworkError("Request timeout", error);
+        throw new NetworkError("Request timeout", error, transportErrorContext("timeout"));
       }
 
+      const cause = error instanceof Error ? error.message : String(error);
       throw new NetworkError(
         "Network request failed",
         error instanceof Error ? error : undefined,
+        transportErrorContext(cause),
       );
     }
   }
@@ -541,6 +590,7 @@ export class ApiClient {
       throw new NetworkError(
         "Invalid JSON response",
         error instanceof Error ? error : undefined,
+        nonJsonResponseContext(response),
       );
     }
 
@@ -708,6 +758,7 @@ export class ApiClient {
         // whatever the server emitted, even if it doesn't match either
         // envelope shape.
         throw new NetworkError(`HTTP ${status}: Request failed`, undefined, {
+          httpStatus: status,
           responseBody: truncateBodyForLog(data),
         });
     }
@@ -998,6 +1049,7 @@ export class ApiClient {
         throw new NetworkError(
           "Invalid JSON response",
           error instanceof Error ? error : undefined,
+          nonJsonResponseContext(response),
         );
       }
 
@@ -1078,6 +1130,7 @@ export class ApiClient {
         throw new NetworkError(
           "Invalid JSON response",
           error instanceof Error ? error : undefined,
+          nonJsonResponseContext(response),
         );
       }
 
