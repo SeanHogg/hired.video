@@ -22,7 +22,7 @@
  * gone. UI-state seeds that the editor still reads from the URL
  * (`?capture=`) are forwarded along on the destination URL.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Eye,
@@ -1029,7 +1029,7 @@ function StudioContentView({
       />
     );
   }
-  const cards = projects.map((project) => (
+  const renderCard = (project: StudioProject) => (
     <StudioVideoCard
       key={project.id}
       project={project}
@@ -1038,21 +1038,41 @@ function StudioContentView({
       onRenamed={onRenamed}
       onRequestDelete={() => onRequestDelete(project)}
     />
-  ));
+  );
+  // Scroll is a horizontal carousel — it stays unpaginated by design (the
+  // whole point is to swipe through the row). Grid + Table are the
+  // "browse everything" modes, so both page the full list (#1917 follow-up).
   if (viewMode === "scroll") {
     return (
       <HorizontalScroller itemCount={projects.length}>
-        {projects.map((project, i) => (
+        {projects.map((project) => (
           <div key={project.id} className="w-72 shrink-0 snap-start">
-            {cards[i]}
+            {renderCard(project)}
           </div>
         ))}
       </HorizontalScroller>
     );
   }
+  return <StudioContentGrid projects={projects} renderCard={renderCard} />;
+}
+
+/** Paginated grid of "My content" cards. Pages the fully-loaded project
+ *  array through the shared `usePaginatedList` anchor so a user with a
+ *  large library doesn't render hundreds of thumbnails at once. */
+function StudioContentGrid({
+  projects,
+  renderCard,
+}: {
+  projects: StudioProject[];
+  renderCard: (project: StudioProject) => ReactNode;
+}) {
+  const { pageItems, paginationProps } = usePaginatedList(projects, 12);
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {cards}
+    <div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {pageItems.map(renderCard)}
+      </div>
+      <Pagination {...paginationProps} />
     </div>
   );
 }
@@ -1255,13 +1275,7 @@ function UnifiedTemplateCarousel({
     );
   }
   if (viewMode === "grid") {
-    return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {rows.map((row) => (
-          <div key={rowKey(row)}>{renderCard(row)}</div>
-        ))}
-      </div>
-    );
+    return <TemplateGrid rows={rows} rowKey={rowKey} renderCard={renderCard} />;
   }
   return (
     <HorizontalScroller itemCount={rows.length}>
@@ -1271,6 +1285,32 @@ function UnifiedTemplateCarousel({
         </div>
       ))}
     </HorizontalScroller>
+  );
+}
+
+/** Paginated grid of template rows. Mirrors `StudioContentGrid` — the
+ *  scroll view stays a free carousel, but the grid pages the full row set
+ *  through the shared `usePaginatedList` anchor so a large owned-template
+ *  library plus the starter catalog don't render in one wall. */
+function TemplateGrid({
+  rows,
+  rowKey,
+  renderCard,
+}: {
+  rows: TemplateRow[];
+  rowKey: (row: TemplateRow) => string;
+  renderCard: (row: TemplateRow) => ReactNode;
+}) {
+  const { pageItems, paginationProps } = usePaginatedList(rows, 12);
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {pageItems.map((row) => (
+          <div key={rowKey(row)}>{renderCard(row)}</div>
+        ))}
+      </div>
+      <Pagination {...paginationProps} />
+    </div>
   );
 }
 

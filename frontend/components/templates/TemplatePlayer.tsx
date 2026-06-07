@@ -6,9 +6,16 @@
 // source of truth for "what does template X look like playing", so the
 // marketplace preview and the editor preview can never drift.
 //
-// Studio-creator templates with a `previewVideoUrl` play through a bare
-// `<video>` element — those are pre-rendered MP4s, not editable canvas
-// states, so the v2 player isn't applicable.
+// Studio-creator templates resolve in priority order:
+//   1. `previewVideoUrl` — a pre-rendered MP4 the creator uploaded. Plays
+//      through a bare `<video>` (exact pixels, not an editable canvas).
+//   2. `videoScript` — the published v1 storyboard. Converted to a v2
+//      CanvasState via `scriptToCanvasState` (the SAME conversion the
+//      editor draft path runs on "Use") and played through the shared
+//      `<CanvasStatePreview/>`. This is what keeps script-only creator
+//      templates — e.g. the sector video-resume catalog — from showing a
+//      bare "No preview available" even though the studio plays them fine.
+//   3. neither — the creator's poster image, or a generic empty state.
 //
 // Resume templates have no time dimension; this component returns null
 // for them and the parent page (MarketplaceTemplatePreview) keeps its
@@ -21,12 +28,15 @@
 // what every comparable marketplace (Canva / Envato / VEED) ships.
 
 import { Play } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import type { TemplateDef } from "@/components/studio/templates/catalog";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
+import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
+import type { VideoScript } from "@/types/video-script";
 import type { TemplateMeta } from "@/lib/templates/types";
 
 interface Props {
@@ -39,20 +49,70 @@ export default function TemplatePlayer({ meta }: Props) {
   if (meta.origin.kind === "resume") return null;
 
   if (meta.origin.kind === "studio-builtin") {
-    return (
-      <BuiltinPlayer def={meta.origin.def} name={meta.name} />
-    );
+    return <BuiltinPlayer def={meta.origin.def} name={meta.name} />;
   }
 
-  // studio-creator. We render whatever media the creator uploaded —
-  // video when present, image fallback otherwise. Shared press-play
-  // overlay so both branches look identical before playback begins.
+  // studio-creator. CreatorPlayer picks MP4 → canvas script → poster in
+  // priority order — see the file header for why.
   return (
     <CreatorPlayer
-      videoUrl={meta.previewVideoUrl}
+      videoScript={meta.origin.template.videoScript}
+      previewVideoUrl={meta.previewVideoUrl}
       thumbnailUrl={meta.thumbnailUrl}
       name={meta.name}
     />
+  );
+}
+
+// ─── Shared canvas player ────────────────────────────────────────────────────
+
+// Press-play player for any v2 CanvasState. Built-ins seed theirs from the
+// catalog; creator templates derive theirs from the published `videoScript`.
+// Both render through `<CanvasStatePreview/>` — the SAME component the editor's
+// PreviewOverlay mounts — so marketplace preview and editor preview can't
+// drift. `poster` is the static still shown before playback; when omitted the
+// canvas itself (paused at frame 0) is the still.
+function CanvasPreviewPlayer({
+  canvasState,
+  name,
+  poster,
+}: {
+  canvasState: CanvasState;
+  name: string;
+  poster?: ReactNode;
+}) {
+  const playback = usePreviewPlayback(canvasState);
+  const [started, setStarted] = useState(false);
+
+  // When playback ends, drop back to the static still so the surface settles
+  // in a recognisable state and the user can press Play again.
+  // usePreviewPlayback auto-pauses at duration; we observe the flip.
+  useEffect(() => {
+    if (started && !playback.isPlaying && playback.playhead >= playback.duration) {
+      setStarted(false);
+    }
+  }, [started, playback.isPlaying, playback.playhead, playback.duration]);
+
+  const showPoster = !started && poster != null;
+
+  return (
+    <div className="relative h-full w-full bg-black">
+      {showPoster ? (
+        poster
+      ) : (
+        <CanvasStatePreview state={canvasState} playback={playback} />
+      )}
+      {!started && (
+        <PosterStartOverlay
+          onPlay={() => {
+            playback.seek(0);
+            playback.play();
+            setStarted(true);
+          }}
+          label={`Play ${name} preview`}
+        />
+      )}
+    </div>
   );
 }
 
@@ -64,77 +124,113 @@ function BuiltinPlayer({ def, name }: { def: TemplateDef; name: string }) {
   // the user clicks Use, so this surface and the editor's PreviewOverlay
   // render through identical primitives — what visitors watch on the
   // marketplace IS what they land on in the editor.
-  const canvasState = useMemo(
-    () => seedCanvasFromTemplate(def.id),
-    [def.id],
-  );
-  const playback = usePreviewPlayback(canvasState);
-  const [started, setStarted] = useState(false);
-
-  // When playback ends, drop back to the static thumb so the surface
-  // settles in a recognisable state and the user can press Play again.
-  // usePreviewPlayback auto-pauses at duration; we observe the flip.
-  useEffect(() => {
-    if (started && !playback.isPlaying && playback.playhead >= playback.duration) {
-      setStarted(false);
-    }
-  }, [started, playback.isPlaying, playback.playhead, playback.duration]);
-
+  const canvasState = useMemo(() => seedCanvasFromTemplate(def.id), [def.id]);
   return (
-    <div className="relative h-full w-full bg-black">
-      {started ? (
-        <CanvasStatePreview state={canvasState} playback={playback} />
-      ) : (
-        <>
-          <TemplateThumb template={def} className="h-full w-full rounded-none" />
-          <PosterStartOverlay
-            onPlay={() => {
-              playback.seek(0);
-              playback.play();
-              setStarted(true);
-            }}
-            label={`Play ${name} preview`}
-          />
-        </>
-      )}
-    </div>
+    <CanvasPreviewPlayer
+      canvasState={canvasState}
+      name={name}
+      poster={<TemplateThumb template={def} className="h-full w-full rounded-none" />}
+    />
   );
 }
 
 // ─── Creator branch ──────────────────────────────────────────────────────────
 
 function CreatorPlayer({
-  videoUrl,
+  videoScript,
+  previewVideoUrl,
   thumbnailUrl,
   name,
 }: {
-  videoUrl: string | undefined;
+  videoScript: unknown;
+  previewVideoUrl: string | undefined;
   thumbnailUrl: string | undefined;
   name: string;
 }) {
-  const [playing, setPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  if (!videoUrl) {
-    // No video uploaded — show whatever poster the creator provided, or
-    // a generic empty state. Either way no Play button (nothing to play).
+  // A pre-rendered MP4 the creator uploaded wins — those are exact pixels,
+  // not an editable canvas, so the v2 player isn't applicable.
+  if (previewVideoUrl) {
     return (
-      <div className="relative h-full w-full bg-muted/30">
-        {thumbnailUrl ? (
+      <CreatorVideoPlayer
+        videoUrl={previewVideoUrl}
+        thumbnailUrl={thumbnailUrl}
+        name={name}
+      />
+    );
+  }
+  // No MP4 — play the published canvas script through the shared v2 player
+  // (the same path useCreateStudioDraft takes on "Use"). This is what
+  // fixes the bare "No preview available" for script-only creator templates.
+  if (isRenderableScript(videoScript)) {
+    return (
+      <CreatorCanvasPlayer
+        script={videoScript}
+        thumbnailUrl={thumbnailUrl}
+        name={name}
+      />
+    );
+  }
+  // Neither media nor a renderable script — show whatever poster the
+  // creator provided, or a generic empty state.
+  return <EmptyPreview thumbnailUrl={thumbnailUrl} name={name} />;
+}
+
+function CreatorCanvasPlayer({
+  script,
+  thumbnailUrl,
+  name,
+}: {
+  script: VideoScript;
+  thumbnailUrl: string | undefined;
+  name: string;
+}) {
+  // Convert the v1 VideoScript column → v2 CanvasState exactly as the
+  // editor draft path does (useCreateStudioDraft → scriptToCanvasState),
+  // so preview and editor render identical content. Guard against a
+  // malformed row so a bad script degrades to the poster, not a crash.
+  const canvasState = useMemo<CanvasState | null>(() => {
+    try {
+      return scriptToCanvasState(script);
+    } catch {
+      return null;
+    }
+  }, [script]);
+
+  if (!canvasState) {
+    return <EmptyPreview thumbnailUrl={thumbnailUrl} name={name} />;
+  }
+
+  return (
+    <CanvasPreviewPlayer
+      canvasState={canvasState}
+      name={name}
+      // Prefer the creator's still when present; otherwise CanvasPreviewPlayer
+      // falls back to the canvas's own frame 0 as the press-play still.
+      poster={
+        thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={name}
             className="h-full w-full object-cover"
             crossOrigin="anonymous"
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-            No preview available
-          </div>
-        )}
-      </div>
-    );
-  }
+        ) : undefined
+      }
+    />
+  );
+}
+
+function CreatorVideoPlayer({
+  videoUrl,
+  thumbnailUrl,
+  name,
+}: {
+  videoUrl: string;
+  thumbnailUrl: string | undefined;
+  name: string;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   return (
     <div className="relative h-full w-full bg-black">
@@ -158,6 +254,48 @@ function CreatorPlayer({
         />
       )}
     </div>
+  );
+}
+
+function EmptyPreview({
+  thumbnailUrl,
+  name,
+}: {
+  thumbnailUrl: string | undefined;
+  name: string;
+}) {
+  // No video uploaded — show whatever poster the creator provided, or a
+  // generic empty state. Either way no Play button (nothing to play).
+  return (
+    <div className="relative h-full w-full bg-muted/30">
+      {thumbnailUrl ? (
+        <img
+          src={thumbnailUrl}
+          alt={name}
+          className="h-full w-full object-cover"
+          crossOrigin="anonymous"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+          No preview available
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A `videoScript` column is renderable when it carries the shape
+ *  `scriptToCanvasState` reads: a `video` settings object and at least one
+ *  scene. Anything else (null, legacy junk, empty draft) degrades to the
+ *  poster / empty state rather than rendering a blank canvas. */
+function isRenderableScript(value: unknown): value is VideoScript {
+  if (!value || typeof value !== "object") return false;
+  const v = value as { video?: unknown; scenes?: unknown };
+  return (
+    !!v.video &&
+    typeof v.video === "object" &&
+    Array.isArray(v.scenes) &&
+    v.scenes.length > 0
   );
 }
 

@@ -324,13 +324,44 @@ export default function UnifiedSearch({
   // card-level "View" click and the list-view title hyperlink so the two can
   // never drift. Returns null when a result has no concrete destination.
   const entityHref = (item: any): string | null => {
-    if (item.type === "resume") return `/resumes/${item.id}`;
-    if (item.type === "job") return `/jobs/${item.id}`;
-    if (item.type === "company") return `/companies/${item.id}`;
-    if (item.type === "people") return `/people/${item.slug || item.id}`;
-    if (item.type === "video") return `/v/${item.id}`;
-    if (item.href) return item.href as string;
-    return null;
+    switch (item.type) {
+      case "resume":
+        return `/resumes/${item.id}`;
+      case "job":
+        return `/jobs/${item.id}`;
+      case "company":
+        return `/companies/${item.id}`;
+      case "people":
+        return `/people/${item.slug || item.id}`;
+      case "video":
+        return `/v/${item.id}`;
+      case "voice":
+        // Mirrors VoiceMarketplaceCard's destination.
+        return item.voiceCloneId
+          ? `/marketplace/voices/${item.voiceCloneId}`
+          : null;
+      case "service":
+        // Mirrors ServiceMarketplaceCard's ctaHref.
+        return item.isPlatformService
+          ? "/services?wizard=open"
+          : `/people/${item.providerSlug || item.provider?.id}?tab=services`;
+      case "course":
+        // Mirrors CourseMarketplaceCard's href.
+        return item.author?.slug && item.slug
+          ? `/courses/${item.author.slug}/${item.slug}`
+          : null;
+      case "template": {
+        // Mirrors TemplateCard's entityUrl (meta.slug or descriptor.id).
+        const slug = item.meta?.slug || item.descriptor?.id;
+        return slug ? `/marketplace/templates/${slug}` : null;
+      }
+      case "tool":
+        // ToolCard navigates to the catalog entry's href.
+        return getCatalogTool(item.id)?.href ?? item.href ?? null;
+      default:
+        // article / guide / faq and any future kind carry their own href.
+        return (item.href as string) ?? null;
+    }
   };
 
   const handleView = (item: any) => {
