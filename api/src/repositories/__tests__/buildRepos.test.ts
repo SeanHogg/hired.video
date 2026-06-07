@@ -34,6 +34,7 @@ describe("buildRepos — dependency-injection wiring", () => {
     // wiring) or an `as keyof Repos` cast error (wired without interface).
     const expected: ReadonlyArray<keyof Repos> = [
       "resumes",
+      "resumeFeedback",
       "users",
       "preferences",
       "autofill",

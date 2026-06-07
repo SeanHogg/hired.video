@@ -24,16 +24,12 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
-import DocumentPagedView, {
-  DocumentViewModeToggle,
-  type DocumentViewMode,
-} from "@/components/studio/document/DocumentPagedView";
 import type { DocumentState } from "@/lib/studio/editor-v2/document-state";
 import {
   applyDocumentTemplate,
   documentTemplatesForEntity,
 } from "@/lib/studio/editor-v2/document-templates";
-import type { ResumeData } from "@/types/resume";
+import { descriptorFromResumeDocument } from "@/lib/studio/document/resume-document-descriptor";
 import EntityHubTabStrip from "@/components/EntityHubTabStrip";
 import MetadataModal from "@/components/MetadataModal";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
@@ -201,10 +197,6 @@ export default function ResumeDetail() {
   // set only on an explicit user pick, so the saved layout renders verbatim on
   // first load and only re-skins when the user switches templates (#1883).
   const [layoutTemplateOverrideId, setLayoutTemplateOverrideId] = useState<string | null>(null);
-  // Paged review mode for canvas resumes — default to the two-up flip spread so
-  // a multi-page resume shows "1 + 2" with page flipping (the same preview
-  // canvas the studio editor uses).
-  const [docViewMode, setDocViewMode] = useState<DocumentViewMode>("paged");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -774,59 +766,52 @@ export default function ResumeDetail() {
             <div className="flex">
               <div className="flex-1 min-w-0">
                 {(() => {
-                  // If the resume was authored on the Studio document canvas,
-                  // render its saved LAYOUT read-only through the SAME paged
-                  // preview canvas the editor uses (preview === render === view,
-                  // #1912). Falls back to the declarative template renderer for
-                  // resumes without a canvas layout.
+                  // ONE render engine for resumes — the declarative renderer
+                  // (columns, themes, hero, per-section layout). The studio
+                  // preview + the PDF export use this same engine via the
+                  // DocumentState→descriptor bridge, so the page, the canvas
+                  // preview, and the print can never drift.
+                  //
+                  // For a canvas-authored resume (saved `documentLayout`) the
+                  // descriptor is bridged from that layout — recovering the
+                  // template's two-column structure that the canvas state alone
+                  // doesn't model. The dropdown re-skin (#1883) applies the
+                  // picked template to the layout before bridging. Resumes
+                  // without a layout use the descriptor resolved from
+                  // `content.meta.template`.
                   const baseLayout = (
                     resume.content?.meta as Record<string, unknown> | undefined
                   )?.documentLayout as DocumentState | undefined;
-                  if (!baseLayout) {
-                    return (
-                      <DeclarativeResumeRenderer
-                        resume={resume}
-                        descriptor={descriptor}
-                        videoSlot={<VideoSlot items={videoItems} />}
-                        isOwner={isOwner}
-                        onEditSection={async () =>
-                          navigate(await resumeEditorPath(resume.id))
-                        }
-                      />
-                    );
-                  }
-                  // Re-skin the saved layout when the user picks a different
-                  // template from the dropdown (#1883) — template switching now
-                  // actually changes the rendered design.
-                  let layout = baseLayout;
-                  if (
-                    layoutTemplateOverrideId &&
-                    layoutTemplateOverrideId !== baseLayout.templateId
-                  ) {
-                    const option = documentTemplatesForEntity("resume").find(
-                      (o) => o.id === layoutTemplateOverrideId,
-                    );
-                    if (option) {
-                      layout = applyDocumentTemplate(
-                        baseLayout,
-                        option,
-                        () => crypto.randomUUID(),
+                  let activeDescriptor = descriptor;
+                  if (baseLayout) {
+                    let layout = baseLayout;
+                    if (
+                      layoutTemplateOverrideId &&
+                      layoutTemplateOverrideId !== baseLayout.templateId
+                    ) {
+                      const option = documentTemplatesForEntity("resume").find(
+                        (o) => o.id === layoutTemplateOverrideId,
                       );
+                      if (option) {
+                        layout = applyDocumentTemplate(
+                          baseLayout,
+                          option,
+                          () => crypto.randomUUID(),
+                        );
+                      }
                     }
+                    activeDescriptor = descriptorFromResumeDocument(layout);
                   }
                   return (
-                    <div className="flex flex-col items-center gap-3 py-6">
-                      <DocumentViewModeToggle
-                        value={docViewMode}
-                        onChange={setDocViewMode}
-                      />
-                      <DocumentPagedView
-                        state={layout}
-                        content={resume.content as unknown as ResumeData}
-                        mode={docViewMode}
-                        className="w-full"
-                      />
-                    </div>
+                    <DeclarativeResumeRenderer
+                      resume={resume}
+                      descriptor={activeDescriptor}
+                      videoSlot={<VideoSlot items={videoItems} />}
+                      isOwner={isOwner}
+                      onEditSection={async () =>
+                        navigate(await resumeEditorPath(resume.id))
+                      }
+                    />
                   );
                 })()}
                 <div className="px-4 sm:px-6 pb-8">
