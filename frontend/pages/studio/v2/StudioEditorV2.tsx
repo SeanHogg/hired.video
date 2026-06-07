@@ -41,6 +41,7 @@ import {
   Download,
   Code2,
   Eye,
+  History,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
@@ -142,6 +143,7 @@ import CanvasRouter from "@/components/studio/v2/CanvasRouter";
 import DocumentStage from "@/components/studio/document/DocumentStage";
 import DocumentLeftPanel from "@/components/studio/document/DocumentLeftPanel";
 import ResumeUpload from "@/components/ResumeUpload";
+import EntityVersionHistoryDialog from "@/components/EntityVersionHistoryDialog";
 import {
   type DocumentState,
   createBlankDocumentState,
@@ -515,6 +517,8 @@ export default function StudioEditorV2() {
   // owned by the resume row. Seeded blank for a fresh draft; fetched from the
   // resume row when DocumentState.entityId is set; persisted back on save.
   const [documentEntityContent, setDocumentEntityContent] = useState<ResumeData | null>(null);
+  // In-editor résumé Version History dialog (#1935).
+  const [resumeVersionHistoryOpen, setResumeVersionHistoryOpen] = useState(false);
   // Captured by DrawingStage so the host can flatten the composite on
   // Export / Save-to-library without DrawingStage needing its own
   // header buttons (single chrome, kind-aware action — per DRY).
@@ -1235,32 +1239,67 @@ export default function StudioEditorV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMediaKind, documentStateHydrated, documentState.entityId]);
 
-  // Inline "upload existing résumé" success path (#1915 / #1935). The user is
-  // already in the resume editor — the upload OVERWRITES the open résumé's
-  // content in place (ResumeUpload `targetResumeId`), so `response.id` is the
-  // same bound entity (a blank, unsaved draft has no entityId, so it falls back
-  // to creating one). Either way we rebuild the canvas here: reuse the same
-  // document-state builder as the ?editResume deep-link so the section blocks
-  // are identical regardless of entry point, and set the parsed content
-  // directly (the content effect above only refetches on an entityId CHANGE,
-  // which an overwrite doesn't trigger).
-  const handleResumeUploaded = useCallback(
-    (response: ResumeUploadResponse) => {
-      const content = response.content as unknown as Record<string, unknown>;
-      const populated = Object.keys(content).filter(
-        (k) => Array.isArray(content[k]) && (content[k] as unknown[]).length > 0,
+  // Bind a résumé's content onto the current canvas (#1915 / #1935). Rebuilds
+  // the document state from the same builder the ?editResume deep-link uses (so
+  // section blocks are identical regardless of entry point) and sets the parsed
+  // content directly — the content effect above only refetches on an entityId
+  // CHANGE, which an in-place overwrite/restore doesn't trigger. Shared by the
+  // inline import success path AND the version-history restore path.
+  const bindResumeToCanvas = useCallback(
+    (id: string, content: ResumeData) => {
+      const c = content as unknown as Record<string, unknown>;
+      const populated = Object.keys(c).filter(
+        (k) => Array.isArray(c[k]) && (c[k] as unknown[]).length > 0,
       );
       const docState = createResumeDocumentState(
-        response.id,
+        id,
         populated,
         () => crypto.randomUUID(),
       );
       resetDocumentHistory(docState);
-      setDocumentEntityContent(response.content);
+      setDocumentEntityContent(content);
+    },
+    [resetDocumentHistory],
+  );
+
+  // Inline "upload existing résumé" success path. The user is already in the
+  // resume editor — the upload OVERWRITES the open résumé's content in place
+  // (ResumeUpload `targetResumeId`), so `response.id` is the same bound entity
+  // (a blank, unsaved draft has no entityId, so it falls back to creating one).
+  const handleResumeUploaded = useCallback(
+    (response: ResumeUploadResponse) => {
+      bindResumeToCanvas(response.id, response.content);
       toast({ title: "Résumé imported", description: response.message });
     },
-    [resetDocumentHistory, toast],
+    [bindResumeToCanvas, toast],
   );
+
+  // In-editor Version History (#1935). Since the editor's Undo only covers
+  // DocumentState layout (not entity content) and the import is persisted
+  // server-side, a destructive import must be reversible from where the user
+  // is — not only from /resumes. Reuses the shared <EntityVersionHistoryDialog>
+  // + resume version endpoints; restore refetches the (now-rolled-back) content
+  // and rebinds it onto the canvas. Null when no résumé row is bound yet.
+  const resumeVersionAdapter = useMemo(() => {
+    const id = documentState.entityId;
+    if (!(currentMediaKind === "document" && documentState.entityKind === "resume" && id)) {
+      return null;
+    }
+    return {
+      list: () => resumeService.listVersions(id),
+      snapshot: () =>
+        resumeService.createVersion(id, {
+          label: t("studio.versionHistory.manualSnapshot"),
+          isAutosave: false,
+        }),
+      restore: async (versionId: string) => {
+        await resumeService.restoreVersion(id, versionId);
+        const r = await resumeService.getResumeById(id);
+        bindResumeToCanvas(id, mapContentToResumeData(r.content));
+        toast({ title: "Version restored" });
+      },
+    };
+  }, [currentMediaKind, documentState.entityKind, documentState.entityId, bindResumeToCanvas, t, toast]);
 
   // Game uses the null-sentinel hydration pattern instead of a
   // separate boolean flag — `gameState !== null` IS the hydration
@@ -3876,12 +3915,35 @@ export default function StudioEditorV2() {
                   targetResumeId={documentState.entityId ?? undefined}
                   onUploadSuccess={handleResumeUploaded}
                 />
+                {/* Version history — the only way to revert a destructive
+                    import (the editor's Undo doesn't cover entity content).
+                    Shown once the résumé is saved (has an entity row). */}
+                {resumeVersionAdapter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-3 w-full justify-start text-muted-foreground"
+                    onClick={() => setResumeVersionHistoryOpen(true)}
+                  >
+                    <History className="mr-1.5 h-4 w-4" />
+                    Version history
+                  </Button>
+                )}
               </div>
             </CollapsiblePanel>
           )}
           </div>
         </div>
       </div>
+      {resumeVersionAdapter && (
+        <EntityVersionHistoryDialog
+          open={resumeVersionHistoryOpen}
+          onOpenChange={setResumeVersionHistoryOpen}
+          entityLabel="Resume"
+          canSnapshot
+          adapter={resumeVersionAdapter}
+        />
+      )}
       {/* Save as Course Lesson — see [AttachToCourseDialog](../../components/creator/AttachToCourseDialog.tsx)
           and the SaveMenuV2 publish-handler wiring above. Self-fetches the
           user's courses; renders a "Create a course" CTA when the list is

@@ -312,7 +312,7 @@ export default function ResumeUpload({
       const proceed = await confirmDialog({
         title: "Replace this résumé?",
         description:
-          "Importing this file replaces the current résumé's content. The editor's Undo won't revert this, but the current version is saved to Version History first, so you can restore it from the Resumes page.",
+          "Importing this file replaces the current résumé's content. The editor's Undo won't revert this, but the current version is saved to Version History first, so you can restore it.",
         confirmText: "Replace résumé",
         cancelText: "Cancel",
         destructive: true,
@@ -543,8 +543,8 @@ export default function ResumeUpload({
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               This replaces the current résumé's content. The current version is
-              saved to Version History first (restorable from the Resumes page);
-              the editor's Undo won't revert it.
+              saved to Version History first (restorable any time); the editor's
+              Undo won't revert it.
             </AlertDescription>
           </Alert>
         )}
