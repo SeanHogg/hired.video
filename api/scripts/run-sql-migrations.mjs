@@ -47,6 +47,18 @@
  *     count and prevents the file from being recorded as applied. If
  *     any file finishes with err > 0, the runner exits 1 so CI fails
  *     loud.
+ *
+ * Transient connectivity (no-retry → fatal regression):
+ *   The neon HTTP driver reaches the database over `fetch`. A cold
+ *   Neon endpoint waking up, or a momentary network blip on the CI
+ *   runner, surfaces as `NeonDbError: Error connecting to database:
+ *   fetch failed` with an ETIMEDOUT/ECONNRESET cause and NO SQL fields
+ *   (`code`/`severity` undefined). With zero retry, the very first
+ *   round-trip (ensureMigrationsTable) failing this way aborted the
+ *   entire deploy. Every DB round-trip now runs through `withRetry`,
+ *   which retries ONLY transient connection failures with exponential
+ *   backoff + jitter. Real SQL errors carry a SQLSTATE `code` and are
+ *   rethrown immediately so genuine migration bugs still fail fast.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -54,6 +66,78 @@ import { join } from "node:path";
 import { neon } from "@neondatabase/serverless";
 
 const DRIZZLE_DIR = join(process.cwd(), "drizzle");
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Substrings that mark a transient network/connection failure (as opposed
+ *  to a SQL/query error). neon-http surfaces connectivity problems as a bare
+ *  `fetch failed` wrapping an OS-level ETIMEDOUT/ECONNRESET, with no Postgres
+ *  SQLSTATE. We match on the whole error chain (message + code + nested
+ *  AggregateError.errors + sourceError/cause). */
+const TRANSIENT_PATTERNS = [
+  "fetch failed",
+  "Error connecting to database",
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EAI_AGAIN",
+  "ENOTFOUND",
+  "EPIPE",
+  "socket hang up",
+  "Connection terminated",
+];
+
+/** True when the error is a transient connection failure worth retrying.
+ *  A real SQL error from neon-http carries a Postgres SQLSTATE `code`
+ *  (e.g. "42P07") and will NOT match any transient pattern, so it is not
+ *  retried. Exported for regression coverage. */
+export function isTransientConnectionError(error) {
+  const seen = new Set();
+  const parts = [];
+  let cur = error;
+  while (cur && typeof cur === "object" && !seen.has(cur)) {
+    seen.add(cur);
+    if (cur.message) parts.push(String(cur.message));
+    if (cur.code) parts.push(String(cur.code));
+    if (Array.isArray(cur.errors)) {
+      for (const sub of cur.errors) {
+        if (sub?.message) parts.push(String(sub.message));
+        if (sub?.code) parts.push(String(sub.code));
+      }
+    }
+    cur = cur.sourceError ?? cur.cause;
+  }
+  const haystack = parts.join(" | ");
+  return TRANSIENT_PATTERNS.some((p) => haystack.includes(p));
+}
+
+/** Run an async DB thunk, retrying ONLY transient connection failures with
+ *  exponential backoff + jitter. Real SQL errors rethrow on the first
+ *  attempt so migration bugs still fail the build loud. Exported for tests. */
+export async function withRetry(thunk, opts = {}) {
+  const { attempts = 5, baseMs = 500, maxMs = 8000, onRetry } = opts;
+  let lastErr;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await thunk();
+    } catch (e) {
+      lastErr = e;
+      if (attempt >= attempts || !isTransientConnectionError(e)) throw e;
+      const backoff = Math.min(maxMs, baseMs * 2 ** (attempt - 1));
+      const delay = backoff + Math.floor(backoff * 0.25 * Math.random());
+      if (onRetry) {
+        onRetry(attempt, delay, e);
+      } else {
+        console.warn(
+          `Transient DB error (attempt ${attempt}/${attempts}), retrying in ${delay}ms: ` +
+            String(e?.message ?? e).slice(0, 160),
+        );
+      }
+      await sleep(delay);
+    }
+  }
+  throw lastErr;
+}
 
 /** Parse a SQL text into an array of top-level statements. Respects:
  *  • `-- line comments` (stripped per-line)
@@ -176,22 +260,22 @@ export function splitSqlStatements(sqlText) {
  *  tables in any pg_dump or admin tool.
  */
 async function ensureMigrationsTable(sql) {
-  await sql(`CREATE TABLE IF NOT EXISTS "_sql_migrations" (
+  await withRetry(() => sql(`CREATE TABLE IF NOT EXISTS "_sql_migrations" (
     "name"       text PRIMARY KEY,
     "applied_at" timestamptz NOT NULL DEFAULT now()
-  )`);
+  )`));
 }
 
 /** Load the set of migration filenames already applied to this database.
  *  Returned as a Set<string> so the runner can do O(1) `has()` checks.
  */
 async function loadAppliedSet(sql) {
-  const rows = await sql(`SELECT "name" FROM "_sql_migrations"`);
+  const rows = await withRetry(() => sql(`SELECT "name" FROM "_sql_migrations"`));
   return new Set(rows.map((r) => r.name));
 }
 
 async function recordApplied(sql, name) {
-  await sql`INSERT INTO "_sql_migrations" ("name") VALUES (${name}) ON CONFLICT DO NOTHING`;
+  await withRetry(() => sql`INSERT INTO "_sql_migrations" ("name") VALUES (${name}) ON CONFLICT DO NOTHING`);
 }
 
 async function runFile(sql, name, path) {
@@ -200,7 +284,7 @@ async function runFile(sql, name, path) {
   let ok = 0, skip = 0, err = 0;
   for (const s of stmts) {
     try {
-      await sql(s);
+      await withRetry(() => sql(s));
       ok++;
     } catch (e) {
       const msg = e?.message ?? String(e);

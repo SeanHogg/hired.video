@@ -9,7 +9,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { splitSqlStatements } from "./run-sql-migrations.mjs";
+import {
+  splitSqlStatements,
+  isTransientConnectionError,
+  withRetry,
+} from "./run-sql-migrations.mjs";
 
 describe("splitSqlStatements", () => {
   it("splits a simple two-statement file", () => {
@@ -128,5 +132,86 @@ CREATE TABLE IF NOT EXISTS user_plan_overrides (user_id uuid PRIMARY KEY);
     const stmts = splitSqlStatements(sql);
     assert.equal(stmts.length, 1);
     assert.match(stmts[0], /^CREATE TABLE IF NOT EXISTS user_plan_overrides/);
+  });
+});
+
+// ── Regression: deploy aborted on a transient Neon connect timeout because the
+//    runner had zero retry. Reproduce the exact neon-http error shape. ──
+function neonConnectTimeout() {
+  // Mirrors: NeonDbError: Error connecting to database: fetch failed
+  //   → sourceError: TypeError: fetch failed
+  //     → cause: AggregateError [ETIMEDOUT]
+  const agg = new Error("");
+  agg.name = "AggregateError";
+  agg.code = "ETIMEDOUT";
+  agg.errors = [];
+  const fetchErr = new TypeError("fetch failed");
+  fetchErr.cause = agg;
+  const neonErr = new Error("Error connecting to database: fetch failed");
+  neonErr.name = "NeonDbError";
+  neonErr.code = undefined; // no SQLSTATE on a connectivity failure
+  neonErr.severity = undefined;
+  neonErr.sourceError = fetchErr;
+  return neonErr;
+}
+
+describe("isTransientConnectionError", () => {
+  it("flags the neon connect-timeout error chain as transient", () => {
+    assert.equal(isTransientConnectionError(neonConnectTimeout()), true);
+  });
+
+  it("flags bare ECONNRESET / socket hang up", () => {
+    assert.equal(isTransientConnectionError(new Error("socket hang up")), true);
+    const e = new Error("read ECONNRESET");
+    e.code = "ECONNRESET";
+    assert.equal(isTransientConnectionError(e), true);
+  });
+
+  it("does NOT flag a real SQL error carrying a Postgres SQLSTATE", () => {
+    const e = new Error('relation "_sql_migrations" already exists');
+    e.name = "NeonDbError";
+    e.code = "42P07"; // duplicate_table
+    assert.equal(isTransientConnectionError(e), false);
+  });
+
+  it("does NOT flag an arbitrary syntax error", () => {
+    const e = new Error('syntax error at or near "SELCT"');
+    e.code = "42601";
+    assert.equal(isTransientConnectionError(e), false);
+  });
+});
+
+describe("withRetry", () => {
+  const fast = { baseMs: 1, maxMs: 4 };
+
+  it("retries a transient failure then succeeds", async () => {
+    let calls = 0;
+    const result = await withRetry(() => {
+      calls++;
+      if (calls < 3) throw neonConnectTimeout();
+      return "ok";
+    }, { ...fast, onRetry: () => {} });
+    assert.equal(result, "ok");
+    assert.equal(calls, 3);
+  });
+
+  it("rethrows a non-transient (real SQL) error immediately — no retry", async () => {
+    let calls = 0;
+    const sqlErr = new Error("column already exists");
+    sqlErr.code = "42701";
+    await assert.rejects(
+      () => withRetry(() => { calls++; throw sqlErr; }, { ...fast, onRetry: () => {} }),
+      /column already exists/,
+    );
+    assert.equal(calls, 1, "a SQL error must not be retried");
+  });
+
+  it("gives up after `attempts` on a persistent transient error", async () => {
+    let calls = 0;
+    await assert.rejects(
+      () => withRetry(() => { calls++; throw neonConnectTimeout(); }, { attempts: 4, ...fast, onRetry: () => {} }),
+      /Error connecting to database/,
+    );
+    assert.equal(calls, 4);
   });
 });
