@@ -314,6 +314,22 @@ function shouldAttachEmulationToken(url: string): boolean {
   }
 }
 
+/**
+ * Standard auth headers for any hand-rolled fetch client (the Bearer token
+ * from localStorage + the active impersonation token), mirroring exactly what
+ * the singleton `apiClient` attaches. Secondary clients (e.g. courses-api)
+ * must route through this so they can't drift from — or silently omit, as
+ * courses-api did, 401ing every authenticated call — the canonical auth rules.
+ */
+export function standardAuthHeaders(url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const token = localStorage.getItem("auth_token");
+  if (token) out.Authorization = `Bearer ${token}`;
+  const emuToken = _emulationTokenGetter();
+  if (emuToken && shouldAttachEmulationToken(url)) out["X-Emulation-Token"] = emuToken;
+  return out;
+}
+
 function pushApiLogEntry(entry: ApiRequestLogEntry): void {
   if (entry.requestBody !== undefined) {
     entry.requestBody = truncateBodyForLog(entry.requestBody);

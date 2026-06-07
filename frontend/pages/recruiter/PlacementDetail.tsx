@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
-import { apiClient } from "@/lib/api-client";
+import { apiClient, standardAuthHeaders } from "@/lib/api-client";
 import {
   workforceService,
   type DeskMarginRow,
@@ -266,15 +266,20 @@ function DocumentsTab({ placementId, toast }: { placementId: string; toast: Retu
     setUploadingId(docId);
     try {
       const buf = await file.arrayBuffer();
-      await fetch(`/api/workforce/documents/${docId}/upload`, {
+      const uploadUrl = `/api/workforce/documents/${docId}/upload`;
+      const res = await fetch(uploadUrl, {
         method: "POST",
         headers: {
           "Content-Type": file.type || "application/octet-stream",
           "x-filename": file.name,
+          // authMiddleware reads the Bearer header only — relying on the cookie
+          // alone 401'd this raw upload cross-origin. Reuse the canonical headers.
+          ...standardAuthHeaders(uploadUrl),
         },
         body: buf,
         credentials: "include",
       });
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
       toast({ title: "Uploaded", description: file.name });
       await refresh();
     } catch (e) {

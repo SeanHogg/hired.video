@@ -6,6 +6,8 @@
  * agree on the same endpoints.
  */
 
+import { standardAuthHeaders } from "../api-client";
+
 const API = ((import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_API_URL ?? "/api").replace(/\/$/, "");
 
 // Every backend route this client targets (`/courses`, `/learning-paths`,
@@ -26,10 +28,17 @@ async function call<T>(
   path: string,
   init: RequestInit & { auth?: string | null } = {},
 ): Promise<T> {
+  const url = apiUrl(path);
   const headers = new Headers(init.headers ?? {});
   headers.set("Content-Type", "application/json");
+  // Attach the canonical auth headers (Bearer + active impersonation token) so
+  // these calls authenticate like every other client. authMiddleware reads the
+  // Authorization header ONLY — there is no cookie fallback — so relying on
+  // `credentials: "include"` alone 401'd cross-origin (api.hired.video) prod.
+  for (const [k, v] of Object.entries(standardAuthHeaders(url))) headers.set(k, v);
+  // An explicit token (SCORM host page) still wins over the localStorage one.
   if (init.auth) headers.set("Authorization", `Bearer ${init.auth}`);
-  const res = await fetch(apiUrl(path), { ...init, headers, credentials: "include" });
+  const res = await fetch(url, { ...init, headers, credentials: "include" });
   const json = await res.json().catch(() => ({})) as { data?: T; error?: { message?: string } };
   if (!res.ok) throw new Error(json.error?.message ?? `Request failed: ${res.status}`);
   return (json.data ?? null) as T;
