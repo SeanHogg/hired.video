@@ -28,9 +28,11 @@ export interface DownloadResumeOptions {
    */
   preloaded?: Resume | null;
   /**
-   * Template descriptor for the PDF print window. Stashed in sessionStorage
-   * keyed by resume id so the print route can pick it up and honour the
-   * user's in-flight edits.
+   * Template descriptor for the PDF print window. Serialised into the print
+   * URL (`?print=1&d=…`) so the print route renders the user's in-flight
+   * template. The URL is the only reliable channel here: the print window is
+   * opened with `noopener`, which gives it a *fresh* sessionStorage rather than
+   * a copy of the opener's — so a sessionStorage stash would never reach it.
    */
   descriptor?: ResumeTemplateDescriptor;
   /** Skip analytics — used for the sample resume and other non-owned reads. */
@@ -47,14 +49,11 @@ export async function downloadResume({
   if (!skipTracking) trackResumeDownload(id, format);
 
   if (format === "pdf") {
-    if (descriptor) {
-      try {
-        sessionStorage.setItem(`resume-descriptor:${id}`, JSON.stringify(descriptor));
-      } catch {
-        // sessionStorage disabled/unavailable — print window falls back to defaults
-      }
-    }
-    await exportResumePdf(`/resumes/${id}?print=1`);
+    const params = new URLSearchParams({ print: "1" });
+    // Carry the in-flight descriptor in the URL — URLSearchParams percent-
+    // encodes the JSON, and the print route reads it back via searchParams.
+    if (descriptor) params.set("d", JSON.stringify(descriptor));
+    await exportResumePdf(`/resumes/${id}?${params.toString()}`);
     return;
   }
 

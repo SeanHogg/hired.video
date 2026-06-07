@@ -250,20 +250,22 @@ export default function ResumeDetail() {
     return [...fromStudio, ...fromMeta];
   }, [resume, studioVideos]);
 
-  // Pick initial template. In print mode, the export flow stashes the in-flight
-  // descriptor in sessionStorage so the PDF matches what the user was viewing —
-  // that wins. Otherwise: URL ?template= (preview), then the resume's saved
-  // default, then DEFAULT_DESCRIPTOR. Folded into one selector so the async
-  // resume-load doesn't race the print effect and clobber the stashed pick.
+  // Pick initial template. In print mode, the export flow serialises the
+  // in-flight descriptor into the print URL (`?d=…`) so the PDF matches what
+  // the user was viewing — that wins. (The URL, not sessionStorage: the print
+  // window is opened with `noopener` and so gets a fresh sessionStorage, never
+  // a copy of the opener's.) Otherwise: URL ?template= (preview), then the
+  // resume's saved default, then DEFAULT_DESCRIPTOR. Folded into one selector
+  // so the async resume-load doesn't race the print effect and clobber the pick.
   const pickInitialDescriptor = (loaded: Resume | null): ResumeTemplateDescriptor => {
-    if (printMode && id) {
-      try {
-        const stashed = sessionStorage.getItem(`resume-descriptor:${id}`);
-        if (stashed) {
-          const parsed = validateDescriptor(JSON.parse(stashed));
+    if (printMode) {
+      const encoded = searchParams.get("d");
+      if (encoded) {
+        try {
+          const parsed = validateDescriptor(JSON.parse(encoded));
           if (parsed.ok) return parsed.value;
-        }
-      } catch {}
+        } catch {}
+      }
     }
     const requested = searchParams.get("template");
     const urlMatch = getTemplateById(requested);

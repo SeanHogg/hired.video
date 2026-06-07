@@ -2328,7 +2328,7 @@ Unlocks are tracked client-side in `localStorage` as a first pass; server-backed
 - `GET /resumes/VIEWER/:id?print=1` — bare print variant:
   - No chrome, no toolbar — just the rendered resume
   - Auto-calls `window.print()` 400ms after load
-  - Reads descriptor from `sessionStorage` under `resume-descriptor:{id}` so the caller's selected template survives the new-window hop
+  - Reads the descriptor from the print URL (`?d=<serialised descriptor>`) so the caller's selected template survives the new-window hop. (URL, not `sessionStorage`: the print window is opened with `noopener`, which gives it a fresh sessionStorage rather than a copy of the opener's — the old stash never reached it, so print always fell back to the default template.)
 - The same `<DeclarativeResumeRenderer>` will later back `ResumeDetail`, `EmbeddedResume` (compact variant), and marketplace previews — one renderer, three hosts.
 
 ### Export formats
@@ -2340,7 +2340,7 @@ Unlocks are tracked client-side in `localStorage` as a first pass; server-backed
 | **Plain Text (.txt)** | JS serializer walking `ResumeData` — bulleted sections, headings, date ranges | zero |
 | **Raw JSON (.json)** | `JSON.stringify(resume.data, null, 2)` | zero |
 
-All four are implemented in `frontend/lib/resume-exporters.ts`. PDF export stashes the current descriptor in `sessionStorage` before opening the print window so the template selection survives the new-tab hop.
+All four are implemented in `frontend/lib/resume-exporters.ts`. PDF export serialises the current descriptor into the print URL (`?print=1&d=…`) before opening the print window so the template selection survives the new-tab hop — the window is opened with `noopener`, so a `sessionStorage` stash would not reach it.
 
 ### Open questions (decide before Phase 1)
 
