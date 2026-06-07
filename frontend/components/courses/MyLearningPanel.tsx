@@ -5,23 +5,27 @@
  *
  * Progress data already existed (`/api/courses/me/enrollments` annotates
  * passed/total lessons; cohort assignments carry due dates) but had no
- * single surface. This packages it for the Student persona (#1886):
- *   • Assigned to you   — training pushed by an educator/employer + due dates
- *   • Your courses      — self-enrolled, with live progress bars
- *   • Join a classroom  — self-serve join-by-code
+ * single surface. Layout is a two-column shell:
+ *   • Left  — one unified content list (assigned + self-enrolled merged,
+ *             deduped by enrollment), with per-item visual cues (which
+ *             classroom assigned it, required, due/overdue, progress) and
+ *             a classroom filter that appears once you've joined one.
+ *   • Right — your learning goal + join-a-classroom (with the educator
+ *             "manage classrooms" link folded into the join card).
  *
  * Read-only over existing endpoints; no new server read was added here.
  */
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { courseService, type EnrollmentRow } from "@/lib/services/course-service";
 import { listMyAssignments, joinCohortByCode, type LearnerAssignment } from "@/lib/courses/courses-api";
 import LearningGoalCard from "@/components/learning/LearningGoalCard";
-import { BookOpen, CalendarClock, AlertTriangle, CheckCircle2, ArrowRight } from "lucide-react";
+import { BookOpen, AlertTriangle, ArrowRight, Users } from "lucide-react";
 
 function dueLabel(dueAt: string | null): { text: string; overdue: boolean } | null {
   if (!dueAt) return null;
@@ -37,6 +41,23 @@ function dueLabel(dueAt: string | null): { text: string; overdue: boolean } | nu
   return { text, overdue };
 }
 
+/** One row in the unified content list — an assigned course/path and/or a
+ *  self-enrolled course collapsed into a single learner-facing item. */
+interface LearningItem {
+  key: string;
+  title: string;
+  href: string;
+  passed: boolean;
+  passedLessons: number | null;
+  totalLessons: number | null;
+  pct: number;
+  assigned: boolean;
+  cohortName: string | null;
+  subjectType: "course" | "path";
+  required: boolean;
+  due: { text: string; overdue: boolean } | null;
+}
+
 export default function MyLearningPanel() {
   const { isAuthenticated } = useAuth();
 
@@ -46,6 +67,7 @@ export default function MyLearningPanel() {
   const [joinCode, setJoinCode] = useState("");
   const [joinMsg, setJoinMsg] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [cohortFilter, setCohortFilter] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,7 +91,7 @@ export default function MyLearningPanel() {
     setJoinMsg(null);
     try {
       const res = await joinCohortByCode(joinCode.trim());
-      setJoinMsg(`Joined "${res.cohort.name}". Any assigned training now appears below.`);
+      setJoinMsg(`Joined "${res.cohort.name}". Any assigned training now appears in your list.`);
       setJoinCode("");
       await load();
     } catch (e) {
@@ -79,61 +101,157 @@ export default function MyLearningPanel() {
     }
   };
 
+  // Merge assigned training + self-enrolled courses into one list, deduped by
+  // enrollment so a course that was assigned *and* started shows up once
+  // (carrying both its classroom cue and its live progress bar).
+  const items = useMemo<LearningItem[]>(() => {
+    const byEnrollment = new Map<string, EnrollmentRow>();
+    for (const r of enrollments) byEnrollment.set(r.enrollment.id, r);
+
+    const result: LearningItem[] = [];
+    const claimedEnrollments = new Set<string>();
+
+    for (const a of assignments) {
+      const enr = a.enrollmentId ? byEnrollment.get(a.enrollmentId) : undefined;
+      if (enr) claimedEnrollments.add(enr.enrollment.id);
+      const total = enr?.totalLessons ?? null;
+      const pct = enr && enr.totalLessons > 0 ? Math.round((enr.passedLessons / enr.totalLessons) * 100) : 0;
+      result.push({
+        key: a.assignmentId,
+        title: a.title,
+        href: a.subjectType === "course"
+          ? (a.enrollmentId ? `/learn/${a.enrollmentId}` : "/tools?tab=learning")
+          : "/tools?tab=learning",
+        passed: a.passed,
+        passedLessons: enr?.passedLessons ?? null,
+        totalLessons: total,
+        pct,
+        assigned: true,
+        cohortName: a.cohortName,
+        subjectType: a.subjectType,
+        required: a.required,
+        due: dueLabel(a.dueAt),
+      });
+    }
+
+    for (const r of enrollments) {
+      if (claimedEnrollments.has(r.enrollment.id)) continue;
+      const pct = r.totalLessons > 0 ? Math.round((r.passedLessons / r.totalLessons) * 100) : 0;
+      result.push({
+        key: r.enrollment.id,
+        title: r.course.title,
+        href: `/learn/${r.enrollment.id}`,
+        passed: r.enrollment.passed,
+        passedLessons: r.passedLessons,
+        totalLessons: r.totalLessons,
+        pct,
+        assigned: false,
+        cohortName: null,
+        subjectType: "course",
+        required: false,
+        due: null,
+      });
+    }
+
+    return result;
+  }, [enrollments, assignments]);
+
+  // Distinct classrooms the learner has training from — drives the filter,
+  // which only appears once they belong to at least one classroom.
+  const cohorts = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of assignments) if (a.cohortName) set.add(a.cohortName);
+    return [...set];
+  }, [assignments]);
+
+  const visibleItems = cohortFilter ? items.filter((i) => i.cohortName === cohortFilter) : items;
+
   return (
-    <div className="space-y-8 mt-2">
-      <p className="text-sm">
-        <Link to="/tools?tab=classrooms" className="text-primary underline">
-          Educator or employer? Manage classrooms &amp; assign training →
-        </Link>
-      </p>
+    <div className="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-3">
+      {/* ── Left: unified content list ───────────────────────────────── */}
+      <div className="space-y-4 lg:col-span-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <BookOpen className="h-5 w-5" /> Your learning
+          </h2>
+          {cohorts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCohortFilter(null)}
+                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                  cohortFilter === null ? "bg-primary text-primary-foreground border-transparent" : "hover:bg-muted"
+                }`}
+              >
+                All
+              </button>
+              {cohorts.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setCohortFilter(name)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${
+                    cohortFilter === name ? "bg-primary text-primary-foreground border-transparent" : "hover:bg-muted"
+                  }`}
+                >
+                  <Users className="h-3 w-3" /> {name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Learning-goal onboarding wedge — capture intent + recommend courses.
-          Self-gates: shows the capture prompt until a goal is set. */}
-      <LearningGoalCard source="onboarding" />
-
-      {/* Assigned to you */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <CalendarClock className="h-5 w-5" /> Assigned to you
-        </h2>
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : assignments.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No assigned training. Join a classroom below or browse the{" "}
-            <Link to="/tools?tab=learning" className="underline">learning library</Link>.
+            {cohortFilter
+              ? "No training from this classroom yet."
+              : <>No courses yet. Join a classroom or browse the{" "}
+                  <Link to="/tools?tab=learning" className="underline">learning library</Link>.</>}
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {assignments.map((a) => {
-              const due = dueLabel(a.dueAt);
-              const href = a.subjectType === "course"
-                ? (a.enrollmentId ? `/learn/${a.enrollmentId}` : "/tools?tab=learning")
-                : "/tools?tab=learning";
+          <div className="space-y-2">
+            {visibleItems.map((item) => {
+              const hasProgress = item.totalLessons != null && item.totalLessons > 0;
+              const cta = item.passed ? "Review" : item.passedLessons ? "Continue" : "Start";
               return (
-                <Card key={a.assignmentId} className={due?.overdue && !a.passed ? "border-destructive/50" : ""}>
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium leading-tight">{a.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {a.cohortName} · {a.subjectType === "course" ? "Course" : "Path"}
-                          {a.required ? " · Required" : ""}
-                        </p>
+                <Card key={item.key} className={item.due?.overdue && !item.passed ? "border-destructive/50" : ""}>
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium truncate">{item.title}</p>
+                        {item.assigned && item.cohortName && (
+                          <Badge variant="secondary" className="gap-1 font-normal">
+                            <Users className="h-3 w-3" /> {item.cohortName}
+                          </Badge>
+                        )}
+                        {item.required && <Badge variant="outline" className="font-normal">Required</Badge>}
                       </div>
-                      {a.passed ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-600 shrink-0">
-                          <CheckCircle2 className="h-4 w-4" /> Done
-                        </span>
-                      ) : due ? (
-                        <span className={`inline-flex items-center gap-1 text-xs shrink-0 ${due.overdue ? "text-destructive" : "text-muted-foreground"}`}>
-                          {due.overdue && <AlertTriangle className="h-3.5 w-3.5" />}{due.text}
-                        </span>
-                      ) : null}
+                      {hasProgress && (
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full bg-primary" style={{ width: `${item.passed ? 100 : item.pct}%` }} />
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {item.passed
+                          ? "Completed"
+                          : hasProgress
+                            ? `${item.passedLessons} of ${item.totalLessons} lessons`
+                            : item.subjectType === "path" ? "Learning path" : "Course"}
+                        {item.due && !item.passed && (
+                          <span className={item.due.overdue ? "text-destructive" : ""}>
+                            {" · "}
+                            {item.due.overdue && <AlertTriangle className="inline h-3.5 w-3.5 mr-0.5 -mt-0.5" />}
+                            {item.due.text}
+                          </span>
+                        )}
+                      </p>
                     </div>
-                    <Button asChild size="sm" variant={a.passed ? "outline" : "default"} className="w-full">
-                      <Link to={href}>
-                        {a.passed ? "Review" : "Start"} <ArrowRight className="h-4 w-4 ml-1" />
+                    <Button asChild size="sm" variant={item.passed ? "outline" : "default"}>
+                      <Link to={item.href}>
+                        {cta}
+                        {!item.passed && <ArrowRight className="h-4 w-4 ml-1" />}
                       </Link>
                     </Button>
                   </CardContent>
@@ -142,54 +260,19 @@ export default function MyLearningPanel() {
             })}
           </div>
         )}
-      </section>
+      </div>
 
-      {/* Your courses */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <BookOpen className="h-5 w-5" /> Your courses
-        </h2>
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : enrollments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            You haven't enrolled in any courses yet.{" "}
-            <Link to="/tools?tab=learning" className="underline">Explore the library</Link>.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {enrollments.map((r) => {
-              const pct = r.totalLessons > 0 ? Math.round((r.passedLessons / r.totalLessons) * 100) : 0;
-              return (
-                <Card key={r.enrollment.id}>
-                  <CardContent className="p-4 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{r.course.title}</p>
-                      <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: `${r.enrollment.passed ? 100 : pct}%` }} />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {r.enrollment.passed ? "Completed" : `${r.passedLessons} of ${r.totalLessons} lessons`}
-                      </p>
-                    </div>
-                    <Button asChild size="sm" variant={r.enrollment.passed ? "outline" : "default"}>
-                      <Link to={`/learn/${r.enrollment.id}`}>{r.enrollment.passed ? "Review" : "Continue"}</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      {/* ── Right: goal + join a classroom ───────────────────────────── */}
+      <div className="space-y-6">
+        {/* Learning-goal onboarding wedge — capture intent + recommend courses.
+            Self-gates: shows the capture prompt until a goal is set. */}
+        <LearningGoalCard source="onboarding" />
 
-      {/* Join a classroom */}
-      <section>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Join a classroom</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Got a join code from an educator or employer? Enter it to receive their assigned training.
             </p>
@@ -206,9 +289,14 @@ export default function MyLearningPanel() {
               </Button>
             </div>
             {joinMsg && <p className="text-sm text-muted-foreground">{joinMsg}</p>}
+            <p className="text-sm border-t pt-3">
+              <Link to="/tools?tab=classrooms" className="text-primary underline">
+                Educator or employer? Manage classrooms &amp; assign training →
+              </Link>
+            </p>
           </CardContent>
         </Card>
-      </section>
+      </div>
     </div>
   );
 }

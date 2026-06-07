@@ -19,12 +19,19 @@
  * Cloudflare Worker.
  */
 
+// Reuse the package's shared SVG text escaper (course-cover.ts) so a `&`
+// (or `<`/`>`/quote) in a lesson title or box label can't produce invalid
+// XML that an `<img>` renders as a broken image — e.g. "Tokens & the
+// context window", "Haiku — fast & cheap". Same module, same purpose, no
+// 7th copy of escapeXml.
+import { escapeXmlText as esc } from "./course-cover";
+
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
 /** Wrap a diagram body in the shared 820×470 frame: gradient backdrop,
  *  eyebrow + title, and the hired.video footer mark. */
 function frame(opts: { eyebrow: string; title: string; body: string }): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 470" width="820" height="470" role="img" aria-label="${opts.title}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 470" width="820" height="470" role="img" aria-label="${esc(opts.title)}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0f172a"/>
@@ -36,8 +43,8 @@ function frame(opts: { eyebrow: string; title: string; body: string }): string {
     </linearGradient>
   </defs>
   <rect width="820" height="470" rx="18" fill="url(#bg)"/>
-  <text x="40" y="52" fill="#a5b4fc" font-family="${FONT}" font-size="15" font-weight="600" letter-spacing="3">${opts.eyebrow.toUpperCase()}</text>
-  <text x="40" y="86" fill="#ffffff" font-family="${FONT}" font-size="26" font-weight="800">${opts.title}</text>
+  <text x="40" y="52" fill="#a5b4fc" font-family="${FONT}" font-size="15" font-weight="600" letter-spacing="3">${esc(opts.eyebrow.toUpperCase())}</text>
+  <text x="40" y="86" fill="#ffffff" font-family="${FONT}" font-size="26" font-weight="800">${esc(opts.title)}</text>
   ${opts.body}
   <text x="40" y="448" fill="rgba(255,255,255,0.45)" font-family="${FONT}" font-size="14" font-weight="600">hired.video</text>
 </svg>`;
@@ -59,7 +66,7 @@ function box(
   const weight = opts.weight ?? 600;
   return `<g>
     <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${fill}" stroke="${stroke}"/>
-    <text x="${x + w / 2}" y="${y + h / 2}" fill="${text}" font-family="${FONT}" font-size="${size}" font-weight="${weight}" text-anchor="middle" dominant-baseline="central">${label}</text>
+    <text x="${x + w / 2}" y="${y + h / 2}" fill="${text}" font-family="${FONT}" font-size="${size}" font-weight="${weight}" text-anchor="middle" dominant-baseline="central">${esc(label)}</text>
   </g>`;
 }
 

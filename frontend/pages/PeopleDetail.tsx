@@ -516,9 +516,8 @@ function PeopleDetailContent() {
           <EntityHubTabStrip entity="person" />
           <PageHeader tabs={profileTabs} activeTabKey={activeProfileTab} />
 
-          <div className="mb-6 flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <ProfileHeader
+          <div className="mb-6">
+            <ProfileHeader
               avatar={profile.profilePicture ?? undefined}
               firstName={firstName}
               lastName={lastName}
@@ -534,18 +533,19 @@ function PeopleDetailContent() {
               onEditUrl={() => setActiveOwnerDialog("url")}
               onShare={() => setShowShare(true)}
               rightSlot={<ProfileHeaderVideos videos={videos} />}
-            />
-            </div>
-            <ArtifactDetailsSheet
-              permission={{ kind: "profile", entity: profile ? { id: profile.id } : null }}
-              title={fullName || "Profile"}
-              activity={{
-                createdAt: profile?.createdAt ?? undefined,
-                updatedAt: profile?.updatedAt ?? undefined,
-                extra: lastActive
-                  ? [{ label: "Last active", value: lastActive }]
-                  : undefined,
-              }}
+              detailsSlot={
+                <ArtifactDetailsSheet
+                  permission={{ kind: "profile", entity: profile ? { id: profile.id } : null }}
+                  title={fullName || "Profile"}
+                  activity={{
+                    createdAt: profile?.createdAt ?? undefined,
+                    updatedAt: profile?.updatedAt ?? undefined,
+                    extra: lastActive
+                      ? [{ label: "Last active", value: lastActive }]
+                      : undefined,
+                  }}
+                />
+              }
             />
           </div>
 

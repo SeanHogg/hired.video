@@ -34,6 +34,12 @@ interface ProfileHeaderProps {
   // it relates to. Self-gating callers may return null when nothing
   // qualifies — the flex column then collapses cleanly.
   rightSlot?: ReactNode;
+  // Optional [🌐 Details] drawer trigger, anchored to the top-right
+  // corner of the card alongside the owner Edit/Share actions. The
+  // supplied element self-gates (renders null for viewers who can't
+  // read stats), so the corner stays empty for everyone but the owner
+  // and admins.
+  detailsSlot?: ReactNode;
 }
 
 export default function ProfileHeader({
@@ -53,6 +59,7 @@ export default function ProfileHeader({
   onShare,
   stats,
   rightSlot,
+  detailsSlot,
 }: ProfileHeaderProps) {
   const { t } = useTranslation();
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`;
@@ -158,22 +165,25 @@ export default function ProfileHeader({
             )}
           </div>
 
-          {/* Right column: owner action buttons stacked above the
+          {/* Right column: top-right action row (owner Edit/Share +
+              the [🌐 Details] drawer trigger) stacked above the
               associated video. Collapses entirely when there are no
-              actions to render and rightSlot is null. */}
-          {(showOwnerActions || rightSlot) && (
+              actions to render, detailsSlot self-hides, and rightSlot
+              is null. */}
+          {(showOwnerActions || detailsSlot || rightSlot) && (
             <div className="w-full lg:w-80 flex-shrink-0 space-y-3">
-              {showOwnerActions && (
+              {(showOwnerActions || detailsSlot) && (
                 <div className="flex items-center justify-end gap-2">
-                  {onEditProfile && (
+                  {showOwnerActions && onEditProfile && (
                     <SectionEditButton onClick={onEditProfile} label={t("actions.editProfile")} />
                   )}
-                  {onShare && (
+                  {showOwnerActions && onShare && (
                     <Button variant="outline" size="sm" onClick={onShare}>
                       <Share className="h-4 w-4 mr-2" />
                       {t("actions.share")}
                     </Button>
                   )}
+                  {detailsSlot}
                 </div>
               )}
               {rightSlot}

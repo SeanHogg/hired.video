@@ -41,7 +41,11 @@ export function pickCoursePalette(seed: string): [string, string, string] {
   return COURSE_COVER_PALETTES[idx]!;
 }
 
-function escapeXmlText(s: string): string {
+/** XML-escape dynamic text before it lands in an SVG attribute or `<text>`
+ *  body. Shared by every SVG renderer in this package (course covers +
+ *  lesson diagrams) so an `&`/`<`/`>`/quote in a title or label can't
+ *  produce invalid XML that an `<img>` renders as a broken image. */
+export function escapeXmlText(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
