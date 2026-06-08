@@ -95,6 +95,9 @@ export const emailCampaigns = pgTable("email_campaigns", {
   description: varchar("description", { length: 1000 }),
   htmlBody: text("html_body"),
   fromName: varchar("from_name", { length: 255 }),
+  // Marketing category (see shared/email-consent.ts) the per-recipient opt-out
+  // gate checks at send time. Migration 0205.
+  category: varchar("category", { length: 32 }).default("product_launches").notNull(),
   audience: jsonb("audience").$type<Record<string, unknown>>(),
   senderCompanyId: uuid("sender_company_id"),
   createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
@@ -146,6 +149,38 @@ export const emailSuppressions = pgTable("email_suppressions", {
 
 export type EmailSuppression = typeof emailSuppressions.$inferSelect;
 export type NewEmailSuppression = typeof emailSuppressions.$inferInsert;
+
+/**
+ * email_marketing_preferences — the email-keyed marketing consent ledger
+ * (migration 0205). Covers users AND non-users (leads, explicit-list
+ * recipients) uniformly, since marketing goes to all three. Distinct from
+ * `email_suppressions`, which is the hard, system-set, NOT-user-reversible
+ * list (bounces / complaints).
+ *
+ * Opt-out model: a missing row = fully subscribed. `unsubscribedAll` is the
+ * master kill switch; `categories` holds explicit per-category choices
+ * (`{cat:false}` = opted out of that category). `token` is the opaque,
+ * unguessable bearer credential embedded in unsubscribe links — NO email is
+ * ever placed in a URL. The ONLY writer that may re-subscribe is the explicit
+ * preference-center action (CAN-SPAM stickiness — see shared/email-consent.ts).
+ */
+export const emailMarketingPreferences = pgTable("email_marketing_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  // 32-byte random, base64url — the unsubscribe/preference link key.
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  unsubscribedAll: boolean("unsubscribed_all").default(false).notNull(),
+  categories: jsonb("categories").$type<Record<string, boolean>>().default({}).notNull(),
+  unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+  resubscribedAt: timestamp("resubscribed_at", { withTimezone: true }),
+  source: varchar("source", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type EmailMarketingPreference = typeof emailMarketingPreferences.$inferSelect;
+export type NewEmailMarketingPreference = typeof emailMarketingPreferences.$inferInsert;
 
 export const communicationTracking = pgTable("communication_tracking", {
   id: uuid("id").primaryKey().defaultRandom(),
