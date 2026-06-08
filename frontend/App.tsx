@@ -101,6 +101,7 @@ const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
 const SearchPage = lazy(() => import("./pages/Search"));
 const Settings = lazy(() => import("./pages/Settings"));
+const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const PaidMediaPage = lazy(() => import("./pages/paid-media/PaidMediaPage"));
 const Contributors = lazy(() => import("./pages/Contributors"));
 const Tasks = lazy(() => import("./pages/Tasks"));
@@ -673,6 +674,7 @@ const App = () => (
                         element={<ResetPassword />}
                       />
                           <Route path="/verify-email" element={<VerifyEmail />} />
+                      <Route path="/email-preferences/:token" element={<EmailPreferences />} />
 
                       <Route path="/confirm-email" element={<ConfirmEmail />} />
                       <Route path="/auth/callback" element={<OAuthCallback />} />

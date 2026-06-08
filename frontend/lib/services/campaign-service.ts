@@ -16,6 +16,7 @@ import type {
   CreateTemplateInput,
   UpdateCampaignInput,
 } from "@shared/campaigns";
+import type { MarketingCategory } from "@shared/email-consent";
 
 const ADMIN = "/api/admin/campaigns";
 
@@ -59,8 +60,14 @@ class CampaignService {
     return res.data;
   }
 
-  async previewAudience(audience: CampaignAudience): Promise<AudiencePreview> {
-    const res = await apiClient.post<AudiencePreview>(`${ADMIN}/audience/preview`, audience);
+  async previewAudience(
+    audience: CampaignAudience,
+    category?: MarketingCategory,
+  ): Promise<AudiencePreview> {
+    const res = await apiClient.post<AudiencePreview>(`${ADMIN}/audience/preview`, {
+      audience,
+      category,
+    });
     return res.data;
   }
 

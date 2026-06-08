@@ -17,6 +17,7 @@ import {
   type CampaignAudience,
   type CampaignAudienceRole,
 } from "@shared/campaigns";
+import type { MarketingCategory } from "@shared/email-consent";
 import { USER_ROLES } from "@shared/user-roles";
 
 const KINDS: CampaignAudience["kind"][] = ["role", "leads", "list"];
@@ -31,9 +32,11 @@ const ROLE_OPTIONS: { value: CampaignAudienceRole; label: string }[] = [
 export interface AudienceSelectorProps {
   value: CampaignAudience | null;
   onChange: (audience: CampaignAudience) => void;
+  /** Campaign category — the count reflects opt-outs for this category. */
+  category?: MarketingCategory;
 }
 
-export function AudienceSelector({ value, onChange }: AudienceSelectorProps) {
+export function AudienceSelector({ value, onChange, category }: AudienceSelectorProps) {
   const kind = value?.kind ?? "role";
   const [preview, setPreview] = useState<{ count: number; loading: boolean }>({
     count: 0,
@@ -47,7 +50,7 @@ export function AudienceSelector({ value, onChange }: AudienceSelectorProps) {
     setPreview((p) => ({ ...p, loading: true }));
     const t = setTimeout(() => {
       campaignService
-        .previewAudience(value)
+        .previewAudience(value, category)
         .then((res) => active && setPreview({ count: res.count, loading: false }))
         .catch(() => active && setPreview({ count: 0, loading: false }));
     }, 400);
@@ -55,7 +58,7 @@ export function AudienceSelector({ value, onChange }: AudienceSelectorProps) {
       active = false;
       clearTimeout(t);
     };
-  }, [value]);
+  }, [value, category]);
 
   const setKind = (k: CampaignAudience["kind"]) => {
     if (k === "role") onChange({ kind: "role", roles: [USER_ROLES.JOB_SEEKER], includeInactive: false });

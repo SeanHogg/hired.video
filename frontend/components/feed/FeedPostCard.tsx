@@ -43,7 +43,7 @@ import {
 } from "@/lib/services/feed-service";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import type { FeedPost, FeedPostComment } from "@/types/feed";
+import type { FeedPost, FeedPostComment, FeedRepostPreview } from "@/types/feed";
 import { FeedReviewEmbed } from "./FeedReviewEmbed";
 import PostStatsSheet from "./PostStatsSheet";
 
@@ -158,7 +158,7 @@ const FeedPostTags = ({
 // The reshared original, embedded inside a repost. Read-only — its own
 // actions live on its standalone card; here it's a clickable preview that
 // deep-links to the original post's detail page.
-const FeedRepostEmbed = ({ original }: { original: FeedPost }) => (
+const FeedRepostEmbed = ({ original }: { original: FeedRepostPreview }) => (
   <Link
     to={`/feed/${original.id}`}
     className="mt-3 block rounded-lg border hover:border-primary/50 transition-colors p-3"

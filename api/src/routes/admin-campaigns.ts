@@ -27,10 +27,10 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { buildRepos } from "../repositories/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { CampaignService } from "../services/campaigns/CampaignService.js";
 import { getPlatformCompanyId } from "../services/campaigns/platform-company.js";
+import { z } from "zod";
 import {
   CreateCampaignSchema,
   UpdateCampaignSchema,
@@ -39,6 +39,7 @@ import {
   UpdateTemplateSchema,
   CampaignAudienceSchema,
 } from "../../../shared/campaigns.js";
+import { MARKETING_CATEGORIES } from "../../../shared/email-consent.js";
 
 const { adminAuditLog } = schema;
 
@@ -47,8 +48,7 @@ export const adminCampaignRoutes = new Hono<AppEnv>();
 adminCampaignRoutes.use("*", superAdminMiddleware);
 
 function buildService(): CampaignService {
-  const db = getDb();
-  return new CampaignService(buildRepos(db).campaigns as any, db);
+  return CampaignService.create(getDb());
 }
 
 async function audit(
@@ -77,7 +77,7 @@ adminCampaignRoutes.post("/", async (c) => {
   const db = getDb();
   // SuperAdmin marketing campaigns are always sent as the hired.video company.
   const senderCompanyId = await getPlatformCompanyId(db);
-  const created = await new CampaignService(buildRepos(db).campaigns as any, db).create(
+  const created = await CampaignService.create(db).create(
     parsed.data,
     { createdByUserId: actorId, senderCompanyId },
   );
@@ -120,12 +120,20 @@ adminCampaignRoutes.delete("/templates/:id", async (c) => {
   return c.json(success({ id, deleted: true }), 200);
 });
 
+const PreviewSchema = z.object({
+  audience: CampaignAudienceSchema,
+  category: z.enum(MARKETING_CATEGORIES).optional(),
+});
+
 adminCampaignRoutes.post("/audience/preview", async (c) => {
-  const parsed = CampaignAudienceSchema.safeParse(await c.req.json().catch(() => ({})));
+  const parsed = PreviewSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "Invalid audience"), 400);
   }
-  return c.json(success(await buildService().previewAudience(parsed.data)), 200);
+  return c.json(
+    success(await buildService().previewAudience(parsed.data.audience, parsed.data.category)),
+    200,
+  );
 });
 
 adminCampaignRoutes.get("/:id", async (c) => {

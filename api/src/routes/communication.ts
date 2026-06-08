@@ -218,8 +218,7 @@ communicationRoutes.post("/email-campaigns", async (c) => {
 // (resolve audience → render → send via the email provider on the cron loop).
 // Replaces the old no-op that just flipped status='sent' without delivering.
 communicationRoutes.post("/email-campaigns/:campaignId/send", async (c) => {
-  const db = getDb();
-  const service = new CampaignService(buildRepos(db).campaigns as any, db);
+  const service = CampaignService.create(getDb());
   const result = await service.schedule(c.req.param("campaignId"), null);
   if (result.ok && result.campaign) {
     return c.json(ok(result.campaign), 200);

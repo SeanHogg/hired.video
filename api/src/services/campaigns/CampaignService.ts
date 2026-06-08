@@ -113,6 +113,7 @@ export class CampaignService {
       subject: row.subject,
       templateId: row.templateId ?? null,
       status: row.status as CampaignStatus,
+      category: (isMarketingCategory(row.category) ? row.category : DEFAULT_MARKETING_CATEGORY),
       audience: (row.audience as CampaignAudience | null) ?? null,
       fromName: row.fromName ?? null,
       senderCompanyId: row.senderCompanyId ?? null,
@@ -176,6 +177,7 @@ export class CampaignService {
       templateId: input.templateId ?? null,
       htmlBody: input.htmlBody ?? null,
       fromName: input.fromName ?? null,
+      category: input.category ?? DEFAULT_MARKETING_CATEGORY,
       audience: (input.audience as Record<string, unknown> | undefined) ?? null,
       status: input.status ?? "draft",
       scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
@@ -194,6 +196,7 @@ export class CampaignService {
     if (input.templateId !== undefined) patch.templateId = input.templateId ?? null;
     if (input.htmlBody !== undefined) patch.htmlBody = input.htmlBody ?? null;
     if (input.fromName !== undefined) patch.fromName = input.fromName ?? null;
+    if (input.category !== undefined) patch.category = input.category;
     if (input.audience !== undefined) patch.audience = input.audience ?? null;
     if (input.status !== undefined) patch.status = input.status;
     if (input.scheduledAt !== undefined) {
@@ -266,17 +269,25 @@ export class CampaignService {
   }
 
   // ── Audience resolution ─────────────────────────────────────────────────────
-  /** Dry-run: count + a small sample for the composer's "≈ N recipients". */
-  async previewAudience(audience: CampaignAudience): Promise<AudiencePreview> {
-    const resolved = await this.resolveAudience(audience);
+  /** Dry-run: count + a small sample for the composer's "≈ N recipients".
+   *  Counts AFTER applying opt-outs for the campaign's category. */
+  async previewAudience(
+    audience: CampaignAudience,
+    category: MarketingCategory = DEFAULT_MARKETING_CATEGORY,
+  ): Promise<AudiencePreview> {
+    const resolved = await this.resolveAudience(audience, category);
     return {
       count: resolved.length,
       sample: resolved.slice(0, 10).map((r) => ({ email: r.email, name: r.name })),
     };
   }
 
-  /** Resolve an audience to a deduped, suppression-filtered recipient list. */
-  private async resolveAudience(audience: CampaignAudience): Promise<ResolvedRecipient[]> {
+  /** Resolve an audience to a deduped, consent-filtered recipient list (drops
+   *  hard suppressions + master opt-outs + opt-outs for `category`). */
+  private async resolveAudience(
+    audience: CampaignAudience,
+    category: MarketingCategory,
+  ): Promise<ResolvedRecipient[]> {
     let raw: ResolvedRecipient[] = [];
 
     if (audience.kind === "role") {
@@ -332,9 +343,8 @@ export class CampaignService {
     }
     const deduped = [...byEmail.values()];
 
-    // Drop the global suppression list.
-    const suppressed = await this.repo.filterSuppressed(deduped.map((r) => r.email));
-    return deduped.filter((r) => !suppressed.has(r.email.toLowerCase()));
+    // Drop hard suppressions + marketing opt-outs for this category (batched).
+    return this.consent.filterMailable(deduped, category);
   }
 
   // ── Send engine (cron) ────────────────────────────────────────────────────
@@ -378,7 +388,10 @@ export class CampaignService {
         console.warn(`[campaigns] ${campaign.id} has no audience — cancelling`);
         return { sent: 0, failed: 0 };
       }
-      const recipients = await this.resolveAudience(audience);
+      const category = isMarketingCategory(campaign.category)
+        ? campaign.category
+        : DEFAULT_MARKETING_CATEGORY;
+      const recipients = await this.resolveAudience(audience, category);
       if (recipients.length === 0) {
         await this.repo.updateCampaign(campaign.id, {
           status: "sent",
@@ -421,7 +434,7 @@ export class CampaignService {
       } as Record<string, string>;
       const subject = renderTemplateBody(content.subject, vars);
       const bodyInner = renderTemplateBody(content.html, vars);
-      const html = await this.wrapBody(bodyInner, recipient.email, campaign.id, recipient.id);
+      const html = await this.wrapBody(bodyInner, recipient.email, recipient.userId ?? null, recipient.id);
 
       if (!provider) {
         await this.repo.markRecipient(recipient.id, {
@@ -472,38 +485,6 @@ export class CampaignService {
     return null;
   }
 
-  // ── Unsubscribe / suppression ───────────────────────────────────────────────
-  private async sign(email: string): Promise<string> {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(getJwtSecret()),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const sig = await crypto.subtle.sign(
-      "HMAC",
-      key,
-      new TextEncoder().encode(`unsub:${email.toLowerCase()}`),
-    );
-    return Buffer.from(new Uint8Array(sig)).toString("base64url");
-  }
-
-  /** One-click unsubscribe URL embedded in every campaign footer. */
-  async buildUnsubscribeUrl(email: string, campaignId: string): Promise<string> {
-    const token = await this.sign(email);
-    const e = Buffer.from(email.toLowerCase(), "utf-8").toString("base64url");
-    return `${frontendBase()}/api/campaigns/unsubscribe?e=${e}&c=${campaignId}&t=${encodeURIComponent(token)}`;
-  }
-
-  /** Verify the HMAC and add the address to the global suppression list. */
-  async unsubscribe(email: string, token: string, campaignId?: string | null): Promise<boolean> {
-    const expected = await this.sign(email);
-    if (token !== expected) return false;
-    await this.repo.addSuppression(email, "unsubscribe", campaignId ?? null);
-    return true;
-  }
-
   /** Mark a recipient opened (tracking-pixel hit). Best-effort, never throws. */
   async markOpened(recipientId: string): Promise<void> {
     try {
@@ -522,24 +503,30 @@ export class CampaignService {
   }
 
   // ── Email chrome ────────────────────────────────────────────────────────────
-  /** Wrap rendered body in a minimal layout + the required unsubscribe footer
-   *  and a 1px open-tracking pixel. */
+  /** Wrap rendered body in a minimal layout + the CAN-SPAM-required footer
+   *  (one-click unsubscribe + manage-preferences link + physical postal
+   *  address) and a 1px open-tracking pixel. The unsubscribe link carries an
+   *  opaque token — never the email. */
   private async wrapBody(
     inner: string,
     email: string,
-    campaignId: string,
+    userId: string | null,
     recipientId: string,
   ): Promise<string> {
-    const unsubUrl = await this.buildUnsubscribeUrl(email, campaignId);
+    const { unsubscribeUrl, manageUrl } = await this.consent.footerLinks(email, userId);
     const pixel = `${frontendBase()}/api/campaigns/open/${recipientId}.png`;
+    const postalAddress =
+      getEnv("EMAIL_PHYSICAL_ADDRESS") || "hired.video — mailing address on file";
     return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f5;">
   <div style="max-width:600px;margin:0 auto;padding:24px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#18181b;line-height:1.6;">
     ${inner}
     <hr style="border:none;border-top:1px solid #e4e4e7;margin:32px 0 16px;" />
     <p style="font-size:12px;color:#71717a;">
       You're receiving this because you're part of the hired.video community.
-      <a href="${unsubUrl}" style="color:#71717a;">Unsubscribe</a>.
+      <a href="${unsubscribeUrl}" style="color:#71717a;">Unsubscribe</a> ·
+      <a href="${manageUrl}" style="color:#71717a;">Manage email preferences</a>.
     </p>
+    <p style="font-size:11px;color:#a1a1aa;">${postalAddress}</p>
   </div>
   <img src="${pixel}" alt="" width="1" height="1" style="display:none" />
 </body></html>`;

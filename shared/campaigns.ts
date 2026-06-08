@@ -13,6 +13,7 @@
  */
 import { z } from "zod";
 import { USER_ROLES, type UserRole } from "./user-roles.js";
+import { MARKETING_CATEGORIES, type MarketingCategory } from "./email-consent.js";
 
 // ─── Status ──────────────────────────────────────────────────────────────
 // String statuses, matching the `email_campaigns.status` column. `draft` is
@@ -140,6 +141,8 @@ export const CreateCampaignSchema = z.object({
   templateId: z.string().uuid().nullable().optional(),
   htmlBody: z.string().optional(),
   fromName: z.string().max(255).optional(),
+  /** Marketing category the per-recipient opt-out gate checks. */
+  category: z.enum(MARKETING_CATEGORIES).optional(),
   audience: CampaignAudienceSchema.optional(),
   /** ISO timestamp. Present + status `scheduled` ⇒ cron sends when due. */
   scheduledAt: z.string().datetime().nullable().optional(),
@@ -184,6 +187,7 @@ export interface CampaignDTO {
   subject: string;
   templateId: string | null;
   status: CampaignStatus;
+  category: MarketingCategory;
   audience: CampaignAudience | null;
   fromName: string | null;
   senderCompanyId: string | null;

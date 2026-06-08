@@ -41,6 +41,34 @@ export interface FeedPostComment {
   updatedAt: string;
 }
 
+/**
+ * Shallow preview of the reshared original embedded inside a repost. The API
+ * sends this flat (no nested likes/comments/repostOf) so the embed can't
+ * recurse — it only renders author + content + media + counts. Mirrors
+ * `FeedRepostPreviewSchema` in `feed-service.ts`.
+ */
+export interface FeedRepostPreview {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  kind: 'text' | 'video' | 'article';
+  linkUrl?: string;
+  linkTitle?: string;
+  linkDescription?: string;
+  linkImageUrl?: string;
+  privacy: 'Public' | 'recruiter' | 'Connections' | 'Private';
+  createdAt: string;
+  media: FeedPostMedia[];
+  likeCount: number;
+  commentCount: number;
+  repostCount: number;
+  subjectType?: string;
+  subjectId?: string;
+  embedPayload?: Record<string, unknown>;
+}
+
 export interface FeedPost {
   id: string;
   userId: string;
@@ -69,7 +97,7 @@ export interface FeedPost {
   // it as a repost without needing the embed.
   repostCount: number;
   repostOfId?: string;
-  repostOf?: FeedPost;
+  repostOf?: FeedRepostPreview;
   // Polymorphic surfacing — when set, this post is a pointer to a
   // reviewable / promotable subject (a review, a video, a resume, …)
   // and the renderer inlines that subject's canonical card.

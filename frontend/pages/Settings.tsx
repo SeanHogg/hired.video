@@ -38,6 +38,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { buildAuthLinkTo } from "@/lib/auth-redirect";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { EmailSettingsTab } from "@/components/email/EmailSettingsTab";
+import { EmailPreferencesPanel } from "@/components/email/EmailPreferencesPanel";
 import { WorkforceSettings } from "@/components/workforce/WorkforceSettings";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
@@ -1090,28 +1091,10 @@ function SettingsContent() {
                         }}
                       />
                     </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium">
-                          {t("settings.notifications.marketingLabel")}
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          {t("settings.notifications.marketingDesc")}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notifications.marketing}
-                        onCheckedChange={async (checked) => {
-                          setNotifications({ ...notifications, marketing: checked });
-                          try {
-                            await settingsService.updateNotificationSettings({ marketing: checked });
-                          } catch (e) {
-                            console.error("Failed to save notifications (marketing)", e);
-                          }
-                        }}
-                      />
-                    </div>
+                    {/* Granular marketing opt-out lives in its own card below
+                        (the authoritative email-keyed consent ledger the send
+                        path actually honors). The old coarse `marketing`
+                        toggle was superseded — see gap register. */}
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
@@ -1134,6 +1117,19 @@ function SettingsContent() {
                         }}
                       />
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Marketing email preferences</CardTitle>
+                    <CardDescription>
+                      Choose which hired.video marketing emails you receive.
+                      Account &amp; security emails are always sent.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <EmailPreferencesPanel />
                   </CardContent>
                 </Card>
               </TabsContent>

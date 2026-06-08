@@ -97,7 +97,7 @@ export const UpdatePreferencesSchema = z.object({
   unsubscribedAll: z.boolean().optional(),
   /** Per-category SUBSCRIBED booleans (true = subscribe, false = opt out).
    *  Unknown keys are ignored server-side. */
-  categories: z.record(z.boolean()).optional(),
+  categories: z.record(z.string(), z.boolean()).optional(),
 });
 export type UpdatePreferencesInput = z.infer<typeof UpdatePreferencesSchema>;
 

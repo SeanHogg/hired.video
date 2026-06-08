@@ -19,12 +19,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   CampaignAudience,
   CampaignDTO,
   CampaignTemplateDTO,
   CreateCampaignInput,
 } from "@shared/campaigns";
+import {
+  DEFAULT_MARKETING_CATEGORY,
+  MARKETING_CATEGORIES,
+  MARKETING_CATEGORY_LABELS,
+  type MarketingCategory,
+} from "@shared/email-consent";
 import { AudienceSelector } from "./AudienceSelector";
 import { TemplatePicker } from "./TemplatePicker";
 
@@ -56,6 +69,7 @@ export function CampaignComposerDialog({
   const [description, setDescription] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [htmlBody, setHtmlBody] = useState("");
+  const [category, setCategory] = useState<MarketingCategory>(DEFAULT_MARKETING_CATEGORY);
   const [audience, setAudience] = useState<CampaignAudience | null>(null);
   const [scheduledAt, setScheduledAt] = useState("");
   const [busy, setBusy] = useState<ComposerAction | null>(null);
@@ -69,6 +83,7 @@ export function CampaignComposerDialog({
     setDescription(initial?.description ?? "");
     setTemplateId(initial?.templateId ?? null);
     setHtmlBody("");
+    setCategory(initial?.category ?? DEFAULT_MARKETING_CATEGORY);
     setAudience(initial?.audience ?? null);
     setScheduledAt(
       initial?.scheduledAt ? toLocalInput(initial.scheduledAt) : "",
@@ -92,6 +107,7 @@ export function CampaignComposerDialog({
           templateId,
           htmlBody: templateId ? undefined : htmlBody,
           fromName: fromName.trim() || undefined,
+          category,
           audience: audience ?? undefined,
           scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         },
@@ -141,9 +157,26 @@ export function CampaignComposerDialog({
             />
           </div>
 
-          <div>
-            <Label htmlFor="c-desc">Internal description (optional)</Label>
-            <Input id="c-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="c-desc">Internal description (optional)</Label>
+              <Input id="c-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Category (drives opt-outs)</Label>
+              <Select value={category} onValueChange={(v) => setCategory(v as MarketingCategory)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MARKETING_CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {MARKETING_CATEGORY_LABELS[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <TemplatePicker templates={templates} value={templateId} onChange={setTemplateId} />
@@ -168,7 +201,7 @@ export function CampaignComposerDialog({
 
           <div className="space-y-2 rounded-lg border border-border p-3">
             <Label className="text-sm font-semibold">Audience</Label>
-            <AudienceSelector value={audience} onChange={setAudience} />
+            <AudienceSelector value={audience} onChange={setAudience} category={category} />
           </div>
 
           <div>

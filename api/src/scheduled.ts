@@ -36,6 +36,7 @@ import { runCounterRecompute } from "./services/maintenance/counter-recompute.js
 import { payoutReleaseWorker } from "./services/payout/ReleaseWorker.js";
 import { engagementPayoutService } from "./services/articles/EngagementPayoutService.js";
 import { CampaignService } from "./services/campaigns/CampaignService.js";
+import { MarketingConsentService } from "./services/email/MarketingConsentService.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -68,6 +69,10 @@ async function processFollowUps(): Promise<void> {
   if (due.length === 0) return;
 
   const provider = getEmailProvider();
+  // Nurture drips are marketing — honor the same opt-out gate campaigns use.
+  // 1:1 sequences have no category, so we check the master switch + hard
+  // suppression only (pass null category).
+  const consent = new MarketingConsentService(buildRepos(db).emailConsent as any);
 
   for (const { enrollment, sequence } of due) {
     try {
@@ -105,6 +110,16 @@ async function processFollowUps(): Promise<void> {
       let errorMessage: string | undefined;
 
       if (step.channel === "email") {
+        // CAN-SPAM: an unsubscribed/suppressed recipient must not receive
+        // marketing nurture. Stop the enrollment so we don't re-attempt.
+        const mailable = await consent.isMailable(enrollment.recipientEmail, null);
+        if (!mailable) {
+          await db
+            .update(schema.followUpEnrollments)
+            .set({ status: "unsubscribed", updatedAt: now } as any)
+            .where(eq(schema.followUpEnrollments.id, enrollment.id));
+          continue;
+        }
         if (provider) {
           try {
             await provider.send({
@@ -179,8 +194,7 @@ async function processFollowUps(): Promise<void> {
 
 async function processCampaigns(): Promise<void> {
   try {
-    const db = getDb();
-    const service = new CampaignService(buildRepos(db).campaigns as any, db);
+    const service = CampaignService.create(getDb());
     const result = await service.processDue(new Date());
     if (result.promoted > 0 || result.processed > 0) {
       console.log(

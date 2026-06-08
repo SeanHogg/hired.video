@@ -163,6 +163,7 @@ import { feedFeatureRoutes } from "./routes/feed-features.js";
 import { adminFeedFeatureRoutes } from "./routes/admin-feed-features.js";
 import { adminCampaignRoutes } from "./routes/admin-campaigns.js";
 import { campaignsPublicRoutes } from "./routes/campaigns-public.js";
+import { emailPreferencesRoutes } from "./routes/email-preferences.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import {
   communityResourceRoutes,
@@ -237,11 +238,14 @@ export function createApp() {
     "/api/auth/oauth",
     "/api/auth/magic-link",
     "/api/errors/report",
-    // Campaign unsubscribe + open-tracking pixel are opened straight from a
-    // recipient's email client (no JWT). The authenticated SuperAdmin manager
-    // lives at /api/admin/campaigns and is NOT matched by this prefix.
-    "/api/campaigns/unsubscribe",
+    // Opened straight from a recipient's email client (no JWT): the open-
+    // tracking pixel, one-click unsubscribe, and the token-keyed preference
+    // center. The authenticated SuperAdmin manager (/api/admin/campaigns) and
+    // the Settings panel (/api/email/preferences/me) are NOT matched by these
+    // prefixes and stay authenticated.
     "/api/campaigns/open",
+    "/api/email/unsubscribe",
+    "/api/email/preferences/token",
     // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages
     // and any other surface that needs the visitor's country before
     // they've signed in.
@@ -700,7 +704,8 @@ export function createApp() {
   app.route("/api/artifact-metrics", artifactMetricsRoutes);
   app.route("/api/take-home-invites", takeHomeInvitesRoutes);
   app.route("/api/affiliates", affiliateRoutes);
-  app.route("/api/campaigns", campaignsPublicRoutes); // public unsubscribe + open pixel
+  app.route("/api/campaigns", campaignsPublicRoutes); // public open-tracking pixel
+  app.route("/api/email", emailPreferencesRoutes); // marketing unsubscribe + preference center
   app.route("/api/marketing", marketingRoutes);
   app.route("/api/settings", settingsRoutes);
   app.route("/api/export", settingsRoutes); // legacy export alias — /api/export/csv maps to /api/settings/export/csv

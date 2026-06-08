@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Sparkles } from "lucide-react";
 import {
   feedFeaturesService,
@@ -114,7 +115,7 @@ export function DashboardFeed({
   );
 }
 
-function FeedHeading({ t }: { t: (k: string, d?: string) => string }) {
+function FeedHeading({ t }: { t: TFunction }) {
   return (
     <div className="flex items-center gap-2 mb-3 sm:mb-4">
       <Sparkles className="h-5 w-5 text-primary" />
