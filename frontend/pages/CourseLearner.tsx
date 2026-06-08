@@ -55,6 +55,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { courseCategoryI18nKey } from "@/lib/course-category";
 import { signalBadgeRefresh } from "@/lib/badges/refresh";
 import ScormPlayer from "@/components/courses/ScormPlayer";
 import TextNarrator from "@/components/audio/TextNarrator";
@@ -291,7 +292,16 @@ export default function CourseLearner() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <GraduationCap className="h-4 w-4" /> {t("labels.courseLearner.course")}
-              {course.category && <>· <Badge variant="outline">{course.category}</Badge></>}
+              {course.category && (
+                <>
+                  ·{" "}
+                  <Badge variant="outline">
+                    {t(courseCategoryI18nKey(course.category), {
+                      defaultValue: course.category,
+                    })}
+                  </Badge>
+                </>
+              )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold truncate">{course.title}</h1>
             {course.summary && <p className="text-sm text-muted-foreground mt-1">{course.summary}</p>}

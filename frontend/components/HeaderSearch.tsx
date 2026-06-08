@@ -12,6 +12,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   useHeaderFiltersRegistry,
@@ -52,10 +53,12 @@ export type HeaderSearchContext =
 
 type ContextOption = {
   value: HeaderSearchContext;
-  label: string;
+  /** i18n key resolved at render (this array is module-level, before any
+   *  hook is available). Reuses existing `labels.*` where one fits. */
+  labelKey: string;
   icon: typeof Sparkles;
   path: string;
-  placeholder: string;
+  placeholderKey: string;
   /** Extra query params merged into every navigate. Used to pin a category
    * when the context funnels into the unified /search page. */
   defaultParams?: Record<string, string>;
@@ -64,53 +67,53 @@ type ContextOption = {
 const CONTEXT_OPTIONS: ContextOption[] = [
   {
     value: "all",
-    label: "All",
+    labelKey: "search.context.all",
     icon: Sparkles,
     path: "/search",
-    placeholder: "Search everything — people, jobs, resumes, companies...",
+    placeholderKey: "search.placeholder.all",
   },
   {
     value: "people",
-    label: "People",
+    labelKey: "labels.people",
     icon: Users,
     path: "/people",
-    placeholder: "Search professionals by name, role, or skills...",
+    placeholderKey: "search.placeholder.people",
   },
   {
     value: "companies",
-    label: "Companies",
+    labelKey: "labels.companies",
     icon: Building2,
     path: "/companies",
-    placeholder: "Search companies, industries, or locations...",
+    placeholderKey: "search.placeholder.companies",
   },
   {
     value: "resumes",
-    label: "Resumes",
+    labelKey: "labels.resumes",
     icon: FileText,
     path: "/resumes",
-    placeholder: "Search resumes by name, title, or skills...",
+    placeholderKey: "search.placeholder.resumes",
   },
   {
     value: "jobs",
-    label: "Jobs",
+    labelKey: "labels.jobs",
     icon: Briefcase,
     path: "/jobs",
-    placeholder: "Search jobs, companies, or skills...",
+    placeholderKey: "search.placeholder.jobs",
   },
   {
     value: "tools",
-    label: "Tools",
+    labelKey: "search.context.tools",
     icon: Wrench,
     path: "/search",
-    placeholder: "Search AI career tools (resume, salary, interview...)",
+    placeholderKey: "search.placeholder.tools",
     defaultParams: { category: "tools" },
   },
   {
     value: "help",
-    label: "Help & Docs",
+    labelKey: "search.context.help",
     icon: HelpCircle,
     path: "/search",
-    placeholder: "Search help topics, features, or questions...",
+    placeholderKey: "search.placeholder.help",
     defaultParams: { category: "guides" },
   },
 ];
@@ -142,6 +145,7 @@ export interface HeaderSearchProps {
 }
 
 export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -261,7 +265,7 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Any</SelectItem>
+              <SelectItem value="all">{t("labels.any")}</SelectItem>
               {(field.options ?? []).map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
@@ -287,9 +291,9 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Any</SelectItem>
-              <SelectItem value="true">Yes</SelectItem>
-              <SelectItem value="false">No</SelectItem>
+              <SelectItem value="all">{t("labels.any")}</SelectItem>
+              <SelectItem value="true">{t("search.yes")}</SelectItem>
+              <SelectItem value="false">{t("search.no")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -307,14 +311,14 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
               type="number"
               value={extraValues[min] ?? ""}
               onChange={(e) => setExtra(min, e.target.value)}
-              placeholder="Min"
+              placeholder={t("search.min")}
               className="h-8 text-sm"
             />
             <Input
               type="number"
               value={extraValues[max] ?? ""}
               onChange={(e) => setExtra(max, e.target.value)}
-              placeholder="Max"
+              placeholder={t("search.max")}
               className="h-8 text-sm"
             />
           </div>
@@ -351,9 +355,9 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}
-            placeholder={current.placeholder}
+            placeholder={t(current.placeholderKey)}
             className="pl-9 pr-24 lg:pr-36 xl:pr-52 h-9"
-            aria-label="Search"
+            aria-label={t("search.ariaSearch")}
           />
           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
             <DropdownMenu>
@@ -362,11 +366,11 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 gap-1 text-xs font-medium"
-                  aria-label="Search type"
-                  title={`Searching: ${current.label}`}
+                  aria-label={t("search.searchType")}
+                  title={t("search.searchingLabel", { label: t(current.labelKey) })}
                 >
                   <CurrentIcon className="h-3.5 w-3.5" />
-                  <span className="hidden lg:inline">{current.label}</span>
+                  <span className="hidden lg:inline">{t(current.labelKey)}</span>
                   <Filter className="h-3 w-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
@@ -381,7 +385,7 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
                       className={cn("gap-2", selected && "font-medium")}
                     >
                       <Icon className="h-4 w-4" />
-                      <span className="flex-1">{opt.label}</span>
+                      <span className="flex-1">{t(opt.labelKey)}</span>
                       {selected && <Check className="h-3.5 w-3.5" />}
                     </DropdownMenuItem>
                   );
@@ -394,10 +398,10 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2 gap-1 text-xs font-medium hidden md:inline-flex"
-                aria-label="Advanced search options"
+                aria-label={t("search.advancedOptions")}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Advanced</span>
+                <span className="hidden xl:inline">{t("search.advanced")}</span>
               </Button>
             </PopoverTrigger>
           </div>
@@ -405,19 +409,19 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
         <PopoverContent align="end" className="w-80">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">Advanced search</h4>
+              <h4 className="text-sm font-semibold">{t("search.advancedSearch")}</h4>
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs"
                 onClick={clearAdvanced}
               >
-                Clear
+                {t("actions.clear")}
               </Button>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">
-                Location
+                {t("labels.location")}
               </label>
               <LocationFilter
                 value={geoFilter}
@@ -427,18 +431,18 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">
-                Date posted
+                {t("search.datePosted")}
               </label>
               <Select value={datePosted} onValueChange={setDatePosted}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Any time</SelectItem>
-                  <SelectItem value="24h">Last 24 hours</SelectItem>
-                  <SelectItem value="3d">Last 3 days</SelectItem>
-                  <SelectItem value="week">Last week</SelectItem>
-                  <SelectItem value="month">Last month</SelectItem>
+                  <SelectItem value="all">{t("search.anyTime")}</SelectItem>
+                  <SelectItem value="24h">{t("search.last24h")}</SelectItem>
+                  <SelectItem value="3d">{t("search.last3d")}</SelectItem>
+                  <SelectItem value="week">{t("search.lastWeek")}</SelectItem>
+                  <SelectItem value="month">{t("search.lastMonth")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -446,13 +450,13 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
               <>
                 <div className="border-t border-border -mx-4" />
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
-                  {current.label} filters
+                  {t("search.contextFilters", { label: t(current.labelKey) })}
                 </p>
                 {registeredFields.map(renderField)}
               </>
             )}
             <Button size="sm" className="w-full" onClick={applyAdvanced}>
-              Apply &amp; search
+              {t("search.applyAndSearch")}
             </Button>
           </div>
         </PopoverContent>

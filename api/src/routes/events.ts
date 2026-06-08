@@ -166,6 +166,13 @@ eventRoutes.post("/", async (c) => {
     await location.setForEntity("event", row.id, parsed.data.geo);
   }
 
+  // Award gamification points to the host for creating an event.
+  // Fire-and-forget — must never fail the create request.
+  const { withGamification } = await import("../domains/gamification/with-gamification.js");
+  await withGamification(c, "event-created", (game, role, uid) =>
+    game.onEventCreated({ userId: uid, role, eventId: row.id }),
+  );
+
   const resolved = await events.resolve(row, userId);
   return c.json(success(resolved), 201);
 });
@@ -255,6 +262,16 @@ eventRoutes.post("/:id/rsvp", async (c) => {
   const rsvp = new EventRsvpService(deps);
   const result = await rsvp.rsvp(c.req.param("id"), userId, parsed.data);
   if (!result) return c.json(error("NOT_FOUND", "Event not found or cancelled"), 404);
+
+  // Award the registrant once their RSVP is confirmed 'going'. Waitlist /
+  // pending / declined don't earn. Deduped on event id inside the helper.
+  if (result.outcome === "going") {
+    const { withGamification } = await import("../domains/gamification/with-gamification.js");
+    await withGamification(c, "event-registered", (game, role, uid) =>
+      game.onEventRegistered({ userId: uid, role, eventId: c.req.param("id") }),
+    );
+  }
+
   return c.json(success(result), 200);
 });
 
@@ -317,8 +334,26 @@ eventRoutes.post("/:id/attendees/:attendeeId/check-in", async (c) => {
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const deps = buildApiDeps(getEnv(c));
   const rsvp = new EventRsvpService(deps);
-  const ok = await rsvp.checkIn(c.req.param("id"), c.req.param("attendeeId"), userId);
-  if (!ok) return c.json(error("FORBIDDEN", "Cannot check in this attendee"), 403);
+  const result = await rsvp.checkIn(c.req.param("id"), c.req.param("attendeeId"), userId);
+  if (result === false) return c.json(error("FORBIDDEN", "Cannot check in this attendee"), 403);
+
+  // A fresh check-in of a registered attendee credits THAT attendee (not the
+  // host doing the check-in) with attendance points. Role is resolved from
+  // the DB because the earner isn't the JWT actor. Fire-and-forget.
+  if (typeof result === "string") {
+    try {
+      const { GamificationService, ACTIONS } = await import("../domains/gamification/index.js");
+      const game = new GamificationService(deps.repos);
+      await game.awardWithRoleLookup(ACTIONS.EVENT_ATTENDED, {
+        userId: result,
+        refId: c.req.param("id"),
+        refType: "event",
+      });
+    } catch (e) {
+      console.warn("[gamification] event-attended award failed", { error: String(e) });
+    }
+  }
+
   return c.json(success({ checkedIn: true }), 200);
 });
 

@@ -889,6 +889,16 @@ async function upsertHandler(c: any): Promise<Response> {
     console.warn("[reviews] aggregate cache recompute failed:", err);
   }
 
+  // Award the reviewer for posting a company review (new reviews only;
+  // edits re-run upsert but don't re-earn). Deduped on review id in the
+  // helper too. Fire-and-forget — never fails the write.
+  if (subjectType === "company" && isNew) {
+    const { withGamification } = await import("../domains/gamification/with-gamification.js");
+    await withGamification(c, "company-review-posted", (game, role, uidEarner) =>
+      game.onCompanyReviewPosted({ userId: uidEarner, role, reviewId: row.id }),
+    );
+  }
+
   return c.json(success({ review: rowToReview(row) }), 200);
 }
 

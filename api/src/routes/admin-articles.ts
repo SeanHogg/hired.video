@@ -164,9 +164,34 @@ adminArticleRoutes.post("/approve", async (c) => {
   )).returning();
   if (updatedRows.length > 0) bumpSearchVersion();
 
+  // Award the article AUTHOR (not the approving admin) publish points.
+  // Role is resolved from the DB since the earner isn't the JWT actor.
+  // Built once; fire-and-forget so an award glitch can't fail the approve.
+  let game: import("../domains/gamification/index.js").GamificationService | null = null;
+  let ACTIONS: typeof import("../domains/gamification/index.js").ACTIONS | null = null;
+  if (updatedRows.length > 0) {
+    try {
+      const mod = await import("../domains/gamification/index.js");
+      const { buildRepos } = await import("../repositories/index.js");
+      game = new mod.GamificationService(buildRepos(db));
+      ACTIONS = mod.ACTIONS;
+    } catch {
+      game = null;
+    }
+  }
+
   // Emit one feed post per approved article (replaces the old per-article
   // emit that used to live in the creator-side publish route).
   for (const a of updatedRows) {
+    if (game && ACTIONS) {
+      await game
+        .awardWithRoleLookup(ACTIONS.ARTICLE_PUBLISHED, {
+          userId: a.userId,
+          refId: a.id,
+          refType: "article",
+        })
+        .catch(() => undefined);
+    }
     const [author] = await db.select({ name: users.name })
       .from(users).where(eq(users.id, a.userId)).limit(1);
     const [profile] = await db.select({ slug: userProfiles.customUrlSlug, avatarUrl: userProfiles.avatarUrl })

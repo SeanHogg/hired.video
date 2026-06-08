@@ -17,6 +17,7 @@
  * Safari, embedded webviews) so no caller needs to compute canPlay.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Headphones,
   Loader2,
@@ -147,9 +148,11 @@ function resolveDefaultVoiceId(voices: NarratorVoice[]): string | null {
 }
 
 function mapLicensedToNarrator(v: LicensedVoice): NarratorVoice {
+  // The "(your voice)" suffix is appended at render via i18n; owner voices
+  // are identified by `group === "owner"`, so the raw name is stored here.
   return {
     id: v.id,
-    name: v.isOwner ? `${v.name} (your voice)` : v.name,
+    name: v.name,
     engine: "vibevoice",
     group: v.isOwner ? "owner" : "purchased",
   };
@@ -169,8 +172,10 @@ export function TextNarrator({
   className,
   preferenceKey,
   variant = "pill",
-  label = "Listen",
+  label,
 }: Props) {
+  const { t } = useTranslation();
+  const pillLabel = label ?? t("narrator.listen");
   // Self-gate: SSR + unsupported browsers render nothing.
   const supported =
     typeof window !== "undefined" &&
@@ -441,13 +446,13 @@ export function TextNarrator({
         "flex items-center gap-2 rounded-xl bg-black/90 px-3 py-2 text-white backdrop-blur-sm",
       )}
       role="region"
-      aria-label="Listen to this content"
+      aria-label={t("narrator.ariaRegion")}
     >
       <Button
         variant="ghost"
         size="sm"
         onClick={() => onSeek(0)}
-        aria-label="Back to start"
+        aria-label={t("narrator.backToStart")}
         disabled={!currentVoice}
         className="h-8 w-8 shrink-0 rounded-full p-0 text-white hover:bg-white/10 disabled:opacity-40"
       >
@@ -458,7 +463,7 @@ export function TextNarrator({
         variant="secondary"
         size="sm"
         onClick={playPauseHandler}
-        aria-label={isPlaying ? "Pause" : "Play"}
+        aria-label={isPlaying ? t("narrator.pause") : t("narrator.play")}
         disabled={!currentVoice || isLoading}
         className="h-9 w-9 shrink-0 rounded-full p-0"
       >
@@ -479,7 +484,7 @@ export function TextNarrator({
         value={Math.min(playheadSec, durationSec)}
         onChange={(e) => onSeek(Number(e.target.value))}
         className="h-1 min-w-0 flex-1 cursor-pointer accent-brand-purple"
-        aria-label="Playhead"
+        aria-label={t("narrator.playhead")}
       />
 
       <span className="shrink-0 text-[11px] tabular-nums opacity-80">
@@ -500,19 +505,21 @@ export function TextNarrator({
     <div className="space-y-3 px-1 pb-1 pt-2">
       <div className="space-y-1">
         <label className="text-[11px] font-medium text-muted-foreground">
-          Voice
+          {t("narrator.voice")}
         </label>
         <Select value={voiceId ?? undefined} onValueChange={onChangeVoice}>
           <SelectTrigger className="h-8 w-full text-xs">
-            <SelectValue placeholder="Pick a voice" />
+            <SelectValue placeholder={t("narrator.pickVoice")} />
           </SelectTrigger>
           <SelectContent>
             {grouped.owner.length > 0 && (
               <SelectGroup>
-                <SelectLabel className="text-xs">Your voices</SelectLabel>
+                <SelectLabel className="text-xs">
+                  {t("narrator.yourVoices")}
+                </SelectLabel>
                 {grouped.owner.map((v) => (
                   <SelectItem key={v.id} value={v.id} className="text-xs">
-                    {v.name}
+                    {t("narrator.yourVoiceName", { name: v.name })}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -520,7 +527,7 @@ export function TextNarrator({
             {grouped.purchased.length > 0 && (
               <SelectGroup>
                 <SelectLabel className="text-xs">
-                  Purchased &amp; licensed
+                  {t("narrator.purchasedLicensed")}
                 </SelectLabel>
                 {grouped.purchased.map((v) => (
                   <SelectItem key={v.id} value={v.id} className="text-xs">
@@ -531,7 +538,9 @@ export function TextNarrator({
             )}
             {grouped.browser.length > 0 && (
               <SelectGroup>
-                <SelectLabel className="text-xs">Browser voices</SelectLabel>
+                <SelectLabel className="text-xs">
+                  {t("narrator.browserVoices")}
+                </SelectLabel>
                 {grouped.browser.map((v) => (
                   <SelectItem key={v.id} value={v.id} className="text-xs">
                     {v.name}
@@ -545,7 +554,7 @@ export function TextNarrator({
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <label className="text-[11px] font-medium text-muted-foreground">
-            Speed
+            {t("narrator.speed")}
           </label>
           <span className="text-[11px] tabular-nums text-muted-foreground">
             {rate.toFixed(2)}×
@@ -557,7 +566,7 @@ export function TextNarrator({
           max={1.8}
           step={0.05}
           onValueChange={onChangeRate}
-          aria-label="Narration speed"
+          aria-label={t("narrator.narrationSpeed")}
         />
       </div>
     </div>
@@ -570,7 +579,7 @@ export function TextNarrator({
         {blackBar}
         <details className="text-xs text-muted-foreground self-end">
           <summary className="cursor-pointer select-none px-1">
-            Voice &amp; speed
+            {t("narrator.voiceAndSpeed")}
           </summary>
           <div className="w-72 rounded-md border bg-popover p-2 shadow-md">
             {settingsPane}
@@ -590,7 +599,7 @@ export function TextNarrator({
         <Button
           variant="outline"
           size="sm"
-          aria-label={isPlaying ? "Open audio player (playing)" : label}
+          aria-label={isPlaying ? t("narrator.openPlayerPlaying") : pillLabel}
           className={cn(
             "h-7 px-2 gap-1.5 text-xs",
             isPlaying && "border-brand-purple text-brand-purple",
@@ -604,7 +613,7 @@ export function TextNarrator({
           ) : (
             <Headphones className="h-3.5 w-3.5" />
           )}
-          <span className="hidden sm:inline">{label}</span>
+          <span className="hidden sm:inline">{pillLabel}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[22rem] p-2">

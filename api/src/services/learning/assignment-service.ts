@@ -249,4 +249,34 @@ export class AssignmentService {
       };
     });
   }
+
+  /** Resolve the active assignments a learner has just satisfied by
+   *  completing a given subject (course/path), returning the
+   *  (assignmentId, memberId) pairs the gamification layer needs to award
+   *  assignment completion. Covers both cohort-wide (memberId NULL) and
+   *  member-specific assignments. One row per matching (assignment, member)
+   *  so a learner in multiple cohorts earns per assignment. */
+  async findCompletableForLearnerSubject(
+    userId: string,
+    subjectType: "course" | "path",
+    subjectId: string,
+  ): Promise<Array<{ assignmentId: string; memberId: string }>> {
+    const rows = await this.db
+      .select({ assignmentId: learningAssignments.id, memberId: cohortMembers.id })
+      .from(cohortMembers)
+      .innerJoin(learningCohorts, eq(learningCohorts.id, cohortMembers.cohortId))
+      .innerJoin(learningAssignments, and(
+        eq(learningAssignments.cohortId, cohortMembers.cohortId),
+        eq(learningAssignments.status, "active"),
+        eq(learningAssignments.subjectType, subjectType),
+        eq(learningAssignments.subjectId, subjectId),
+        or(isNull(learningAssignments.memberId), eq(learningAssignments.memberId, cohortMembers.id)),
+      ))
+      .where(and(
+        eq(cohortMembers.userId, userId),
+        eq(cohortMembers.status, "active"),
+        eq(learningCohorts.status, "active"),
+      ));
+    return rows.map((r) => ({ assignmentId: r.assignmentId, memberId: r.memberId }));
+  }
 }

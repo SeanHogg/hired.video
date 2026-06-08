@@ -118,6 +118,16 @@ cohortRoutes.post("/join", async (c) => {
   if (!data) return c.json(error("VALIDATION_ERROR", "A join code is required."), 400);
   try {
     const result = await new CohortService(getDb()).joinByCode(userId, data.joinCode);
+    // The joining student earns once per (student, cohort). Fire-and-forget.
+    const { withGamification } = await import("../domains/gamification/with-gamification.js");
+    await withGamification(c, "cohort-student-joined", (game, role, uidEarner) =>
+      game.onCohortStudentJoined({
+        userId: uidEarner,
+        role,
+        cohortId: result.cohort.id,
+        memberId: result.member.id,
+      }),
+    );
     return c.json(success(result), 200);
   } catch (e) {
     return mapError(c, e);
@@ -138,6 +148,11 @@ cohortRoutes.post("/", async (c) => {
   }
   try {
     const created = await new CohortService(db).createCohort(userId, data);
+    // The educator earns for spinning up a classroom. Fire-and-forget.
+    const { withGamification } = await import("../domains/gamification/with-gamification.js");
+    await withGamification(c, "cohort-created", (game, role, uidEarner) =>
+      game.onCohortCreated({ userId: uidEarner, role, cohortId: created.id }),
+    );
     return c.json(success(created), 201);
   } catch (e) {
     return mapError(c, e);
@@ -195,6 +210,25 @@ cohortRoutes.post("/:id/members", async (c) => {
   if (!data) return c.json(error("VALIDATION_ERROR", "Provide a userId, invitedEmail, or displayName."), 400);
   try {
     const row = await new CohortService(getDb()).addMember(userId, c.req.param("id"), data);
+    // An educator-added member who has a real account earns the same
+    // student-joined award as a self-serve join. Role is resolved from the
+    // DB since the earner isn't the JWT actor. RefId mirrors the helper's
+    // `cohort:<cohortId>:<memberId>` so both join paths dedup together.
+    // Invited-only rows (no userId yet) earn on accept, not here.
+    if (row.userId) {
+      try {
+        const { GamificationService, ACTIONS } = await import("../domains/gamification/index.js");
+        const { buildRepos } = await import("../repositories/index.js");
+        const game = new GamificationService(buildRepos(getDb()));
+        await game.awardWithRoleLookup(ACTIONS.COHORT_STUDENT_JOINED, {
+          userId: row.userId,
+          refId: `cohort:${row.cohortId}:${row.id}`,
+          refType: "cohort_member",
+        });
+      } catch (e) {
+        console.warn("[gamification] cohort-student-joined (addMember) award failed", { error: String(e) });
+      }
+    }
     return c.json(success(row), 201);
   } catch (e) {
     return mapError(c, e);

@@ -220,8 +220,16 @@ export class EventRsvpService {
     } as any);
   }
 
-  /** Mark a user checked-in at the door. */
-  async checkIn(eventId: string, attendeeId: string, actingUserId: string): Promise<boolean> {
+  /** Mark a user checked-in at the door. Returns the checked-in attendee's
+   *  userId (when registered) on a fresh check-in so the caller can award
+   *  attendance points, `false` when the action wasn't permitted/found, and
+   *  `null` when it was a no-op (already checked-in) or a guest with no
+   *  account to credit. */
+  async checkIn(
+    eventId: string,
+    attendeeId: string,
+    actingUserId: string,
+  ): Promise<string | false | null> {
     const event = await this.deps.repos.events.findById(eventId);
     if (!event) return false;
     if (!(await this.canManageAttendees(event, actingUserId))) return false;
@@ -229,13 +237,13 @@ export class EventRsvpService {
     const attendees = await this.deps.repos.events.findAttendeesByEvent(eventId);
     const target = attendees.find((a) => a.id === attendeeId);
     if (!target) return false;
-    if (target.checkedInAt) return true;
+    if (target.checkedInAt) return null; // idempotent — no fresh credit
 
     await this.deps.repos.events.upsertAttendee({
       ...target,
       checkedInAt: this.deps.now(),
     } as any);
-    return true;
+    return target.userId ?? null;
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────

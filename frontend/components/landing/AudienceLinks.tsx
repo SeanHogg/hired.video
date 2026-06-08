@@ -13,6 +13,7 @@
  * touching either consumer.
  */
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   LIFE_STAGE_AUDIENCE_REGISTRY,
   type LifeStageAudienceMeta,
@@ -30,6 +31,7 @@ export interface AudienceLinksProps {
 }
 
 export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
+  const { t } = useTranslation();
   const roleAudiences = LIFE_STAGE_AUDIENCE_REGISTRY.filter((a) =>
     ROLE_KEYS.includes(a.key),
   );
@@ -37,10 +39,18 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
     (a) => !ROLE_KEYS.includes(a.key),
   );
 
+  // Audience labels live in the shared registry (English source of truth);
+  // resolve each through i18n keyed by its stable enum, falling back to the
+  // registry label so a missing translation still renders real copy.
+  const audienceLabel = (a: LifeStageAudienceMeta) =>
+    t(`audiences.${a.key}.label`, { defaultValue: a.label });
+
   if (variant === "compact") {
     return (
       <div>
-        <h3 className="font-semibold text-foreground mb-4">Resource maps</h3>
+        <h3 className="font-semibold text-foreground mb-4">
+          {t("resourceMaps.title")}
+        </h3>
         <ul className="space-y-2">
           {roleAudiences.map((a) => (
             <li key={a.key}>
@@ -48,7 +58,7 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
                 to={`/for/${audienceSlug(a.key)}`}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                {a.label}
+                {audienceLabel(a)}
               </Link>
             </li>
           ))}
@@ -57,7 +67,7 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
               to="/for"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              All resource maps →
+              {t("resourceMaps.all")}
             </Link>
           </li>
         </ul>
@@ -68,7 +78,9 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
   // Expanded — full grid for the anonymous-visitor footer.
   return (
     <div className="md:col-span-2">
-      <h3 className="font-semibold text-foreground mb-4">Resource maps by situation</h3>
+      <h3 className="font-semibold text-foreground mb-4">
+        {t("resourceMaps.bySituation")}
+      </h3>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {[...roleAudiences, ...situationAudiences].map((a) => (
           <Link
@@ -76,7 +88,7 @@ export function AudienceLinks({ variant }: AudienceLinksProps): JSX.Element {
             to={`/for/${audienceSlug(a.key)}`}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            {a.label}
+            {audienceLabel(a)}
           </Link>
         ))}
       </div>

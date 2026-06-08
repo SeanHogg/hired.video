@@ -1293,6 +1293,29 @@ courseRoutes.patch("/enrollments/:enrollmentId/progress", async (c) => {
       }
     }
 
+    // Cohort-assignment completion — if this course was assigned to the
+    // learner via one or more classrooms, credit each satisfied assignment.
+    // Deduped on (assignment, member) in the helper. Best-effort.
+    try {
+      const role = pickScoringRole(c.var.user?.roles);
+      if (role) {
+        const { AssignmentService } = await import("../services/learning/assignment-service.js");
+        const completable = await new AssignmentService(db).findCompletableForLearnerSubject(
+          userId,
+          "course",
+          existing.courseId,
+        );
+        if (completable.length > 0) {
+          const game = gamificationFromContext(c);
+          for (const { assignmentId, memberId } of completable) {
+            await game.onCohortAssignmentCompleted({ userId, role, assignmentId, memberId });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[courses] cohort-assignment completion fan-out failed", e instanceof Error ? e.message : String(e));
+    }
+
     // Path completion fan-out — for every path this course belongs to,
     // check whether the user has now finished it.
     try {

@@ -2760,6 +2760,7 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
       userId: studioProjects.userId,
       companyId: studioProjects.companyId,
       videoId: studioProjects.videoId,
+      mediaKind: studioProjects.mediaKind,
     })
     .from(studioProjects)
     .where(eq(studioProjects.id, projectId))
@@ -2837,6 +2838,33 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
     }).catch(() => undefined);
   } else if (isUnpublish) {
     await removePublication(projectId, "profile").catch(() => undefined);
+  }
+
+  // Award the project CREATOR (not necessarily the publishing actor) for
+  // publishing a creative-studio create-kind (game / comic / podcast). Video
+  // and other output kinds are scored elsewhere / not at all. Role is resolved
+  // from the DB so a delegated editor publishing on the creator's behalf still
+  // credits the creator. Deduped on project id. Fire-and-forget.
+  if (isPublish && (row.mediaKind === "game" || row.mediaKind === "comic" || row.mediaKind === "podcast")) {
+    try {
+      const { GamificationService, ACTIONS } = await import("../domains/gamification/index.js");
+      const { buildRepos } = await import("../repositories/index.js");
+      const game = new GamificationService(buildRepos(db));
+      const action =
+        row.mediaKind === "game"
+          ? ACTIONS.STUDIO_GAME_PUBLISHED
+          : row.mediaKind === "comic"
+            ? ACTIONS.STUDIO_COMIC_PUBLISHED
+            : ACTIONS.STUDIO_PODCAST_PUBLISHED;
+      await game.awardWithRoleLookup(action, {
+        userId: row.userId,
+        refId: projectId,
+        refType: "studio_project",
+        metadata: { mediaKind: row.mediaKind },
+      });
+    } catch (e) {
+      console.warn("[gamification] studio-create-published award failed", { projectId, error: String(e) });
+    }
   }
 
   return c.json(ok(dto));

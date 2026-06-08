@@ -54,6 +54,7 @@ const NAME = {
   learningPaths: tableNameOf(learningPaths),
   learningPathCourses: tableNameOf(learningPathCourses),
   learningPathEnrollments: tableNameOf(learningPathEnrollments),
+  users: tableNameOf(users),
 };
 
 /**
