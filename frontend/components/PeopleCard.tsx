@@ -149,6 +149,11 @@ export default function PeopleCard({
     }
   };
 
+  // Status is a known enum (active/looking/busy/inactive); localize via i18n
+  // with the raw value as fallback so an unexpected status still renders.
+  const statusLabel = (status: string) =>
+    t(`peopleCard.status.${status}`, { defaultValue: status });
+
   const getRoleIcon = (role: string | number | undefined | null) => {
     const normalizedRole = normalizeRole(role);
     switch (normalizedRole) {
@@ -282,6 +287,38 @@ export default function PeopleCard({
     ? actions
     : fallbackActions.filter((a): a is DynamicCardAction => a !== null);
 
+  // Connect dialog defined once and rendered in both layouts (DRY) — the
+  // vertical layout previously carried a hardcoded English duplicate.
+  const connectDialog = (
+    <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("headings.sendConnectionRequest")}</DialogTitle>
+          <DialogDescription>
+            {t("messages.connectionRequestDesc", { name: displayFullName })}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Textarea
+            placeholder={t("fields.connectionMessage.placeholder")}
+            value={connectMessage}
+            onChange={(e) => setConnectMessage(e.target.value)}
+            rows={3}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowConnectDialog(false)}>
+              {t("actions.cancel")}
+            </Button>
+            <Button onClick={handleSendConnect}>
+              <Send className="h-4 w-4 mr-2" />
+              {t("actions.sendRequest")}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (layout === "horizontal") {
     return (
       <>
@@ -310,7 +347,7 @@ export default function PeopleCard({
               {person.openToWork && (
                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700">{t("labels.openToWork")}</Badge>
               )}
-              <Badge variant="secondary" className={getStatusColor(person.status)}>{person.status}</Badge>
+              <Badge variant="secondary" className={getStatusColor(person.status)}>{statusLabel(person.status)}</Badge>
             </div>
           </div>
           <div className="flex-shrink-0 p-2">
@@ -322,31 +359,7 @@ export default function PeopleCard({
           </div>
         </BaseCard>
 
-        {/* Connect Dialog */}
-        <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("headings.sendConnectionRequest")}</DialogTitle>
-              <DialogDescription>
-                {t("messages.connectionRequestDesc", { name: displayFullName })}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Textarea
-                placeholder={t("fields.connectionMessage.placeholder")}
-                value={connectMessage}
-                onChange={(e) => setConnectMessage(e.target.value)}
-                rows={3}
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowConnectDialog(false)}>{t("actions.cancel")}</Button>
-                <Button onClick={handleSendConnect}>
-                  <Send className="h-4 w-4 mr-2" />{t("actions.sendRequest")}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {connectDialog}
       </>
     );
   }
@@ -381,7 +394,7 @@ export default function PeopleCard({
                       className="text-xs bg-green-50 text-green-700 flex-shrink-0"
                     >
                       <Users className="h-3 w-3 mr-1" />
-                      Connected
+                      {t("labels.connected")}
                     </Badge>
                   )}
                 </div>
@@ -425,14 +438,14 @@ export default function PeopleCard({
               variant="secondary"
               className={getStatusColor(person.status)}
             >
-              {person.status}
+              {statusLabel(person.status)}
             </Badge>
             {person.isCreator && (
               <Badge
                 variant="outline"
                 className="text-xs bg-purple-50 text-purple-700 border-purple-200"
               >
-                Creator
+                {t("labels.creator")}
               </Badge>
             )}
             {person.openToWork && (
@@ -440,7 +453,7 @@ export default function PeopleCard({
                 variant="outline"
                 className="text-xs bg-green-50 text-green-700"
               >
-                Open to Work
+                {t("labels.openToWork")}
               </Badge>
             )}
           </div>
@@ -461,7 +474,7 @@ export default function PeopleCard({
           {person.companyName && (
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="truncate">at {person.companyName}</span>
+              <span className="truncate">{t("peopleCard.atCompany", { company: person.companyName })}</span>
             </div>
           )}
 
@@ -473,15 +486,15 @@ export default function PeopleCard({
               <div className="grid grid-cols-2 gap-2 text-xs text-center">
                 <div>
                   <div className="font-medium">{person.connectionCount}</div>
-                  <div className="text-muted-foreground">Connections</div>
+                  <div className="text-muted-foreground">{t("labels.connections")}</div>
                 </div>
                 <div>
                   <div className="font-medium">{person.followerCount}</div>
-                  <div className="text-muted-foreground">Followers</div>
+                  <div className="text-muted-foreground">{t("labels.followers")}</div>
                 </div>
               </div>
               <OwnerMetricsRow isOwner={isOwnProfile} className="justify-center pt-1">
-                <Metric icon={Eye} value={person.profileViews ?? 0} label="profile views" />
+                <Metric icon={Eye} value={person.profileViews ?? 0} label={t("peopleCard.profileViews")} />
               </OwnerMetricsRow>
             </>
           )}
@@ -491,18 +504,23 @@ export default function PeopleCard({
             <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
               <div className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                Active{" "}
-                {person.lastActiveAt &&
-                !isNaN(new Date(person.lastActiveAt).getTime())
-                  ? new Date(person.lastActiveAt).toLocaleDateString()
-                  : "Unknown"}
+                {t("peopleCard.active", {
+                  date:
+                    person.lastActiveAt &&
+                    !isNaN(new Date(person.lastActiveAt).getTime())
+                      ? new Date(person.lastActiveAt).toLocaleDateString()
+                      : t("labels.unknown"),
+                })}
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                Joined{" "}
-                {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
-                  ? new Date(person.createdAt).toLocaleDateString()
-                  : "Unknown"}
+                {t("peopleCard.joined", {
+                  date:
+                    person.createdAt &&
+                    !isNaN(new Date(person.createdAt).getTime())
+                      ? new Date(person.createdAt).toLocaleDateString()
+                      : t("labels.unknown"),
+                })}
               </div>
             </div>
           )}
@@ -515,10 +533,10 @@ export default function PeopleCard({
                 size="sm"
                 onClick={() => onAddToTalentPool(person.id)}
                 disabled={isInTalentPool}
-                title={isInTalentPool ? "Already in talent pool" : "Add to talent pool"}
+                title={isInTalentPool ? t("peopleCard.alreadyInTalentPool") : t("peopleCard.addToTalentPool")}
               >
                 <UserCog className="h-3 w-3 mr-1" />
-                {isInTalentPool ? "In Talent Pool" : "Add to Talent Pool"}
+                {isInTalentPool ? t("peopleCard.inTalentPool") : t("peopleCard.addToTalentPool")}
               </Button>
             </div>
           )}
@@ -547,33 +565,7 @@ export default function PeopleCard({
       />
 
       {/* Connect Dialog — triggered from the Connect action in CardActions */}
-      <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Connection Request</DialogTitle>
-            <DialogDescription>
-              Add a personal message to your connection request to {displayFullName}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="I'd love to connect and expand my professional network..."
-              value={connectMessage}
-              onChange={(e) => setConnectMessage(e.target.value)}
-              rows={3}
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowConnectDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSendConnect}>
-                <Send className="h-3 w-3 mr-2" />
-                Send Request
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {connectDialog}
     </BaseCard>
   );
 }

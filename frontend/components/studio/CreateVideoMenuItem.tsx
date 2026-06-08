@@ -10,6 +10,7 @@
 
 import { Video } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   formatStudioSubject,
@@ -24,12 +25,15 @@ interface Props {
 }
 
 export default function CreateVideoMenuItem({ subject, forceNew = false }: Props) {
+  const { t } = useTranslation();
   const href = `/studio?subject=${formatStudioSubject(subject)}${forceNew ? "&new=1" : ""}`;
   return (
     <DropdownMenuItem asChild>
       <Link to={href} className="cursor-pointer">
         <Video className="w-4 h-4 mr-2" />
-        {STUDIO_SUBJECT_LABEL[subject.kind]}
+        {t(`studioSubject.${subject.kind}.label`, {
+          defaultValue: STUDIO_SUBJECT_LABEL[subject.kind],
+        })}
       </Link>
     </DropdownMenuItem>
   );

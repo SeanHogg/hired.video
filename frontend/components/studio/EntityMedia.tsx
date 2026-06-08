@@ -47,6 +47,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, Loader2, Pencil, Play, Plus } from "lucide-react";
 import {
   formatStudioSubject,
@@ -83,6 +84,7 @@ export default function EntityMedia({
   ownerUserId,
   className,
 }: EntityMediaProps) {
+  const { t } = useTranslation();
   const apiReady = useApiReady();
   const [items, setItems] = useState<StudioProject[] | null>(null);
   // Collapsed by default — the projects fetch below is gated on this so a
@@ -145,14 +147,21 @@ export default function EntityMedia({
   // be a Photoshop drawing or a game. Per-tile `<MediaKindBadge>`
   // overlays already convey kind for each item; the rail header is
   // a count, not a taxonomy label.
-  const headerLabel = itemsHeaderLabel(items);
+  const headerLabel = t("entityMedia.itemCount", { count: items?.length ?? 0 });
 
-  const subjectLabel = STUDIO_SUBJECT_LABEL[subject.kind];
+  // Subject label is localized via i18n keyed by the subject kind, falling
+  // back to the shared English map so a new kind still renders real copy.
+  const subjectLabel = t(`studioSubject.${subject.kind}.label`, {
+    defaultValue: STUDIO_SUBJECT_LABEL[subject.kind],
+  });
   const newItemHref = `/studio?subject=${formatStudioSubject(subject)}&new=1`;
   // Collapsed trigger can't show a count (we haven't fetched yet), so it
   // names the subject; once expanded + loaded it switches to the live
   // "X items" count.
-  const triggerLabel = items === null ? `${subjectLabel} media` : headerLabel;
+  const triggerLabel =
+    items === null
+      ? t("entityMedia.subjectMedia", { subject: subjectLabel })
+      : headerLabel;
 
   return (
     <Collapsible
@@ -173,13 +182,13 @@ export default function EntityMedia({
           <Link
             to={newItemHref}
             className="snap-start shrink-0 w-48 rounded-md border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-primary"
-            title={`Create ${subjectLabel}`}
+            title={t("entityMedia.createSubject", { subject: subjectLabel })}
           >
             <div className="rounded-full bg-primary/10 p-1.5">
               <Plus className="w-4 h-4" />
             </div>
             <span className="text-xs font-medium leading-tight text-center">
-              Create {subjectLabel}
+              {t("entityMedia.createSubject", { subject: subjectLabel })}
             </span>
           </Link>
         )}
@@ -194,7 +203,7 @@ export default function EntityMedia({
             the panel is already open, so say so rather than render a blank
             rail. Owners always see the Create chip above instead. */}
         {items !== null && items.length === 0 && !viewerCanCreate && (
-          <p className="text-xs text-muted-foreground py-2">No media yet.</p>
+          <p className="text-xs text-muted-foreground py-2">{t("entityMedia.noMediaYet")}</p>
         )}
 
         {items?.map((v) => {
@@ -244,7 +253,7 @@ export default function EntityMedia({
                   <Link
                     to={openHref}
                     className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
-                    title="Edit in Studio"
+                    title={t("entityMedia.editInStudio")}
                   >
                     <Pencil className="w-3 h-3" />
                   </Link>
@@ -257,15 +266,4 @@ export default function EntityMedia({
       </CollapsibleContent>
     </Collapsible>
   );
-}
-
-/** Header label — always "X items" regardless of the kind mix. The
- *  studio is multi-kind now (a resume may link a video + a Photoshop
- *  drawing + a podcast), so the rail counts attachments without
- *  taxonomising them; the per-tile `<MediaKindBadge>` carries kind
- *  for each individual item. Exported so a future test can lock this
- *  in without exporting the whole component shape. */
-export function itemsHeaderLabel(items: StudioProject[] | null): string {
-  const count = items?.length ?? 0;
-  return `${count} item${count === 1 ? "" : "s"}`;
 }
