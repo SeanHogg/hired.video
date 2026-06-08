@@ -80,6 +80,10 @@ import {
   FeedFeaturesRepository,
   type IFeedFeaturesRepository,
 } from "./feedFeaturesRepository.js";
+import {
+  CampaignRepository,
+  type ICampaignRepository,
+} from "./campaignRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -137,6 +141,8 @@ export interface Repos {
   resumeFeedback: IResumeFeedbackRepository;
   // SuperAdmin-curated dashboard feed cards, per role (migration 0202)
   feedFeatures: IFeedFeaturesRepository;
+  // email campaign engine: campaigns, recipients, templates, suppressions (migration 0204)
+  campaigns: ICampaignRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -174,6 +180,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     communityResources: new CommunityResourcesRepository(db, now),
     resumeFeedback: new ResumeFeedbackRepository(db, now),
     feedFeatures: new FeedFeaturesRepository(db, now),
+    campaigns: new CampaignRepository(db, now),
   };
 }
 

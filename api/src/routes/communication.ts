@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Variables, AppEnv } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
+import { CampaignService } from "../services/campaigns/CampaignService.js";
 import {
   findOrCreateDirectConversation,
   sendMessage,
@@ -213,15 +214,20 @@ communicationRoutes.post("/email-campaigns", async (c) => {
   return c.json(ok(created), 201);
 });
 
+// Real send: hands the campaign to the canonical CampaignService engine
+// (resolve audience → render → send via the email provider on the cron loop).
+// Replaces the old no-op that just flipped status='sent' without delivering.
 communicationRoutes.post("/email-campaigns/:campaignId/send", async (c) => {
   const db = getDb();
-  const [updated] = await db
-    .update(emailCampaigns)
-    .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() } as any)
-    .where(eq(emailCampaigns.id, c.req.param("campaignId")))
-    .returning();
-  if (!updated) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Campaign not found" } }, 404);
-  return c.json(ok(updated), 200);
+  const service = new CampaignService(buildRepos(db).campaigns as any, db);
+  const result = await service.schedule(c.req.param("campaignId"), null);
+  if (result.ok && result.campaign) {
+    return c.json(ok(result.campaign), 200);
+  }
+  return c.json(
+    { success: false, error: { code: "VALIDATION_ERROR", message: result.reason ?? "Cannot send campaign" } },
+    400,
+  );
 });
 
 communicationRoutes.get("/tracking", async (c) => {

@@ -35,6 +35,7 @@ import { runRetentionSweep } from "./services/maintenance/retention-sweep.js";
 import { runCounterRecompute } from "./services/maintenance/counter-recompute.js";
 import { payoutReleaseWorker } from "./services/payout/ReleaseWorker.js";
 import { engagementPayoutService } from "./services/articles/EngagementPayoutService.js";
+import { CampaignService } from "./services/campaigns/CampaignService.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -165,6 +166,31 @@ async function processFollowUps(): Promise<void> {
   }
 
   console.log(`[scheduled] Processed ${due.length} follow-up enrollment(s).`);
+}
+
+// ---------------------------------------------------------------------------
+// Email campaign send loop (migration 0204)
+// ---------------------------------------------------------------------------
+// Every /5 tick: promote due `scheduled` campaigns to `sending`, then drain a
+// bounded batch of pending recipients per in-flight campaign through the email
+// provider. Idempotent + resumable (recipient population is ON CONFLICT DO
+// NOTHING; a campaign stays `sending` until its queue empties). Bounded by
+// CampaignService's per-tick caps so it never blows the Worker CPU budget.
+
+async function processCampaigns(): Promise<void> {
+  try {
+    const db = getDb();
+    const service = new CampaignService(buildRepos(db).campaigns as any, db);
+    const result = await service.processDue(new Date());
+    if (result.promoted > 0 || result.processed > 0) {
+      console.log(
+        `[scheduled] campaigns: promoted=${result.promoted} processed=${result.processed} ` +
+          `sent=${result.sent} failed=${result.failed}`,
+      );
+    }
+  } catch (err) {
+    console.error("[scheduled] campaign send loop failed:", err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -708,6 +734,7 @@ export async function runScheduled(): Promise<void> {
   const now = new Date();
   const sweeps: Array<Promise<unknown>> = [
     processFollowUps(),
+    processCampaigns(),
     processJobQueue(),
     processEventReminders(),
     processPartnerProgramDispatch(),

@@ -161,6 +161,8 @@ import { articleRoutes } from "./routes/articles.js";
 import { adminArticleRoutes } from "./routes/admin-articles.js";
 import { feedFeatureRoutes } from "./routes/feed-features.js";
 import { adminFeedFeatureRoutes } from "./routes/admin-feed-features.js";
+import { adminCampaignRoutes } from "./routes/admin-campaigns.js";
+import { campaignsPublicRoutes } from "./routes/campaigns-public.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import {
   communityResourceRoutes,
@@ -235,6 +237,11 @@ export function createApp() {
     "/api/auth/oauth",
     "/api/auth/magic-link",
     "/api/errors/report",
+    // Campaign unsubscribe + open-tracking pixel are opened straight from a
+    // recipient's email client (no JWT). The authenticated SuperAdmin manager
+    // lives at /api/admin/campaigns and is NOT matched by this prefix.
+    "/api/campaigns/unsubscribe",
+    "/api/campaigns/open",
     // Geo-IP surface for the dynamic Privacy / Terms / Cookie pages
     // and any other surface that needs the visitor's country before
     // they've signed in.
@@ -693,6 +700,7 @@ export function createApp() {
   app.route("/api/artifact-metrics", artifactMetricsRoutes);
   app.route("/api/take-home-invites", takeHomeInvitesRoutes);
   app.route("/api/affiliates", affiliateRoutes);
+  app.route("/api/campaigns", campaignsPublicRoutes); // public unsubscribe + open pixel
   app.route("/api/marketing", marketingRoutes);
   app.route("/api/settings", settingsRoutes);
   app.route("/api/export", settingsRoutes); // legacy export alias — /api/export/csv maps to /api/settings/export/csv
@@ -736,6 +744,7 @@ export function createApp() {
   app.route("/api/admin/job-sources", jobScraperAdminRoutes);
   app.route("/api/admin/articles", adminArticleRoutes);
   app.route("/api/admin/feed-features", adminFeedFeatureRoutes); // SA dashboard-feed curation
+  app.route("/api/admin/campaigns", adminCampaignRoutes); // SA email-campaign manager
   app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/admin/community-resources", adminCommunityResourceRoutes);
   app.route("/api/lms-oauth", lmsOauthRoutes);

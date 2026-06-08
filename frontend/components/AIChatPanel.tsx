@@ -48,8 +48,6 @@ import { aiService } from "@/lib/services/ai-service";
 import { TIER_COPY } from "@shared/tier-copy";
 import { getPrompt } from "@shared/ai-prompts";
 import {
-  getContextLabel,
-  getActionLabel,
   createDashboardContext,
   createJobContext,
   createResumeContext,
@@ -58,6 +56,7 @@ import {
   createTasksContext,
   createGeneralContext
 } from "@/lib/utils/ai-context-helpers";
+import { useAiLabels } from "@/lib/utils/use-ai-labels";
 import type { AIAction, AIContextType, AIContext } from "@/lib/types/ai-context";
 import { detectContextType } from "@/lib/config/page-meta-registry";
 import { useAIUsage } from "@/hooks/use-ai-usage";
@@ -338,6 +337,7 @@ export default function AIChatPanel() {
   const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage, getFormSnapshot } = useAI();
   const isMobile = useIsMobile();
   const isSuperAdmin = isSuperAdminFromToken();
+  const { contextLabel, actionLabel } = useAiLabels();
   const activeResumeId = resolveActiveResumeId(location.pathname, pageContext);
 
   // Get personalized welcome message based on user role
@@ -444,7 +444,7 @@ export default function AIChatPanel() {
   const getContextSuggestions = () => {
     if (pageContext && pageContext.availableActions.length > 0) {
       return pageContext.availableActions.slice(0, 4).map((action: string) => ({
-        text: getActionLabel(action),
+        text: actionLabel(action),
         icon: getIconForAction(action),
         action: action as AIAction,
       }));
@@ -846,7 +846,7 @@ export default function AIChatPanel() {
                 {t("aiChat.title", "AI CHRO")}
                 {pageContext && (
                   <span className="text-xs font-normal text-muted-foreground bg-background px-2 py-0.5 rounded-full">
-                    {getContextLabel(pageContext.contextType)}
+                    {contextLabel(pageContext.contextType)}
                   </span>
                 )}
               </h3>
@@ -938,7 +938,7 @@ export default function AIChatPanel() {
                     key={action}
                     className="text-xs bg-background px-2 py-1 rounded-full"
                   >
-                    {getActionLabel(action)}
+                    {actionLabel(action)}
                   </span>
                 ))}
               </div>

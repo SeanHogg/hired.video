@@ -8,13 +8,6 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
 
 export const marketingRoutes = new Hono<AppEnv>();
 
-const CreateCampaignSchema = z.object({
-  name: z.string().min(1).max(255),
-  subject: z.string().min(1).max(500),
-  status: z.enum(["draft", "scheduled", "sent", "cancelled"]).default("draft"),
-  scheduledAt: z.string().datetime().optional(),
-});
-
 const CreateLeadSchema = z.object({
   email: z.string().email(),
   name: z.string().optional(),
@@ -24,73 +17,10 @@ const CreateLeadSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-// ─── Campaigns ────────────────────────────────────────────────────────────────
-
-marketingRoutes.get("/campaigns", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const campaigns = await db
-    .select()
-    .from(schema.emailCampaigns)
-    .orderBy(desc(schema.emailCampaigns.createdAt))
-    .limit(100);
-  return c.json(success(campaigns), 200);
-});
-
-marketingRoutes.post("/campaigns", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateCampaignSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-  const db = getDb();
-  const [campaign] = await db
-    .insert(schema.emailCampaigns)
-    .values({
-      name: parsed.data.name,
-      subject: parsed.data.subject,
-      status: parsed.data.status,
-      scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
-    } as any)
-    .returning();
-  return c.json(success(campaign), 201);
-});
-
-marketingRoutes.get("/campaigns/:id", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [campaign] = await db
-    .select()
-    .from(schema.emailCampaigns)
-    .where(eq(schema.emailCampaigns.id, c.req.param("id")))
-    .limit(1);
-  if (!campaign) return c.json(error("NOT_FOUND", "Campaign not found"), 404);
-
-  const recipients = await db
-    .select()
-    .from(schema.emailCampaignRecipients)
-    .where(eq(schema.emailCampaignRecipients.campaignId, campaign.id));
-
-  return c.json(success({ ...campaign, recipients }), 200);
-});
-
-marketingRoutes.patch("/campaigns/:id/status", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => ({}));
-  const newStatus = typeof body.status === "string" ? body.status : null;
-  if (!newStatus) return c.json(error("VALIDATION_ERROR", "status is required"), 400);
-  const db = getDb();
-  const [updated] = await db
-    .update(schema.emailCampaigns)
-    .set({ status: newStatus, updatedAt: new Date() } as any)
-    .where(eq(schema.emailCampaigns.id, c.req.param("id")))
-    .returning();
-  if (!updated) return c.json(error("NOT_FOUND", "Campaign not found"), 404);
-  return c.json(success(updated), 200);
-});
+// Campaign CRUD lives in the canonical engine: CampaignService, surfaced at
+// /api/admin/campaigns (SuperAdmin) and /api/communication/email-campaigns
+// (user-facing). The duplicate stub endpoints that used to live here had no
+// consumers and were removed in migration 0204's consolidation.
 
 // ─── Leads ────────────────────────────────────────────────────────────────────
 

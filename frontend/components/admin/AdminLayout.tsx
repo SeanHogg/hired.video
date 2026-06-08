@@ -30,6 +30,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "dashboard", label: "Overview",  href: "/admin/dashboard", icon: BarChart3  },
   { resource: "feed",      label: "Feed",      href: "/admin/feed",      icon: Megaphone  },
   { resource: "feed",      label: "Dashboard Feed", href: "/admin/dashboard-feed", icon: Sparkles },
+  { resource: "campaigns", label: "Campaigns", href: "/admin/campaigns", icon: Mail       },
   { resource: "users",     label: "Users",     href: "/admin/users",     icon: Users      },
   { resource: "companies", label: "Companies", href: "/admin/companies", icon: Building2   },
   { resource: "roles",     label: "Roles",     href: "/admin/roles",     icon: Shield     },

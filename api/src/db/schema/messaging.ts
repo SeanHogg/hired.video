@@ -87,6 +87,17 @@ export const emailCampaigns = pgTable("email_campaigns", {
   templateId: uuid("template_id").references(() => emailTemplates.id, { onDelete: "set null" }),
   subject: varchar("subject", { length: 500 }).notNull(),
   status: varchar("status", { length: 50 }).default("draft").notNull(),
+  // Campaign-engine columns (migration 0204). A campaign renders from its
+  // attached template OR `htmlBody` (inline override). `audience` is the
+  // CampaignAudience discriminated union the send worker resolves to a
+  // concrete recipient list. `senderCompanyId` attributes the send — for
+  // SuperAdmin marketing campaigns this is the hired.video platform company.
+  description: varchar("description", { length: 1000 }),
+  htmlBody: text("html_body"),
+  fromName: varchar("from_name", { length: 255 }),
+  audience: jsonb("audience").$type<Record<string, unknown>>(),
+  senderCompanyId: uuid("sender_company_id"),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -101,7 +112,13 @@ export const emailCampaignRecipients = pgTable("email_campaign_recipients", {
   campaignId: uuid("campaign_id").notNull().references(() => emailCampaigns.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   email: varchar("email", { length: 255 }).notNull(),
+  // Display name + per-recipient {{var}} map, snapshotted at audience-resolve
+  // time so a later edit to the user row can't retro-change a sent email
+  // (migration 0204). `errorMessage` holds the provider failure for triage.
+  name: varchar("name", { length: 255 }),
+  personalization: jsonb("personalization").$type<Record<string, string>>(),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
+  errorMessage: text("error_message"),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   openedAt: timestamp("opened_at", { withTimezone: true }),
   clickedAt: timestamp("clicked_at", { withTimezone: true }),
@@ -110,6 +127,25 @@ export const emailCampaignRecipients = pgTable("email_campaign_recipients", {
 
 export type EmailCampaignRecipient = typeof emailCampaignRecipients.$inferSelect;
 export type NewEmailCampaignRecipient = typeof emailCampaignRecipients.$inferInsert;
+
+/**
+ * email_suppressions — global unsubscribe / do-not-email list (migration
+ * 0204). Marketing campaigns MUST skip any address here (CAN-SPAM). Populated
+ * by the public one-click unsubscribe endpoint and any hard-bounce handling.
+ * Keyed by lowercased email; reason is free-text ("unsubscribe" | "bounce" |
+ * "complaint" | "manual").
+ */
+export const emailSuppressions = pgTable("email_suppressions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  reason: varchar("reason", { length: 64 }).default("unsubscribe").notNull(),
+  // The campaign whose footer triggered the opt-out, when known — analytics only.
+  campaignId: uuid("campaign_id").references(() => emailCampaigns.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type EmailSuppression = typeof emailSuppressions.$inferSelect;
+export type NewEmailSuppression = typeof emailSuppressions.$inferInsert;
 
 export const communicationTracking = pgTable("communication_tracking", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -15,6 +15,7 @@ export type CrudAction = "create" | "read" | "update" | "delete";
 export type AdminResource =
   | "dashboard"
   | "feed"
+  | "campaigns"
   | "users"
   | "companies"
   | "roles"
@@ -37,6 +38,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
   [USER_ROLES.SUPER_ADMIN]: {
     dashboard:  ["read"],
     feed:       ["create", "read", "update", "delete"],
+    campaigns:  ["create", "read", "update", "delete"],
     users:      ["create", "read", "update", "delete"],
     companies:  ["create", "read", "update", "delete"],
     roles:      ["create", "read", "update", "delete"],
@@ -112,6 +114,7 @@ export function useAdminPermissions(): AdminPermissions {
 export const ADMIN_RESOURCES: AdminResource[] = [
   "dashboard",
   "feed",
+  "campaigns",
   "users",
   "roles",
   "jobs",
@@ -139,6 +142,7 @@ export const CRUD_LABELS: Record<CrudAction, string> = {
 export const RESOURCE_LABELS: Record<AdminResource, string> = {
   dashboard:  "Overview",
   feed:       "Feed",
+  campaigns:  "Campaigns",
   users:      "Users",
   companies:  "Companies",
   roles:      "Roles",

@@ -299,6 +299,7 @@ const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const DashboardFeedCuration = lazy(() => import("./pages/admin/DashboardFeedCuration"));
+const CampaignManager = lazy(() => import("./pages/admin/CampaignManager"));
 const PostDetail = lazy(() => import("./pages/PostDetail"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const CompanyManagement = lazy(() => import("./pages/admin/CompanyManagement"));
@@ -1084,6 +1085,7 @@ const App = () => (
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
                       <Route path="/admin/feed"              element={<AdminLayout><FeedManagement /></AdminLayout>} />
                       <Route path="/admin/dashboard-feed"    element={<AdminLayout><DashboardFeedCuration /></AdminLayout>} />
+                      <Route path="/admin/campaigns"         element={<AdminLayout><CampaignManager /></AdminLayout>} />
                       <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
                       <Route path="/admin/companies"         element={<AdminLayout><CompanyManagement /></AdminLayout>} />
                       <Route path="/admin/roles"             element={<AdminLayout><RolesPermissions /></AdminLayout>} />
