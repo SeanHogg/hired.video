@@ -23,6 +23,12 @@ import assert from "node:assert/strict";
 
 import { CohortAnalyticsService, invalidateCohortAnalyticsCache } from "../cohort-analytics.js";
 import { schema } from "../../../db/index.js";
+// `users` is imported from its source module rather than the aggregated
+// `schema` namespace: the barrel re-exports 88 schema files via `export *`,
+// and a common name like `users` can fail to surface on the namespace type
+// under stricter/clean TS module resolution (seen in CI). Importing the table
+// directly makes the binding unambiguous regardless of star-export order.
+import { users } from "../../../db/schema/users.js";
 
 const {
   cohortMembers,
@@ -33,7 +39,6 @@ const {
   learningPaths,
   learningPathCourses,
   learningPathEnrollments,
-  users,
 } = schema;
 
 type Row = Record<string, any>;
