@@ -23,21 +23,14 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import ActionsModal from "@/components/ActionsModal";
 import SearchBar from "@/components/SearchBar";
-import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
-import ServiceMarketplaceCard, { type ServiceMarketplaceItem } from "@/components/ServiceMarketplaceCard";
-import CourseMarketplaceCard, { type CourseMarketplaceItem } from "@/components/CourseMarketplaceCard";
+import { type ServiceMarketplaceItem } from "@/components/ServiceMarketplaceCard";
 import { apiClient } from "@/lib/api-client";
-import TemplateCard from "@/components/resume-renderer/TemplateCard";
-import ContentCard from "@/components/search/ContentCard";
-import { ToolCard } from "@/components/ToolCard";
-import { getCatalogTool } from "@/data/tools-catalog";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
-import { useCardRenderer } from "@/lib/card-factory";
-import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
+import { useFeedCardRenderer, feedEntityHref } from "@/lib/feed-card-renderer";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { type SearchFilters } from "@/lib/services/search-service";
 import {
@@ -320,49 +313,9 @@ export default function UnifiedSearch({
     setActionsModal({ isOpen: true, item });
   const handleCloseActions = () => setActionsModal({ isOpen: false, item: null });
 
-  // Single map from a search result to its detail-page route, shared by the
-  // card-level "View" click and the list-view title hyperlink so the two can
-  // never drift. Returns null when a result has no concrete destination.
-  const entityHref = (item: any): string | null => {
-    switch (item.type) {
-      case "resume":
-        return `/resumes/${item.id}`;
-      case "job":
-        return `/jobs/${item.id}`;
-      case "company":
-        return `/companies/${item.id}`;
-      case "people":
-        return `/people/${item.slug || item.id}`;
-      case "video":
-        return `/v/${item.id}`;
-      case "voice":
-        // Mirrors VoiceMarketplaceCard's destination.
-        return item.voiceCloneId
-          ? `/marketplace/voices/${item.voiceCloneId}`
-          : null;
-      case "service":
-        // Mirrors ServiceMarketplaceCard's ctaHref.
-        return item.isPlatformService
-          ? "/services?wizard=open"
-          : `/people/${item.providerSlug || item.provider?.id}?tab=services`;
-      case "course":
-        // Mirrors CourseMarketplaceCard's href.
-        return item.author?.slug && item.slug
-          ? `/courses/${item.author.slug}/${item.slug}`
-          : null;
-      case "template": {
-        // Mirrors TemplateCard's entityUrl (meta.slug or descriptor.id).
-        const slug = item.meta?.slug || item.descriptor?.id;
-        return slug ? `/marketplace/templates/${slug}` : null;
-      }
-      case "tool":
-        // ToolCard navigates to the catalog entry's href.
-        return getCatalogTool(item.id)?.href ?? item.href ?? null;
-      default:
-        // article / guide / faq and any future kind carry their own href.
-        return (item.href as string) ?? null;
-    }
-  };
+  // Result → detail-page route, shared with the dashboard feed via the
+  // feed-card-renderer module so the two can never drift.
+  const entityHref = feedEntityHref;
 
   const handleView = (item: any) => {
     const href = entityHref(item);
@@ -466,20 +419,11 @@ export default function UnifiedSearch({
   // Append service marketplace + course items when applicable
   const combinedItems = [...contentItems, ...(serviceItems as any[]), ...courseItems];
 
-  const userContext = user
-    ? createUserContext({
-        userId: user.id,
-        role: user.role || "regular_user",
-        accountId: (user as any).accountId,
-        permissions: (user as any).permissions || [],
-      })
-    : getDefaultUserContext();
-
-  const allSectionRenderer = useCardRenderer({
-    section: "all",
-    userContext,
-    showOwnership: false,
-    interactions: { onView: handleView, onActions: handleOpenActions },
+  // Heterogeneous type → card mapping lives in the shared
+  // useFeedCardRenderer hook so /search and the dashboard feed can't drift.
+  const renderResultCard = useFeedCardRenderer({
+    onView: handleView,
+    onActions: handleOpenActions,
   });
 
   const handleSearch = (query: string) => {
@@ -639,54 +583,6 @@ export default function UnifiedSearch({
   const totalFound = hasClientSideFiltering
     ? filteredItems.length
     : searchResults?.total || 0;
-
-  // One card definition shared by the Scroll and Grid views so the
-  // heterogeneous type → card switch lives in a single place (DRY). The
-  // Table view renders its own dense rows instead.
-  const renderResultCard = (item: any, index: number): React.ReactNode => {
-    if (item.type === "voice") {
-      return <VoiceMarketplaceCard key={item.id} item={item as any} />;
-    }
-    if (item.type === "service") {
-      return (
-        <ServiceMarketplaceCard
-          key={item.id}
-          item={item as ServiceMarketplaceItem}
-        />
-      );
-    }
-    if (item.type === "course") {
-      return (
-        <CourseMarketplaceCard
-          key={item.id}
-          item={item as CourseMarketplaceItem}
-        />
-      );
-    }
-    if (item.type === "template" && (item.meta || item.descriptor)) {
-      return (
-        <TemplateCard
-          key={item.id}
-          meta={item.meta}
-          descriptor={item.descriptor}
-        />
-      );
-    }
-    if (item.type === "tool") {
-      const catalogEntry = getCatalogTool(item.id);
-      if (catalogEntry) {
-        return <ToolCard key={item.id} tool={catalogEntry} />;
-      }
-    }
-    if (
-      item.type === "article" ||
-      item.type === "guide" ||
-      item.type === "faq"
-    ) {
-      return <ContentCard key={item.id} item={item as any} />;
-    }
-    return allSectionRenderer(item, index);
-  };
 
   // Build the card list for Grid/Scroll once, including the page-1 promo
   // slot, so both modes stay identical.

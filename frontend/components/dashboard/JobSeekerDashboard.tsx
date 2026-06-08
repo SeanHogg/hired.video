@@ -13,6 +13,7 @@ import ProfileStatistics from "./shared/ProfileStatistics";
 import ApplicationStatistics from "./shared/ApplicationStatistics";
 import JobMatchesCard from "./shared/JobMatchesCard";
 import UpcomingInterviewsCard from "./shared/UpcomingInterviewsCard";
+import { DashboardFeed } from "./DashboardFeed";
 
 import type { JobSeekerDashboard as JobSeekerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -55,6 +56,12 @@ export function JobSeekerDashboard({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+
+      {/* SuperAdmin-curated feed — fills the dashboard for new job seekers
+          who have no activity yet, and surfaces featured tools / articles /
+          content for everyone. Shows a friendly empty state on first login
+          rather than a blank page. */}
+      <DashboardFeed showEmptyState />
 
       {/* Metrics Grid */}
       <MetricGrid

@@ -476,10 +476,7 @@ export default function Career360() {
           timelineMonths: selected.timelineMonths,
         },
       });
-      setState((prev) => ({
-        doc: { ...(prev?.doc ?? {}), selected: next },
-        history: prev?.history ?? [],
-      }));
+      persistSelected(next);
       toast.success("Plan refreshed.");
     } catch (err) {
       console.error("[career360] refresh plan failed", err);

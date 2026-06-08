@@ -159,6 +159,8 @@ import { creatorRoutes } from "./routes/creators.js";
 import { bookingsRoutes } from "./routes/bookings.js";
 import { articleRoutes } from "./routes/articles.js";
 import { adminArticleRoutes } from "./routes/admin-articles.js";
+import { feedFeatureRoutes } from "./routes/feed-features.js";
+import { adminFeedFeatureRoutes } from "./routes/admin-feed-features.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import {
   communityResourceRoutes,
@@ -665,6 +667,7 @@ export function createApp() {
   app.route("/api/messages", messageRoutes);
   app.route("/api/chat", messageRoutes); // legacy AI chat endpoint alias
   app.route("/api/feed", feedRoutes);
+  app.route("/api/feed-features", feedFeatureRoutes); // SA-curated dashboard feed (read)
   app.route("/api/notifications", notificationRoutes);
   app.route("/api/inbox", inboxRoutes);
   app.route("/api/integrations/email", emailIntegrationRoutes);
@@ -732,6 +735,7 @@ export function createApp() {
   // catch-all intercept the sub-route. (#1701 — admin article queue 404.)
   app.route("/api/admin/job-sources", jobScraperAdminRoutes);
   app.route("/api/admin/articles", adminArticleRoutes);
+  app.route("/api/admin/feed-features", adminFeedFeatureRoutes); // SA dashboard-feed curation
   app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/admin/community-resources", adminCommunityResourceRoutes);
   app.route("/api/lms-oauth", lmsOauthRoutes);

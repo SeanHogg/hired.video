@@ -8,6 +8,7 @@ import { emitNotification, resolveActor } from "../services/notifications/notifi
 import { cacheMiddleware } from "../utils/cache-headers.js";
 import { etagMiddleware } from "../utils/etag.js";
 import { FEED_POST_LIST_FIELDS, parseFields, projectRows } from "../../../shared/projection.js";
+import { recordArtifactView, ipCountryFromCtx } from "../services/analytics/artifactView.js";
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
@@ -146,14 +147,21 @@ feedRoutes.use("/*", etagMiddleware());
 // ─────────────────────────────────────────────────────────────────────────────
 // DTO builder
 // ─────────────────────────────────────────────────────────────────────────────
+interface PostDtoSupport {
+  authorName: string;
+  authorAvatar: string | null;
+  likes: Array<{ id: string; userId: string }>;
+  commentCount: number;
+  repostCount: number;
+}
+
 function toPostDto(
   post: typeof feedPosts.$inferSelect,
-  authorName: string,
-  authorAvatar: string | null,
-  likes: Array<{ id: string; userId: string }>,
-  commentCount: number,
+  support: PostDtoSupport,
   currentUserId: string,
+  repostOf: ReturnType<typeof toPostDto> | null,
 ) {
+  const { authorName, authorAvatar, likes, commentCount, repostCount } = support;
   return {
     id: post.id,
     userId: post.userId,
@@ -174,6 +182,7 @@ function toPostDto(
     comments: [],
     likeCount: likes.length,
     commentCount,
+    repostCount,
     isLikedByCurrentUser: likes.some((l) => l.userId === currentUserId),
     // Polymorphic surfacing — when set, the renderer mounts the
     // canonical card for `subjectType` (e.g. <ReviewCard>) instead
@@ -182,19 +191,27 @@ function toPostDto(
     subjectType: post.subjectType ?? undefined,
     subjectId: post.subjectId ?? undefined,
     embedPayload: post.embedPayload ?? undefined,
+    // Reshare. `repostOfId` flags this row as a repost; `repostOf` is the
+    // embedded original (one level deep — a repost of a repost still only
+    // carries its immediate parent) so the renderer never N+1s.
+    repostOfId: post.repostOfId ?? undefined,
+    repostOf: repostOf ?? undefined,
   };
 }
 
-async function fetchPostDtos(
-  postRows: Array<typeof feedPosts.$inferSelect>,
-  currentUserId: string,
+/** Load the author / avatar / likes / comment-count / reshare-count maps
+ *  for a set of post rows in one batched round-trip each (no N+1). Shared
+ *  by the main post rows AND the embedded reshare originals. */
+async function loadSupport(
+  rows: Array<typeof feedPosts.$inferSelect>,
   db: ReturnType<typeof getDb>,
-) {
-  if (postRows.length === 0) return [];
-  const postIds = postRows.map((p) => p.id);
-  const authorIds = [...new Set(postRows.map((p) => p.userId))];
+): Promise<Map<string, PostDtoSupport>> {
+  const out = new Map<string, PostDtoSupport>();
+  if (rows.length === 0) return out;
+  const postIds = rows.map((p) => p.id);
+  const authorIds = [...new Set(rows.map((p) => p.userId))];
 
-  const [authorRows, profileRows, likeRows, commentCounts] = await Promise.all([
+  const [authorRows, profileRows, likeRows, commentCounts, repostCounts] = await Promise.all([
     db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, authorIds)),
     db
       .select({ userId: userProfiles.userId, avatarUrl: userProfiles.avatarUrl })
@@ -209,27 +226,81 @@ async function fetchPostDtos(
       .from(feedPostComments)
       .where(inArray(feedPostComments.feedPostId, postIds))
       .groupBy(feedPostComments.feedPostId),
+    db
+      .select({ repostOfId: feedPosts.repostOfId, count: sql<number>`count(*)::int` })
+      .from(feedPosts)
+      .where(inArray(feedPosts.repostOfId, postIds))
+      .groupBy(feedPosts.repostOfId),
   ]);
 
   const authorMap = new Map(authorRows.map((a) => [a.id, a.name]));
   const avatarMap = new Map(profileRows.map((p) => [p.userId, p.avatarUrl ?? null]));
-
   const likesByPost = new Map<string, Array<{ id: string; userId: string }>>();
   for (const like of likeRows) {
     if (!likesByPost.has(like.feedPostId)) likesByPost.set(like.feedPostId, []);
     likesByPost.get(like.feedPostId)!.push({ id: like.id, userId: like.userId });
   }
-
   const commentCountMap = new Map(commentCounts.map((c) => [c.feedPostId, c.count]));
+  const repostCountMap = new Map(
+    repostCounts.filter((r) => r.repostOfId).map((r) => [r.repostOfId as string, c2n(r.count)]),
+  );
+
+  for (const post of rows) {
+    out.set(post.id, {
+      authorName: authorMap.get(post.userId) ?? "Unknown",
+      authorAvatar: avatarMap.get(post.userId) ?? null,
+      likes: likesByPost.get(post.id) ?? [],
+      commentCount: commentCountMap.get(post.id) ?? 0,
+      repostCount: repostCountMap.get(post.id) ?? 0,
+    });
+  }
+  return out;
+}
+
+function c2n(v: number): number {
+  return Number(v) || 0;
+}
+
+async function fetchPostDtos(
+  postRows: Array<typeof feedPosts.$inferSelect>,
+  currentUserId: string,
+  db: ReturnType<typeof getDb>,
+) {
+  if (postRows.length === 0) return [];
+
+  // Resolve embedded reshare originals (one level deep). Fetch only the
+  // originals NOT already present in `postRows` to avoid a redundant query.
+  const presentIds = new Set(postRows.map((p) => p.id));
+  const originalIds = [
+    ...new Set(
+      postRows
+        .map((p) => p.repostOfId)
+        .filter((id): id is string => Boolean(id) && !presentIds.has(id as string)),
+    ),
+  ];
+  const originalRows =
+    originalIds.length > 0
+      ? await db.select().from(feedPosts).where(inArray(feedPosts.id, originalIds))
+      : [];
+
+  const support = await loadSupport([...postRows, ...originalRows], db);
+
+  const originalDtoById = new Map<string, ReturnType<typeof toPostDto>>();
+  for (const row of [...postRows, ...originalRows]) {
+    if (!originalDtoById.has(row.id)) {
+      originalDtoById.set(
+        row.id,
+        toPostDto(row, support.get(row.id)!, currentUserId, null),
+      );
+    }
+  }
 
   return postRows.map((post) =>
     toPostDto(
       post,
-      authorMap.get(post.userId) ?? "Unknown",
-      avatarMap.get(post.userId) ?? null,
-      likesByPost.get(post.id) ?? [],
-      commentCountMap.get(post.id) ?? 0,
+      support.get(post.id)!,
       currentUserId,
+      post.repostOfId ? originalDtoById.get(post.repostOfId) ?? null : null,
     ),
   );
 }
@@ -293,8 +364,69 @@ feedRoutes.get("/posts/:postId", async (c) => {
     .limit(1);
   if (!post) return c.json(error("NOT_FOUND", "Post not found"), 404);
 
+  // Impression tracking → polymorphic artifact_views (kind 'post'). The
+  // helper no-ops when the viewer IS the author, so an owner reading their
+  // own post never inflates their stats. Fire-and-forget — telemetry must
+  // not slow or break the read.
+  c.executionCtx?.waitUntil(
+    recordArtifactView({
+      artifactKind: "post",
+      artifactId: post.id,
+      ownerUserId: post.userId,
+      viewerId: currentUserId || null,
+      ipCountry: ipCountryFromCtx(c),
+      referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+    }),
+  );
+
   const [dto] = await fetchPostDtos([post], currentUserId, db);
   return c.json(success(dto), 200);
+});
+
+/** POST /api/feed/posts/:postId/reshare — repost (optionally with a quote).
+ *  A reshare is a new feed_posts row whose repost_of_id points at the
+ *  original; `content` (if any) is the quote commentary shown above the
+ *  embedded original. */
+feedRoutes.post("/posts/:postId/reshare", async (c) => {
+  const originalId = c.req.param("postId");
+  const userId = c.var.user.sub;
+  const db = getDb();
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  // The original must exist AND be visible to this user — you can't reshare
+  // a private post you can't see.
+  const visibility = feedVisibilityCondition(userId, isRecruiterLike(c.var.user));
+  const [original] = await db
+    .select()
+    .from(feedPosts)
+    .where(sql`${eq(feedPosts.id, originalId)} AND ${visibility}`)
+    .limit(1);
+  if (!original) return c.json(error("NOT_FOUND", "Post not found"), 404);
+
+  // Reshare the ROOT, not a reshare — keeps the embed one level deep and
+  // the reshare count anchored on the original.
+  const rootId = original.repostOfId ?? original.id;
+  const content = typeof body.content === "string" ? body.content : "";
+
+  const [post] = await db
+    .insert(feedPosts)
+    .values({
+      userId,
+      content,
+      kind: "text",
+      privacy: normalizePrivacy(body.privacy, "Public"),
+      media: [],
+      tags: buildTagsField(content),
+      repostOfId: rootId,
+    } as any)
+    .returning();
+
+  if (content) {
+    c.executionCtx?.waitUntil(createMentionNotifications(content, post.id, userId, db));
+  }
+
+  const [dto] = await fetchPostDtos([post], userId, db);
+  return c.json(success(dto), 201);
 });
 
 /** POST /api/feed/posts */

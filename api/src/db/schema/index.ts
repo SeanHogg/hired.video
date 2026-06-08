@@ -86,3 +86,4 @@ export * from "./peopleOps.js";
 export * from "./peopleOpsExt.js";
 export * from "./screening.js";
 export * from "./resumeFeedback.js";
+export * from "./feedFeatures.js";

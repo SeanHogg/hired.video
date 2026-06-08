@@ -549,9 +549,8 @@ export default function SkillExtractor() {
       header={{
         icon: <Sparkles className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-brand-purple/10",
-        title: "Skill Extractor",
-        description:
-          "Upload a job description or resume and instantly pull out every skill it mentions — grouped, deduplicated, and categorized.",
+        title: t("tools.card.skill-extractor.title"),
+        description: t("tools.skillExtractor.subtitle"),
         tier: "free",
       }}
       authOverlay={{

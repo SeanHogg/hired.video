@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
+import { DashboardFeed } from "./DashboardFeed";
 import NewCandidatesCard from "./shared/NewCandidatesCard";
 import ScheduledInterviewsCard from "./shared/ScheduledInterviewsCard";
 
@@ -97,6 +98,9 @@ export function RecruiterDashboard({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* SuperAdmin-curated feed for recruiters (silent when uncurated). */}
+      <DashboardFeed />
+
       {/* Metrics Grid */}
       <MetricGrid
         metrics={dashboardData.metrics || []}

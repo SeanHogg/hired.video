@@ -165,8 +165,8 @@ export default function VideoPitchLab() {
   function handleCopyUrl() {
     if (!recording?.url) return;
     void navigator.clipboard.writeText(recording.url).then(
-      () => toast.success("Pitch URL copied"),
-      () => toast.error("Could not copy"),
+      () => toast.success(t("tools.videoPitchLab.toastUrlCopied")),
+      () => toast.error(t("tools.videoPitchLab.toastCopyFail")),
     );
   }
 
@@ -181,9 +181,8 @@ export default function VideoPitchLab() {
       header={{
         icon: <Video className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-purple-100",
-        title: "Video Pitch Lab",
-        description:
-          "Workshop the one-minute 'tell me about yourself' video pitch every recruiter asks for. AI-drafted script, prep timer, retake, AI feedback — then a portable URL you can paste into any application.",
+        title: t("tools.card.video-pitch-lab.title"),
+        description: t("tools.videoPitchLab.description"),
         tier: "free",
       }}
       authOverlay={{
@@ -196,45 +195,45 @@ export default function VideoPitchLab() {
           <>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">1. Pick length and tone</CardTitle>
+                <CardTitle className="text-base">{t("tools.videoPitchLab.section1")}</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Length</Label>
+                  <Label>{t("tools.videoPitchLab.lengthLabel")}</Label>
                   <Select value={String(length)} onValueChange={(v) => setLength(Number(v) as Length)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="30">30 seconds (hook only)</SelectItem>
-                      <SelectItem value="60">60 seconds (recommended)</SelectItem>
-                      <SelectItem value="90">90 seconds (in-depth)</SelectItem>
+                      <SelectItem value="30">{t("tools.videoPitchLab.len30")}</SelectItem>
+                      <SelectItem value="60">{t("tools.videoPitchLab.len60")}</SelectItem>
+                      <SelectItem value="90">{t("tools.videoPitchLab.len90")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Tone</Label>
+                  <Label>{t("tools.videoPitchLab.toneLabel")}</Label>
                   <Select value={tone} onValueChange={(v) => setTone(v as Tone)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="casual">Casual</SelectItem>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
+                      <SelectItem value="casual">{t("tools.videoPitchLab.toneCasual")}</SelectItem>
+                      <SelectItem value="professional">{t("tools.videoPitchLab.toneProfessional")}</SelectItem>
+                      <SelectItem value="enthusiastic">{t("tools.videoPitchLab.toneEnthusiastic")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Based on resume (optional)</Label>
+                  <Label>{t("tools.videoPitchLab.basedOnResume")}</Label>
                   <Select value={resumeId} onValueChange={setResumeId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Pick a resume" />
+                      <SelectValue placeholder={t("tools.videoPitchLab.pickResume")} />
                     </SelectTrigger>
                     <SelectContent>
                       {resumes.map((r) => (
                         <SelectItem key={r.id} value={r.id}>
-                          {r.title ?? "Untitled resume"}
+                          {r.title ?? t("tools.videoPitchLab.untitledResume")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -245,7 +244,7 @@ export default function VideoPitchLab() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">2. Draft your script</CardTitle>
+                <CardTitle className="text-base">{t("tools.videoPitchLab.section2")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button onClick={handleGenerateScript} disabled={generating} className="gap-1">

@@ -46,6 +46,11 @@ export const feedPosts = pgTable(
     // Recomputed at write time by whichever route emits the post; the
     // feed list query never has to N+1 back to the source table.
     embedPayload: jsonb("embed_payload").$type<Record<string, unknown>>(),
+    // Reshare / repost (migration 0203). When set, this row is a repost of
+    // another feed_posts row; `content` (if any) is the quote commentary.
+    // Self-ref FK is ON DELETE SET NULL so deleting an original leaves the
+    // reshare standing rather than cascade-deleting it.
+    repostOfId: uuid("repost_of_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

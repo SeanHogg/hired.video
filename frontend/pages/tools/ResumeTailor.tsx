@@ -172,8 +172,8 @@ export default function ResumeTailor() {
           overallScore: typeof response.newScore === "number" ? response.newScore : undefined,
           summary: response.summaryRecommendations,
           categoryScores: [
-            { label: "Before tailor", score: response.oldScore },
-            { label: "After tailor", score: response.newScore },
+            { label: t("tools.resumeTailor.beforeTailor"), score: response.oldScore },
+            { label: t("tools.resumeTailor.afterTailor"), score: response.newScore },
           ],
           recommendations: response.changes.map((change) => ({
             title: `${change.section}: ${change.before.slice(0, 60)}${change.before.length > 60 ? "…" : ""}`,
@@ -197,11 +197,11 @@ export default function ResumeTailor() {
       const msg = err?.context?.serverMessage ?? err?.message;
       let base: string;
       if (code === "AI_UNAVAILABLE" || code === "AI_RATE_LIMITED" || code === "AI_INVALID_RESPONSE" || code === "AI_AUTH_FAILED") {
-        base = msg || "AI providers are temporarily unavailable. Please try again in a minute.";
+        base = msg || t("errors.aiUnavailable");
       } else if (code === "VALIDATION_ERROR") {
-        base = msg || "The AI output couldn't be validated. Try again.";
+        base = msg || t("errors.aiValidationFailed");
       } else {
-        base = "Failed to generate tailored resume. Please try again.";
+        base = t("tools.resumeTailor.errFailed");
       }
       setError(appendDiagnosticReference(base, err));
     } finally {
@@ -232,11 +232,11 @@ export default function ResumeTailor() {
       const text = renderMarkdownFromJsonResume(result.tailoredResume);
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast.success("Resume copied to clipboard");
+      toast.success(t("tools.resumeTailor.toastCopied"));
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.warn("[ResumeTailor] clipboard copy failed", err);
-      toast.error("Copy failed");
+      toast.error(t("tools.resumeTailor.toastCopyFailed"));
     }
   };
 
@@ -258,13 +258,12 @@ export default function ResumeTailor() {
       header={{
         icon: <Sparkles className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-brand-purple/10",
-        title: "AI Resume Tailor",
-        description: "Generate a tailored resume optimized for a specific job",
+        title: t("tools.resumeTailor.headerTitle"),
+        description: t("tools.resumeTailor.headerDescription"),
       }}
       authOverlay={{
         show: showAuthOverlay,
-        message:
-          "Sign in to tailor your resume — we'll keep the job description you've pasted and generate the tailored version as soon as you're back.",
+        message: t("tools.resumeTailor.authMessage"),
       }}
     >
             {(
@@ -288,7 +287,7 @@ export default function ResumeTailor() {
                             disabled={resumesLoading}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a resume..." />
+                              <SelectValue placeholder={t("tools.resumeTailor.selectResumePlaceholder")} />
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
@@ -301,8 +300,7 @@ export default function ResumeTailor() {
                           </Select>
                         ) : (
                           <p className="text-sm text-muted-foreground border border-dashed rounded-md p-3">
-                            Paste a job below, then sign in to pick one of your saved
-                            resumes — we'll keep the job description you've entered.
+                            {t("tools.resumeTailor.pasteSignInHint")}
                           </p>
                         )}
                       </div>
@@ -311,25 +309,25 @@ export default function ResumeTailor() {
                         <TabsList className="grid grid-cols-3 w-full">
                           <TabsTrigger value="paste">
                             <FileText className="h-4 w-4 mr-1.5" />
-                            Paste
+                            {t("tools.resumeTailor.tabPaste")}
                           </TabsTrigger>
                           <TabsTrigger value="upload">
                             <Upload className="h-4 w-4 mr-1.5" />
-                            Upload JD
+                            {t("tools.resumeTailor.tabUpload")}
                           </TabsTrigger>
                           <TabsTrigger value="saved" disabled={!isAuthenticated}>
                             <Briefcase className="h-4 w-4 mr-1.5" />
-                            Saved Job
+                            {t("tools.resumeTailor.tabSaved")}
                           </TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="paste" className="space-y-2 mt-4">
                           <Label htmlFor="job-description">
-                            Paste Job Description or URL
+                            {t("tools.resumeTailor.pasteLabel")}
                           </Label>
                           <Textarea
                             id="job-description"
-                            placeholder="Paste the job description here, or paste the job posting URL..."
+                            placeholder={t("tools.resumeTailor.pastePlaceholder")}
                             value={jobDescription}
                             onChange={(e) => setJobDescription(e.target.value)}
                             rows={12}
@@ -338,7 +336,7 @@ export default function ResumeTailor() {
                         </TabsContent>
 
                         <TabsContent value="upload" className="space-y-2 mt-4">
-                          <Label>Upload a job description file</Label>
+                          <Label>{t("tools.resumeTailor.uploadLabel")}</Label>
                           <input
                             ref={fileInputRef}
                             type="file"
@@ -381,7 +379,7 @@ export default function ResumeTailor() {
                         </TabsContent>
 
                         <TabsContent value="saved" className="space-y-2 mt-4">
-                          <Label htmlFor="saved-job-select">Pick a tracked job</Label>
+                          <Label htmlFor="saved-job-select">{t("tools.resumeTailor.pickTrackedJob")}</Label>
                           {isAuthenticated ? (
                             <Select
                               value={selectedJobId}
@@ -392,10 +390,10 @@ export default function ResumeTailor() {
                                 <SelectValue
                                   placeholder={
                                     savedJobsLoading
-                                      ? "Loading your jobs..."
+                                      ? t("tools.resumeTailor.loadingJobs")
                                       : savedJobs && savedJobs.length > 0
-                                        ? "Select a saved job..."
-                                        : "No saved jobs yet — track a job first"
+                                        ? t("tools.resumeTailor.selectSavedJob")
+                                        : t("tools.resumeTailor.noSavedJobs")
                                   }
                                 />
                               </SelectTrigger>
@@ -424,12 +422,12 @@ export default function ResumeTailor() {
                         {isGenerating ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generating...
+                            {t("tools.resumeTailor.generating")}
                           </>
                         ) : (
                           <>
                             <Sparkles className="h-4 w-4 mr-2" />
-                            Generate Tailored Resume
+                            {t("tools.resumeTailor.generateBtn")}
                           </>
                         )}
                       </Button>
@@ -452,20 +450,20 @@ export default function ResumeTailor() {
                         <CardContent className="p-6">
                           <div className="flex items-center justify-between">
                             <div className="text-center">
-                              <p className="text-sm text-muted-foreground">Original Score</p>
+                              <p className="text-sm text-muted-foreground">{t("tools.resumeTailor.originalScore")}</p>
                               <p className={`text-3xl font-bold ${getScoreColor(result.oldScore)}`}>
                                 {Math.round(result.oldScore)}%
                               </p>
                             </div>
                             <div className="text-4xl">→</div>
                             <div className="text-center">
-                              <p className="text-sm text-muted-foreground">New Score</p>
+                              <p className="text-sm text-muted-foreground">{t("tools.resumeTailor.newScore")}</p>
                               <p className={`text-3xl font-bold ${getScoreColor(result.newScore)}`}>
                                 {Math.round(result.newScore)}%
                               </p>
                             </div>
                             <div className="text-center">
-                              <p className="text-sm text-muted-foreground">Improvement</p>
+                              <p className="text-sm text-muted-foreground">{t("tools.resumeTailor.improvement")}</p>
                               <p className="text-3xl font-bold text-green-600">
                                 +{Math.round(result.newScore - result.oldScore)}%
                               </p>
@@ -484,7 +482,7 @@ export default function ResumeTailor() {
                           ) : (
                             <Copy className="h-4 w-4 mr-2" />
                           )}
-                          {copied ? "Copied!" : "Copy as Markdown"}
+                          {copied ? t("tools.resumeTailor.copied") : t("tools.resumeTailor.copyMarkdown")}
                         </Button>
                         <Button
                           onClick={handleOpenVariation}
@@ -492,7 +490,7 @@ export default function ResumeTailor() {
                           disabled={!result.variationId}
                         >
                           <ExternalLink className="h-4 w-4 mr-2" />
-                          Open Variation
+                          {t("tools.resumeTailor.openVariation")}
                         </Button>
                       </div>
 
@@ -500,7 +498,7 @@ export default function ResumeTailor() {
                       {result.changes && result.changes.length > 0 && (
                         <Card>
                           <CardHeader>
-                            <CardTitle>Changes ({result.changes.length})</CardTitle>
+                            <CardTitle>{t("tools.resumeTailor.changesCount", { count: result.changes.length })}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <ul className="space-y-3">
@@ -515,23 +513,23 @@ export default function ResumeTailor() {
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                                     <div className="bg-red-500/10 p-2 rounded">
                                       <div className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">
-                                        Before
+                                        {t("tools.resumeTailor.before")}
                                       </div>
                                       <div className="whitespace-pre-wrap break-words">
-                                        {change.before || <em>empty</em>}
+                                        {change.before || <em>{t("tools.resumeTailor.empty")}</em>}
                                       </div>
                                     </div>
                                     <div className="bg-green-500/10 p-2 rounded">
                                       <div className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">
-                                        After
+                                        {t("tools.resumeTailor.after")}
                                       </div>
                                       <div className="whitespace-pre-wrap break-words">
-                                        {change.after || <em>empty</em>}
+                                        {change.after || <em>{t("tools.resumeTailor.empty")}</em>}
                                       </div>
                                     </div>
                                   </div>
                                   <div className="text-muted-foreground">
-                                    <span className="font-semibold">Why:</span> {change.why}
+                                    <span className="font-semibold">{t("tools.resumeTailor.why")}</span> {change.why}
                                   </div>
                                 </li>
                               ))}
@@ -544,7 +542,7 @@ export default function ResumeTailor() {
                       {result.summaryRecommendations && (
                         <Card>
                           <CardHeader>
-                            <CardTitle>Recommendations</CardTitle>
+                            <CardTitle>{t("tools.resumeTailor.recommendations")}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -560,7 +558,7 @@ export default function ResumeTailor() {
                           variation exactly. */}
                       <Card>
                         <CardHeader>
-                          <CardTitle>Tailored Resume</CardTitle>
+                          <CardTitle>{t("tools.resumeTailor.tailoredResume")}</CardTitle>
                         </CardHeader>
                         <CardContent>
                           {previewResume && (
@@ -577,11 +575,10 @@ export default function ResumeTailor() {
                       <CardContent className="p-12 text-center">
                         <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
                         <h3 className="text-lg font-semibold mb-2">
-                          Your Tailored Resume Will Appear Here
+                          {t("tools.resumeTailor.emptyTitle")}
                         </h3>
                         <p className="text-muted-foreground">
-                          Paste a job description and click "Generate" to create a
-                          resume optimized for that specific position.
+                          {t("tools.resumeTailor.emptyBody")}
                         </p>
                       </CardContent>
                     </Card>

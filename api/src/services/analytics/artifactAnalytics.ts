@@ -89,6 +89,14 @@ export async function lookupArtifactOwner(
         .limit(1);
       return r?.userId ?? null;
     }
+    case "post": {
+      const [r] = await db
+        .select({ userId: schema.feedPosts.userId })
+        .from(schema.feedPosts)
+        .where(eq(schema.feedPosts.id, artifactId))
+        .limit(1);
+      return r?.userId ?? null;
+    }
     case "studio_template":
     case "service": {
       // Same fallback as 'article' — read the owner stamp off the first

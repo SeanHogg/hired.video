@@ -76,6 +76,10 @@ import {
   ResumeFeedbackRepository,
   type IResumeFeedbackRepository,
 } from "./resumeFeedbackRepository.js";
+import {
+  FeedFeaturesRepository,
+  type IFeedFeaturesRepository,
+} from "./feedFeaturesRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -131,6 +135,8 @@ export interface Repos {
   communityResources: ICommunityResourcesRepository;
   // resume feedback & career coaching reviews (migration 0200)
   resumeFeedback: IResumeFeedbackRepository;
+  // SuperAdmin-curated dashboard feed cards, per role (migration 0202)
+  feedFeatures: IFeedFeaturesRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -167,6 +173,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     coffeeRequests: new CoffeeRequestsRepository(db, now),
     communityResources: new CommunityResourcesRepository(db, now),
     resumeFeedback: new ResumeFeedbackRepository(db, now),
+    feedFeatures: new FeedFeaturesRepository(db, now),
   };
 }
 
@@ -206,6 +213,7 @@ export type {
   ICoffeeRequestsRepository,
   ICommunityResourcesRepository,
   IResumeFeedbackRepository,
+  IFeedFeaturesRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────

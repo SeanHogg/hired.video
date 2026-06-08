@@ -20,6 +20,7 @@ import {
   Mail,
   Puzzle,
   MonitorPlay,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
@@ -28,6 +29,7 @@ import { AppShell } from "@/components/AppShell";
 const TABS: { resource: AdminResource; label: string; href: string; icon: React.ElementType }[] = [
   { resource: "dashboard", label: "Overview",  href: "/admin/dashboard", icon: BarChart3  },
   { resource: "feed",      label: "Feed",      href: "/admin/feed",      icon: Megaphone  },
+  { resource: "feed",      label: "Dashboard Feed", href: "/admin/dashboard-feed", icon: Sparkles },
   { resource: "users",     label: "Users",     href: "/admin/users",     icon: Users      },
   { resource: "companies", label: "Companies", href: "/admin/companies", icon: Building2   },
   { resource: "roles",     label: "Roles",     href: "/admin/roles",     icon: Shield     },

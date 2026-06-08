@@ -227,9 +227,8 @@ export default function FormAutofill() {
       header={{
         icon: <ClipboardPaste className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-brand-purple/10",
-        title: "Application Form Autofill",
-        description:
-          "AI-powered answers for job application forms using your profile and resume",
+        title: t("tools.formAutofill.heading"),
+        description: t("tools.formAutofill.subtitle"),
       }}
       authOverlay={{
         show: showAuthOverlay,

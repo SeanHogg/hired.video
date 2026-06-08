@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Lock, CheckCircle2, ClipboardCheck, Clock } from "lucide-react";
 
 import { ToolShell } from "@/components/tools/ToolShell";
@@ -33,12 +34,21 @@ import type { AssessmentDescriptor, AssessmentKind } from "@shared/assessments/k
 import type { AssessmentQuestion } from "@shared/assessments/question-banks";
 import { scoreBand } from "@shared/assessments/scoring";
 
-const BAND_LABEL: Record<ReturnType<typeof scoreBand>, string> = {
-  "very-low": "Very Low",
-  low: "Low",
-  average: "Average",
-  high: "High",
-  "very-high": "Very High",
+/** i18n key per score band — resolved through `t` at the call site so the
+ *  band label tracks the active locale. */
+const BAND_LABEL_KEY: Record<ReturnType<typeof scoreBand>, string> = {
+  "very-low": "tools.predictiveAssessments.bandVeryLow",
+  low: "tools.predictiveAssessments.bandLow",
+  average: "tools.predictiveAssessments.bandAverage",
+  high: "tools.predictiveAssessments.bandHigh",
+  "very-high": "tools.predictiveAssessments.bandVeryHigh",
+};
+
+/** i18n key per run status — falls back to the raw status string. */
+const STATUS_KEY: Record<string, string> = {
+  started: "tools.predictiveAssessments.statusStarted",
+  in_progress: "tools.predictiveAssessments.statusInProgress",
+  completed: "tools.predictiveAssessments.statusCompleted",
 };
 
 function fmtDate(iso: string | null | undefined): string {
@@ -47,6 +57,7 @@ function fmtDate(iso: string | null | undefined): string {
 }
 
 export default function PredictiveAssessments() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { isPro } = useSubscription();
 
@@ -62,9 +73,8 @@ export default function PredictiveAssessments() {
   const shellHeader = {
     icon: <ClipboardCheck className="h-6 w-6 text-emerald-700" />,
     iconBgClassName: "bg-emerald-100",
-    title: "Predictive Assessments",
-    description:
-      "Validated-inspired psychometric instruments — Big Five, cognitive ability, situational judgment, EQ, and DISC. Take the free Big Five + cognitive sample in 8 minutes total; upgrade to Pro for the full battery and the resume → predictive-index match.",
+    title: t("tools.card.predictive-assessments.title"),
+    description: t("tools.predictiveAssessments.description"),
   } as const;
 
   // Initial load — catalog + history.
@@ -105,7 +115,7 @@ export default function PredictiveAssessments() {
 
   async function handlePickKind(kind: AssessmentKind) {
     if (!isAuthenticated) {
-      toast({ title: "Sign in to take an assessment", description: "Free Big Five + cognitive sample take 5 minutes total." });
+      toast({ title: t("tools.predictiveAssessments.signInTitle"), description: t("tools.predictiveAssessments.signInDesc") });
       return;
     }
     try {
@@ -117,8 +127,8 @@ export default function PredictiveAssessments() {
       setActiveQuestions(questions);
       setActiveRun(run);
     } catch (err: any) {
-      const message = err?.message ?? "Couldn't start the assessment.";
-      toast({ title: "Couldn't start", description: message, variant: "destructive" });
+      const message = err?.message ?? t("tools.predictiveAssessments.startFailDesc");
+      toast({ title: t("tools.predictiveAssessments.startFailTitle"), description: message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +148,7 @@ export default function PredictiveAssessments() {
         setHistory(refreshed);
       }
     } catch (err: any) {
-      toast({ title: "Couldn't record answer", description: err?.message ?? "Try again.", variant: "destructive" });
+      toast({ title: t("tools.predictiveAssessments.recordFailTitle"), description: err?.message ?? t("tools.predictiveAssessments.recordFailDesc"), variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -178,12 +188,15 @@ export default function PredictiveAssessments() {
                       <CardDescription>{activeDescriptor.oneLiner}</CardDescription>
                     </div>
                     <Button variant="ghost" size="sm" onClick={exitToCatalog}>
-                      Save & exit
+                      {t("tools.predictiveAssessments.saveExit")}
                     </Button>
                   </div>
                   <Progress value={progress} className="mt-3" />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Question {(activeRun.responses?.length ?? 0) + 1} of {activeQuestions.length}
+                    {t("tools.predictiveAssessments.questionProgress", {
+                      current: (activeRun.responses?.length ?? 0) + 1,
+                      total: activeQuestions.length,
+                    })}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -191,11 +204,11 @@ export default function PredictiveAssessments() {
                   {currentQuestion.scale === "agreement_5" && (
                     <div className="grid grid-cols-5 gap-2">
                       {[
-                        { v: 1, l: "Strongly Disagree" },
-                        { v: 2, l: "Disagree" },
-                        { v: 3, l: "Neutral" },
-                        { v: 4, l: "Agree" },
-                        { v: 5, l: "Strongly Agree" },
+                        { v: 1, l: t("tools.predictiveAssessments.agree1") },
+                        { v: 2, l: t("tools.predictiveAssessments.agree2") },
+                        { v: 3, l: t("tools.predictiveAssessments.agree3") },
+                        { v: 4, l: t("tools.predictiveAssessments.agree4") },
+                        { v: 5, l: t("tools.predictiveAssessments.agree5") },
                       ].map((opt) => (
                         <Button
                           key={opt.v}
@@ -238,12 +251,12 @@ export default function PredictiveAssessments() {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        {activeDescriptor.title} — Results
+                        {t("tools.predictiveAssessments.resultsHeading", { title: activeDescriptor.title })}
                       </CardTitle>
                       <CardDescription>{activeRun.results?.narrative}</CardDescription>
                     </div>
                     <Button variant="outline" size="sm" onClick={exitToCatalog}>
-                      Take another
+                      {t("tools.predictiveAssessments.takeAnother")}
                     </Button>
                   </div>
                 </CardHeader>
@@ -263,10 +276,10 @@ export default function PredictiveAssessments() {
                           <div className="flex items-center justify-between text-sm">
                             <span className="font-medium">{dim.label}</span>
                             <span className="text-muted-foreground">
-                              {pct}% · <span className="font-medium text-foreground">{BAND_LABEL[band]}</span>
+                              {pct}% · <span className="font-medium text-foreground">{t(BAND_LABEL_KEY[band])}</span>
                               {typeof percentile === "number" && (
                                 <span className="ml-2 text-xs text-emerald-700">
-                                  Top {Math.max(1, 100 - percentile)}%
+                                  {t("tools.predictiveAssessments.topPercent", { percent: Math.max(1, 100 - percentile) })}
                                 </span>
                               )}
                             </span>
@@ -278,8 +291,9 @@ export default function PredictiveAssessments() {
                     })}
                     {activeRun.results?.normSampleSize && (
                       <p className="text-[10px] text-muted-foreground mt-2">
-                        Percentiles calibrated against {activeRun.results.normSampleSize}{" "}
-                        completed runs on the platform.
+                        {t("tools.predictiveAssessments.normCalibrated", {
+                          count: activeRun.results.normSampleSize,
+                        })}
                       </p>
                     )}
                   </div>
@@ -299,7 +313,7 @@ export default function PredictiveAssessments() {
                           <CardTitle className="text-base">{d.title}</CardTitle>
                           {d.tier === "pro" && (
                             <Badge variant={isLocked ? "outline" : "secondary"} className="text-xs gap-1">
-                              {isLocked && <Lock className="w-3 h-3" />} Pro
+                              {isLocked && <Lock className="w-3 h-3" />} {t("tools.predictiveAssessments.pro")}
                             </Badge>
                           )}
                         </div>
@@ -309,9 +323,9 @@ export default function PredictiveAssessments() {
                         <p className="text-sm text-muted-foreground line-clamp-3">{d.longDescription}</p>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> ~{d.estimatedMinutes} min
+                            <Clock className="w-3 h-3" /> {t("tools.predictiveAssessments.minutes", { minutes: d.estimatedMinutes })}
                           </span>
-                          <span>{d.questionCount > 0 ? `${d.questionCount} items` : "Résumé-driven"}</span>
+                          <span>{d.questionCount > 0 ? t("tools.predictiveAssessments.items", { count: d.questionCount }) : t("tools.predictiveAssessments.resumeDriven")}</span>
                         </div>
                         <Button
                           size="sm"
@@ -321,13 +335,13 @@ export default function PredictiveAssessments() {
                         >
                           {isLocked ? (
                             <>
-                              <Lock className="w-4 h-4 mr-1" /> Upgrade to take
+                              <Lock className="w-4 h-4 mr-1" /> {t("tools.predictiveAssessments.upgradeToTake")}
                             </>
                           ) : submitting ? (
                             <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                           ) : (
                             <>
-                              <Sparkles className="w-4 h-4 mr-1" /> Start
+                              <Sparkles className="w-4 h-4 mr-1" /> {t("tools.predictiveAssessments.start")}
                             </>
                           )}
                         </Button>
@@ -343,12 +357,12 @@ export default function PredictiveAssessments() {
           <aside className="space-y-3">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Your history</CardTitle>
-                <CardDescription>Every start + complete is captured.</CardDescription>
+                <CardTitle className="text-base">{t("tools.predictiveAssessments.historyTitle")}</CardTitle>
+                <CardDescription>{t("tools.predictiveAssessments.historySubtitle")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {history.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No assessments yet.</p>
+                  <p className="text-sm text-muted-foreground">{t("tools.predictiveAssessments.historyEmpty")}</p>
                 ) : (
                   <ul className="space-y-3">
                     {history.slice(0, 10).map((run) => {
@@ -358,15 +372,15 @@ export default function PredictiveAssessments() {
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium truncate">{descriptor?.title ?? run.assessmentKind}</span>
                             <Badge variant="outline" className="text-[10px]">
-                              {run.status}
+                              {STATUS_KEY[run.status] ? t(STATUS_KEY[run.status]) : run.status}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {run.status === "completed"
-                              ? `Completed ${fmtDate(run.completedAt)}`
-                              : `Started ${fmtDate(run.startedAt)}`}
+                              ? t("tools.predictiveAssessments.completedOn", { date: fmtDate(run.completedAt) })
+                              : t("tools.predictiveAssessments.startedOn", { date: fmtDate(run.startedAt) })}
                             {run.scores && run.status === "completed" && (
-                              <> · Overall {Math.round((run.scores.overall ?? 0) * 100)}%</>
+                              <> · {t("tools.predictiveAssessments.overall", { percent: Math.round((run.scores.overall ?? 0) * 100) })}</>
                             )}
                           </p>
                         </li>

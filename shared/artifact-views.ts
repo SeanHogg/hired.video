@@ -42,6 +42,9 @@ export const ARTIFACT_KINDS = [
   "company",
   "studio_template",
   "service",
+  // Social feed post — keys on feed_posts.id; '%'-unit single-shot
+  // impressions with viewer + geography rollup (no heatmap).
+  "post",
 ] as const;
 
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];

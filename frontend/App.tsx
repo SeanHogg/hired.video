@@ -298,6 +298,7 @@ const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"))
 const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
+const DashboardFeedCuration = lazy(() => import("./pages/admin/DashboardFeedCuration"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const CompanyManagement = lazy(() => import("./pages/admin/CompanyManagement"));
 const RolesPermissions = lazy(() => import("./pages/admin/RolesPermissions"));
@@ -1080,6 +1081,7 @@ const App = () => (
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
                       <Route path="/admin/feed"              element={<AdminLayout><FeedManagement /></AdminLayout>} />
+                      <Route path="/admin/dashboard-feed"    element={<AdminLayout><DashboardFeedCuration /></AdminLayout>} />
                       <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
                       <Route path="/admin/companies"         element={<AdminLayout><CompanyManagement /></AdminLayout>} />
                       <Route path="/admin/roles"             element={<AdminLayout><RolesPermissions /></AdminLayout>} />

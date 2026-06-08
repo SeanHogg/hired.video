@@ -1,4 +1,5 @@
 import { Zap } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { ResumeAnalysisToolPage } from "@/components/tools/ResumeAnalysisToolPage";
 
 // Optimizer surface — same engine as the AI Resume Scorer (one
@@ -9,33 +10,33 @@ import { ResumeAnalysisToolPage } from "@/components/tools/ResumeAnalysisToolPag
 // through the registry's wand tools (consolidate / standardize /
 // shorten / etc.).
 export default function ResumeOptimizer() {
+  const { t } = useTranslation();
   return (
     <ResumeAnalysisToolPage
       toolId="resume-optimizer"
       header={{
         icon: <Zap className="h-6 w-6 text-brand-blue" />,
         iconBgClassName: "bg-brand-blue/10",
-        title: "Resume Optimizer",
-        description: "Optimize your resume for ATS systems and improve your job search success",
+        title: t("tools.resumeOptimizer.title"),
+        description: t("tools.resumeOptimizer.subtitle"),
       }}
       submit={{
-        label: "Optimize Resume",
-        loadingLabel: "Optimizing...",
+        label: t("tools.resumeOptimizer.submitLabel"),
+        loadingLabel: t("tools.resumeOptimizer.submitLoading"),
         icon: Zap,
       }}
       endpoint="/api/ResumeOptimizer/optimize"
       showJobDescription
-      reportLabel="Resume Optimization Report"
+      reportLabel={t("tools.resumeOptimizer.reportLabel")}
       emptyState={{
-        title: "Ready to Optimize",
-        blurb:
-          "Upload a resume file, paste text, or select from your saved resumes to get optimization suggestions.",
+        title: t("tools.resumeOptimizer.emptyTitle"),
+        blurb: t("tools.resumeOptimizer.emptyBlurb"),
         bullets: [
-          "ATS compatibility analysis",
-          "Keyword optimization suggestions",
-          "Format improvement recommendations",
-          "Content quality assessment",
-          "Actionable improvement tips",
+          t("tools.resumeOptimizer.feature1"),
+          t("tools.resumeOptimizer.feature2"),
+          t("tools.resumeOptimizer.feature3"),
+          t("tools.resumeOptimizer.feature4"),
+          t("tools.resumeOptimizer.feature5"),
         ],
       }}
     />

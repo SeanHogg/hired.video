@@ -1,4 +1,5 @@
 import { Brain, Star } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ResumeAnalysisToolPage } from "@/components/tools/ResumeAnalysisToolPage";
@@ -10,17 +11,18 @@ import { ResumeAnalysisToolPage } from "@/components/tools/ResumeAnalysisToolPag
 // recommendations panel renders the same Take-Action buttons as the
 // Optimizer (registry-backed wands).
 export default function AIResumeScorer() {
+  const { t } = useTranslation();
   return (
     <ResumeAnalysisToolPage
       toolId="ai-resume-scorer"
       header={{
         icon: <Brain className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-brand-purple/10",
-        title: "AI Resume Scorer",
-        description: "Get instant AI-powered feedback and scoring for your resume",
+        title: t("tools.aiResumeScorer.title"),
+        description: t("tools.aiResumeScorer.subtitle"),
         titleExtras: (
           <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-            Hot
+            {t("tools.badge.hot")}
           </Badge>
         ),
       }}
@@ -32,11 +34,11 @@ export default function AIResumeScorer() {
                 <Star className="h-4 w-4 text-purple-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-purple-900 mb-1">How it works</h3>
+                <h3 className="font-semibold text-purple-900 mb-1">
+                  {t("tools.aiResumeScorer.howItWorksTitle")}
+                </h3>
                 <p className="text-sm text-purple-800">
-                  Our AI analyzes your resume across multiple dimensions including ATS
-                  compatibility, content quality, keyword optimization, and formatting to
-                  provide a comprehensive score and actionable feedback.
+                  {t("tools.aiResumeScorer.howItWorksBody")}
                 </p>
               </div>
             </div>
@@ -44,23 +46,22 @@ export default function AIResumeScorer() {
         </Card>
       }
       submit={{
-        label: "Score My Resume",
-        loadingLabel: "Scoring Resume...",
+        label: t("tools.aiResumeScorer.submitLabel"),
+        loadingLabel: t("tools.aiResumeScorer.submitLoading"),
         icon: Brain,
       }}
       endpoint="/api/ResumeScorer/score"
-      reportLabel="Resume Score Report"
+      reportLabel={t("tools.aiResumeScorer.reportHeader")}
       emptyState={{
-        title: "Ready to Score",
-        blurb:
-          "Upload a resume file, paste text, or select from your saved resumes to get instant AI-powered scoring.",
+        title: t("tools.aiResumeScorer.emptyTitle"),
+        blurb: t("tools.aiResumeScorer.emptyBlurb"),
         bullets: [
-          "Overall resume score and letter grade",
-          "ATS compatibility analysis",
-          "Content quality assessment",
-          "Keyword optimization score",
-          "Format and impact evaluation",
-          "Personalized improvement recommendations",
+          t("tools.aiResumeScorer.feature1"),
+          t("tools.aiResumeScorer.feature2"),
+          t("tools.aiResumeScorer.feature3"),
+          t("tools.aiResumeScorer.feature4"),
+          t("tools.aiResumeScorer.feature5"),
+          t("tools.aiResumeScorer.feature6"),
         ],
       }}
     />

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Building2,
   ArrowRight,
@@ -46,6 +47,7 @@ function fmt(n: number | null) {
 }
 
 export default function EmployerResearch() {
+  const { t } = useTranslation();
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [city, setCity] = useState("");
@@ -57,7 +59,7 @@ export default function EmployerResearch() {
 
   const runResearch = async () => {
     if (!company.trim() && !role.trim()) {
-      setError("Enter a company name or a role to research.");
+      setError(t("tools.employerResearch.errorEnter"));
       return;
     }
     setError(null);
@@ -127,9 +129,8 @@ export default function EmployerResearch() {
       header={{
         icon: <Building2 className="h-6 w-6 text-brand-purple" />,
         iconBgClassName: "bg-purple-100",
-        title: "Employer Research",
-        description:
-          "Pressure-test a company and an offer in 10 minutes — multi-axis reviews + role × city salary data, side by side.",
+        title: t("tools.card.employer-research.title"),
+        description: t("tools.card.employer-research.description"),
       }}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -138,30 +139,36 @@ export default function EmployerResearch() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
-                Research Inputs
+                {t("tools.employerResearch.inputsTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Company</label>
+                <label className="text-sm font-medium mb-2 block">
+                  {t("tools.employerResearch.companyLabel")}
+                </label>
                 <Input
-                  placeholder="e.g., Acme Robotics"
+                  placeholder={t("tools.employerResearch.companyPlaceholder")}
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Role</label>
+                <label className="text-sm font-medium mb-2 block">
+                  {t("tools.employerResearch.roleLabel")}
+                </label>
                 <Input
-                  placeholder="e.g., Senior Software Engineer"
+                  placeholder={t("tools.employerResearch.rolePlaceholder")}
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">City</label>
+                <label className="text-sm font-medium mb-2 block">
+                  {t("tools.employerResearch.cityLabel")}
+                </label>
                 <Input
-                  placeholder="e.g., San Francisco"
+                  placeholder={t("tools.employerResearch.cityPlaceholder")}
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                 />
@@ -176,12 +183,12 @@ export default function EmployerResearch() {
                 {running ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Researching…
+                    {t("tools.employerResearch.researching")}
                   </>
                 ) : (
                   <>
                     <Search className="h-4 w-4 mr-2" />
-                    Run Research
+                    {t("tools.employerResearch.runResearch")}
                   </>
                 )}
               </Button>
@@ -196,11 +203,11 @@ export default function EmployerResearch() {
 
           <Card className="bg-muted/30">
             <CardContent className="p-5 text-sm space-y-3">
-              <p className="font-semibold">What you get</p>
+              <p className="font-semibold">{t("tools.employerResearch.whatYouGet")}</p>
               <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                <li>Company matches with multi-axis review ratings</li>
-                <li>Average / min / max salary for the role × city pair</li>
-                <li>Deeplinks into the full reviews + salary guide pages</li>
+                <li>{t("tools.employerResearch.bullet1")}</li>
+                <li>{t("tools.employerResearch.bullet2")}</li>
+                <li>{t("tools.employerResearch.bullet3")}</li>
               </ul>
             </CardContent>
           </Card>
@@ -212,14 +219,13 @@ export default function EmployerResearch() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="h-5 w-5" />
-                  Companies
+                  {t("tools.employerResearch.companies")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {companies.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No companies matched “{company}”. Try a shorter name or check
-                    spelling.
+                    {t("tools.employerResearch.noCompanies", { company })}
                   </p>
                 )}
                 {companies.map((c) => {
@@ -233,7 +239,7 @@ export default function EmployerResearch() {
                         <p className="font-medium truncate">{c.name}</p>
                         <p className="text-xs text-muted-foreground truncate">
                           {[c.industry, c.location].filter(Boolean).join(" · ") ||
-                            "Company"}
+                            t("tools.employerResearch.companyFallback")}
                         </p>
                         <div className="flex items-center gap-2 mt-1.5">
                           {typeof c.rating === "number" && (
@@ -244,8 +250,9 @@ export default function EmployerResearch() {
                           )}
                           {typeof c.reviewCount === "number" && c.reviewCount > 0 && (
                             <span className="text-xs text-muted-foreground">
-                              {c.reviewCount} review
-                              {c.reviewCount === 1 ? "" : "s"}
+                              {t("tools.employerResearch.reviewCount", {
+                                count: c.reviewCount,
+                              })}
                             </span>
                           )}
                         </div>
@@ -253,12 +260,14 @@ export default function EmployerResearch() {
                       <div className="flex flex-col gap-2 shrink-0">
                         <Button asChild size="sm" variant="outline">
                           <Link to={`/companies/${slugOrId}/reviews`}>
-                            Reviews <ExternalLink className="ml-1 h-3 w-3" />
+                            {t("tools.employerResearch.reviewsBtn")}{" "}
+                            <ExternalLink className="ml-1 h-3 w-3" />
                           </Link>
                         </Button>
                         <Button asChild size="sm" variant="ghost">
                           <Link to={`/companies/${slugOrId}`}>
-                            Profile <ArrowRight className="ml-1 h-3 w-3" />
+                            {t("tools.employerResearch.profileBtn")}{" "}
+                            <ArrowRight className="ml-1 h-3 w-3" />
                           </Link>
                         </Button>
                       </div>
@@ -274,16 +283,17 @@ export default function EmployerResearch() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
-                  Salary — {role}
-                  {city ? ` in ${city}` : ""}
+                  {city
+                    ? t("tools.employerResearch.salaryHeadingCity", { role, city })
+                    : t("tools.employerResearch.salaryHeading", { role })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {salary.sampleSize === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No active listings matched this role
-                    {city ? ` in ${city}` : ""}. Try a broader role keyword or
-                    drop the city to see the national figure.
+                    {city
+                      ? t("tools.employerResearch.noListingsCity", { city })
+                      : t("tools.employerResearch.noListings")}
                   </p>
                 ) : (
                   <>
@@ -292,18 +302,23 @@ export default function EmployerResearch() {
                         {fmt(salary.averageSalary)}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Average · based on {salary.sampleSize} active listing
-                        {salary.sampleSize === 1 ? "" : "s"}
+                        {t("tools.employerResearch.averageBasedOn", {
+                          count: salary.sampleSize,
+                        })}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="text-center p-3 bg-muted rounded-md">
                         <div className="font-semibold">{fmt(salary.minSalary)}</div>
-                        <div className="text-xs text-muted-foreground">Min</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("tools.employerResearch.minLabel")}
+                        </div>
                       </div>
                       <div className="text-center p-3 bg-muted rounded-md">
                         <div className="font-semibold">{fmt(salary.maxSalary)}</div>
-                        <div className="text-xs text-muted-foreground">Max</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("tools.employerResearch.maxLabel")}
+                        </div>
                       </div>
                     </div>
                   </>
@@ -311,7 +326,7 @@ export default function EmployerResearch() {
                 {salaryPagePath && (
                   <Button asChild variant="outline" className="w-full">
                     <Link to={salaryPagePath}>
-                      Open full salary guide
+                      {t("tools.employerResearch.openSalaryGuide")}
                       <ArrowRight className="ml-1 h-4 w-4" />
                     </Link>
                   </Button>
@@ -324,8 +339,7 @@ export default function EmployerResearch() {
             <Card>
               <CardContent className="p-8 text-center text-sm text-muted-foreground">
                 <Search className="h-10 w-10 mx-auto mb-3" />
-                Enter a company, role, or both, then run research to see reviews
-                and salary data side by side.
+                {t("tools.employerResearch.emptyState")}
               </CardContent>
             </Card>
           )}
