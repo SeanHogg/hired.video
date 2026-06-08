@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export interface AIInputBoxProps {
   onSubmit: (value: string) => void;
   placeholder?: string;
-  helpText?: string;
+  helpText?: React.ReactNode;
   buttonLabel?: string;
   disabled?: boolean;
   className?: string;

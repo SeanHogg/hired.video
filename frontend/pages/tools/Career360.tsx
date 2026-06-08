@@ -334,7 +334,7 @@ export default function Career360() {
       } catch (err) {
         if (!cancelled) {
           console.error("[career360] load failed", err);
-          toast.error("Couldn't load Career 360 — try refreshing.");
+          toast.error(t("tools.career360.toastLoadFailed"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -358,17 +358,26 @@ export default function Career360() {
     () =>
       OUTER_BLUEPRINT.map((b) => ({
         ...b,
+        // Resolve the wheel label in the active locale; the blueprint's
+        // English label is the i18next default so a missing key never
+        // renders a raw key.
+        label: t(`tools.career360.segment.${b.id}`, b.label),
         health: wheelHealth[b.id] ?? "unknown",
       })),
-    [wheelHealth],
+    [wheelHealth, t],
   );
 
   // Inner ring = outcomes. We don't measure these yet (#413), so they
   // stay "unknown" until score history shows up; that's intentional —
   // better grey than misleading green.
   const inner: WheelSignal[] = useMemo(
-    () => INNER_BLUEPRINT.map((b) => ({ ...b, health: "unknown" as SegmentHealth })),
-    [],
+    () =>
+      INNER_BLUEPRINT.map((b) => ({
+        ...b,
+        label: t(`tools.career360.segment.${b.id}`, b.label),
+        health: "unknown" as SegmentHealth,
+      })),
+    [t],
   );
 
   const counts = useMemo(() => {
@@ -417,7 +426,7 @@ export default function Career360() {
       console.error("[career360] suggest failed", err);
       toast.error(
         appendDiagnosticReference(
-          "Couldn't generate target suggestions — try again.",
+          t("tools.career360.toastSuggestFailed"),
           err,
         ),
       );
@@ -435,7 +444,7 @@ export default function Career360() {
       console.error("[career360] select failed", err);
       toast.error(
         appendDiagnosticReference(
-          "Couldn't build the plan — try a different target or refresh.",
+          t("tools.career360.toastPlanFailed"),
           err,
         ),
       );
@@ -456,7 +465,7 @@ export default function Career360() {
     } catch (err) {
       console.error("[career360] custom select failed", err);
       toast.error(
-        appendDiagnosticReference("Couldn't build the plan for that target.", err),
+        appendDiagnosticReference(t("tools.career360.toastPlanFailedTarget"), err),
       );
     } finally {
       setSelecting(false);
@@ -477,10 +486,10 @@ export default function Career360() {
         },
       });
       persistSelected(next);
-      toast.success("Plan refreshed.");
+      toast.success(t("tools.career360.toastPlanRefreshed"));
     } catch (err) {
       console.error("[career360] refresh plan failed", err);
-      toast.error("Couldn't refresh the plan.");
+      toast.error(t("tools.career360.toastPlanRefreshFailed"));
     } finally {
       setSelecting(false);
     }
@@ -493,7 +502,7 @@ export default function Career360() {
       await refreshState();
     } catch (err) {
       console.error("[career360] clear failed", err);
-      toast.error("Couldn't clear the target.");
+      toast.error(t("tools.career360.toastClearFailed"));
     } finally {
       setClearing(false);
     }
@@ -576,15 +585,13 @@ export default function Career360() {
                 <Card className="border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20">
                   <CardContent className="p-4 flex items-start gap-3 text-sm">
                     <div className="flex-1">
-                      <div className="font-medium">Build a resume first to unlock the coach</div>
+                      <div className="font-medium">{t("tools.career360.gateTitle")}</div>
                       <p className="text-muted-foreground mt-1">
-                        Career 360's wheel + target picker work without a resume, but the per-segment
-                        AI coach needs your background to give useful answers. Build a master resume in
-                        a minute and the coach will surface tool actions automatically.
+                        {t("tools.career360.gateBody")}
                       </p>
                     </div>
                     <Button asChild size="sm" variant="default" className="shrink-0">
-                      <Link to="/resume-builder">Start your resume</Link>
+                      <Link to="/resume-builder">{t("tools.career360.gateCta")}</Link>
                     </Button>
                   </CardContent>
                 </Card>

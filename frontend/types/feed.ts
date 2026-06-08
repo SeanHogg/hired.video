@@ -64,6 +64,12 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   isLikedByCurrentUser: boolean;
+  // Reshare. `repostCount` = times this post was reposted; `repostOf` = the
+  // embedded original when this post itself is a repost; `repostOfId` flags
+  // it as a repost without needing the embed.
+  repostCount: number;
+  repostOfId?: string;
+  repostOf?: FeedPost;
   // Polymorphic surfacing — when set, this post is a pointer to a
   // reviewable / promotable subject (a review, a video, a resume, …)
   // and the renderer inlines that subject's canonical card.

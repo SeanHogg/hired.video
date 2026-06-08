@@ -57,6 +57,7 @@ function metricsPanelKind(kind: ArtifactKindKey): ArtifactKind {
     case "company":
     case "studio_template":
     case "service":
+    case "post":
       return "channel";
   }
 }

@@ -40,6 +40,7 @@ import { ToolCallCard } from "@/components/chat/ToolCallCard";
 import { cn } from "@/lib/utils";
 import Markdown from "@/components/Markdown";
 import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -304,7 +305,27 @@ Engage conversationally to understand their needs and provide helpful guidance.`
   return (basePrompt + contextInstructions + actionInstructions).trim();
 }
 
-const AI_FOOTER_CAPTION = "Powered by BuilderForce.ai";
+const BUILDERFORCE_URL = "https://builderforce.ai";
+
+/** Shared footer caption — "Powered by BuilderForce.ai" with the brand as a
+ *  new-window hyperlink. Rendered both inline in the input box (`helpText`)
+ *  and in the upsell fallback, so it lives in one place. */
+function AIFooterCaption() {
+  const { t } = useTranslation();
+  return (
+    <>
+      {t("aiChat.poweredByPrefix", "Powered by")}{" "}
+      <a
+        href={BUILDERFORCE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium underline underline-offset-2 hover:text-foreground"
+      >
+        BuilderForce.ai
+      </a>
+    </>
+  );
+}
 
 // ============================================================================
 // COMPONENT
@@ -312,23 +333,25 @@ const AI_FOOTER_CAPTION = "Powered by BuilderForce.ai";
 
 export default function AIChatPanel() {
   const location = useLocation();
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage, getFormSnapshot } = useAI();
   const isMobile = useIsMobile();
+  const isSuperAdmin = isSuperAdminFromToken();
   const activeResumeId = resolveActiveResumeId(location.pathname, pageContext);
 
   // Get personalized welcome message based on user role
   const getWelcomeMessage = () => {
     if (!isAuthenticated || !user) {
-      return "👋 Hi! I'm your AI CHRO — Chief Human Resources Officer. Whether you're searching for your next role, sourcing top talent, or building a team, I'm here to guide you. What can I help you with?";
+      return t("aiChat.welcome.anonymous", "👋 Hi! I'm your AI CHRO — Chief Human Resources Officer. Whether you're searching for your next role, sourcing top talent, or building a team, I'm here to guide you. What can I help you with?");
     }
 
     const roleMessages: Record<string, string> = {
-      [USER_ROLES.JOB_SEEKER]: "👋 Hi! I'm your AI CHRO. I can help you craft a standout resume, ace your interviews, negotiate your salary, and land the role you deserve. What are we working on today?",
-      [USER_ROLES.RECRUITER]: "👋 Hi! I'm your AI CHRO. I can help you source top candidates, write compelling job descriptions, run structured interviews, and close faster. What's on your hiring agenda?",
-      [USER_ROLES.EMPLOYER]: "👋 Hi! I'm your AI CHRO. I can help you build high-performing teams, optimize your hiring process, benchmark compensation, and manage your workforce strategy. Where do you want to start?",
-      [USER_ROLES.ADMIN]: "👋 Hi! I'm your AI CHRO. I can help you manage the platform, analyze user metrics, and drive better outcomes across the board. What do you need?",
-      [USER_ROLES.SUPER_ADMIN]: "👋 Hi! I'm your AI CHRO. Full platform visibility is at your fingertips — analytics, user management, system insights. What are we looking at?",
+      [USER_ROLES.JOB_SEEKER]: t("aiChat.welcome.jobSeeker", "👋 Hi! I'm your AI CHRO. I can help you craft a standout resume, ace your interviews, negotiate your salary, and land the role you deserve. What are we working on today?"),
+      [USER_ROLES.RECRUITER]: t("aiChat.welcome.recruiter", "👋 Hi! I'm your AI CHRO. I can help you source top candidates, write compelling job descriptions, run structured interviews, and close faster. What's on your hiring agenda?"),
+      [USER_ROLES.EMPLOYER]: t("aiChat.welcome.employer", "👋 Hi! I'm your AI CHRO. I can help you build high-performing teams, optimize your hiring process, benchmark compensation, and manage your workforce strategy. Where do you want to start?"),
+      [USER_ROLES.ADMIN]: t("aiChat.welcome.admin", "👋 Hi! I'm your AI CHRO. I can help you manage the platform, analyze user metrics, and drive better outcomes across the board. What do you need?"),
+      [USER_ROLES.SUPER_ADMIN]: t("aiChat.welcome.superAdmin", "👋 Hi! I'm your AI CHRO. Full platform visibility is at your fingertips — analytics, user management, system insights. What are we looking at?"),
     };
 
     return roleMessages[user.role] || roleMessages[USER_ROLES.JOB_SEEKER];
@@ -820,7 +843,7 @@ export default function AIChatPanel() {
             </div>
             <div>
               <h3 className="font-semibold flex items-center gap-2">
-                AI CHRO
+                {t("aiChat.title", "AI CHRO")}
                 {pageContext && (
                   <span className="text-xs font-normal text-muted-foreground bg-background px-2 py-0.5 rounded-full">
                     {getContextLabel(pageContext.contextType)}
@@ -829,8 +852,11 @@ export default function AIChatPanel() {
               </h3>
               <p className="text-xs text-muted-foreground">
                 {pageContext
-                  ? `${pageContext.availableAPIs.length} APIs available • ${pageContext.availableActions.length} actions`
-                  : "Always here to help"}
+                  ? t("aiChat.subtitle.stats", "{{apis}} APIs available • {{actions}} actions", {
+                      apis: pageContext.availableAPIs.length,
+                      actions: pageContext.availableActions.length,
+                    })
+                  : t("aiChat.subtitle.default", "Always here to help")}
               </p>
             </div>
           </div>
@@ -839,7 +865,7 @@ export default function AIChatPanel() {
               variant="ghost"
               size="icon"
               onClick={startNewChat}
-              title="New chat"
+              title={t("aiChat.newChat", "New chat")}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -847,17 +873,18 @@ export default function AIChatPanel() {
               variant="ghost"
               size="icon"
               onClick={toggleHistory}
-              title="Chat history"
+              title={t("aiChat.chatHistory", "Chat history")}
               className={cn(showHistory && "bg-muted")}
             >
               <History className="h-4 w-4" />
             </Button>
-            {pageContext && (
+            {/* Page-context debug panel is a staff diagnostic — SuperAdmin only. */}
+            {pageContext && isSuperAdmin && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowContextInfo(!showContextInfo)}
-                title="Toggle context info"
+                title={t("aiChat.toggleContextInfo", "Toggle context info")}
               >
                 <Info className="h-4 w-4" />
               </Button>
@@ -885,17 +912,17 @@ export default function AIChatPanel() {
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 <Code className="h-4 w-4" />
-                Page Context
+                {t("aiChat.context.pageContext", "Page Context")}
               </h4>
               <div className="text-xs space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Type:</span>
+                  <span className="text-muted-foreground">{t("aiChat.context.type", "Type:")}</span>
                   <span className="font-mono bg-background px-2 py-0.5 rounded">
                     {pageContext.contextType}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">URL:</span>
+                  <span className="text-muted-foreground">{t("aiChat.context.url", "URL:")}</span>
                   <span className="font-mono text-xs truncate">
                     {pageContext.pageUrl}
                   </span>
@@ -904,7 +931,7 @@ export default function AIChatPanel() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold mb-2">Available Actions</h4>
+              <h4 className="text-sm font-semibold mb-2">{t("aiChat.context.availableActions", "Available Actions")}</h4>
               <div className="flex flex-wrap gap-1">
                 {pageContext.availableActions.map((action) => (
                   <span
@@ -918,7 +945,7 @@ export default function AIChatPanel() {
             </div>
 
             <div>
-              <h4 className="text-sm font-semibold mb-2">Available APIs ({pageContext.availableAPIs.length})</h4>
+              <h4 className="text-sm font-semibold mb-2">{t("aiChat.context.availableApis", "Available APIs ({{count}})", { count: pageContext.availableAPIs.length })}</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {pageContext.availableAPIs.map((api) => (
                   <div
@@ -946,7 +973,7 @@ export default function AIChatPanel() {
                 className="rounded"
               />
               <label htmlFor="useOrchestration" className="text-xs cursor-pointer">
-                Use API Orchestration
+                {t("aiChat.context.useOrchestration", "Use API Orchestration")}
               </label>
             </div>
           </div>
@@ -959,19 +986,19 @@ export default function AIChatPanel() {
               <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <h4 className="font-semibold text-sm flex-1">Chat History</h4>
+              <h4 className="font-semibold text-sm flex-1">{t("aiChat.history.title", "Chat History")}</h4>
               <Button variant="ghost" size="sm" onClick={startNewChat} className="gap-1 text-xs">
                 <Plus className="h-3 w-3" />
-                New Chat
+                {t("aiChat.history.newChat", "New Chat")}
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {isLoadingSessions ? (
-                <div className="p-4 text-sm text-muted-foreground text-center">Loading...</div>
+                <div className="p-4 text-sm text-muted-foreground text-center">{t("status.loading", "Loading…")}</div>
               ) : sessions.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p>No previous chats</p>
+                  <p>{t("aiChat.history.empty", "No previous chats")}</p>
                 </div>
               ) : (
                 <div className="divide-y">
@@ -996,7 +1023,7 @@ export default function AIChatPanel() {
                         size="icon"
                         className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
                         onClick={(e) => deleteSession(session.id, e)}
-                        title="Delete chat"
+                        title={t("aiChat.deleteChat", "Delete chat")}
                       >
                         <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
@@ -1031,12 +1058,12 @@ export default function AIChatPanel() {
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         <Brain className="h-3 w-3 text-primary" />
-                        <span className="text-xs font-medium text-primary">AI CHRO</span>
+                        <span className="text-xs font-medium text-primary">{t("aiChat.title", "AI CHRO")}</span>
                       </div>
                       <button
                         onClick={() => copyMessage(message.id, message.content)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background"
-                        title="Copy response"
+                        title={t("aiChat.copyResponse", "Copy response")}
                       >
                         {copiedMessageId === message.id ? (
                           <Check className="h-3 w-3 text-green-500" />
@@ -1096,7 +1123,7 @@ export default function AIChatPanel() {
                   <div className="flex items-center gap-2 mb-2">
                     <Brain className="h-3 w-3 text-primary" />
                     <span className="text-xs font-medium text-primary">
-                      AI Assistant
+                      {t("aiChat.assistant", "AI Assistant")}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -1130,10 +1157,10 @@ export default function AIChatPanel() {
               {pageContext ? (
                 <>
                   <Sparkles className="h-3 w-3" />
-                  Context-aware suggestions:
+                  {t("aiChat.suggestions.contextAware", "Context-aware suggestions:")}
                 </>
               ) : (
-                "Quick suggestions:"
+                t("aiChat.suggestions.quick", "Quick suggestions:")
               )}
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -1171,20 +1198,26 @@ export default function AIChatPanel() {
                   user's R2 library + shows up in MediaPicker. After
                   generation the URL is pushed into the chat as a user
                   message; the assistant sees it, can comment, and the
-                  conversation continues naturally. */}
+                  conversation continues naturally.
+
+                  Studio-only: image generation feeds the Studio canvas,
+                  so the chip surfaces only when the chat opens over the
+                  Studio editor (contextType resolved from the /studio
+                  route in page-meta-registry). */}
+              {pageContext?.contextType === "studio" && (
               <div className="mb-2 flex items-center gap-2">
                 <Popover open={aiImagePromptOpen} onOpenChange={setAiImagePromptOpen}>
                   <PopoverTrigger asChild>
                     <UiButton variant="outline" size="sm" className="h-7 gap-1">
                       <ImageIcon className="h-3.5 w-3.5" />
-                      <span className="text-xs">Generate image</span>
+                      <span className="text-xs">{t("aiChat.generateImage", "Generate image")}</span>
                     </UiButton>
                   </PopoverTrigger>
                   <PopoverContent align="start" side="top" className="w-80 p-0">
                     <MediaAiPromptPanel
                       compact
                       kindNoun="image"
-                      placeholder="A clean studio backdrop, soft warm lighting…"
+                      placeholder={t("aiChat.imagePlaceholder", "A clean studio backdrop, soft warm lighting…")}
                       onGenerated={(result, prompt) => {
                         // Synthesize a tool-run card directly — no
                         // model round-trip, no token spend on a chat
@@ -1201,7 +1234,7 @@ export default function AIChatPanel() {
                           ...prev,
                           {
                             id: `gen-image-${Date.now()}`,
-                            content: "Generated and saved to your library.",
+                            content: t("aiChat.imageGenerated", "Generated and saved to your library."),
                             sender: "ai",
                             timestamp: new Date(),
                             toolRuns: [
@@ -1222,11 +1255,12 @@ export default function AIChatPanel() {
                   </PopoverContent>
                 </Popover>
               </div>
+              )}
               <AIInputBox
                 onSubmit={(v) => handleSendMessage(v)}
                 disabled={isTyping}
-                placeholder="Ask me anything about HR..."
-                helpText={AI_FOOTER_CAPTION}
+                placeholder={t("aiChat.inputPlaceholder", "Ask me anything about HR...")}
+                helpText={<AIFooterCaption />}
               />
             </>
           ) : (
@@ -1234,22 +1268,22 @@ export default function AIChatPanel() {
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm text-muted-foreground">
                   {isAuthenticated
-                    ? "You have 10 free AI requests per month. Upgrade to Pro for unlimited access."
-                    : "Sign in to get 10 free AI requests per month. Upgrade to Pro for unlimited access."}
+                    ? t("aiChat.upgrade.authenticated", "You have 10 free AI requests per month. Upgrade to Pro for unlimited access.")
+                    : t("aiChat.upgrade.anonymous", "Sign in to get 10 free AI requests per month. Upgrade to Pro for unlimited access.")}
                 </div>
                 <div className="flex gap-2">
                   {!isAuthenticated && (
                     <UiButton asChild variant="outline" size="sm">
-                      <Link to="/login">Sign In</Link>
+                      <Link to="/login">{t("actions.signIn", "Sign In")}</Link>
                     </UiButton>
                   )}
                   <UiButton asChild size="sm">
-                    <Link to="/pricing">View Plans</Link>
+                    <Link to="/pricing">{t("aiChat.viewPlans", "View Plans")}</Link>
                   </UiButton>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                {AI_FOOTER_CAPTION}
+                <AIFooterCaption />
               </p>
             </>
           )}

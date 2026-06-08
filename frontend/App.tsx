@@ -299,6 +299,7 @@ const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const DashboardFeedCuration = lazy(() => import("./pages/admin/DashboardFeedCuration"));
+const PostDetail = lazy(() => import("./pages/PostDetail"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const CompanyManagement = lazy(() => import("./pages/admin/CompanyManagement"));
 const RolesPermissions = lazy(() => import("./pages/admin/RolesPermissions"));
@@ -693,6 +694,7 @@ const App = () => (
                       <Route path="/rewards" element={<RewardsPage />} />
                       <Route path="/home" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/feed" element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/feed/:id" element={<PostDetail />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"

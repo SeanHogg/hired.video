@@ -735,6 +735,7 @@ export default function Home() {
                         onDelete={handlePostDelete}
                         onEdit={handlePostEdit}
                         onHide={handlePostHide}
+                        onReshare={(created) => setPosts((prev) => [created, ...prev])}
                       />
                     ))}
 

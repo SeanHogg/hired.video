@@ -38,6 +38,7 @@ import { useArticlePermissions } from "@/hooks/use-article-permissions";
 import { useStudioTemplatePermissions } from "@/hooks/use-studio-template-permissions";
 import { useServicePermissions } from "@/hooks/use-service-permissions";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/lib/auth";
 import type { Resume } from "@/types/resume";
 
 export interface EntityDetailsPermission {
@@ -52,6 +53,7 @@ export interface ArticleArg { kind: "article"; entity: { id: string; authorId?: 
 export interface StudioTemplateArg { kind: "studio_template"; entity: { id: string; creatorUserId?: string | null } | null | undefined; }
 export interface ServiceArg { kind: "service"; entity: { id: string; providerUserId?: string | null } | null | undefined; }
 export interface VideoArg { kind: "video"; entity: { id: string; userId?: string | null } | null | undefined; }
+export interface PostArg { kind: "post"; entity: { id: string; userId?: string | null } | null | undefined; }
 
 export type EntityDetailsPermissionArgs =
   | ResumeArg
@@ -61,7 +63,8 @@ export type EntityDetailsPermissionArgs =
   | ArticleArg
   | StudioTemplateArg
   | ServiceArg
-  | VideoArg;
+  | VideoArg
+  | PostArg;
 
 export function useEntityDetailsPermission(
   args: EntityDetailsPermissionArgs,
@@ -74,6 +77,9 @@ export function useEntityDetailsPermission(
   // backing stats endpoint (see the header comment). Plain admins are
   // intentionally excluded so we never render a button that 403s.
   const { isSuperAdmin: canViewAsAdmin } = usePermissions();
+  // Posts have no dedicated permission hook — ownership is simply "I am the
+  // author", resolved against the authed viewer here.
+  const { user } = useAuth();
 
   const resume = useResumePermissions(args.kind === "resume" ? args.entity : null);
   const job = useJobPermissions(args.kind === "job" ? args.entity ?? null : null);
@@ -93,5 +99,11 @@ export function useEntityDetailsPermission(
     case "studio_template": return { canViewStats: template.isOwner || canViewAsAdmin };
     case "service": return { canViewStats: service.isOwner || canViewAsAdmin };
     case "video": return { canViewStats: video.isOwner || canViewAsAdmin };
+    case "post": {
+      const isOwner = Boolean(
+        args.entity?.userId && user?.id && args.entity.userId === user.id,
+      );
+      return { canViewStats: isOwner || canViewAsAdmin };
+    }
   }
 }

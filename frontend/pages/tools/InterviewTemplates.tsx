@@ -294,6 +294,7 @@ function TemplateEditorDialog({
   onClose,
   onSaved,
 }: EditorProps) {
+  const { t } = useTranslation();
   const seed = initial ?? initialDraft ?? null;
   const [title, setTitle] = useState(seed?.title ?? "");
   const [description, setDescription] = useState(seed?.description ?? "");
@@ -321,7 +322,7 @@ function TemplateEditorDialog({
 
   function addQuestion() {
     if (!draft.text.trim() || draft.text.trim().length < 8) {
-      toast.error("Question must be at least 8 characters");
+      toast.error(t("tools.interviewTemplates.errQuestionShort"));
       return;
     }
     setQuestions((qs) => [
@@ -363,7 +364,7 @@ function TemplateEditorDialog({
       return;
     }
     if (!targetRole.trim()) {
-      const msg = "Enter a target role first — AI questions are generated from it.";
+      const msg = t("tools.interviewTemplates.errTargetRoleFirst");
       setGenError(msg);
       toast.error(msg);
       return;
@@ -376,7 +377,7 @@ function TemplateEditorDialog({
     });
     if (!res) return;
     if (res.questions.length === 0) {
-      setGenError("Couldn't generate questions for that role. Try a more specific title.");
+      setGenError(t("tools.interviewTemplates.genFailed"));
       return;
     }
     // Re-id on append so a second generate pass can't collide with ids
@@ -386,20 +387,20 @@ function TemplateEditorDialog({
       .filter((q) => !seen.has(q.text.trim().toLowerCase()))
       .map((q, i) => ({ ...q, id: `gen-${Date.now()}-${i}` }));
     if (fresh.length === 0) {
-      toast.info("Those questions are already in the list");
+      toast.info(t("tools.interviewTemplates.infoAlreadyInList"));
       return;
     }
     setQuestions((qs) => [...qs, ...fresh]);
-    toast.success(`Added ${fresh.length} AI-generated question${fresh.length === 1 ? "" : "s"}`);
+    toast.success(t("tools.interviewTemplates.addedQuestions", { count: fresh.length }));
   }
 
   async function handleSave() {
     if (!title.trim()) {
-      toast.error("Give the template a title");
+      toast.error(t("tools.interviewTemplates.errNeedTitle"));
       return;
     }
     if (questions.length === 0) {
-      toast.error("Add at least one question");
+      toast.error(t("tools.interviewTemplates.errNeedQuestion"));
       return;
     }
     const draftPayload = currentDraft();
@@ -416,15 +417,15 @@ function TemplateEditorDialog({
       };
       if (initial) {
         await updateQuestionSet(initial.id, payload);
-        toast.success("Template updated");
+        toast.success(t("tools.interviewTemplates.templateUpdated"));
       } else {
         await createQuestionSet(payload);
-        toast.success("Template saved");
+        toast.success(t("tools.interviewTemplates.templateSaved"));
       }
       onSaved();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save");
+      toast.error(err instanceof Error ? err.message : t("tools.interviewTemplates.errCouldNotSave"));
     } finally {
       setSaving(false);
     }
@@ -434,46 +435,46 @@ function TemplateEditorDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initial ? "Edit template" : "New interview template"}</DialogTitle>
+          <DialogTitle>{initial ? t("tools.interviewTemplates.dialogEdit") : t("tools.interviewTemplates.dialogNew")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Title</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Senior Backend Screening" />
+              <Label>{t("tools.interviewTemplates.titleLabel")}</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("tools.interviewTemplates.titlePlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label>Target role</Label>
-              <Input value={targetRole} onChange={(e) => setTargetRole(e.target.value)} placeholder="e.g. Senior Backend Engineer" />
+              <Label>{t("tools.interviewTemplates.targetRoleLabel")}</Label>
+              <Input value={targetRole} onChange={(e) => setTargetRole(e.target.value)} placeholder={t("tools.interviewTemplates.targetRolePlaceholder")} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Description / instructions</Label>
+            <Label>{t("tools.interviewTemplates.descLabel")}</Label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              placeholder="Shown to candidates when they open the interview"
+              placeholder={t("tools.interviewTemplates.descPlaceholder")}
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label>Style</Label>
+              <Label>{t("tools.interviewTemplates.styleLabel")}</Label>
               <Select value={style} onValueChange={(v) => setStyle(v as typeof style)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="mixed">Mixed</SelectItem>
-                  <SelectItem value="behavioral">Behavioral</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
+                  <SelectItem value="mixed">{t("tools.interviewTemplates.styleMixed")}</SelectItem>
+                  <SelectItem value="behavioral">{t("tools.interviewTemplates.styleBehavioral")}</SelectItem>
+                  <SelectItem value="technical">{t("tools.interviewTemplates.styleTechnical")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Prep time (s)</Label>
+              <Label>{t("tools.interviewTemplates.prepTime")}</Label>
               <Input
                 type="number"
                 min={0}
@@ -483,7 +484,7 @@ function TemplateEditorDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Max retakes</Label>
+              <Label>{t("tools.interviewTemplates.maxRetakes")}</Label>
               <Input
                 type="number"
                 min={0}
@@ -497,14 +498,14 @@ function TemplateEditorDialog({
           <div className="flex items-center gap-3">
             <Switch checked={proctoringOn} onCheckedChange={setProctoringOn} id="proctoring" />
             <Label htmlFor="proctoring" className="cursor-pointer text-sm">
-              Proctor (tab-blur + paste + copy tracking on each answer)
+              {t("tools.interviewTemplates.proctorLabel")}
             </Label>
           </div>
 
           <div className="space-y-2 border-t pt-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <Label className="text-base">Questions ({questions.length})</Label>
-              <span className="text-xs text-muted-foreground">~{totalMinutes} min total</span>
+              <Label className="text-base">{t("tools.interviewTemplates.questionsCount", { count: questions.length })}</Label>
+              <span className="text-xs text-muted-foreground">{t("tools.interviewTemplates.minTotal", { minutes: totalMinutes })}</span>
             </div>
             <div className="space-y-2">
               {questions.map((q, i) => (
@@ -526,14 +527,14 @@ function TemplateEditorDialog({
             <div className="rounded-md border border-brand-purple/30 bg-purple-50/50 p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-brand-purple" />
-                <Label className="text-xs font-medium">Generate with AI</Label>
+                <Label className="text-xs font-medium">{t("tools.interviewTemplates.generateWithAi")}</Label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Builds skill-tailored questions from the target role
+                {t("tools.interviewTemplates.generateHint1")}
                 {targetRole.trim() ? (
                   <> (<span className="font-medium text-foreground">{targetRole.trim()}</span>)</>
                 ) : null}{" "}
-                and style above — each is added below so you can edit or remove it.
+                {t("tools.interviewTemplates.generateHint2")}
               </p>
               <div className="flex items-center gap-2">
                 <Select value={String(genCount)} onValueChange={(v) => setGenCount(Number(v))}>
@@ -543,7 +544,7 @@ function TemplateEditorDialog({
                   <SelectContent>
                     {QUESTION_COUNT_OPTIONS.map((n) => (
                       <SelectItem key={n} value={String(n)}>
-                        {n} questions
+                        {t("tools.interviewTemplates.nQuestions", { count: n })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -560,7 +561,7 @@ function TemplateEditorDialog({
                   ) : (
                     <Sparkles className="h-3.5 w-3.5" />
                   )}
-                  Generate
+                  {t("actions.generate")}
                 </Button>
               </div>
               {genError && (
@@ -570,12 +571,12 @@ function TemplateEditorDialog({
               )}
             </div>
             <div className="rounded-md border-dashed border p-3 space-y-2">
-              <Label className="text-xs">Add a question manually</Label>
+              <Label className="text-xs">{t("tools.interviewTemplates.addManually")}</Label>
               <Textarea
                 value={draft.text}
                 onChange={(e) => setDraft((d) => ({ ...d, text: e.target.value }))}
                 rows={2}
-                placeholder="e.g. Tell me about a time you had to debug a production outage"
+                placeholder={t("tools.interviewTemplates.manualPlaceholder")}
               />
               <div className="flex items-center gap-2">
                 <Input
@@ -589,10 +590,10 @@ function TemplateEditorDialog({
                   }
                   className="w-24"
                 />
-                <span className="text-xs text-muted-foreground">seconds max</span>
+                <span className="text-xs text-muted-foreground">{t("tools.interviewTemplates.secondsMax")}</span>
                 <Button size="sm" onClick={addQuestion} className="ml-auto gap-1">
                   <Plus className="h-3.5 w-3.5" />
-                  Add
+                  {t("actions.add")}
                 </Button>
               </div>
             </div>
@@ -600,11 +601,11 @@ function TemplateEditorDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            {initial ? "Save changes" : "Create template"}
+            {initial ? t("tools.interviewTemplates.saveChanges") : t("tools.interviewTemplates.createTemplate")}
           </Button>
         </DialogFooter>
       </DialogContent>

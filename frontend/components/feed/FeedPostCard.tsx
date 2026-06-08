@@ -1,8 +1,9 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
-  Share,
+  Repeat2,
   MoreHorizontal,
   Globe,
   Lock,
@@ -10,8 +11,8 @@ import {
   Hash,
   AtSign,
   ExternalLink,
-  Calendar,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -30,11 +31,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { likeFeedPost, unlikeFeedPost, createComment, deleteFeedPost, updateFeedPost, reportFeedPost } from "@/lib/services/feed-service";
+import {
+  likeFeedPost,
+  unlikeFeedPost,
+  createComment,
+  getPostComments,
+  resharePost,
+  deleteFeedPost,
+  updateFeedPost,
+  reportFeedPost,
+} from "@/lib/services/feed-service";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import type { FeedPost, CreateFeedPostCommentRequest } from "@/types/feed";
+import type { FeedPost, FeedPostComment } from "@/types/feed";
 import { FeedReviewEmbed } from "./FeedReviewEmbed";
+import PostStatsSheet from "./PostStatsSheet";
 
 // Sub-components
 const FeedPostMedia = ({ media }: { media: FeedPost['media'] }) => {
@@ -144,6 +155,39 @@ const FeedPostTags = ({
   );
 };
 
+// The reshared original, embedded inside a repost. Read-only — its own
+// actions live on its standalone card; here it's a clickable preview that
+// deep-links to the original post's detail page.
+const FeedRepostEmbed = ({ original }: { original: FeedPost }) => (
+  <Link
+    to={`/feed/${original.id}`}
+    className="mt-3 block rounded-lg border hover:border-primary/50 transition-colors p-3"
+  >
+    <div className="flex items-center gap-2">
+      <Avatar className="h-6 w-6">
+        <AvatarImage src={original.userAvatar} />
+        <AvatarFallback className="text-[10px]">
+          {original.userName.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <span className="text-sm font-medium">{original.userName}</span>
+      <span className="text-xs text-muted-foreground">
+        {formatDistanceToNow(new Date(original.createdAt), { addSuffix: true })}
+      </span>
+    </div>
+    {original.content && (
+      <p className="text-sm mt-2 whitespace-pre-wrap line-clamp-6">{original.content}</p>
+    )}
+    <FeedPostMedia media={original.media} />
+    <FeedPostLinkPreview
+      linkUrl={original.linkUrl}
+      linkTitle={original.linkTitle}
+      linkDescription={original.linkDescription}
+      linkImageUrl={original.linkImageUrl}
+    />
+  </Link>
+);
+
 const FeedPostActions = ({
   post,
   onLike,
@@ -151,6 +195,7 @@ const FeedPostActions = ({
   onDelete,
   onEdit,
   onHide,
+  onReshare,
 }: {
   post: FeedPost;
   onLike: (postId: string) => void;
@@ -158,6 +203,7 @@ const FeedPostActions = ({
   onDelete: (postId: string) => void;
   onEdit: (postId: string, updatedPost: FeedPost) => void;
   onHide: (postId: string) => void;
+  onReshare?: (newPost: FeedPost) => void;
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -168,6 +214,22 @@ const FeedPostActions = ({
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [saving, setSaving] = useState(false);
+
+  // Comment thread — loaded on demand the first time the viewer expands it
+  // (the feed/list DTO ships an empty comments array to keep the feed query
+  // flat). `loaded` distinguishes "no comments" from "not fetched yet".
+  const [comments, setComments] = useState<FeedPostComment[]>(post.comments ?? []);
+  const [commentsLoaded, setCommentsLoaded] = useState((post.comments ?? []).length > 0);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+
+  // Reshare composer.
+  const [showReshare, setShowReshare] = useState(false);
+  const [quote, setQuote] = useState("");
+  const [resharing, setResharing] = useState(false);
+
+  const commentCount = commentsLoaded ? comments.length : post.commentCount;
 
   const handleLike = async () => {
     if (!user) return;
@@ -187,9 +249,54 @@ const FeedPostActions = ({
     }
   };
 
-  const handleComment = () => {
-    setShowComments(!showComments);
+  const handleComment = async () => {
+    const next = !showComments;
+    setShowComments(next);
     onComment(post.id);
+    if (next && !commentsLoaded) {
+      setLoadingComments(true);
+      try {
+        const loaded = await getPostComments(post.id);
+        setComments(loaded);
+        setCommentsLoaded(true);
+      } catch (err) {
+        console.error("Failed to load comments:", err);
+      } finally {
+        setLoadingComments(false);
+      }
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!user || !newComment.trim()) return;
+    setPostingComment(true);
+    try {
+      const created = await createComment({ feedPostId: post.id, content: newComment.trim() });
+      // New comments sort newest-first (matches the API ordering).
+      setComments((prev) => [created, ...prev]);
+      setCommentsLoaded(true);
+      setNewComment("");
+    } catch {
+      toast({ title: "Could not post comment", description: "Please try again later.", variant: "destructive" });
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const handleReshare = async () => {
+    if (!user) return;
+    setResharing(true);
+    try {
+      const created = await resharePost(post.id, { content: quote.trim() || undefined });
+      toast({ title: quote.trim() ? "Reposted with your comment" : "Reposted to your feed" });
+      setShowReshare(false);
+      setQuote("");
+      onReshare?.(created);
+    } catch {
+      toast({ title: "Could not repost", description: "Please try again later.", variant: "destructive" });
+    } finally {
+      setResharing(false);
+    }
   };
 
   const handleReport = async () => {
@@ -287,6 +394,27 @@ const FeedPostActions = ({
         </div>
       )}
 
+      {/* Reshare composer — optional quote above the embedded original. */}
+      {showReshare && (
+        <div className="border rounded-lg p-3 space-y-2">
+          <textarea
+            value={quote}
+            onChange={(e) => setQuote(e.target.value)}
+            placeholder="Add a comment to your repost (optional)…"
+            className="w-full min-h-[70px] px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            disabled={resharing}
+          />
+          <div className="flex justify-end space-x-2">
+            <Button size="sm" variant="ghost" onClick={() => { setShowReshare(false); setQuote(""); }} disabled={resharing}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleReshare} disabled={resharing}>
+              {resharing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Repost"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -314,16 +442,18 @@ const FeedPostActions = ({
             className="text-muted-foreground hover:text-blue-500"
           >
             <MessageCircle className="h-4 w-4 mr-2" />
-            {post.commentCount}
+            {commentCount}
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => setShowReshare((v) => !v)}
+            disabled={!user}
             className="text-muted-foreground hover:text-green-500"
           >
-            <Share className="h-4 w-4 mr-2" />
-            Share
+            <Repeat2 className="h-4 w-4 mr-2" />
+            {post.repostCount > 0 ? post.repostCount : "Repost"}
           </Button>
         </div>
 
@@ -353,51 +483,69 @@ const FeedPostActions = ({
       {/* Comments Section */}
       {showComments && (
         <div className="border-t pt-4 space-y-3">
-          {post.comments.slice(0, 3).map((comment) => (
-            <div key={comment.id} className="flex space-x-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={comment.userAvatar} />
-                <AvatarFallback className="text-xs">
-                  {comment.userName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="bg-muted rounded-lg px-3 py-2">
-                  <p className="text-sm font-medium">{comment.userName}</p>
-                  <p className="text-sm">{comment.content}</p>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                </p>
-              </div>
+          {loadingComments ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading comments…
             </div>
-          ))}
-
-          {post.comments.length > 3 && (
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
-              View all {post.commentCount} comments
-            </Button>
+          ) : comments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No comments yet. Be the first.</p>
+          ) : (
+            comments.map((comment) => (
+              <div key={comment.id} className="flex space-x-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={comment.userAvatar} />
+                  <AvatarFallback className="text-xs">
+                    {comment.userName.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="bg-muted rounded-lg px-3 py-2">
+                    <p className="text-sm font-medium">{comment.userName}</p>
+                    <p className="text-sm">{comment.content}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+            ))
           )}
 
           {/* Add Comment */}
-          <div className="flex space-x-3 pt-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.avatar} />
-              <AvatarFallback className="text-xs">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 flex space-x-2">
-              <input
-                type="text"
-                placeholder="Write a comment..."
-                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <Button size="sm" variant="outline">
-                Post
-              </Button>
+          {user && (
+            <div className="flex space-x-3 pt-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.avatar} />
+                <AvatarFallback className="text-xs">
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 flex space-x-2">
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleAddComment();
+                    }
+                  }}
+                  placeholder="Write a comment..."
+                  disabled={postingComment}
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddComment}
+                  disabled={postingComment || !newComment.trim()}
+                >
+                  {postingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post"}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
@@ -413,9 +561,12 @@ interface FeedPostCardProps {
   onHide: (postId: string) => void;
   // Hashtag discovery (gap #1829): filter the feed to a clicked hashtag.
   onSelectTag?: (tag: string) => void;
+  // Reshare: the parent prepends the new repost to its timeline.
+  onReshare?: (newPost: FeedPost) => void;
 }
 
-export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit, onHide, onSelectTag }: FeedPostCardProps) {
+export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit, onHide, onSelectTag, onReshare }: FeedPostCardProps) {
+  const isRepost = Boolean(post.repostOfId);
   const getPrivacyIcon = () => {
     switch (post.privacy) {
       case 'Public':
@@ -445,6 +596,13 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
   return (
     <Card>
       <CardHeader className="pb-3">
+        {/* Repost attribution line — "<name> reposted" above the author row. */}
+        {isRepost && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Repeat2 className="h-3.5 w-3.5" />
+            <span>{post.userName} reposted</span>
+          </div>
+        )}
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
             <Avatar>
@@ -472,25 +630,38 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
               </div>
             </div>
           </div>
+          {/* Owner-only insights drawer (impressions + viewer geography).
+              Self-gates: renders nothing for non-authors. */}
+          <PostStatsSheet post={post} />
         </div>
       </CardHeader>
 
       <CardContent className="pt-0">
         {/* Post Content — article posts (gap #1828) render long-form with
             roomier type + line height; everything else stays compact. */}
-        <div className="prose prose-sm max-w-none">
-          <p className={`whitespace-pre-wrap ${post.kind === 'article' ? 'text-[15px] leading-7' : ''}`}>
-            {post.content}
-          </p>
-        </div>
+        {post.content && (
+          <div className="prose prose-sm max-w-none">
+            <p className={`whitespace-pre-wrap ${post.kind === 'article' ? 'text-[15px] leading-7' : ''}`}>
+              {post.content}
+            </p>
+          </div>
+        )}
 
-        {/* Polymorphic subject embed — when the post points at a
-            reviewable/promotable thing, render its canonical card
-            here instead of the default link/media block. Threaded
-            comments inside the embed write to the subject's own
-            comment stream (e.g. review_comments), so the feed and
-            the subject page share one thread. */}
-        {post.subjectType === "review" && post.subjectId ? (
+        {isRepost ? (
+          // A repost embeds the original; the resharer's quote (post.content)
+          // already rendered above. Fall back to a tombstone when the
+          // original was deleted (repostOf absent).
+          post.repostOf ? (
+            <FeedRepostEmbed original={post.repostOf} />
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground italic rounded-lg border border-dashed p-3">
+              The original post is no longer available.
+            </p>
+          )
+        ) : post.subjectType === "review" && post.subjectId ? (
+          // Polymorphic subject embed — when the post points at a
+          // reviewable/promotable thing, render its canonical card here
+          // instead of the default link/media block.
           <FeedReviewEmbed reviewId={post.subjectId} embedPayload={post.embedPayload} />
         ) : (
           <>
@@ -515,6 +686,7 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
           onDelete={onDelete}
           onEdit={onEdit}
           onHide={onHide}
+          onReshare={onReshare}
         />
       </CardContent>
     </Card>

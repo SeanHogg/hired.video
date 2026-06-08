@@ -272,7 +272,7 @@ export default function FormAutofill() {
 
                     {inputMode === "url" ? (
                       <div className="space-y-2">
-                        <Label htmlFor="form-url">Application Form URL</Label>
+                        <Label htmlFor="form-url">{t("tools.formAutofill.formUrlLabel")}</Label>
                         <Input
                           id="form-url"
                           type="url"
@@ -322,10 +322,10 @@ export default function FormAutofill() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="job-desc">Job Description</Label>
+                      <Label htmlFor="job-desc">{t("tools.formAutofill.jobDescLabel")}</Label>
                       <Textarea
                         id="job-desc"
-                        placeholder="Paste the job description to help tailor your answers..."
+                        placeholder={t("tools.formAutofill.jobDescPlaceholder")}
                         rows={4}
                         value={jobDescription}
                         onChange={(e) => setJobDescription(e.target.value)}
@@ -334,14 +334,14 @@ export default function FormAutofill() {
 
                     {isAuthenticated && (
                       <div className="space-y-2">
-                        <Label htmlFor="resume-select">Resume</Label>
+                        <Label htmlFor="resume-select">{t("labels.resume")}</Label>
                         <Select
                           value={selectedResumeId}
                           onValueChange={setSelectedResumeId}
                           disabled={resumesLoading}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Use active resume..." />
+                            <SelectValue placeholder={t("tools.formAutofill.useActiveResume")} />
                           </SelectTrigger>
                           <SelectContent>
                             {resumes
@@ -359,11 +359,11 @@ export default function FormAutofill() {
 
                     <div className="space-y-2">
                       <Label htmlFor="custom-instructions">
-                        Custom Instructions
+                        {t("tools.formAutofill.customInstructionsLabel")}
                       </Label>
                       <Input
                         id="custom-instructions"
-                        placeholder="e.g., Emphasize leadership experience..."
+                        placeholder={t("tools.formAutofill.customInstructionsPlaceholder")}
                         value={customInstructions}
                         onChange={(e) => setCustomInstructions(e.target.value)}
                       />

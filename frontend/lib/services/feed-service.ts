@@ -66,6 +66,31 @@ export const FeedPostCommentSchema = z.object({
   updatedAt: z.string(),
 });
 
+// Shallow preview of the reshared original embedded inside a repost. Kept
+// flat (no nested likes/comments/repostOf) so the schema can't recurse;
+// the embed only renders author + content + media + counts.
+export const FeedRepostPreviewSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  userAvatar: z.string().optional(),
+  content: z.string(),
+  kind: z.enum(["text", "video", "article"]).default("text"),
+  linkUrl: z.string().optional(),
+  linkTitle: z.string().optional(),
+  linkDescription: z.string().optional(),
+  linkImageUrl: z.string().optional(),
+  privacy: z.enum(["Public", "recruiter", "Connections", "Private"]),
+  createdAt: z.string(),
+  media: z.array(FeedPostMediaSchema).default([]),
+  likeCount: z.number().default(0),
+  commentCount: z.number().default(0),
+  repostCount: z.number().default(0),
+  subjectType: z.string().optional(),
+  subjectId: z.string().optional(),
+  embedPayload: z.record(z.string(), z.unknown()).optional(),
+}).passthrough();
+
 export const FeedPostSchema = z.object({
   id: z.string(),
   userId: z.string(),
@@ -86,6 +111,11 @@ export const FeedPostSchema = z.object({
   comments: z.array(FeedPostCommentSchema),
   likeCount: z.number(),
   commentCount: z.number(),
+  // Reshare count (how many times this post was reposted) + the embedded
+  // original when this post IS a repost (gap social-feed pass).
+  repostCount: z.number().default(0),
+  repostOfId: z.string().optional(),
+  repostOf: FeedRepostPreviewSchema.optional(),
   isLikedByCurrentUser: z.boolean(),
   // Polymorphic surfacing — populated for posts that point at a
   // reviewable/promotable subject (review, video, voice clone, …).
@@ -269,6 +299,33 @@ export async function unlikeFeedPost(postId: string): Promise<void> {
  */
 export async function reportFeedPost(postId: string, reason: string, details?: string): Promise<void> {
   await apiClient.post(`/api/feed/posts/${postId}/report`, { reason, details });
+}
+
+/**
+ * Reshare / repost a feed post. Optional `content` = a quote-repost (the
+ * resharer's commentary above the embedded original); empty = plain repost.
+ */
+export async function resharePost(
+  postId: string,
+  options: { content?: string; privacy?: FeedPost["privacy"] } = {},
+): Promise<FeedPost> {
+  const response = await apiClient.post<ApiSuccessResponse<FeedPost>>(
+    `/api/feed/posts/${postId}/reshare`,
+    { content: options.content ?? "", privacy: options.privacy ?? "Public" },
+  );
+  return FeedPostSchema.parse(response.data);
+}
+
+/**
+ * Load the full comment thread for a post (the list/detail DTO ships an
+ * empty comments array to keep the feed query flat — this fetches them on
+ * demand when a viewer expands the thread).
+ */
+export async function getPostComments(postId: string): Promise<FeedPostComment[]> {
+  const response = await apiClient.get<ApiSuccessResponse<FeedPostComment[]>>(
+    `/api/feed/posts/${postId}/comments`,
+  );
+  return z.array(FeedPostCommentSchema).parse(response.data ?? []);
 }
 
 /**

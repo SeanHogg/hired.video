@@ -249,13 +249,13 @@ export default function VideoPitchLab() {
               <CardContent className="space-y-3">
                 <Button onClick={handleGenerateScript} disabled={generating} className="gap-1">
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {script ? "Re-draft with AI" : "Draft with AI"}
+                  {script ? t("tools.videoPitchLab.redraft") : t("tools.videoPitchLab.draft")}
                 </Button>
                 <Textarea
                   value={script}
                   onChange={(e) => setScript(e.target.value)}
                   rows={6}
-                  placeholder="Type or paste your pitch here, or let AI draft a starter from your resume."
+                  placeholder={t("tools.videoPitchLab.pitchPlaceholder")}
                 />
                 <div className="flex justify-end">
                   <Button
@@ -276,11 +276,11 @@ export default function VideoPitchLab() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center justify-between flex-wrap gap-2">
-                <span>3. Record your pitch</span>
+                <span>{t("tools.videoPitchLab.section3")}</span>
                 <div className="flex gap-2">
                   <Badge variant="outline" className="gap-1">
                     <Clock className="h-3 w-3" />
-                    Max {length}s
+                    {t("tools.videoPitchLab.maxSeconds", { length })}
                   </Badge>
                   <Badge variant="outline">{tone}</Badge>
                 </div>
@@ -289,7 +289,7 @@ export default function VideoPitchLab() {
             <CardContent className="space-y-3">
               <Alert>
                 <AlertDescription className="text-xs">
-                  The teleprompter shows your script as you record. Aim for eye contact, not reading word-for-word.
+                  {t("tools.videoPitchLab.teleprompterTip")}
                 </AlertDescription>
               </Alert>
               <WebcamRecorderWithUpload
@@ -302,7 +302,7 @@ export default function VideoPitchLab() {
                 }}
               />
               <Button variant="ghost" onClick={() => setStep("setup")}>
-                Back to script
+                {t("tools.videoPitchLab.backToScript")}
               </Button>
             </CardContent>
           </Card>
@@ -311,7 +311,7 @@ export default function VideoPitchLab() {
         {step === "review" && recording && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">4. Review and share</CardTitle>
+              <CardTitle className="text-base">{t("tools.videoPitchLab.section4")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <video
@@ -328,40 +328,39 @@ export default function VideoPitchLab() {
                 >
                   {savingPitch ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                   {savedPitchUrl === recording.url
-                    ? "Saved as your profile pitch"
+                    ? t("tools.videoPitchLab.savedAsPitch")
                     : savedPitchUrl
-                      ? "Replace profile pitch with this one"
-                      : "Save as my profile pitch"}
+                      ? t("tools.videoPitchLab.replacePitch")
+                      : t("tools.videoPitchLab.saveAsPitch")}
                 </Button>
                 <Button onClick={handleCopyUrl} variant="outline" className="gap-1">
                   <Copy className="h-3.5 w-3.5" />
-                  Copy pitch URL
+                  {t("tools.videoPitchLab.copyPitchUrl")}
                 </Button>
                 <Button asChild variant="outline" className="gap-1">
                   <a href={aiCoachReviewHref()}>
                     <MessageSquare className="h-3.5 w-3.5" />
-                    Get AI feedback on script
+                    {t("tools.videoPitchLab.getAiFeedback")}
                   </a>
                 </Button>
                 <Button onClick={() => setStep("record")} variant="ghost">
-                  Re-record
+                  {t("tools.videoPitchLab.reRecord")}
                 </Button>
                 <Button asChild variant="ghost" className="ml-auto">
-                  <Link to="/interview-assignments">View interview assignments</Link>
+                  <Link to="/interview-assignments">{t("tools.videoPitchLab.viewAssignments")}</Link>
                 </Button>
               </div>
               {savedPitchUrl && savedPitchUrl !== recording.url && (
                 <Alert>
                   <AlertDescription className="text-xs flex items-center gap-2">
                     <Star className="h-3.5 w-3.5 text-amber-500" />
-                    You already have a profile pitch saved. Saving this one replaces it.
+                    {t("tools.videoPitchLab.alreadyHavePitch")}
                   </AlertDescription>
                 </Alert>
               )}
               <Alert>
                 <AlertDescription className="text-xs">
-                  Paste the URL above into any job application, your public profile, or a recruiter
-                  message. The pitch is hosted on hired.video — no re-upload needed for each application.
+                  {t("tools.videoPitchLab.shareHint")}
                 </AlertDescription>
               </Alert>
             </CardContent>

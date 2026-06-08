@@ -566,6 +566,7 @@ export default function Feed() {
                         onEdit={handlePostEdit}
                         onHide={handlePostHide}
                         onSelectTag={handleSelectTag}
+                        onReshare={(created) => setPosts((prev) => [created, ...prev])}
                       />
                     ))}
 

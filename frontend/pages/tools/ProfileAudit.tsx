@@ -75,10 +75,10 @@ export default function ProfileAudit() {
           strengths: passes.map((c) => `${c.label}: ${c.detail}`),
           weaknesses: issues.map((c) => `${c.label}: ${c.detail}`),
           recommendations: [
-            { title: "Headline rewrite", description: `${data.rationales.headline}\n\nProposed: ${data.proposed.headline}` },
-            { title: "Summary rewrite", description: `${data.rationales.summary}\n\nProposed: ${data.proposed.summary}` },
+            { title: t("tools.profileAudit.recHeadline"), description: `${data.rationales.headline}\n\nProposed: ${data.proposed.headline}` },
+            { title: t("tools.profileAudit.recSummary"), description: `${data.rationales.summary}\n\nProposed: ${data.proposed.summary}` },
             ...(data.proposed.currentRole && data.proposed.currentRole !== data.current.currentRole
-              ? [{ title: "Current role rewrite", description: `Proposed: ${data.proposed.currentRole}` }]
+              ? [{ title: t("tools.profileAudit.recCurrentRole"), description: `Proposed: ${data.proposed.currentRole}` }]
               : []),
           ],
           raw: data,

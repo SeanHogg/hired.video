@@ -159,7 +159,9 @@ function toPostDto(
   post: typeof feedPosts.$inferSelect,
   support: PostDtoSupport,
   currentUserId: string,
-  repostOf: ReturnType<typeof toPostDto> | null,
+  // Embedded reshare original — typed loosely to avoid a self-referential
+  // return-type cycle; it's the same DTO shape with repostOf already null.
+  repostOf: Record<string, unknown> | null,
 ) {
   const { authorName, authorAvatar, likes, commentCount, repostCount } = support;
   return {
@@ -285,7 +287,7 @@ async function fetchPostDtos(
 
   const support = await loadSupport([...postRows, ...originalRows], db);
 
-  const originalDtoById = new Map<string, ReturnType<typeof toPostDto>>();
+  const originalDtoById = new Map<string, Record<string, unknown>>();
   for (const row of [...postRows, ...originalRows]) {
     if (!originalDtoById.has(row.id)) {
       originalDtoById.set(
