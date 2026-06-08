@@ -13,6 +13,7 @@
 
 import { Wand2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   DropdownMenuItem,
   DropdownMenuSub,
@@ -25,6 +26,7 @@ import {
   getCatalogToolsForEntity,
   type ToolEntityContext,
 } from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
 
 interface Props {
   /** What kind of entity this menu was opened from. Drives which tools
@@ -37,6 +39,7 @@ interface Props {
 
 export function ToolsSubmenu({ entityType, entityId }: Props) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   // useAuth already resolves SuperAdmin's preview/impersonation role into
   // user.role, so we don't need a separate effective-role hook here.
   const tools = getCatalogToolsForEntity(entityType, entityId, user?.role);
@@ -46,10 +49,11 @@ export function ToolsSubmenu({ entityType, entityId }: Props) {
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
         <Wand2 className="w-4 h-4 mr-2" />
-        Run Tool
+        {t("tools.runTool", "Run Tool")}
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent className="max-h-[70vh] overflow-y-auto">
-        {tools.map((tool) => {
+        {tools.map((rawTool) => {
+          const tool = localizeTool(rawTool, t);
           const Icon = tool.icon;
           return (
             <DropdownMenuItem key={tool.id} asChild>

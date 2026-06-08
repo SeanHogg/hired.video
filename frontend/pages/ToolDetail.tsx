@@ -12,6 +12,7 @@
 // removed tool.
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -20,13 +21,19 @@ import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { ToolAudienceBadge } from "@/components/ToolAudienceBadge";
 import { ToolPromoVideo } from "@/components/ToolPromoVideo";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
 import { cn } from "@/lib/utils";
 import { AppShell } from "@/components/AppShell";
 import { usePageChrome } from "@/lib/seo";
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
-  const tool = useMemo(() => TOOLS_CATALOG.find((t) => t.id === id), [id]);
+  const { t } = useTranslation();
+  const rawTool = useMemo(() => TOOLS_CATALOG.find((tl) => tl.id === id), [id]);
+  const tool = useMemo(
+    () => (rawTool ? localizeTool(rawTool, t) : undefined),
+    [rawTool, t],
+  );
   usePageChrome();
 
   if (!tool) return <Navigate to="/tools" replace />;
@@ -101,7 +108,9 @@ export default function ToolDetail() {
 
       <section className="border-t pt-6">
         <Button asChild size="lg" className="w-full sm:w-auto">
-          <Link to={tool.href}>{tool.ctaLabel ?? `Open ${tool.title}`}</Link>
+          <Link to={tool.href}>
+            {tool.ctaLabel ?? t("tools.openNamed", { name: tool.title })}
+          </Link>
         </Button>
       </section>
       </div>

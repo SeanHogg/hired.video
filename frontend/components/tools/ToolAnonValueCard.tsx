@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
 
 interface Props {
   toolId: string;
@@ -33,10 +34,11 @@ export function ToolAnonValueCard({ toolId }: Props) {
   // Authenticated users have already converted — no marketing surface.
   if (isAuthenticated) return null;
 
-  const entry = TOOLS_CATALOG.find((tool) => tool.id === toolId);
+  const rawEntry = TOOLS_CATALOG.find((tool) => tool.id === toolId);
   // Catalog miss is a soft-fail: better to render the tool with no
   // marketing strip than to crash the page on a typo'd toolId.
-  if (!entry) return null;
+  if (!rawEntry) return null;
+  const entry = localizeTool(rawEntry, t);
 
   const redirectTarget = `${location.pathname}${location.search}`;
   const redirectQuery = `?redirect=${encodeURIComponent(redirectTarget)}`;

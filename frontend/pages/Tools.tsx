@@ -41,6 +41,7 @@ import {
   type ToolCategory,
   type ToolTier,
 } from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
 
 type TierFilter = "all" | ToolTier;
 type AudienceFilter = "for_me" | "all" | ToolAudience;
@@ -215,11 +216,14 @@ export default function Tools() {
       if (!isToolInAudience(tool, resolvedAudience)) return false;
       if (tierFilter !== "all" && tool.tier !== tierFilter) return false;
       if (q === "") return true;
+      // Search the LOCALIZED copy so a user typing in their language
+      // matches what the cards actually show (not the English source).
+      const lt = localizeTool(tool, t);
       const haystack =
-        `${tool.title} ${tool.description} ${tool.features?.join(" ") ?? ""} ${tool.statusBadge?.label ?? ""}`.toLowerCase();
+        `${lt.title} ${lt.description} ${lt.features?.join(" ") ?? ""} ${lt.statusBadge?.label ?? ""}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [toolQuery, tierFilter, resolvedAudience]);
+  }, [toolQuery, tierFilter, resolvedAudience, t]);
 
   const categoryCounts = useMemo(() => {
     const map = new Map<ToolCategory, number>();
@@ -748,7 +752,9 @@ function ToolsTable({ tools }: { tools: ToolCatalogEntry[] }) {
           </tr>
         </thead>
         <tbody>
-          {tools.map((tool) => (
+          {tools.map((rawTool) => {
+            const tool = localizeTool(rawTool, t);
+            return (
             <tr
               key={tool.id}
               className="border-b border-border last:border-0 hover:bg-muted/30"
@@ -778,7 +784,8 @@ function ToolsTable({ tools }: { tools: ToolCatalogEntry[] }) {
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -19,6 +19,7 @@ import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
 import { ToolAudienceBadge } from "@/components/ToolAudienceBadge";
 import { ToolPromoVideo } from "@/components/ToolPromoVideo";
 import { cn } from "@/lib/utils";
+import { useLocalizedTool } from "@/lib/tools/localize-tool";
 import type { ToolCatalogEntry } from "@/data/tools-catalog";
 
 interface Props {
@@ -26,7 +27,10 @@ interface Props {
   className?: string;
 }
 
-export function ToolCard({ tool, className }: Props) {
+export function ToolCard({ tool: rawTool, className }: Props) {
+  // Resolve every user-facing string for the active locale at the single
+  // catalog seam; behavioral fields (icon, href, …) pass through unchanged.
+  const tool = useLocalizedTool(rawTool);
   const Icon = tool.icon;
 
   return (

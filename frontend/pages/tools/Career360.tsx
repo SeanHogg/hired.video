@@ -41,6 +41,8 @@ import {
   createResumeContext,
 } from "@/lib/utils/ai-context-helpers";
 import { career360Service, type Career360State } from "@/lib/services/career360-service";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { buildCareer360RunRecord } from "@/lib/tools/career360-run-result";
 import { resumeService } from "@/lib/services/resume-service";
 import { toast } from "sonner";
 import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
@@ -295,6 +297,7 @@ export default function Career360() {
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const { openAIWithPageContextAndMessage } = useAI();
+  const { recordRun } = useToolRunRecorder("career-360");
   const [state, setState] = useState<Career360State | null>(null);
   const [masterResume, setMasterResume] = useState<MasterResumeRef | null>(null);
   const [loading, setLoading] = useState(true);
@@ -383,6 +386,21 @@ export default function Career360() {
     }
   };
 
+  /** Commit a freshly built plan to local state AND record it as a
+   *  "career-360" tool run. Career 360's "run" is the gap-and-roadmap
+   *  computation, so every select / custom-target / refresh persists a
+   *  run — that's what the header's "View History" sheet reads. Shared
+   *  across all three entry points so the record-on-build behaviour can't
+   *  drift between them. Recording is fire-and-forget: it never blocks the
+   *  plan from rendering (the recorder hook swallows persistence errors). */
+  const persistSelected = (next: SelectedTarget) => {
+    setState((prev) => ({
+      doc: { ...(prev?.doc ?? {}), selected: next },
+      history: prev?.history ?? [],
+    }));
+    void recordRun(buildCareer360RunRecord(next));
+  };
+
   const handleSuggest = async () => {
     setSuggesting(true);
     try {
@@ -412,10 +430,7 @@ export default function Career360() {
     setSelecting(true);
     try {
       const next = await career360Service.select({ fromSuggestionId: suggestionId });
-      setState((prev) => ({
-        doc: { ...(prev?.doc ?? {}), selected: next },
-        history: prev?.history ?? [],
-      }));
+      persistSelected(next);
     } catch (err) {
       console.error("[career360] select failed", err);
       toast.error(
@@ -437,10 +452,7 @@ export default function Career360() {
     setSelecting(true);
     try {
       const next = await career360Service.select({ custom: params });
-      setState((prev) => ({
-        doc: { ...(prev?.doc ?? {}), selected: next },
-        history: prev?.history ?? [],
-      }));
+      persistSelected(next);
     } catch (err) {
       console.error("[career360] custom select failed", err);
       toast.error(

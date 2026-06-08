@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +14,11 @@ import AuthOverlay from "@/components/AuthOverlay";
 import AIChatPanel from "@/components/AIChatPanel";
 import FloatingAIButton from "@/components/FloatingAIButton";
 import { getCatalogTool } from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
 
 export default function AICoach() {
   const location = useLocation();
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const { openAIChat, openAIWithMessage, isAIChatOpen } = useAI();
@@ -54,8 +57,14 @@ export default function AICoach() {
     openAIWithMessage(prompt);
   };
 
-  const profileAuditTool = getCatalogTool("profile-audit");
-  const interviewQuestionsTool = getCatalogTool("interview-questions");
+  const profileAuditRaw = getCatalogTool("profile-audit");
+  const interviewQuestionsRaw = getCatalogTool("interview-questions");
+  const profileAuditTool = profileAuditRaw
+    ? localizeTool(profileAuditRaw, t)
+    : undefined;
+  const interviewQuestionsTool = interviewQuestionsRaw
+    ? localizeTool(interviewQuestionsRaw, t)
+    : undefined;
 
   const coachingFeatures = [
     {

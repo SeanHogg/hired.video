@@ -24,6 +24,8 @@ import { getStaticTemplates } from "@/lib/templates/registry";
 import { BLOG_POSTS } from "@/data/blog-posts";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
+import { localizeTool } from "@/lib/tools/localize-tool";
+import i18n from "@/lib/i18n/i18n";
 
 export type CardFeedType =
   | "resume"
@@ -495,7 +497,10 @@ async function fetchTools(
   page: number,
   search = "",
 ): Promise<TypedFetchResult> {
-  const filtered = TOOLS_CATALOG.filter((t) =>
+  // Localize every entry up front so search matching AND the rendered
+  // cards both operate on the active-locale copy (single catalog seam).
+  const localized = TOOLS_CATALOG.map((entry) => localizeTool(entry, i18n.t));
+  const filtered = localized.filter((t) =>
     matchesNeedle(
       search,
       t.title,
