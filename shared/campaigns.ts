@@ -68,6 +68,11 @@ const ROLE_VALUES = [
   USER_ROLES.EMPLOYEE,
 ] as const;
 
+/** The roles a campaign audience can target — narrower than UserRole (no
+ *  admin/super_admin). Use this in audience UI so the toggle set can't drift
+ *  from RoleAudienceSchema. */
+export type CampaignAudienceRole = (typeof ROLE_VALUES)[number];
+
 export const RoleAudienceSchema = z.object({
   kind: z.literal("role"),
   roles: z.array(z.enum(ROLE_VALUES)).min(1),

@@ -15,12 +15,13 @@ import { campaignService } from "@/lib/services/campaign-service";
 import {
   AUDIENCE_KIND_LABELS,
   type CampaignAudience,
+  type CampaignAudienceRole,
 } from "@shared/campaigns";
-import { USER_ROLES, type UserRole } from "@shared/user-roles";
+import { USER_ROLES } from "@shared/user-roles";
 
 const KINDS: CampaignAudience["kind"][] = ["role", "leads", "list"];
 
-const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+const ROLE_OPTIONS: { value: CampaignAudienceRole; label: string }[] = [
   { value: USER_ROLES.JOB_SEEKER, label: "Job Seekers" },
   { value: USER_ROLES.RECRUITER, label: "Recruiters" },
   { value: USER_ROLES.EMPLOYER, label: "Employers" },
