@@ -7,14 +7,13 @@
  * services/campaigns/CampaignService.ts, which owns audience resolution, the
  * read-through cache, and the send loop.
  */
-import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const {
   emailCampaigns,
   emailCampaignRecipients,
   emailTemplates,
-  emailSuppressions,
 } = schema;
 
 export type DbLike = any;
@@ -61,10 +60,6 @@ export interface ICampaignRepository {
   createTemplate(values: TemplateInsert): Promise<TemplateRow>;
   updateTemplate(id: string, patch: Partial<TemplateInsert>): Promise<TemplateRow | null>;
   deleteTemplate(id: string): Promise<boolean>;
-
-  // Suppressions
-  filterSuppressed(emails: string[]): Promise<Set<string>>;
-  addSuppression(email: string, reason: string, campaignId?: string | null): Promise<void>;
 }
 
 export class CampaignRepository implements ICampaignRepository {
@@ -263,23 +258,5 @@ export class CampaignRepository implements ICampaignRepository {
       .where(eq(emailTemplates.id, id))
       .returning({ id: emailTemplates.id });
     return rows.length > 0;
-  }
-
-  // ── Suppressions ──────────────────────────────────────────────────────────
-  async filterSuppressed(emails: string[]): Promise<Set<string>> {
-    if (emails.length === 0) return new Set();
-    const lowered = emails.map((e) => e.toLowerCase());
-    const rows = await this.db
-      .select({ email: emailSuppressions.email })
-      .from(emailSuppressions)
-      .where(inArray(emailSuppressions.email, lowered));
-    return new Set(rows.map((r: { email: string }) => r.email));
-  }
-
-  async addSuppression(email: string, reason: string, campaignId?: string | null): Promise<void> {
-    await this.db
-      .insert(emailSuppressions)
-      .values({ email: email.toLowerCase(), reason, campaignId: campaignId ?? null })
-      .onConflictDoNothing({ target: emailSuppressions.email });
   }
 }

@@ -12,8 +12,9 @@
 import { and, eq, inArray, isNotNull, like } from "drizzle-orm";
 import { schema } from "../../db/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
-import { getJwtSecret } from "../../utils/jwt.js";
 import { getEmailProvider } from "../adapters/email.js";
+import { MarketingConsentService } from "../email/MarketingConsentService.js";
+import { buildRepos } from "../../repositories/index.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
 import {
   CAMPAIGN_STATUS_LABELS,
@@ -27,6 +28,11 @@ import {
   type CreateTemplateInput,
   type UpdateCampaignInput,
 } from "../../../../shared/campaigns.js";
+import {
+  DEFAULT_MARKETING_CATEGORY,
+  isMarketingCategory,
+  type MarketingCategory,
+} from "../../../../shared/email-consent.js";
 import type {
   CampaignRepository,
   CampaignRow,
@@ -84,7 +90,19 @@ export class CampaignService {
   constructor(
     private readonly repo: CampaignRepository,
     private readonly db: any,
+    private readonly consent: MarketingConsentService,
   ) {}
+
+  /** Wire the engine + its consent gate from a db handle. Use this at call
+   *  sites instead of hand-constructing the dependency graph. */
+  static create(db: any): CampaignService {
+    const repos = buildRepos(db);
+    return new CampaignService(
+      repos.campaigns as any,
+      db,
+      new MarketingConsentService(repos.emailConsent as any),
+    );
+  }
 
   // ── Mapping ───────────────────────────────────────────────────────────────
   private toDTO(row: CampaignRow, stats: RecipientStatCounts): CampaignDTO {

@@ -147,6 +147,8 @@ export interface Repos {
   feedFeatures: IFeedFeaturesRepository;
   // email campaign engine: campaigns, recipients, templates, suppressions (migration 0204)
   campaigns: ICampaignRepository;
+  // marketing email consent: preference ledger + hard suppression (migration 0205)
+  emailConsent: IEmailConsentRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -185,6 +187,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     resumeFeedback: new ResumeFeedbackRepository(db, now),
     feedFeatures: new FeedFeaturesRepository(db, now),
     campaigns: new CampaignRepository(db, now),
+    emailConsent: new EmailConsentRepository(db, now),
   };
 }
 
