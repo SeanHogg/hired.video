@@ -84,6 +84,10 @@ import {
   CampaignRepository,
   type ICampaignRepository,
 } from "./campaignRepository.js";
+import {
+  EmailConsentRepository,
+  type IEmailConsentRepository,
+} from "./emailConsentRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
