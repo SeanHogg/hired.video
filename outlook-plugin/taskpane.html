@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Outlook Email Curation Plugin</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Email Curation Rules</h1>
+  <button id="createRuleBtn">Create New Rule</button>
+  <div id="rulesList">
+    <!-- Rules will be listed here -->
+  </div>
+
+  <div id="ruleFormContainer" style="display: none;">
+    <h2>Create/Edit Rule</h2>
+    <form id="ruleForm">
+      <label for="ruleName">Rule Name:</label>
+      <input type="text" id="ruleName" required><br><br>
+
+      <label for="ruleConditions">Conditions:</label><br>
+      <div id="conditionsContainer">
+        <!-- Conditions will be added here -->
+      </div>
+      <button type="button" id="addConditionBtn">Add Condition</button><br><br>
+
+      <label for="ruleActions">Actions:</label><br>
+      <div id="actionsContainer">
+        <!-- Actions will be added here -->
+      </div>
+      <button type="button" id="addActionBtn">Add Action</button><br><br>
+
+      <label for="rulePriority">Priority:</label>
+      <input type="number" id="rulePriority" value="0" required><br><br>
+
+      <button type="submit">Save Rule</button>
+      <button type="button" id="cancelRuleFormBtn">Cancel</button>
+    </form>
+  </div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
