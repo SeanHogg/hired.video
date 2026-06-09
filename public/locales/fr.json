@@ -1,0 +1,18 @@
+{
+  "headings": {
+    "editAbout": "Modifier à propos"
+  },
+  "fields": {
+    "aboutYou": {
+      "label": "À propos de vous",
+      "placeholder": "Décrivez-vous en quelques mots..."
+    }
+  },
+  "labels": {
+    "charactersCount": "Nombre de caractères : {{count}} sur {{max}}"
+  },
+  "actions": {
+    "cancel": "Annuler",
+    "save": "Enregistrer"
+  }
+}
