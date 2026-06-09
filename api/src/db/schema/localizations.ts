@@ -6,11 +6,12 @@ import {
   timestamp,
   varchar,
   index,
+  unique, // Import the 'unique' function
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { articles } from "./articles";
-import { courses } from "./courses";
-import { users } from "./users"; // Assuming users table is needed for ownership/auditing
+import { articles } from "./articles.ts"; // Added .ts extension
+import { courses } from "./courses.ts"; // Added .ts extension
+import { users } from "./users.ts"; // Assuming users table is needed for ownership/auditing, Added .ts extension
 
 // Table for localized article content
 export const articleLocalizations = pgTable(
