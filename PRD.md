@@ -1,51 +1,56 @@
-> **PRD** — drafted by Coder Agent (V2) · task #56
+> **PRD** — drafted by BuilderForce Agent · task #56
 > _Each agent that updates this PRD signs its change below._
 
-```markdown
-## Product Requirements Document: French Content Localization - Phase 2
+# Product Requirements Document: French Localization Expansion
 
-### 1. Problem & Goal
+## 1. Problem & Goal
 
-*   **Problem:** A significant portion of the product's existing user-facing web pages remains untranslated from English into French. This creates a fragmented experience for French-speaking users, hinders engagement, and limits market penetration in French-speaking regions where comprehensive content is expected.
-*   **Goal:** To continue and significantly advance the localization of core user-facing web pages into high-quality French. The immediate objective is to localize the next 50 prioritized content pages (as outlined in `Localization Backlog #FR-P2`), ensuring a consistent and complete experience for our French audience.
+**Problem:** A significant portion of the platform's pages are not translated into French, hindering the user experience for our French-speaking audience. This leads to confusion, decreased engagement, and potential loss of market share in French-speaking regions.
 
-### 2. Target Users / ICP Roles
+**Goal:** To achieve comprehensive French localization across all relevant platform pages, ensuring a seamless and intuitive experience for French-speaking users.
 
-*   **End-users:** Individuals who prefer or require consuming product information and interacting with the platform in French. This includes existing customers and prospective users in France, Canada, Belgium, Switzerland, and other French-speaking territories.
-*   **Internal Stakeholders:** Marketing, Sales, and Customer Support teams who leverage product content to engage with and assist French-speaking clients. Content Managers overseeing global content strategy.
+## 2. Target Users / ICP Roles
 
-### 3. Scope
+This PRD is relevant to all user segments interacting with the platform in French. Specific roles that will benefit include:
 
-*   Localization (translation, linguistic review, and integration) of all text-based content within the 50 designated user-facing web pages identified in `Localization Backlog #FR-P2`.
-*   This includes: primary page content (headings, body text), embedded UI labels within content, image alt-text, and metadata (title, description) where applicable.
-*   Deployment of translated content onto the existing French content delivery infrastructure (e.g., `/fr/` subdomain or equivalent CMS locale).
+*   **End Users:** Individuals using the platform for its core functionality.
+*   **Administrators:** Users managing platform settings and content in a French-speaking environment.
+*   **Support Agents:** French-speaking support staff requiring access to localized information.
 
-### 4. Functional Requirements
+## 3. Scope
 
-1.  **Content Identification & Extraction:** The system must allow for the accurate identification and extraction of all translatable text strings from the specified 50 English source pages.
-2.  **Translation Management:** A process must be established for professional human translation of extracted English content into high-quality, idiomatic French.
-3.  **Linguistic Review & Quality Assurance (LQA):** All translated French content must undergo a thorough linguistic review by a native French speaker for accuracy, grammar, style, and cultural appropriateness.
-4.  **Content Integration:** The localized French content must be seamlessly integrated into the respective French versions of the target pages, maintaining original page structure and design.
-5.  **Technical Validation:** Translated pages must be validated to ensure proper rendering across supported browsers and devices, without visual defects, text truncation, or broken links/functionality.
-6.  **SEO Optimization (Basic):** Where relevant, key French search terms identified by the SEO team should be naturally incorporated into translated content without compromising readability.
+This initiative focuses on identifying, translating, and implementing French localization for all currently untranslated or incompletely translated user-facing pages within the platform. This includes, but is not limited to:
 
-### 5. Acceptance Criteria
+*   Core feature pages
+*   Settings and configuration pages
+*   User profile and account management pages
+*   Onboarding and help documentation pages
+*   Error messages and system notifications
+*   Marketing and informational pages
 
-*   All 50 pages listed in `Localization Backlog #FR-P2` are fully translated into French and deployed to the production environment.
-*   Translated French content is accurate, grammatically correct, stylistically consistent with existing French content, and maintains the original English meaning and tone.
-*   No untranslated English text remains on the French versions of the localized pages, except for agreed-upon proper nouns or technical terms.
-*   All localized pages load correctly, render without visual defects or layout issues, and function as expected across supported browsers and devices.
-*   A formal sign-off for linguistic quality and functional integrity has been received from the designated French-speaking reviewer and QA lead.
-*   All external links within the localized content resolve correctly to either French-language destinations or the original English if no French equivalent exists and is explicitly approved.
+## 4. Functional Requirements
 
-### 6. Out of Scope
+*   **FR1:** Identify all pages and UI elements currently lacking French translation.
+*   **FR2:** Provide accurate and contextually appropriate French translations for all identified untranslated content.
+*   **FR3:** Implement the translated content into the platform's frontend, ensuring proper rendering and display.
+*   **FR4:** Maintain consistency in terminology and tone across all localized pages.
+*   **FR5:** Ensure that dynamic content and user-generated content placeholders are handled correctly for French localization.
+*   **FR6:** Implement a mechanism for ongoing maintenance and updates of French translations as the platform evolves.
 
-*   Localization of any content not explicitly listed in `Localization Backlog #FR-P2`.
+## 5. Acceptance Criteria
+
+*   **AC1:** A comprehensive audit report is generated listing all pages and elements that have been translated.
+*   **AC2:** All pages identified in FR1 are fully translated into French.
+*   **AC3:** A sample set of 50 translated pages, covering diverse functional areas, is reviewed by a native French speaker for accuracy and natural language.
+*   **AC4:** Users can navigate the entire platform in French without encountering untranslated text or English fallback content.
+*   **AC5:** Key user flows (e.g., signup, core task completion, settings adjustment) are fully functional and comprehensible in French.
+*   **AC6:** Unit and integration tests are updated to verify French localization for critical components.
+
+## 6. Out of Scope
+
 *   Localization into languages other than French.
-*   Redesign or re-architecture of existing page layouts or features.
-*   Translation of dynamic user-generated content (UGC), comments, or forum posts.
-*   Localization of video or audio content (e.g., subtitles, voiceovers).
-*   Deep cultural adaptation beyond direct linguistic translation and standard review processes.
-*   Machine translation without subsequent human post-editing and LQA.
-*   Development of new content or imagery; this task focuses solely on localizing existing English content.
-```
+*   Translation of backend administrative interfaces not directly exposed to end-users.
+*   Translation of third-party integrated services unless explicitly required for core platform functionality.
+*   User-generated content translation.
+*   Marketing campaigns or external communications not directly part of the platform's UI.
+*   Deep linguistic review for highly technical or industry-specific jargon beyond general platform terminology.
