@@ -1,68 +1,51 @@
-> **PRD** — drafted by Coder Agent (V2) · task #55
+> **PRD** — drafted by Coder Agent (V2) · task #56
 > _Each agent that updates this PRD signs its change below._
 
-# Product Requirements Document: Outlook Email Curation Plugin
+```markdown
+## Product Requirements Document: French Content Localization - Phase 2
 
-## 1. Problem & Goal
+### 1. Problem & Goal
 
-### 1.1 Problem
-Users of Microsoft Outlook often experience email overload, leading to critical messages being missed, important emails getting buried, and significant time spent manually sorting and prioritizing their inbox. The current native Outlook rules, while functional, lack a streamlined user experience for advanced curation and management.
+*   **Problem:** A significant portion of the product's existing user-facing web pages remains untranslated from English into French. This creates a fragmented experience for French-speaking users, hinders engagement, and limits market penetration in French-speaking regions where comprehensive content is expected.
+*   **Goal:** To continue and significantly advance the localization of core user-facing web pages into high-quality French. The immediate objective is to localize the next 50 prioritized content pages (as outlined in `Localization Backlog #FR-P2`), ensuring a consistent and complete experience for our French audience.
 
-### 1.2 Goal
-To provide Outlook users with an intuitive and powerful plugin that automates email organization and prioritization based on user-defined rules, thereby reducing inbox clutter, increasing efficiency, and ensuring important communications are highlighted.
+### 2. Target Users / ICP Roles
 
-## 2. Target Users / ICP Roles
+*   **End-users:** Individuals who prefer or require consuming product information and interacting with the platform in French. This includes existing customers and prospective users in France, Canada, Belgium, Switzerland, and other French-speaking territories.
+*   **Internal Stakeholders:** Marketing, Sales, and Customer Support teams who leverage product content to engage with and assist French-speaking clients. Content Managers overseeing global content strategy.
 
-*   **Professionals with High Email Volume:** Individuals who receive hundreds of emails daily and struggle to keep their inbox manageable.
-*   **Project Managers / Team Leads:** Users who need to quickly identify and categorize project-related communications, status updates, or client requests.
-*   **Support & Operations Staff:** Those who rely on email for ticketing or operational alerts and need rapid classification and action.
-*   **General Power Users:** Anyone looking to gain more control over their email flow and improve their overall productivity within Outlook.
+### 3. Scope
 
-## 3. Scope
+*   Localization (translation, linguistic review, and integration) of all text-based content within the 50 designated user-facing web pages identified in `Localization Backlog #FR-P2`.
+*   This includes: primary page content (headings, body text), embedded UI labels within content, image alt-text, and metadata (title, description) where applicable.
+*   Deployment of translated content onto the existing French content delivery infrastructure (e.g., `/fr/` subdomain or equivalent CMS locale).
 
-This project focuses on developing an Outlook Add-in (compatible with Outlook desktop and Outlook on the Web) that enables users to create, manage, and execute custom rules for email curation.
+### 4. Functional Requirements
 
-## 4. Functional Requirements
+1.  **Content Identification & Extraction:** The system must allow for the accurate identification and extraction of all translatable text strings from the specified 50 English source pages.
+2.  **Translation Management:** A process must be established for professional human translation of extracted English content into high-quality, idiomatic French.
+3.  **Linguistic Review & Quality Assurance (LQA):** All translated French content must undergo a thorough linguistic review by a native French speaker for accuracy, grammar, style, and cultural appropriateness.
+4.  **Content Integration:** The localized French content must be seamlessly integrated into the respective French versions of the target pages, maintaining original page structure and design.
+5.  **Technical Validation:** Translated pages must be validated to ensure proper rendering across supported browsers and devices, without visual defects, text truncation, or broken links/functionality.
+6.  **SEO Optimization (Basic):** Where relevant, key French search terms identified by the SEO team should be naturally incorporated into translated content without compromising readability.
 
-*   **FR1: Rule Creation Interface:** Users must be able to create new email curation rules via a dedicated plugin interface.
-*   **FR2: Rule Conditions:** Rules must support multiple conditions, including but not limited to:
-    *   Sender's email address (exact, contains, starts with, ends with)
-    *   Recipient's email address (To, CC, BCC)
-    *   Subject keywords (contains, exact match, regex)
-    *   Body keywords (contains, exact match, regex)
-    *   Attachment presence
-    *   Email age (e.g., older than X days)
-    *   Email importance (High, Normal, Low)
-    *   Email category
-*   **FR3: Rule Actions:** Rules must support multiple actions, including but not limited to:
-    *   Move email to a specified folder
-    *   Assign a specific Outlook category
-    *   Flag email for follow-up (with optional due date)
-    *   Mark email as read/unread
-    *   Delete email
-    *   Forward email to a specified address
-    *   Reply with a template
-*   **FR4: Rule Prioritization:** Users must be able to define the execution order of rules (e.g., drag-and-drop reordering).
-*   **FR5: Rule Management:** Users must be able to enable, disable, edit, and delete existing rules.
-*   **FR6: Real-time Processing:** The plugin must process incoming emails automatically based on enabled rules as they arrive in the inbox.
-*   **FR7: Manual Rule Execution:** Users must have the option to manually run selected rules against existing emails in a folder.
-*   **FR8: Conflict Resolution & Notifications:** The plugin must provide a mechanism to handle conflicting rules (e.g., stop processing after first match) and notify users of rule execution status or errors.
-*   **FR9: User Interface Integration:** The plugin must integrate seamlessly into the Outlook UI (e.g., via a ribbon button for access to rule management, and potentially a right-click context menu for quick rule creation from an email).
+### 5. Acceptance Criteria
 
-## 5. Acceptance Criteria
+*   All 50 pages listed in `Localization Backlog #FR-P2` are fully translated into French and deployed to the production environment.
+*   Translated French content is accurate, grammatically correct, stylistically consistent with existing French content, and maintains the original English meaning and tone.
+*   No untranslated English text remains on the French versions of the localized pages, except for agreed-upon proper nouns or technical terms.
+*   All localized pages load correctly, render without visual defects or layout issues, and function as expected across supported browsers and devices.
+*   A formal sign-off for linguistic quality and functional integrity has been received from the designated French-speaking reviewer and QA lead.
+*   All external links within the localized content resolve correctly to either French-language destinations or the original English if no French equivalent exists and is explicitly approved.
 
-*   **AC1: Installation & Compatibility:** The plugin installs successfully on Outlook Desktop (Windows/macOS) and Outlook on the Web, and is functional across supported versions.
-*   **AC2: Basic Rule Execution:** A user can create a rule to move emails from a specific sender (e.g., `newsletter@example.com`) to a designated folder (e.g., "Newsletters"), and subsequent incoming emails from that sender are automatically moved.
-*   **AC3: Complex Rule Execution:** A user can create a rule with multiple conditions (e.g., Subject contains "Urgent" AND Sender is from `client.com`) and multiple actions (e.g., Flag as "High Importance" AND assign "Client Task" category), and it executes correctly.
-*   **AC4: Rule Order Adherence:** When two enabled rules have conflicting actions for the same email, the rule with higher priority (as defined by the user) is executed first, and subsequent rules are handled according to the defined conflict resolution strategy.
-*   **AC5: Rule Management Usability:** Users can easily create, edit, enable/disable, and delete rules through an intuitive UI, with changes reflected immediately.
-*   **AC6: Performance Impact:** The plugin does not introduce noticeable latency or degradation to Outlook's general performance during regular use.
-*   **AC7: Error Handling:** The plugin gracefully handles scenarios like invalid folder names or missing categories without crashing, providing clear user feedback.
+### 6. Out of Scope
 
-## 6. Out of Scope
-
-*   **AI/ML-driven Email Classification:** The plugin will not use artificial intelligence or machine learning to suggest or automatically create rules; all rules are explicitly defined by the user.
-*   **Integration with non-Outlook Clients:** Support is limited to Microsoft Outlook desktop clients and Outlook on the Web; no integrations for other email platforms (e.g., Gmail, Apple Mail).
-*   **Advanced Workflow Automation:** Complex multi-step workflows involving external systems (e.g., pushing data to CRM, creating tasks in project management tools) are not within scope.
-*   **Mobile-Specific UI/Features:** While the add-in should function on Outlook Mobile if supported by the underlying platform, a dedicated mobile-optimized UI or features are not planned for this iteration.
-*   **Centralized Rule Management for Organizations:** No features for IT administrators to push or manage rules centrally for multiple users.
+*   Localization of any content not explicitly listed in `Localization Backlog #FR-P2`.
+*   Localization into languages other than French.
+*   Redesign or re-architecture of existing page layouts or features.
+*   Translation of dynamic user-generated content (UGC), comments, or forum posts.
+*   Localization of video or audio content (e.g., subtitles, voiceovers).
+*   Deep cultural adaptation beyond direct linguistic translation and standard review processes.
+*   Machine translation without subsequent human post-editing and LQA.
+*   Development of new content or imagery; this task focuses solely on localizing existing English content.
+```
