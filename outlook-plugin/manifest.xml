@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appv1.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:type="MailApp"
+           scriptable="true"
+           xmlns:bt="http://schemas.microsoft.com/office/integration/1.0/custombusinesstables">
+
+  <Id>d392a9a4-00a8-4772-8272-23a7a9000515</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Your Company</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Outlook Email Curation Plugin"/>
+  <Description DefaultValue="Automate email organization and prioritization based on user-defined rules."/>
+  <IconUrl DefaultValue="https://localhost:3000/images/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/images/icon-64.png"/>
+  <SupportUrl DefaultValue="https://localhost:3000/help"/>
+
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+
+  <Permissions>ReadWriteItem</Permissions>
+  <AllowExternalSyncData>true</AllowExternalSyncData>
+
+  <ExtensionPoint xsi:type="AdaptiveCardDesignTime" >
+      <CustomXlsx />
+      <CustomTab>
+          <Group Id="taskpaneGroup">
+              <Label resid="TaskPaneGroupLabel"/>
+              <OfficeTab id="TaskTab">
+                  <Group id="ActionsGroup">
+                      <Label resid="ActionsGroupLabel"/>
+                      <Control xsi:type="Button" id="CreateRuleButton">
+                          <Label resid="CreateRuleButtonLabel"/>
+                          <Supertip>
+                              <Title resid="CreateRuleButtonLabel"/>
+                              <Description resid="CreateRuleButtonSuperTip"/>
+                          </Supertip>
+                          <Icon>
+                              <bt:Image size="32" resid="Icon16"/>
+                              <bt:Image size="64" resid="Icon32"/>
+                          </Icon>
+                          <Action xsi:type="ShowTaskpane">
+                              <TaskpaneId>CreateRuleTaskPane</TaskpaneId>
+                              <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+                          </Action>
+                      </Control>
+                  </Group>
+              </OfficeTab>
+          </Group>
+          <SupportUrl resid="SupportUrl"/>
+      </CustomTab>
+  </ExtensionPoint>
+
+  <Control xsi:type="TaskPane" id="CreateRuleTaskPane">
+      <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+  </Control>
+
+  <Resources>
+    <bt:Urls>
+      <bt:Url id="TaskPane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+      <bt:Url id="Help.Url" DefaultValue="https://localhost:3000/help"/>
+    </bt:Urls>
+    <bt:ShortStrings>
+      <bt:String id="GetStarted.Title" DefaultValue="Get started"/>
+      <bt:String id="CreateRuleButtonLabel" DefaultValue="Create Rule"/>
+      <bt:String id="ActionsGroupLabel" DefaultValue="Actions"/>
+      <bt:String id="TaskPaneGroupLabel" DefaultValue="Outlook Curation"/>
+    </bt:ShortStrings>
+    <bt:LongStrings>
+      <bt:String id="CreateRuleButtonSuperTip" DefaultValue="Create a new email curation rule."/>
+    </bt:LongStrings>
+  </Resources>
+
+</OfficeApp>
