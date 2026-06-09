@@ -64,6 +64,7 @@ export default function Sidebar({
       exactMatch: false,
     },
     { name: t("labels.studio"), href: "/studio", icon: Palette, exactMatch: false },
+    { name: t("labels.tools"), href: "/tools", icon: Wrench, exactMatch: false },
     { name: t("labels.resumes"), href: "/resumes", icon: FileText, exactMatch: false },
     { name: t("labels.jobs"), href: "/jobs", icon: Briefcase, exactMatch: false },
     {
@@ -73,7 +74,6 @@ export default function Sidebar({
       exactMatch: false,
     },
     { name: t("labels.people"), href: "/people", icon: Users, exactMatch: false },
-    { name: t("labels.tools"), href: "/tools", icon: Wrench, exactMatch: false },
     { name: t("labels.tasksAndEvents", { defaultValue: "Tasks / Events" }), href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false },
     { name: t("labels.marketplace"), href: "/search", icon: Store, exactMatch: false },
