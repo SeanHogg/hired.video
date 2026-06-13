@@ -4,78 +4,15 @@ import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { withGamification } from "../domains/gamification/with-gamification.js";
+import { isCompletedStatus, toTaskDto } from "../services/productivity/task-dto.js";
+import { getOrCreateDefaultBoard } from "../services/productivity/default-board.js";
 
-const { boards, tasks } = schema;
+const { tasks } = schema;
 
 export const taskRoutes = new Hono<AppEnv>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
-}
-
-/** ProductivityItemStatus values that mean "this task is done".
- *  Mirrors the enum in frontend/types/task.ts:
- *    Closed = 4, Completed = 6. */
-const COMPLETED_STATUSES = new Set([4, 6]);
-
-function isCompletedStatus(status: unknown): boolean {
-  return typeof status === "number" && COMPLETED_STATUSES.has(status);
-}
-
-type TaskDto = {
-  id: string;
-  text: string;
-  description?: string;
-  start: string;
-  end?: string;
-  taskType: number;
-  subTaskType?: number;
-  actionToTake?: number;
-  status: number;
-  assignedToUserId?: string;
-  createdByUserId?: string;
-  creationDateTime: string;
-  updateDateTime: string;
-  url?: string;
-};
-
-/** Map DB task row → legacy TaskDTO */
-function toTaskDto(row: typeof tasks.$inferSelect): TaskDto {
-  const meta = (row.metadata ?? {}) as Record<string, unknown>;
-  return {
-    id: row.id,
-    text: row.title,
-    description: row.description ?? undefined,
-    start: meta.start as string ?? new Date(row.createdAt).toISOString(),
-    end: meta.end as string ?? undefined,
-    taskType: typeof meta.taskType === "number" ? meta.taskType : 0,
-    subTaskType: typeof meta.subTaskType === "number" ? meta.subTaskType : undefined,
-    actionToTake: typeof meta.actionToTake === "number" ? meta.actionToTake : undefined,
-    status: typeof meta.legacyStatus === "number" ? meta.legacyStatus : 1,
-    assignedToUserId: row.userId,
-    createdByUserId: row.userId,
-    creationDateTime: new Date(row.createdAt).toISOString(),
-    updateDateTime: new Date(row.updatedAt).toISOString(),
-    url: typeof meta.url === "string" ? meta.url : undefined,
-  };
-}
-
-/** Ensure a default "tasks" board exists for the user; returns its id */
-async function getOrCreateDefaultBoard(userId: string, db: ReturnType<typeof getDb>): Promise<string> {
-  const [existing] = await db
-    .select({ id: boards.id })
-    .from(boards)
-    .where(and(eq(boards.userId, userId), eq(boards.name, "__default__")))
-    .limit(1);
-
-  if (existing) return existing.id;
-
-  const [created] = await db
-    .insert(boards)
-    .values({ userId, name: "__default__", description: "Default task board" } as any)
-    .returning({ id: boards.id });
-
-  return created.id;
 }
 
 taskRoutes.get("/", async (c) => {

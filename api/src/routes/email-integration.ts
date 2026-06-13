@@ -338,7 +338,10 @@ emailIntegrationRoutes.patch("/accounts/:id", async (c) => {
   // Active inbox profile assignment (#1984) — validate ownership/preset
   // membership before persisting so a user can't point a mailbox at
   // someone else's clone.
-  if (typeof body.activeProfileId === "string" && body.activeProfileId) {
+  if (body.activeProfileId === null) {
+    // Reset to the default (Job Hunter) — the resolver falls back when null.
+    patch.activeProfileId = null;
+  } else if (typeof body.activeProfileId === "string" && body.activeProfileId) {
     const candidate = await repos.inboxProfiles.findById(body.activeProfileId);
     if (candidate && (candidate.isPreset || candidate.ownerId === uid)) {
       patch.activeProfileId = body.activeProfileId;

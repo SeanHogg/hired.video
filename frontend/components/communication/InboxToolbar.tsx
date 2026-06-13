@@ -29,7 +29,7 @@ export interface InboxToolbarProps {
   /** Open the Sync History sheet. The parent owns the sheet so this
    *  component stays a pure toolbar. */
   onOpenHistory: () => void;
-  /** Open the Settings drawer where minJobScore lives. */
+  /** Open the Settings drawer (relevance threshold + inbox processor). */
   onOpenSettings: () => void;
   /** Manual refresh — re-fetches /api/inbox after the sync completes
    *  so newly classified messages appear immediately. */

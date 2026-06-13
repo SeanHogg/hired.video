@@ -83,14 +83,9 @@ import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { useAuth, USER_ROLES } from "@/lib/auth";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
+import TaskBoard from "@/components/tasks/TaskBoard";
+import TaskDetailSheet from "@/components/tasks/TaskDetailSheet";
+import { taskTypeColors, priorityColors } from "@/components/tasks/task-styles";
 import { taskService } from "@/lib/services/task-service";
 import {
   TaskDTO,
@@ -111,36 +106,8 @@ import {
 // Use the TaskUIState interface from types/task.ts
 interface Task extends TaskUIState {}
 
-const taskTypeColors = {
-  [TaskType.General]: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  [TaskType.Project]: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  [TaskType.Email]: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  [TaskType.Phone]: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  [TaskType.Meeting]: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  [TaskType.Interview]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  [TaskType.Recruiting]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  [TaskType.Sales]: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  [TaskType.Onboarding]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  [TaskType.OnboardingProfile]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  [TaskType.OnboardingProfileSettings]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  [TaskType.OnboardingPrivacy]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  [TaskType.Recruiter]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  [TaskType.RecruiterPreferences]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  [TaskType.JobSeeker]: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-  [TaskType.JobSeekerPreferences]: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-  [TaskType.Company]: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  [TaskType.CompanySettings]: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  [TaskType.Profile]: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200",
-  [TaskType.Job]: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
-  [TaskType.Resume]: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
-};
-
-const priorityColors = {
-  low: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  medium:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-};
+// taskTypeColors + priorityColors now live in components/tasks/task-styles.ts
+// (shared with the reusable <TaskBoard> + <TaskDetailSheet>).
 
 // Events FAQ lifted from the deleted /events page. Lives on the Discover
 // surface so the marketing copy stays public (events are public per the
@@ -259,8 +226,8 @@ export default function Tasks() {
 
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [editTask, setEditTask] = useState<Task | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  // Sheet opens in view mode by default; "Add task" / row-Edit start in edit.
+  const [sheetStartInEdit, setSheetStartInEdit] = useState(false);
 
   // API state management
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -269,23 +236,17 @@ export default function Tasks() {
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
 
   const openTaskPanel = (task: Task | null) => {
-    setIsEditing(false);
+    setSheetStartInEdit(false);
     setSelectedTask(task);
-    setEditTask(task ? { ...task } : null);
     setTaskPanelOpen(true);
   };
-  const closeTaskPanel = () => setTaskPanelOpen(false);
 
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<ProductivityItemStatus | null>(null);
-
-  const handleDelete = async () => {
-    if (!selectedTask) return;
+  const handleDeleteTask = async (task: Task) => {
     try {
-      if (isGuid(selectedTask.id)) {
-        await taskService.deleteTask(selectedTask.id);
+      if (isGuid(task.id)) {
+        await taskService.deleteTask(task.id);
       }
-      setTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
       setTaskPanelOpen(false);
     } catch (e) {
       console.error("Delete failed", e);
@@ -293,330 +254,52 @@ export default function Tasks() {
     }
   };
 
-  const renderTaskSheet = () => (
-    <Sheet open={taskPanelOpen} onOpenChange={setTaskPanelOpen}>
-      <SheetContent side="right" className="sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>
-            {isEditing
-              ? (editTask ? (isGuid(editTask.id) ? (editTask.title || t("actions.editTaskAction")) : t("actions.createNewTask")) : t("actions.editTaskAction"))
-              : t("headings.taskDetails")}
-          </SheetTitle>
-          {!isEditing && selectedTask?.description && (
-            <SheetDescription>{selectedTask.description}</SheetDescription>
-          )}
-        </SheetHeader>
-        {selectedTask && !isEditing && (
-          <div className="mt-4 space-y-3 text-sm">
-            <div>
-              <Label htmlFor="view-title">{t("labels.taskTitleColumn")}</Label>
-              <Input id="view-title" value={selectedTask.title} readOnly disabled />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t("labels.transactionType")}</span>
-              <Badge className={taskTypeColors[selectedTask.type]}>
-                {getTaskTypeDisplayName(selectedTask.type)}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t("labels.priorityColumn")}</span>
-              <Badge className={priorityColors[selectedTask.priority]}>
-                {selectedTask.priority}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t("labels.callStatus")}</span>
-              <Badge>{getStatusDisplayName(selectedTask.status)}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t("labels.start")}</span>
-              <span>
-                {selectedTask.startDate
-                  ? selectedTask.startDate &&
-                    !isNaN(new Date(selectedTask.startDate).getTime())
-                    ? new Date(selectedTask.startDate).toLocaleDateString()
-                    : "Invalid date"
-                  : "-"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t("labels.due")}</span>
-              <span>
-                {selectedTask.dueDate &&
-                !isNaN(new Date(selectedTask.dueDate).getTime())
-                  ? new Date(selectedTask.dueDate).toLocaleDateString()
-                  : "Invalid date"}
-              </span>
-            </div>
-            {selectedTask.assignedTo && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{t("labels.assignedTo")}</span>
-                <span>
-                  {selectedTask.assignedTo.firstName}{" "}
-                  {selectedTask.assignedTo.lastName}
-                </span>
-              </div>
-            )}
-            {selectedTask.createdBy && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{t("labels.createdBy")}</span>
-                <span>
-                  {selectedTask.createdBy.firstName}{" "}
-                  {selectedTask.createdBy.lastName}
-                </span>
-              </div>
-            )}
-            {selectedTask.url && (
-              <div className="pt-2">
-                <Link to={selectedTask.url} onClick={() => setTaskPanelOpen(false)}>
-                  <Button className="w-full" size="sm">
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    {t("actions.goToTask", { title: selectedTask.title })}
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
+  // Persist a created/edited task from the detail sheet. New (non-guid id)
+  // rows are prepended; existing rows merged — then flushed to the API.
+  const handleSaveTask = async (draft: Task) => {
+    setTasks((prev) => {
+      const exists = prev.some((tk) => tk.id === draft.id);
+      return exists
+        ? prev.map((tk) => (tk.id === draft.id ? { ...draft, updatedAt: new Date().toISOString() } : tk))
+        : [{ ...draft, updatedAt: new Date().toISOString() }, ...prev];
+    });
+    await saveTaskToApi({ ...draft });
+    setSelectedTask(draft);
+  };
 
-        {isEditing && editTask && (
-          <div className="mt-4 space-y-3 text-sm">
-            <div>
-              <Label htmlFor="edit-title">{t("labels.taskTitleColumn")}</Label>
-              <Input
-                id="edit-title"
-                value={editTask.title}
-                onChange={(e) =>
-                  setEditTask({ ...editTask, title: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">{t("fields.taskDescription.label")}</Label>
-              <Textarea
-                id="edit-description"
-                value={editTask.description || ""}
-                onChange={(e) =>
-                  setEditTask({ ...editTask, description: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-type">{t("labels.transactionType")}</Label>
-              <Select
-                value={editTask.type.toString()}
-                onValueChange={(v) =>
-                  setEditTask({ ...editTask, type: parseInt(v) as TaskType })
-                }
-              >
-                <SelectTrigger id="edit-type">
-                  <SelectValue placeholder={t("fields.taskType.placeholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
-                    <SelectItem key={taskType} value={taskType.toString()}>
-                      {getTaskTypeDisplayName(taskType)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-priority">{t("labels.priorityColumn")}</Label>
-              <Select
-                value={editTask.priority}
-                onValueChange={(v) =>
-                  setEditTask({ ...editTask, priority: v as Task["priority"] })
-                }
-              >
-                <SelectTrigger id="edit-priority">
-                  <SelectValue placeholder={t("fields.taskPriority.placeholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">{t("labels.priorityLevel.low")}</SelectItem>
-                  <SelectItem value="medium">{t("labels.priorityLevel.medium")}</SelectItem>
-                  <SelectItem value="high">{t("labels.priorityLevel.high")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-status">{t("labels.callStatus")}</Label>
-              <Select
-                value={editTask.status.toString()}
-                onValueChange={(v) =>
-                  setEditTask({ ...editTask, status: parseInt(v) as ProductivityItemStatus })
-                }
-              >
-                <SelectTrigger id="edit-status">
-                  <SelectValue placeholder={t("fields.statusSelect.placeholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ProductivityItemStatus.Planning.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.Planning)}
-                  </SelectItem>
-                  <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.ToDo)}
-                  </SelectItem>
-                  <SelectItem value={ProductivityItemStatus.Open.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.Open)}
-                  </SelectItem>
-                  <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.InProgress)}
-                  </SelectItem>
-                  <SelectItem value={ProductivityItemStatus.Completed.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.Completed)}
-                  </SelectItem>
-                  <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.OnHold)}
-                  </SelectItem>
-                  <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
-                    {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="edit-start">{t("fields.startDateField.label")}</Label>
-                <Input
-                  id="edit-start"
-                  type="date"
-                  value={editTask.startDate || ""}
-                  onChange={(e) =>
-                    setEditTask({ ...editTask, startDate: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-due">{t("fields.dueDateField.label")}</Label>
-                <Input
-                  id="edit-due"
-                  type="date"
-                  value={editTask.dueDate}
-                  onChange={(e) =>
-                    setEditTask({ ...editTask, dueDate: e.target.value })
-                  }
-                />
-              </div>
-            </div>
+  // Kanban drag-drop status change — also stamps a start date the first time a
+  // task moves to In Progress. Reverts + surfaces an error on save failure.
+  const handleKanbanStatusChange = async (taskId: string, status: ProductivityItemStatus) => {
+    const now = new Date().toISOString().split("T")[0];
+    let originalTask: Task | null = null;
+    let updatedTask: Task | null = null;
+    setTasks((prev) => {
+      originalTask = prev.find((tk) => tk.id === taskId) || null;
+      const updated = prev.map((tk) =>
+        tk.id === taskId
+          ? {
+              ...tk,
+              status,
+              startDate:
+                status === ProductivityItemStatus.InProgress && !tk.startDate ? now : tk.startDate,
+              updatedAt: new Date().toISOString(),
+            }
+          : tk,
+      );
+      updatedTask = updated.find((tk) => tk.id === taskId) || null;
+      return updated;
+    });
+    if (updatedTask && originalTask) {
+      try {
+        await saveTaskToApi(updatedTask);
+      } catch (err) {
+        console.error("Failed to update task status:", err);
+        setTasks((prev) => prev.map((tk) => (tk.id === taskId ? originalTask! : tk)));
+        setError(t("errors.failedUpdateTaskStatus"));
+      }
+    }
+  };
 
-            {/* Task Assignment - only show for employer/recruiter roles */}
-            {(user?.role === USER_ROLES.EMPLOYER ||
-              user?.role === USER_ROLES.RECRUITER) &&
-              assignableUsers.length > 0 && (
-                <div>
-                  <Label htmlFor="edit-assigned">{t("fields.assignToField.label")}</Label>
-                  <Select
-                    value={editTask.assignedTo?.id || "unassigned"}
-                    onValueChange={(userId) => {
-                      if (userId === "unassigned") {
-                        setEditTask({
-                          ...editTask,
-                          assignedTo: undefined,
-                        });
-                        return;
-                      }
-                      const assignedUser = assignableUsers.find(
-                        (u) => u.userProfile?.id === userId,
-                      );
-                      setEditTask({
-                        ...editTask,
-                        assignedTo: assignedUser?.userProfile || undefined,
-                      });
-                    }}
-                  >
-                    <SelectTrigger id="edit-assigned">
-                      <SelectValue placeholder={t("fields.assignee.placeholder")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">{t("labels.unassigned")}</SelectItem>
-                      {assignableUsers
-                        .filter((association) => association.userProfile?.id)
-                        .map((association) => (
-                          <SelectItem
-                            key={association.id}
-                            value={association.userProfile?.id || ""}
-                          >
-                            {association.userProfile?.firstName}{" "}
-                            {association.userProfile?.lastName}
-                            {association.userProfile?.role &&
-                              ` (${association.userProfile.role})`}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-          </div>
-        )}
-
-        <SheetFooter className="mt-6">
-          <div className="flex w-full justify-between gap-2">
-            {!isEditing ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setIsEditing(true);
-                  setEditTask(selectedTask ? { ...selectedTask } : null);
-                }}
-              >
-                {t("actions.edit")}
-              </Button>
-            ) : (
-              <div className="flex gap-2 ml-auto">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setTaskPanelOpen(false);
-                    setIsEditing(false);
-                    setEditTask(selectedTask ? { ...selectedTask } : null);
-                  }}
-                >
-                  {t("actions.cancel")}
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (!editTask) return;
-                    // Local update
-                    setTasks((prev) => {
-                      const exists = prev.some((t) => t.id === editTask.id);
-                      const updated = exists
-                        ? prev.map((t) =>
-                            t.id === editTask.id
-                              ? {
-                                  ...editTask,
-                                  updatedAt: new Date().toISOString(),
-                                }
-                              : t,
-                          )
-                        : [
-                            {
-                              ...editTask,
-                              updatedAt: new Date().toISOString(),
-                            },
-                            ...prev,
-                          ];
-                      return updated;
-                    });
-                    // Remote save
-                    await saveTaskToApi({ ...editTask });
-                    setSelectedTask(editTask);
-                    setIsEditing(false);
-                    setTaskPanelOpen(false);
-                  }}
-                >
-                  {t("actions.save")}
-                </Button>
-              </div>
-            )}
-            <Button variant="destructive" onClick={handleDelete}>
-              {t("actions.deleteAdmin")}
-            </Button>
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  );
 
   // Load tasks from backend using the task service
   useEffect(() => {
@@ -1088,100 +771,11 @@ export default function Tasks() {
     }
   };
 
-  // Drag and drop helpers for Kanban view
-  const onDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
-    e.dataTransfer.setData("text/plain", taskId);
-    e.dataTransfer.effectAllowed = "move";
-    setDraggedTaskId(taskId);
-    
-    // Add visual feedback to the dragged element
-    const draggedElement = e.currentTarget;
-    draggedElement.style.opacity = "0.5";
-    draggedElement.style.transform = "rotate(5deg) scale(1.05)";
-    draggedElement.style.boxShadow = "0 10px 25px rgba(0,0,0,0.3)";
-  };
-
-  const onDropOnColumn = async (
-    e: React.DragEvent<HTMLDivElement>,
-    column: ProductivityItemStatus,
-  ) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain");
-    if (!id) return;
-
-    const now = new Date().toISOString().split("T")[0];
-    let originalTask: Task | null = null;
-    let updatedTask: Task | null = null;
-
-    // Store original task for potential rollback
-    setTasks((prev) => {
-      originalTask = prev.find((t) => t.id === id) || null;
-      const updated = prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              status: column,
-              startDate:
-                column === ProductivityItemStatus.InProgress && !t.startDate ? now : t.startDate,
-              updatedAt: new Date().toISOString(),
-            }
-          : t,
-      );
-      updatedTask = updated.find((t) => t.id === id) || null;
-      return updated;
-    });
-
-    // Clear drag state immediately after drop
-    setDraggedTaskId(null);
-    setDragOverColumn(null);
-
-    // Save to API and handle potential errors
-    if (updatedTask && originalTask) {
-      try {
-        await saveTaskToApi(updatedTask);
-      } catch (error) {
-        // Revert to original state on error
-        console.error("Failed to update task status:", error);
-        setTasks((prev) =>
-          prev.map((t) => (t.id === id ? originalTask! : t))
-        );
-        setError(t("errors.failedUpdateTaskStatus"));
-      }
-    }
-  };
-
-  const onDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
-    // Reset visual feedback
-    const draggedElement = e.currentTarget;
-    draggedElement.style.opacity = "";
-    draggedElement.style.transform = "";
-    draggedElement.style.boxShadow = "";
-    
-    // Clear drag state
-    setDraggedTaskId(null);
-    setDragOverColumn(null);
-  };
-
-  const onDragOver = (e: React.DragEvent<HTMLDivElement>, column?: ProductivityItemStatus) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    
-    if (column) {
-      setDragOverColumn(column);
-    }
-  };
-
+  // Local-only remove (table-row trash); kanban drag-status lives in <TaskBoard>.
   const deleteTask = (taskId: string) => {
     setTasks(tasks.filter((task) => task.id !== taskId));
   };
 
-  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    // Only clear if we're leaving the column entirely, not just moving to a child element
-    const relatedTarget = e.relatedTarget as Node;
-    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
-      setDragOverColumn(null);
-    }
-  };
 
   const taskTabs: PageHeaderTab[] = [
     { key: "table",    label: t("fields.bulkListPick.label"), icon: TableIcon,    to: "/tasks?tab=table" },
@@ -1328,8 +922,7 @@ export default function Tasks() {
                         createdAt: today.toISOString(),
                       };
                       setSelectedTask(newTask);
-                      setEditTask({ ...newTask });
-                      setIsEditing(true);
+                      setSheetStartInEdit(true);
                       setTaskPanelOpen(true);
                     }}
                   >
@@ -1538,7 +1131,7 @@ export default function Tasks() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedTask(task);
-                                  setIsEditing(true);
+                                  setSheetStartInEdit(true);
                                   setTaskPanelOpen(true);
                                 }}
                               >
@@ -1734,263 +1327,6 @@ export default function Tasks() {
             )}
 
             {/* Kanban View */}
-            {currentView === "kanban" && (
-              <Card data-testid="kanban-view">
-                <CardHeader>
-                  <CardTitle>{t("headings.kanbanView")}</CardTitle>
-                  <CardDescription>
-                    {t("messages.dragToUpdateStatus")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Planning Column */}
-                    <div
-                      className={`rounded-lg border p-3 transition-all duration-200 ${
-                        dragOverColumn === ProductivityItemStatus.Planning
-                          ? "bg-blue-50 border-blue-300 border-2 scale-105"
-                          : "bg-muted/30"
-                      }`}
-                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.Planning)}
-                      onDragLeave={onDragLeave}
-                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.Planning)}
-                    >
-                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
-                        dragOverColumn === ProductivityItemStatus.Planning ? "text-blue-600" : ""
-                      }`}>
-                        {getStatusDisplayName(ProductivityItemStatus.Planning)}
-                        {dragOverColumn === ProductivityItemStatus.Planning && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                            {t("labels.dropHere")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-2 min-h-24">
-                        {tasks
-                          .filter((t) => t.status === ProductivityItemStatus.Planning)
-                          .map((t) => (
-                            <div
-                              key={t.id}
-                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
-                                draggedTaskId === t.id
-                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
-                                  : "hover:shadow-md hover:scale-102"
-                              }`}
-                              draggable
-                              onDragStart={(e) => onDragStart(e, t.id)}
-                              onDragEnd={onDragEnd}
-                              onClick={() => openTaskPanel(t)}
-                            >
-                              <div className="text-sm font-medium">
-                                {t.title}
-                              </div>
-                              {t.description && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {t.description.length > 60
-                                    ? `${t.description.substring(0, 60)}...`
-                                    : t.description}
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center gap-2">
-                                <Badge className={taskTypeColors[t.type]}>
-                                  {getTaskTypeDisplayName(t.type)}
-                                </Badge>
-                                <Badge className={priorityColors[t.priority]}>
-                                  {t.priority}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* To Do Column */}
-                    <div data-testid="todo-column"
-                      className={`rounded-lg border p-3 transition-all duration-200 ${
-                        dragOverColumn === ProductivityItemStatus.ToDo
-                          ? "bg-yellow-50 border-yellow-300 border-2 scale-105"
-                          : "bg-muted/30"
-                      }`}
-                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.ToDo)}
-                      onDragLeave={onDragLeave}
-                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.ToDo)}
-                    >
-                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
-                        dragOverColumn === ProductivityItemStatus.ToDo ? "text-yellow-600" : ""
-                      }`}>
-                        {getStatusDisplayName(ProductivityItemStatus.ToDo)}
-                        {dragOverColumn === ProductivityItemStatus.ToDo && (
-                          <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full">
-                            {t("labels.dropHere")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-2 min-h-24">
-                        {tasks
-                          .filter((t) => t.status === ProductivityItemStatus.ToDo)
-                          .map((t) => (
-                            <div
-                              key={t.id}
-                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
-                                draggedTaskId === t.id
-                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
-                                  : "hover:shadow-md hover:scale-102"
-                              }`}
-                              draggable
-                              onDragStart={(e) => onDragStart(e, t.id)}
-                              onDragEnd={onDragEnd}
-                              onClick={() => openTaskPanel(t)}
-                              role="button"
-                              tabIndex={0}
-                            >
-                              <div className="text-sm font-medium">
-                                {t.title}
-                              </div>
-                              {t.description && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {t.description.length > 60
-                                    ? `${t.description.substring(0, 60)}...`
-                                    : t.description}
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center gap-2">
-                                <Badge className={taskTypeColors[t.type]}>
-                                  {getTaskTypeDisplayName(t.type)}
-                                </Badge>
-                                <Badge className={priorityColors[t.priority]}>
-                                  {t.priority}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* In Progress Column */}
-                    <div data-testid="inprogress-column"
-                      className={`rounded-lg border p-3 transition-all duration-200 ${
-                        dragOverColumn === ProductivityItemStatus.InProgress
-                          ? "bg-orange-50 border-orange-300 border-2 scale-105"
-                          : "bg-muted/30"
-                      }`}
-                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.InProgress)}
-                      onDragLeave={onDragLeave}
-                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.InProgress)}
-                    >
-                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
-                        dragOverColumn === ProductivityItemStatus.InProgress ? "text-orange-600" : ""
-                      }`}>
-                        {getStatusDisplayName(ProductivityItemStatus.InProgress)}
-                        {dragOverColumn === ProductivityItemStatus.InProgress && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
-                            {t("labels.dropHere")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-2 min-h-24">
-                        {tasks
-                          .filter((t) => t.status === ProductivityItemStatus.InProgress)
-                          .map((t) => (
-                            <div
-                              key={t.id}
-                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
-                                draggedTaskId === t.id
-                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
-                                  : "hover:shadow-md hover:scale-102"
-                              }`}
-                              draggable
-                              onDragStart={(e) => onDragStart(e, t.id)}
-                              onDragEnd={onDragEnd}
-                              onClick={() => openTaskPanel(t)}
-                            >
-                              <div className="text-sm font-medium">
-                                {t.title}
-                              </div>
-                              {t.description && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {t.description.length > 60
-                                    ? `${t.description.substring(0, 60)}...`
-                                    : t.description}
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center gap-2">
-                                <Badge className={taskTypeColors[t.type]}>
-                                  {getTaskTypeDisplayName(t.type)}
-                                </Badge>
-                                <Badge className={priorityColors[t.priority]}>
-                                  {t.priority}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* Completed Column */}
-                    <div data-testid="completed-column"
-                      className={`rounded-lg border p-3 transition-all duration-200 ${
-                        dragOverColumn === ProductivityItemStatus.Completed
-                          ? "bg-green-50 border-green-300 border-2 scale-105"
-                          : "bg-muted/30"
-                      }`}
-                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.Completed)}
-                      onDragLeave={onDragLeave}
-                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.Completed)}
-                    >
-                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
-                        dragOverColumn === ProductivityItemStatus.Completed ? "text-green-600" : ""
-                      }`}>
-                        {getStatusDisplayName(ProductivityItemStatus.Completed)}
-                        {dragOverColumn === ProductivityItemStatus.Completed && (
-                          <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
-                            {t("labels.dropHere")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-2 min-h-24">
-                        {tasks
-                          .filter((t) => t.status === ProductivityItemStatus.Completed)
-                          .map((t) => (
-                            <div
-                              key={t.id}
-                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
-                                draggedTaskId === t.id
-                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
-                                  : "hover:shadow-md hover:scale-102"
-                              }`}
-                              draggable
-                              onDragStart={(e) => onDragStart(e, t.id)}
-                              onDragEnd={onDragEnd}
-                              onClick={() => openTaskPanel(t)}
-                            >
-                              <div className="text-sm font-medium">
-                                {t.title}
-                              </div>
-                              {t.description && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {t.description.length > 60
-                                    ? `${t.description.substring(0, 60)}...`
-                                    : t.description}
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center gap-2">
-                                <Badge className={taskTypeColors[t.type]}>
-                                  {getTaskTypeDisplayName(t.type)}
-                                </Badge>
-                                <Badge className={priorityColors[t.priority]}>
-                                  {t.priority}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {renderTaskSheet()}
           </div>
         </div>
 </AppShell>

@@ -63,6 +63,15 @@ export const tasks = pgTable(
     oneOnOneId: uuid("one_on_one_id"), // → people_one_on_ones.id
     // one_on_one | meeting | sync | milestone | review | interview | manual
     sourceType: varchar("source_type", { length: 16 }),
+    // ── Gig marketplace work items (migration 0209) ────────────────────────
+    // When gigProjectId IS NOT NULL this personal task was materialised from
+    // an awarded gig deliverable (gig_milestones row). The task is owned by
+    // the winning creator (userId) so it surfaces on their normal Tasks page
+    // AND the Content Creator → Gigs board. gigMilestoneId links 1:1 back to
+    // the escrow milestone so completing the task advances the gig. The
+    // gig poster reads progress by querying tasks on gigProjectId (any owner).
+    gigProjectId: uuid("gig_project_id"),
+    gigMilestoneId: uuid("gig_milestone_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -74,6 +83,8 @@ export const tasks = pgTable(
     // CHRO action-item inbox per segment.
     index("idx_tasks_segment_status").on(t.segmentId, t.status),
     index("idx_tasks_one_on_one").on(t.oneOnOneId),
+    // Gig poster's progress query — all work items for one gig, any owner.
+    index("idx_tasks_gig_project").on(t.gigProjectId),
   ],
 );
 

@@ -65,7 +65,7 @@ export function InboxSettingsSheet({
 
   // Assign a mailbox to an inbox profile — its first sync after this uses
   // the new taxonomy/prompt/actions (#1984).
-  const assignProfile = async (accountId: string, profileId: string) => {
+  const assignProfile = async (accountId: string, profileId: string | null) => {
     setSavingId(accountId);
     setError(null);
     try {
@@ -102,13 +102,22 @@ export function InboxSettingsSheet({
         aria-describedby="inbox-settings-description"
       >
         <SheetHeader className="px-5 pt-5 pb-3 border-b">
-          <SheetTitle>Inbox settings</SheetTitle>
+          <div className="flex items-center justify-between gap-2">
+            <SheetTitle>Inbox settings</SheetTitle>
+            <Button variant="outline" size="sm" onClick={() => setEditorOpen(true)}>
+              <SlidersHorizontal className="h-3.5 w-3.5 mr-1" /> Edit processors
+            </Button>
+          </div>
           <SheetDescription id="inbox-settings-description">
-            Configure how strictly each mailbox filters synced mail. Only
-            emails the classifier rates above the threshold reach the
-            inbox feed.
+            Configure how strictly each mailbox filters synced mail and which
+            inbox processor (taxonomy + prompt + actions) it classifies under.
           </SheetDescription>
         </SheetHeader>
+        <InboxProcessorEditor
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          onSaved={onSaved}
+        />
 
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-6">
@@ -152,7 +161,7 @@ export function InboxSettingsSheet({
                         <Select
                           value={a.activeProfileId ?? "__default__"}
                           onValueChange={(v) =>
-                            assignProfile(a.id, v === "__default__" ? "" : v)
+                            assignProfile(a.id, v === "__default__" ? null : v)
                           }
                         >
                           <SelectTrigger className="h-8 flex-1">
