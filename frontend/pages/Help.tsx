@@ -46,7 +46,7 @@ import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromFAQ } from "@/lib/audio/narrator-text";
 
 export default function Help() {  const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("headings.help.helpAndSupport"), url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
@@ -60,7 +60,7 @@ export default function Help() {  const location = useLocation();
   // FAQs are the single DB-backed store now (kind='faq' articles, seeded
   // by migration 0210) — replaced the static help-faqs.ts catalogue.
   const { data: faqRes } = useQuery({
-    queryKey: ["help-faqs"],
+    queryKey: ["help-faqs", i18n.language],
     queryFn: () => helpService.listFaqs(),
     staleTime: 10 * 60 * 1000,
   });

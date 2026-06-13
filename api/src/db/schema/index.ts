@@ -9,6 +9,7 @@ export * from "./videos.js";
 export * from "./studioPublications.js";
 export * from "./pageEmbeds.js";
 export * from "./helpMappings.js";
+export * from "./helpContentTranslations.js";
 export * from "./messaging.js";
 export * from "./billing.js";
 export * from "./affiliates.js";

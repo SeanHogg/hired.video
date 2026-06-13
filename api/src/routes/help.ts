@@ -27,7 +27,14 @@ import { HelpMappingService } from "../services/help/help-mapping-service.js";
 import { isSemanticHelpAvailable } from "../services/help/help-embeddings.js";
 import { AI_CONTEXT_TYPES } from "../../../shared/ai-context-types.js";
 import { UuidLikeSchema } from "../../../shared/validation.js";
+import { DEFAULT_LOCALE, normalizeLocale } from "../../../shared/i18n.js";
 import type { HelpContextKey } from "../../../shared/help.js";
+
+/** Resolve the request's `?locale=` to a supported locale (EN default).
+ *  Help content localizes per locale with EN fallback. */
+function reqLocale(c: { req: { query: (k: string) => string | undefined } }) {
+  return normalizeLocale(c.req.query("locale")) ?? DEFAULT_LOCALE;
+}
 
 export const helpRoutes = new Hono<AppEnv>();
 
@@ -50,18 +57,18 @@ helpRoutes.get("/contexts", async (c) => {
 
 helpRoutes.get("/faqs", async (c) => {
   const svc = new HelpMappingService(getDb());
-  return c.json(success({ groups: await svc.listFaqs() }));
+  return c.json(success({ groups: await svc.listFaqs(reqLocale(c)) }));
 });
 
 helpRoutes.get("/guides", async (c) => {
   const svc = new HelpMappingService(getDb());
-  return c.json(success({ guides: await svc.listGuides() }));
+  return c.json(success({ guides: await svc.listGuides(reqLocale(c)) }));
 });
 
 helpRoutes.get("/search", async (c) => {
   const q = c.req.query("q") ?? "";
   const svc = new HelpMappingService(getDb());
-  return c.json(success({ articles: await svc.searchHelp(q) }));
+  return c.json(success({ articles: await svc.searchHelp(q, 12, reqLocale(c)) }));
 });
 
 helpRoutes.get("/resolve", async (c) => {
@@ -70,7 +77,9 @@ helpRoutes.get("/resolve", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Unknown or missing context key"), 400);
   }
   const svc = new HelpMappingService(getDb());
-  return c.json(success(await svc.resolveForContext(parsed.data as HelpContextKey)));
+  return c.json(
+    success(await svc.resolveForContext(parsed.data as HelpContextKey, reqLocale(c))),
+  );
 });
 
 // ── SuperAdmin curation ───────────────────────────────────────────────

@@ -49,6 +49,56 @@ function stateWithWidgets(widgets: Widget[]): CanvasState {
   };
 }
 
+describe("voiceover narration round-trip (#2006)", () => {
+  it("does NOT emit an A2 audio clip for a pending (no-url) narration placeholder", () => {
+    const base = emptyCanvasState();
+    const scene = { ...emptyScene("Hook"), durationSeconds: 4, widgets: [] };
+    const state: CanvasState = {
+      ...base,
+      scenes: [scene],
+      voiceovers: [
+        { id: "vo-1", url: "", text: "Stop scrolling.", durationSeconds: 4, anchorSceneId: scene.id, label: "Narration" },
+      ],
+    };
+    const a2 = canvasStateToTimeline(state).tracks.find((t) => t.id === "a2");
+    expect(a2?.clips ?? []).toHaveLength(0);
+  });
+
+  it("preserves a pending narration script through emit → hydrate", () => {
+    const base = emptyCanvasState();
+    const scene = { ...emptyScene("Hook"), durationSeconds: 4, widgets: [] };
+    const state: CanvasState = {
+      ...base,
+      scenes: [scene],
+      voiceovers: [
+        { id: "vo-1", url: "", text: "Stop scrolling — this changes hiring.", durationSeconds: 4, anchorSceneId: scene.id, label: "Narration — Hook" },
+      ],
+    };
+    const round = timelineToCanvasState(canvasStateToTimeline(state));
+    expect(round.voiceovers).toHaveLength(1);
+    expect(round.voiceovers[0]).toMatchObject({
+      url: "",
+      text: "Stop scrolling — this changes hiring.",
+      anchorSceneId: round.scenes[0].id,
+    });
+  });
+
+  it("keeps the source script on a synthesised (with-url) clip too", () => {
+    const base = emptyCanvasState();
+    const scene = { ...emptyScene("Hook"), durationSeconds: 4, widgets: [] };
+    const state: CanvasState = {
+      ...base,
+      scenes: [scene],
+      voiceovers: [
+        { id: "vo-1", url: "https://cdn/n.wav", text: "Voiced line.", durationSeconds: 4, anchorSceneId: scene.id, label: "Narration" },
+      ],
+    };
+    const round = timelineToCanvasState(canvasStateToTimeline(state));
+    const vo = round.voiceovers.find((v) => v.url === "https://cdn/n.wav");
+    expect(vo?.text).toBe("Voiced line.");
+  });
+});
+
 describe("canvasStateToTimeline", () => {
   it("emits the unified five-track shape with v2 as the widget overlay track", () => {
     const state = stateWithWidgets([defaultWidget("text")]);

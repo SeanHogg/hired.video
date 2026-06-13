@@ -7,6 +7,7 @@
  */
 
 import { apiClient, type ApiSuccessResponse } from "../api-client";
+import i18n from "@/lib/i18n/i18n";
 import type {
   HelpArticleCard,
   HelpContextKey,
@@ -15,6 +16,13 @@ import type {
   ResolveHelpResponse,
   SetHelpMappingInput,
 } from "@shared/help";
+
+/** The active UI locale, appended to public help reads so content comes
+ *  back localized (EN fallback server-side). Centralized here so callers
+ *  never thread locale through (DRY). */
+function localeParam(): string {
+  return `locale=${encodeURIComponent(i18n.language || "en")}`;
+}
 
 export const helpService = {
   /** Active context keys that carry any help — cached app-wide so the
@@ -25,31 +33,31 @@ export const helpService = {
     >;
   },
 
-  /** Curated published article set for a page context. */
+  /** Curated published article set for a page context (localized). */
   resolve(context: HelpContextKey): Promise<ApiSuccessResponse<ResolveHelpResponse>> {
     return apiClient.get(
-      `/api/help/resolve?context=${encodeURIComponent(context)}`,
+      `/api/help/resolve?context=${encodeURIComponent(context)}&${localeParam()}`,
     ) as Promise<ApiSuccessResponse<ResolveHelpResponse>>;
   },
 
-  /** All published FAQs grouped by category (DB-backed; replaced the
-   *  static help-faqs.ts). Drives the Help page accordion + card feed. */
+  /** All published FAQs grouped by category, localized (DB-backed; replaced
+   *  the static help-faqs.ts). Drives the Help page accordion + card feed. */
   listFaqs(): Promise<ApiSuccessResponse<{ groups: HelpFaqGroup[] }>> {
-    return apiClient.get("/api/help/faqs") as Promise<
+    return apiClient.get(`/api/help/faqs?${localeParam()}`) as Promise<
       ApiSuccessResponse<{ groups: HelpFaqGroup[] }>
     >;
   },
 
-  /** All published guide articles as cards (DB-backed; replaced HELP_GUIDES). */
+  /** All published guide articles as localized cards (DB-backed; replaced HELP_GUIDES). */
   listGuides(): Promise<ApiSuccessResponse<{ guides: HelpArticleCard[] }>> {
-    return apiClient.get("/api/help/guides") as Promise<
+    return apiClient.get(`/api/help/guides?${localeParam()}`) as Promise<
       ApiSuccessResponse<{ guides: HelpArticleCard[] }>
     >;
   },
 
-  /** Search published help content (faq|guide) for the drawer search box. */
+  /** Search published help content (faq|guide), localized. */
   search(q: string): Promise<ApiSuccessResponse<{ articles: HelpArticleCard[] }>> {
-    return apiClient.get(`/api/help/search?q=${encodeURIComponent(q)}`) as Promise<
+    return apiClient.get(`/api/help/search?q=${encodeURIComponent(q)}&${localeParam()}`) as Promise<
       ApiSuccessResponse<{ articles: HelpArticleCard[] }>
     >;
   },

@@ -17,6 +17,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { HelpCircle, Search, FileText, BookOpen, ArrowRight, Loader2 } from "lucide-react";
 import {
@@ -47,6 +48,8 @@ function articleHref(a: HelpArticleCard): string {
 export function HelpDrawer(): JSX.Element | null {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const lang = i18n.language;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -68,7 +71,7 @@ export function HelpDrawer(): JSX.Element | null {
   // Resolve the curated set: prefer the specific context, fall back to general.
   const resolveKey = hasContextHelp ? contextKey : "general";
   const { data: resolveRes, isLoading: resolveLoading } = useQuery({
-    queryKey: ["help-resolve", resolveKey],
+    queryKey: ["help-resolve", resolveKey, lang],
     queryFn: () => helpService.resolve(resolveKey),
     enabled: open && hasAnyHelp,
     staleTime: 5 * 60 * 1000,
@@ -78,7 +81,7 @@ export function HelpDrawer(): JSX.Element | null {
 
   const trimmed = query.trim();
   const { data: searchRes, isFetching: searchFetching } = useQuery({
-    queryKey: ["help-search", trimmed],
+    queryKey: ["help-search", trimmed, lang],
     queryFn: () => helpService.search(trimmed),
     enabled: open && trimmed.length >= 2,
     staleTime: 60 * 1000,

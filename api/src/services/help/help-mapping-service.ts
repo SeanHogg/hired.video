@@ -18,7 +18,9 @@
 import { and, asc, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { getDb } from "../../db/index.js";
 import { helpMappings } from "../../db/schema/helpMappings.js";
+import { helpContentTranslations } from "../../db/schema/helpContentTranslations.js";
 import { articles } from "../../db/schema/articles.js";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "../../../../shared/i18n.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import { getSearchVersion } from "../../utils/search-cache.js";
 import {
@@ -69,13 +71,49 @@ function toHelpCard(r: HelpCardRow): HelpArticleCard {
 export class HelpMappingService {
   constructor(private readonly db: Db) {}
 
+  /** Overlay per-locale title/summary onto cards (EN = base article; a
+   *  missing translation row or null column falls back to the base).
+   *  Two queries, never N+1. No-op for the EN/default locale. */
+  private async localizeCards(
+    cards: HelpArticleCard[],
+    locale: Locale,
+  ): Promise<HelpArticleCard[]> {
+    if (locale === DEFAULT_LOCALE || cards.length === 0) return cards;
+    const rows = await this.db
+      .select({
+        articleId: helpContentTranslations.articleId,
+        title: helpContentTranslations.title,
+        summary: helpContentTranslations.summary,
+      })
+      .from(helpContentTranslations)
+      .where(
+        and(
+          eq(helpContentTranslations.locale, locale),
+          inArray(
+            helpContentTranslations.articleId,
+            cards.map((c) => c.id),
+          ),
+        ),
+      );
+    const byId = new Map(rows.map((r) => [r.articleId, r] as const));
+    return cards.map((c) => {
+      const t = byId.get(c.id);
+      if (!t) return c;
+      return { ...c, title: t.title ?? c.title, summary: t.summary ?? c.summary };
+    });
+  }
+
   /** The curated, published article set for a page context. Read-through
-   *  cached; invalidated on any write that touches the context. */
-  async resolveForContext(contextKey: HelpContextKey): Promise<ResolveHelpResponse> {
+   *  cached per (context, locale); invalidated on any write that touches
+   *  the context. */
+  async resolveForContext(
+    contextKey: HelpContextKey,
+    locale: Locale = DEFAULT_LOCALE,
+  ): Promise<ResolveHelpResponse> {
     const articlesForCtx = await getOrSetCached<HelpArticleCard[]>({
-      key: ctxCacheKey(contextKey),
+      key: `${ctxCacheKey(contextKey)}:${locale}`,
       ttlSeconds: RESOLVE_TTL_SECONDS,
-      loader: () => this.loadForContext(contextKey),
+      loader: async () => this.localizeCards(await this.loadForContext(contextKey), locale),
     });
     return { context: contextKey, articles: articlesForCtx };
   }
@@ -110,15 +148,16 @@ export class HelpMappingService {
    *  search version token — any article create/update/publish bumps it,
    *  so results never go stale without an explicit purge (the same
    *  contract the unified search uses; keyspace is unbounded). */
-  async searchHelp(query: string, limit = 12): Promise<HelpArticleCard[]> {
+  async searchHelp(query: string, limit = 12, locale: Locale = DEFAULT_LOCALE): Promise<HelpArticleCard[]> {
     const q = query.trim().slice(0, 100);
     if (q.length < 2) return [];
     const version = await getSearchVersion();
     // `mode` in the key so flipping the Vectorize binding on/off doesn't
-    // serve a cached result from the other path.
+    // serve a cached result from the other path; `locale` so each language
+    // caches its own localized cards.
     const mode = isSemanticHelpAvailable() ? "sem" : "kw";
     return getOrSetCached<HelpArticleCard[]>({
-      key: `help:search:${mode}:v${version}:${limit}:${q.toLowerCase()}`,
+      key: `help:search:${mode}:${locale}:v${version}:${limit}:${q.toLowerCase()}`,
       ttlSeconds: 120,
       loader: async () => {
         // Phase 2: semantic KNN via Vectorize when available; the loader
@@ -127,9 +166,9 @@ export class HelpMappingService {
         const semanticIds = await semanticSearchHelpIds(q, limit);
         if (semanticIds && semanticIds.length > 0) {
           const cards = await this.loadPublishedHelpCardsByIds(semanticIds);
-          if (cards.length > 0) return cards;
+          if (cards.length > 0) return this.localizeCards(cards, locale);
         }
-        return this.keywordSearch(q, limit);
+        return this.localizeCards(await this.keywordSearch(q, limit), locale);
       },
     });
   }
@@ -221,10 +260,10 @@ export class HelpMappingService {
    *  page accordion + the card feed's FAQ cards (the single DB-backed
    *  source that replaced the static help-faqs.ts catalogue). Cached under
    *  the global search version (bumped on any article write). */
-  async listFaqs(): Promise<HelpFaqGroup[]> {
+  async listFaqs(locale: Locale = DEFAULT_LOCALE): Promise<HelpFaqGroup[]> {
     const version = await getSearchVersion();
     return getOrSetCached<HelpFaqGroup[]>({
-      key: `help:faqs:v${version}`,
+      key: `help:faqs:${locale}:v${version}`,
       ttlSeconds: 300,
       loader: async () => {
         const rows = await this.db
@@ -240,16 +279,20 @@ export class HelpMappingService {
           .where(and(eq(articles.status, "published"), eq(articles.kind, "faq")))
           .orderBy(asc(articles.category), asc(articles.createdAt));
 
+        // Per-locale overlay: question ← translated title, answer ←
+        // translated body (EN base falls through on a miss/null).
+        const tx = await this.faqTranslations(rows.map((r) => r.id), locale);
         const byCat = new Map<string, HelpFaqGroup>();
         for (const r of rows) {
           const category = r.category ?? "General";
           const group = byCat.get(category) ?? { category, questions: [] };
+          const t = tx.get(r.id);
           group.questions.push({
             id: r.id,
             slug: r.slug,
             userId: r.userId,
-            question: r.question,
-            answer: r.answer,
+            question: t?.title ?? r.question,
+            answer: t?.body ?? r.answer,
           });
           byCat.set(category, group);
         }
@@ -258,12 +301,35 @@ export class HelpMappingService {
     });
   }
 
+  /** Fetch (title, body) FAQ translations for a locale, keyed by article
+   *  id. Empty map for the EN/default locale (no overlay needed). */
+  private async faqTranslations(
+    ids: string[],
+    locale: Locale,
+  ): Promise<Map<string, { title: string | null; body: string | null }>> {
+    if (locale === DEFAULT_LOCALE || ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({
+        articleId: helpContentTranslations.articleId,
+        title: helpContentTranslations.title,
+        body: helpContentTranslations.bodyMd,
+      })
+      .from(helpContentTranslations)
+      .where(
+        and(
+          eq(helpContentTranslations.locale, locale),
+          inArray(helpContentTranslations.articleId, ids),
+        ),
+      );
+    return new Map(rows.map((r) => [r.articleId, { title: r.title, body: r.body }] as const));
+  }
+
   /** All published guide articles as cards — powers the card feed's guide
    *  cards (DB-backed, replacing the static HELP_GUIDES list). */
-  async listGuides(): Promise<HelpArticleCard[]> {
+  async listGuides(locale: Locale = DEFAULT_LOCALE): Promise<HelpArticleCard[]> {
     const version = await getSearchVersion();
     return getOrSetCached<HelpArticleCard[]>({
-      key: `help:guides:v${version}`,
+      key: `help:guides:${locale}:v${version}`,
       ttlSeconds: 300,
       loader: async () => {
         const rows = await this.db
@@ -279,7 +345,7 @@ export class HelpMappingService {
           .from(articles)
           .where(and(eq(articles.status, "published"), eq(articles.kind, "guide")))
           .orderBy(asc(articles.title));
-        return rows.map(toHelpCard);
+        return this.localizeCards(rows.map(toHelpCard), locale);
       },
     });
   }
@@ -371,7 +437,10 @@ export class HelpMappingService {
   }
 
   private invalidate(contextKey: string): void {
-    invalidateCachedKey(ctxCacheKey(contextKey));
+    // The resolve cache is keyed per (context, locale) — clear every locale.
+    for (const locale of SUPPORTED_LOCALES) {
+      invalidateCachedKey(`${ctxCacheKey(contextKey)}:${locale}`);
+    }
     invalidateCachedKey(CONTEXTS_KEY);
   }
 }
