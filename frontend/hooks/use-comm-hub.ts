@@ -42,7 +42,10 @@ export interface InboxAccount {
   accountEmail: string;
   accountLabel: string | null;
   status: string;
-  minJobScore: number;
+  minRelevanceScore: number;
+  /** Active inbox profile (taxonomy + prompt) for this mailbox; null =
+   *  Job Hunter preset. */
+  activeProfileId: string | null;
   lastSyncedAt: string | null;
   lastError: string | null;
 }

@@ -1,17 +1,23 @@
 /**
- * Two-stage classifier for synced emails.
+ * Two-stage classifier for synced emails — now **profile-driven**.
  *
  * Stage-1: deterministic rules (rules.ts). Free, high-precision, runs
- * on every message. ATS sender domains, application-status phrases,
- * interview/offer/rejection phrases, recruiter outreach phrasing,
- * newsletter heuristics.
+ * on every message. The default rule set is selected by the active
+ * profile (`profile.defaultRuleSet`) so a recruiter mailbox runs
+ * recruiter rules, not the job-seeker ATS rules.
  *
- * Stage-2: LLM. Only invoked when Stage-1 returns null. Keeps the
+ * Stage-2: LLM. Only invoked when Stage-1 returns null. The system
+ * prompt + allowed categories + optional structured extraction all come
+ * from the active profile (`classify_prompt` / `taxonomy` /
+ * `extract_schema`) rather than hardcoded constants. Keeps the
  * full-mailbox-sync cost bounded — most messages are caught by rules.
  *
- * Per-message summary is generated for any email scored ≥ 0.6 in any
- * job-related category, so the inbox row preview shows an AI gist
- * rather than the raw provider snippet.
+ * Per-message summary is generated for any email scored ≥ 0.6 in a
+ * VISIBLE category (per the profile taxonomy), so the inbox row preview
+ * shows an AI gist rather than the raw provider snippet.
+ *
+ * Zero-regression: the Job Hunter preset carries the exact pre-profiles
+ * prompt + taxonomy, so the job-seeker path is byte-for-byte unchanged.
  */
 
 import { z } from "zod";
@@ -21,57 +27,53 @@ import type { EmailUserRuleRow } from "../../repositories/emailUserRulesReposito
 import {
   classifyByRules,
   type ClassificationResult,
-  type EmailCategory,
-} from "./rules.js";
+  type InboxProfileShape,
+  categoryKeys,
+  isVisibleCategory,
+} from "../../../../shared/email-classification/index.js";
 
-const JOB_RELATED: EmailCategory[] = [
-  "job_opportunity",
-  "application_status",
-  "recruiter_outreach",
-  "interview_invite",
-  "offer",
-  "rejection",
-];
-
-const ClassifySchema = z.object({
-  category: z.enum([
-    "job_opportunity",
-    "application_status",
-    "recruiter_outreach",
-    "interview_invite",
-    "offer",
-    "rejection",
-    "newsletter",
-    "spam",
-    "personal",
-    "other",
-  ]),
-  score: z.number().min(0).max(1),
-  reason: z.string().max(200).optional(),
-});
-
-const SUMMARY_PROMPT = `You produce a one-sentence summary of an email for a job-seeker's inbox.
+const GENERIC_SUMMARY_PROMPT = `You produce a one-sentence summary of an email.
 Constraints:
 - One sentence, max 25 words.
 - Lead with the most actionable detail (date, role, company, action requested).
 - Plain text, no markdown, no quoting.
 `;
 
-const CLASSIFY_PROMPT = `You classify an email for a job-seeker's inbox.
-Return ONLY a JSON object: { "category": "...", "score": 0.NN, "reason": "..." }.
-Allowed categories:
-- job_opportunity   = inbound recruiter pitch about a specific role or list of roles
-- application_status= ATS notification / hiring team update on an application the candidate submitted
-- recruiter_outreach= recruiter introduction without a specific role yet
-- interview_invite  = scheduling or invitation to an interview / phone screen
-- offer             = job offer extended
-- rejection         = decision-not-to-move-forward email
-- newsletter        = job board digest, marketing newsletter
-- spam              = unsolicited bulk, scam, fraudulent
-- personal          = friend/family/personal correspondence
-- other             = does not fit the above
+/** Stage-2 result schema. `category` is validated as a free string then
+ *  coerced against the profile's taxonomy (a hallucinated category falls
+ *  back to "other"); `extracted` is an open record shaped by the
+ *  profile's `extract_schema`. */
+const ClassifySchema = z.object({
+  category: z.string(),
+  score: z.number().min(0).max(1),
+  reason: z.string().max(200).optional(),
+  extracted: z.record(z.string(), z.any()).optional(),
+});
 
-score = your confidence in [0, 1].`;
+/** Render the profile's `extract_schema` properties as a short bullet
+ *  list the LLM can follow, appended to the classify prompt. */
+function describeExtractSchema(schema: Record<string, unknown>): string {
+  const props = (schema as any)?.properties;
+  if (!props || typeof props !== "object") return "";
+  const lines: string[] = [];
+  for (const [field, def] of Object.entries(props)) {
+    const desc = (def as any)?.description ?? "";
+    lines.push(`- ${field}${desc ? `: ${desc}` : ""}`);
+  }
+  return lines.join("\n");
+}
+
+/** Build the Stage-2 system prompt from the profile, appending an
+ *  extraction instruction block when the profile defines fields. */
+function buildClassifySystemPrompt(profile: InboxProfileShape): string {
+  if (!profile.extractSchema) return profile.classifyPrompt;
+  const fields = describeExtractSchema(profile.extractSchema);
+  if (!fields) return profile.classifyPrompt;
+  return (
+    profile.classifyPrompt +
+    `\n\nAlso return an "extracted" object pulling these fields out of the email (omit a field when it isn't present):\n${fields}`
+  );
+}
 
 function summaryUserMessage(email: NormalisedEmail): string {
   const body = (email.bodyText ?? email.bodyHtml ?? email.snippet ?? "").slice(0, 4000);
@@ -90,25 +92,34 @@ export async function classifyEmail(
   deps: ClassifierDeps,
   email: NormalisedEmail,
   userRules: EmailUserRuleRow[],
+  profile: InboxProfileShape,
 ): Promise<ClassificationResult> {
-  const stage1 = classifyByRules(email, userRules);
+  const stage1 = classifyByRules(email, userRules as any, profile.defaultRuleSet);
   if (stage1) return stage1;
   // Stage-2 — LLM. Falls back to a low-confidence "other" if the LLM
   // call blows up so we still persist the row.
+  const allowed = new Set(categoryKeys(profile));
   try {
     const result = await deps.llm.callJson(
       "email_classify",
       {
         useCase: "email_classify",
-        systemPrompt: CLASSIFY_PROMPT,
+        systemPrompt: buildClassifySystemPrompt(profile),
         userMessage: classifyUserMessage(email),
       },
       ClassifySchema,
     );
+    // Coerce a hallucinated category to "other" so it can't leak into the
+    // feed as a visible category the profile never declared.
+    const category = allowed.has(result.data.category) ? result.data.category : "other";
     return {
-      category: result.data.category,
+      category,
       score: result.data.score,
       source: "llm",
+      extracted:
+        profile.extractSchema && result.data.extracted
+          ? result.data.extracted
+          : null,
     };
   } catch (err) {
     console.error("[email-classifier] LLM stage failed:", err);
@@ -120,15 +131,16 @@ export async function summariseEmail(
   deps: ClassifierDeps,
   email: NormalisedEmail,
   classification: ClassificationResult,
+  profile: InboxProfileShape,
 ): Promise<string | null> {
-  // Only summarise job-related categories above the noise floor — keeps
-  // LLM cost off newsletters/spam/personal mail.
-  if (!JOB_RELATED.includes(classification.category)) return null;
+  // Only summarise VISIBLE categories above the noise floor — keeps LLM
+  // cost off newsletters/spam/personal mail.
+  if (!isVisibleCategory(classification.category, profile)) return null;
   if (classification.score < 0.6) return null;
   try {
     const result = await deps.llm.callText("email_summary", {
       useCase: "email_summary",
-      systemPrompt: SUMMARY_PROMPT,
+      systemPrompt: profile.summaryPrompt ?? GENERIC_SUMMARY_PROMPT,
       userMessage: summaryUserMessage(email),
     });
     return (result.content ?? "").trim() || null;

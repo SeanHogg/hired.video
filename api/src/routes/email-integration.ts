@@ -44,6 +44,18 @@ import {
   RefreshAccessTokenError,
 } from "../services/email-integration/oauth.js";
 import { requirePro } from "../middleware/auth-gates.js";
+import { createLLMClient } from "../services/adapters/llm-client.js";
+import {
+  cloneProfile,
+  updateProfile,
+  deleteProfile,
+  dryRun,
+  rowToProfileShape,
+} from "../services/email-integration/processor-service.js";
+import {
+  INBOX_ACTION_TRIGGER_VALUES,
+  INBOX_ACTION_HANDLER_VALUES,
+} from "../../../shared/email-classification/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { loadConsumed } from "../domains/services-processing/services-processor.js";
@@ -310,10 +322,29 @@ emailIntegrationRoutes.patch("/accounts/:id", async (c) => {
   if (body.status === "active" || body.status === "paused") patch.status = body.status;
   // Per-account confidence floor for the inbox feed. Clamp to [0, 1]
   // so a misconfigured client can't permanently hide every message
-  // (>1) or flood the inbox with every newsletter (<0).
-  if (typeof body.minJobScore === "number" && Number.isFinite(body.minJobScore)) {
-    const clamped = Math.max(0, Math.min(1, body.minJobScore));
-    patch.minJobScore = clamped.toFixed(3);
+  // (>1) or flood the inbox with every newsletter (<0). Accept the
+  // legacy `minJobScore` key too so a stale client build keeps working
+  // through the rename.
+  const rawScore =
+    typeof body.minRelevanceScore === "number"
+      ? body.minRelevanceScore
+      : typeof body.minJobScore === "number"
+        ? body.minJobScore
+        : undefined;
+  if (typeof rawScore === "number" && Number.isFinite(rawScore)) {
+    const clamped = Math.max(0, Math.min(1, rawScore));
+    patch.minRelevanceScore = clamped.toFixed(3);
+  }
+  // Active inbox profile assignment (#1984) — validate ownership/preset
+  // membership before persisting so a user can't point a mailbox at
+  // someone else's clone.
+  if (typeof body.activeProfileId === "string" && body.activeProfileId) {
+    const candidate = await repos.inboxProfiles.findById(body.activeProfileId);
+    if (candidate && (candidate.isPreset || candidate.ownerId === uid)) {
+      patch.activeProfileId = body.activeProfileId;
+    } else {
+      return c.json(error("VALIDATION_ERROR", "Unknown or unauthorized profile"), 400);
+    }
   }
   if (Object.keys(patch).length === 0) {
     return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
@@ -399,7 +430,12 @@ emailIntegrationRoutes.get("/rules", async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const repos = buildRepos(getDb());
-  const rules = await repos.emailUserRules.findAllForUser(uid);
+  // Optional ?profileId scopes to one profile's rules (builder UI);
+  // omitted = all of the user's rules (legacy Settings panel).
+  const profileId = c.req.query("profileId");
+  const rules = profileId
+    ? await repos.emailUserRules.findAllForProfile(uid, profileId)
+    : await repos.emailUserRules.findAllForUser(uid);
   return c.json(success(rules));
 });
 
@@ -413,6 +449,7 @@ emailIntegrationRoutes.post("/rules", async (c) => {
   const repos = buildRepos(getDb());
   const row = await repos.emailUserRules.insert({
     userId: uid,
+    profileId: typeof body.profileId === "string" ? body.profileId : null,
     name: body.name.slice(0, 120),
     conditions: body.conditions,
     actionCategory: typeof body.actionCategory === "string" ? body.actionCategory : "other",
@@ -502,6 +539,202 @@ emailIntegrationRoutes.get("/sync-runs", async (c) => {
           errorMessage: r.errorMessage,
         };
       }),
+    ),
+  );
+});
+
+// ── Inbox processors — profiles (#1979/#1983) ────────────────────────────────
+// The role-keyed classifier aggregate. Presets are shared (read-only);
+// users clone + edit owner-scoped copies. The builder UI reads/writes here.
+
+emailIntegrationRoutes.get("/profiles", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const repos = buildRepos(getDb());
+  const rows = await repos.inboxProfiles.listAvailableForOwner(uid);
+  // Decode to the runtime shape so the editor gets typed taxonomy/schema.
+  return c.json(success(rows.map((r) => rowToProfileShape(r))));
+});
+
+emailIntegrationRoutes.get("/profiles/:id", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const repos = buildRepos(getDb());
+  const row = await repos.inboxProfiles.findById(c.req.param("id"));
+  if (!row || (!row.isPreset && row.ownerId !== uid)) {
+    return c.json(error("NOT_FOUND", "Profile not found"), 404);
+  }
+  return c.json(success(rowToProfileShape(row)));
+});
+
+/** Clone a profile (preset or own) into an editable copy. */
+emailIntegrationRoutes.post("/profiles", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body.sourceProfileId !== "string") {
+    return c.json(error("VALIDATION_ERROR", "Required: sourceProfileId"), 400);
+  }
+  const repos = buildRepos(getDb());
+  const cloned = await cloneProfile(repos, uid, body.sourceProfileId, {
+    name: typeof body.name === "string" ? body.name : undefined,
+  });
+  if (!cloned) return c.json(error("NOT_FOUND", "Source profile not found"), 404);
+  return c.json(success(rowToProfileShape(cloned)), 201);
+});
+
+emailIntegrationRoutes.patch("/profiles/:id", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const patch: Record<string, unknown> = {};
+  if (typeof body.name === "string") patch.name = body.name.slice(0, 120);
+  if (typeof body.description === "string") patch.description = body.description;
+  if (Array.isArray(body.taxonomy)) patch.taxonomy = body.taxonomy;
+  if (typeof body.classifyPrompt === "string") patch.classifyPrompt = body.classifyPrompt;
+  if (typeof body.summaryPrompt === "string" || body.summaryPrompt === null) {
+    patch.summaryPrompt = body.summaryPrompt;
+  }
+  if (body.extractSchema === null || (body.extractSchema && typeof body.extractSchema === "object")) {
+    patch.extractSchema = body.extractSchema;
+  }
+  if (Array.isArray(body.roles)) patch.roles = body.roles;
+  if (typeof body.defaultRuleSet === "string" || body.defaultRuleSet === null) {
+    patch.defaultRuleSet = body.defaultRuleSet;
+  }
+  if (typeof body.minRelevanceScore === "number" && Number.isFinite(body.minRelevanceScore)) {
+    patch.minRelevanceScore = Math.max(0, Math.min(1, body.minRelevanceScore)).toFixed(3);
+  }
+  if (Object.keys(patch).length === 0) {
+    return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
+  }
+  const repos = buildRepos(getDb());
+  const updated = await updateProfile(repos, uid, c.req.param("id"), patch);
+  if (!updated) return c.json(error("NOT_FOUND", "Profile not found or not editable"), 404);
+  return c.json(success(rowToProfileShape(updated)));
+});
+
+emailIntegrationRoutes.delete("/profiles/:id", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const repos = buildRepos(getDb());
+  await deleteProfile(repos, uid, c.req.param("id"));
+  return c.json(success({ success: true }));
+});
+
+/** Dry-run preview — classify a sample of the last N synced messages
+ *  under this profile WITHOUT persisting (guards a bad prompt). */
+emailIntegrationRoutes.post("/profiles/:id/dry-run", requirePro("Inbox Sync"), async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const sampleSize = Math.min(20, Math.max(1, Number(body.sampleSize ?? 10) || 10));
+  const repos = buildRepos(getDb());
+  const llm = createLLMClient(c.env, c.var.user);
+  const result = await dryRun({ repos, llm }, uid, c.req.param("id"), sampleSize);
+  if (!result) return c.json(error("NOT_FOUND", "Profile not found"), 404);
+  return c.json(success(result));
+});
+
+// ── Inbox processors — actions (#1981) ───────────────────────────────────────
+
+emailIntegrationRoutes.get("/profiles/:id/actions", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const repos = buildRepos(getDb());
+  const profile = await repos.inboxProfiles.findById(c.req.param("id"));
+  if (!profile || (!profile.isPreset && profile.ownerId !== uid)) {
+    return c.json(error("NOT_FOUND", "Profile not found"), 404);
+  }
+  const actions = await repos.inboxActions.findAllForProfile(c.req.param("id"));
+  return c.json(success(actions));
+});
+
+emailIntegrationRoutes.post("/profiles/:id/actions", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => null);
+  if (
+    !body ||
+    typeof body.name !== "string" ||
+    !INBOX_ACTION_TRIGGER_VALUES.includes(body.triggerType) ||
+    !INBOX_ACTION_HANDLER_VALUES.includes(body.handler)
+  ) {
+    return c.json(error("VALIDATION_ERROR", "Required: name, valid triggerType, valid handler"), 400);
+  }
+  const repos = buildRepos(getDb());
+  // Only the owner of a cloned profile may attach actions to it.
+  const profile = await repos.inboxProfiles.findById(c.req.param("id"));
+  if (!profile || profile.ownerId !== uid) {
+    return c.json(error("FORBIDDEN", "Can only add actions to your own profile"), 403);
+  }
+  const row = await repos.inboxActions.insert({
+    profileId: c.req.param("id"),
+    ownerId: uid,
+    name: body.name.slice(0, 120),
+    triggerType: body.triggerType,
+    triggerValue: typeof body.triggerValue === "string" ? body.triggerValue.slice(0, 120) : null,
+    handler: body.handler,
+    config: body.config && typeof body.config === "object" ? body.config : null,
+    isEnabled: body.isEnabled !== false,
+    priority: typeof body.priority === "number" ? body.priority : 100,
+  } as any);
+  return c.json(success(row), 201);
+});
+
+emailIntegrationRoutes.patch("/actions/:id", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const patch: Record<string, unknown> = {};
+  if (typeof body.name === "string") patch.name = body.name.slice(0, 120);
+  if (INBOX_ACTION_TRIGGER_VALUES.includes(body.triggerType)) patch.triggerType = body.triggerType;
+  if (typeof body.triggerValue === "string" || body.triggerValue === null) {
+    patch.triggerValue = body.triggerValue;
+  }
+  if (INBOX_ACTION_HANDLER_VALUES.includes(body.handler)) patch.handler = body.handler;
+  if (body.config === null || (body.config && typeof body.config === "object")) patch.config = body.config;
+  if (typeof body.isEnabled === "boolean") patch.isEnabled = body.isEnabled;
+  if (typeof body.priority === "number") patch.priority = body.priority;
+  if (Object.keys(patch).length === 0) {
+    return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
+  }
+  const repos = buildRepos(getDb());
+  const updated = await repos.inboxActions.patchOwned(c.req.param("id"), uid, patch as any);
+  if (!updated) return c.json(error("NOT_FOUND", "Action not found or not owned"), 404);
+  return c.json(success(updated));
+});
+
+emailIntegrationRoutes.delete("/actions/:id", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const repos = buildRepos(getDb());
+  await repos.inboxActions.removeOwned(c.req.param("id"), uid);
+  return c.json(success({ success: true }));
+});
+
+// ── Inbox processors — action run audit (#1981 Sync-History surfacing) ───────
+
+emailIntegrationRoutes.get("/action-runs", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? "25") || 25));
+  const repos = buildRepos(getDb());
+  const runs = await repos.inboxActionRuns.findRecentForUser(uid, limit);
+  return c.json(
+    success(
+      runs.map((r) => ({
+        id: r.id,
+        messageId: r.messageId,
+        actionId: r.actionId,
+        handler: r.handler,
+        status: r.status,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        detail: r.detail,
+        createdAt:
+          r.createdAt instanceof Date ? r.createdAt.toISOString() : new Date(r.createdAt).toISOString(),
+      })),
     ),
   );
 });

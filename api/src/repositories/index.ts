@@ -51,6 +51,16 @@ import {
   type IEmailUserRulesRepository,
 } from "./emailUserRulesRepository.js";
 import {
+  InboxProfilesRepository,
+  type IInboxProfilesRepository,
+} from "./inboxProfilesRepository.js";
+import {
+  InboxActionsRepository,
+  InboxActionRunsRepository,
+  type IInboxActionsRepository,
+  type IInboxActionRunsRepository,
+} from "./inboxActionsRepository.js";
+import {
   EmailSyncRunsRepository,
   type IEmailSyncRunsRepository,
 } from "./emailSyncRunsRepository.js";
@@ -121,6 +131,9 @@ export interface Repos {
   externalEmailMessages: IExternalEmailMessagesRepository;
   emailUserRules: IEmailUserRulesRepository;
   emailSyncRuns: IEmailSyncRunsRepository;
+  inboxProfiles: IInboxProfilesRepository;
+  inboxActions: IInboxActionsRepository;
+  inboxActionRuns: IInboxActionRunsRepository;
   // media aggregate module
   media: IMediaRepository;
   // marketing aggregate module
@@ -174,6 +187,9 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     externalEmailMessages: new ExternalEmailMessagesRepository(db, now),
     emailUserRules: new EmailUserRulesRepository(db, now),
     emailSyncRuns: new EmailSyncRunsRepository(db),
+    inboxProfiles: new InboxProfilesRepository(db, now),
+    inboxActions: new InboxActionsRepository(db, now),
+    inboxActionRuns: new InboxActionRunsRepository(db),
     media: new MediaRepository(db, now),
     marketing: new MarketingRepository(db, now),
     platform: new PlatformRepository(db, now),
@@ -216,6 +232,9 @@ export type {
   IExternalEmailMessagesRepository,
   IEmailUserRulesRepository,
   IEmailSyncRunsRepository,
+  IInboxProfilesRepository,
+  IInboxActionsRepository,
+  IInboxActionRunsRepository,
   IMediaRepository,
   IMarketingRepository,
   IPlatformRepository,
@@ -232,6 +251,8 @@ export type {
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
 
+export type { InboxProfileRow, InboxProfileInsert, InboxProfilePatch } from "./inboxProfilesRepository.js";
+export type { InboxActionRow, InboxActionInsert, InboxActionPatch, InboxActionRunRow, InboxActionRunInsert } from "./inboxActionsRepository.js";
 export type { ResumeRow, ResumeInsert, ResumePatch, PaginationOptions } from "./resumeRepository.js";
 export type { UserRow, UserInsert, UserPatch, UserSearchFilters, UserSearchResult, UserProfileRow, UserProfileInsert, UserConnectionRow, UserConnectionInsert, UserActorRow } from "./usersRepository.js";
 export type { AccountPreferencesRow, AccountPreferencesInsert, PrivacyPreferencesRow, PrivacyPreferencesInsert, CookiePreferencesRow, CookiePreferencesInsert, JobPreferencesRow, JobPreferencesInsert } from "./preferencesRepository.js";

@@ -9,11 +9,8 @@
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
-import { JOB_INBOX_CATEGORIES } from "../../../shared/email-classification/index.js";
 
 const { externalEmailMessages, externalEmailAccounts, jobItems } = schema;
-
-export { JOB_INBOX_CATEGORIES };
 
 export type DbLike = any;
 
@@ -33,7 +30,7 @@ export interface ExternalEmailInboxRow extends ExternalEmailMessageRow {
 }
 
 /** Hard floor below which messages never reach the inbox regardless of
- *  per-account minJobScore — a safety net against a user dialing their
+ *  per-account minRelevanceScore — a safety net against a user dialing their
  *  threshold to 0 and getting flooded by LLM "low confidence" passes.
  *  Kept in lockstep with `classifyEmail()`'s 0.2 fallback. */
 export const JOB_INBOX_HARD_FLOOR = "0.250";
@@ -69,6 +66,10 @@ export interface InboxCursor {
 export interface IExternalEmailMessagesRepository {
   findRecentForUser(userId: string, limit?: number): Promise<ExternalEmailInboxRow[]>;
   findInboxForUser(userId: string, opts?: FindInboxOptions): Promise<ExternalEmailInboxRow[]>;
+  /** Most-recent messages for a user, UNFILTERED by relevance/category —
+   *  powers the processor dry-run preview (#1983), which re-classifies a
+   *  raw sample without persisting. */
+  findRecentRawForUser(userId: string, limit?: number): Promise<ExternalEmailMessageRow[]>;
   findById(id: string, userId: string): Promise<ExternalEmailMessageRow | null>;
   findByIdWithAccount(id: string, userId: string): Promise<ExternalEmailInboxRow | null>;
   findByAccount(accountId: string): Promise<ExternalEmailMessageRow[]>;
@@ -156,16 +157,18 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       conditions.push(eq(externalEmailMessages.category, "spam"));
     } else {
       conditions.push(
-        // Job-only filter — the inbox surface is for job-related mail.
-        // Newsletters / spam / personal / "other" emails stay in the
-        // table (so the classifier can revise later) but never reach the
-        // inbox feed. Unclassified rows (still pending or LLM failure
-        // fallback) are excluded too: there is no useful preview yet.
-        inArray(externalEmailMessages.category, JOB_INBOX_CATEGORIES as unknown as string[]),
-        // Per-account confidence floor. Joining on accounts means each
-        // mailbox sets its own threshold (Inbox settings → "Minimum job
-        // score"); the hard floor below catches a misconfigured 0.
-        sql`${externalEmailMessages.score} >= ${externalEmailAccounts.minJobScore}`,
+        // Relevance filter — `is_relevant` is computed at ingest from the
+        // account's active profile (`isVisibleCategory(category, profile)`),
+        // so recruiter taxonomies surface the right mail without this query
+        // knowing the per-profile category set. Non-visible mail stays in
+        // the table (the classifier can revise later) but never reaches the
+        // feed. Unclassified rows default `is_relevant = false` and are
+        // excluded too: there is no useful preview yet.
+        eq(externalEmailMessages.isRelevant, true),
+        // Per-account confidence floor, applied LIVE so the Settings slider
+        // keeps re-filtering already-synced mail; the hard floor below
+        // catches a misconfigured 0.
+        sql`${externalEmailMessages.score} >= ${externalEmailAccounts.minRelevanceScore}`,
         sql`${externalEmailMessages.score} >= ${JOB_INBOX_HARD_FLOOR}::numeric`,
       );
     }
@@ -208,6 +211,18 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       .limit(Math.min(200, Math.max(1, limit)))) as InboxJoinRow[];
 
     return rows.map(flattenInboxRow);
+  }
+
+  async findRecentRawForUser(
+    userId: string,
+    limit = 20,
+  ): Promise<ExternalEmailMessageRow[]> {
+    return (await this.db
+      .select()
+      .from(externalEmailMessages)
+      .where(eq(externalEmailMessages.userId, userId))
+      .orderBy(desc(externalEmailMessages.receivedAt), desc(externalEmailMessages.id))
+      .limit(Math.min(50, Math.max(1, limit)))) as ExternalEmailMessageRow[];
   }
 
   async findById(id: string, userId: string): Promise<ExternalEmailMessageRow | null> {
@@ -361,6 +376,14 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
         (patch as any).applyUrls != null
           ? JSON.stringify((patch as any).applyUrls)
           : null;
+      // `extracted` (jsonb) travels the same way as apply_urls — stringify
+      // explicitly so the raw `sql` template lands it in the column. The
+      // role-aware extraction payload (recruiter presets) would otherwise
+      // be silently dropped (#1980).
+      const extractedJson =
+        (patch as any).extracted != null
+          ? JSON.stringify((patch as any).extracted)
+          : null;
       return sql`(${id}::uuid,
             ${patch.category ?? null},
             ${(patch as any).score ?? null}::numeric,
@@ -370,7 +393,9 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
             ${patch.linkedJobId ?? null}::uuid,
             ${(patch as any).dedupScore ?? null}::numeric,
             ${patch.dedupMethod ?? null},
-            ${patch.isArchived ?? null}::boolean)`;
+            ${patch.isArchived ?? null}::boolean,
+            ${extractedJson}::jsonb,
+            ${(patch as any).isRelevant ?? null}::boolean)`;
     });
     const values = sql.join(rows, sql`, `);
     await this.db.execute(sql`
@@ -385,10 +410,13 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
         dedup_score = COALESCE(v.dedup_score, m.dedup_score),
         dedup_method = COALESCE(v.dedup_method, m.dedup_method),
         is_archived = COALESCE(v.is_archived, m.is_archived),
+        extracted = COALESCE(v.extracted, m.extracted),
+        is_relevant = COALESCE(v.is_relevant, m.is_relevant),
         updated_at = ${now}
       FROM (VALUES ${values}) AS v(
         id, category, score, summary, apply_url, apply_urls,
-        linked_job_id, dedup_score, dedup_method, is_archived
+        linked_job_id, dedup_score, dedup_method, is_archived,
+        extracted, is_relevant
       )
       WHERE m.id = v.id
     `);

@@ -77,6 +77,7 @@ export type LLMUseCase =
   | "email_classify"
   | "email_summary"
   | "email_digest"
+  | "inbox_draft_jd"
   | "scorecard_bias_check"
   | "article_moderation"
   | "course_generation"
@@ -325,6 +326,10 @@ const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   },
   email_summary: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.3, maxTokens: 220 },
   email_digest: { model: "google/gemma-4-31b-it:free", temperature: 0.4, maxTokens: 600 },
+  // L2 inbox action: draft a tailored JD from recruiter intake notes
+  // (#1982). A bit more headroom + a touch more temperature than the
+  // classify path since this generates prose, not a strict label.
+  inbox_draft_jd: { model: "google/gemma-4-31b-it:free", temperature: 0.5, maxTokens: 900 },
   // Scorecard bias linter (#1385). Short input + strict JSON output; the
   // gemma 4 instruct family hits the sweet spot of cheap + structured.
   article_moderation: { model: "openai/gpt-oss-120b:free", temperature: 0.2 },

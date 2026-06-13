@@ -74,17 +74,32 @@ const EMPTY_DRAFT: Pick<EmailUserRule, "name" | "conditions" | "actionCategory" 
   priority: 50,
 };
 
-export function EmailRulesPanel() {
+export interface EmailRulesPanelProps {
+  /** When set, the panel lists + creates rules scoped to one inbox
+   *  profile (the processor editor reuses this panel — DRY). Omitted =
+   *  the legacy global Settings panel showing every rule. */
+  profileId?: string;
+  /** Override the selectable categories (the profile's taxonomy). When
+   *  omitted, falls back to the legacy candidate categories. */
+  categories?: readonly string[];
+}
+
+export function EmailRulesPanel({ profileId, categories }: EmailRulesPanelProps = {}) {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [rules, setRules] = useState<EmailUserRule[]>([]);
   const [draft, setDraft] = useState<typeof EMPTY_DRAFT>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
 
+  const categoryOptions = categories && categories.length > 0 ? categories : RULE_CATEGORIES;
+
   useEffect(() => {
     if (!isAuthenticated) return;
-    emailIntegrationService.listRules().then(setRules).catch(() => setRules([]));
-  }, [isAuthenticated]);
+    const load = profileId
+      ? emailIntegrationService.listProfileRules(profileId)
+      : emailIntegrationService.listRules();
+    load.then(setRules).catch(() => setRules([]));
+  }, [isAuthenticated, profileId]);
 
   const handleAdd = async () => {
     if (!draft.name.trim() || draft.conditions.length === 0 || !draft.conditions[0].value.trim()) {
@@ -97,7 +112,9 @@ export function EmailRulesPanel() {
     }
     setBusy(true);
     try {
-      const created = await emailIntegrationService.createRule(draft);
+      const created = await emailIntegrationService.createRule(
+        profileId ? { ...draft, profileId } : draft,
+      );
       setRules((prev) => [...prev, created]);
       setDraft(EMPTY_DRAFT);
     } finally {
@@ -193,7 +210,7 @@ export function EmailRulesPanel() {
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {RULE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}
+                {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c.replace(/_/g, " ")}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button onClick={handleAdd} disabled={busy}>

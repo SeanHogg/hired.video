@@ -30,6 +30,61 @@ import {
 import { users } from "./users.js";
 import { jobItems } from "./jobs.js";
 
+/**
+ * inbox_profiles — the role-keyed unit that generalises the hardwired
+ * job-seeker classifier into a first-class aggregate (role-aware inbox
+ * processors, #1979). System presets (`is_preset = true`,
+ * `owner_id = NULL`) are seeded by migration 0206/0207 and mirror
+ * `shared/email-classification/presets.ts`; user clones are owner-scoped.
+ *
+ * A profile drives the L1 processor end-to-end:
+ *   • `taxonomy`         — Category[]; the inbox-visibility SSoT (replaces
+ *     the hardcoded `JOB_INBOX_CATEGORIES`).
+ *   • `classify_prompt`  — Stage-2 system prompt (replaces `CLASSIFY_PROMPT`).
+ *   • `summary_prompt`   — Stage-2 summariser prompt.
+ *   • `extract_schema`   — JSON-Schema-ish fields the Stage-2 prompt pulls
+ *     into `external_email_messages.extracted`.
+ *   • `default_rule_set` — which code-pinned Stage-1 rule set runs.
+ *   • `min_relevance_score` — profile-level confidence floor (the per-account
+ *     `min_relevance_score` overrides it).
+ *   • `version` — bumped on edit; cache key + rules-compile invalidation.
+ */
+export const inboxProfiles = pgTable(
+  "inbox_profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** NULL for seeded system presets; set for user clones. */
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
+    /** UserRole[] this profile is offered to. */
+    roles: jsonb("roles").default([]).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    isPreset: boolean("is_preset").default(false).notNull(),
+    /** Stable key for a seeded preset (job_hunter, recruiter_sourcing, …);
+     *  NULL for clones. */
+    presetKey: varchar("preset_key", { length: 64 }),
+    /** Category[] incl. the universal noise buckets. */
+    taxonomy: jsonb("taxonomy").notNull(),
+    classifyPrompt: text("classify_prompt").notNull(),
+    summaryPrompt: text("summary_prompt"),
+    extractSchema: jsonb("extract_schema"),
+    defaultRuleSet: varchar("default_rule_set", { length: 32 }),
+    minRelevanceScore: numeric("min_relevance_score", { precision: 4, scale: 3 })
+      .default("0.500")
+      .notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    ownerIdx: index("inbox_profiles_owner_idx").on(t.ownerId),
+    presetKeyUnq: uniqueIndex("inbox_profiles_preset_key_key").on(t.presetKey),
+  }),
+);
+
+export type InboxProfile = typeof inboxProfiles.$inferSelect;
+export type NewInboxProfile = typeof inboxProfiles.$inferInsert;
+
 export const externalEmailAccounts = pgTable(
   "external_email_accounts",
   {
@@ -54,9 +109,18 @@ export const externalEmailAccounts = pgTable(
     lastError: text("last_error"),
     /** Per-account confidence floor — only messages classified at or
      *  above this score reach the inbox feed. Defaults to 0.5 so newly
-     *  connected mailboxes get a sensible "job mail only" cut without
-     *  user setup. */
-    minJobScore: numeric("min_job_score", { precision: 4, scale: 3 }).default("0.500").notNull(),
+     *  connected mailboxes get a sensible "relevant mail only" cut without
+     *  user setup. Renamed from `min_job_score` in 0206 — the meaning now
+     *  comes from the account's active profile, not a candidate taxonomy. */
+    minRelevanceScore: numeric("min_relevance_score", { precision: 4, scale: 3 })
+      .default("0.500")
+      .notNull(),
+    /** The inbox profile (taxonomy + prompt + extraction + rules) this
+     *  mailbox classifies under. NULL falls back to the Job Hunter preset
+     *  so the pre-profiles job-seeker path is byte-for-byte unchanged. */
+    activeProfileId: uuid("active_profile_id").references(() => inboxProfiles.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -96,6 +160,18 @@ export const externalEmailMessages = pgTable(
     category: varchar("category", { length: 40 }),
     score: numeric("score", { precision: 4, scale: 3 }),
     summary: text("summary"),
+
+    /** L1 structured fields the Stage-2 prompt pulled out, shaped by the
+     *  active profile's `extract_schema` (recruiter presets — role,
+     *  company, candidateRef, …). NULL for Job Hunter (no extraction). */
+    extracted: jsonb("extracted"),
+    /** Computed at ingest from `isVisibleCategory(category, profile)` —
+     *  whether this message's category reaches the inbox feed under the
+     *  account's active profile. Decouples the read query from the
+     *  hardcoded `JOB_INBOX_CATEGORIES` list so recruiter taxonomies show
+     *  the right mail. The per-account score floor is still applied LIVE
+     *  in the read query so the Settings slider keeps re-filtering. */
+    isRelevant: boolean("is_relevant").default(false).notNull(),
 
     /** Discovered apply URL extracted from the body — used by the dedup
      *  + auto-create flow (P3) when no existing job_items row matches.
@@ -160,6 +236,10 @@ export const emailUserRules = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** The profile this rule belongs to. NULL = legacy global rule,
+     *  applied to the user's Job Hunter (job-seeker) profile so existing
+     *  rows keep firing unchanged. */
+    profileId: uuid("profile_id").references(() => inboxProfiles.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 120 }).notNull(),
     conditions: jsonb("conditions").default([]).notNull(),
     actionCategory: varchar("action_category", { length: 40 }).notNull(),
@@ -209,7 +289,7 @@ export const emailSyncRuns = pgTable(
     messagesSynced: integer("messages_synced").default(0).notNull(),
     messagesClassified: integer("messages_classified").default(0).notNull(),
     /** Messages classified to a non-job category (newsletter / spam /
-     *  personal / other) or below the per-account `minJobScore` floor.
+     *  personal / other) or below the per-account `minRelevanceScore` floor.
      *  Surfaced in the Sync History sheet as the "excluded" count so
      *  users see what the filter held back. */
     messagesExcluded: integer("messages_excluded").default(0).notNull(),

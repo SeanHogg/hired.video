@@ -6,7 +6,7 @@
  * overrides created via the Settings rule editor.
  */
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { emailUserRules } = schema;
@@ -19,7 +19,17 @@ export type EmailUserRulePatch = Partial<EmailUserRuleInsert>;
 
 export interface IEmailUserRulesRepository {
   findEnabledForUser(userId: string): Promise<EmailUserRuleRow[]>;
+  /** Enabled rules for one profile, priority asc. Legacy global rules
+   *  (`profile_id IS NULL`) are folded in when `includeLegacyGlobal` is
+   *  set — true only for job-seeker profiles, so a recruiter mailbox
+   *  doesn't inherit candidate-era global rules. */
+  findEnabledForProfile(
+    userId: string,
+    profileId: string,
+    includeLegacyGlobal: boolean,
+  ): Promise<EmailUserRuleRow[]>;
   findAllForUser(userId: string): Promise<EmailUserRuleRow[]>;
+  findAllForProfile(userId: string, profileId: string): Promise<EmailUserRuleRow[]>;
   findById(id: string, userId: string): Promise<EmailUserRuleRow | null>;
   insert(input: EmailUserRuleInsert): Promise<EmailUserRuleRow>;
   patch(id: string, userId: string, patch: EmailUserRulePatch): Promise<void>;
@@ -37,11 +47,40 @@ export class EmailUserRulesRepository implements IEmailUserRulesRepository {
       .orderBy(asc(emailUserRules.priority))) as EmailUserRuleRow[];
   }
 
+  async findEnabledForProfile(
+    userId: string,
+    profileId: string,
+    includeLegacyGlobal: boolean,
+  ): Promise<EmailUserRuleRow[]> {
+    const profileScope = includeLegacyGlobal
+      ? or(eq(emailUserRules.profileId, profileId), isNull(emailUserRules.profileId))
+      : eq(emailUserRules.profileId, profileId);
+    return (await this.db
+      .select()
+      .from(emailUserRules)
+      .where(
+        and(
+          eq(emailUserRules.userId, userId),
+          eq(emailUserRules.isEnabled, true),
+          profileScope,
+        ),
+      )
+      .orderBy(asc(emailUserRules.priority))) as EmailUserRuleRow[];
+  }
+
   async findAllForUser(userId: string): Promise<EmailUserRuleRow[]> {
     return (await this.db
       .select()
       .from(emailUserRules)
       .where(eq(emailUserRules.userId, userId))
+      .orderBy(asc(emailUserRules.priority))) as EmailUserRuleRow[];
+  }
+
+  async findAllForProfile(userId: string, profileId: string): Promise<EmailUserRuleRow[]> {
+    return (await this.db
+      .select()
+      .from(emailUserRules)
+      .where(and(eq(emailUserRules.userId, userId), eq(emailUserRules.profileId, profileId)))
       .orderBy(asc(emailUserRules.priority))) as EmailUserRuleRow[];
   }
 

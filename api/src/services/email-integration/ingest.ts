@@ -74,19 +74,20 @@ import type { NormalisedEmail } from "./providers/types.js";
 import {
   classifyByRules,
   type ClassificationResult,
-  isJobCategory,
+  isVisibleCategory,
   type NormalisedEmailWire,
 } from "../../../../shared/email-classification/index.js";
+import { resolveAccountProfile } from "./profile-service.js";
+import { dispatchActions, type ActionContext, type ActionEffect } from "./action-engine.js";
+import "./action-handlers.js"; // registers the Phase-4 L2 handlers
+import type { InboxActionRunInsert } from "../../repositories/inboxActionsRepository.js";
+import type { NotificationInsert } from "../../repositories/notificationsRepository.js";
 
 export interface IngestDeps {
-  repos: Pick<
-    Repos,
-    | "externalEmailAccounts"
-    | "externalEmailMessages"
-    | "emailUserRules"
-    | "emailSyncRuns"
-    | "jobs"
-  >;
+  // Full repos container — the L2 action engine reaches Contacts / JD /
+  // pipeline / notifications, so widening the Pick per handler buys
+  // nothing. Production passes `buildRepos(getDb())`.
+  repos: Repos;
   llm: LLMClient;
 }
 
@@ -190,7 +191,14 @@ export async function ingestForAccount(
   const account = await loadOwnedAccount(deps, userId, request.accountId);
   if (!account) throw new Error("Account not found or not owned by user");
 
-  const minScore = Number(account.minJobScore ?? "0.5");
+  // Resolve the mailbox's active profile (cached). Drives Stage-1 rule
+  // set, Stage-2 prompt/taxonomy/extraction, and visibility. No profile
+  // → Job Hunter preset (zero-regression job-seeker behaviour).
+  const profile = await resolveAccountProfile(deps.repos, account);
+  // Per-account floor takes precedence; profile default backs it.
+  const minScore = Number(account.minRelevanceScore ?? profile.minRelevanceScore ?? 0.5);
+  // Legacy global (profile_id NULL) rules only apply to job-seeker profiles.
+  const includeLegacyGlobalRules = profile.roles.includes("job_seeker");
 
   const result: IngestResult = {
     accountId: account.id,
@@ -213,10 +221,23 @@ export async function ingestForAccount(
   // Pre-flight: load rules + dedup context ONCE for the entire chunk.
   // Both lookups are user-scoped (not email-scoped) so paying for them
   // per-message was pure waste — that was the #815 bug.
-  const [userRules, dedupCtx] = await Promise.all([
-    deps.repos.emailUserRules.findEnabledForUser(account.userId),
+  const [userRules, dedupCtx, actions] = await Promise.all([
+    deps.repos.emailUserRules.findEnabledForProfile(
+      account.userId,
+      profile.id,
+      includeLegacyGlobalRules,
+    ),
     loadDedupContext({ jobs: deps.repos.jobs }, account.userId),
+    // L2 action config for the active profile (#1981). Empty for most
+    // profiles → the dispatch loop is skipped entirely.
+    deps.repos.inboxActions.findEnabledForProfile(profile.id),
   ]);
+
+  // Collected L2 effects, persisted after PASS C in two batched writes
+  // (audit rows + notifications) so the action engine adds O(1) writes
+  // per chunk, not O(messages).
+  const actionRunInserts: InboxActionRunInsert[] = [];
+  const notificationInserts: NotificationInsert[] = [];
 
   // ───── PASS A — bulk insert.
   const insertPayloads: ExternalEmailMessageInsert[] = request.messages.map(
@@ -278,7 +299,7 @@ export async function ingestForAccount(
       if (row.category && (row.linkedJobId || row.dedupScore != null)) {
         result.messagesIngested += 1;
         const score = row.score == null ? 0 : Number(row.score);
-        if (isJobCategory(row.category as any) && score >= minScore) {
+        if (isVisibleCategory(row.category, profile) && score >= minScore) {
           result.messagesJobRelated += 1;
         } else {
           result.messagesExcluded += 1;
@@ -286,13 +307,13 @@ export async function ingestForAccount(
         continue;
       }
 
-      // Stage-1 / Stage-2 classification.
+      // Stage-1 / Stage-2 classification — both profile-driven.
       let classification: ClassificationResult;
-      const stage1 = classifyByRules(email, userRules as any);
+      const stage1 = classifyByRules(email, userRules as any, profile.defaultRuleSet);
       if (stage1) {
         classification = stage1;
       } else {
-        classification = await classifyEmail({ llm: deps.llm }, email, userRules);
+        classification = await classifyEmail({ llm: deps.llm }, email, userRules, profile);
       }
       if (classification.ruleName) {
         result.rulesFired[classification.ruleName] =
@@ -334,7 +355,8 @@ export async function ingestForAccount(
       let dedupMethod: string | null = null;
 
       const passed =
-        isJobCategory(classification.category) && classification.score >= minScore;
+        isVisibleCategory(classification.category, profile) &&
+        classification.score >= minScore;
 
       // Summary is only shown in the inbox detail sheet, and excluded
       // messages don't surface there by default — gate the LLM call on
@@ -343,7 +365,7 @@ export async function ingestForAccount(
       // summary column stays null; the `Show dismissed` / `Junk` views
       // render the snippet instead.
       const summary = passed
-        ? await summariseEmail({ llm: deps.llm }, email, classification)
+        ? await summariseEmail({ llm: deps.llm }, email, classification, profile)
         : null;
 
       if (passed) {
@@ -390,6 +412,10 @@ export async function ingestForAccount(
           category: classification.category,
           score: String(classification.score) as any,
           summary,
+          // L1 structured extraction (recruiter presets) — null for Job Hunter.
+          extracted: (classification.extracted ?? null) as any,
+          // Profile-computed visibility — what the read query filters on.
+          isRelevant: passed,
           applyUrl,
           applyUrls: applyUrls as any,
           linkedJobId,
@@ -404,6 +430,31 @@ export async function ingestForAccount(
       if (linkedJobId) {
         if (dedupMethod === "auto_created") result.jobsCreated += 1;
         else result.jobsLinked += 1;
+      }
+
+      // ── L2 action engine (#1981). Only relevant messages with a
+      // matching enabled action fire. Effects are collected and persisted
+      // in two batched writes after PASS C (idempotent on message×action).
+      if (passed && actions.length > 0) {
+        const ctx: ActionContext = {
+          userId: account.userId,
+          profile,
+          messageId: row.id,
+          email,
+          category: classification.category,
+          ruleName: classification.ruleName ?? null,
+          extracted: classification.extracted ?? null,
+          summary,
+        };
+        const effects: ActionEffect[] = await dispatchActions(
+          { repos: deps.repos, llm: deps.llm },
+          ctx,
+          actions,
+        );
+        for (const e of effects) {
+          actionRunInserts.push(e.run);
+          if (e.notification) notificationInserts.push(e.notification);
+        }
       }
     } catch (err) {
       console.error(
@@ -423,6 +474,25 @@ export async function ingestForAccount(
     } catch (err) {
       console.error("[email-ingest] bulk patch failed:", err);
       result.errorMessage = describeDbError(err);
+    }
+  }
+
+  // ───── L2 effect persistence — two batched writes, best-effort. The
+  // audit insert is idempotent (ON CONFLICT (message_id, action_id) DO
+  // NOTHING) so a re-posted chunk never double-records a run. Failures
+  // here must not drop the chunk's messages (already persisted in PASS C).
+  if (actionRunInserts.length > 0) {
+    try {
+      await deps.repos.inboxActionRuns.recordRuns(actionRunInserts);
+    } catch (err) {
+      console.error("[email-ingest] action-run audit insert failed:", err);
+    }
+  }
+  if (notificationInserts.length > 0) {
+    try {
+      await deps.repos.notifications.insertNotifications(notificationInserts);
+    } catch (err) {
+      console.error("[email-ingest] action notification insert failed:", err);
     }
   }
 

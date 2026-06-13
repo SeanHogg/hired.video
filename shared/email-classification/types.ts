@@ -64,10 +64,18 @@ export type EmailCategory =
   | "other";
 
 export interface ClassificationResult {
-  category: EmailCategory;
+  /** A category KEY from the active profile's taxonomy. Kept as `string`
+   *  (not the legacy `EmailCategory` union) because the taxonomy is now
+   *  profile-driven — recruiter presets add `new_requisition`,
+   *  `candidate_reply`, etc. The legacy union still types the Job Hunter
+   *  preset + `isJobCategory`. */
+  category: string;
   score: number;
   source: "user_rule" | "default_rule" | "llm";
   ruleName?: string;
+  /** Optional L1 structured extraction pulled by the Stage-2 prompt when
+   *  the profile defines an `extractSchema`. Null/absent for Job Hunter. */
+  extracted?: Record<string, unknown> | null;
 }
 
 /** Job-related categories — single source of truth for inbox visibility.

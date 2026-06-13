@@ -11,11 +11,14 @@
  *
  * The main-button verb adapts automatically because it reads
  * `template.label` ("New Podcast episode", "New Sizzle Reel", …). The
- * dropdown groups items by mediaKind so a 17+-entry flat list doesn't
- * make picking a podcast template harder than picking a video one.
- * Section headers self-hide when the catalog has zero templates of that
- * kind — adding a Phase 4 voice template lights up its section
- * automatically with no further wiring.
+ * dropdown is a MEGA MENU: every mediaKind becomes its own labelled
+ * column laid out in a multi-column masonry so the user sees all ~40
+ * starters at a glance instead of scrolling a single 17+-entry list.
+ * Columns render in `KIND_DISPLAY_ORDER` — Video then Document lead, the
+ * remaining kinds follow in catalog order. Section columns self-hide
+ * when the catalog has zero templates of that kind, so adding a future
+ * voice / cad template lights up its column automatically with no
+ * further wiring.
  */
 import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +27,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -39,6 +41,19 @@ import {
   MEDIA_KIND_UI,
   type MediaKind,
 } from "@shared/media-kinds";
+
+/**
+ * Order the mega-menu columns render in. Video then Document lead (the two
+ * most-used starters); every other kind follows in `MEDIA_KINDS` order. We
+ * derive the tail from the SSoT rather than hand-listing it so a newly added
+ * mediaKind appears automatically — it just lands after Document instead of
+ * needing a manual entry here.
+ */
+const KIND_DISPLAY_ORDER: MediaKind[] = [
+  "video",
+  "document",
+  ...MEDIA_KINDS.filter((k) => k !== "video" && k !== "document"),
+];
 
 interface NewVideoSplitButtonProps {
   /** Visual variant — "outline" for the editor toolbar; "primary" for
@@ -99,16 +114,24 @@ export default function NewVideoSplitButton({
             <ChevronDown className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="max-h-[60vh] w-60 overflow-y-auto">
-          {MEDIA_KINDS.map((kind, kindIndex) => (
-            <KindSection
-              key={kind}
-              kind={kind}
-              defaultTemplate={defaultTemplate}
-              onPick={startNewWithTemplate}
-              showSeparatorAbove={kindIndex > 0}
-            />
-          ))}
+        <DropdownMenuContent
+          align="end"
+          className="max-h-[70vh] w-[92vw] max-w-3xl overflow-y-auto p-3"
+        >
+          {/* Multi-column masonry — each kind is a self-contained block that
+              never splits across columns (break-inside-avoid). Video leads
+              and, being the largest set, naturally anchors the first column;
+              the shorter kinds pack in around it. */}
+          <div className="columns-2 gap-4 md:columns-3 [&>*]:break-inside-avoid">
+            {KIND_DISPLAY_ORDER.map((kind) => (
+              <KindSection
+                key={kind}
+                kind={kind}
+                defaultTemplate={defaultTemplate}
+                onPick={startNewWithTemplate}
+              />
+            ))}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -116,27 +139,26 @@ export default function NewVideoSplitButton({
 }
 
 /**
- * One MediaKind section inside the dropdown. Self-hides when the catalog
+ * One MediaKind column inside the mega menu. Self-hides when the catalog
  * has zero templates of this kind — no caller-passed `hasPodcastTemplates`
  * boolean. Header label reads from MEDIA_KIND_UI so a rename ripples once.
+ * The wrapping block carries `break-inside-avoid` (applied by the parent
+ * masonry container) so a column header is never orphaned from its items.
  */
 function KindSection({
   kind,
   defaultTemplate,
   onPick,
-  showSeparatorAbove,
 }: {
   kind: MediaKind;
   defaultTemplate: ContentTemplate;
   onPick: (id: ContentTemplate) => void;
-  showSeparatorAbove: boolean;
 }) {
   const items: TemplateDef[] = TEMPLATE_CATALOG.filter((t) => t.mediaKind === kind);
   if (items.length === 0) return null;
   return (
-    <>
-      {showSeparatorAbove && <DropdownMenuSeparator />}
-      <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+    <div className="mb-4">
+      <DropdownMenuLabel className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {MEDIA_KIND_UI[kind].badgeLabel}
       </DropdownMenuLabel>
       {items.map((t) => {
@@ -156,6 +178,6 @@ function KindSection({
           </DropdownMenuItem>
         );
       })}
-    </>
+    </div>
   );
 }

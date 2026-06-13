@@ -60,7 +60,9 @@ export interface UserRule {
 interface DefaultRule {
   name: string;
   conditions: RuleCondition[];
-  category: EmailCategory;
+  /** Profile category key — `string`, not the legacy union, since
+   *  recruiter rule sets emit `new_requisition` etc. */
+  category: string;
   /** Confidence applied by the deterministic match — defaults are tight
    *  on ATS senders (0.95) and looser on heuristics (0.7). */
   score: number;
@@ -143,6 +145,66 @@ const NEWSLETTER_HINTS = [
   "manage preferences",
 ];
 
+/** Recruiter sourcing phrases — high-precision Stage-1 hints. */
+const NEW_REQUISITION_PHRASES = [
+  "new requisition",
+  "new req",
+  "open role",
+  "we're hiring for",
+  "we are hiring for",
+  "need to fill",
+  "role to fill",
+  "looking to hire",
+];
+
+const CANDIDATE_REPLY_PHRASES = [
+  "thanks for reaching out",
+  "thank you for reaching out",
+  "interested in the role",
+  "not interested",
+  "happy to chat",
+  "open to learning more",
+  "re: opportunity",
+];
+
+const SUBMISSION_UPDATE_PHRASES = [
+  "candidate feedback",
+  "moving the candidate forward",
+  "client passed",
+  "wants to interview",
+  "declined the candidate",
+  "submission update",
+];
+
+const COMPANY_HIRING_PHRASES = [
+  "is hiring",
+  "are hiring",
+  "expanding the team",
+  "scaling the team",
+  "raised a",
+  "series a",
+  "series b",
+  "now hiring",
+];
+
+const INBOUND_LEAD_PHRASES = [
+  "recruiting help",
+  "staffing support",
+  "help us hire",
+  "looking for a recruiter",
+  "fill some roles",
+];
+
+const INTAKE_NOTES_PHRASES = [
+  "intake notes",
+  "role requirements",
+  "must-haves",
+  "must haves",
+  "job description for",
+  "here's what we're looking for",
+  "ideal candidate",
+];
+
 export const DEFAULT_RULES: DefaultRule[] = [
   ...APPLICATION_STATUS_PHRASES.map((phrase) => ({
     name: `default:application_status_${phrase}`,
@@ -201,6 +263,66 @@ export const DEFAULT_RULES: DefaultRule[] = [
     score: 0.55,
   })),
 ];
+
+/** Recruiter Stage-1 default rules, grouped by preset rule-set key.
+ *  These run only when the active profile selects the matching
+ *  `defaultRuleSet` — a job-seeker mailbox never sees recruiter rules
+ *  (and vice-versa), so ATS-domain mail isn't mis-tagged as
+ *  `application_status` in a recruiter inbox. */
+const RECRUITER_SOURCING_RULES: DefaultRule[] = [
+  ...NEW_REQUISITION_PHRASES.map((phrase) => ({
+    name: `recruiter_sourcing:new_requisition_${phrase}`,
+    conditions: [{ field: "any", op: "contains", value: phrase } as RuleCondition],
+    category: "new_requisition",
+    score: 0.8,
+  })),
+  ...CANDIDATE_REPLY_PHRASES.map((phrase) => ({
+    name: `recruiter_sourcing:candidate_reply_${phrase}`,
+    conditions: [{ field: "body", op: "contains", value: phrase } as RuleCondition],
+    category: "candidate_reply",
+    score: 0.8,
+  })),
+  ...SUBMISSION_UPDATE_PHRASES.map((phrase) => ({
+    name: `recruiter_sourcing:submission_update_${phrase}`,
+    conditions: [{ field: "any", op: "contains", value: phrase } as RuleCondition],
+    category: "submission_update",
+    score: 0.8,
+  })),
+];
+
+const RECRUITER_BIZDEV_RULES: DefaultRule[] = [
+  ...COMPANY_HIRING_PHRASES.map((phrase) => ({
+    name: `recruiter_bizdev:company_hiring_${phrase}`,
+    conditions: [{ field: "any", op: "contains", value: phrase } as RuleCondition],
+    category: "company_hiring",
+    score: 0.75,
+  })),
+  ...INBOUND_LEAD_PHRASES.map((phrase) => ({
+    name: `recruiter_bizdev:inbound_lead_${phrase}`,
+    conditions: [{ field: "body", op: "contains", value: phrase } as RuleCondition],
+    category: "inbound_lead",
+    score: 0.8,
+  })),
+];
+
+const RECRUITER_INTAKE_RULES: DefaultRule[] = [
+  ...INTAKE_NOTES_PHRASES.map((phrase) => ({
+    name: `recruiter_intake:intake_notes_${phrase}`,
+    conditions: [{ field: "any", op: "contains", value: phrase } as RuleCondition],
+    category: "intake_notes",
+    score: 0.8,
+  })),
+];
+
+/** Named Stage-1 default rule sets. The profile's `defaultRuleSet`
+ *  selects one; `null`/unknown → no default rules (LLM-only Stage-2).
+ *  `job_seeker` is the legacy set and stays the back-compat default. */
+export const DEFAULT_RULE_SETS: Record<string, DefaultRule[]> = {
+  job_seeker: DEFAULT_RULES,
+  recruiter_sourcing: RECRUITER_SOURCING_RULES,
+  recruiter_bizdev: RECRUITER_BIZDEV_RULES,
+  recruiter_intake: RECRUITER_INTAKE_RULES,
+};
 
 function getDomain(email: string): string {
   const at = email.indexOf("@");
@@ -265,6 +387,11 @@ function isUserRuleConditionsArray(x: unknown): x is RuleCondition[] {
 export function classifyByRules(
   email: NormalisedEmail,
   userRules: UserRule[],
+  /** Which code-pinned default rule set runs after user rules. Comes
+   *  from `profile.defaultRuleSet`; defaults to the legacy job-seeker
+   *  set so the pre-profiles call shape (client PWA sync) is unchanged.
+   *  `null` / unknown key → no default rules (Stage-2 LLM handles it). */
+  defaultRuleSet: string | null = "job_seeker",
 ): ClassificationResult | null {
   // 1. User rules first — they override defaults.
   for (const r of userRules) {
@@ -280,8 +407,9 @@ export function classifyByRules(
       };
     }
   }
-  // 2. Default rules.
-  for (const r of DEFAULT_RULES) {
+  // 2. Default rules — only the profile's selected set.
+  const defaults = defaultRuleSet ? DEFAULT_RULE_SETS[defaultRuleSet] ?? [] : [];
+  for (const r of defaults) {
     if (evalRule(email, r.conditions)) {
       return { category: r.category, score: r.score, source: "default_rule", ruleName: r.name };
     }

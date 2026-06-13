@@ -118,7 +118,10 @@ export interface InboxAccountDto {
   accountEmail: string;
   accountLabel: string | null;
   status: string;
-  minJobScore: number;
+  minRelevanceScore: number;
+  /** The mailbox's active inbox profile (taxonomy + prompt). Null falls
+   *  back to the Job Hunter preset. */
+  activeProfileId: string | null;
   lastSyncedAt: string | null;
   /** Last refresh / sync error from the account row — present whenever
    *  `status === "error"`. The Inbox tab uses this to render an inline
@@ -237,7 +240,8 @@ function toAccountDto(row: ExternalEmailAccountRow): InboxAccountDto {
     accountEmail: row.accountEmail,
     accountLabel: row.accountLabel,
     status: row.status,
-    minJobScore: Number(row.minJobScore ?? "0.5"),
+    minRelevanceScore: Number(row.minRelevanceScore ?? "0.5"),
+    activeProfileId: row.activeProfileId ?? null,
     lastSyncedAt: row.lastSyncedAt ? new Date(row.lastSyncedAt).toISOString() : null,
     lastError: row.lastError ?? null,
   };

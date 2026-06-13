@@ -23,6 +23,9 @@ export type NotificationInsert = typeof notifications.$inferInsert;
 export interface INotificationsRepository {
   findNotificationsForUser(userId: string, limit?: number): Promise<NotificationRow[]>;
   insertNotification(input: NotificationInsert): Promise<void>;
+  /** Bulk insert in one round-trip — used by the inbox action engine so
+   *  a chunk of `notify` effects collapses to a single write (no N+1). */
+  insertNotifications(inputs: NotificationInsert[]): Promise<void>;
 }
 
 export class NotificationsRepository implements INotificationsRepository {
@@ -44,5 +47,10 @@ export class NotificationsRepository implements INotificationsRepository {
 
   async insertNotification(input: NotificationInsert): Promise<void> {
     await this.db.insert(notifications).values(input as any);
+  }
+
+  async insertNotifications(inputs: NotificationInsert[]): Promise<void> {
+    if (inputs.length === 0) return;
+    await this.db.insert(notifications).values(inputs as any);
   }
 }
