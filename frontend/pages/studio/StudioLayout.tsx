@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { parseStudioSubject, type StudioSubject } from "@shared/studio-subject";
 import {
   Sparkles,
@@ -135,6 +136,7 @@ function makeInitialState(): StudioProjectState {
 }
 
 function Landing() {
+  const { t } = useTranslation();
   // Mirror the / homepage spotlight — same SA-curated featured set so
   // unauthenticated visitors see the same showcase on both surfaces.
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
@@ -162,16 +164,14 @@ function Landing() {
                 <Star className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
               </div>
               <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                Creator Studio
+                {t("labels.studioLayout.creatorStudio")}
               </span>
             </div>
             <h1 className="text-4xl lg:text-5xl font-bold mb-6">
-              AI Studio for Videos, Comics, Games, Podcasts &amp; More
+              {t("headings.studioLayout.heroTitle")}
             </h1>
             <p className="text-lg lg:text-xl text-muted-foreground mb-8">
-              One studio, every format. Turn your resume into a video pitch, a 6-page comic, a
-              podcast trailer, or a browser game — AI writes the script, picks the art direction,
-              and renders the finished piece. No camera, no editing, no experience required.
+              {t("messages.studioLayout.heroSubtitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link to="/signup">
@@ -179,13 +179,13 @@ function Landing() {
                   size="lg"
                   className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                 >
-                  Start Creating
+                  {t("actions.studioLayout.startCreating")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link to="/login">
                 <Button size="lg" variant="outline" className="text-lg px-8">
-                  Sign In
+                  {t("actions.signIn")}
                 </Button>
               </Link>
             </div>
@@ -213,12 +213,12 @@ function Landing() {
             which kind a visitor cares about — no per-kind copy here. */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
           {[
-            { stat: `${listShippableKindPitches().length}+`, label: "Creator formats in one studio" },
-            { stat: "60s", label: "AI scaffolds your first scene" },
-            { stat: "100%", label: "In-browser render — no install" },
-            { stat: "Free", label: "First project on every account" },
+            { id: "formats", stat: `${listShippableKindPitches().length}+`, label: t("labels.studioLayout.statFormats") },
+            { id: "scaffold", stat: "60s", label: t("labels.studioLayout.statScaffold") },
+            { id: "render", stat: "100%", label: t("labels.studioLayout.statRender") },
+            { id: "free", stat: t("labels.studioLayout.statFreeValue"), label: t("labels.studioLayout.statFree") },
           ].map((s) => (
-            <div key={s.stat} className="text-center">
+            <div key={s.id} className="text-center">
               <div className="text-3xl font-bold text-primary mb-2">{s.stat}</div>
               <p className="text-sm text-muted-foreground">{s.label}</p>
             </div>
@@ -234,24 +234,22 @@ function Landing() {
             individual kinds. */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center mb-12">
-            Everything You Need to Stand Out
+            {t("headings.studioLayout.standOut")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Zap className="h-10 w-10 text-brand-purple mb-4" />
-                <CardTitle>AI Script &amp; Scaffold</CardTitle>
+                <CardTitle>{t("headings.studioLayout.featureScript")}</CardTitle>
                 <CardDescription>
-                  Paste a resume, job description, or prompt. The AI writes the script for whatever
-                  format you pick — video scenes, podcast segments, comic panels, game levels,
-                  voiceover beats — and grounds the story in your real material.
+                  {t("messages.studioLayout.featureScriptDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Format-aware scaffolding (scenes, panels, levels, beats)</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Grounded in your resume / job / company brief</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Edit any scene or panel with plain English</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featureScriptBullet1")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featureScriptBullet2")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featureScriptBullet3")}</div>
                 </div>
               </CardContent>
             </Card>
@@ -259,18 +257,16 @@ function Landing() {
             <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
               <CardHeader>
                 <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
-                <CardTitle>One Canvas, Every Format</CardTitle>
+                <CardTitle>{t("headings.studioLayout.featureCanvas")}</CardTitle>
                 <CardDescription>
-                  The same editor surface mounts the right runtime per format. Render in your
-                  browser — MP4 / MP3 / GIF / PNG / PDF / CBZ / HTML5 game bundle — and re-import
-                  any export back into a new project.
+                  {t("messages.studioLayout.featureCanvasDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Video, podcast, voice, animation, game, comic in one studio</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />MP4 720p / 1080p, MP3, GIF, PDF / CBZ, HTML5 ZIP</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Closed-loop interop — exports land in your asset library</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featureCanvasBullet1")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featureCanvasBullet2")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featureCanvasBullet3")}</div>
                 </div>
               </CardContent>
             </Card>
@@ -278,18 +274,16 @@ function Landing() {
             <Card className="border-primary/20 hover:border-primary/40 transition-colors">
               <CardHeader>
                 <Share2 className="h-10 w-10 text-primary mb-4" />
-                <CardTitle>Publish Where It Belongs</CardTitle>
+                <CardTitle>{t("headings.studioLayout.featurePublish")}</CardTitle>
                 <CardDescription>
-                  Each format ships with the right destinations — YouTube + LinkedIn for video,
-                  RSS / Apple / Spotify for podcasts, itch.io / GitHub Pages for games, your
-                  Profile gallery for images. One click, the right pipeline.
+                  {t("messages.studioLayout.featurePublishDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Per-kind publish menu — destinations gate themselves</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Public shareable link + embed code on every project</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />AI LinkedIn post generator — hook, caption, hashtags</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featurePublishBullet1")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featurePublishBullet2")}</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.studioLayout.featurePublishBullet3")}</div>
                 </div>
               </CardContent>
             </Card>
@@ -298,19 +292,19 @@ function Landing() {
 
         {/* How it works */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">{t("headings.studioLayout.howItWorks")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
-              { icon: Upload, step: "1. Paste Your Resume", desc: "Drop in your resume text or upload a PDF" },
-              { icon: Sparkles, step: "2. AI Writes the Script", desc: "AI generates a script in the format you pick — scenes, panels, beats" },
-              { icon: Eye, step: "3. Preview & Edit", desc: "Tweak any scene or panel with plain-English instructions" },
+              { id: "paste", icon: Upload, step: t("labels.studioLayout.step1Title"), desc: t("messages.studioLayout.step1Desc") },
+              { id: "write", icon: Sparkles, step: t("labels.studioLayout.step2Title"), desc: t("messages.studioLayout.step2Desc") },
+              { id: "preview", icon: Eye, step: t("labels.studioLayout.step3Title"), desc: t("messages.studioLayout.step3Desc") },
               // Step 4 is kind-agnostic — the studio exports MP4 (video /
               // animation / motion comic), MP3 (podcast / voice), PNG / PDF /
               // CBZ (comic), HTML5 ZIP (game), etc. Single line of marketing
               // copy covers them all rather than a per-kind enumeration.
-              { icon: TrendingUp, step: "4. Export & Share", desc: "Download or publish — every format exports to the right destination" },
-            ].map(({ icon: Icon, step, desc }) => (
-              <div key={step} className="text-center">
+              { id: "export", icon: TrendingUp, step: t("labels.studioLayout.step4Title"), desc: t("messages.studioLayout.step4Desc") },
+            ].map(({ id, icon: Icon, step, desc }) => (
+              <div key={id} className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Icon className="h-8 w-8 text-primary" />
                 </div>
@@ -327,10 +321,9 @@ function Landing() {
             ripples into this grid automatically. No per-kind branch
             anywhere in this component. */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-3">What you can make</h2>
+          <h2 className="text-3xl font-bold text-center mb-3">{t("headings.studioLayout.whatYouCanMake")}</h2>
           <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            One studio canvas, every output. Pick the format that fits the moment — the studio
-            handles the AI scripting, the rendering, and the publish destinations for each.
+            {t("messages.studioLayout.whatYouCanMakeDesc")}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {listShippableKindPitches().map((pitch) => (
@@ -353,41 +346,41 @@ function Landing() {
 
         {/* Advertising extras */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-center mb-12">Built for Every Format — Resumes, Promos, Podcasts, Games &amp; More</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">{t("headings.studioLayout.builtForEveryFormat")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
               <CardHeader>
                 <Users className="h-10 w-10 text-brand-purple mb-4" />
-                <CardTitle>Brand Kits</CardTitle>
+                <CardTitle>{t("headings.studioLayout.brandKits")}</CardTitle>
                 <CardDescription>
-                  Save your colours, logo, and font once. Every new project automatically applies your brand — videos, podcasts, comics, games, all of it.
+                  {t("messages.studioLayout.brandKitsDesc")}
                 </CardDescription>
               </CardHeader>
             </Card>
             <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
               <CardHeader>
                 <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
-                <CardTitle>Project Analytics</CardTitle>
+                <CardTitle>{t("headings.studioLayout.projectAnalytics")}</CardTitle>
                 <CardDescription>
-                  Track views, plays, and CTA clicks per project. Group into campaigns and measure performance across formats and channels.
+                  {t("messages.studioLayout.projectAnalyticsDesc")}
                 </CardDescription>
               </CardHeader>
             </Card>
             <Card className="border-primary/20 hover:border-primary/40 transition-colors">
               <CardHeader>
                 <Play className="h-10 w-10 text-primary mb-4" />
-                <CardTitle>Embed &amp; Share</CardTitle>
+                <CardTitle>{t("headings.studioLayout.embedShare")}</CardTitle>
                 <CardDescription>
-                  Embed on your website or job posting, share via public link, or generate a QR code CTA.
+                  {t("messages.studioLayout.embedShareDesc")}
                 </CardDescription>
               </CardHeader>
             </Card>
             <Card className="border-green-500/20 hover:border-green-500/40 transition-colors">
               <CardHeader>
                 <Share2 className="h-10 w-10 text-green-600 mb-4" />
-                <CardTitle>LinkedIn Post AI</CardTitle>
+                <CardTitle>{t("headings.studioLayout.linkedInPostAi")}</CardTitle>
                 <CardDescription>
-                  AI generates a hook, caption, and hashtags for your project. One click posts it to LinkedIn — ready in seconds.
+                  {t("messages.studioLayout.linkedInPostAiDesc")}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -410,54 +403,48 @@ function Landing() {
           rather than per-kind specifics. */}
       <MarketingFAQ
         schemaId="studio"
-        subheading="The quick answers to what creators ask before they generate their first studio project."
+        subheading={t("messages.studioLayout.faqSubheading")}
         items={[
           {
-            question: "What can I make in the Studio?",
+            question: t("messages.studioLayout.faqQ1Question"),
             answer:
-              `Pick a format and start: ${listShippableKindPitches()
-                .map((p) => p.title.toLowerCase())
-                .join(", ")}. Each format mounts its own canvas runtime inside the same editor — switching kinds is as simple as picking a different template.`,
+              t("messages.studioLayout.faqQ1Answer", {
+                formats: listShippableKindPitches()
+                  .map((p) => p.title.toLowerCase())
+                  .join(", "),
+              }),
           },
           {
-            question: "Do I need to record myself on camera?",
-            answer:
-              "No. The AI generates a polished result from your written brief — no camera, microphone, or editing skills required. If you'd rather record yourself, video and podcast projects accept selfie-style recordings that the Studio will cut into your scenes.",
+            question: t("messages.studioLayout.faqQ2Question"),
+            answer: t("messages.studioLayout.faqQ2Answer"),
           },
           {
-            question: "How long does it take to make a project?",
-            answer:
-              "Most creators finish their first project in about 60 seconds of wall-clock time. Paste your brief, pick a template, and the AI handles the script + scaffolding for the format you picked (scenes, panels, levels, episode chapters). Edit anything you like before exporting.",
+            question: t("messages.studioLayout.faqQ3Question"),
+            answer: t("messages.studioLayout.faqQ3Answer"),
           },
           {
-            question: "What does the AI actually generate?",
-            answer:
-              "The AI writes a format-aware scaffold — video / podcast scripts get a hook → middle → CTA arc; comics get a 6-page narrative with panel art direction; games get level layouts with starter sprites + behaviors. The brief grounds the output in your real material (resume, job spec, company info).",
+            question: t("messages.studioLayout.faqQ4Question"),
+            answer: t("messages.studioLayout.faqQ4Answer"),
           },
           {
-            question: "Can I use my own branding?",
-            answer:
-              "Yes. Save your colours, logo, and font once in a Brand Kit and every new project automatically applies your brand identity — across every format, not just video. Great for recruiters, creators, and companies producing multiple pieces.",
+            question: t("messages.studioLayout.faqQ5Question"),
+            answer: t("messages.studioLayout.faqQ5Answer"),
           },
           {
-            question: "Where can I publish my work?",
-            answer:
-              "Each format ships with the right destinations: video → YouTube / LinkedIn / public link + embed; podcast → RSS feed, Apple Podcasts, Spotify for Creators; game → itch.io, GitHub Pages, embed on hired.video; comic → hired.video reader, Webtoon, Tapas; voice → marketplace + profile embed; image → profile gallery + asset library. The publish menu self-gates per format.",
+            question: t("messages.studioLayout.faqQ6Question"),
+            answer: t("messages.studioLayout.faqQ6Answer"),
           },
           {
-            question: "Is the Studio free?",
-            answer:
-              "Your first AI-generated project is free on every account. Paid plans unlock unlimited generations, premium themes, 1080p / lossless export without watermark, voice cloning, brand kits, and analytics. See the pricing page for current tiers.",
+            question: t("messages.studioLayout.faqQ7Question"),
+            answer: t("messages.studioLayout.faqQ7Answer"),
           },
           {
-            question: "What formats and resolutions do you support?",
-            answer:
-              "Video exports as MP4 in 720p or 1080p (16:9 landscape and 9:16 vertical). Podcasts export as MP3 / M4A / OGG / WAV with chapter markers. Animations export as GIF / WebP. Comics export as PDF / CBZ / PNG strip / motion MP4. Games export as a self-contained HTML5 ZIP that runs on any web host. Voice exports as MP3 / WAV. Images export as PNG / JPG / WebP / SVG.",
+            question: t("messages.studioLayout.faqQ8Question"),
+            answer: t("messages.studioLayout.faqQ8Answer"),
           },
           {
-            question: "Can recruiters and companies use the Studio too?",
-            answer:
-              "Yes — the Studio is designed for candidates, recruiters, and companies across every format. Video resumes, podcast trailers, recruiter personal-brand promos, company sizzle reels, hiring-themed games, employer-brand comics, voiceover demos. Same AI engine, the right template for each use case.",
+            question: t("messages.studioLayout.faqQ9Question"),
+            answer: t("messages.studioLayout.faqQ9Answer"),
           },
         ]}
       />
@@ -466,11 +453,10 @@ function Landing() {
       <div className="px-4 pb-16">
         <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
           <h3 className="text-3xl font-bold mb-4">
-            Ready to Make Something?
+            {t("headings.studioLayout.finalCta")}
           </h3>
           <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-            One studio. Videos, podcasts, games, comics, voice clips, animations — every format
-            you need to stand out, all in one place.
+            {t("messages.studioLayout.finalCtaDesc")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/signup">
@@ -478,13 +464,13 @@ function Landing() {
                 size="lg"
                 className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
               >
-                Get Started Free
+                {t("actions.getStartedFree")}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link to="/pricing">
               <Button size="lg" variant="outline">
-                View Pricing
+                {t("actions.viewPricing")}
               </Button>
             </Link>
           </div>
@@ -496,6 +482,7 @@ function Landing() {
 
 export default function StudioLayout() {
   useSEO("/studio");
+  const { t } = useTranslation();
 
   const { user, isLoading: authLoading, isSuperAdmin } = useAuth();
   const { toast } = useToast();
@@ -1047,7 +1034,7 @@ export default function StudioLayout() {
       setTab("storyboard");
     } catch (e: unknown) {
       patchState({ status: "error" });
-      toast({ title: "Generation failed", description: String(e), variant: "destructive" });
+      toast({ title: t("messages.studioLayout.generationFailed"), description: String(e), variant: "destructive" });
     }
   }
 
@@ -1079,8 +1066,8 @@ export default function StudioLayout() {
       });
       if (!decision.allowed) {
         toast({
-          title: "Free plan limit reached",
-          description: "You've already published your free video. Upgrade to Pro for unlimited videos.",
+          title: t("messages.studioLayout.freePlanLimitTitle"),
+          description: t("messages.studioLayout.freePlanLimitDesc"),
           variant: "destructive",
         });
         return;
@@ -1128,8 +1115,8 @@ export default function StudioLayout() {
       // URL for `isBakedFresh()` to consider, so a stamp would be a lie.
       if (skipUpload) {
         toast({
-          title: "Render ready",
-          description: "Local render done — turn 'Upload to library' back on in Save options to publish.",
+          title: t("messages.studioLayout.renderReadyTitle"),
+          description: t("messages.studioLayout.renderReadyDesc"),
         });
         return;
       }
@@ -1180,7 +1167,7 @@ export default function StudioLayout() {
         return [uploadRes.data!, ...without];
       });
 
-      toast({ title: "Video ready", description: "Saved to your library and published to your profile." });
+      toast({ title: t("messages.studioLayout.videoReadyTitle"), description: t("messages.studioLayout.videoReadyDesc") });
     } catch (e: unknown) {
       patchState({ status: "error" });
       const msg = String(e);
@@ -1193,9 +1180,9 @@ export default function StudioLayout() {
         const trigger = match?.[1] ?? "4K export";
         toast({ title: TIER_COPY.proRequiredToastTitle(), description: TIER_COPY.proRequiredToastBody(trigger), variant: "destructive" });
       } else if (/QUOTA_EXCEEDED/i.test(msg)) {
-        toast({ title: "Free limit reached", description: "Free accounts can publish 1 video. Upgrade for unlimited.", variant: "destructive" });
+        toast({ title: t("messages.studioLayout.freeLimitTitle"), description: t("messages.studioLayout.freeLimitDesc"), variant: "destructive" });
       } else {
-        toast({ title: "Export failed", description: msg, variant: "destructive" });
+        toast({ title: t("messages.studioLayout.exportFailed"), description: msg, variant: "destructive" });
       }
     }
   }
@@ -1246,10 +1233,10 @@ export default function StudioLayout() {
         youtubeVideoId: pubRes.data.youtubeVideoId,
         status: "done",
       });
-      toast({ title: "Published to YouTube!", description: "Your video is live." });
+      toast({ title: t("messages.studioLayout.publishedToYoutubeTitle"), description: t("messages.studioLayout.publishedToYoutubeDesc") });
     } catch (e: unknown) {
       patchState({ status: "error" });
-      toast({ title: "Publish failed", description: String(e), variant: "destructive" });
+      toast({ title: t("messages.studioLayout.publishFailed"), description: String(e), variant: "destructive" });
     }
   }
 
@@ -1293,7 +1280,7 @@ export default function StudioLayout() {
         try {
           await studioService.linkSubject(state.projectId, subject);
         } catch (e) {
-          toast({ title: "Link failed", description: String(e), variant: "destructive" });
+          toast({ title: t("messages.studioLayout.linkFailed"), description: String(e), variant: "destructive" });
         }
       }
     },
@@ -1310,7 +1297,7 @@ export default function StudioLayout() {
         try {
           await studioService.unlinkSubject(state.projectId, subject);
         } catch (e) {
-          toast({ title: "Unlink failed", description: String(e), variant: "destructive" });
+          toast({ title: t("messages.studioLayout.unlinkFailed"), description: String(e), variant: "destructive" });
         }
       }
     },
@@ -1372,13 +1359,13 @@ export default function StudioLayout() {
     if (state.script && state.script.scenes.length > 0) {
       const hasCustomTheme = JSON.stringify(state.script.video.theme) !== JSON.stringify(state.activeTemplate?.video.theme);
       const description = hasCustomTheme
-        ? "Apply this template's theme? Your scene content will be kept, but your current theme customisations will be replaced."
-        : "Apply this template's theme to your current scenes?";
+        ? t("messages.studioLayout.applyThemeReplaceDesc")
+        : t("messages.studioLayout.applyThemeKeepDesc");
       if (
         !(await confirmDialog({
-          title: "Apply template theme",
+          title: t("messages.studioLayout.applyTemplateThemeTitle"),
           description,
-          confirmText: "Apply",
+          confirmText: t("labels.apply"),
         }))
       )
         return;
@@ -1406,7 +1393,7 @@ export default function StudioLayout() {
 
     if (!state.resumeText.trim()) {
       setTab("prompt");
-      toast({ title: "Template loaded", description: "Paste your resume to personalise it." });
+      toast({ title: t("messages.studioLayout.templateLoadedTitle"), description: t("messages.studioLayout.templateLoadedDesc") });
     } else {
       setTab("storyboard");
     }
@@ -1418,10 +1405,10 @@ export default function StudioLayout() {
     if (!state.projectId) return;
     try {
       await studioService.updateProjectVisibility(state.projectId, pub);
-      toast({ title: pub ? "Video is now public" : "Video is now unlisted" });
+      toast({ title: pub ? t("messages.studioLayout.videoNowPublic") : t("messages.studioLayout.videoNowUnlisted") });
     } catch (e: unknown) {
       setIsPublic(!pub); // revert on failure
-      toast({ title: "Failed to update visibility", description: String(e), variant: "destructive" });
+      toast({ title: t("messages.studioLayout.visibilityUpdateFailed"), description: String(e), variant: "destructive" });
     }
   }
 
@@ -1434,7 +1421,7 @@ export default function StudioLayout() {
         handleCreateNew();
       }
     } catch {
-      toast({ title: "Delete failed", description: "Could not delete project.", variant: "destructive" });
+      toast({ title: t("messages.studioLayout.deleteFailedTitle"), description: t("messages.studioLayout.deleteFailedDesc"), variant: "destructive" });
     }
   }
 
@@ -1461,8 +1448,8 @@ export default function StudioLayout() {
     })) return true;
     if (!compiledVideo) {
       toast({
-        title: "Add your details first",
-        description: "Generate the script before publishing.",
+        title: t("messages.studioLayout.addDetailsFirstTitle"),
+        description: t("messages.studioLayout.addDetailsBeforePublish"),
         variant: "destructive",
       });
       return false;
@@ -1487,9 +1474,9 @@ export default function StudioLayout() {
       // user lands on the just-created copy ready to edit.
       setProjects((prev) => [clone, ...prev.filter((p) => p.id !== clone.id)]);
       handleProjectSelect(clone);
-      toast({ title: "Cloned", description: `"${clone.title}" is ready to edit.` });
+      toast({ title: t("messages.studioLayout.clonedTitle"), description: t("messages.studioLayout.clonedDesc", { title: clone.title }) });
     } catch (e) {
-      toast({ title: "Clone failed", description: String(e), variant: "destructive" });
+      toast({ title: t("messages.studioLayout.cloneFailed"), description: String(e), variant: "destructive" });
     }
   }
 
@@ -1534,7 +1521,7 @@ export default function StudioLayout() {
     if (!isPublishedToProfile && !projectIdForPatch) {
       const saved = await handleSave();
       if (!saved) {
-        toast({ title: "Save failed", description: "Couldn't persist this draft — try again.", variant: "destructive" });
+        toast({ title: t("messages.studioLayout.saveFailed"), description: t("messages.studioLayout.saveDraftFailedDesc"), variant: "destructive" });
         return;
       }
       // patchState is async — read the freshly-returned id directly
@@ -1552,16 +1539,16 @@ export default function StudioLayout() {
         });
         if (isPublishedToProfile) {
           setIsPublishedToProfile(false);
-          toast({ title: "Removed from profile", description: "The video stays in your library — share it whenever you want." });
+          toast({ title: t("messages.studioLayout.removedFromProfileTitle"), description: t("messages.studioLayout.removedFromProfileDesc") });
         } else {
           setIsPublishedToProfile(true);
           setHasShared(true);
-          toast({ title: "Published to profile!", description: "Your video is now visible on your profile." });
+          toast({ title: t("messages.studioLayout.publishedToProfileTitle"), description: t("messages.studioLayout.publishedToProfileDesc") });
         }
       }
     } catch (e: unknown) {
       toast({
-        title: isPublishedToProfile ? "Remove failed" : "Publish failed",
+        title: isPublishedToProfile ? t("messages.studioLayout.removeFailed") : t("messages.studioLayout.publishFailed"),
         description: String(e),
         variant: "destructive",
       });
@@ -1688,10 +1675,10 @@ export default function StudioLayout() {
         const without = prev.filter((p) => p.id !== saved.id);
         return [saved, ...without];
       });
-      toast({ title: "Saved", description: `"${saved.title}" saved to Recent Projects.` });
+      toast({ title: t("messages.studioLayout.savedTitle"), description: t("messages.studioLayout.savedDesc", { title: saved.title }) });
       return saved;
     } catch (e: unknown) {
-      toast({ title: "Save failed", description: String(e), variant: "destructive" });
+      toast({ title: t("messages.studioLayout.saveFailed"), description: String(e), variant: "destructive" });
       return null;
     } finally {
       setIsSaving(false);
@@ -1726,8 +1713,8 @@ export default function StudioLayout() {
       setTab("prompt");
       setPromptValidationFlash(true);
       toast({
-        title: "Add your details first",
-        description: "Save runs the generator — paste your resume or pitch text in the Prompt tab.",
+        title: t("messages.studioLayout.addDetailsFirstTitle"),
+        description: t("messages.studioLayout.saveRunsGeneratorDesc"),
         variant: "destructive",
       });
       return;
@@ -1812,9 +1799,9 @@ export default function StudioLayout() {
             aria-describedby="studio-tools-description"
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>Studio tools</SheetTitle>
+              <SheetTitle>{t("labels.studioLayout.studioTools")}</SheetTitle>
               <SheetDescription id="studio-tools-description">
-                Projects, templates, themes, backgrounds and media for the current video.
+                {t("messages.studioLayout.studioToolsDesc")}
               </SheetDescription>
             </SheetHeader>
             <StudioSidebar
@@ -1855,8 +1842,8 @@ export default function StudioLayout() {
             <div className="hidden md:flex w-8 shrink-0 border-r bg-card flex-col items-center py-2">
               <button
                 type="button"
-                title="Show sidebar"
-                aria-label="Show sidebar"
+                title={t("labels.studioLayout.showSidebar")}
+                aria-label={t("labels.studioLayout.showSidebar")}
                 className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setStudioSidebarHidden(false)}
               >
@@ -1899,13 +1886,13 @@ export default function StudioLayout() {
                 type="button"
                 onClick={() => setMobileSidebarOpen(true)}
                 className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-md border bg-background text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                aria-label="Open studio tools"
+                aria-label={t("labels.studioLayout.openStudioTools")}
               >
                 <PanelLeftOpen className="w-4 h-4" aria-hidden="true" />
-                Tools
+                {t("actions.toolsMobile")}
               </button>
               <span className="text-xs text-muted-foreground truncate flex-1" aria-live="polite">
-                {state.name || "Untitled project"}
+                {state.name || t("labels.untitledProject")}
               </span>
             </div>
 
@@ -1948,7 +1935,7 @@ export default function StudioLayout() {
             <div
               role="separator"
               aria-orientation="horizontal"
-              aria-label="Resize video preview"
+              aria-label={t("labels.studioLayout.resizeVideoPreview")}
               aria-valuenow={Math.round(videoHeight)}
               aria-valuemin={80}
               tabIndex={0}
@@ -1997,7 +1984,7 @@ export default function StudioLayout() {
                 onClick={() => setTimelineOpen((v) => !v)}
               >
                 {timelineOpen ? <ChevronDown className="w-3 h-3" aria-hidden="true" /> : <ChevronRight className="w-3 h-3" aria-hidden="true" />}
-                Timeline
+                {t("labels.studioLayout.timeline")}
               </button>
               <div id="studio-timeline-panel" hidden={!timelineOpen}>
                 {timelineOpen && (
@@ -2010,7 +1997,7 @@ export default function StudioLayout() {
                     />
                   ) : (
                     <div className="px-5 py-3 text-xs text-muted-foreground">
-                      Generate a script to see the timeline
+                      {t("messages.studioLayout.generateToSeeTimeline")}
                     </div>
                   )
                 )}
@@ -2057,7 +2044,7 @@ export default function StudioLayout() {
                   pushHistory(restored);
                   patchState({ script: restored });
                   recompile(restored);
-                  toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
+                  toast({ title: t("messages.studioLayout.versionRestoredTitle"), description: t("messages.studioLayout.versionRestoredDesc") });
                 }
               }}
               onApplyRewrite={(scenes) => {
@@ -2066,7 +2053,7 @@ export default function StudioLayout() {
                 pushHistory(updated);
                 patchState({ script: updated });
                 recompile(updated);
-                toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
+                toast({ title: t("messages.studioLayout.scriptRewrittenTitle"), description: t("messages.studioLayout.scriptRewrittenDesc", { count: scenes.length }) });
               }}
               onApplyHook={(patch) => {
                 if (!state.script || state.script.scenes.length === 0) return;
@@ -2079,7 +2066,7 @@ export default function StudioLayout() {
                 pushHistory(next);
                 patchState({ script: next });
                 recompile(next);
-                toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
+                toast({ title: t("messages.studioLayout.hookAppliedTitle"), description: t("messages.studioLayout.hookAppliedDesc") });
               }}
               onVoiceoverGenerated={(results) => {
                 const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
@@ -2090,12 +2077,12 @@ export default function StudioLayout() {
                   voiceover: {
                     enabled: true,
                     voiceId: state.voiceover?.voiceId ?? "browser-default",
-                    voiceName: state.voiceover?.voiceName ?? "Default",
+                    voiceName: state.voiceover?.voiceName ?? t("labels.studioLayout.defaultVoiceName"),
                     speed: state.voiceover?.speed ?? 1,
                     scenes,
                   },
                 });
-                toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
+                toast({ title: t("messages.studioLayout.voiceoverAddedTitle"), description: t("messages.studioLayout.voiceoverAddedDesc", { count: results.length }) });
               }}
               onVoiceConfigChange={(cfg) => {
                 patchState({
@@ -2137,14 +2124,14 @@ export default function StudioLayout() {
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-card border rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="font-semibold">Publish to LinkedIn</h2>
+              <h2 className="font-semibold">{t("messages.studioLayout.publishToLinkedIn")}</h2>
               <button type="button" onClick={() => setLinkedInPublishOpen(false)} className="text-muted-foreground hover:text-foreground">
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("actions.close")}</span>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-5">
-              <Suspense fallback={<div className="text-center py-8 text-muted-foreground text-sm">Loading…</div>}>
+              <Suspense fallback={<div className="text-center py-8 text-muted-foreground text-sm">{t("status.loading")}</div>}>
                 <LinkedInPublisher
                   projectId={state.projectId}
                   videoBlob={state.videoBlob}
@@ -2153,7 +2140,7 @@ export default function StudioLayout() {
                   ).join(" ").slice(0, 200) ?? ""}
                   onPublished={() => {
                     setLinkedInPublishOpen(false);
-                    toast({ title: "Published to LinkedIn!" });
+                    toast({ title: t("messages.studioLayout.publishedToLinkedIn") });
                   }}
                 />
               </Suspense>
@@ -2190,16 +2177,16 @@ export default function StudioLayout() {
           <CreatorTemplatesPanel
             open={myTemplatesOpen}
             onOpenChange={setMyTemplatesOpen}
-            onEditTemplate={(t) => {
+            onEditTemplate={(tmpl) => {
               // Loading the source project is a separate flow; for now we
               // just close the panel and surface a toast pointing at the
               // marketplace listing so the user can navigate manually.
               setMyTemplatesOpen(false);
               toast({
-                title: "Open template to edit",
-                description: t.sourceProjectId
-                  ? "Switch to the source project from Recent to keep editing."
-                  : "Templates without a source project can be edited from the marketplace listing.",
+                title: t("messages.studioLayout.openTemplateToEditTitle"),
+                description: tmpl.sourceProjectId
+                  ? t("messages.studioLayout.openTemplateSwitchDesc")
+                  : t("messages.studioLayout.openTemplateMarketplaceDesc"),
               });
             }}
           />
@@ -2212,12 +2199,9 @@ export default function StudioLayout() {
       <AlertDialog open={regenerateConfirmOpen} onOpenChange={setRegenerateConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Update storyboard with new prompt?</AlertDialogTitle>
+            <AlertDialogTitle>{t("messages.studioLayout.regenerateDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              You've edited the prompt since the storyboard was generated.
-              Updating will regenerate the scenes from the new prompt — your
-              custom edits to scene text, images, and audio will be preserved
-              where possible.
+              {t("messages.studioLayout.regenerateDialogDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2227,7 +2211,7 @@ export default function StudioLayout() {
                 setTab("storyboard");
               }}
             >
-              Keep current
+              {t("actions.studioLayout.keepCurrent")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
@@ -2235,7 +2219,7 @@ export default function StudioLayout() {
                 void handleGenerate();
               }}
             >
-              Update
+              {t("labels.update")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2249,23 +2233,23 @@ export default function StudioLayout() {
             // step renders whether the user picked a video / comic /
             // podcast / game template. Specific output verbs stay on
             // the per-template intake form (`firstTabLabel`).
-            title: "Welcome to the Studio!",
-            body: "Create a professional pitch in minutes — video, comic, podcast, or game. Start by pasting your resume or job description in the first tab.",
+            title: t("headings.studioLayout.onboard1Title"),
+            body: t("messages.studioLayout.onboard1Body"),
             icon: <Sparkles className="h-8 w-8 text-primary" />,
           },
           {
-            title: "Generate Your Script",
-            body: "Click 'Generate Script' on the right panel. Our AI will write a compelling script tailored to your background and target role.",
+            title: t("headings.studioLayout.onboard2Title"),
+            body: t("messages.studioLayout.onboard2Body"),
             icon: <Zap className="h-8 w-8 text-primary" />,
           },
           {
-            title: "Preview & Customise",
-            body: "Your video preview updates live. Drag the divider below the video to resize it. Switch to the Storyboard tab to edit individual scenes.",
+            title: t("headings.studioLayout.onboard3Title"),
+            body: t("messages.studioLayout.onboard3Body"),
             icon: <Play className="h-8 w-8 text-primary" />,
           },
           {
-            title: "Export & Share",
-            body: "When happy with your video, export as MP4 or publish directly to your profile. You can also post to LinkedIn or YouTube.",
+            title: t("headings.studioLayout.onboard4Title"),
+            body: t("messages.studioLayout.onboard4Body"),
             icon: <Share2 className="h-8 w-8 text-primary" />,
           },
         ];
@@ -2300,7 +2284,7 @@ export default function StudioLayout() {
                       setOnboardingStep(-1);
                     }}
                   >
-                    Skip
+                    {t("actions.skip")}
                   </Button>
                   <Button
                     size="sm"
@@ -2313,7 +2297,7 @@ export default function StudioLayout() {
                       }
                     }}
                   >
-                    {isLast ? "Get Started" : "Next"}
+                    {isLast ? t("actions.getStarted") : t("actions.next")}
                     {!isLast && <ChevronRight className="ml-1 h-4 w-4" />}
                   </Button>
                 </div>

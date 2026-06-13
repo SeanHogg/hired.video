@@ -18,6 +18,7 @@ import {
   Store,
   Heart,
   Palette,
+  Handshake,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -77,6 +78,7 @@ export default function Sidebar({
     { name: t("labels.tasksAndEvents", { defaultValue: "Tasks / Events" }), href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false },
     { name: t("labels.marketplace"), href: "/search", icon: Store, exactMatch: false },
+    { name: t("labels.gigs", { defaultValue: "Gigs" }), href: "/gigs", icon: Handshake, exactMatch: false },
     { name: t("labels.myServices"), href: "/services", icon: ShoppingBag, exactMatch: false },
   ];
 

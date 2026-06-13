@@ -14,6 +14,7 @@ import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
+import GigsPanel from "@/components/creator/GigsPanel";
 import CoursesManagerPanel from "@/components/creator/CoursesManagerPanel";
 import ArticlesManagerPanel from "@/components/creator/ArticlesManagerPanel";
 import VoiceCloneManager from "@/components/studio/VoiceCloneManager";
@@ -39,12 +40,13 @@ export type CreatorWorkspaceTab =
   | "profile"
   | "payouts"
   | "portfolio"
+  | "gigs"
   | "account"
   | "courses"
   | "articles"
   | "voice-clones";
 
-const TAB_VALUES = ["offerings", "profile", "payouts", "portfolio", "account", "courses", "articles", "voice-clones"] as const;
+const TAB_VALUES = ["offerings", "profile", "payouts", "portfolio", "gigs", "account", "courses", "articles", "voice-clones"] as const;
 
 interface Props {
   onProfileChange?: (next: CreatorProfile | null) => void;
@@ -179,6 +181,7 @@ export default function CreatorWorkspace({
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="payouts">Payouts &amp; Earnings</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            <TabsTrigger value="gigs">Gigs</TabsTrigger>
             {profile?.coursesActive && <TabsTrigger value="courses">Courses</TabsTrigger>}
             {profile?.articlesActive && <TabsTrigger value="articles">Articles</TabsTrigger>}
             {profile?.voiceActive && <TabsTrigger value="voice-clones">Voice Clones</TabsTrigger>}
@@ -330,6 +333,13 @@ export default function CreatorWorkspace({
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Gigs — the creator's awarded gig-marketplace work, rendered on the
+            same reusable <TaskBoard> as the Tasks page. Self-fetches + self-
+            gates (empty state links to the marketplace). */}
+        <TabsContent value="gigs">
+          <GigsPanel />
         </TabsContent>
 
         {/* Courses authoring — hosted at /services/creator/courses. Tab only

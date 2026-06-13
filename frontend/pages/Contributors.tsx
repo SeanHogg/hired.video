@@ -14,6 +14,7 @@
 // being wrapped in `if (count > 0)` guards by the caller.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { usePageChrome } from "@/lib/seo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, Trash2, UserPlus, UserCheck, Clock } from "lucide-react";
@@ -51,18 +52,16 @@ interface GrantRow {
 
 export default function Contributors() {
   usePageChrome();
+  const { t } = useTranslation();
   const { user } = useAuth();  if (!user) return null;
 
   return (
     <AppShell bgClassName="bg-background">
 <main className="px-4 sm:px-6 lg:px-8 pb-12">
           <header className="py-6">
-            <h1 className="text-2xl font-bold">Contributors</h1>
+            <h1 className="text-2xl font-bold">{t("headings.contributors.title")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Invite a video editor or coach to make videos on your behalf, and see
-              who has invited you to edit on theirs. Anything you create as a
-              contributor stays with the person who invited you, and shows up on
-              your portfolio as a credit.
+              {t("messages.contributors.intro")}
             </p>
           </header>
 
@@ -78,6 +77,7 @@ export default function Contributors() {
 // ─── Section 1: people I've invited ─────────────────────────────────────────
 
 function InvitedByMeSection() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -101,10 +101,10 @@ function InvitedByMeSection() {
       queryClient.invalidateQueries({ queryKey: ["workspace-grants", "given"] });
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       setEmail("");
-      toast({ title: "Invitation sent", description: "They can now edit on your behalf in Studio." });
+      toast({ title: t("messages.contributors.inviteSentTitle"), description: t("messages.contributors.inviteSentDescription") });
     },
     onError: (err: any) => {
-      toast({ title: "Couldn't invite", description: err?.message ?? "Try again later.", variant: "destructive" });
+      toast({ title: t("messages.contributors.inviteErrorTitle"), description: err?.message ?? t("messages.contributors.tryAgainLater"), variant: "destructive" });
     },
   });
 
@@ -115,7 +115,7 @@ function InvitedByMeSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspace-grants", "given"] });
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      toast({ title: "Access revoked" });
+      toast({ title: t("messages.contributors.accessRevoked") });
     },
   });
 
@@ -125,11 +125,10 @@ function InvitedByMeSection() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <UserPlus className="w-5 h-5" /> People I've Invited
+          <UserPlus className="w-5 h-5" /> {t("headings.contributors.peopleIveInvited")}
         </CardTitle>
         <CardDescription>
-          Editors / coaches who can act on your behalf in Studio. Their work shows
-          up on their own profile as a portfolio credit and on yours as a regular video.
+          {t("messages.contributors.peopleIveInvitedDescription")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -142,7 +141,7 @@ function InvitedByMeSection() {
         >
           <div className="flex-1">
             <Label htmlFor="invite-email" className="sr-only">
-              Contributor email
+              {t("labels.contributors.contributorEmail")}
             </Label>
             <Input
               id="invite-email"
@@ -154,15 +153,14 @@ function InvitedByMeSection() {
             />
           </div>
           <Button type="submit" disabled={invite.isPending || !email.trim()}>
-            {invite.isPending ? "Inviting…" : "Invite"}
+            {invite.isPending ? t("actions.contributors.inviting") : t("actions.contributors.invite")}
           </Button>
         </form>
 
-        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {isLoading && <p className="text-sm text-muted-foreground">{t("status.loading")}</p>}
         {!isLoading && activeGrants.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            You haven't invited anyone yet. The contributor must already have a
-            hired.video account before you can invite them.
+            {t("messages.contributors.noneInvitedYet")}
           </p>
         )}
         <ul className="divide-y rounded-md border">
@@ -170,7 +168,7 @@ function InvitedByMeSection() {
             <li key={g.id} className="flex items-center justify-between gap-4 p-4">
               <div className="min-w-0 flex-1">
                 <div className="font-medium truncate">
-                  {g.contributorName ?? g.contributorEmail ?? "Unknown"}
+                  {g.contributorName ?? g.contributorEmail ?? t("labels.unknown")}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
                   <Mail className="w-3 h-3" /> {g.contributorEmail ?? "—"}
@@ -183,7 +181,7 @@ function InvitedByMeSection() {
                 size="sm"
                 onClick={() => revoke.mutate(g.id)}
                 disabled={revoke.isPending}
-                aria-label="Revoke access"
+                aria-label={t("labels.contributors.revokeAccess")}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -198,6 +196,7 @@ function InvitedByMeSection() {
 // ─── Section 2: invitations granted to me ───────────────────────────────────
 
 function InvitedToMeSection() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery<GrantRow[]>({
     queryKey: ["workspace-grants", "received"],
     queryFn: async () => {
@@ -212,18 +211,17 @@ function InvitedToMeSection() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <UserCheck className="w-5 h-5" /> People Who've Invited Me
+          <UserCheck className="w-5 h-5" /> {t("headings.contributors.peopleWhoveInvitedMe")}
         </CardTitle>
         <CardDescription>
-          Subjects who have authorised you to make videos on their behalf. Switch
-          between workspaces from the dropdown in the Studio sidebar.
+          {t("messages.contributors.peopleWhoveInvitedMeDescription")}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {isLoading && <p className="text-sm text-muted-foreground">{t("status.loading")}</p>}
         {!isLoading && grants.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No-one has invited you as a contributor yet.
+            {t("messages.contributors.noneInvitedMeYet")}
           </p>
         )}
         <ul className="divide-y rounded-md border">
@@ -231,14 +229,14 @@ function InvitedToMeSection() {
             <li key={g.id} className="flex items-center justify-between gap-4 p-4">
               <div className="min-w-0 flex-1">
                 <div className="font-medium truncate">
-                  {g.subjectName ?? g.subjectEmail ?? "Unknown"}
+                  {g.subjectName ?? g.subjectEmail ?? t("labels.unknown")}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
                   <Mail className="w-3 h-3" /> {g.subjectEmail ?? "—"}
                   <Badge variant="outline" className="text-[10px]">{g.role}</Badge>
                   {g.expiresAt && (
                     <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Expires {new Date(g.expiresAt).toLocaleDateString()}
+                      <Clock className="w-3 h-3" /> {t("labels.contributors.expires", { date: new Date(g.expiresAt).toLocaleDateString() })}
                     </span>
                   )}
                 </div>

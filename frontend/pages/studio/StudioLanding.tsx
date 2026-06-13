@@ -24,6 +24,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation, type TFunction } from "react-i18next";
 import {
   Eye,
   Globe,
@@ -143,6 +144,7 @@ type TemplateRow =
 
 export default function StudioLanding() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const { selection } = useWorkspace();
@@ -264,7 +266,7 @@ export default function StudioLanding() {
               crypto.randomUUID(),
             );
           }
-          return { name: resume.title || "Resume", documentState };
+          return { name: resume.title || t("labels.studioLanding.resumeFallbackName"), documentState };
         },
       },
       {
@@ -272,7 +274,7 @@ export default function StudioLanding() {
         load: async (id) => {
           const job = await jobService.getJobById(id);
           return {
-            name: job.title || "Job Posting",
+            name: job.title || t("labels.studioLanding.jobFallbackName"),
             documentState: createJobDocumentState(id, () => crypto.randomUUID()),
           };
         },
@@ -282,7 +284,7 @@ export default function StudioLanding() {
         load: async (id) => {
           const article = await articleService.getMine(id);
           return {
-            name: article.title || "Article",
+            name: article.title || t("labels.studioLanding.articleFallbackName"),
             documentState: articleToDocumentState(
               { id: article.id, title: article.title, bodyMd: article.bodyMd },
               () => crypto.randomUUID(),
@@ -315,8 +317,8 @@ export default function StudioLanding() {
           navigateToProject(created);
         } catch (err) {
           toast({
-            title: "Couldn't open content",
-            description: err instanceof Error ? err.message : "Unknown error",
+            title: t("messages.studioLanding.openContentFailed"),
+            description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
             variant: "destructive",
           });
         }
@@ -340,8 +342,8 @@ export default function StudioLanding() {
           const script = tpl.videoScript as VideoScript | null | undefined;
           if (!script) {
             toast({
-              title: "Template has no content",
-              description: "The creator hasn't finished setting it up yet.",
+              title: t("messages.studioLanding.templateNoContentTitle"),
+              description: t("messages.studioLanding.templateNoContentBody"),
               variant: "destructive",
             });
             return;
@@ -350,8 +352,8 @@ export default function StudioLanding() {
           navigateToProject(created);
         } catch (err) {
           toast({
-            title: "Couldn't load template",
-            description: err instanceof Error ? err.message : "Unknown error",
+            title: t("messages.studioLanding.loadTemplateFailed"),
+            description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
             variant: "destructive",
           });
         }
@@ -390,8 +392,8 @@ export default function StudioLanding() {
       } catch (err) {
         if (!cancelled) {
           toast({
-            title: "Couldn't load your projects",
-            description: err instanceof Error ? err.message : "Unknown error",
+            title: t("messages.studioLanding.loadProjectsFailed"),
+            description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
             variant: "destructive",
           });
           setProjects([]);
@@ -543,8 +545,8 @@ export default function StudioLanding() {
     const script = template.videoScript as VideoScript | null | undefined;
     if (!script) {
       toast({
-        title: "Template has no content",
-        description: "The creator hasn't finished setting it up yet.",
+        title: t("messages.studioLanding.templateNoContentTitle"),
+        description: t("messages.studioLanding.templateNoContentBody"),
         variant: "destructive",
       });
       return;
@@ -558,8 +560,8 @@ export default function StudioLanding() {
       if (created) navigate(`/studio/${encodeURIComponent(created.id)}`);
     } catch (err) {
       toast({
-        title: "Couldn't open template",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("messages.studioLanding.openTemplateFailed"),
+        description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
         variant: "destructive",
       });
     }
@@ -639,9 +641,9 @@ export default function StudioLanding() {
       <section className="mb-12">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-medium">Templates</h2>
+            <h2 className="text-lg font-medium">{t("headings.studioLanding.templates")}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pick a preset — every kind the studio supports ships its own templates — or reuse one you've published or purchased.
+              {t("messages.studioLanding.templatesDescription")}
             </p>
           </div>
           <ViewModeToggle
@@ -685,7 +687,7 @@ export default function StudioLanding() {
             "My projects" (was "My videos" pre-#894) because the studio
             now hosts every media kind, not just video. */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-medium">My content</h2>
+          <h2 className="text-lg font-medium">{t("headings.studioLanding.myContent")}</h2>
           <div className="flex items-center gap-3">
             <ViewModeToggle
               value={contentView}
@@ -698,19 +700,19 @@ export default function StudioLanding() {
         {/* Visibility axis — gates the grid below by `isPublic`. Reuses
             the templates-section FilterPillRow so the visual matches
             the Type / Use-for rows above. */}
-        <FilterPillRow label="Visibility">
+        <FilterPillRow label={t("fields.visibility.label")}>
           <CategoryPill
-            label="All"
+            label={t("labels.allShort")}
             active={visibilityFilter === "all"}
             onClick={() => setVisibilityFilter("all")}
           />
           <CategoryPill
-            label="Public"
+            label={t("labels.public")}
             active={visibilityFilter === "public"}
             onClick={() => setVisibilityFilter("public")}
           />
           <CategoryPill
-            label="Private"
+            label={t("labels.private")}
             active={visibilityFilter === "private"}
             onClick={() => setVisibilityFilter("private")}
           />
@@ -730,18 +732,20 @@ export default function StudioLanding() {
             <div>
               {totalProjectCount === 0 ? (
                 <>
-                  <p className="text-sm font-medium">No projects yet</p>
+                  <p className="text-sm font-medium">{t("messages.studioLanding.noProjectsYet")}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Pick a template above to get started.
+                    {t("messages.studioLanding.noProjectsYetHint")}
                   </p>
                 </>
               ) : (
                 <>
                   <p className="text-sm font-medium">
-                    No {visibilityFilter} projects
+                    {visibilityFilter === "public"
+                      ? t("messages.studioLanding.noPublicProjects")
+                      : t("messages.studioLanding.noPrivateProjects")}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Switch the visibility filter or start a new project from a template above.
+                    {t("messages.studioLanding.noFilteredProjectsHint")}
                   </p>
                 </>
               )}
@@ -804,6 +808,7 @@ function StudioVideoCard({
   onRenamed: (next: StudioProject) => void;
   onRequestDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [titleDraft, setTitleDraft] = useState(project.title);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -842,18 +847,18 @@ function StudioVideoCard({
       // retyping (#663). The toast offers a one-click retry action that
       // re-enters edit mode pinned to the same draft.
       toast({
-        title: "Couldn't rename",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("messages.studioLanding.renameFailed"),
+        description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
         variant: "destructive",
         action: (
           <ToastAction
-            altText="Retry rename"
+            altText={t("labels.studioLanding.retryRenameAlt")}
             onClick={() => {
               setEditingTitle(true);
               queueMicrotask(() => titleInputRef.current?.focus());
             }}
           >
-            Retry
+            {t("actions.retry")}
           </ToastAction>
         ),
       });
@@ -867,8 +872,10 @@ function StudioVideoCard({
   // Visual decision resolved via the shared `projectVisibilityVisual`
   // helper so this surface and `VisibilityChip` stay in lockstep
   // (#673).
-  const { Icon: VisibilityIcon, label: visibilityLabel } =
-    projectVisibilityVisual(project.isPublic);
+  const { Icon: VisibilityIcon } = projectVisibilityVisual(project.isPublic);
+  const visibilityLabel = project.isPublic
+    ? t("labels.public")
+    : t("labels.private");
 
   return (
     <div className="group overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">
@@ -877,7 +884,7 @@ function StudioVideoCard({
           type="button"
           onClick={onOpen}
           className="block h-full w-full"
-          aria-label={`Open ${project.title}`}
+          aria-label={t("labels.studioLanding.openProjectAria", { title: project.title })}
         >
           <VideoProjectThumbnail project={project} />
         </button>
@@ -890,8 +897,8 @@ function StudioVideoCard({
             e.stopPropagation();
             onShowDetails();
           }}
-          title={`${visibilityLabel} — click for details`}
-          aria-label={`${visibilityLabel} — open details`}
+          title={t("labels.studioLanding.visibilityBadgeTitle", { label: visibilityLabel })}
+          aria-label={t("labels.studioLanding.visibilityBadgeAria", { label: visibilityLabel })}
           className={cn(
             "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold shadow-md backdrop-blur transition",
             project.isPublic
@@ -926,7 +933,7 @@ function StudioVideoCard({
             className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
           >
             <Pencil className="h-3.5 w-3.5" />
-            Edit
+            {t("actions.edit")}
           </button>
           <button
             type="button"
@@ -937,7 +944,7 @@ function StudioVideoCard({
             className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
           >
             <Globe className="h-3.5 w-3.5" />
-            Details
+            {t("actions.details")}
           </button>
           <button
             type="button"
@@ -945,8 +952,8 @@ function StudioVideoCard({
               e.stopPropagation();
               onRequestDelete();
             }}
-            aria-label={`Delete ${project.title}`}
-            title="Delete"
+            aria-label={t("labels.studioLanding.deleteProjectAria", { title: project.title })}
+            title={t("actions.delete")}
             className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-600 shadow-md hover:bg-red-500 hover:text-white"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -977,7 +984,7 @@ function StudioVideoCard({
             type="button"
             onClick={() => setEditingTitle(true)}
             className="flex w-full items-center gap-1.5 text-left"
-            aria-label={`Rename ${project.title}`}
+            aria-label={t("labels.studioLanding.renameProjectAria", { title: project.title })}
           >
             <span className="truncate text-sm font-medium">
               {project.title}
@@ -990,8 +997,10 @@ function StudioVideoCard({
         )}
         <p className="mt-1 text-xs text-muted-foreground">
           {renaming
-            ? "Saving…"
-            : `Updated ${new Date(project.updateDateTime).toLocaleDateString()}`}
+            ? t("messages.studioLanding.saving")
+            : t("labels.studioLanding.updatedOn", {
+                date: new Date(project.updateDateTime).toLocaleDateString(),
+              })}
         </p>
       </div>
     </div>
@@ -1090,6 +1099,7 @@ function StudioContentTable({
   onShowDetails: (project: StudioProject) => void;
   onRequestDelete: (project: StudioProject) => void;
 }) {
+  const { t } = useTranslation();
   const { pageItems, paginationProps } = usePaginatedList(projects, 12);
   return (
     <div>
@@ -1097,17 +1107,19 @@ function StudioContentTable({
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 font-medium">Name</th>
-            <th className="px-3 py-2 font-medium">Type</th>
-            <th className="px-3 py-2 font-medium">Visibility</th>
-            <th className="px-3 py-2 font-medium">Updated</th>
-            <th className="px-3 py-2 text-right font-medium">Actions</th>
+            <th className="px-3 py-2 font-medium">{t("labels.name")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.type")}</th>
+            <th className="px-3 py-2 font-medium">{t("fields.visibility.label")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.updated")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.actions")}</th>
           </tr>
         </thead>
         <tbody>
           {pageItems.map((project) => {
-            const { Icon: VisibilityIcon, label: visibilityLabel } =
-              projectVisibilityVisual(project.isPublic);
+            const { Icon: VisibilityIcon } = projectVisibilityVisual(project.isPublic);
+            const visibilityLabel = project.isPublic
+              ? t("labels.public")
+              : t("labels.private");
             return (
               <tr
                 key={project.id}
@@ -1145,7 +1157,7 @@ function StudioContentTable({
                       onClick={() => onOpen(project.id)}
                     >
                       <Pencil className="mr-1 h-3.5 w-3.5" />
-                      Edit
+                      {t("actions.edit")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -1153,13 +1165,13 @@ function StudioContentTable({
                       onClick={() => onShowDetails(project)}
                     >
                       <Globe className="mr-1 h-3.5 w-3.5" />
-                      Details
+                      {t("actions.details")}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => onRequestDelete(project)}
-                      aria-label={`Delete ${project.title}`}
+                      aria-label={t("labels.studioLanding.deleteProjectAria", { title: project.title })}
                       className="text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1205,6 +1217,7 @@ function UnifiedTemplateCarousel({
   onPickOwned: (template: StudioTemplate) => void;
   onPreviewOwned: (template: StudioTemplate) => void;
 }) {
+  const { t } = useTranslation();
   // Owned-only filters depend on the licensed-templates fetch; the
   // built-in catalog is static so it never reads from `loading`. Only
   // gate the skeleton on `loading` when the active filter actually needs
@@ -1229,15 +1242,15 @@ function UnifiedTemplateCarousel({
     const kindLabel = kindFilter !== "all" ? MEDIA_KIND_UI[kindFilter].badgeLabel : null;
     const message = useForFilter === "created"
       ? kindLabel
-        ? `You haven't published any ${kindLabel} templates yet.`
-        : "You haven't published any templates yet."
+        ? t("messages.studioLanding.emptyCreatedKind", { kind: kindLabel })
+        : t("messages.studioLanding.emptyCreated")
       : useForFilter === "purchased"
         ? kindLabel
-          ? `You haven't purchased or claimed any ${kindLabel} templates yet.`
-          : "You haven't purchased or claimed any templates yet."
+          ? t("messages.studioLanding.emptyPurchasedKind", { kind: kindLabel })
+          : t("messages.studioLanding.emptyPurchased")
         : kindLabel
-          ? `No ${kindLabel} templates match your search yet — try a different kind or refine your search.`
-          : "No templates match your search.";
+          ? t("messages.studioLanding.emptySearchKind", { kind: kindLabel })
+          : t("messages.studioLanding.emptySearch");
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 py-12 text-center text-sm text-muted-foreground">
         {message}
@@ -1331,6 +1344,7 @@ function TemplateTable({
   onPickOwned: (template: StudioTemplate) => void;
   onPreviewOwned: (template: StudioTemplate) => void;
 }) {
+  const { t } = useTranslation();
   const { pageItems, paginationProps } = usePaginatedList(rows, 12);
   return (
     <div>
@@ -1338,10 +1352,10 @@ function TemplateTable({
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 font-medium">Name</th>
-            <th className="px-3 py-2 font-medium">Type</th>
-            <th className="px-3 py-2 font-medium">Source</th>
-            <th className="px-3 py-2 text-right font-medium">Actions</th>
+            <th className="px-3 py-2 font-medium">{t("labels.name")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.type")}</th>
+            <th className="px-3 py-2 font-medium">{t("labels.studioLanding.source")}</th>
+            <th className="px-3 py-2 text-right font-medium">{t("labels.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -1354,7 +1368,7 @@ function TemplateTable({
                     key: `builtin:${row.template.id}`,
                     name: row.template.label,
                     mediaKind: row.template.mediaKind,
-                    source: "Starter",
+                    source: t("labels.studioLanding.sourceStarter"),
                     canPreview: true,
                     onUse: () => onPickBuiltin(row.template.id),
                     onPreview: () => onPreviewBuiltin(row.template.id),
@@ -1363,7 +1377,7 @@ function TemplateTable({
                     key: `owned:${row.owned.provenance}:${row.owned.template.id}`,
                     name: row.owned.template.name,
                     mediaKind: row.owned.template.mediaKind,
-                    source: PROVENANCE_BADGE[row.owned.provenance].label,
+                    source: provenanceBadge(t)[row.owned.provenance].label,
                     canPreview: row.owned.template.visibility !== "private",
                     onUse: () => onPickOwned(row.owned.template),
                     onPreview: () => onPreviewOwned(row.owned.template),
@@ -1390,12 +1404,12 @@ function TemplateTable({
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={cells.onUse}>
                       <Pencil className="mr-1 h-3.5 w-3.5" />
-                      Use
+                      {t("actions.use")}
                     </Button>
                     {cells.canPreview && (
                       <Button variant="ghost" size="sm" onClick={cells.onPreview}>
                         <Eye className="mr-1 h-3.5 w-3.5" />
-                        Preview
+                        {t("actions.preview")}
                       </Button>
                     )}
                   </div>
@@ -1420,6 +1434,7 @@ function BuiltinTemplateCard({
   onPick: (id: string) => void;
   onPreview: (id: ContentTemplate) => void;
 }) {
+  const { t } = useTranslation();
   const Icon = template.icon;
   return (
     <div className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">
@@ -1430,7 +1445,7 @@ function BuiltinTemplateCard({
         type="button"
         onClick={() => onPick(template.id)}
         className="flex flex-1 flex-col text-left"
-        aria-label={`Use ${template.label} template`}
+        aria-label={t("labels.studioLanding.useTemplateAria", { name: template.label })}
       >
         <div className="relative">
           <TemplateThumb template={template} />
@@ -1440,7 +1455,7 @@ function BuiltinTemplateCard({
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
               <Pencil className="h-3.5 w-3.5" />
-              Use
+              {t("actions.use")}
             </span>
           </div>
           {/* Kind badge — bottom-left, always visible, self-hides for
@@ -1472,11 +1487,11 @@ function BuiltinTemplateCard({
       <button
         type="button"
         onClick={() => onPreview(template.id)}
-        aria-label={`Preview ${template.label} template`}
+        aria-label={t("labels.studioLanding.previewTemplateAria", { name: template.label })}
         className="absolute right-2 top-2 z-10 hidden items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-md backdrop-blur transition hover:bg-white group-hover:flex group-focus-within:flex"
       >
         <Eye className="h-3.5 w-3.5" />
-        Preview
+        {t("actions.preview")}
       </button>
     </div>
   );
@@ -1502,8 +1517,9 @@ function OwnedTemplateCard({
   onPick: (template: StudioTemplate) => void;
   onPreview: (template: StudioTemplate) => void;
 }) {
+  const { t } = useTranslation();
   const { template, provenance } = owned;
-  const badge = PROVENANCE_BADGE[provenance];
+  const badge = provenanceBadge(t)[provenance];
   const canPreview = template.visibility !== "private";
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">
@@ -1511,7 +1527,7 @@ function OwnedTemplateCard({
         type="button"
         onClick={() => onPick(template)}
         className="flex flex-1 flex-col text-left"
-        aria-label={`Use ${template.name} template`}
+        aria-label={t("labels.studioLanding.useTemplateAria", { name: template.name })}
       >
         <div className="relative aspect-video w-full overflow-hidden bg-muted">
           {template.thumbnailUrl ? (
@@ -1529,7 +1545,7 @@ function OwnedTemplateCard({
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
               <Pencil className="h-3.5 w-3.5" />
-              Use
+              {t("actions.use")}
             </span>
           </div>
           {/* Kind badge — bottom-left, symmetric with BuiltinTemplateCard.
@@ -1574,7 +1590,7 @@ function OwnedTemplateCard({
         <button
           type="button"
           onClick={() => onPreview(template)}
-          aria-label={`Preview ${template.name} template`}
+          aria-label={t("labels.studioLanding.previewTemplateAria", { name: template.name })}
           className="absolute right-2 top-2 z-10 hidden items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-md backdrop-blur transition hover:bg-white group-hover:flex group-focus-within:flex"
         >
           <Eye className="h-3.5 w-3.5" />
@@ -1585,7 +1601,7 @@ function OwnedTemplateCard({
   );
 }
 
-const PROVENANCE_BADGE: Record<
+function provenanceBadge(t: TFunction): Record<
   OwnedTemplate["provenance"],
   {
     label: string;
@@ -1594,26 +1610,28 @@ const PROVENANCE_BADGE: Record<
     pillClassName: string;
     fallbackBlurb: string;
   }
-> = {
-  created: {
-    label: "Yours",
-    Icon: UserIcon,
-    iconClassName: "bg-brand-purple/10 text-brand-purple",
-    pillClassName: "bg-brand-purple/90 text-white",
-    fallbackBlurb: "Your published template.",
-  },
-  purchased: {
-    label: "Purchased",
-    Icon: ShoppingBag,
-    iconClassName: "bg-emerald-500/10 text-emerald-600",
-    pillClassName: "bg-emerald-500/90 text-white",
-    fallbackBlurb: "Template you purchased from the marketplace.",
-  },
-  claimed: {
-    label: "Claimed",
-    Icon: Sparkles,
-    iconClassName: "bg-sky-500/10 text-sky-600",
-    pillClassName: "bg-sky-500/90 text-white",
-    fallbackBlurb: "Free template you claimed.",
-  },
-};
+> {
+  return {
+    created: {
+      label: t("labels.studioLanding.provenanceYours"),
+      Icon: UserIcon,
+      iconClassName: "bg-brand-purple/10 text-brand-purple",
+      pillClassName: "bg-brand-purple/90 text-white",
+      fallbackBlurb: t("messages.studioLanding.provenanceYoursBlurb"),
+    },
+    purchased: {
+      label: t("labels.studioLanding.provenancePurchased"),
+      Icon: ShoppingBag,
+      iconClassName: "bg-emerald-500/10 text-emerald-600",
+      pillClassName: "bg-emerald-500/90 text-white",
+      fallbackBlurb: t("messages.studioLanding.provenancePurchasedBlurb"),
+    },
+    claimed: {
+      label: t("labels.studioLanding.provenanceClaimed"),
+      Icon: Sparkles,
+      iconClassName: "bg-sky-500/10 text-sky-600",
+      pillClassName: "bg-sky-500/90 text-white",
+      fallbackBlurb: t("messages.studioLanding.provenanceClaimedBlurb"),
+    },
+  };
+}

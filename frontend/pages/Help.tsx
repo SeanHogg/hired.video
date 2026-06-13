@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
@@ -44,8 +45,9 @@ import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromFAQ } from "@/lib/audio/narrator-text";
 
 export default function Help() {  const location = useLocation();
+  const { t } = useTranslation();
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Help & Support", url: "/help" }]);
+  useBreadcrumbs([{ name: t("headings.help.helpAndSupport"), url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
   const { openAIChat } = useAI();
   const { openContactPanel } = useContactPanel();
@@ -91,32 +93,34 @@ export default function Help() {  const location = useLocation();
   // Chat still opens the AI assistant; phone keeps the tel: deeplink.
   const contactOptions = [
     {
+      id: "liveChat",
       icon: MessageCircle,
-      title: "Live Chat",
-      description: "Chat with our AI assistant",
-      action: "Start Chat",
-      available: "Mon-Fri, 9AM-6PM PST",
+      title: t("labels.help.liveChat"),
+      description: t("messages.help.liveChat"),
+      action: t("actions.help.startChat"),
+      available: t("labels.help.liveChatHours"),
       onClick: () => openAIChat(),
     },
     {
+      id: "emailSupport",
       icon: Mail,
-      title: "Email Support",
-      description: "Send our team a message",
-      action: "Send Message",
-      available: "Typical response within 24h",
+      title: t("labels.help.emailSupport"),
+      description: t("messages.help.emailSupport"),
+      action: t("actions.help.sendMessage"),
+      available: t("labels.help.emailResponseTime"),
       onClick: () =>
         openContactPanel({
           inquiryType: "support",
-          title: "Contact support",
-          description:
-            "Send our team a message and we'll get back to you within 24 hours.",
+          title: t("headings.help.contactSupport"),
+          description: t("messages.help.contactSupportPanel"),
         }),
     },
     {
+      id: "phoneSupport",
       icon: Phone,
-      title: "Phone Support",
-      description: "Call our support line",
-      action: "Call Now",
+      title: t("labels.help.phoneSupport"),
+      description: t("messages.help.phoneSupport"),
+      action: t("actions.help.callNow"),
       available: "+1 (555) 123-4567",
       href: "tel:+15551234567",
     },
@@ -124,30 +128,31 @@ export default function Help() {  const location = useLocation();
 
   const resources = [
     {
+      id: "gettingStarted",
       icon: BookOpen,
-      title: "Getting Started Guide",
-      description:
-        "Complete guide to setting up your profile and creating your first video resume",
+      title: t("headings.help.gettingStartedGuide"),
+      description: t("messages.help.gettingStartedGuide"),
       link: "/guides/getting-started",
     },
     {
+      id: "videoBestPractices",
       icon: Video,
-      title: "Video Resume Best Practices",
-      description:
-        "Tips and tricks for creating compelling video resumes that get results",
+      title: t("headings.help.videoBestPractices"),
+      description: t("messages.help.videoBestPractices"),
       link: "/guides/video-best-practices",
     },
     {
+      id: "networking",
       icon: Users,
-      title: "Networking Tips",
-      description:
-        "How to build professional connections and leverage your network",
+      title: t("headings.help.networkingTips"),
+      description: t("messages.help.networkingTips"),
       link: "/guides/networking",
     },
     {
+      id: "jobSearch",
       icon: Briefcase,
-      title: "Job Search Strategies",
-      description: "Proven strategies for finding and landing your dream job",
+      title: t("headings.help.jobSearchStrategies"),
+      description: t("messages.help.jobSearchStrategies"),
       link: "/guides/job-search",
     },
   ];
@@ -173,13 +178,12 @@ export default function Help() {  const location = useLocation();
               <div className="inline-flex items-center space-x-2 mb-4">
                 <HelpCircle className="h-8 w-8 text-primary" />
                 <span className="text-2xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Help & Support
+                  {t("headings.help.helpAndSupport")}
                 </span>
               </div>
-              <h1 className="text-4xl font-bold mb-4">How can we help you?</h1>
+              <h1 className="text-4xl font-bold mb-4">{t("headings.help.howCanWeHelp")}</h1>
               <p className="text-xl text-muted-foreground">
-                Find answers to common questions, browse our guides, or get in
-                touch with our support team.
+                {t("messages.help.intro")}
               </p>
             </div>
 
@@ -187,11 +191,11 @@ export default function Help() {  const location = useLocation();
             {searchQuery && (
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  Showing results for{" "}
+                  {t("messages.help.showingResultsPrefix")}{" "}
                   <span className="font-medium text-foreground">
                     &quot;{searchQuery}&quot;
                   </span>{" "}
-                  — use the header search to refine.
+                  {t("messages.help.showingResultsSuffix")}
                 </p>
               </div>
             )}
@@ -199,20 +203,19 @@ export default function Help() {  const location = useLocation();
             {/* Main Content */}
             <Tabs defaultValue="faq" className="space-y-6">
               <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto">
-                <TabsTrigger value="faq">FAQ</TabsTrigger>
-                <TabsTrigger value="guides">Guides</TabsTrigger>
-                <TabsTrigger value="contact">Contact</TabsTrigger>
+                <TabsTrigger value="faq">{t("labels.help.tabFaq")}</TabsTrigger>
+                <TabsTrigger value="guides">{t("labels.help.tabGuides")}</TabsTrigger>
+                <TabsTrigger value="contact">{t("labels.help.tabContact")}</TabsTrigger>
               </TabsList>
 
               {/* FAQ Tab */}
               <TabsContent value="faq" className="space-y-6">
                 <div className="text-center mb-8">
                   <h2 className="text-2xl font-bold mb-2">
-                    Frequently Asked Questions
+                    {t("headings.help.faq")}
                   </h2>
                   <p className="text-muted-foreground">
-                    Quick answers to the most common questions about
-                    hired.video
+                    {t("messages.help.faq")}
                   </p>
                 </div>
 
@@ -224,7 +227,7 @@ export default function Help() {  const location = useLocation();
                       filteredFaqs.flatMap((c) => c.questions),
                     )}
                     preferenceKey={`help.faq${searchQuery ? `.${searchQuery}` : ""}`}
-                    label="Listen to FAQs"
+                    label={t("labels.help.listenToFaqs")}
                   />
                 </div>
 
@@ -265,11 +268,10 @@ export default function Help() {  const location = useLocation();
                   <div className="text-center py-12">
                     <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-2">
-                      No results found
+                      {t("headings.help.noResults")}
                     </h3>
                     <p className="text-muted-foreground">
-                      Try adjusting your search or browse our guides and contact
-                      options.
+                      {t("messages.help.noResults")}
                     </p>
                   </div>
                 )}
@@ -278,17 +280,16 @@ export default function Help() {  const location = useLocation();
               {/* Guides Tab */}
               <TabsContent value="guides" className="space-y-6">
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold mb-2">Helpful Guides</h2>
+                  <h2 className="text-2xl font-bold mb-2">{t("headings.help.helpfulGuides")}</h2>
                   <p className="text-muted-foreground">
-                    Comprehensive guides to help you get the most out of
-                    hired.video
+                    {t("messages.help.helpfulGuides")}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {resources.map((resource, index) => (
+                  {resources.map((resource) => (
                     <Card
-                      key={index}
+                      key={resource.id}
                       className="hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <CardHeader>
@@ -309,7 +310,7 @@ export default function Help() {  const location = useLocation();
                       <CardContent>
                         <Button variant="outline" className="w-full gap-2" asChild>
                           <Link to={resource.link}>
-                            Read Guide
+                            {t("actions.help.readGuide")}
                             <ArrowRight className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -321,17 +322,16 @@ export default function Help() {  const location = useLocation();
                 {/* Additional Resources */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Video Tutorials</CardTitle>
+                    <CardTitle>{t("headings.help.videoTutorials")}</CardTitle>
                     <CardDescription>
-                      Watch step-by-step video tutorials to master hired.video
-                      features
+                      {t("messages.help.videoTutorials")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Button className="gap-2" asChild>
                       <Link to="/guides/tutorials">
                         <Video className="h-4 w-4" />
-                        Watch Tutorials
+                        {t("actions.help.watchTutorials")}
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
@@ -342,16 +342,15 @@ export default function Help() {  const location = useLocation();
               {/* Contact Tab */}
               <TabsContent value="contact" className="space-y-6">
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold mb-2">Get in Touch</h2>
+                  <h2 className="text-2xl font-bold mb-2">{t("headings.help.getInTouch")}</h2>
                   <p className="text-muted-foreground">
-                    Need personalized help? Our support team is here to assist
-                    you
+                    {t("messages.help.getInTouch")}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {contactOptions.map((option, index) => (
-                    <Card key={index} className="text-center">
+                  {contactOptions.map((option) => (
+                    <Card key={option.id} className="text-center">
                       <CardHeader>
                         <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                           <option.icon className="h-8 w-8 text-primary" />
@@ -382,16 +381,16 @@ export default function Help() {  const location = useLocation();
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Zap className="h-5 w-5" />
-                      System Status
+                      {t("headings.help.systemStatus")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-green-500 rounded-full" />
-                      <span className="text-sm">All systems operational</span>
+                      <span className="text-sm">{t("messages.help.allSystemsOperational")}</span>
                       <Button variant="link" className="ml-auto p-0 h-auto" asChild>
                         <a href="https://status.hired.video" target="_blank" rel="noopener noreferrer">
-                          View Status Page
+                          {t("actions.help.viewStatusPage")}
                           <ExternalLink className="h-3 w-3 ml-1" />
                         </a>
                       </Button>

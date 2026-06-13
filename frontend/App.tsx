@@ -134,6 +134,9 @@ const VendorSync = lazy(() => import("./pages/tools/VendorSync"));
 const ToolDetail = lazy(() => import("./pages/ToolDetail"));
 const Outreach = lazy(() => import("./pages/Outreach"));
 const SourcingBrowse = lazy(() => import("./pages/SourcingBrowse"));
+const GigMarketplace = lazy(() => import("./pages/GigMarketplace"));
+const GigCreatePage = lazy(() => import("./pages/GigCreatePage"));
+const GigDetail = lazy(() => import("./pages/GigDetail"));
 const TranscriptSearch = lazy(() => import("./pages/TranscriptSearch"));
 const HiringManagerPortal = lazy(() => import("./pages/HiringManagerPortal"));
 const PhoneDashboard = lazy(() => import("./pages/PhoneDashboard"));
@@ -783,6 +786,9 @@ const App = () => (
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />
                       <Route path="/sourcing/browse" element={<SourcingBrowse />} />
+                      <Route path="/gigs" element={<GigMarketplace />} />
+                      <Route path="/gigs/new" element={<GigCreatePage />} />
+                      <Route path="/gigs/:id" element={<GigDetail />} />
                       <Route path="/transcripts/search" element={<TranscriptSearch />} />
                       <Route path="/pipeline/portal/:token" element={<HiringManagerPortal />} />
                       <Route path="/jobs/create" element={<JobCreatePage />} />

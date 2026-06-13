@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   paidMediaService,
@@ -44,6 +45,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 };
 
 export default function PaidMediaPage({ forceWorkspace, title }: PaidMediaPageProps) {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const workspace = forceWorkspace ?? parseWorkspaceQuery(searchParams.get("workspace"));
   const status = searchParams.get("status");
@@ -54,30 +56,29 @@ export default function PaidMediaPage({ forceWorkspace, title }: PaidMediaPagePr
   return (
     <div className="py-8 px-4">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold">{title ?? "Paid Media"}</h1>
+        <h1 className="text-2xl font-semibold">{title ?? t("headings.paidMedia.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Connect your Meta, Google, LinkedIn, TikTok and Microsoft ad accounts. Build campaigns once,
-          deploy to every platform.
+          {t("messages.paidMedia.intro")}
         </p>
         {status === "connected" && (
           <div className="mt-3 rounded-md bg-green-50 border border-green-200 text-green-800 text-sm px-3 py-2">
-            Connected {platformParam ? PLATFORM_LABEL[platformParam] ?? platformParam : "platform"} successfully.
+            {t("messages.paidMedia.connectedSuccess", { platform: platformParam ? PLATFORM_LABEL[platformParam] ?? platformParam : t("labels.paidMedia.platformFallback") })}
           </div>
         )}
         {status === "error" && (
           <div className="mt-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm px-3 py-2">
-            Connection failed: {searchParams.get("reason") ?? "unknown error"}
+            {t("messages.paidMedia.connectionFailed", { reason: searchParams.get("reason") ?? t("messages.paidMedia.unknownError") })}
           </div>
         )}
       </header>
 
       <nav className="border-b mb-6 flex gap-4 text-sm">
         {([
-          ["connections", "Connections"],
-          ["campaigns",   "Campaigns"],
-          ["creatives",   "Creatives"],
-          ["pixels",      "Pixels & CAPI"],
-          ["reporting",   "Reporting"],
+          ["connections", t("labels.paidMedia.tabConnections")],
+          ["campaigns",   t("labels.paidMedia.tabCampaigns")],
+          ["creatives",   t("labels.paidMedia.tabCreatives")],
+          ["pixels",      t("labels.paidMedia.tabPixels")],
+          ["reporting",   t("labels.paidMedia.tabReporting")],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -100,6 +101,7 @@ export default function PaidMediaPage({ forceWorkspace, title }: PaidMediaPagePr
 
 // ─── Connections tab ──────────────────────────────────────────────────────
 function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const platformsQ = useQuery({ queryKey: ["paid-media", "platforms"], queryFn: () => paidMediaService.listPlatforms() });
   const connectionsQ = useQuery({ queryKey: ["paid-media", "connections"], queryFn: () => paidMediaService.listConnections() });
@@ -113,7 +115,7 @@ function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
     onSuccess: (url) => { window.location.href = url; },
   });
 
-  if (platformsQ.isLoading || connectionsQ.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (platformsQ.isLoading || connectionsQ.isLoading) return <p className="text-sm text-muted-foreground">{t("status.loading")}</p>;
 
   const byPlatform = new Map((connectionsQ.data ?? []).map((c) => [c.platform, c]));
   const accountsByConnection = new Map<string, typeof accountsQ.data extends infer T ? (T extends Array<infer A> ? A[] : never) : never>();
@@ -133,17 +135,17 @@ function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
               <h3 className="font-medium">{PLATFORM_LABEL[p.platform] ?? p.platform}</h3>
               {!p.configured && (
                 <p className="text-xs text-amber-600 mt-1">
-                  OAuth credentials not configured on the server. Set the platform env vars (see API .env.example).
+                  {t("messages.paidMedia.oauthNotConfigured")}
                 </p>
               )}
               {conn ? (
                 <div className="mt-2 text-sm space-y-1">
                   <p>
-                    <span className="text-muted-foreground">Connected as: </span>
-                    {conn.externalUserHandle ?? conn.externalUserId ?? "(unknown)"}
+                    <span className="text-muted-foreground">{t("labels.paidMedia.connectedAs")} </span>
+                    {conn.externalUserHandle ?? conn.externalUserId ?? t("labels.paidMedia.unknownHandle")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Status: <span className={conn.status === "active" ? "text-green-600" : "text-red-600"}>{conn.status}</span>
+                    {t("labels.paidMedia.status")} <span className={conn.status === "active" ? "text-green-600" : "text-red-600"}>{conn.status}</span>
                     {conn.lastError && ` — ${conn.lastError}`}
                   </p>
                   {(accountsByConnection.get(conn.id) ?? []).length > 0 && (
@@ -155,7 +157,7 @@ function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground mt-2">Not connected.</p>
+                <p className="text-sm text-muted-foreground mt-2">{t("messages.paidMedia.notConnected")}</p>
               )}
             </div>
             <div className="flex gap-2">
@@ -166,14 +168,14 @@ function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
                     disabled={!p.configured || connectM.isPending}
                     onClick={() => connectM.mutate(p.platform)}
                   >
-                    Reconnect
+                    {t("actions.paidMedia.reconnect")}
                   </button>
                   <button
                     className="text-sm border border-red-200 text-red-700 rounded px-3 py-1.5 hover:bg-red-50"
                     disabled={disconnectM.isPending}
                     onClick={() => disconnectM.mutate(conn.id)}
                   >
-                    Disconnect
+                    {t("actions.disconnect")}
                   </button>
                 </>
               ) : (
@@ -182,7 +184,7 @@ function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
                   disabled={!p.configured || connectM.isPending}
                   onClick={() => connectM.mutate(p.platform)}
                 >
-                  Connect
+                  {t("actions.connect")}
                 </button>
               )}
             </div>
@@ -195,6 +197,7 @@ function ConnectionsTab({ workspace }: { workspace: WorkspaceParam }) {
 
 // ─── Campaigns tab ────────────────────────────────────────────────────────
 function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const campaignsQ = useQuery({ queryKey: ["paid-media", "campaigns", workspace], queryFn: () => paidMediaService.listCampaigns(workspace) });
   const accountsQ = useQuery({ queryKey: ["paid-media", "accounts"], queryFn: () => paidMediaService.listAccounts() });
@@ -213,7 +216,7 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
     <div className="space-y-4">
       <div className="flex justify-end">
         <button className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5" onClick={() => setShowNew((v) => !v)}>
-          {showNew ? "Cancel" : "New campaign"}
+          {showNew ? t("actions.cancel") : t("actions.paidMedia.newCampaign")}
         </button>
       </div>
 
@@ -225,19 +228,19 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
       )}
 
       {campaignsQ.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
       ) : (campaignsQ.data ?? []).length === 0 ? (
-        <p className="text-sm text-muted-foreground">No campaigns yet.</p>
+        <p className="text-sm text-muted-foreground">{t("messages.paidMedia.noCampaigns")}</p>
       ) : (
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground border-b">
             <tr>
-              <th className="text-left py-2 font-medium">Name</th>
-              <th className="text-left py-2 font-medium">Objective</th>
-              <th className="text-left py-2 font-medium">Status</th>
-              <th className="text-right py-2 font-medium">Budget</th>
-              <th className="text-right py-2 font-medium">Spent</th>
-              <th className="text-right py-2 font-medium">Sync</th>
+              <th className="text-left py-2 font-medium">{t("labels.paidMedia.colName")}</th>
+              <th className="text-left py-2 font-medium">{t("labels.paidMedia.colObjective")}</th>
+              <th className="text-left py-2 font-medium">{t("labels.paidMedia.status")}</th>
+              <th className="text-right py-2 font-medium">{t("labels.paidMedia.colBudget")}</th>
+              <th className="text-right py-2 font-medium">{t("labels.paidMedia.colSpent")}</th>
+              <th className="text-right py-2 font-medium">{t("labels.paidMedia.colSync")}</th>
             </tr>
           </thead>
           <tbody>
@@ -258,7 +261,7 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
                       e.target.value = "";
                     }}
                   >
-                    <option value="">Sync to…</option>
+                    <option value="">{t("labels.paidMedia.syncTo")}</option>
                     {(accountsQ.data ?? []).map((a) => (
                       <option key={a.id} value={a.id}>{PLATFORM_LABEL[a.platform] ?? a.platform} · {a.name}</option>
                     ))}
@@ -274,6 +277,7 @@ function CampaignsTab({ workspace }: { workspace: WorkspaceParam }) {
 }
 
 function NewCampaignForm({ onSubmit, submitting }: { onSubmit: (input: Partial<Campaign>) => void; submitting: boolean }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [objective, setObjective] = useState("TRAFFIC");
   const [dailyBudget, setDailyBudget] = useState("");
@@ -290,17 +294,17 @@ function NewCampaignForm({ onSubmit, submitting }: { onSubmit: (input: Partial<C
       }}
     >
       <div className="col-span-1 md:col-span-2">
-        <label className="text-xs text-muted-foreground">Name</label>
+        <label className="text-xs text-muted-foreground">{t("labels.paidMedia.colName")}</label>
         <input
           required
           className="w-full mt-1 px-2 py-1.5 text-sm border rounded"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Q3 employer acquisition"
+          placeholder={t("labels.paidMedia.campaignNamePlaceholder")}
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Objective</label>
+        <label className="text-xs text-muted-foreground">{t("labels.paidMedia.colObjective")}</label>
         <select className="w-full mt-1 px-2 py-1.5 text-sm border rounded" value={objective} onChange={(e) => setObjective(e.target.value)}>
           {["AWARENESS", "TRAFFIC", "LEAD_GENERATION", "CONVERSIONS", "VIDEO_VIEWS", "JOB_APPLICATIONS"].map((o) => (
             <option key={o} value={o}>{o.replace(/_/g, " ")}</option>
@@ -308,7 +312,7 @@ function NewCampaignForm({ onSubmit, submitting }: { onSubmit: (input: Partial<C
         </select>
       </div>
       <div>
-        <label className="text-xs text-muted-foreground">Daily budget ($)</label>
+        <label className="text-xs text-muted-foreground">{t("labels.paidMedia.dailyBudget")}</label>
         <input
           type="number"
           step="0.01"
@@ -320,7 +324,7 @@ function NewCampaignForm({ onSubmit, submitting }: { onSubmit: (input: Partial<C
       </div>
       <div className="col-span-full flex justify-end">
         <button disabled={submitting} className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50">
-          {submitting ? "Creating…" : "Create campaign"}
+          {submitting ? t("messages.paidMedia.creating") : t("actions.paidMedia.createCampaign")}
         </button>
       </div>
     </form>
@@ -337,13 +341,14 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Creatives tab ────────────────────────────────────────────────────────
 function CreativesTab({ workspace }: { workspace: WorkspaceParam }) {
+  const { t } = useTranslation();
   const creativesQ = useQuery({ queryKey: ["paid-media", "creatives", workspace], queryFn: () => paidMediaService.listCreatives(workspace) });
-  if (creativesQ.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (creativesQ.isLoading) return <p className="text-sm text-muted-foreground">{t("status.loading")}</p>;
   if ((creativesQ.data ?? []).length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No creatives yet. Create one from any Studio project, or upload an asset.
+          {t("messages.paidMedia.noCreatives")}
         </p>
       </div>
     );
@@ -370,6 +375,7 @@ function CreativesTab({ workspace }: { workspace: WorkspaceParam }) {
 
 // ─── Pixels tab ───────────────────────────────────────────────────────────
 function PixelsTab({ workspace }: { workspace: WorkspaceParam }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const pixelsQ = useQuery({ queryKey: ["paid-media", "pixels", workspace], queryFn: () => paidMediaService.getPixels(workspace) });
   const saveM = useMutation({
@@ -380,7 +386,7 @@ function PixelsTab({ workspace }: { workspace: WorkspaceParam }) {
   const get = (k: string) => draft[k] ?? (pixelsQ.data as any)?.[k] ?? "";
   const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
 
-  if (pixelsQ.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (pixelsQ.isLoading) return <p className="text-sm text-muted-foreground">{t("status.loading")}</p>;
 
   return (
     <form
@@ -395,41 +401,39 @@ function PixelsTab({ workspace }: { workspace: WorkspaceParam }) {
       }}
     >
       <p className="text-sm text-muted-foreground">
-        Pixel IDs render in the page HTML and are public. Server tokens (CAPI / Events API access tokens) are
-        encrypted at rest with envelope encryption (AES-GCM via HKDF-SHA-256) and used only for the server-side
-        Conversions API fan-out.
+        {t("messages.paidMedia.pixelsDisclaimer")}
       </p>
 
       <PixelSection title="Meta (Facebook + Instagram)">
-        <PixelInput label="Pixel ID" k="metaPixelId" value={get("metaPixelId")} onChange={set} />
-        <PixelInput label="Conversions API access token" k="metaCapiToken" value={get("metaCapiToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.metaCapiTokenSet} />
+        <PixelInput label={t("labels.paidMedia.pixelId")} k="metaPixelId" value={get("metaPixelId")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.conversionsApiToken")} k="metaCapiToken" value={get("metaCapiToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.metaCapiTokenSet} />
       </PixelSection>
 
       <PixelSection title="Google">
-        <PixelInput label="GA4 Measurement ID (G-XXXXXXX)" k="ga4MeasurementId" value={get("ga4MeasurementId")} onChange={set} />
-        <PixelInput label="GA4 Measurement Protocol API secret" k="ga4ApiSecret" value={get("ga4ApiSecret")} onChange={set} secret hasValue={(pixelsQ.data as any)?.ga4ApiSecretSet} />
-        <PixelInput label="Google Ads conversion ID (AW-XXXXX)" k="googleAdsConversionId" value={get("googleAdsConversionId")} onChange={set} />
-        <PixelInput label="Google Ads conversion label" k="googleAdsConversionLabel" value={get("googleAdsConversionLabel")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.ga4MeasurementId")} k="ga4MeasurementId" value={get("ga4MeasurementId")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.ga4ApiSecret")} k="ga4ApiSecret" value={get("ga4ApiSecret")} onChange={set} secret hasValue={(pixelsQ.data as any)?.ga4ApiSecretSet} />
+        <PixelInput label={t("labels.paidMedia.googleAdsConversionId")} k="googleAdsConversionId" value={get("googleAdsConversionId")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.googleAdsConversionLabel")} k="googleAdsConversionLabel" value={get("googleAdsConversionLabel")} onChange={set} />
       </PixelSection>
 
       <PixelSection title="LinkedIn">
-        <PixelInput label="Insight Tag partner ID" k="linkedInPartnerId" value={get("linkedInPartnerId")} onChange={set} />
-        <PixelInput label="Conversions API access token" k="linkedInCapiToken" value={get("linkedInCapiToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.linkedInCapiTokenSet} />
+        <PixelInput label={t("labels.paidMedia.linkedInPartnerId")} k="linkedInPartnerId" value={get("linkedInPartnerId")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.conversionsApiToken")} k="linkedInCapiToken" value={get("linkedInCapiToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.linkedInCapiTokenSet} />
       </PixelSection>
 
       <PixelSection title="TikTok">
-        <PixelInput label="Pixel ID" k="tiktokPixelId" value={get("tiktokPixelId")} onChange={set} />
-        <PixelInput label="Events API access token" k="tiktokAccessToken" value={get("tiktokAccessToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.tiktokAccessTokenSet} />
+        <PixelInput label={t("labels.paidMedia.pixelId")} k="tiktokPixelId" value={get("tiktokPixelId")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.eventsApiToken")} k="tiktokAccessToken" value={get("tiktokAccessToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.tiktokAccessTokenSet} />
       </PixelSection>
 
       <PixelSection title="Microsoft Advertising (Bing)">
-        <PixelInput label="UET tag ID" k="bingUetTagId" value={get("bingUetTagId")} onChange={set} />
-        <PixelInput label="UET API access token" k="bingUetApiToken" value={get("bingUetApiToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.bingUetApiTokenSet} />
+        <PixelInput label={t("labels.paidMedia.uetTagId")} k="bingUetTagId" value={get("bingUetTagId")} onChange={set} />
+        <PixelInput label={t("labels.paidMedia.uetApiToken")} k="bingUetApiToken" value={get("bingUetApiToken")} onChange={set} secret hasValue={(pixelsQ.data as any)?.bingUetApiTokenSet} />
       </PixelSection>
 
       <div className="flex justify-end">
         <button disabled={saveM.isPending} className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50">
-          {saveM.isPending ? "Saving…" : "Save pixels"}
+          {saveM.isPending ? t("messages.paidMedia.savingPixels") : t("actions.paidMedia.savePixels")}
         </button>
       </div>
     </form>
@@ -453,16 +457,17 @@ function PixelInput({ label, k, value, onChange, secret, hasValue }: {
   secret?: boolean;
   hasValue?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <label className="block">
-      <span className="text-xs text-muted-foreground">{label}{secret && hasValue ? " (set — type a new value to replace)" : ""}</span>
+      <span className="text-xs text-muted-foreground">{label}{secret && hasValue ? t("labels.paidMedia.secretSetSuffix") : ""}</span>
       <input
         type={secret ? "password" : "text"}
         autoComplete="off"
         className="w-full mt-1 px-2 py-1.5 text-sm border rounded"
         value={value}
         onChange={(e) => onChange(k, e.target.value)}
-        placeholder={secret ? (hasValue ? "•••••••• (saved)" : "") : ""}
+        placeholder={secret ? (hasValue ? t("labels.paidMedia.secretSavedPlaceholder") : "") : ""}
       />
     </label>
   );
@@ -470,6 +475,7 @@ function PixelInput({ label, k, value, onChange, secret, hasValue }: {
 
 // ─── Reporting tab ────────────────────────────────────────────────────────
 function ReportingTab({ workspace: _workspace }: { workspace: WorkspaceParam }) {
+  const { t } = useTranslation();
   const today = new Date();
   const thirty = new Date(today.getTime() - 30 * 24 * 3600_000);
   const [since, setSince] = useState(thirty.toISOString().slice(0, 10));
@@ -496,11 +502,11 @@ function ReportingTab({ workspace: _workspace }: { workspace: WorkspaceParam }) 
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Since</span>
+          <span className="block text-xs text-muted-foreground">{t("labels.paidMedia.since")}</span>
           <input type="date" className="border rounded px-2 py-1" value={since} onChange={(e) => setSince(e.target.value)} />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Until</span>
+          <span className="block text-xs text-muted-foreground">{t("labels.paidMedia.until")}</span>
           <input type="date" className="border rounded px-2 py-1" value={until} onChange={(e) => setUntil(e.target.value)} />
         </label>
         <div className="ml-auto flex gap-2">
@@ -511,28 +517,28 @@ function ReportingTab({ workspace: _workspace }: { workspace: WorkspaceParam }) 
               disabled={pullM.isPending}
               onClick={() => pullM.mutate(a.id)}
             >
-              Pull {PLATFORM_LABEL[a.platform] ?? a.platform}
+              {t("actions.paidMedia.pull", { platform: PLATFORM_LABEL[a.platform] ?? a.platform })}
             </button>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Impressions" value={rollup.impressions.toLocaleString()} />
-        <Stat label="Clicks"      value={rollup.clicks.toLocaleString()} />
-        <Stat label="Spend"       value={`$${(rollup.spendCents / 100).toFixed(2)}`} />
-        <Stat label="Conversions" value={rollup.conversions.toLocaleString()} />
+        <Stat label={t("labels.paidMedia.impressions")} value={rollup.impressions.toLocaleString()} />
+        <Stat label={t("labels.paidMedia.clicks")}      value={rollup.clicks.toLocaleString()} />
+        <Stat label={t("labels.paidMedia.spend")}       value={`$${(rollup.spendCents / 100).toFixed(2)}`} />
+        <Stat label={t("labels.paidMedia.conversions")} value={rollup.conversions.toLocaleString()} />
       </div>
 
       <table className="w-full text-sm">
         <thead className="text-xs text-muted-foreground border-b">
           <tr>
-            <th className="text-left py-2 font-medium">Date</th>
-            <th className="text-left py-2 font-medium">Platform</th>
-            <th className="text-right py-2 font-medium">Impressions</th>
-            <th className="text-right py-2 font-medium">Clicks</th>
-            <th className="text-right py-2 font-medium">Spend</th>
-            <th className="text-right py-2 font-medium">Conv.</th>
+            <th className="text-left py-2 font-medium">{t("labels.paidMedia.colDate")}</th>
+            <th className="text-left py-2 font-medium">{t("labels.paidMedia.platform")}</th>
+            <th className="text-right py-2 font-medium">{t("labels.paidMedia.impressions")}</th>
+            <th className="text-right py-2 font-medium">{t("labels.paidMedia.clicks")}</th>
+            <th className="text-right py-2 font-medium">{t("labels.paidMedia.spend")}</th>
+            <th className="text-right py-2 font-medium">{t("labels.paidMedia.colConv")}</th>
           </tr>
         </thead>
         <tbody>

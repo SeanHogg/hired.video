@@ -48,8 +48,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -65,7 +63,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { AppShell } from "@/components/AppShell";
 import HeaderSearch from "@/components/HeaderSearch";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
@@ -1326,7 +1323,37 @@ export default function Tasks() {
               </Card>
             )}
 
-            {/* Kanban View */}
+            {/* Kanban View — reusable board, shared with Content Creator → Gigs */}
+            {currentView === "kanban" && (
+              <Card data-testid="kanban-view">
+                <CardHeader>
+                  <CardTitle>{t("headings.kanbanView")}</CardTitle>
+                  <CardDescription>{t("messages.dragToUpdateStatus")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TaskBoard
+                    tasks={tasks}
+                    onStatusChange={handleKanbanStatusChange}
+                    onTaskClick={openTaskPanel}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            <TaskDetailSheet
+              open={taskPanelOpen}
+              onOpenChange={setTaskPanelOpen}
+              task={selectedTask}
+              startInEdit={sheetStartInEdit}
+              onSave={handleSaveTask}
+              onDelete={handleDeleteTask}
+              availableTaskTypes={getAvailableTaskTypesForRole(user?.role || "")}
+              assignableUsers={
+                user?.role === USER_ROLES.EMPLOYER || user?.role === USER_ROLES.RECRUITER
+                  ? assignableUsers
+                  : []
+              }
+            />
           </div>
         </div>
 </AppShell>

@@ -11,6 +11,7 @@
 // tracked there.
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ClipboardList, Plus, Send, Archive, Loader2, Link as LinkIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -58,8 +59,9 @@ interface DraftQuestion {
 }
 
 export default function ScreeningTemplates() {
+  const { t } = useTranslation();
   useSEO("/services/screening");
-  useBreadcrumbs([{ name: "Screening", url: "/services/screening" }]);
+  useBreadcrumbs([{ name: t("headings.screeningTemplates.screening"), url: "/services/screening" }]);
   const { companyId } = useCurrentCompanyScope();
   const { toast } = useToast();
 
@@ -91,11 +93,11 @@ export default function ScreeningTemplates() {
     try {
       setTemplates(await screeningService.listTemplates(companyId));
     } catch {
-      toast({ title: "Couldn't load templates", variant: "destructive" });
+      toast({ title: t("messages.screeningTemplates.couldntLoadTemplates"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, toast, t]);
 
   useEffect(() => {
     void load();
@@ -154,13 +156,13 @@ export default function ScreeningTemplates() {
         description: description.trim() || null,
         items: buildItems(),
       });
-      toast({ title: "Template created" });
+      toast({ title: t("messages.screeningTemplates.templateCreated") });
       setBuilderOpen(false);
       resetBuilder();
       await load();
     } catch (e) {
       toast({
-        title: "Couldn't save template",
+        title: t("messages.screeningTemplates.couldntSaveTemplate"),
         description: e instanceof Error ? e.message : undefined,
         variant: "destructive",
       });
@@ -169,12 +171,12 @@ export default function ScreeningTemplates() {
     }
   }
 
-  async function archive(t: ScreeningTemplateRow) {
+  async function archive(tpl: ScreeningTemplateRow) {
     try {
-      await screeningService.archiveTemplate(t.id);
+      await screeningService.archiveTemplate(tpl.id);
       await load();
     } catch {
-      toast({ title: "Couldn't archive", variant: "destructive" });
+      toast({ title: t("messages.screeningTemplates.couldntArchive"), variant: "destructive" });
     }
   }
 
@@ -191,13 +193,16 @@ export default function ScreeningTemplates() {
         message: sendMessage.trim() || undefined,
       });
       setLastMagicLink(res.magicLink);
-      toast({ title: "Screening sent", description: `Invitation emailed to ${candEmail.trim()}.` });
+      toast({
+        title: t("messages.screeningTemplates.screeningSent"),
+        description: t("messages.screeningTemplates.invitationEmailed", { email: candEmail.trim() }),
+      });
       setCandEmail("");
       setCandName("");
       setSendMessage("");
     } catch (e) {
       toast({
-        title: "Couldn't send",
+        title: t("messages.screeningTemplates.couldntSend"),
         description: e instanceof Error ? e.message : undefined,
         variant: "destructive",
       });
@@ -211,13 +216,13 @@ export default function ScreeningTemplates() {
       <main className="px-6 py-8 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Screening</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("headings.screeningTemplates.screening")}</h1>
             <p className="text-muted-foreground">
-              Build a per-role screening checklist once, then send it to candidates by magic link.
+              {t("messages.screeningTemplates.intro")}
             </p>
           </div>
           <Button onClick={() => setBuilderOpen(true)} disabled={!companyId}>
-            <Plus className="mr-1.5 h-4 w-4" /> New template
+            <Plus className="mr-1.5 h-4 w-4" /> {t("actions.screeningTemplates.newTemplate")}
           </Button>
         </div>
 
@@ -229,32 +234,30 @@ export default function ScreeningTemplates() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" /> No screening templates yet
+                <ClipboardList className="h-5 w-5" /> {t("headings.screeningTemplates.noTemplatesYet")}
               </CardTitle>
               <CardDescription>
-                Create a template to define what each candidate must complete — résumé and contact
-                details are always required; add validated assessments, references, and application
-                questions as needed.
+                {t("messages.screeningTemplates.emptyState")}
               </CardDescription>
             </CardHeader>
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            {templates.map((t) => (
-              <Card key={t.id}>
+            {templates.map((tpl) => (
+              <Card key={tpl.id}>
                 <CardHeader>
-                  <CardTitle className="text-base">{t.name}</CardTitle>
+                  <CardTitle className="text-base">{tpl.name}</CardTitle>
                   <CardDescription>
-                    {t.roleFamily ? <Badge variant="secondary" className="mr-2">{t.roleFamily}</Badge> : null}
-                    {t.description}
+                    {tpl.roleFamily ? <Badge variant="secondary" className="mr-2">{tpl.roleFamily}</Badge> : null}
+                    {tpl.description}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex gap-2">
-                  <Button size="sm" onClick={() => { setSendFor(t); setLastMagicLink(null); }}>
-                    <Send className="mr-1.5 h-3.5 w-3.5" /> Send to candidate
+                  <Button size="sm" onClick={() => { setSendFor(tpl); setLastMagicLink(null); }}>
+                    <Send className="mr-1.5 h-3.5 w-3.5" /> {t("actions.screeningTemplates.sendToCandidate")}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => void archive(t)}>
-                    <Archive className="mr-1.5 h-3.5 w-3.5" /> Archive
+                  <Button size="sm" variant="ghost" onClick={() => void archive(tpl)}>
+                    <Archive className="mr-1.5 h-3.5 w-3.5" /> {t("actions.archive")}
                   </Button>
                 </CardContent>
               </Card>
@@ -267,26 +270,26 @@ export default function ScreeningTemplates() {
       <Dialog open={builderOpen} onOpenChange={setBuilderOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New screening template</DialogTitle>
-            <DialogDescription>Résumé and contact confirmation are always required.</DialogDescription>
+            <DialogTitle>{t("headings.screeningTemplates.newScreeningTemplate")}</DialogTitle>
+            <DialogDescription>{t("messages.screeningTemplates.alwaysRequired")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-name">Template name</Label>
-              <Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Senior Backend Engineer" />
+              <Label htmlFor="tpl-name">{t("labels.screeningTemplates.templateName")}</Label>
+              <Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("labels.screeningTemplates.templateNamePlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-role">Role family (optional)</Label>
-              <Input id="tpl-role" value={roleFamily} onChange={(e) => setRoleFamily(e.target.value)} placeholder="Engineering" />
+              <Label htmlFor="tpl-role">{t("labels.screeningTemplates.roleFamily")}</Label>
+              <Input id="tpl-role" value={roleFamily} onChange={(e) => setRoleFamily(e.target.value)} placeholder={t("labels.screeningTemplates.roleFamilyPlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="tpl-desc">Description (optional)</Label>
+              <Label htmlFor="tpl-desc">{t("labels.screeningTemplates.descriptionOptional")}</Label>
               <Textarea id="tpl-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
 
             <div className="space-y-2 rounded-md border p-3">
-              <Label>Validated AI assessments</Label>
-              <p className="text-xs text-muted-foreground">Optional — skipped automatically if the candidate has already taken them.</p>
+              <Label>{t("labels.screeningTemplates.validatedAiAssessments")}</Label>
+              <p className="text-xs text-muted-foreground">{t("messages.screeningTemplates.assessmentsHint")}</p>
               <div className="flex flex-wrap gap-2">
                 {ASSESSMENT_KINDS.map((a) => {
                   const on = assessmentKinds.includes(a.kind);
@@ -311,7 +314,7 @@ export default function ScreeningTemplates() {
 
             <div className="space-y-2 rounded-md border p-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="tpl-refs">Request references</Label>
+                <Label htmlFor="tpl-refs">{t("labels.screeningTemplates.requestReferences")}</Label>
                 <input
                   id="tpl-refs"
                   type="checkbox"
@@ -322,7 +325,7 @@ export default function ScreeningTemplates() {
               </div>
               {includeReferences ? (
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="tpl-minrefs" className="text-sm">Minimum</Label>
+                  <Label htmlFor="tpl-minrefs" className="text-sm">{t("labels.screeningTemplates.minimum")}</Label>
                   <Input
                     id="tpl-minrefs"
                     type="number"
@@ -338,7 +341,7 @@ export default function ScreeningTemplates() {
 
             <div className="space-y-2 rounded-md border p-3">
               <div className="flex items-center justify-between">
-                <Label>Application questions</Label>
+                <Label>{t("labels.screeningTemplates.applicationQuestions")}</Label>
                 <Button
                   type="button"
                   size="sm"
@@ -347,15 +350,15 @@ export default function ScreeningTemplates() {
                     setQuestions((q) => [...q, { id: uid(), prompt: "", kind: "custom", answerType: "text" }])
                   }
                 >
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add
+                  <Plus className="mr-1 h-3.5 w-3.5" /> {t("actions.add")}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Work authorization, visa sponsorship, EEO self-ID, knockouts, or custom.</p>
+              <p className="text-xs text-muted-foreground">{t("messages.screeningTemplates.questionsHint")}</p>
               {questions.map((q, idx) => (
                 <div key={q.id} className="space-y-2 border-t pt-2">
                   <Input
                     value={q.prompt}
-                    placeholder="e.g. Are you authorized to work in the US?"
+                    placeholder={t("labels.screeningTemplates.questionPromptPlaceholder")}
                     onChange={(e) =>
                       setQuestions((prev) => prev.map((x) => (x.id === q.id ? { ...x, prompt: e.target.value } : x)))
                     }
@@ -369,11 +372,11 @@ export default function ScreeningTemplates() {
                     >
                       <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="custom">Custom</SelectItem>
-                        <SelectItem value="work_authorization">Work authorization</SelectItem>
-                        <SelectItem value="visa_sponsorship">Visa sponsorship</SelectItem>
-                        <SelectItem value="eeo_disability">EEO / disability</SelectItem>
-                        <SelectItem value="knockout">Knockout</SelectItem>
+                        <SelectItem value="custom">{t("labels.screeningTemplates.kindCustom")}</SelectItem>
+                        <SelectItem value="work_authorization">{t("labels.screeningTemplates.kindWorkAuthorization")}</SelectItem>
+                        <SelectItem value="visa_sponsorship">{t("labels.screeningTemplates.kindVisaSponsorship")}</SelectItem>
+                        <SelectItem value="eeo_disability">{t("labels.screeningTemplates.kindEeoDisability")}</SelectItem>
+                        <SelectItem value="knockout">{t("labels.screeningTemplates.kindKnockout")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <Select
@@ -384,8 +387,8 @@ export default function ScreeningTemplates() {
                     >
                       <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="text">Text</SelectItem>
-                        <SelectItem value="boolean">Yes / No</SelectItem>
+                        <SelectItem value="text">{t("labels.screeningTemplates.answerTypeText")}</SelectItem>
+                        <SelectItem value="boolean">{t("labels.screeningTemplates.answerTypeBoolean")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -394,18 +397,18 @@ export default function ScreeningTemplates() {
                       variant="ghost"
                       onClick={() => setQuestions((prev) => prev.filter((x) => x.id !== q.id))}
                     >
-                      Remove
+                      {t("actions.remove")}
                     </Button>
                   </div>
-                  <span className="sr-only">Question {idx + 1}</span>
+                  <span className="sr-only">{t("labels.screeningTemplates.questionNumber", { number: idx + 1 })}</span>
                 </div>
               ))}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setBuilderOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setBuilderOpen(false)}>{t("actions.cancel")}</Button>
             <Button onClick={() => void saveTemplate()} disabled={saving || !name.trim()}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create template"}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("actions.screeningTemplates.createTemplate")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -415,22 +418,22 @@ export default function ScreeningTemplates() {
       <Dialog open={!!sendFor} onOpenChange={(o) => !o && setSendFor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send “{sendFor?.name}” to a candidate</DialogTitle>
+            <DialogTitle>{t("headings.screeningTemplates.sendToCandidateTitle", { name: sendFor?.name })}</DialogTitle>
             <DialogDescription>
-              They'll get a magic link to complete only the steps we don't already have on file.
+              {t("messages.screeningTemplates.sendDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="cand-email">Candidate email</Label>
+              <Label htmlFor="cand-email">{t("labels.screeningTemplates.candidateEmail")}</Label>
               <Input id="cand-email" type="email" value={candEmail} onChange={(e) => setCandEmail(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cand-name">Candidate name (optional)</Label>
+              <Label htmlFor="cand-name">{t("labels.screeningTemplates.candidateName")}</Label>
               <Input id="cand-name" value={candName} onChange={(e) => setCandName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cand-msg">Message (optional)</Label>
+              <Label htmlFor="cand-msg">{t("labels.screeningTemplates.messageOptional")}</Label>
               <Textarea id="cand-msg" value={sendMessage} onChange={(e) => setSendMessage(e.target.value)} />
             </div>
             {lastMagicLink ? (
@@ -441,9 +444,9 @@ export default function ScreeningTemplates() {
             ) : null}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setSendFor(null)}>Close</Button>
+            <Button variant="ghost" onClick={() => setSendFor(null)}>{t("actions.close")}</Button>
             <Button onClick={() => void sendRequest()} disabled={sending || !candEmail.trim()}>
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send screening"}
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("actions.screeningTemplates.sendScreening")}
             </Button>
           </DialogFooter>
         </DialogContent>
