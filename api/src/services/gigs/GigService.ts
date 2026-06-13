@@ -17,10 +17,18 @@
 
 import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import { getOrCreateDefaultBoard } from "../productivity/default-board.js";
 import { toTaskDto, type TaskDto } from "../productivity/task-dto.js";
 
 const { gigProjects, gigBids, gigMilestones, tasks, users, userProfiles } = schema;
+
+// Read-through cache wiring. Gig writes are low-volume, so a single global
+// version token (bumped on every write) keeps all gig read keys fresh without
+// per-entity dependency tracking. The keyspace is unbounded (open-gig list,
+// per-user lists), so it rides the version token; the 60s TTL is a backstop.
+const GIG_VERSION_KEY = "gigs:version";
+const GIG_TTL_SECONDS = 60;
 
 // ── status vocabularies ──────────────────────────────────────────────────
 // Personal-task status (frontend ProductivityItemStatus): ToDo=1, InProgress=3,
@@ -75,6 +83,23 @@ export class GigService {
     return getDb();
   }
 
+  // ── cache version token ────────────────────────────────────────────────────
+
+  /** Current global gig cache version (rotates on every write). */
+  private async version(): Promise<string> {
+    return getOrSetCached<string>({
+      key: GIG_VERSION_KEY,
+      ttlSeconds: 600,
+      loader: async () => `${Date.now()}-${Math.floor(Math.random() * 1e9)}`,
+    });
+  }
+
+  /** Drop the version token so every cached gig read key becomes unreachable.
+   *  Called by every gig write (incl. the escrow-release route handler). */
+  bumpVersion(): void {
+    invalidateCachedKey(GIG_VERSION_KEY);
+  }
+
   // ── projects ─────────────────────────────────────────────────────────────
 
   /** Create a brief + its deliverable items (milestones). Any user may post. */
@@ -83,7 +108,7 @@ export class GigService {
       throw new GigError("VALIDATION_ERROR", "budgetMaxCents must be >= budgetMinCents");
     }
     const items = input.items ?? [];
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       const [project] = await tx
         .insert(gigProjects)
         .values({
@@ -117,42 +142,67 @@ export class GigService {
       }
       return { project, milestones };
     });
+    this.bumpVersion();
+    return result;
   }
 
-  /** Open briefs accepting bids — the public marketplace grid. */
+  /** Open briefs accepting bids — the public marketplace grid. Cached. */
   async listOpenProjects(limit = 100) {
-    const rows = await this.db
-      .select()
-      .from(gigProjects)
-      .where(eq(gigProjects.status, "open"))
-      .orderBy(desc(gigProjects.createdAt))
-      .limit(limit);
-    return rows;
+    const v = await this.version();
+    return getOrSetCached<(typeof gigProjects.$inferSelect)[]>({
+      key: `gigs:open:v1:${limit}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: () =>
+        this.db
+          .select()
+          .from(gigProjects)
+          .where(eq(gigProjects.status, "open"))
+          .orderBy(desc(gigProjects.createdAt))
+          .limit(limit),
+    });
   }
 
-  /** The caller's own posted briefs (owner view). */
+  /** The caller's own posted briefs (owner view). Cached per user. */
   async listMyProjects(ownerUserId: string) {
-    return this.db
-      .select()
-      .from(gigProjects)
-      .where(eq(gigProjects.ownerUserId, ownerUserId))
-      .orderBy(desc(gigProjects.createdAt));
+    const v = await this.version();
+    return getOrSetCached<(typeof gigProjects.$inferSelect)[]>({
+      key: `gigs:mine:v1:${ownerUserId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: () =>
+        this.db
+          .select()
+          .from(gigProjects)
+          .where(eq(gigProjects.ownerUserId, ownerUserId))
+          .orderBy(desc(gigProjects.createdAt)),
+    });
   }
 
-  /** Project + its deliverable items. Public read (bids are owner-gated). */
+  /** Project + its deliverable items. Public read (bids are owner-gated). Cached. */
   async getProject(projectId: string) {
-    const [project] = await this.db
-      .select()
-      .from(gigProjects)
-      .where(eq(gigProjects.id, projectId))
-      .limit(1);
-    if (!project) throw new GigError("NOT_FOUND", "Project not found");
-    const milestones = await this.db
-      .select()
-      .from(gigMilestones)
-      .where(eq(gigMilestones.projectId, projectId))
-      .orderBy(asc(gigMilestones.ordinal));
-    return { project, milestones };
+    const v = await this.version();
+    const cached = await getOrSetCached<{
+      project: typeof gigProjects.$inferSelect;
+      milestones: (typeof gigMilestones.$inferSelect)[];
+    } | null>({
+      key: `gigs:detail:v1:${projectId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: async () => {
+        const [project] = await this.db
+          .select()
+          .from(gigProjects)
+          .where(eq(gigProjects.id, projectId))
+          .limit(1);
+        if (!project) return null;
+        const milestones = await this.db
+          .select()
+          .from(gigMilestones)
+          .where(eq(gigMilestones.projectId, projectId))
+          .orderBy(asc(gigMilestones.ordinal));
+        return { project, milestones };
+      },
+    });
+    if (!cached) throw new GigError("NOT_FOUND", "Project not found");
+    return cached;
   }
 
   // ── bids ───────────────────────────────────────────────────────────────
@@ -191,6 +241,7 @@ export class GigService {
         },
       })
       .returning();
+    this.bumpVersion();
     return row;
   }
 
@@ -218,14 +269,20 @@ export class GigService {
       .orderBy(asc(gigBids.proposedAmountCents));
   }
 
-  /** Bids the caller has placed, each with its project summary. */
+  /** Bids the caller has placed, each with its project summary. Cached per user. */
   async listMyBids(bidderUserId: string) {
-    return this.db
-      .select({ bid: gigBids, project: gigProjects })
-      .from(gigBids)
-      .innerJoin(gigProjects, eq(gigProjects.id, gigBids.projectId))
-      .where(eq(gigBids.bidderUserId, bidderUserId))
-      .orderBy(desc(gigBids.createdAt));
+    const v = await this.version();
+    return getOrSetCached<{ bid: typeof gigBids.$inferSelect; project: typeof gigProjects.$inferSelect }[]>({
+      key: `gigs:mybids:v1:${bidderUserId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: () =>
+        this.db
+          .select({ bid: gigBids, project: gigProjects })
+          .from(gigBids)
+          .innerJoin(gigProjects, eq(gigProjects.id, gigBids.projectId))
+          .where(eq(gigBids.bidderUserId, bidderUserId))
+          .orderBy(desc(gigBids.createdAt)),
+    });
   }
 
   /**
@@ -311,6 +368,7 @@ export class GigService {
       }
     });
 
+    this.bumpVersion();
     return { awarded: true, bidId: bid.id, projectId: project.id, tasksCreated: milestones.length };
   }
 
@@ -322,21 +380,28 @@ export class GigService {
     tasks: TaskDto[];
     projects: { id: string; title: string; status: string }[];
   }> {
-    const rows = await this.db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.userId, creatorUserId), isNotNull(tasks.gigProjectId)))
-      .orderBy(desc(tasks.createdAt));
-    const dtos = rows.map(toTaskDto);
+    const v = await this.version();
+    return getOrSetCached<{ tasks: TaskDto[]; projects: { id: string; title: string; status: string }[] }>({
+      key: `gigs:work:v1:${creatorUserId}:${v}`,
+      ttlSeconds: GIG_TTL_SECONDS,
+      loader: async () => {
+        const rows = await this.db
+          .select()
+          .from(tasks)
+          .where(and(eq(tasks.userId, creatorUserId), isNotNull(tasks.gigProjectId)))
+          .orderBy(desc(tasks.createdAt));
+        const dtos = rows.map(toTaskDto);
 
-    const projectIds = Array.from(new Set(rows.map((r) => r.gigProjectId).filter(Boolean) as string[]));
-    const projects = projectIds.length
-      ? await this.db
-          .select({ id: gigProjects.id, title: gigProjects.title, status: gigProjects.status })
-          .from(gigProjects)
-          .where(inArray(gigProjects.id, projectIds))
-      : [];
-    return { tasks: dtos, projects };
+        const projectIds = Array.from(new Set(rows.map((r) => r.gigProjectId).filter(Boolean) as string[]));
+        const projects = projectIds.length
+          ? await this.db
+              .select({ id: gigProjects.id, title: gigProjects.title, status: gigProjects.status })
+              .from(gigProjects)
+              .where(inArray(gigProjects.id, projectIds))
+          : [];
+        return { tasks: dtos, projects };
+      },
+    });
   }
 
   /**
@@ -378,6 +443,7 @@ export class GigService {
           .where(eq(gigMilestones.id, task.gigMilestoneId));
       }
     }
+    this.bumpVersion();
     return toTaskDto(updated);
   }
 
@@ -406,6 +472,7 @@ export class GigService {
         status: "pending",
       })
       .returning();
+    this.bumpVersion();
     return row;
   }
 
@@ -416,6 +483,7 @@ export class GigService {
       .set({ status: "approved", approvedAt: new Date(), updatedAt: new Date() })
       .where(eq(gigMilestones.id, milestone.id))
       .returning();
+    this.bumpVersion();
     return row;
   }
 

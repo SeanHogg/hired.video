@@ -274,6 +274,7 @@ gigsRoutes.post("/milestones/:id/release", async (c) => {
     .where(eq(gigMilestones.id, milestone.id))
     .returning();
 
+  gigService.bumpVersion();
   return c.json(
     success({
       milestone: row,

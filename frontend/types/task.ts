@@ -172,6 +172,33 @@ export interface TaskUIState {
   url?: string;
 }
 
+// Canonical TaskDTO → TaskUIState mapper. Single source of truth shared by the
+// Tasks page load and the Content Creator → Gigs board so the two never drift
+// (legacy taskType/status live in the DTO; dates are coerced to local `ymd`).
+export const taskDtoToUIState = (dto: TaskDTO): TaskUIState => {
+  const toYmd = (iso?: string): string | undefined => {
+    if (!iso) return undefined;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return undefined;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  return {
+    id: dto.id || "",
+    title: dto.text || "",
+    description: dto.description,
+    type: mapBackendTaskTypeToUI(dto.taskType),
+    priority: "medium",
+    status: mapBackendStatusToUI(dto.status),
+    startDate: toYmd(dto.start),
+    dueDate: toYmd(dto.end) ?? toYmd(dto.start) ?? new Date().toISOString().slice(0, 10),
+    createdAt: dto.creationDateTime || new Date().toISOString(),
+    updatedAt: dto.updateDateTime,
+    assignedTo: dto.assignedToUser,
+    createdBy: dto.createdByUser,
+    url: dto.url,
+  };
+};
+
 // Utility functions for type conversion
 export const mapBackendTaskTypeToUI = (taskType: TaskType): TaskType => {
   return taskType; // Direct mapping since we're using the same enum

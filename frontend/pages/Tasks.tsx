@@ -87,6 +87,7 @@ import { taskService } from "@/lib/services/task-service";
 import {
   TaskDTO,
   TaskUIState,
+  taskDtoToUIState,
   mapBackendTaskTypeToUI,
   mapBackendStatusToUI,
   mapUITaskTypeToBackend,
@@ -312,31 +313,9 @@ export default function Tasks() {
           taskService.getAssignableUsers().catch(() => []), // Don't fail if users can't be loaded
         ]);
 
-        // Convert backend DTOs to UI format
-        const uiTasks: Task[] = tasksData.map((dto: TaskDTO): Task => {
-          const start = dto.start ? new Date(dto.start) : null;
-          const end = dto.end ? new Date(dto.end) : null;
-          const ymd = (d: Date | null) =>
-            d
-              ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-              : undefined;
-
-          return {
-            id: dto.id || "",
-            title: dto.text || "",
-            description: dto.description,
-            type: mapBackendTaskTypeToUI(dto.taskType),
-            priority: "medium", // Default priority since backend doesn't have this
-            status: mapBackendStatusToUI(dto.status),
-            startDate: ymd(start),
-            dueDate: ymd(end || start) || ymd(new Date()),
-            createdAt: dto.creationDateTime || new Date().toISOString(),
-            updatedAt: dto.updateDateTime,
-            assignedTo: dto.assignedToUser,
-            createdBy: dto.createdByUser,
-            url: dto.url,
-          };
-        });
+        // Convert backend DTOs to UI format via the shared canonical mapper
+        // (also used by the Content Creator → Gigs board).
+        const uiTasks: Task[] = tasksData.map((dto: TaskDTO) => taskDtoToUIState(dto));
 
         setTasks(uiTasks);
         setAssignableUsers(usersData);
@@ -626,48 +605,6 @@ export default function Tasks() {
     /^(\{)?[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}(\})?$/.test(
       value,
     );
-
-  // Old mapping functions removed - now using enum directly
-
-  const fromBackendDto = (dto: any): Task => {
-    const start = dto.start ? new Date(dto.start) : null;
-    const end = dto.end ? new Date(dto.end) : null;
-    const ymd = (d: Date | null) =>
-      d
-        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-        : undefined;
-    return {
-      id: dto.id,
-      title: dto.text,
-      description: dto.description || undefined,
-      type: mapBackendTaskTypeToUI(dto.taskType),
-      priority: "medium",
-      status: mapBackendStatusToUI(dto.status),
-      startDate: ymd(start || end),
-      dueDate: ymd(end || start) || ymd(new Date()),
-      createdAt: dto.creationDateTime
-        ? new Date(dto.creationDateTime).toISOString()
-        : new Date().toISOString(),
-      updatedAt: dto.updateDateTime
-        ? new Date(dto.updateDateTime).toISOString()
-        : undefined,
-      url: dto.url,
-    };
-  };
-
-  const toBackendDto = (task: Task) => {
-    const start = task.startDate || task.dueDate;
-    const end = task.dueDate;
-    return {
-      id: isGuid(task.id) ? task.id : null,
-      text: task.title,
-      description: task.description,
-      start: start ? new Date(start).toISOString() : new Date().toISOString(),
-      end: end ? new Date(end).toISOString() : null,
-      taskType: mapUITaskTypeToBackend(task.type),
-      status: mapUIStatusToBackend(task.status),
-    } as const;
-  };
 
   const saveTaskToApi = async (task: Task) => {
     try {

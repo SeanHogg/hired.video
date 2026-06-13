@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2, Loader2, Briefcase } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export default function GigCreatePage() {
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -51,17 +53,17 @@ export default function GigCreatePage() {
 
   const submit = async () => {
     if (title.trim().length < 3) {
-      toast({ title: "Add a title", description: "At least 3 characters.", variant: "destructive" });
+      toast({ title: t("gigs.create.errTitle"), description: t("gigs.create.errTitleBody"), variant: "destructive" });
       return;
     }
     if (description.trim().length < 10) {
-      toast({ title: "Add a description", description: "Describe the work (10+ characters).", variant: "destructive" });
+      toast({ title: t("gigs.create.errDesc"), description: t("gigs.create.errDescBody"), variant: "destructive" });
       return;
     }
     const min = dollarsToCents(budgetMin);
     const max = dollarsToCents(budgetMax);
     if (!(max >= min) || max <= 0) {
-      toast({ title: "Check the budget", description: "Max must be ≥ min and greater than 0.", variant: "destructive" });
+      toast({ title: t("gigs.create.errBudget"), description: t("gigs.create.errBudgetBody"), variant: "destructive" });
       return;
     }
     const cleanItems: GigItemInput[] = items
@@ -80,12 +82,12 @@ export default function GigCreatePage() {
         estimatedDurationDays: durationDays ? Number.parseInt(durationDays, 10) : undefined,
         items: cleanItems,
       });
-      toast({ title: "Gig posted", description: "Creators can now bid on it." });
+      toast({ title: t("gigs.create.postedTitle"), description: t("gigs.create.postedBody") });
       navigate(`/gigs/${project.id}`);
     } catch (e) {
       toast({
-        title: "Couldn't post gig",
-        description: e instanceof Error ? e.message : "Try again",
+        title: t("gigs.create.errPost"),
+        description: e instanceof Error ? e.message : t("gigs.common.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -99,51 +101,48 @@ export default function GigCreatePage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Briefcase className="w-7 h-7 text-primary" />
-            Post a gig
+            {t("gigs.create.title")}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Describe the work and break it into deliverable items. Creators bid; you award one and pay per item as
-            it&apos;s completed.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{t("gigs.create.intro")}</p>
         </div>
 
         <Card>
           <CardContent className="p-5 space-y-4">
             <div>
-              <Label htmlFor="gig-title">Title</Label>
-              <Input id="gig-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 3 short promo videos for our product launch" />
+              <Label htmlFor="gig-title">{t("gigs.create.fieldTitle")}</Label>
+              <Input id="gig-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("gigs.create.titlePlaceholder")} />
             </div>
             <div>
-              <Label htmlFor="gig-desc">Description</Label>
-              <Textarea id="gig-desc" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What you need, tone, references, deadlines…" />
+              <Label htmlFor="gig-desc">{t("gigs.create.fieldDescription")}</Label>
+              <Textarea id="gig-desc" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("gigs.create.descPlaceholder")} />
             </div>
             <div>
-              <Label htmlFor="gig-skills">Required skills (comma-separated)</Label>
-              <Input id="gig-skills" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="video editing, motion graphics, scripting" />
+              <Label htmlFor="gig-skills">{t("gigs.create.fieldSkills")}</Label>
+              <Input id="gig-skills" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder={t("gigs.create.skillsPlaceholder")} />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <Label htmlFor="gig-kind">Budget type</Label>
+                <Label htmlFor="gig-kind">{t("gigs.create.budgetType")}</Label>
                 <select
                   id="gig-kind"
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                   value={budgetKind}
                   onChange={(e) => setBudgetKind(e.target.value as "fixed" | "hourly")}
                 >
-                  <option value="fixed">Fixed</option>
-                  <option value="hourly">Hourly</option>
+                  <option value="fixed">{t("gigs.create.fixed")}</option>
+                  <option value="hourly">{t("gigs.create.hourly")}</option>
                 </select>
               </div>
               <div>
-                <Label htmlFor="gig-min">Budget min ($)</Label>
+                <Label htmlFor="gig-min">{t("gigs.create.budgetMin")}</Label>
                 <Input id="gig-min" type="number" min="0" step="0.01" value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="gig-max">Budget max ($)</Label>
+                <Label htmlFor="gig-max">{t("gigs.create.budgetMax")}</Label>
                 <Input id="gig-max" type="number" min="0" step="0.01" value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="gig-duration">Duration (days)</Label>
+                <Label htmlFor="gig-duration">{t("gigs.create.duration")}</Label>
                 <Input id="gig-duration" type="number" min="1" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} />
               </div>
             </div>
@@ -154,13 +153,11 @@ export default function GigCreatePage() {
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold">Deliverable items</h2>
-                <p className="text-sm text-muted-foreground">
-                  Each item becomes a task on the creator&apos;s board and an escrow milestone you release on completion.
-                </p>
+                <h2 className="font-semibold">{t("gigs.create.itemsTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("gigs.create.itemsIntro")}</p>
               </div>
               <Button size="sm" variant="outline" onClick={addItem}>
-                <Plus className="h-4 w-4 mr-1" /> Add item
+                <Plus className="h-4 w-4 mr-1" /> {t("gigs.create.addItem")}
               </Button>
             </div>
             {items.map((it, i) => (
@@ -169,7 +166,7 @@ export default function GigCreatePage() {
                   <Input
                     value={it.title}
                     onChange={(e) => updateItem(i, { title: e.target.value })}
-                    placeholder={`Item ${i + 1} title (e.g. 30s teaser cut)`}
+                    placeholder={t("gigs.create.itemTitlePlaceholder", { n: i + 1 })}
                   />
                   <Input
                     type="number"
@@ -190,7 +187,7 @@ export default function GigCreatePage() {
                   rows={2}
                   value={it.description}
                   onChange={(e) => updateItem(i, { description: e.target.value })}
-                  placeholder="Optional details for this item"
+                  placeholder={t("gigs.create.itemDetailsPlaceholder")}
                 />
               </div>
             ))}
@@ -199,11 +196,11 @@ export default function GigCreatePage() {
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => navigate("/gigs")} disabled={submitting}>
-            Cancel
+            {t("gigs.common.cancel")}
           </Button>
           <Button onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-            Post gig
+            {t("gigs.create.submit")}
           </Button>
         </div>
       </div>

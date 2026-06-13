@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Briefcase, DollarSign, Clock, Loader2, Send, Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ const BID_STATUS_BADGE: Record<string, string> = {
 
 export default function GigMarketplace() {
   const location = useLocation();
+  const { t } = useTranslation();
   useSEO(location.pathname, {
     title: "Gig Marketplace — hired.video",
     description: "Browse open gigs and bid, or post a brief for content creators.",
@@ -63,9 +65,9 @@ export default function GigMarketplace() {
   const sortedOpen = useMemo(() => [...open].sort((a, b) => b.budgetMaxCents - a.budgetMaxCents), [open]);
 
   const TABS: { key: View; label: string; count: number }[] = [
-    { key: "browse", label: "Browse", count: open.length },
-    { key: "posted", label: "My posted gigs", count: mine.length },
-    { key: "bids", label: "My bids", count: myBids.length },
+    { key: "browse", label: t("gigs.marketplace.tabBrowse"), count: open.length },
+    { key: "posted", label: t("gigs.marketplace.tabPosted"), count: mine.length },
+    { key: "bids", label: t("gigs.marketplace.tabBids"), count: myBids.length },
   ];
 
   return (
@@ -75,15 +77,13 @@ export default function GigMarketplace() {
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Briefcase className="w-7 h-7 text-primary" />
-              Gig marketplace
+              {t("gigs.marketplace.title")}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Post a brief with deliverables for content creators to bid on — or browse open gigs and place your own bid.
-            </p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{t("gigs.marketplace.intro")}</p>
           </div>
           <Link to="/gigs/new">
             <Button>
-              <Plus className="w-4 h-4 mr-1" /> Post a gig
+              <Plus className="w-4 h-4 mr-1" /> {t("gigs.marketplace.postGig")}
             </Button>
           </Link>
         </div>
@@ -107,11 +107,11 @@ export default function GigMarketplace() {
 
         {loading ? (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+            <Loader2 className="w-4 h-4 animate-spin" /> {t("gigs.common.loading")}
           </div>
         ) : view === "browse" ? (
           sortedOpen.length === 0 ? (
-            <EmptyState title="No open gigs" body="Be the first to post a brief for creators." />
+            <EmptyState title={t("gigs.marketplace.emptyOpenTitle")} body={t("gigs.marketplace.emptyOpenBody")} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sortedOpen.map((p) => (
@@ -130,7 +130,8 @@ export default function GigMarketplace() {
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {p.estimatedDurationDays && (
                         <span className="inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" />~{p.estimatedDurationDays} days
+                          <Clock className="w-3 h-3" />
+                          {t("gigs.marketplace.daysApprox", { n: p.estimatedDurationDays })}
                         </span>
                       )}
                       {p.requiredSkills.slice(0, 4).map((s) => (
@@ -141,7 +142,7 @@ export default function GigMarketplace() {
                     </div>
                     <div className="flex justify-end">
                       <Button size="sm" onClick={() => setBidProject(p)}>
-                        <Send className="w-3.5 h-3.5 mr-1" /> Place bid
+                        <Send className="w-3.5 h-3.5 mr-1" /> {t("gigs.marketplace.placeBid")}
                       </Button>
                     </div>
                   </CardContent>
@@ -151,7 +152,7 @@ export default function GigMarketplace() {
           )
         ) : view === "posted" ? (
           mine.length === 0 ? (
-            <EmptyState title="You haven't posted any gigs" body="Post a brief and creators will bid on it." />
+            <EmptyState title={t("gigs.marketplace.emptyPostedTitle")} body={t("gigs.marketplace.emptyPostedBody")} />
           ) : (
             <div className="space-y-2">
               {mine.map((p) => (
@@ -172,7 +173,7 @@ export default function GigMarketplace() {
             </div>
           )
         ) : myBids.length === 0 ? (
-          <EmptyState title="No bids yet" body="Browse open gigs and place a bid to get started." />
+          <EmptyState title={t("gigs.marketplace.emptyBidsTitle")} body={t("gigs.marketplace.emptyBidsBody")} />
         ) : (
           <div className="space-y-2">
             {myBids.map(({ bid, project }) => (
@@ -181,7 +182,7 @@ export default function GigMarketplace() {
                   <CardContent className="py-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium">{project.title}</div>
-                      <div className="text-xs text-muted-foreground">Your bid: {money(bid.proposedAmountCents)}</div>
+                      <div className="text-xs text-muted-foreground">{t("gigs.marketplace.yourBid", { amount: money(bid.proposedAmountCents) })}</div>
                     </div>
                     <Badge variant="secondary" className={BID_STATUS_BADGE[bid.status] ?? ""}>
                       {bid.status}
