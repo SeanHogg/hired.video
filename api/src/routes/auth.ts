@@ -187,12 +187,14 @@ export const RegisterSchema = z.object({
   lastName: z.string().optional(),
   // Canonical lower_snake values only — the schema no longer accepts
   // PascalCase. Clients must send the exact enum value shared via
-  // shared/user-roles.ts. Affiliate is NOT a role: it's a service an
-  // existing-role user can opt into via `enableAffiliate` below.
-  role: z.enum(["job_seeker", "recruiter", "employer", "admin"]).default("job_seeker"),
-  // When true, auto-creates an affiliate profile for the new user. The
-  // user still holds one of the four roles above — affiliate status is
-  // layered on top.
+  // shared/user-roles.ts. `creator` + `affiliate` are first-class roles
+  // (promoted 2026-06-13) so growth/SaaS reports can GROUP BY role and
+  // creator-only / affiliate-only accounts surface as themselves under
+  // /people. `employee` stays invite-only (coerced to job_seeker if sent).
+  role: z.enum(["job_seeker", "recruiter", "employer", "creator", "affiliate", "admin"]).default("job_seeker"),
+  // When true, auto-creates an affiliate profile for the new user. Typically
+  // paired with `role: "affiliate"` from the affiliate-program page, but it
+  // remains independent — any role can layer affiliate status on top.
   enableAffiliate: z.boolean().optional(),
   // Inbound referral attribution. The frontend captures `?ref=CODE` into
   // a first-touch cookie and ships it here; `handleRegister` resolves it

@@ -310,6 +310,11 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
       name,
       passwordHash,
       role,
+      // Creator signups land in channel-mode immediately so their /people
+      // profile renders as a channel rather than a résumé from day one
+      // (resolveProfileMode honours the explicit setting over auto-flip).
+      // Every other role keeps the `auto` default.
+      ...(role === "creator" ? { profileMode: "channel" } : {}),
       // Pin the signup network attribution to the user row so spam
       // investigation works without scanning request_logs.
       signupIp: deps.clientIp,

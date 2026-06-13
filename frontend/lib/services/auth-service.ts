@@ -45,6 +45,8 @@ export const RegisterRequestSchema = z.object({
     USER_ROLES.JOB_SEEKER,
     USER_ROLES.RECRUITER,
     USER_ROLES.EMPLOYER,
+    USER_ROLES.CREATOR,
+    USER_ROLES.AFFILIATE,
     USER_ROLES.ADMIN,
   ]).optional(),
   referralCode: z.string().trim().min(1).max(64).optional(),

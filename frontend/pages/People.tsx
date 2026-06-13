@@ -168,6 +168,8 @@ export default function People() {
         { value: "job_seeker", label: t("labels.jobSeekers") },
         { value: "recruiter", label: t("labels.recruiters") },
         { value: "employer", label: t("labels.employers") },
+        { value: "creator", label: t("labels.creators") },
+        { value: "affiliate", label: t("labels.affiliates") },
       ],
     },
     {

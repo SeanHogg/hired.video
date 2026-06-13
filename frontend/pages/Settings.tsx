@@ -814,18 +814,18 @@ function SettingsContent() {
                       {showWorkforceTab && (
                         <TabsTrigger value="workforce" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                           <Briefcase className="h-4 w-4" />
-                          <span>Workforce</span>
+                          <span>{t("tabs.workforce")}</span>
                         </TabsTrigger>
                       )}
                       {showPointsTab && (
                         <TabsTrigger value="points" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                           <Trophy className="h-4 w-4" />
-                          <span>Points &amp; Rewards</span>
+                          <span>{t("tabs.pointsRewards")}</span>
                         </TabsTrigger>
                       )}
                       <TabsTrigger value="creator-profile" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <UserCircle className="h-4 w-4" />
-                        <span>Creator Account</span>
+                        <span>{t("tabs.creatorAccount")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="notifications" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Bell className="h-4 w-4" />
@@ -862,12 +862,12 @@ function SettingsContent() {
                       {hasRecruiterSurface && (
                         <TabsTrigger value="recruiter-sharing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                           <Share2 className="h-4 w-4" />
-                          <span>Sharing &amp; Branding</span>
+                          <span>{t("tabs.sharingBranding")}</span>
                         </TabsTrigger>
                       )}
                       <TabsTrigger value="email" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Mail className="h-4 w-4" />
-                        <span>Email</span>
+                        <span>{t("tabs.email")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="integrations" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Youtube className="h-4 w-4" />
@@ -899,7 +899,7 @@ function SettingsContent() {
                           className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                         >
                           <Briefcase className="h-4 w-4" />
-                          <span>Workforce</span>
+                          <span>{t("tabs.workforce")}</span>
                         </TabsTrigger>
                       )}
                       {showPointsTab && (
@@ -908,20 +908,20 @@ function SettingsContent() {
                           className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                         >
                           <Trophy className="h-4 w-4" />
-                          <span>Points &amp; Rewards</span>
+                          <span>{t("tabs.pointsRewards")}</span>
                         </TabsTrigger>
                       )}
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                         <Video className="h-3 w-3" />
-                        Content Creator
+                        {t("labels.tabGroupContentCreator")}
                       </div>
                       <TabsTrigger
                         value="creator-profile"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <UserCircle className="h-4 w-4" />
-                        <span>Account</span>
+                        <span>{t("tabs.account")}</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -996,14 +996,14 @@ function SettingsContent() {
                         <>
                           <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                             <Share2 className="h-3 w-3" />
-                            Recruiter
+                            {t("labels.tabGroupRecruiter")}
                           </div>
                           <TabsTrigger
                             value="recruiter-sharing"
                             className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                           >
                             <Share2 className="h-4 w-4" />
-                            <span>Sharing &amp; Branding</span>
+                            <span>{t("tabs.sharingBranding")}</span>
                           </TabsTrigger>
                         </>
                       )}
@@ -1016,7 +1016,7 @@ function SettingsContent() {
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Mail className="h-4 w-4" />
-                        <span>Email</span>
+                        <span>{t("tabs.email")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="integrations"
@@ -1122,10 +1122,9 @@ function SettingsContent() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Marketing email preferences</CardTitle>
+                    <CardTitle>{t("headings.marketingEmailPreferences")}</CardTitle>
                     <CardDescription>
-                      Choose which hired.video marketing emails you receive.
-                      Account &amp; security emails are always sent.
+                      {t("messages.marketingEmailPreferencesDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

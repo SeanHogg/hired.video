@@ -25,6 +25,19 @@
 
 import { USER_ROLES, type UserRole } from "../../../../shared/user-roles.js";
 
+/** General content/engagement actions any non-staff "earner" role can score
+ *  (profile, daily session, social, reviews, events, …). Extracted because
+ *  the literal triple was repeated across ~30 rules (DRY); `creator` joins it
+ *  now that Creator is a first-class scoring role (#1998). Role-SPECIFIC
+ *  rules (resume actions = job_seeker only, sourcing = recruiter only, etc.)
+ *  keep their own narrower `roles` arrays. */
+export const GENERAL_EARNING_ROLES: UserRole[] = [
+  USER_ROLES.JOB_SEEKER,
+  USER_ROLES.RECRUITER,
+  USER_ROLES.EMPLOYER,
+  USER_ROLES.CREATOR,
+];
+
 /** Coarse buckets surfaced in the user-facing activity feed. */
 export type PointsCategory =
   | "earn"
@@ -266,7 +279,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.FEED_POST_CREATED]: {
     key: ACTIONS.FEED_POST_CREATED,
     label: "Posted to the social feed",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 10,
     category: "earn",
     dailyCapPoints: 30,
@@ -275,7 +288,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.RESOURCE_SUBMITTED]: {
     key: ACTIONS.RESOURCE_SUBMITTED,
     label: "Submitted a community resource",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 25,
     category: "earn",
     dailyCapPoints: 100, // keep low-effort link spam from farming points
@@ -286,7 +299,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.LESSON_COMPLETED]: {
     key: ACTIONS.LESSON_COMPLETED,
     label: "Completed a course lesson",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 10,
     category: "earn",
     dailyCapPoints: 80,
@@ -295,7 +308,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.COURSE_PASSED]: {
     key: ACTIONS.COURSE_PASSED,
     label: "Passed a course",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 100,
     category: "earn",
     source: "learning",
@@ -303,7 +316,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.CERTIFICATE_EARNED]: {
     key: ACTIONS.CERTIFICATE_EARNED,
     label: "Earned a verifiable certificate",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 50,
     category: "earn",
     source: "learning",
@@ -311,7 +324,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.LEARNING_PATH_COMPLETED]: {
     key: ACTIONS.LEARNING_PATH_COMPLETED,
     label: "Completed a learning pathway",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 250,
     category: "earn",
     source: "learning",
@@ -319,7 +332,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.COURSE_PUBLISHED]: {
     key: ACTIONS.COURSE_PUBLISHED,
     label: "Published a course",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 200,
     category: "earn",
     source: "learning",
@@ -335,7 +348,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.BADGE_UNLOCKED]: {
     key: ACTIONS.BADGE_UNLOCKED,
     label: "Badge unlocked",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 0, // engine sets per-badge value
     category: "badge_bonus",
     source: "badge",
@@ -348,7 +361,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.PLAY_GAME_CHALLENGE]: {
     key: ACTIONS.PLAY_GAME_CHALLENGE,
     label: "Completed a 3D-world challenge",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 25,
     category: "earn",
     dailyCapPoints: 200,
@@ -361,7 +374,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.EVENT_CREATED]: {
     key: ACTIONS.EVENT_CREATED,
     label: "Created an event",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 50,
     category: "earn",
     dailyCapPoints: 200,
@@ -370,7 +383,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.EVENT_REGISTERED]: {
     key: ACTIONS.EVENT_REGISTERED,
     label: "Registered for an event",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 10,
     category: "earn",
     dailyCapPoints: 50,
@@ -379,7 +392,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.EVENT_ATTENDED]: {
     key: ACTIONS.EVENT_ATTENDED,
     label: "Attended an event",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 25,
     category: "earn",
     dailyCapPoints: 100,
@@ -392,7 +405,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.BOOKING_SESSION_COMPLETED]: {
     key: ACTIONS.BOOKING_SESSION_COMPLETED,
     label: "Completed a booked session",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 75,
     category: "earn",
     dailyCapPoints: 300,
@@ -401,7 +414,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.BOOKING_SESSION_BOOKED]: {
     key: ACTIONS.BOOKING_SESSION_BOOKED,
     label: "Booked a session",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 20,
     category: "earn",
     dailyCapPoints: 100,
@@ -412,7 +425,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.ARTICLE_PUBLISHED]: {
     key: ACTIONS.ARTICLE_PUBLISHED,
     label: "Published an article",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 75,
     category: "earn",
     dailyCapPoints: 225,
@@ -425,7 +438,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.REFERENCE_GIVEN]: {
     key: ACTIONS.REFERENCE_GIVEN,
     label: "Gave a reference",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 40,
     category: "earn",
     dailyCapPoints: 160,
@@ -434,7 +447,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.REFERENCE_RECEIVED]: {
     key: ACTIONS.REFERENCE_RECEIVED,
     label: "Received a reference",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 20,
     category: "earn",
     dailyCapPoints: 100,
@@ -445,7 +458,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.COMPANY_REVIEW_POSTED]: {
     key: ACTIONS.COMPANY_REVIEW_POSTED,
     label: "Posted a company review",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 25,
     category: "earn",
     dailyCapPoints: 75, // keep low-effort review spam from farming points
@@ -458,7 +471,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.COHORT_CREATED]: {
     key: ACTIONS.COHORT_CREATED,
     label: "Created a learning cohort",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 100,
     category: "earn",
     source: "cohort",
@@ -466,7 +479,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.COHORT_STUDENT_JOINED]: {
     key: ACTIONS.COHORT_STUDENT_JOINED,
     label: "Joined a learning cohort",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 20,
     category: "earn",
     source: "cohort",
@@ -474,7 +487,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.COHORT_ASSIGNMENT_COMPLETED]: {
     key: ACTIONS.COHORT_ASSIGNMENT_COMPLETED,
     label: "Completed a cohort assignment",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 50,
     category: "earn",
     dailyCapPoints: 200,
@@ -487,7 +500,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.STUDIO_GAME_PUBLISHED]: {
     key: ACTIONS.STUDIO_GAME_PUBLISHED,
     label: "Published a game",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 150,
     category: "earn",
     source: "studio",
@@ -495,7 +508,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.STUDIO_COMIC_PUBLISHED]: {
     key: ACTIONS.STUDIO_COMIC_PUBLISHED,
     label: "Published a comic",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 150,
     category: "earn",
     source: "studio",
@@ -503,7 +516,7 @@ export const POINTS_CATALOG: Record<ActionKey, PointsRule> = {
   [ACTIONS.STUDIO_PODCAST_PUBLISHED]: {
     key: ACTIONS.STUDIO_PODCAST_PUBLISHED,
     label: "Published a podcast",
-    roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
+    roles: GENERAL_EARNING_ROLES,
     points: 150,
     category: "earn",
     source: "studio",

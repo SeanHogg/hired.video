@@ -102,6 +102,44 @@ const WORKFORCE_DEFAULTS: ProfileSections = {
   openToCoffee: false,
 };
 
+// Content creators (#1997) render a channel-style profile (profileMode
+// defaults to "channel" at signup). Lead with their content + social
+// presence; hide the résumé-centric sections (Video Resume, Master Resume,
+// Skill Network, Opportunity Preferences) since a creator isn't presenting
+// as a job applicant. Keep Skills (discoverability), About, Contact, Social,
+// ProfileVideos (their library), and openToCoffee (creators network).
+const CREATOR_DEFAULTS: ProfileSections = {
+  videoResume: false,
+  masterResume: false,
+  skillNetwork: false,
+  skills: true,
+  about: true,
+  contact: true,
+  social: true,
+  opportunityPreferences: false,
+  additionalInfo: true,
+  profileVideos: true,
+  openToCoffee: true,
+};
+
+// Affiliates (#1997) promote referrals; they are NOT on the job market and
+// have no creator library by default. Public profile is a light social
+// baseline — About + Social only — so the profile isn't empty but exposes
+// nothing candidate-like. They can opt sections back on in Settings.
+const AFFILIATE_DEFAULTS: ProfileSections = {
+  videoResume: false,
+  masterResume: false,
+  skillNetwork: false,
+  skills: false,
+  about: true,
+  contact: false,
+  social: true,
+  opportunityPreferences: false,
+  additionalInfo: false,
+  profileVideos: false,
+  openToCoffee: false,
+};
+
 export function getDefaultProfileSections(role: string | null | undefined): ProfileSections {
   switch (role) {
     case USER_ROLES.RECRUITER:
@@ -109,6 +147,10 @@ export function getDefaultProfileSections(role: string | null | undefined): Prof
       return { ...HIRING_SIDE_DEFAULTS };
     case USER_ROLES.EMPLOYEE:
       return { ...WORKFORCE_DEFAULTS };
+    case USER_ROLES.CREATOR:
+      return { ...CREATOR_DEFAULTS };
+    case USER_ROLES.AFFILIATE:
+      return { ...AFFILIATE_DEFAULTS };
     case USER_ROLES.JOB_SEEKER:
     case USER_ROLES.ADMIN:
     case USER_ROLES.SUPER_ADMIN:

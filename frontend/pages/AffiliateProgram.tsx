@@ -1,16 +1,11 @@
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
-import { AuthCaptchaSlot } from "@/components/auth/AuthCaptchaSlot";
-import { EmailField } from "@/components/auth/EmailField";
+import ProgramSignupForm, { type ProgramSignupFields } from "@/components/auth/ProgramSignupForm";
 import { useAuth } from "@/lib/auth";
-import { useTurnstile } from "@/lib/hooks/use-turnstile";
-import { mapAuthError } from "@/lib/services/auth-errors";
 import { USER_ROLES } from "@shared/user-roles";
 import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
@@ -21,44 +16,16 @@ export default function AffiliateProgram() {
   useBreadcrumbs([{ name: t("labels.affiliateProgram"), url: "/affiliate-program" }]);
   const navigate = useNavigate();
   const { signup, isLoading, isAuthenticated } = useAuth();
-  const captcha = useTurnstile();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  // Sign the visitor up AS an affiliate (role=affiliate, promoted to a
+  // first-class role 2026-06-13) and auto-create their affiliate profile via
+  // enableAffiliate=true. Inbound `?ref=` attribution is picked up by
+  // `signup()` from the shared first-touch store — no querystring parsing here.
+  const registerAffiliate = (fields: ProgramSignupFields, token: string) =>
+    signup(fields.email, fields.password, fields.firstName, fields.lastName, USER_ROLES.AFFILIATE, undefined, true, token);
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    if (!email || !password || !firstName || !lastName) {
-      setError(t("errors.affiliate.fillAllFields"));
-      return;
-    }
-
-    if (!captcha.ready) {
-      setError(t("errors.captchaRequired"));
-      return;
-    }
-
-    // Register with the default role (job seeker); affiliate is a service layered on top of any role.
-    // Inbound `?ref=` attribution is picked up by `signup()` from the
-    // shared first-touch store (cookie populated by useAttributionCapture
-    // on every route) — no need to re-parse the querystring here.
-    try {
-      await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, undefined, true, captcha.token);
-      setSuccess(t("messages.affiliate.registrationSuccess"));
-      setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);
-    } catch (err) {
-      setError(t(mapAuthError(err).messageKey));
-      // Token is one-shot — reset so the user can retry without a soft-lock.
-      captcha.reset();
-    }
-  };
+  const goToSuccess = (fields: ProgramSignupFields) =>
+    setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(fields.email)}&firstName=${encodeURIComponent(fields.firstName)}`), 1000);
 
   return (
     <AppShell bgClassName="bg-background">
@@ -140,52 +107,16 @@ export default function AffiliateProgram() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card id="affiliate-signup" className="shadow-lg">
-                  <CardHeader>
-                    <CardTitle>{t("headings.affiliate.becomeAffiliate")}</CardTitle>
-                    <CardDescription>{t("messages.affiliate.registerCta")}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form className="space-y-4" onSubmit={handleRegister}>
-                      <div>
-                        <label className="text-sm font-medium">{t("fields.firstName.label")}</label>
-                        <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("fields.firstName.placeholder")} required />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">{t("fields.lastName.label")}</label>
-                        <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("fields.lastName.placeholder")} required />
-                      </div>
-                      <EmailField
-                        id="affiliate-email"
-                        value={email}
-                        onChange={setEmail}
-                        label={t("fields.emailAddress.label")}
-                        placeholder={t("fields.email.placeholder")}
-                      />
-                      <div>
-                        <label className="text-sm font-medium">{t("fields.password.label")}</label>
-                        <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-                        <p className="text-xs text-muted-foreground mt-1">{t("messages.affiliate.passwordMinLength")}</p>
-                      </div>
-                      <AuthCaptchaSlot captcha={captcha} />
-                      {error && <p className="text-sm text-red-600">{error}</p>}
-                      {success && <p className="text-sm text-green-600">{success}</p>}
-                      <Button type="submit" className="w-full" disabled={isLoading || !captcha.ready}>
-                        {isLoading ? t("messages.affiliate.creatingAccount") : t("actions.affiliate.createAccount")}
-                      </Button>
-                      <div className="text-xs text-center text-muted-foreground">
-                        {t("messages.affiliate.agreePrefix")}{" "}
-                        <Link to="/terms" className="text-primary hover:underline">
-                          {t("labels.tos")}
-                        </Link>{" "}
-                        {t("messages.affiliate.agreeAnd")}{" "}
-                        <Link to="/privacy" className="text-primary hover:underline">
-                          {t("labels.privacyPolicy")}
-                        </Link>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
+                <ProgramSignupForm
+                  id="affiliate-signup"
+                  title={t("headings.affiliate.becomeAffiliate")}
+                  description={t("messages.affiliate.registerCta")}
+                  submitLabel={t("actions.affiliate.createAccount")}
+                  successMessage={t("messages.affiliate.registrationSuccess")}
+                  register={registerAffiliate}
+                  onSuccess={goToSuccess}
+                  isLoading={isLoading}
+                />
               )}
             </div>
           </section>

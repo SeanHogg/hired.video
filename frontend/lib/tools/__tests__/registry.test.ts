@@ -67,12 +67,16 @@ import type { NormalizedToolRunResult } from "../types";
 describe("getCoachToolSpecs", () => {
   it("emits one entry per tool that declares a `parameters` schema", () => {
     const specs = getCoachToolSpecs();
-    // Default view is non-SuperAdmin, so SuperAdmin-only tools
-    // (`requiresSuperAdmin`) are gated out — mirror that gate here or the
-    // expectation drifts the moment a SuperAdmin tool is added.
+    // getCoachToolSpecs applies two self-gates we must mirror or the
+    // expectation drifts the moment a gated tool is added:
+    //   • `requiresSuperAdmin` — default view is non-SA, so SA tools are out.
+    //   • `requiresStudioEditor` — only exposed when a Studio editor is
+    //     mounted in the tab; no editor is mounted in this unit test, so
+    //     those tools (record / insert-widget / add-scene, etc.) are out.
     const expectedNames = toolRegistry
       .filter((t) => t.parameters)
       .filter((t) => !t.requiresSuperAdmin)
+      .filter((t) => !t.requiresStudioEditor)
       .map((t) => t.id)
       .sort();
     const actualNames = specs.map((s) => s.function.name).sort();

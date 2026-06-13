@@ -314,11 +314,24 @@ export default function Signup() {
                     </div>
                   </div>
 
-	                  <div className="text-sm text-muted-foreground">
-	                    {t("prompts.affiliate")}{" "}
-	                    <Link to="/affiliate-program" className="text-primary hover:underline">
-	                      {t("actions.signUpAffiliate")}
-	                    </Link>.
+	                  {/* Specialized first-class roles (creator / affiliate) keep
+	                      their own create-account landing pages rather than
+	                      crowding the core 3-way picker — see #1996. Both register
+	                      the visitor with the matching `role` so growth reports
+	                      segment them cleanly. */}
+	                  <div className="space-y-1 text-sm text-muted-foreground">
+	                    <div>
+	                      {t("prompts.creator")}{" "}
+	                      <Link to="/services" className="text-primary hover:underline">
+	                        {t("actions.signUpCreator")}
+	                      </Link>.
+	                    </div>
+	                    <div>
+	                      {t("prompts.affiliate")}{" "}
+	                      <Link to="/affiliate-program" className="text-primary hover:underline">
+	                        {t("actions.signUpAffiliate")}
+	                      </Link>.
+	                    </div>
 	                  </div>
 
 

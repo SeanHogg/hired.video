@@ -60,6 +60,7 @@ interface ProductDashboardData {
     activeUsers: number;
     newUsersLast30Days: number;
     usersByRole?: Record<string, number>;
+    newUsersByRole?: Record<string, number>;
     usersByStatus?: Record<string, number>;
   };
   jobMetrics: {
@@ -601,6 +602,27 @@ export default function ProductDashboard() {
                     },
                   )}
                 </div>
+
+                {/* New signups by role (last 30d) — the growth-by-role view
+                    that motivated promoting creator/affiliate to roles (#2000).
+                    Dynamic over usersByRole keys so any role appears. */}
+                {dashboardData.userMetrics.newUsersByRole &&
+                  Object.keys(dashboardData.userMetrics.newUsersByRole).length > 0 && (
+                    <div className="mt-6 space-y-2 border-t pt-4">
+                      <div className="text-sm font-medium">New signups by role (last 30 days):</div>
+                      {Object.entries(dashboardData.userMetrics.newUsersByRole)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([role, count]) => (
+                          <div key={role} className="flex justify-between items-center text-sm">
+                            <span className="flex items-center gap-2">
+                              <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                              {getRoleDisplayLabel(role)}
+                            </span>
+                            <span className="font-medium">{count}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
               </CardContent>
             </Card>
 

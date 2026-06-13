@@ -73,6 +73,7 @@ adminRoutes.get("/", async (c) => {
 		mrr,
 		prevMrr,
 		usersByRole,
+		newUsersByRole30,
 	] = await Promise.all([
 		repos.users.countAll(),
 		repos.users.countActive(),
@@ -89,6 +90,7 @@ adminRoutes.get("/", async (c) => {
 		repos.subscriptions.activeMrr(),
 		repos.subscriptions.activeMrrBefore(thirtyDaysAgo),
 		repos.users.countByRole(),
+		repos.users.countByRoleCreatedSince(thirtyDaysAgo),
 	]);
 
 	const arr = mrr * 12;
@@ -98,6 +100,9 @@ adminRoutes.get("/", async (c) => {
 
 	const usersByRoleMap: Record<string, number> = {};
 	for (const r of usersByRole) usersByRoleMap[r.role] = r.n;
+
+	const newUsersByRoleMap: Record<string, number> = {};
+	for (const r of newUsersByRole30) newUsersByRoleMap[r.role] = r.n;
 
 	// 90-day growth series (weekly buckets)
 	const growthSeries: Array<{ date: string; count: number }> = [];
@@ -115,6 +120,7 @@ adminRoutes.get("/", async (c) => {
 			activeUsers,
 			newUsersLast30Days: newUsers30,
 			usersByRole: usersByRoleMap,
+			newUsersByRole: newUsersByRoleMap,
 			usersByStatus: { active: activeUsers, inactive: totalUsers - activeUsers },
 		},
 		jobMetrics: {

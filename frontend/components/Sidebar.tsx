@@ -27,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { AuthButtons } from "@/components/AuthButtons";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useAuth } from "@/lib/auth";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
+import { USER_ROLES, type UserRole } from "@shared/user-roles";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
@@ -53,34 +55,55 @@ export default function Sidebar({
   const { isAuthenticated, user } = useAuth();
   const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
   const { isPro } = useSubscription();
+  const effectiveRole = useEffectiveRole();
   const location = useLocation();
   const { t } = useTranslation();
 
-  // Main navigation items - shown to all users
-  const navigation = [
+  // Main navigation items. `hideForRoles` trims the rail for the narrow
+  // personas so each role only sees relevant features (#1995) — the SSoT
+  // complaint was that every logged-in user saw every item. We deny-list
+  // (rather than allow-list) so the established roles (job_seeker /
+  // recruiter / employer / admin) keep their full menu with zero regression;
+  // only `affiliate` (and lightly `creator`) get a reduced set. An affiliate
+  // is here to refer + earn, so studio/resumes/companies/outreach/gigs are
+  // noise for them — their workspace lives under My Services.
+  const navigation: {
+    name: string;
+    href: string;
+    icon: typeof TrendingUp;
+    exactMatch: boolean;
+    hideForRoles?: UserRole[];
+  }[] = [
     {
       name: t("labels.dashboard"),
       href: "/dashboard",
       icon: TrendingUp,
       exactMatch: false,
     },
-    { name: t("labels.studio"), href: "/studio", icon: Palette, exactMatch: false },
+    { name: t("labels.studio"), href: "/studio", icon: Palette, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE] },
     { name: t("labels.tools"), href: "/tools", icon: Wrench, exactMatch: false },
-    { name: t("labels.resumes"), href: "/resumes", icon: FileText, exactMatch: false },
+    { name: t("labels.resumes"), href: "/resumes", icon: FileText, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE] },
     { name: t("labels.jobs"), href: "/jobs", icon: Briefcase, exactMatch: false },
     {
       name: t("labels.companies"),
       href: "/companies",
       icon: Building2,
       exactMatch: false,
+      hideForRoles: [USER_ROLES.AFFILIATE],
     },
     { name: t("labels.people"), href: "/people", icon: Users, exactMatch: false },
     { name: t("labels.tasksAndEvents", { defaultValue: "Tasks / Events" }), href: "/tasks", icon: CheckSquare, exactMatch: false },
-    { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false },
+    { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE, USER_ROLES.CREATOR] },
     { name: t("labels.marketplace"), href: "/search", icon: Store, exactMatch: false },
-    { name: t("labels.gigs", { defaultValue: "Gigs" }), href: "/gigs", icon: Handshake, exactMatch: false },
+    { name: t("labels.gigs", { defaultValue: "Gigs" }), href: "/gigs", icon: Handshake, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE] },
     { name: t("labels.myServices"), href: "/services", icon: ShoppingBag, exactMatch: false },
   ];
+
+  // Self-gating per active role (respects impersonation / persona preview via
+  // useEffectiveRole). Items with no `hideForRoles` show for everyone.
+  const visibleNavigation = navigation.filter(
+    (item) => !item.hideForRoles?.includes(effectiveRole as UserRole),
+  );
 
   // Additional navigation for unauthenticated users (mobile)
   const publicNavigation = [
@@ -205,7 +228,7 @@ export default function Sidebar({
                 </h3>
               )}
               <nav className="space-y-1">
-                {navigation.map((item) => (
+                {visibleNavigation.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}

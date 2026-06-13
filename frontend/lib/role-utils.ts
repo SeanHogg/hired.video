@@ -24,6 +24,8 @@ export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.RECRUITER]: "Recruiter",
   [USER_ROLES.EMPLOYER]: "Employer",
   [USER_ROLES.EMPLOYEE]: "Employee",
+  [USER_ROLES.CREATOR]: "Creator",
+  [USER_ROLES.AFFILIATE]: "Affiliate",
   [USER_ROLES.ADMIN]: "Administrator",
   [USER_ROLES.SUPER_ADMIN]: "Super Administrator",
   "Unassigned": "Unassigned", // Users without a role or profile
@@ -35,6 +37,8 @@ export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.RECRUITER]: "Recruiting talent for companies",
   [USER_ROLES.EMPLOYER]: "Managing company and hiring",
   [USER_ROLES.EMPLOYEE]: "Workforce member punching time against tasks for an employer",
+  [USER_ROLES.CREATOR]: "Publishing content and selling services to an audience",
+  [USER_ROLES.AFFILIATE]: "Earning commission by referring new users",
   [USER_ROLES.ADMIN]: "System administration",
   [USER_ROLES.SUPER_ADMIN]: "Full system control and product management",
   "Unassigned": "Users without a role or profile assigned",
@@ -73,8 +77,8 @@ export function normalizeRole(
         return USER_ROLES.RECRUITER;
       case BACKEND_ROLE_VALUES.EMPLOYER: // 20
         return USER_ROLES.EMPLOYER;
-      case 50: // Legacy affiliate enum value — affiliate is now a service, not a role
-        return USER_ROLES.EMPLOYER;
+      case 50: // Legacy numeric affiliate enum — affiliate is now a first-class role (2026-06-13)
+        return USER_ROLES.AFFILIATE;
       case BACKEND_ROLE_VALUES.ADMIN: // 0
         return USER_ROLES.ADMIN;
       case BACKEND_ROLE_VALUES.SUPER_ADMIN: // -1
@@ -98,8 +102,10 @@ export function normalizeRole(
       return USER_ROLES.EMPLOYER;
     case "employee":
       return USER_ROLES.EMPLOYEE;
-    case "affiliate": // Legacy — affiliate is now a service, not a role
-      return USER_ROLES.EMPLOYER;
+    case "creator": // First-class role (2026-06-13) — content-creator persona
+      return USER_ROLES.CREATOR;
+    case "affiliate": // First-class role (2026-06-13) — was previously coerced to employer
+      return USER_ROLES.AFFILIATE;
     case "admin":
     case "administrator":
       return USER_ROLES.ADMIN;
@@ -198,6 +204,14 @@ export class RolePermissions {
 
   get isEmployee(): boolean {
     return this.role === USER_ROLES.EMPLOYEE;
+  }
+
+  get isCreator(): boolean {
+    return this.role === USER_ROLES.CREATOR;
+  }
+
+  get isAffiliate(): boolean {
+    return this.role === USER_ROLES.AFFILIATE;
   }
 
   get isAdmin(): boolean {

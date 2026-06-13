@@ -73,7 +73,9 @@ describe("RegisterSchema — role normalisation", () => {
   const base = { email: "new@example.com", password: "password123", name: "New User" };
 
   it("accepts the canonical lower_snake role values", () => {
-    for (const role of ["job_seeker", "recruiter", "employer", "admin"]) {
+    // `creator` + `affiliate` were promoted to first-class roles 2026-06-13
+    // (growth/SaaS reporting segments by users.role).
+    for (const role of ["job_seeker", "recruiter", "employer", "creator", "affiliate", "admin"]) {
       const r = RegisterSchema.safeParse({ ...base, role });
       assert.equal(r.success, true, `should accept "${role}"`);
       if (r.success) assert.equal(r.data.role, role);
@@ -92,10 +94,11 @@ describe("RegisterSchema — role normalisation", () => {
     }
   });
 
-  it("rejects 'affiliate' as a role — affiliate is a service, not a role", () => {
-    // Affiliate status is controlled by `enableAffiliate: true`. The
-    // underlying role must still be one of the four enum values.
-    assert.equal(RegisterSchema.safeParse({ ...base, role: "affiliate" }).success, false);
+  it("accepts 'affiliate' as a first-class role (promoted 2026-06-13)", () => {
+    // Affiliate is now a role you can register as directly (the
+    // affiliate-program page does so), AND `enableAffiliate: true` still
+    // layers the affiliate_profiles row on top. Canonical snake_case only.
+    assert.equal(RegisterSchema.safeParse({ ...base, role: "affiliate" }).success, true);
     assert.equal(RegisterSchema.safeParse({ ...base, role: "Affiliate" }).success, false);
   });
 

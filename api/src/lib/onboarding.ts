@@ -92,6 +92,34 @@ function getOnboardingTasksForRole(role: string): OnboardingTaskDef[] {
         },
       ];
       break;
+    case "creator":
+      ordered = [
+        persona,
+        profile,
+        settings,
+        {
+          title: "Set up your Creator profile",
+          description: "Add your channel details and publish your first content to start earning",
+          taskType: 18,
+          url: "/services/creator",
+          position: 0,
+        },
+      ];
+      break;
+    case "affiliate":
+      ordered = [
+        persona,
+        profile,
+        settings,
+        {
+          title: "Get your referral link",
+          description: "Grab your affiliate link and start sharing it to earn commission",
+          taskType: 19,
+          url: "/services?tab=dashboard",
+          position: 0,
+        },
+      ];
+      break;
     default:
       ordered = [persona, profile, settings];
   }

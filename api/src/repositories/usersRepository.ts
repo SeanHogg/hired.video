@@ -79,6 +79,7 @@ export interface IUsersRepository {
   countActive(): Promise<number>;
   countCreatedSince(since: Date): Promise<number>;
   countByRole(): Promise<Array<{ role: string; n: number }>>;
+  countByRoleCreatedSince(since: Date): Promise<Array<{ role: string; n: number }>>;
   search(filters: UserSearchFilters, page?: number, limit?: number): Promise<UserSearchResult>;
   insertOne(input: UserInsert): Promise<UserRow>;
   updateById(id: string, patch: UserPatch): Promise<UserRow | null>;
@@ -177,6 +178,19 @@ export class UsersRepository implements IUsersRepository {
   /** Grouped count by role — drives the admin-dashboard pie chart. */
   async countByRole(): Promise<Array<{ role: string; n: number }>> {
     const rows = await this.db.select({ role: users.role, n: count() }).from(users).groupBy(users.role);
+    return (rows as Array<{ role: string; n: number }>).map((r) => ({ role: r.role, n: Number(r.n) }));
+  }
+
+  /** Grouped signup count by role since a date — drives the "new signups by
+   *  role" growth breakdown on the product dashboard (#2000). Same dynamic
+   *  GROUP BY as countByRole so new roles (creator/affiliate) appear without
+   *  a code change. */
+  async countByRoleCreatedSince(since: Date): Promise<Array<{ role: string; n: number }>> {
+    const rows = await this.db
+      .select({ role: users.role, n: count() })
+      .from(users)
+      .where(gte(users.createdAt, since))
+      .groupBy(users.role);
     return (rows as Array<{ role: string; n: number }>).map((r) => ({ role: r.role, n: Number(r.n) }));
   }
 

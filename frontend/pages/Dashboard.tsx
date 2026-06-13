@@ -37,6 +37,9 @@ const RecruiterDashboard = lazy(() => import("@/components/dashboard/RecruiterDa
 const EmployerDashboard = lazy(() => import("@/components/dashboard/EmployerDashboard"));
 const AdminDashboard = lazy(() => import("@/components/dashboard/AdminDashboard"));
 const CreatorDashboard = lazy(() => import("@/components/dashboard/CreatorDashboard"));
+const AffiliateDashboard = lazy(() =>
+  import("@/pages/AffiliateDashboard").then((m) => ({ default: m.AffiliateDashboardContent })),
+);
 const ProductDashboard = lazy(() => import("@/pages/admin/ProductDashboard"));
 import TabStrip, { type TabStripItem } from "@/components/ui/tab-strip";
 import { BarChart3, Activity } from "lucide-react";
@@ -121,6 +124,11 @@ export default function Dashboard() {
       return <RecruiterDashboard {...commonProps} />;
     if (rolePermissions.isEmployer)
       return <EmployerDashboard {...commonProps} />;
+    // Creator + Affiliate are first-class roles (2026-06-13). They land on
+    // their own home surfaces rather than the generic "no dashboard" fallback;
+    // both components self-fetch, so they take no commonProps.
+    if (rolePermissions.isCreator) return <CreatorDashboard />;
+    if (rolePermissions.isAffiliate) return <AffiliateDashboard />;
     // Fallback for unknown roles
     return (
       <div className="text-center">

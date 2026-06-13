@@ -1136,6 +1136,66 @@
     <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/ad_outdoor_billboard_4x1?lang=es" />
     <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/ad_outdoor_billboard_4x1?lang=fr-CA" />
   </url>
+  <url><loc>https://hired.video/templates/resume_doc</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/resume_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/resume_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/resume_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/resume_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/job_doc</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/job_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/job_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/job_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/job_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/article_doc</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/article_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/article_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/article_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/article_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/blog_doc</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/blog_doc" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/blog_doc" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/blog_doc?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/blog_doc?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad3d_part</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad3d_part" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad3d_part" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad3d_part?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad3d_part?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad3d_massing</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad3d_massing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad3d_massing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad3d_massing?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad3d_massing?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/cad3d_product</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/cad3d_product" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/cad3d_product" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/cad3d_product?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/cad3d_product?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/icomic_branching_pitch</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/icomic_branching_pitch" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/icomic_branching_pitch" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/icomic_branching_pitch?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/icomic_branching_pitch?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/icomic_choose_path</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/icomic_choose_path" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/icomic_choose_path" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/icomic_choose_path?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/icomic_choose_path?lang=fr-CA" />
+  </url>
+  <url><loc>https://hired.video/templates/icomic_case_study</loc><lastmod>2026-06-13</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hired.video/templates/icomic_case_study" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://hired.video/templates/icomic_case_study" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://hired.video/templates/icomic_case_study?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr-CA" href="https://hired.video/templates/icomic_case_study?lang=fr-CA" />
+  </url>
 
   <!-- ===== Legal ===== -->
   <url>

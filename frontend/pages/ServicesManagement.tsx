@@ -10,7 +10,6 @@ import {
   Sparkles,
   ShoppingBag,
   Users,
-  Briefcase,
   TrendingUp,
   DollarSign,
   Tag,
@@ -21,8 +20,10 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
+import ProgramSignupForm, { type ProgramSignupFields } from "@/components/auth/ProgramSignupForm";
+import { USER_ROLES } from "@shared/user-roles";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,9 +125,19 @@ function MetricCard({
 
 export default function ServicesManagement() {
   const { t } = useTranslation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, signup, isLoading: authLoading } = useAuth();
   const effectiveRole = useEffectiveRole();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Public create-account handlers (logged-out branch). Register the visitor
+  // AS a creator (role=creator); attribution + locale flow through signup()
+  // from the shared first-touch store.
+  const registerCreator = (fields: ProgramSignupFields, token: string) =>
+    signup(fields.email, fields.password, fields.firstName, fields.lastName, USER_ROLES.CREATOR, undefined, undefined, token);
+
+  const goToSignupSuccess = (fields: ProgramSignupFields) =>
+    setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(fields.email)}&firstName=${encodeURIComponent(fields.firstName)}`), 1000);
 
   // Top-level tab is driven by the URL path so each section is deep-linkable
   // and the back button works. /services → dashboard, /services/creator →
@@ -283,138 +294,126 @@ export default function ServicesManagement() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  // Marketing page for unauthenticated visitors
+  // Public create-account page for logged-out visitors — modelled on the
+  // affiliate-program landing (shared <ProgramSignupForm>): the /services
+  // public face IS the "Become a Creator" signup, registering the new
+  // account as role=creator so it surfaces under /people as a Creator and
+  // counts as a Creator in growth/SaaS reports (GROUP BY users.role).
   if (!isAuthenticated || !user) {
     return (
-      <AppShell>
-        <div className="px-4 py-16">
-              {/* Hero */}
-              <div className="text-center mb-16">
-                <div className="inline-flex items-center space-x-2 mb-6">
+      <AppShell bgClassName="bg-background">
+        <main>
+          {/* Hero + signup */}
+          <section className="px-6 py-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2">
                   <div className="relative">
-                    <ShoppingBag className="h-12 w-12 text-primary" />
-                    <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                    <Sparkles className="h-7 w-7 text-brand-purple" />
                   </div>
-                  <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    {t("services.marketplaceLabel")}
+                  <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t("creator.landing.eyebrow")}
                   </span>
                 </div>
-                <h1 className="text-5xl font-bold mb-6">
-                  {t("services.heroTitle")}
-                </h1>
-                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  {t("services.heroSubtitle")}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link to="/signup">
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
-                    >
-                      {t("actions.getStartedFree")}
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
-                  <Link to="/login">
-                    <Button size="lg" variant="outline" className="text-lg px-8">
-                      {t("actions.signIn")}
-                    </Button>
+                <h1 className="text-4xl font-bold tracking-tight">{t("creator.landing.heroTitle")}</h1>
+                <p className="text-muted-foreground text-lg">{t("creator.landing.heroSubtitle")}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-start space-x-3">
+                    <Video className="h-6 w-6 text-pink-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">{t("creator.landing.feature1Title")}</p>
+                      <p className="text-sm text-muted-foreground">{t("creator.landing.feature1Desc")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <DollarSign className="h-6 w-6 text-green-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">{t("creator.landing.feature2Title")}</p>
+                      <p className="text-sm text-muted-foreground">{t("creator.landing.feature2Desc")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <Users className="h-6 w-6 text-purple-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">{t("creator.landing.feature3Title")}</p>
+                      <p className="text-sm text-muted-foreground">{t("creator.landing.feature3Desc")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <Tag className="h-6 w-6 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">{t("creator.landing.feature4Title")}</p>
+                      <p className="text-sm text-muted-foreground">{t("creator.landing.feature4Desc")}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    size="lg"
+                    onClick={() => document.getElementById("creator-signup")?.scrollIntoView({ behavior: "smooth" })}
+                  >
+                    {t("creator.landing.joinCta")}
+                  </Button>
+                  <Link to="/login" className="text-sm text-muted-foreground hover:underline">
+                    {t("actions.signIn")}
                   </Link>
                 </div>
               </div>
 
-              {/* Features */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-16">
-                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
-                  <CardHeader>
-                    <Tag className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>{t("services.listServicesTitle")}</CardTitle>
-                    <CardDescription>
-                      {t("services.listServicesDesc")}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
+              <ProgramSignupForm
+                id="creator-signup"
+                title={t("creator.landing.signupTitle")}
+                description={t("creator.landing.signupDesc")}
+                submitLabel={t("creator.landing.createAccount")}
+                successMessage={t("creator.landing.registrationSuccess")}
+                register={registerCreator}
+                onSuccess={goToSignupSuccess}
+                isLoading={authLoading}
+              />
+            </div>
+          </section>
 
-                <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
-                  <CardHeader>
-                    <Inbox className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>{t("services.manageInquiriesTitle")}</CardTitle>
-                    <CardDescription>
-                      {t("services.manageInquiriesDesc")}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
+          {/* What you get */}
+          <section className="px-6 py-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="border-brand-purple/20">
+                <CardHeader>
+                  <Tag className="h-10 w-10 text-brand-purple mb-4" />
+                  <CardTitle>{t("services.listServicesTitle")}</CardTitle>
+                  <CardDescription>{t("services.listServicesDesc")}</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="border-brand-blue/20">
+                <CardHeader>
+                  <Inbox className="h-10 w-10 text-brand-blue mb-4" />
+                  <CardTitle>{t("services.manageInquiriesTitle")}</CardTitle>
+                  <CardDescription>{t("services.manageInquiriesDesc")}</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="border-primary/20">
+                <CardHeader>
+                  <DollarSign className="h-10 w-10 text-primary mb-4" />
+                  <CardTitle>{t("services.getPaidTitle")}</CardTitle>
+                  <CardDescription>{t("services.getPaidDesc")}</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </section>
 
-                <Card className="border-primary/20 hover:border-primary/40 transition-colors">
-                  <CardHeader>
-                    <DollarSign className="h-10 w-10 text-primary mb-4" />
-                    <CardTitle>{t("services.getPaidTitle")}</CardTitle>
-                    <CardDescription>
-                      {t("services.getPaidDesc")}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </div>
-
-              {/* Who it's for */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">
-                  {t("services.audienceTitle")}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <Card className="text-center">
-                    <CardHeader>
-                      <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
-                      <CardTitle>{t("services.coachesTitle")}</CardTitle>
-                      <CardDescription>
-                        {t("services.coachesDesc")}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-
-                  <Card className="text-center">
-                    <CardHeader>
-                      <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
-                      <CardTitle>{t("services.recruitersTitle")}</CardTitle>
-                      <CardDescription>
-                        {t("services.recruitersDesc")}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-
-                  <Card className="text-center">
-                    <CardHeader>
-                      <TrendingUp className="h-12 w-12 mx-auto text-purple-600 mb-4" />
-                      <CardTitle>{t("services.jobSeekersTitle")}</CardTitle>
-                      <CardDescription>
-                        {t("services.jobSeekersDesc")}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                </div>
-              </div>
-
-              {/* CTA */}
-              <div className="text-center">
-                <Card className="inline-block border-brand-purple/30 bg-gradient-to-br from-brand-purple/5 to-brand-blue/5">
-                  <CardContent className="py-10 px-12">
-                    <h3 className="text-2xl font-bold mb-2">{t("services.readyToStartTitle")}</h3>
-                    <p className="text-muted-foreground mb-6">
-                      {t("services.readyToStartDesc")}
-                    </p>
-                    <Link to="/signup">
-                      <Button
-                        size="lg"
-                        className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                      >
-                        {t("actions.signUpFree")}
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </div>
-        </div>
+          {/* Final CTA */}
+          <section className="px-6 py-10">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <h2 className="text-2xl font-semibold">{t("creator.landing.ctaTitle")}</h2>
+              <p className="text-muted-foreground max-w-2xl">{t("creator.landing.ctaBody")}</p>
+              <Button
+                size="lg"
+                onClick={() => document.getElementById("creator-signup")?.scrollIntoView({ behavior: "smooth" })}
+              >
+                {t("creator.landing.joinCta")}
+              </Button>
+            </div>
+          </section>
+        </main>
       </AppShell>
     );
   }

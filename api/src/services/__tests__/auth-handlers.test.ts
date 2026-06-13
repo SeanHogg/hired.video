@@ -465,7 +465,10 @@ describe("handleRegister", () => {
     assert.equal(deps._state.users.length, 0, "no user created from rejected input");
   });
 
-  it("rejects 'affiliate' as a role — affiliate is an opt-in service, not a role", async () => {
+  it("accepts 'affiliate' as a first-class role (promoted 2026-06-13)", async () => {
+    // Affiliate is now a role the affiliate-program page registers users as
+    // directly (reporting segments by users.role). `enableAffiliate` still
+    // independently controls whether the affiliate_profiles row is created.
     const deps = makeDeps();
     const res = await handleRegister(deps, {
       email: "aff-role@example.com",
@@ -473,8 +476,21 @@ describe("handleRegister", () => {
       name: "AffRole",
       role: "affiliate",
     });
-    assert.equal(res.status, 400);
-    assert.equal(deps._state.users.length, 0);
+    assert.equal(res.status, 201);
+    assert.equal(deps._state.users[0].role, "affiliate");
+  });
+
+  it("seeds profileMode=channel for creator signups", async () => {
+    const deps = makeDeps();
+    const res = await handleRegister(deps, {
+      email: "creator@example.com",
+      password: "password123",
+      name: "Creator",
+      role: "creator",
+    });
+    assert.equal(res.status, 201);
+    assert.equal(deps._state.users[0].role, "creator");
+    assert.equal(deps._state.users[0].profileMode, "channel", "creator lands in channel mode");
   });
 
   it("accepts enableAffiliate:true layered on top of a real role (affiliate is a service)", async () => {

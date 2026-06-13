@@ -62,14 +62,14 @@ describe('SearchBar Component', () => {
     });
 
     it('renders with different contexts', () => {
-      // i18n isn't initialised under test, so the placeholder renders the raw
-      // `search.bar.placeholder.<context>` key — assert on the context token,
-      // which is what actually proves the per-context wiring.
+      // i18n is initialised in the test setup, so the placeholder renders the
+      // real per-context copy from `search.bar.placeholder.<context>`. Assert
+      // on that copy, which proves the per-context wiring end to end.
       const { rerender } = render(<SearchBar {...defaultProps} context="people" />);
-      expect(screen.getByPlaceholderText(/people/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/search professionals/i)).toBeInTheDocument();
 
       rerender(<SearchBar {...defaultProps} context="companies" />);
-      expect(screen.getByPlaceholderText(/companies/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/search companies/i)).toBeInTheDocument();
     });
   });
 

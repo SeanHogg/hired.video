@@ -51,7 +51,11 @@ function normalizeRole(role: string): string | null {
     job_seeker: "job_seeker",
     recruiter: "recruiter",
     employer: "employer",
-    affiliate: "employer", // Affiliate is a service, not a role — map to employer
+    // creator + affiliate are first-class roles (2026-06-13) — they map to
+    // themselves so the /people role facet filters correctly and a role
+    // change to creator/affiliate persists instead of silently coercing.
+    creator: "creator",
+    affiliate: "affiliate",
     admin: "admin",
   };
   return map[role.toLowerCase()] ?? null;

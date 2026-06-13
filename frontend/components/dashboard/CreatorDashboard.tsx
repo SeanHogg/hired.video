@@ -23,6 +23,7 @@ import StatCard from "@/components/analytics/StatCard";
 import GeoHotspotMap from "@/components/analytics/GeoHotspotMap";
 import ReferrerBreakdown from "@/components/analytics/ReferrerBreakdown";
 import MetricBadgeCluster from "@/components/shared/MetricBadgeCluster";
+import CreatorEnrollmentCTA from "@/components/creator/CreatorEnrollmentCTA";
 import {
   fetchCreatorRollup,
   type CreatorRollup,
@@ -77,21 +78,25 @@ export default function CreatorDashboard() {
 
   if (!rollup || rollup.totals.artifactCount === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <BarChart3 className="mx-auto mb-3 h-10 w-10 opacity-50" />
-          <p className="font-medium mb-1">No views yet</p>
-          <p className="text-sm">
-            Publish a resume, video, article, or template to start collecting
-            engagement stats. Every public artifact you own will roll up here.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <CreatorEnrollmentCTA />
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            <BarChart3 className="mx-auto mb-3 h-10 w-10 opacity-50" />
+            <p className="font-medium mb-1">No views yet</p>
+            <p className="text-sm">
+              Publish a resume, video, article, or template to start collecting
+              engagement stats. Every public artifact you own will roll up here.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      <CreatorEnrollmentCTA />
       {/* Top stat strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard title="Total views" value={rollup.totals.totalViews} icon={Eye} />

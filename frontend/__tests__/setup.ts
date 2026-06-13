@@ -1,6 +1,28 @@
 import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import enResources from '../public/locales/en.json';
+
+// Initialize the i18next singleton with the bundled English catalogue so
+// component/page tests resolve real copy instead of raw lookup keys (without
+// this, useTranslation echoes the key and any localized-label assertion
+// fails). We deliberately do NOT wire i18next-http-backend / LanguageDetector
+// here — the production module (lib/i18n/i18n.ts) does, but in jsdom the
+// backend fires a stray `/locales/{{lng}}.json` fetch on init that pollutes
+// fetch-call-count assertions (e.g. the apiClient retry tests). English is
+// bundled, tests never switch locale, so a resources-only init is sufficient
+// and side-effect-free.
+void i18n.use(initReactI18next).init({
+  lng: 'en',
+  fallbackLng: 'en',
+  supportedLngs: ['en'],
+  keySeparator: false,
+  interpolation: { escapeValue: false },
+  resources: { en: { translation: enResources as Record<string, string | string[]> } },
+  react: { useSuspense: false },
+});
 
 // Cleanup after each test case
 afterEach(() => {

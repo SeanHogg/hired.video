@@ -142,22 +142,25 @@ describe('Tasks Page', () => {
       // Act
       renderTasksPage();
 
-      // Assert — Kanban columns render. Query by testid: the status label
-      // ("To Do" etc.) also appears as a per-card status badge, so a bare
-      // getByText is ambiguous once the page renders fully.
+      // Assert — Kanban columns render. The board is the extracted
+      // <TaskBoard> (#1992), which keys each column by ProductivityItemStatus
+      // value: ToDo=1, InProgress=3, Completed=6 (Planning=0 also renders).
+      // Query by `task-column-<status>` testid: the status label ("To Do"
+      // etc.) also appears as a per-card status badge, so a bare getByText is
+      // ambiguous once the page renders fully.
       await waitFor(() => {
-        expect(screen.getByTestId('todo-column')).toBeInTheDocument();
-        expect(screen.getByTestId('inprogress-column')).toBeInTheDocument();
-        expect(screen.getByTestId('completed-column')).toBeInTheDocument();
+        expect(screen.getByTestId('task-column-1')).toBeInTheDocument();
+        expect(screen.getByTestId('task-column-3')).toBeInTheDocument();
+        expect(screen.getByTestId('task-column-6')).toBeInTheDocument();
       });
 
       // Check tasks are in correct columns
       await waitFor(() => {
         expect(
-          within(screen.getByTestId('todo-column')).getByText('Complete resume'),
+          within(screen.getByTestId('task-column-1')).getByText('Complete resume'),
         ).toBeInTheDocument();
         expect(
-          within(screen.getByTestId('inprogress-column')).getByText('Apply to jobs'),
+          within(screen.getByTestId('task-column-3')).getByText('Apply to jobs'),
         ).toBeInTheDocument();
       });
     });
