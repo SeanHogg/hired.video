@@ -51,6 +51,39 @@ export type AIContextType =
   // Fallback for any page without a more specific context
   | "general";
 
+/** Runtime list of every context type — the value-level companion to the
+ *  `AIContextType` union. `satisfies` makes the compiler reject any entry
+ *  that isn't a real union member (same guard pattern as
+ *  `GENERAL_SHAPED_CONTEXT_TYPES`). Consumers that must validate a context
+ *  key at runtime (e.g. the help-mapping route) import this. */
+export const AI_CONTEXT_TYPES = [
+  "resume-list",
+  "resume-create",
+  "resume-edit",
+  "resume-view",
+  "job-list",
+  "job-create",
+  "job-edit",
+  "job-view",
+  "profile-view",
+  "profile-edit",
+  "outreach",
+  "messaging",
+  "search",
+  "dashboard",
+  "tasks",
+  "studio",
+  "article-view",
+  "article-edit",
+  "company-view",
+  "company-edit",
+  "course-learn",
+  "course-author",
+  "learning",
+  "interview-practice",
+  "general",
+] as const satisfies readonly AIContextType[];
+
 /** Context types that are carried by `GeneralContext` rather than a
  *  bespoke interface. Kept here so the frontend `GeneralContext`
  *  definition and any MCP mapping stay in sync without re-listing. */

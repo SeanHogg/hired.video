@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import { EmailVerificationBanner } from "@/components/auth/EmailVerificationBanner";
 import { GeoLocaleSuggestionBanner } from "@/components/i18n/GeoLocaleSuggestionBanner";
 import { MarketingPageVideo } from "@/components/MarketingPageVideo";
+import { HelpDrawer } from "@/components/help/HelpDrawer";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, useVerificationBlocked } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -88,6 +89,7 @@ function MinimalShell({
         {children}
       </div>
       <Footer />
+      <HelpDrawer />
     </div>
   );
 }
@@ -132,6 +134,7 @@ export function AppShell({
         </div>
         <Footer />
       </div>
+      <HelpDrawer />
     </div>
   );
 }

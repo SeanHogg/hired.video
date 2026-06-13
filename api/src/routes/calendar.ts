@@ -440,15 +440,146 @@ calendarRoutes.post("/sync", requirePro("Calendar Integration"), async (c) => {
   return c.json(success({ synced: results.length, results }), 200);
 });
 
+type SyncableConnection = {
+  id: string;
+  provider: string;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+};
+
+/**
+ * Returns a valid access token for the connection, refreshing it first when it
+ * is expired or within the skew window. Implements refresh-token rotation:
+ * providers that hand back a new refresh token (Microsoft always; Google on
+ * re-consent) have it persisted so the next refresh uses the current one.
+ * Falls back to the stored access token when refresh isn't possible.
+ */
+async function ensureFreshAccessToken(conn: SyncableConnection): Promise<string | null> {
+  const SKEW_MS = 2 * 60 * 1000;
+  const stillValid =
+    !!conn.tokenExpiresAt && new Date(conn.tokenExpiresAt).getTime() - Date.now() > SKEW_MS;
+  if (stillValid && conn.accessToken) return conn.accessToken;
+  if (!conn.refreshToken) return conn.accessToken;
+
+  const cfg = CALENDAR_PROVIDERS[conn.provider];
+  if (!cfg) return conn.accessToken;
+  const clientId = getEnv(conn.provider === "google" ? "GOOGLE_CLIENT_ID" : "MICROSOFT_CLIENT_ID");
+  const clientSecret = getEnv(conn.provider === "google" ? "GOOGLE_CLIENT_SECRET" : "MICROSOFT_CLIENT_SECRET");
+  if (!clientId || !clientSecret) return conn.accessToken;
+
+  try {
+    const res = await fetch(cfg.tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: conn.refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+        // Microsoft requires the scope on refresh; Google ignores it.
+        ...(conn.provider === "outlook" ? { scope: cfg.scopes.join(" ") } : {}),
+      }).toString(),
+    });
+    if (!res.ok) return conn.accessToken;
+    const data: any = await res.json();
+    const newAccess: string | undefined = data.access_token;
+    if (!newAccess) return conn.accessToken;
+    const expiresIn = Number(data.expires_in ?? 3600);
+    const rotatedRefresh: string | undefined = data.refresh_token || undefined;
+    await getDb()
+      .update(schema.calendarConnections)
+      .set({
+        accessToken: newAccess,
+        ...(rotatedRefresh ? { refreshToken: rotatedRefresh } : {}),
+        tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(schema.calendarConnections.id, conn.id));
+    return newAccess;
+  } catch {
+    return conn.accessToken;
+  }
+}
+
+/**
+ * Pushes one platform event to the provider's calendar and returns the created
+ * external event id (or null on failure / unsupported provider). Google uses
+ * Calendar v3; Outlook uses Microsoft Graph. Both providers share the same
+ * caller loop in `syncCalendar` — only the request shape differs here.
+ */
+async function pushEventToProvider(
+  provider: string,
+  accessToken: string,
+  ev: {
+    title: string;
+    description?: string | null;
+    startAt: Date | string;
+    endAt: Date | string;
+    timezone?: string | null;
+    location?: string | null;
+    meetingUrl?: string | null;
+  },
+): Promise<string | null> {
+  const startIso = new Date(ev.startAt as any).toISOString();
+  const endIso = new Date(ev.endAt as any).toISOString();
+  const timeZone = ev.timezone || "UTC";
+
+  try {
+    if (provider === "google") {
+      const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: ev.title,
+          description: ev.description ?? "",
+          ...(ev.location ? { location: ev.location } : {}),
+          start: { dateTime: startIso, timeZone },
+          end: { dateTime: endIso, timeZone },
+        }),
+      });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      return data.id ?? null;
+    }
+
+    if (provider === "outlook") {
+      // Graph wants a local (offset-free) datetime + an explicit timeZone.
+      const graphTime = (iso: string) => iso.replace(/\.\d+Z$/, "").replace(/Z$/, "");
+      const res = await fetch("https://graph.microsoft.com/v1.0/me/events", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: ev.title,
+          body: { contentType: "HTML", content: ev.description ?? "" },
+          start: { dateTime: graphTime(startIso), timeZone },
+          end: { dateTime: graphTime(endIso), timeZone },
+          ...(ev.location ? { location: { displayName: ev.location } } : {}),
+          ...(ev.meetingUrl ? { onlineMeetingUrl: ev.meetingUrl } : {}),
+        }),
+      });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      return data.id ?? null;
+    }
+  } catch {
+    return null;
+  }
+  return null; // ical / unknown — nothing to push to
+}
+
 async function syncCalendar(
   userId: string,
-  conn: { provider: string; accessToken: string; id: string },
+  conn: SyncableConnection,
 ): Promise<{ provider: string; pushed: number; pulled: number }> {
   const db = getDb();
 
-  // Fetch user's upcoming calendar events from the platform
-  const now = new Date();
-  const twoWeeksOut = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+  // Refresh the token up front so a full sync run never half-fails on expiry.
+  const accessToken = await ensureFreshAccessToken(conn);
+  if (!accessToken || conn.provider === "ical") {
+    return { provider: conn.provider, pushed: 0, pulled: 0 };
+  }
+
   const events = await db
     .select()
     .from(schema.scheduledEvents)
@@ -460,30 +591,20 @@ async function syncCalendar(
     .catch(() => []);
 
   let pushed = 0;
-  if (conn.provider === "google" && conn.accessToken) {
-    for (const ev of events) {
-      try {
-        const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${conn.accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            summary: (ev as any).title,
-            description: (ev as any).description ?? "",
-            start: { dateTime: (ev as any).startAt },
-            end: { dateTime: (ev as any).endAt },
-          }),
-        });
-        if (res.ok) {
-          const data: any = await res.json();
-          await db.update(schema.scheduledEvents)
-            .set({ syncedToCalendar: true, externalEventId: data.id, updatedAt: new Date() } as any)
-            .where(eq(schema.scheduledEvents.id, (ev as any).id));
-          pushed++;
-        }
-      } catch { /* skip this event */ }
+  for (const ev of events) {
+    const externalId = await pushEventToProvider(conn.provider, accessToken, ev as any);
+    if (externalId) {
+      await db.update(schema.scheduledEvents)
+        .set({
+          syncedToCalendar: true,
+          externalEventId: externalId,
+          calendarConnectionId: conn.id,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(schema.scheduledEvents.id, (ev as any).id));
+      pushed++;
     }
   }
-  // Outlook sync would mirror the same pattern using Graph API
 
   return { provider: conn.provider, pushed, pulled: 0 };
 }

@@ -107,6 +107,13 @@ export interface PageVideoScene {
   /** For "cta" scenes — button label + destination. */
   ctaText: string;
   ctaUrl: string;
+  /** Spoken narration for this scene — the line the TTS engine voices over
+   *  the beat (NOT the on-screen text, which must stay terse). Empty string
+   *  means a silent scene. The page→video commit path synthesises this to
+   *  audio and lands it on the Timeline A2 voiceover track; scene duration
+   *  is then stretched to fit the narration so visuals and audio stay in
+   *  sync. */
+  narration: string;
   durationSeconds: number;
 }
 

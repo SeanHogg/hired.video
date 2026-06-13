@@ -59,6 +59,10 @@ const SceneSchema = z.object({
   imageIndex: z.number().int().min(-1).max(50).default(-1),
   /** Button label for "cta" scenes ("" otherwise). */
   ctaText: z.string().max(40).default(""),
+  /** Spoken narration for this beat — a natural, conversational line the
+   *  voiceover reads OVER the scene (distinct from the terse on-screen
+   *  headline). One or two short sentences. "" = silent scene. */
+  narration: z.string().max(240).default(""),
 });
 
 const ScaffoldedSchema = z.object({
@@ -80,6 +84,8 @@ function buildSystemPrompt(): string {
     `  2. 2–4 "point" scenes — each a distinct concrete value/benefit pulled from the page, with 1–4 tight bullets.`,
     `  3. OPTIONAL one "stat" scene — only if the page has a real number worth dramatising (price, count, %). Put the figure in "stat" and the context in "statCaption".`,
     `  4. ONE "cta" scene — restate the offer and give a clear call to action ("Start free", "See pricing", "Try it now").`,
+    ``,
+    `For EVERY scene also write "narration": one or two natural spoken sentences a voiceover reads over the beat. The narration carries the story for the EAR; the headline/bullets carry it for the EYE — they must complement, not duplicate, each other. Conversational, brand-confident, no stage directions. The cta scene's narration should speak the call to action aloud.`,
     ``,
     `Rules:`,
     `- Write for the eye and ear: every headline reads in under 2 seconds.`,
@@ -183,6 +189,15 @@ function labelFor(kind: PageVideoScene["kind"], index: number): string {
   }
 }
 
+/** Rough spoken-duration estimate for a narration line. ~2.6 words/sec is
+ *  a comfortable VO cadence; +0.6s padding for the breath at scene start.
+ *  Empty narration contributes nothing (caller floors on the visual min). */
+function estimateSpeechSeconds(narration: string): number {
+  const words = narration.trim().split(/\s+/).filter(Boolean).length;
+  if (words === 0) return 0;
+  return words / 2.6 + 0.6;
+}
+
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 /** Theme the video to the page's real brand colours when we harvested a
@@ -230,7 +245,11 @@ function assembleSpec(
       imageUrl: img?.url ?? null,
       ctaText: s.kind === "cta" ? s.ctaText || "Learn more" : "",
       ctaUrl: s.kind === "cta" ? fallbackCtaUrl : "",
-      durationSeconds: durationFor(s.kind),
+      narration: s.narration.trim(),
+      // Stretch the beat so the narration fits — visuals and voiceover stay
+      // in sync. A real audio length replaces this estimate once the commit
+      // path synthesises the clip (the editor re-times from the WAV).
+      durationSeconds: Math.max(durationFor(s.kind), estimateSpeechSeconds(s.narration)),
     };
   });
 

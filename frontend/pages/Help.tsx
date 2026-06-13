@@ -39,7 +39,8 @@ import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
 import { useAuth } from "@/lib/auth";
-import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
+import { useQuery } from "@tanstack/react-query";
+import { helpService } from "@/lib/services/help-service";
 import { useContactPanel } from "@/components/ContactPanel";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromFAQ } from "@/lib/audio/narrator-text";
@@ -56,8 +57,14 @@ export default function Help() {  const location = useLocation();
   // meaningful.
   const { effective: searchQuery } = useSearchQueryParam();
 
-  const faqs = HELP_FAQS;
-  void HELP_GUIDES;
+  // FAQs are the single DB-backed store now (kind='faq' articles, seeded
+  // by migration 0210) — replaced the static help-faqs.ts catalogue.
+  const { data: faqRes } = useQuery({
+    queryKey: ["help-faqs"],
+    queryFn: () => helpService.listFaqs(),
+    staleTime: 10 * 60 * 1000,
+  });
+  const faqs = useMemo(() => faqRes?.data?.groups ?? [], [faqRes]);
 
   // Inject FAQPage JSON-LD for all visible Q&As
   const faqSchema = useMemo(() => ({
@@ -70,7 +77,7 @@ export default function Help() {  const location = useLocation();
         acceptedAnswer: { "@type": "Answer", text: q.answer },
       })),
     ),
-  }), []);
+  }), [faqs]);
 
   useEffect(() => {
     const scriptId = "help-faq-jsonld";

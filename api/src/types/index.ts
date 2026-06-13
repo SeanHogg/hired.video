@@ -25,6 +25,11 @@ export interface Env {
   // helpers fall through to the in-memory tier when this is missing.
   KV_CACHE?: KVNamespace;
   AI?: { run: (model: string, inputs: Record<string, unknown>) => Promise<unknown> };
+  // Cloudflare Vectorize index for semantic help search (#2004). Optional:
+  // when the binding (+ Workers AI above) is absent, help search degrades
+  // to the keyword ILIKE path. Neon is intentionally NOT used for vectors
+  // (storage capped) — vectors live in Vectorize, embeddings come from AI.
+  VECTORIZE?: VectorizeIndex;
   // YouTube company OAuth
   YOUTUBE_COMPANY_CLIENT_ID?: string;
   YOUTUBE_COMPANY_CLIENT_SECRET?: string;

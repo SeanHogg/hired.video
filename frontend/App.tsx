@@ -318,6 +318,7 @@ const Workers = lazy(() => import("./pages/admin/Workers"));
 const Security = lazy(() => import("./pages/admin/Security"));
 const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
 const PageEmbeds = lazy(() => import("./pages/admin/PageEmbeds"));
+const HelpMappings = lazy(() => import("./pages/admin/HelpMappings"));
 const ExtensionTelemetry = lazy(() => import("./pages/admin/ExtensionTelemetry"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
 const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
@@ -1112,6 +1113,7 @@ const App = () => (
                       <Route path="/admin/account-analytics" element={<AdminLayout><AdminAccountAnalytics /></AdminLayout>} />
                       <Route path="/admin/points"            element={<AdminLayout><AdminPoints /></AdminLayout>} />
                       <Route path="/admin/page-embeds"       element={<AdminLayout><PageEmbeds /></AdminLayout>} />
+                      <Route path="/admin/help-mappings"     element={<AdminLayout><HelpMappings /></AdminLayout>} />
                       {/* Legacy redirect */}
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 

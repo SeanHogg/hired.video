@@ -85,6 +85,22 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   // before pushing into v2 (paint order = clip-array order).
   const widgetEntries: Array<{ clip: Clip; z: number }> = [];
 
+  // Pending-synthesis voiceovers (a script in `text`, no audio `url` yet)
+  // can't be emitted as A2 clips — an empty sourceId would break the
+  // renderer. But the script must survive a save so the editor can voice
+  // it later, so we stash these on the first scene's background effect
+  // (same place audioMix rides), and `timelineToCanvasState` rehydrates
+  // them back into `voiceovers[]` (gap #2006).
+  const pendingVoiceovers = state.voiceovers
+    .filter((vo) => vo.text && !vo.url)
+    .map((vo) => ({
+      id: vo.id,
+      text: vo.text,
+      anchorSceneId: vo.anchorSceneId,
+      label: vo.label,
+      durationSeconds: vo.durationSeconds,
+    }));
+
   for (const scene of state.scenes) {
     const sceneFrames = Math.max(1, Math.round(scene.durationSeconds * fps));
 
@@ -122,6 +138,9 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
             // saves space and gives the read-side one obvious place
             // to look. The mix is canvas-scoped, not scene-scoped.
             ...(cursor === 0 && state.audioMix ? { audioMix: state.audioMix } : {}),
+            ...(cursor === 0 && pendingVoiceovers.length
+              ? { pendingVoiceovers }
+              : {}),
           },
         },
       ],
@@ -221,6 +240,12 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   // composed with master × voiceover-lane. Anchor scene id (when set)
   // picks the clip's start frame; otherwise it starts at 0.
   for (const vo of state.voiceovers) {
+    // Skip un-synthesised placeholders (a pending-narration clip carries a
+    // `text` script but no `url` yet) — emitting an audio clip with an empty
+    // sourceId would break the renderer. The script is NOT lost: it was
+    // stashed on the first background effect above (#2006) and rehydrates
+    // into `voiceovers[]`.
+    if (!vo.url) continue;
     const anchorIdx = vo.anchorSceneId
       ? state.scenes.findIndex((s) => s.id === vo.anchorSceneId)
       : 0;
@@ -250,6 +275,9 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
             label: vo.label,
             gain: vo.gain ?? 1,
             muted: Boolean(vo.muted),
+            // Keep the source script with synthesised clips too, so the
+            // editor can show the words + re-synthesise (#2006).
+            ...(vo.text ? { text: vo.text } : {}),
           },
         },
       ],
@@ -790,8 +818,26 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
       label: stringOr(meta.label, "Voiceover"),
       gain: typeof meta.gain === "number" ? meta.gain : (c.gain ?? 1),
       muted: meta.muted === true,
+      ...(typeof meta.text === "string" && meta.text ? { text: meta.text } : {}),
     };
   });
+
+  // Rehydrate pending-synthesis voiceovers stashed on the first bg effect
+  // (#2006) — scripts that hadn't been voiced when the draft was saved.
+  const pendingRaw = Array.isArray(firstBgParams.pendingVoiceovers)
+    ? (firstBgParams.pendingVoiceovers as Array<Record<string, unknown>>)
+    : [];
+  for (const p of pendingRaw) {
+    if (typeof p.text !== "string" || !p.text) continue;
+    voiceovers.push({
+      id: stringOr(p.id, `vo-pending-${voiceovers.length}`),
+      url: "",
+      text: p.text,
+      durationSeconds: typeof p.durationSeconds === "number" ? p.durationSeconds : 0,
+      anchorSceneId: typeof p.anchorSceneId === "string" ? p.anchorSceneId : null,
+      label: stringOr(p.label, "Narration"),
+    });
+  }
 
   return {
     schemaVersion: CANVAS_STATE_VERSION,

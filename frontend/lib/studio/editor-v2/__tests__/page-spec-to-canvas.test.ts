@@ -28,6 +28,7 @@ function scene(over: Partial<PageVideoScene> & { kind: PageVideoScene["kind"] })
     imageUrl: null,
     ctaText: "",
     ctaUrl: "",
+    narration: "",
     durationSeconds: 5,
     ...over,
   };
@@ -48,6 +49,27 @@ describe("pageVideoSpecToCanvas()", () => {
     const canvas = pageVideoSpecToCanvas(spec([scene({ kind: "hook" }), scene({ kind: "cta" })]));
     expect(canvas.scenes).toHaveLength(2);
     expect(canvas.colorPalette).toHaveLength(4);
+  });
+
+  it("seeds a pending-synthesis voiceover clip per narrated scene, anchored to it", () => {
+    const canvas = pageVideoSpecToCanvas(
+      spec([
+        scene({ kind: "hook", narration: "Stop scrolling — this changes hiring." }),
+        scene({ kind: "point", narration: "" }), // silent → no clip
+        scene({ kind: "cta", narration: "Start free today." }),
+      ]),
+    );
+    expect(canvas.voiceovers).toHaveLength(2);
+    // Each clip carries its script, has no url yet, and anchors to its scene.
+    expect(canvas.voiceovers[0]).toMatchObject({
+      text: "Stop scrolling — this changes hiring.",
+      url: "",
+      anchorSceneId: canvas.scenes[0].id,
+    });
+    expect(canvas.voiceovers[1]).toMatchObject({
+      text: "Start free today.",
+      anchorSceneId: canvas.scenes[2].id,
+    });
   });
 
   it("renders the hook headline as a heading widget", () => {

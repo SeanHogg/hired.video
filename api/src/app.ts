@@ -56,6 +56,7 @@ import { inboxRoutes } from "./routes/inbox.js";
 import { emailIntegrationRoutes } from "./routes/email-integration.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { searchRoutes } from "./routes/search.js";
+import { helpRoutes } from "./routes/help.js";
 import { billingRoutes } from "./routes/billing.js";
 import { affiliateRoutes } from "./routes/affiliates.js";
 import { marketingRoutes } from "./routes/marketing.js";
@@ -685,6 +686,7 @@ export function createApp() {
   app.route("/api/dashboard", dashboardRoutes);
   app.route("/api/userdashboard", dashboardRoutes); // legacy dashboard alias
   app.route("/api/search", searchRoutes);
+  app.route("/api/help", helpRoutes);
   app.route("/api/billing", billingRoutes);
   app.route("/api/affiliate", affiliateRoutes); // legacy singular endpoint alias
   app.route("/api/payment", paymentRoutes);

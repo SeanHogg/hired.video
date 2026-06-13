@@ -46,6 +46,7 @@ import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { hydrateCanvasState } from "@/lib/studio/editor-v2/hydrate-canvas-state";
 import { harvestCurrentPage } from "@/lib/studio/page-harvest";
 import { pageVideoSpecToCanvas } from "@/lib/studio/editor-v2/page-spec-to-canvas";
+import { synthesizePendingNarration } from "@/lib/studio/page-narration";
 import type { PageVideoSpec } from "@shared/page-video-spec";
 import { resolveUserContent } from "@/lib/studio/editor-v2/resolve-user-content";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
@@ -778,11 +779,17 @@ export async function commitMutation(
     if (raw.kind === "generate_video_from_page") {
       const name = String(raw.name ?? "Page video");
       const spec = raw.spec as PageVideoSpec;
+      // Synthesise the per-scene narration into audio on the A2 voiceover
+      // track BEFORE emitting the timeline, so the draft opens already
+      // narrated (best-effort — silent fallback when no WebGPU engine).
+      const { canvas: narrated } = await synthesizePendingNarration(
+        pageVideoSpecToCanvas(spec),
+      );
       const created = await studioService.saveDraft({
         name,
         kind: "nle",
         mediaKind: "video",
-        timelineSpec: canvasStateToTimeline(pageVideoSpecToCanvas(spec)),
+        timelineSpec: canvasStateToTimeline(narrated),
       });
       const projectId = created.data?.id;
       if (!projectId) throw new Error("Studio draft created but no id returned");

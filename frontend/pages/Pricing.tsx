@@ -866,12 +866,6 @@ export default function Pricing() {
                       />
                       <FeatureRow
                         icon={Download}
-                        label={t("messages.pricing.feature.export720video")}
-                        free
-                        pro
-                      />
-                      <FeatureRow
-                        icon={Download}
                         label={t("messages.pricing.feature.export1080video")}
                         free
                         pro

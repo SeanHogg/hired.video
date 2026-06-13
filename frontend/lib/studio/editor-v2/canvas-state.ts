@@ -596,6 +596,12 @@ export interface VoiceoverClip {
   anchorSceneId: string | null;
   /** Display label surfaced in the timeline strip. */
   label: string;
+  /** The narration script that produced (or will produce) this clip's
+   *  audio. Set by AI-generated drafts (e.g. the page→video pipeline) so
+   *  the editor can show the words and re-synthesise on demand. Optional —
+   *  recorded/uploaded clips have no source script. A clip with `text` but
+   *  an empty `url` is a "pending synthesis" placeholder. */
+  text?: string;
   /** Per-clip gain in the 0..1 range (1 = unity). Optional — preview
    *  and render fall back to 1 when absent. Mutated by `<AudioMixerV2>`. */
   gain?: number;
