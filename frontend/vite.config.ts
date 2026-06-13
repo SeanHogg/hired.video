@@ -249,8 +249,17 @@ export default defineConfig(({ mode }) => {
           navigateFallbackDenylist: [/^\/api\//, /^\/config\.js/],
           // Clean up old caches on activation
           cleanupOutdatedCaches: true,
-          skipWaiting: true,
-          clientsClaim: true,
+          // NOTE: do NOT set skipWaiting/clientsClaim here. With
+          // registerType: "prompt" (above) the new SW must stay in the
+          // `waiting` state so `useRegisterSW` fires onNeedRefresh and the
+          // PWAUpdatePrompt toast ("New Version Available!") can render.
+          // skipWaiting:true activates the new SW immediately, so it never
+          // waits, needRefresh never flips true, the toast never shows, and
+          // the tab keeps running stale assets until a manual hard-reload.
+          // The prompt's "Update Now" → updateServiceWorker(true) posts the
+          // SKIP_WAITING message that workbox-build's generated SW listens
+          // for (auto-injected when skipWaiting is unset), then reloads on
+          // controllerchange. That is the correct skip-on-demand path.
         },
       }),
       // Bundle analyzer — opt-in only. gzip+brotli-sizing every chunk and
