@@ -71,19 +71,19 @@ const FEATURES = {
     key: "skill_network",
     label: "Skill Network",
     blurb: "Visualize transferable skills and how they connect to opportunities.",
-    href: "/skill-network",
+    href: "/pivot-explorer",
   } satisfies AudienceFocusFeature,
   learningPaths: {
     key: "learning_paths",
     label: "Learning paths",
     blurb: "Certifications + courses to bridge into a new role or refresh expertise.",
-    href: "/learn",
+    href: "/learning",
   } satisfies AudienceFocusFeature,
   coffeeChats: {
     key: "coffee_chats",
     label: "Coffee chats",
     blurb: "Warm-intro 1:1 networking — same surface for mentorship, advisory, and outreach.",
-    href: "/coffee",
+    href: "/network/warm-intros",
   } satisfies AudienceFocusFeature,
   gamification: {
     key: "gamification",
@@ -107,7 +107,7 @@ const FEATURES = {
     key: "job_posting",
     label: "Post a job",
     blurb: "Reach candidates with rich job posts + sourcing marketplace.",
-    href: "/jobs/new",
+    href: "/jobs/create",
   } satisfies AudienceFocusFeature,
   candidateSearch: {
     key: "candidate_search",
@@ -119,7 +119,7 @@ const FEATURES = {
     key: "bidding_marketplace",
     label: "Sourcing bids",
     blurb: "Bid on company-posted sourcing requests; get paid per qualified placement.",
-    href: "/recruit/bids",
+    href: "/sourcing/browse",
   } satisfies AudienceFocusFeature,
   profile: {
     key: "profile",
@@ -175,7 +175,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "employer",
     focusFeatures: [FEATURES.jobPosting, FEATURES.candidateSearch, FEATURES.studio, FEATURES.articles],
     focusContentKinds: ["job", "article", "template", "learning_path"],
-    ctaPrimary: { label: "Post a job", href: "/jobs/new" },
+    ctaPrimary: { label: "Post a job", href: "/jobs/create" },
     ctaSecondary: { label: "Talk to sales", href: "/contact" },
   },
   {
@@ -187,7 +187,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     focusFeatures: [FEATURES.biddingMarketplace, FEATURES.outreach, FEATURES.candidateSearch, FEATURES.gamification],
     focusContentKinds: ["job", "article", "template"],
     ctaPrimary: { label: "Open Recruit", href: "/recruit" },
-    ctaSecondary: { label: "How bidding works", href: "/recruit/how-it-works" },
+    ctaSecondary: { label: "How bidding works", href: "/for-recruiters" },
   },
 
   // ─── Life-stage audiences (NEW per #1629) ────────────────────────────
@@ -245,8 +245,8 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.skillNetwork, FEATURES.resumeBuilder, FEATURES.studio, FEATURES.learningPaths, FEATURES.coffeeChats],
     focusContentKinds: ["article", "learning_path", "template", "video", "job"],
-    ctaPrimary: { label: "Map my skills", href: "/skill-network" },
-    ctaSecondary: { label: "Browse cert paths", href: "/learn" },
+    ctaPrimary: { label: "Map my skills", href: "/pivot-explorer" },
+    ctaSecondary: { label: "Browse cert paths", href: "/learning" },
   },
   {
     key: "returning_to_workforce",
@@ -268,7 +268,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     primaryRole: "job_seeker",
     focusFeatures: [FEATURES.skillNetwork, FEATURES.resumeBuilder, FEATURES.learningPaths, FEATURES.studio, FEATURES.jobBoard],
     focusContentKinds: ["article", "learning_path", "template", "job", "video"],
-    ctaPrimary: { label: "Translate my skills", href: "/skill-network" },
+    ctaPrimary: { label: "Translate my skills", href: "/pivot-explorer" },
     ctaSecondary: { label: "Veteran-friendly jobs", href: "/jobs" },
   },
   {
@@ -303,7 +303,7 @@ export const LIFE_STAGE_AUDIENCE_REGISTRY: LifeStageAudienceMeta[] = [
     focusFeatures: [FEATURES.learningPaths, FEATURES.studio, FEATURES.gamification, FEATURES.coffeeChats, FEATURES.jobBoard],
     focusContentKinds: ["learning_path", "template", "article", "job", "video"],
     jobFilter: { experienceLevel: "entry" },
-    ctaPrimary: { label: "Pick a bootcamp track", href: "/learn" },
+    ctaPrimary: { label: "Pick a bootcamp track", href: "/learning" },
     ctaSecondary: { label: "Entry-level roles", href: "/jobs?experienceLevel=entry" },
   },
   {

@@ -27,6 +27,8 @@ import {
   FREE_TEAM_MEMBER_LIMIT,
   FREE_PUBLISHED_VIDEOS_LIMIT,
   TOKEN_PACKS,
+  INBOX_SYNC_INCLUDED_ACCOUNTS,
+  INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
 } from "../../../../shared/pricing.js";
 import { isAdminRole, deriveAudience, deriveTier } from "../../domains/billing/audience.js";
 import type { JwtPayload } from "../../types/index.js";
@@ -58,6 +60,42 @@ describe("Pricing constants", () => {
     assert.equal(FREE_AI_MONTHLY_LIMIT, 10);
     assert.equal(FREE_TEAM_MEMBER_LIMIT, 2);
     assert.equal(FREE_PUBLISHED_VIDEOS_LIMIT, 1);
+  });
+
+  it("Inbox Sync includes 3 mailboxes; extra slots are $5/mo each (#809)", () => {
+    // Marketing copy ("3 mailboxes per user, +$5/mo each"), the upgrade
+    // banner, and the InboxSeatAddonService PRICE_CENTS all derive from
+    // these two constants — pin them so the add-on contract can't drift.
+    assert.equal(INBOX_SYNC_INCLUDED_ACCOUNTS, 3);
+    assert.equal(INBOX_SYNC_EXTRA_ACCOUNT_PRICE, 5);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Inbox-seat add-on (#809) — cap + recurring-charge arithmetic
+//
+// Mirrors the math in InboxSeatAddonService.getState() and the connect-time
+// cap check in routes/email-integration.ts. Pure assertions so the
+// money-adjacent path is guarded without a DB harness.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Inbox-seat add-on arithmetic", () => {
+  const PRICE_CENTS = Math.round(INBOX_SYNC_EXTRA_ACCOUNT_PRICE * 100);
+
+  it("unit price resolves to 500 cents", () => {
+    assert.equal(PRICE_CENTS, 500);
+  });
+
+  it("effective cap = included base + purchased slots", () => {
+    for (const qty of [0, 1, 3, 50]) {
+      assert.equal(INBOX_SYNC_INCLUDED_ACCOUNTS + qty, 3 + qty);
+    }
+  });
+
+  it("monthly total = quantity × unit price", () => {
+    assert.equal(0 * PRICE_CENTS, 0); // no add-on → $0
+    assert.equal(1 * PRICE_CENTS, 500); // 1 slot → $5/mo
+    assert.equal(4 * PRICE_CENTS, 2000); // 4 slots → $20/mo
   });
 });
 

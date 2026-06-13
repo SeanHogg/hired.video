@@ -36,6 +36,10 @@ export const followUpSteps = pgTable("follow_up_steps", {
   subject: varchar("subject", { length: 500 }).notNull(),
   bodyTemplate: text("body_template").notNull(), // supports {{name}}, {{company}} placeholders
   channel: varchar("channel", { length: 50 }).default("email").notNull(), // email | message
+  // When true, the sender runs the rendered body through the AI personalization
+  // layer (services/outreach/personalize.ts) before delivery. Defaults false so
+  // existing steps keep their deterministic-template behaviour. Migration 0213.
+  aiPersonalize: boolean("ai_personalize").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

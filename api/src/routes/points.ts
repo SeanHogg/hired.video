@@ -5,7 +5,7 @@
  *   GET  /api/points/activity     — paginated ledger
  *   GET  /api/points/catalog      — action rules + redemption SKUs (for UI)
  *   POST /api/points/session/ping — record a daily-session activity signal
- *   POST /api/points/redeem       — Phase-3 endpoint; today returns 501
+ *   POST /api/points/redeem       — convert points to a reward SKU (Pro-gated)
  *
  * Auth: standard JWT (mounted under the global auth middleware).
  */
@@ -18,6 +18,7 @@ import { getDb } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { gamificationFromContext } from "../domains/gamification/with-gamification.js";
 import { pickScoringRole } from "../../../shared/user-roles.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const pointsRoutes = new Hono<AppEnv>();
 
@@ -99,7 +100,13 @@ const RedeemBody = z.object({
   recipientEmail: z.string().email().optional(),
 });
 
-pointsRoutes.post("/redeem", async (c) => {
+// Cashout / redemption is a Pro entitlement: free accounts earn + accrue
+// points but cannot convert them (gift cards, AI credits, premium months).
+// This is the runtime gate behind the Pricing copy "Earn points only" (free)
+// vs "Full cashout + redemption" (Pro); admins/super-admins bypass via
+// requirePro itself. Gating here — not inside RedemptionEngine — keeps it on
+// the same seam every other billable surface uses.
+pointsRoutes.post("/redeem", requirePro("Points Cashout & Redemption"), async (c) => {
   const userId = c.var.user.sub;
   const parsed = RedeemBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {

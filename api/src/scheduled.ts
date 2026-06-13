@@ -37,6 +37,7 @@ import { payoutReleaseWorker } from "./services/payout/ReleaseWorker.js";
 import { engagementPayoutService } from "./services/articles/EngagementPayoutService.js";
 import { CampaignService } from "./services/campaigns/CampaignService.js";
 import { MarketingConsentService } from "./services/email/MarketingConsentService.js";
+import { personalizeMessage } from "./services/outreach/personalize.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -101,10 +102,24 @@ async function processFollowUps(): Promise<void> {
       // Substitute template variables
       const ctx = (enrollment.context ?? {}) as Record<string, string>;
       const name = enrollment.recipientName ?? ctx.name ?? "there";
-      const body = step.bodyTemplate
+      let body = step.bodyTemplate
         .replace(/\{\{name\}\}/gi, name)
         .replace(/\{\{company\}\}/gi, ctx.company ?? "")
         .replace(/\{\{(\w+)\}\}/g, (_m, k) => ctx[k] ?? "");
+
+      // AI message personalization (opt-in per step). Runs AFTER deterministic
+      // {{var}} substitution; degrades to the rendered body on any failure so a
+      // model outage never blocks the drip. Gap closed: "AI message
+      // personalization" was previously template-substitution only.
+      if (step.aiPersonalize) {
+        const env = (globalThis as any).__ENV ?? {};
+        body = await personalizeMessage(env, undefined, {
+          body,
+          recipientName: enrollment.recipientName ?? ctx.name ?? null,
+          subject: step.subject,
+          context: ctx,
+        });
+      }
 
       let sendStatus: "sent" | "failed" = "sent";
       let errorMessage: string | undefined;

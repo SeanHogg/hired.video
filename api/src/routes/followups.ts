@@ -15,6 +15,8 @@ const StepSchema = z.object({
   subject: z.string().min(1).max(500),
   bodyTemplate: z.string().min(1),
   channel: z.enum(["email", "message"]).default("email"),
+  // Opt this step into AI rewrite of the rendered body at send time.
+  aiPersonalize: z.boolean().default(false),
 });
 
 const CreateSequenceSchema = z.object({
@@ -75,6 +77,7 @@ followUpRoutes.post("/sequences", requirePro("Automated Follow-ups"), async (c) 
         subject: s.subject,
         bodyTemplate: s.bodyTemplate,
         channel: s.channel,
+        aiPersonalize: s.aiPersonalize,
       })),
     )
     .returning();

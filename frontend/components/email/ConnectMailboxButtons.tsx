@@ -31,10 +31,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useEmailAccounts } from "@/hooks/use-email-accounts";
-import {
-  INBOX_SYNC_INCLUDED_ACCOUNTS,
-  INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
-} from "@shared/pricing";
+import { useInboxSeats } from "@/hooks/use-inbox-seats";
+import { INBOX_SYNC_EXTRA_ACCOUNT_PRICE } from "@shared/pricing";
 
 interface ConnectMailboxButtonsProps {
   /** Where to return to after the OAuth round-trip. Defaults to the
@@ -53,13 +51,17 @@ export function ConnectMailboxButtons({ redirect }: ConnectMailboxButtonsProps) 
   const { isAuthenticated } = useAuth();
   const { isPro, loading: subLoading } = useSubscription();
   const { activeCount, loading: accountsLoading } = useEmailAccounts();
+  // Effective cap = included base + purchased add-on slots. Reading it from
+  // the shared hook (not the bare constant) means a slot bought in the
+  // sibling `<InboxSeatAddonControl />` immediately lifts this gate.
+  const { effectiveCap, loading: seatsLoading } = useInboxSeats(isPro);
 
   // Anonymous users have no `link_token` to send through the OAuth flow.
   if (!isAuthenticated) return null;
 
   // Hold UI while we know whether the user is Pro / at-cap — otherwise
   // we'd flash the wrong CTA on first render.
-  if (subLoading || accountsLoading) return null;
+  if (subLoading || accountsLoading || seatsLoading) return null;
 
   if (!isPro) {
     return (
@@ -71,15 +73,21 @@ export function ConnectMailboxButtons({ redirect }: ConnectMailboxButtonsProps) 
     );
   }
 
-  const atCap = activeCount >= INBOX_SYNC_INCLUDED_ACCOUNTS;
+  const atCap = activeCount >= effectiveCap;
   if (atCap) {
+    // Every connectable mailbox (included base + purchased slots) is full.
+    // Route to Settings → Email, where the self-gating
+    // `<InboxSeatAddonControl />` lets the user buy another slot ($5/mo each)
+    // and connect more. Previously this linked to a Pricing banner that told
+    // users to "add the add-on from Settings → Billing" — a surface that
+    // didn't exist, so the flow dead-ended (gap #2009).
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-xs text-muted-foreground">
-          You've connected the {INBOX_SYNC_INCLUDED_ACCOUNTS} included
-          mailboxes. Add more for ${INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo each.
+          You've connected all {effectiveCap} of your mailboxes. Add more for $
+          {INBOX_SYNC_EXTRA_ACCOUNT_PRICE}/mo each.
         </p>
-        <Link to="/pricing?upgrade=inbox-extra">
+        <Link to="/settings?tab=email">
           <Button variant="outline">Add more inboxes</Button>
         </Link>
       </div>

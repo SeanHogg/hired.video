@@ -94,6 +94,23 @@ export interface TokenBudget {
   totalAvailable: number | null;
 }
 
+/**
+ * Inbox-seat add-on state (#809) — extra connected mailboxes a Pro user has
+ * purchased above the included base. Mirrors `InboxAddonState` in
+ * [InboxSeatAddonService](../../../api/src/services/billing/InboxSeatAddonService.ts).
+ */
+export interface InboxSeatState {
+  /** Extra slots purchased above the included base. */
+  quantity: number;
+  /** Per-slot monthly price in cents (e.g. 500 = $5/mo). */
+  unitPriceCents: number;
+  /** quantity × unitPriceCents — the recurring add-on charge. */
+  monthlyTotalCents: number;
+  /** Included base + purchased quantity = total connectable mailboxes. */
+  effectiveCap: number;
+  status: "active" | "cancelled" | "past_due";
+}
+
 export const billingService = {
   async getSubscription(): Promise<SubscriptionSummary> {
     const res: ApiSuccessResponse<SubscriptionSummary> = await apiClient.get(
@@ -209,6 +226,28 @@ export const billingService = {
     const res = await apiClient.post<InitCollectionResult>(
       "/api/payment/init-collection",
       { successUrl, cancelUrl, amount, currency, paymentMethodType },
+    );
+    return res.data;
+  },
+
+  /** Current inbox-seat add-on state (extra mailboxes above the included base). */
+  async getInboxSeats(): Promise<InboxSeatState> {
+    const res: ApiSuccessResponse<InboxSeatState> = await apiClient.get(
+      "/api/Billing/inbox-seats",
+    );
+    return res.data;
+  },
+
+  /**
+   * Set the number of extra inbox slots (0–50). Returns the new add-on
+   * state so callers can render the updated cap + monthly total without a
+   * second round-trip. The local row is authoritative for the connect-time
+   * cap; provider recurring-charge sync is handled server-side.
+   */
+  async setInboxSeats(quantity: number): Promise<InboxSeatState> {
+    const res: ApiSuccessResponse<InboxSeatState> = await apiClient.patch(
+      "/api/Billing/inbox-seats",
+      { quantity },
     );
     return res.data;
   },

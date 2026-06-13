@@ -1,13 +1,16 @@
 // ats.ts — ATS integrations: Greenhouse, Lever, Workday (#64)
 // Provides connection management, candidate sync, and inbound webhooks.
-// Provider API calls are stubbed where credentials are unavailable.
+// Greenhouse (Harvest) and Lever pulls are live; Workday (SOAP/RaaS) is
+// tenant-specific and remains a configured-stub (see gap register).
 
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+
+type Db = ReturnType<typeof getDb>;
 
 export const atsRoutes = new Hono<AppEnv>();
 
@@ -135,8 +138,9 @@ atsRoutes.delete("/connections/:id", async (c) => {
 
 /**
  * POST /api/ats/sync/:connectionId
- * Pulls candidates from the connected ATS and upserts them into talentPoolCandidates.
- * Currently a stub — real provider calls require active API credentials.
+ * Pulls candidates from the connected ATS and upserts them into
+ * talentPoolCandidates (deduped by email, scoped to the company owner).
+ * Greenhouse + Lever are live; Workday returns a configured-stub note.
  */
 atsRoutes.post("/sync/:connectionId", async (c) => {
   const userId = uid(c);
@@ -160,36 +164,189 @@ atsRoutes.post("/sync/:connectionId", async (c) => {
     .limit(1);
   if (!company || company.ownerId !== userId) return c.json(error("FORBIDDEN", "Access denied"), 403);
 
-  // Stub: in production, call provider-specific API
-  const syncResult = await syncFromProvider(conn.provider as Provider, conn.apiKey, conn.config);
+  const syncResult = await importFromProvider(
+    db,
+    company.ownerId,
+    conn.provider as Provider,
+    conn.apiKey,
+    (conn.config ?? {}) as Record<string, unknown>,
+  );
 
-  // Update lastSyncAt
   await db.update(table).set({ lastSyncAt: new Date() } as any).where(eq(table.id, conn.id));
 
   return c.json(success({
     provider: conn.provider,
     synced: syncResult.candidatesImported,
+    skippedDuplicates: syncResult.skippedDuplicates,
     lastSyncAt: new Date().toISOString(),
     note: syncResult.note,
   }), 200);
 });
 
-async function syncFromProvider(
+// ─── Provider candidate fetchers ──────────────────────────────────────────────
+
+/** One ATS candidate flattened to the fields talent_pool_candidates needs. */
+type NormalizedCandidate = {
+  name: string;
+  email: string | null;
+  title: string | null;
+  company: string | null;
+};
+
+/** ATS REST keys auth as HTTP Basic with the key as username + empty password
+ *  (Greenhouse Harvest + Lever both use this). */
+function basicAuthHeader(apiKey: string): string {
+  return `Basic ${btoa(`${apiKey}:`)}`;
+}
+
+const PROVIDER_PAGE_SIZE = 100;
+const PROVIDER_MAX_PAGES = 2; // bound a single sync to ≤200 candidates
+
+async function fetchGreenhouseCandidates(apiKey: string): Promise<NormalizedCandidate[]> {
+  const out: NormalizedCandidate[] = [];
+  for (let page = 1; page <= PROVIDER_MAX_PAGES; page++) {
+    const res = await fetch(
+      `https://harvest.greenhouse.io/v1/candidates?per_page=${PROVIDER_PAGE_SIZE}&page=${page}`,
+      { headers: { Authorization: basicAuthHeader(apiKey), "Content-Type": "application/json" } },
+    );
+    if (!res.ok) throw new Error(`Greenhouse ${res.status}`);
+    const rows = (await res.json()) as any[];
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    for (const r of rows) {
+      const name = [r.first_name, r.last_name].filter(Boolean).join(" ").trim() || "(unnamed)";
+      const email = r.email_addresses?.find((e: any) => e?.value)?.value ?? null;
+      out.push({
+        name,
+        email: email ? String(email) : null,
+        title: r.title ? String(r.title) : null,
+        company: r.company ? String(r.company) : null,
+      });
+    }
+    if (rows.length < PROVIDER_PAGE_SIZE) break;
+  }
+  return out;
+}
+
+async function fetchLeverCandidates(apiKey: string): Promise<NormalizedCandidate[]> {
+  const out: NormalizedCandidate[] = [];
+  let next: string | undefined;
+  for (let page = 0; page < PROVIDER_MAX_PAGES; page++) {
+    const params = new URLSearchParams({ limit: String(PROVIDER_PAGE_SIZE) });
+    if (next) params.set("offset", next);
+    const res = await fetch(`https://api.lever.co/v1/opportunities?${params.toString()}`, {
+      headers: { Authorization: basicAuthHeader(apiKey), "Content-Type": "application/json" },
+    });
+    if (!res.ok) throw new Error(`Lever ${res.status}`);
+    const body = (await res.json()) as { data?: any[]; hasNext?: boolean; next?: string };
+    const rows = body.data ?? [];
+    for (const r of rows) {
+      out.push({
+        name: r.name ? String(r.name) : "(unnamed)",
+        email: Array.isArray(r.emails) && r.emails[0] ? String(r.emails[0]) : null,
+        title: r.headline ? String(r.headline) : null,
+        company: r.headline ? String(r.headline) : null,
+      });
+    }
+    if (!body.hasNext || !body.next) break;
+    next = body.next;
+  }
+  return out;
+}
+
+/**
+ * Fetches candidates from the provider and upserts them into the owner's
+ * talent pool. Dedup is by email within the owner's pool (one batched query,
+ * never N+1). Email-less candidates are imported once per name (best effort).
+ * Mirrors the extension-capture pattern: candidateId is the owner's id as a
+ * placeholder until the candidate links a real hired.video account.
+ */
+async function importFromProvider(
+  db: Db,
+  ownerId: string,
   provider: Provider,
-  _apiKey: string,
-  _config: Record<string, unknown>,
-): Promise<{ candidatesImported: number; note: string }> {
-  // Stub implementations — replace with real HTTP calls when provider creds available
+  apiKey: string,
+  config: Record<string, unknown>,
+): Promise<{ candidatesImported: number; skippedDuplicates: number; note: string }> {
+  let candidates: NormalizedCandidate[];
   switch (provider) {
     case "greenhouse":
-      return { candidatesImported: 0, note: "Greenhouse sync stub. Set GREENHOUSE_API_KEY and configure harvest board token." };
+      candidates = await fetchGreenhouseCandidates(apiKey);
+      break;
     case "lever":
-      return { candidatesImported: 0, note: "Lever sync stub. Set LEVER_API_KEY." };
+      candidates = await fetchLeverCandidates(apiKey);
+      break;
     case "workday":
-      return { candidatesImported: 0, note: "Workday sync stub. Configure tenant URL and SOAP credentials." };
+      // Workday Recruiting has no single REST candidates endpoint — integration
+      // is per-tenant SOAP / Report-as-a-Service. Honest stub until a tenant
+      // URL + RaaS report are configured (gap register).
+      return {
+        candidatesImported: 0,
+        skippedDuplicates: 0,
+        note: config?.tenantUrl
+          ? "Workday RaaS pull not yet implemented — tenant configured."
+          : "Workday sync requires a tenant URL + RaaS report. Not configured.",
+      };
     default:
-      return { candidatesImported: 0, note: "Unknown provider." };
+      return { candidatesImported: 0, skippedDuplicates: 0, note: "Unknown provider." };
   }
+
+  if (candidates.length === 0) {
+    return { candidatesImported: 0, skippedDuplicates: 0, note: `${provider}: no candidates returned.` };
+  }
+
+  // Dedup by email against the owner's existing pool in one batched query.
+  const emails = Array.from(
+    new Set(candidates.map((c) => c.email?.toLowerCase()).filter((e): e is string => !!e)),
+  );
+  const existingEmails = new Set<string>();
+  if (emails.length) {
+    const rows = await db
+      .select({ email: schema.talentPoolCandidates.candidateEmail })
+      .from(schema.talentPoolCandidates)
+      .where(and(
+        eq(schema.talentPoolCandidates.recruiterId, ownerId),
+        inArray(schema.talentPoolCandidates.candidateEmail, emails),
+      ))
+      .catch(() => [] as Array<{ email: string | null }>);
+    for (const r of rows) if (r.email) existingEmails.add(r.email.toLowerCase());
+  }
+
+  const toInsert = candidates.filter((c) => {
+    const key = c.email?.toLowerCase();
+    if (key && existingEmails.has(key)) return false;
+    if (key) existingEmails.add(key); // collapse in-batch duplicates too
+    return true;
+  });
+  const skippedDuplicates = candidates.length - toInsert.length;
+
+  let imported = 0;
+  if (toInsert.length) {
+    const inserted = await db
+      .insert(schema.talentPoolCandidates)
+      .values(toInsert.map((c) => ({
+        recruiterId: ownerId,
+        candidateId: ownerId, // placeholder until the candidate links an account
+        candidateName: c.name,
+        candidateEmail: c.email ?? undefined,
+        candidateTitle: c.title ?? undefined,
+        currentCompany: c.company ?? undefined,
+        currentTitle: c.title ?? undefined,
+        status: "active",
+        tags: [`ats:${provider}`],
+      })) as any)
+      .returning({ id: schema.talentPoolCandidates.id })
+      .catch((e) => {
+        console.error(`[ats:${provider}] upsert failed:`, e);
+        return [] as Array<{ id: string }>;
+      });
+    imported = inserted.length;
+  }
+
+  return {
+    candidatesImported: imported,
+    skippedDuplicates,
+    note: `${provider}: imported ${imported}, skipped ${skippedDuplicates} duplicate(s).`,
+  };
 }
 
 // ─── Inbound webhooks (provider → platform) ──────────────────────────────────

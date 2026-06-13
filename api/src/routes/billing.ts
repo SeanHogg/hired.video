@@ -10,6 +10,7 @@ import { TIER_COPY } from "../../../shared/tier-copy.js";
 import { servicesProcessor } from "../domains/services-processing/index.js";
 import type { UsageInvoice } from "../../../shared/usage-statement.js";
 import { inboxSeatAddonService } from "../services/billing/InboxSeatAddonService.js";
+import { requirePro } from "../middleware/auth-gates.js";
 
 export const billingRoutes = new Hono<AppEnv>();
 
@@ -706,8 +707,13 @@ billingRoutes.patch("/company/:companyId/seats", async (c) => {
 //
 //   GET   /api/billing/inbox-seats             current quantity + monthly $
 //   PATCH /api/billing/inbox-seats { quantity } set new quantity (0-50)
+//
+// Pro-gated — the add-on only stacks on top of the Pro-included mailboxes,
+// so a Free caller has nothing to manage here (the connect-time gate would
+// block them anyway). `requirePro` keeps a non-Pro user from writing a
+// dangling `inbox_seat_addons` row that the cap-check would never honour.
 // ---------------------------------------------------------------------------
-billingRoutes.get("/inbox-seats", async (c) => {
+billingRoutes.get("/inbox-seats", requirePro("Inbox Sync"), async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   return c.json(ok(await inboxSeatAddonService.getState(userId)), 200);
@@ -717,7 +723,7 @@ const inboxSeatsPatchSchema = z.object({
   quantity: z.number().int().min(0).max(50),
 });
 
-billingRoutes.patch("/inbox-seats", async (c) => {
+billingRoutes.patch("/inbox-seats", requirePro("Inbox Sync"), async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const parsed = inboxSeatsPatchSchema.safeParse(await c.req.json().catch(() => ({})));

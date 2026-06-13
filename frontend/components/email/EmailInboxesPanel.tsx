@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ConnectMailboxButtons } from "@/components/email/ConnectMailboxButtons";
+import { InboxSeatAddonControl } from "@/components/email/InboxSeatAddonControl";
 import { ReconnectMailboxButton } from "@/components/email/ReconnectMailbox";
 import { useAuth } from "@/lib/auth";
 import { confirmDialog } from "@/lib/dialogs";
@@ -237,6 +238,11 @@ export function EmailInboxesPanel() {
           <ConnectMailboxButtons />
         </CardContent>
       </Card>
+
+      {/* Self-gating add-on control — renders only for a Pro user who is at
+          their mailbox cap or already owns paid slots (DRY: all purchase
+          logic lives in the shared component, not here). */}
+      <InboxSeatAddonControl />
 
       <SyncHistory runs={runs} />
     </div>

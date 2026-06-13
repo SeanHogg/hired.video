@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { UuidLikeSchema } from "../../../shared/validation.js";
 import type { Variables, AppEnv } from "../types/index.js";
@@ -568,6 +568,115 @@ async function pushEventToProvider(
   return null; // ical / unknown — nothing to push to
 }
 
+/** One external event normalized to our `scheduled_events` shape. */
+type PulledEvent = {
+  externalEventId: string;
+  title: string;
+  description: string | null;
+  startAt: Date;
+  endAt: Date;
+  timezone: string;
+  location: string | null;
+  meetingUrl: string | null;
+};
+
+/**
+ * Pulls upcoming events from the provider's calendar (now → +`days` days) and
+ * returns them normalized. Google uses Calendar v3 `events.list` (singleEvents
+ * so recurring instances expand); Outlook uses Graph `calendarView`. Cancelled
+ * events and all-day-only entries without a usable time window are dropped.
+ * Returns [] on any failure / unsupported provider — the caller treats pull as
+ * best-effort so a provider hiccup never fails the whole sync.
+ */
+async function pullEventsFromProvider(
+  provider: string,
+  accessToken: string,
+  days = 60,
+): Promise<PulledEvent[]> {
+  const now = new Date();
+  const timeMin = now.toISOString();
+  const timeMax = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+  const MAX = 100;
+
+  try {
+    if (provider === "google") {
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: "true",
+        orderBy: "startTime",
+        maxResults: String(MAX),
+      });
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!res.ok) return [];
+      const data: any = await res.json();
+      const out: PulledEvent[] = [];
+      for (const it of (data.items ?? []) as any[]) {
+        if (!it?.id || it.status === "cancelled") continue;
+        const startRaw = it.start?.dateTime ?? (it.start?.date ? `${it.start.date}T00:00:00Z` : null);
+        const endRaw = it.end?.dateTime ?? (it.end?.date ? `${it.end.date}T00:00:00Z` : null);
+        if (!startRaw || !endRaw) continue;
+        out.push({
+          externalEventId: String(it.id),
+          title: String(it.summary ?? "(untitled event)").slice(0, 500),
+          description: it.description ?? null,
+          startAt: new Date(startRaw),
+          endAt: new Date(endRaw),
+          timezone: it.start?.timeZone ?? "UTC",
+          location: it.location ?? null,
+          meetingUrl: it.hangoutLink ?? null,
+        });
+      }
+      return out;
+    }
+
+    if (provider === "outlook") {
+      const params = new URLSearchParams({
+        startDateTime: timeMin,
+        endDateTime: timeMax,
+        $top: String(MAX),
+        $orderby: "start/dateTime",
+      });
+      const res = await fetch(`https://graph.microsoft.com/v1.0/me/calendarView?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, Prefer: 'outlook.timezone="UTC"' },
+      });
+      if (!res.ok) return [];
+      const data: any = await res.json();
+      const out: PulledEvent[] = [];
+      for (const it of (data.value ?? []) as any[]) {
+        if (!it?.id || it.isCancelled) continue;
+        // Graph returns offset-free local datetimes paired with an explicit
+        // timeZone; with the Prefer header above that is UTC, so append Z.
+        const toDate = (t: any): Date | null => {
+          if (!t?.dateTime) return null;
+          const s = String(t.dateTime);
+          return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(s) ? s : `${s}Z`);
+        };
+        const startAt = toDate(it.start);
+        const endAt = toDate(it.end);
+        if (!startAt || !endAt) continue;
+        out.push({
+          externalEventId: String(it.id),
+          title: String(it.subject ?? "(untitled event)").slice(0, 500),
+          description: it.bodyPreview ?? null,
+          startAt,
+          endAt,
+          timezone: it.start?.timeZone ?? "UTC",
+          location: it.location?.displayName ?? null,
+          meetingUrl: it.onlineMeeting?.joinUrl ?? null,
+        });
+      }
+      return out;
+    }
+  } catch {
+    return [];
+  }
+  return []; // ical / unknown — nothing to pull
+}
+
 async function syncCalendar(
   userId: string,
   conn: SyncableConnection,
@@ -606,7 +715,63 @@ async function syncCalendar(
     }
   }
 
-  return { provider: conn.provider, pushed, pulled: 0 };
+  // ─── Pull: external events → scheduled_events (the second sync direction) ──
+  // Dedup by externalEventId scoped to this connection in a single pre-read so
+  // re-syncs update in place instead of duplicating. Pulled rows are stored
+  // syncedToCalendar:true with externalEventId set, so the push query above
+  // (which selects syncedToCalendar=false) never echoes them back upstream.
+  const pulledEvents = await pullEventsFromProvider(conn.provider, accessToken);
+  let pulled = 0;
+  if (pulledEvents.length) {
+    const existing = await db
+      .select({ id: schema.scheduledEvents.id, externalEventId: schema.scheduledEvents.externalEventId })
+      .from(schema.scheduledEvents)
+      .where(and(
+        eq(schema.scheduledEvents.userId, userId),
+        eq(schema.scheduledEvents.calendarConnectionId, conn.id),
+        isNotNull(schema.scheduledEvents.externalEventId),
+      ))
+      .catch(() => [] as Array<{ id: string; externalEventId: string | null }>);
+    const byExt = new Map(existing.map((r) => [r.externalEventId, r.id]));
+
+    for (const ev of pulledEvents) {
+      const existingId = byExt.get(ev.externalEventId);
+      if (existingId) {
+        await db.update(schema.scheduledEvents)
+          .set({
+            title: ev.title,
+            description: ev.description,
+            startAt: ev.startAt,
+            endAt: ev.endAt,
+            timezone: ev.timezone,
+            location: ev.location,
+            meetingUrl: ev.meetingUrl,
+            updatedAt: new Date(),
+          } as any)
+          .where(eq(schema.scheduledEvents.id, existingId));
+      } else {
+        await db.insert(schema.scheduledEvents).values({
+          userId,
+          calendarConnectionId: conn.id,
+          externalEventId: ev.externalEventId,
+          title: ev.title,
+          description: ev.description,
+          startAt: ev.startAt,
+          endAt: ev.endAt,
+          timezone: ev.timezone,
+          location: ev.location,
+          meetingUrl: ev.meetingUrl,
+          type: "meeting",
+          status: "confirmed",
+          syncedToCalendar: true,
+          visibility: "private",
+        } as any);
+      }
+      pulled++;
+    }
+  }
+
+  return { provider: conn.provider, pushed, pulled };
 }
 
 // ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ export default function PeopleOperations() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  const primaryCta = () => navigate(isAuthenticated ? "/people/roster" : "/signup?intent=employer");
+  const primaryCta = () => navigate(isAuthenticated ? "/people/roster" : "/signup?role=employer");
 
   return (
     <AppShell bgClassName="bg-background">
