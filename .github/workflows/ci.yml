@@ -50,12 +50,23 @@ jobs:
 
       - name: Run type checking (frontend)
         run: cd frontend && npm run typecheck
+        env:
+          # `tsc` checks the whole project (frontend + server + shared via
+          # the root tsconfig) and peaks past Node's ~2 GB default old-space
+          # limit — OOM'd at ~2015 MB during type-relation checking. Same fix
+          # as the Build SPA step below: ubuntu-latest has 16 GB, lift the
+          # ceiling to 6 GB. Program-size bloat is tracked in the gap register.
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Run type checking (api)
         # Gates schema drift in the worker bundle (gap #1617). Was not
         # previously checked in CI, which is how `userProfiles.firstName
         # /lastName/bio` (#1591) and other drift landed on main unnoticed.
         run: cd api && npm run typecheck
+        env:
+          # Same heap headroom as the frontend typecheck — the worker bundle
+          # is large enough to approach Node's ~2 GB default old-space limit.
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Lint SQL migrations
         # Gap #1643. Enforces the idempotent patterns in
