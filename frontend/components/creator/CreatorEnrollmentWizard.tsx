@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Stepper } from "@/components/ui/stepper";
 import Markdown from "@/components/Markdown";
 import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
 import { useToast } from "@/hooks/use-toast";
@@ -162,7 +163,15 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
           </DialogDescription>
         </DialogHeader>
 
-        <StepIndicator step={step} />
+        <Stepper
+          current={step}
+          className="py-2"
+          steps={[
+            { key: "programs", label: "Programs" },
+            { key: "terms", label: "Terms" },
+            { key: "profile", label: "Profile" },
+          ]}
+        />
 
         {step === "programs" && (
           <div className="space-y-3 py-2">
@@ -280,27 +289,5 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function StepIndicator({ step }: { step: Step }) {
-  const steps: { key: Step; label: string }[] = [
-    { key: "programs", label: "Programs" },
-    { key: "terms", label: "Terms" },
-    { key: "profile", label: "Profile" },
-  ];
-  const idx = steps.findIndex((s) => s.key === step);
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-      {steps.map((s, i) => (
-        <div key={s.key} className="flex items-center gap-2">
-          <span className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-semibold ${
-            i <= idx ? "bg-primary text-primary-foreground" : "bg-muted"
-          }`}>{i + 1}</span>
-          <span className={i === idx ? "font-medium text-foreground" : ""}>{s.label}</span>
-          {i < steps.length - 1 && <span className="w-6 h-px bg-border" />}
-        </div>
-      ))}
-    </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   Sparkles,
   ShoppingBag,
   Users,
+  Briefcase,
   TrendingUp,
   DollarSign,
   Tag,
@@ -375,26 +376,57 @@ export default function ServicesManagement() {
 
           {/* What you get */}
           <section className="px-6 py-6">
+            <h2 className="text-3xl font-bold text-center mb-10">{t("services.marketplaceLabel")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="border-brand-purple/20">
+              <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                 <CardHeader>
                   <Tag className="h-10 w-10 text-brand-purple mb-4" />
                   <CardTitle>{t("services.listServicesTitle")}</CardTitle>
                   <CardDescription>{t("services.listServicesDesc")}</CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-brand-blue/20">
+              <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                 <CardHeader>
                   <Inbox className="h-10 w-10 text-brand-blue mb-4" />
                   <CardTitle>{t("services.manageInquiriesTitle")}</CardTitle>
                   <CardDescription>{t("services.manageInquiriesDesc")}</CardDescription>
                 </CardHeader>
               </Card>
-              <Card className="border-primary/20">
+              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                 <CardHeader>
                   <DollarSign className="h-10 w-10 text-primary mb-4" />
                   <CardTitle>{t("services.getPaidTitle")}</CardTitle>
                   <CardDescription>{t("services.getPaidDesc")}</CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </section>
+
+          {/* Who it's for — the original services-marketplace audience material.
+              Kept alongside the creator create-account hero so we don't lose
+              the coaches / recruiters / job-seekers positioning. */}
+          <section className="px-6 py-8">
+            <h2 className="text-3xl font-bold text-center mb-10">{t("services.audienceTitle")}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <Card className="text-center">
+                <CardHeader>
+                  <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
+                  <CardTitle>{t("services.coachesTitle")}</CardTitle>
+                  <CardDescription>{t("services.coachesDesc")}</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="text-center">
+                <CardHeader>
+                  <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
+                  <CardTitle>{t("services.recruitersTitle")}</CardTitle>
+                  <CardDescription>{t("services.recruitersDesc")}</CardDescription>
+                </CardHeader>
+              </Card>
+              <Card className="text-center">
+                <CardHeader>
+                  <TrendingUp className="h-12 w-12 mx-auto text-purple-600 mb-4" />
+                  <CardTitle>{t("services.jobSeekersTitle")}</CardTitle>
+                  <CardDescription>{t("services.jobSeekersDesc")}</CardDescription>
                 </CardHeader>
               </Card>
             </div>

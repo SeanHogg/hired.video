@@ -32,6 +32,7 @@ import {
 import { ToolShell } from "@/components/tools/ToolShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Stepper } from "@/components/ui/stepper";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -191,6 +192,17 @@ export default function VideoPitchLab() {
       }}
     >
       <div className="space-y-6 mt-4">
+        {/* Always-visible journey so a first-time visitor sees this is a
+            guided Script → Record → Review flow, not a one-off form. */}
+        <Stepper
+          current={step}
+          steps={[
+            { key: "setup", label: t("tools.videoPitchLab.stepScript") },
+            { key: "record", label: t("tools.videoPitchLab.stepRecord") },
+            { key: "review", label: t("tools.videoPitchLab.stepReview") },
+          ]}
+        />
+
         {step === "setup" && (
           <>
             <Card>
@@ -257,14 +269,19 @@ export default function VideoPitchLab() {
                   rows={6}
                   placeholder={t("tools.videoPitchLab.pitchPlaceholder")}
                 />
-                <div className="flex justify-end">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {script.trim().length < 20 && (
+                    <span className="text-xs text-muted-foreground mr-auto">
+                      {t("tools.videoPitchLab.scriptHint")}
+                    </span>
+                  )}
                   <Button
                     onClick={handleContinueToRecord}
                     disabled={script.trim().length < 20}
                     className="gap-1"
                   >
                     <Mic className="h-4 w-4" />
-                    Continue to record
+                    {t("tools.videoPitchLab.continueToRecord")}
                   </Button>
                 </div>
               </CardContent>
