@@ -8,26 +8,39 @@
 
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, FileText, BookOpen } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import Markdown from "@/components/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import { getHelpItem } from "@/lib/help/content";
+import { useHelpContent } from "@/lib/help/use-help-content";
+import { helpKindIcon } from "@/lib/help/kind-icon";
 
 export default function HelpArticle(): JSX.Element {
   const { slug = "" } = useParams();
   const { pathname } = useLocation();
   const { t, i18n } = useTranslation();
-  const item = getHelpItem(slug, i18n.language);
+  const help = useHelpContent();
+  const item = help ? help.getHelpItem(slug, i18n.language) : null;
 
   useSEO(pathname);
   useBreadcrumbs([
     { name: t("headings.help.helpAndSupport", "Help & Support"), url: "/help" },
     { name: item?.title ?? t("headings.help.notFound", "Not found"), url: pathname },
   ]);
+
+  // Catalog still loading — show a spinner, not the not-found state.
+  if (!help) {
+    return (
+      <AppShell bgClassName="bg-background">
+        <div className="flex items-center justify-center py-24 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!item) {
     return (
@@ -50,7 +63,7 @@ export default function HelpArticle(): JSX.Element {
     );
   }
 
-  const Icon = item.kind === "guide" ? BookOpen : FileText;
+  const Icon = helpKindIcon(item.kind);
 
   return (
     <AppShell bgClassName="bg-background">

@@ -16,7 +16,7 @@
  *   POST   /api/help/reindex          — (re)build Vectorize from client items
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -44,7 +44,7 @@ const ReindexSchema = z.object({
     .max(1000),
 });
 
-function requireSuperAdmin(c: { var: { user?: { sub?: string } } }) {
+function requireSuperAdmin(c: Context<AppEnv>) {
   const user = c.var.user;
   if (!user?.sub) return { err: error("UNAUTHORIZED", "Authentication required"), status: 401 as const };
   if (!isSuperAdmin(user)) return { err: error("FORBIDDEN", "SuperAdmin access required"), status: 403 as const };

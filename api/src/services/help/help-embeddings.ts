@@ -74,15 +74,41 @@ export async function upsertHelpEmbedding(input: {
   }
 }
 
-/** Remove a help item's embedding by slug. */
-export async function deleteHelpEmbedding(slug: string): Promise<void> {
+/** Delete embeddings by slug (e.g. items removed from the catalog). Wired
+ *  by the reindex prune step (#2076). Best-effort no-op without bindings. */
+export async function deleteHelpEmbeddings(slugs: string[]): Promise<void> {
   const b = getVectorizeBindings();
-  if (!b) return;
+  if (!b || slugs.length === 0) return;
   try {
-    await b.vectorize.deleteByIds([slug]);
+    await b.vectorize.deleteByIds(slugs);
   } catch {
     /* best-effort */
   }
+}
+
+// ── Indexed-slug ledger (KV) ──────────────────────────────────────────
+// Vectorize has no cheap "list all ids", so reindex tracks the set of
+// slugs it has indexed in KV; the next reindex diffs against it to prune
+// vectors for slugs that no longer exist in the bundled catalog (#2076).
+const INDEXED_SLUGS_KEY = "help:indexed-slugs";
+
+function getKv(): KVNamespace | undefined {
+  return (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
+}
+
+/** The slugs indexed by the last reindex (empty when unknown / evicted). */
+export async function getIndexedHelpSlugs(): Promise<string[]> {
+  const kv = getKv();
+  if (!kv) return [];
+  const raw = await kv.get(INDEXED_SLUGS_KEY, "json").catch(() => null);
+  return Array.isArray(raw) ? (raw as string[]) : [];
+}
+
+/** Record the current indexed slug set (persisted, no TTL). */
+export async function recordIndexedHelpSlugs(slugs: string[]): Promise<void> {
+  const kv = getKv();
+  if (!kv) return;
+  await kv.put(INDEXED_SLUGS_KEY, JSON.stringify(slugs)).catch(() => undefined);
 }
 
 /** Semantic KNN over help content. Returns ranked article ids, or null

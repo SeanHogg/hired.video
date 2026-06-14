@@ -15,6 +15,10 @@ import type { getDb } from "../../db/index.js";
 import { helpMappings } from "../../db/schema/helpMappings.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import {
+  deleteHelpEmbeddings,
+  getIndexedHelpSlugs,
+  isSemanticHelpAvailable,
+  recordIndexedHelpSlugs,
   semanticSearchHelpIds,
   upsertHelpEmbedding,
 } from "./help-embeddings.js";
@@ -59,8 +63,19 @@ export class HelpMappingService {
   async searchSemantic(query: string, limit = 12): Promise<{ slugs: string[]; semantic: boolean }> {
     const q = query.trim().slice(0, 200);
     if (q.length < 2) return { slugs: [], semantic: false };
-    const slugs = await semanticSearchHelpIds(q, limit);
-    return slugs === null ? { slugs: [], semantic: false } : { slugs, semantic: true };
+    // Read-through cache: a semantic hit costs a Workers-AI embed + a
+    // Vectorize query, so identical queries must not re-run that per request.
+    // Keyspace is unbounded (free text) → TTL backstop; `avail` in the key so
+    // provisioning Vectorize doesn't keep serving cached "unavailable" misses.
+    const avail = isSemanticHelpAvailable() ? "1" : "0";
+    return getOrSetCached<{ slugs: string[]; semantic: boolean }>({
+      key: `help:sem:${avail}:${limit}:${q.toLowerCase()}`,
+      ttlSeconds: 300,
+      loader: async () => {
+        const slugs = await semanticSearchHelpIds(q, limit);
+        return slugs === null ? { slugs: [], semantic: false } : { slugs, semantic: true };
+      },
+    });
   }
 
   /** Cheap membership set — which context keys have any active help, so the
@@ -146,6 +161,15 @@ export class HelpMappingService {
     for (const item of items) {
       await upsertHelpEmbedding({ slug: item.slug, text: item.text });
     }
+    // Prune vectors for slugs that are no longer in the catalog (#2076):
+    // diff the new set against the ledger of previously-indexed slugs, then
+    // record the new set. Best-effort + no-op when Vectorize/KV are absent.
+    const current = items.map((i) => i.slug);
+    const currentSet = new Set(current);
+    const previous = await getIndexedHelpSlugs();
+    const removed = previous.filter((slug) => !currentSet.has(slug));
+    if (removed.length > 0) await deleteHelpEmbeddings(removed);
+    await recordIndexedHelpSlugs(current);
     return items.length;
   }
 

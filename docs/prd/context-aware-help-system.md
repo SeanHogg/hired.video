@@ -1,6 +1,6 @@
 # PRD — Context-Aware Help System
 
-**Status:** v2 (content-as-files + caching-first) built 2026-06-13 (gaps #2001–#2009; v2 = #2009 supersedes the v1 DB-content build). tsc + lint clean both projects; help-service (6) + content (10) unit tests pass. NOT runtime-verified (needs migration 0210 applied; semantic search needs the Vectorize index provisioned). Remaining items at the end + in the Consolidated Gap Register.
+**Status:** v2 (content-as-files + caching-first) built 2026-06-13 (gaps #2001–#2007 + #2074 rearchitecture; #2074 supersedes the v1 DB-content build; perf/prune follow-ups #2075/#2076). tsc + lint clean both projects; help-service (6) + content (10) unit tests pass. NOT runtime-verified (needs migration 0210 applied; semantic search needs the Vectorize index provisioned). Remaining items at the end + in the Consolidated Gap Register.
 **Owner:** Platform
 **Related:** [[project_context_aware_help]] memory, [page → video](./.) (#1860), Consolidated Gap Register #2001–#2008.
 

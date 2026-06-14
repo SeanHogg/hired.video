@@ -22,7 +22,6 @@ import { studioTemplatesService } from "@/lib/services/studio-templates-service"
 import { eventsService } from "@/lib/services/events-service";
 import { getStaticTemplates } from "@/lib/templates/registry";
 import { BLOG_POSTS } from "@/data/blog-posts";
-import { listHelpItems } from "@/lib/help/content";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
 import { localizeTool } from "@/lib/tools/localize-tool";
 import i18n from "@/lib/i18n/i18n";
@@ -468,7 +467,9 @@ async function fetchGuides(
   search = "",
 ): Promise<TypedFetchResult> {
   // Bundled guide content (locale-resolved, EN fallback) — single source of
-  // truth, zero DB/fetch. Replaced the static HELP_GUIDES list (#2002/#2003).
+  // truth, zero DB/fetch. Dynamic import keeps the help catalog out of the
+  // entry bundle (#2075). Replaced the static HELP_GUIDES list (#2002/#2003).
+  const { listHelpItems } = await import("@/lib/help/content");
   const guides = listHelpItems(i18n.language, { kind: "guide" });
   const filtered = guides.filter((g) => matchesNeedle(search, g.title, g.summary));
   const start = Math.max(0, (page - 1) * limit);
@@ -537,7 +538,9 @@ async function fetchFaqs(
   search = "",
 ): Promise<TypedFetchResult> {
   // Bundled FAQ content (locale-resolved, EN fallback) — single source of
-  // truth, zero DB/fetch. Replaced the static HELP_FAQS catalogue (#2002).
+  // truth, zero DB/fetch. Dynamic import keeps the help catalog out of the
+  // entry bundle (#2075). Replaced the static HELP_FAQS catalogue (#2002).
+  const { listHelpItems } = await import("@/lib/help/content");
   const flat = listHelpItems(i18n.language, { kind: "faq" }).filter((q) =>
     matchesNeedle(search, q.title, q.summary, q.body, q.category),
   );

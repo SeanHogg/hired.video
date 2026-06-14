@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HelpCircle, Search, FileText, BookOpen, ArrowRight, Loader2 } from "lucide-react";
+import { HelpCircle, Search, ArrowRight, Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -27,19 +27,17 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { detectContextType } from "@/lib/config/page-meta-registry";
 import { helpService } from "@/lib/services/help-service";
-import { helpItemsForSlugs, searchHelpLocal, type HelpItem } from "@/lib/help/content";
+import type { HelpItem } from "@/lib/help/content";
+import { useHelpContent } from "@/lib/help/use-help-content";
+import { helpKindIcon } from "@/lib/help/kind-icon";
 import { cn } from "@/lib/utils";
-
-const KIND_ICON: Record<string, typeof FileText> = {
-  faq: HelpCircle,
-  guide: BookOpen,
-};
 
 export function HelpDrawer(): JSX.Element | null {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { i18n } = useTranslation();
   const lang = i18n.language;
+  const help = useHelpContent(); // lazy-loaded catalog (#2075); null until ready
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -68,8 +66,8 @@ export function HelpDrawer(): JSX.Element | null {
     retry: false,
   });
   const curated = useMemo<HelpItem[]>(
-    () => helpItemsForSlugs(resolveRes?.data?.slugs ?? [], lang),
-    [resolveRes, lang],
+    () => (help ? help.helpItemsForSlugs(resolveRes?.data?.slugs ?? [], lang) : []),
+    [help, resolveRes, lang],
   );
 
   const trimmed = query.trim();
@@ -79,8 +77,8 @@ export function HelpDrawer(): JSX.Element | null {
   // call to Vectorize; when it returns hits we render those, else we keep
   // the local keyword results (graceful, zero-latency baseline).
   const localResults = useMemo<HelpItem[]>(
-    () => (searching ? searchHelpLocal(trimmed, lang) : []),
-    [searching, trimmed, lang],
+    () => (searching && help ? help.searchHelpLocal(trimmed, lang) : []),
+    [help, searching, trimmed, lang],
   );
   const { data: semanticRes } = useQuery({
     queryKey: ["help-search", trimmed],
@@ -91,9 +89,9 @@ export function HelpDrawer(): JSX.Element | null {
   });
   const semanticItems = useMemo<HelpItem[]>(() => {
     const r = semanticRes?.data;
-    if (!r?.semantic || r.slugs.length === 0) return [];
-    return helpItemsForSlugs(r.slugs, lang);
-  }, [semanticRes, lang]);
+    if (!help || !r?.semantic || r.slugs.length === 0) return [];
+    return help.helpItemsForSlugs(r.slugs, lang);
+  }, [help, semanticRes, lang]);
 
   const results = searching ? (semanticItems.length > 0 ? semanticItems : localResults) : curated;
 
@@ -147,7 +145,7 @@ export function HelpDrawer(): JSX.Element | null {
             ) : (
               <ul className="space-y-1">
                 {results.map((item) => {
-                  const Icon = KIND_ICON[item.kind] ?? FileText;
+                  const Icon = helpKindIcon(item.kind);
                   return (
                     <li key={item.slug}>
                       <button

@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { helpService } from "@/lib/services/help-service";
-import { listHelpItems, helpIndexItems, getHelpItem } from "@/lib/help/content";
+import { useHelpContent } from "@/lib/help/use-help-content";
 import { useToast } from "@/hooks/use-toast";
 import { AI_CONTEXT_TYPES } from "@shared/ai-context-types";
 import type { HelpContextKey, HelpMappingListItem } from "@shared/help";
@@ -42,9 +42,15 @@ export default function HelpMappings() {
   });
   const mappings = data?.data?.mappings ?? [];
 
-  // The slug picker + mapping titles come from the bundled content catalog.
-  const catalog = useMemo(() => listHelpItems(i18n.language), [i18n.language]);
-  const titleForSlug = (slug: string) => getHelpItem(slug, i18n.language)?.title ?? slug;
+  // The slug picker + mapping titles come from the lazily-loaded bundled
+  // content catalog (#2075).
+  const help = useHelpContent();
+  const catalog = useMemo(
+    () => (help ? help.listHelpItems(i18n.language) : []),
+    [help, i18n.language],
+  );
+  const titleForSlug = (slug: string) =>
+    (help ? help.getHelpItem(slug, i18n.language)?.title : undefined) ?? slug;
 
   const grouped = useMemo(() => {
     const byCtx = new Map<string, HelpMappingListItem[]>();
@@ -112,7 +118,7 @@ export default function HelpMappings() {
   });
 
   const reindex = useMutation({
-    mutationFn: () => helpService.reindex(helpIndexItems()),
+    mutationFn: () => helpService.reindex(help ? help.helpIndexItems() : []),
     onSuccess: (res) => {
       const { indexed, semantic } = res.data ?? { indexed: 0, semantic: false };
       toast({
@@ -141,7 +147,7 @@ export default function HelpMappings() {
           variant="outline"
           size="sm"
           className="gap-2"
-          disabled={reindex.isPending}
+          disabled={reindex.isPending || !help}
           onClick={() => reindex.mutate()}
         >
           {reindex.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

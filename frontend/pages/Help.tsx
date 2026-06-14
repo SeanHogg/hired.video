@@ -36,7 +36,7 @@ import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
 import { useAuth } from "@/lib/auth";
-import { listHelpItems } from "@/lib/help/content";
+import { useHelpContent } from "@/lib/help/use-help-content";
 import Markdown from "@/components/Markdown";
 import { useContactPanel } from "@/components/ContactPanel";
 import TextNarrator from "@/components/audio/TextNarrator";
@@ -54,19 +54,25 @@ export default function Help() {  const location = useLocation();
   // meaningful.
   const { effective: searchQuery } = useSearchQueryParam();
 
-  // FAQs + guides come from the bundled content catalog (locale-resolved,
-  // EN fallback) — ZERO DB, zero fetch. Grouped by category for the accordion.
+  // FAQs + guides come from the lazily-loaded bundled content catalog
+  // (locale-resolved, EN fallback) — ZERO DB, zero fetch (#2074/#2075).
+  // Grouped by category for the accordion.
+  const help = useHelpContent();
   const faqs = useMemo(() => {
+    if (!help) return [];
     const byCat = new Map<string, { category: string; questions: { question: string; answer: string; slug: string }[] }>();
-    for (const item of listHelpItems(i18n.language, { kind: "faq" })) {
+    for (const item of help.listHelpItems(i18n.language, { kind: "faq" })) {
       const group = byCat.get(item.category) ?? { category: item.category, questions: [] };
       group.questions.push({ question: item.title, answer: item.body, slug: item.slug });
       byCat.set(item.category, group);
     }
     return [...byCat.values()];
-  }, [i18n.language]);
+  }, [help, i18n.language]);
 
-  const guides = useMemo(() => listHelpItems(i18n.language, { kind: "guide" }), [i18n.language]);
+  const guides = useMemo(
+    () => (help ? help.listHelpItems(i18n.language, { kind: "guide" }) : []),
+    [help, i18n.language],
+  );
 
   // Inject FAQPage JSON-LD for all visible Q&As
   const faqSchema = useMemo(() => ({
