@@ -21,7 +21,7 @@ import {
 } from "./rules.js";
 import { RedemptionEngine, type RedemptionOutcome } from "./redemption-engine.js";
 import { buildTremendousClient } from "../../services/tremendous/client.js";
-import { NotificationService } from "../../services/notifications/notification-service.js";
+import { NotificationService } from "../../services/notifications/notificationService.js";
 
 export interface AwardArgs {
   userId: string;

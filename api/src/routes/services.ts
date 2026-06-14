@@ -28,7 +28,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
-import { NotificationService } from "../services/notifications/notification-service.js";
+import { NotificationService } from "../services/notifications/notificationService.js";
 
 const {
   serviceOfferings,

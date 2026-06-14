@@ -17,7 +17,7 @@
 import { and, eq } from "drizzle-orm";
 import type { getDb } from "../../db/index.js";
 import { schema } from "../../db/index.js";
-import { NotificationService } from "../notifications/notification-service.js";
+import { NotificationService } from "../notifications/notificationService.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 

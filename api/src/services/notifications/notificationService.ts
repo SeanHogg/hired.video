@@ -1,24 +1,39 @@
 /**
- * NotificationService — the one place that writes to the notifications
- * table. Routes never call `db.insert(notifications)` directly; they
- * call `emitNotification` so every notification ends up with the same
- * `data` shape and the actor lookup happens in one place.
+ * The single notification dispatcher. Every notification — system-
+ * originated (badge / points / certificate / service-inquiry) and
+ * actor-originated (connection request / mention / new message /
+ * moderation) — flows through `emitNotification`, which:
+ *
+ *   1. PERSISTS one durable row per recipient in the `notifications`
+ *      table (the bell/inbox history — always written), and
+ *   2. fans out a preference-gated Web Push to each recipient
+ *      (`isChannelAllowed(prefs, "push", type)`; gap #254 + #2098).
  *
  * Stable `data` envelope:
- *   { actor: UserActor | null, target?: { id, type }, ...extraData }
+ *   { actor: UserActor | null, target?: { id, type }, url?, ...extraData }
+ * The frontend bell parses this once (e.g. `data.url` deep-links on
+ * click — CommunicationHub.tsx); a new notification type just picks a new
+ * `type` discriminant and supplies a title/message.
  *
- * Frontends parse this once. Adding a new notification type — follow,
- * post-comment, like, message-received — does not require new
- * deserialisation logic; it just picks a new `type` discriminant and
- * supplies a title/message.
+ * `NotificationService.notify` is the thin single-recipient,
+ * system-actor convenience wrapper for callers that don't carry `repos`
+ * (gamification, learning, services) — it builds repos from the global
+ * db and delegates here, so there is exactly ONE persist+push+gate
+ * implementation. (Consolidated 2026-06-14 — previously a second
+ * persist-only path in notification-service.ts never pushed.)
  *
- * Layering: this is a service, so it depends on `repos` via DI and
- * never touches Drizzle directly. The repo composes the user-actor
- * join; the service composes the notification insert.
+ * Layering: this is a service, so it depends on `repos` via DI for the
+ * write. The preference read + push transport are global best-effort
+ * side-channels (cached + VAPID), independent of the injected repos.
  */
 
 import type { Repos } from "../../repositories/index.js";
+import { buildRepos } from "../../repositories/index.js";
+import { getDb } from "../../db/index.js";
 import { actorDisplayName, toUserActor, type UserActor } from "../user/userActor.js";
+import { sendPushToUser } from "../push/web-push.js";
+import { isChannelAllowed } from "../../../../shared/notification-preferences.js";
+import { loadNotificationPreferences } from "./preferences.js";
 
 export type NotificationServiceDeps = { repos: Pick<Repos, "users" | "notifications"> };
 
@@ -34,7 +49,9 @@ export interface EmitNotificationInput {
    *  user never gets notified about their own actions. */
   recipientIds: string[];
   /** Discriminant the inbox uses to pick an icon and route accept/decline
-   *  affordances. e.g. "connection_request", "feed_mention". */
+   *  affordances, AND the key the push gate maps to a preference category
+   *  (see categoryForNotificationType). e.g. "connection_request",
+   *  "feed_mention", "message_received". */
   type: string;
   /** Pre-resolved actor (preferred when the route already loaded one).
    *  Pass null only if the actor genuinely is the system. */
@@ -46,9 +63,15 @@ export interface EmitNotificationInput {
   /** Optional reference to the entity that triggered the notification
    *  (connection id, post id, comment id, etc.). */
   target?: NotificationTarget;
+  /** Deep link opened on click (stored at `data.url`) and used as the
+   *  push notification's url. */
+  url?: string;
   /** Anything else the frontend might want — kept open so unusual
    *  notification types don't have to extend the envelope. */
   extraData?: Record<string, unknown>;
+  /** Set false to persist the bell row(s) only, with no push fan-out.
+   *  Default true. */
+  push?: boolean;
 }
 
 /** Look up an actor and a display name in one shot. Use this when the
@@ -63,8 +86,39 @@ export async function resolveActor(
   return { actor, actorName: actorDisplayName(actor) };
 }
 
-/** Insert one notification row per recipient. Self-notifications are
- *  filtered (a user mentioning themselves gets nothing). */
+/**
+ * Fan a Web Push out to recipients who allow this notification's category
+ * on the push channel. Best-effort: a prefs-lookup failure errs toward
+ * sending (a cache/DB hiccup never silently swallows a notification), and
+ * a push transport failure is swallowed (the durable row already landed).
+ */
+async function fanOutPush(
+  recipients: string[],
+  type: string,
+  title: string,
+  body: string,
+  url: string | undefined,
+): Promise<void> {
+  await Promise.all(
+    recipients.map(async (userId) => {
+      let allowed = true;
+      try {
+        allowed = isChannelAllowed(await loadNotificationPreferences(userId), "push", type);
+      } catch {
+        allowed = true;
+      }
+      if (allowed) {
+        await sendPushToUser(userId, { title, body, url }).catch(() => undefined);
+      }
+    }),
+  );
+}
+
+/**
+ * Persist one notification row per recipient (single bulk write — no
+ * N+1) and fan out the preference-gated push. Self-notifications are
+ * filtered (a user mentioning themselves gets nothing).
+ */
 export async function emitNotification(
   deps: NotificationServiceDeps,
   input: EmitNotificationInput,
@@ -78,19 +132,81 @@ export async function emitNotification(
   const data = {
     actor: input.actor,
     ...(input.target ? { target: input.target } : {}),
+    ...(input.url ? { url: input.url } : {}),
     ...(input.extraData ?? {}),
   };
   const message = input.message ?? input.title;
 
-  await Promise.all(
-    recipients.map((userId) =>
-      deps.repos.notifications.insertNotification({
-        userId,
-        type: input.type,
-        title: input.title,
-        message,
-        data: data as any,
-      } as any),
-    ),
+  await deps.repos.notifications.insertNotifications(
+    recipients.map((userId) => ({
+      userId,
+      type: input.type,
+      title: input.title,
+      message,
+      data: data as any,
+    })) as any,
   );
+
+  if (input.push !== false) {
+    await fanOutPush(recipients, input.type, input.title, message, input.url);
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Single-recipient, system-actor convenience wrapper
+// ---------------------------------------------------------------------------
+
+export type NotificationType =
+  | "badge"
+  | "points"
+  | "course"
+  | "assignment"
+  | "certificate"
+  | "service_inquiry"
+  | "review"
+  | "system";
+
+export interface NotifyInput {
+  userId: string;
+  /** Maps to notifications.type — drives icon + smart-feed weighting +
+   *  the push preference category. */
+  type: NotificationType;
+  title: string;
+  /** Maps to notifications.message (defaults to title). */
+  message?: string;
+  /** Deep link opened on click. Stored in notifications.data.url. */
+  url?: string;
+  /** Optional source entity, stashed in notifications.data for "view source". */
+  refType?: string;
+  refId?: string;
+  /** Set false to persist only (no Web Push). Default true. */
+  push?: boolean;
+}
+
+export const NotificationService = {
+  /** Persist a single system notification in the canonical `notifications`
+   *  table + push it, honouring the recipient's push preferences. Best-
+   *  effort: a failure never blocks the action that triggered it. */
+  async notify(input: NotifyInput): Promise<void> {
+    try {
+      const extraData: Record<string, unknown> = {};
+      if (input.refType) extraData.refType = input.refType;
+      if (input.refId) extraData.refId = input.refId;
+      await emitNotification(
+        { repos: buildRepos(getDb()) },
+        {
+          recipientIds: [input.userId],
+          type: input.type,
+          actor: null,
+          title: input.title.slice(0, 255),
+          message: input.message,
+          url: input.url,
+          extraData,
+          push: input.push,
+        },
+      );
+    } catch {
+      // Never let a notification hiccup take down the triggering action.
+    }
+  },
+};
