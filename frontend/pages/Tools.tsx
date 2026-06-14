@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { ToolsBrowser } from "@/components/ToolsBrowser";
-import { ToolsLearningGrid } from "@/components/ToolsLearningGrid";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import LearningPanel, { LEARNING_VIEW_MODES } from "@/components/courses/LearningPanel";
@@ -129,12 +128,17 @@ export default function Tools() {
                 </div>
               </div>
 
-              {/* Filterable tools browser — the SAME audience / tier /
-                  category chips + Scroll / Grid / Table view switcher the
-                  authenticated tools tab renders, so signed-out visitors get
-                  the identical browse experience (consistency) and can filter
-                  the catalog before signing up. Shares ToolsBrowser with the
-                  authenticated path so the filter logic lives in one place. */}
+              {/* Filterable tools + courses browser — the SAME audience /
+                  tier / category chips + Scroll / Grid / Table view switcher
+                  the authenticated tools tab renders, so signed-out visitors
+                  get the identical browse experience (consistency) and can
+                  filter the catalog before signing up. `weaveCourses` intermixes
+                  the learning-library courses through the grid so both content
+                  kinds stay visible above the fold (the page is built around
+                  that); `roleGated={false}` showcases the whole catalog since
+                  the role query is disabled for anonymous visitors. Shares
+                  ToolsBrowser with the authenticated path so the filter +
+                  weave logic lives in one place. */}
               <div className="mb-12 sm:mb-16">
                 <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
                   {t("headings.tools.careerToolsCourses")}
@@ -142,24 +146,7 @@ export default function Tools() {
                 <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
                   {t("messages.tools.careerToolsCoursesDesc")}
                 </p>
-                <ToolsBrowser roleGated={false} />
-              </div>
-
-              {/* Built-in courses showcase. The tools browser above is a
-                  tool-only catalog (it filters on tool axes), so courses are
-                  kept in their own strip here to preserve the above-the-fold
-                  course discovery the signed-out page is built around.
-                  ToolsLearningGrid weaves tools + courses; with an empty tools
-                  list it degrades to a courses-only grid (see weave()), so we
-                  reuse it without duplicating the tools shown above. */}
-              <div className="mb-12 sm:mb-16">
-                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
-                  {t("headings.tools.coursesShowcase")}
-                </h2>
-                <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
-                  {t("messages.tools.coursesShowcaseDesc")}
-                </p>
-                <ToolsLearningGrid tools={[]} courseLimit={9} />
+                <ToolsBrowser roleGated={false} weaveCourses courseLimit={12} />
               </div>
 
               {/* Stats Section */}

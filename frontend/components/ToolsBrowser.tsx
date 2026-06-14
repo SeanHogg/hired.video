@@ -2,26 +2,32 @@ import { ArrowRight } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { useRoleAccess } from "@/hooks/use-role-access";
 import { useSearchQueryParam } from "@/hooks/use-search-query-param";
 import { ToolCard } from "@/components/ToolCard";
 import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
+import CourseMarketplaceCard, {
+  type CourseMarketplaceItem,
+} from "@/components/CourseMarketplaceCard";
 import { CategoryFilterBar } from "@/components/CategoryFilterBar";
 import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
 import { HorizontalScroller } from "@/components/HorizontalScroller";
+import { courseService } from "@/lib/services/course-service";
 import {
   TOOLS_CATALOG,
   audienceForRole,
   isToolInAudience,
   type ToolAudience,
-  type ToolCatalogEntry,
   type ToolCategory,
   type ToolTier,
 } from "@/data/tools-catalog";
 import { localizeTool } from "@/lib/tools/localize-tool";
+import { weaveToolsAndCourses, type WovenItem } from "@/lib/tools/weave-courses";
 
 type TierFilter = "all" | ToolTier;
 type AudienceFilter = "for_me" | "all" | ToolAudience;
@@ -87,11 +93,36 @@ function parseAudienceFilter(raw: string | null): AudienceFilter {
  * that should showcase the whole catalog regardless of role — e.g. the
  * signed-out marketing page, where the role query is disabled and would
  * otherwise collapse the grid to the JOB_SEEKER defaults.
+ *
+ * Set `weaveCourses` to intermix the published learning-library courses
+ * through the (filtered) tool list — used on the signed-out marketing
+ * page so visitors discover both content kinds in one grid. The
+ * authenticated tools tab leaves it off because courses live in their own
+ * Learning tab there. Tool filters narrow only the tools; courses are a
+ * constant offering and stay woven in regardless of the active filter.
  */
-export function ToolsBrowser({ roleGated = true }: { roleGated?: boolean } = {}) {
+export function ToolsBrowser({
+  roleGated = true,
+  weaveCourses = false,
+  courseLimit = 12,
+}: {
+  roleGated?: boolean;
+  weaveCourses?: boolean;
+  courseLimit?: number;
+} = {}) {
   const { t } = useTranslation();
   const effectiveRole = useEffectiveRole();
   const { canSeeTool } = useRoleAccess();
+
+  // Published learning-library courses to weave in. Cached via react-query
+  // (in-memory, shared across consumers) so the list isn't refetched on every
+  // filter/view toggle. Only fetched on surfaces that opt into the weave.
+  const { data: courses = [] } = useQuery({
+    queryKey: ["published-courses", courseLimit],
+    queryFn: () => courseService.listPublished(courseLimit),
+    staleTime: 5 * 60 * 1000,
+    enabled: weaveCourses,
+  });
 
   // Layout switcher for the AI-tools catalog list (Scroll / Grid / Table),
   // matching the Studio landing pattern. Persisted per-surface so the
@@ -193,12 +224,28 @@ export function ToolsBrowser({ roleGated = true }: { roleGated?: boolean } = {})
     audienceFilter !== "for_me" ||
     categoryFilter !== "all";
 
-  // Single card renderer shared by the Grid and Scroll layouts so the
-  // card JSX lives in exactly one place (ToolCard). The scroll track
-  // wraps each in a fixed-width snap cell at the call site.
-  const renderToolCard = (tool: ToolCatalogEntry) => (
-    <ToolCard key={tool.id} tool={tool} />
+  // The list the layouts render: the filtered tools with the published
+  // courses woven in (when this surface opts into the weave). Courses are
+  // not subject to the tool filters — they're a constant learning offering
+  // — so the weave runs against the already-filtered tool list. When the
+  // weave is off (authenticated tools tab) this is just the tools.
+  const wovenItems = useMemo<WovenItem[]>(
+    () => weaveToolsAndCourses(filteredTools, weaveCourses ? courses : []),
+    [filteredTools, courses, weaveCourses],
   );
+
+  // Single card renderer shared by the Grid and Scroll layouts so the
+  // tool/course branch lives in exactly one place. The scroll track wraps
+  // each in a fixed-width snap cell at the call site.
+  const renderWovenCard = (item: WovenItem) =>
+    item.kind === "tool" ? (
+      <ToolCard key={item.key} tool={item.value} />
+    ) : (
+      <CourseMarketplaceCard
+        key={item.key}
+        item={item.value as CourseMarketplaceItem}
+      />
+    );
 
   return (
     <>
@@ -313,18 +360,18 @@ export function ToolsBrowser({ roleGated = true }: { roleGated?: boolean } = {})
             <p>{t("messages.tools.noMatch")}</p>
           </div>
         ) : viewMode === "table" ? (
-          <ToolsTable tools={filteredTools} />
+          <ToolsTable items={wovenItems} />
         ) : viewMode === "scroll" ? (
-          <HorizontalScroller itemCount={filteredTools.length}>
-            {filteredTools.map((tool) => (
-              <div key={tool.id} className="w-72 shrink-0 snap-start">
-                {renderToolCard(tool)}
+          <HorizontalScroller itemCount={wovenItems.length}>
+            {wovenItems.map((item) => (
+              <div key={item.key} className="w-72 shrink-0 snap-start">
+                {renderWovenCard(item)}
               </div>
             ))}
           </HorizontalScroller>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {filteredTools.map((tool) => renderToolCard(tool))}
+            {wovenItems.map((item) => renderWovenCard(item))}
           </div>
         )}
       </div>
@@ -333,13 +380,14 @@ export function ToolsBrowser({ roleGated = true }: { roleGated?: boolean } = {})
 }
 
 /**
- * Dense table layout for the AI-tools catalog — the Table view of the
- * /tools browse switcher. Mirrors the ResumeOwnedTable idiom (border,
- * muted header, hover rows, ghost-button action cell) so the browse
- * surfaces stay visually consistent. Each row deep-links to the tool's
- * canonical href.
+ * Dense table layout for the /tools browse switcher's Table view. Mirrors
+ * the ResumeOwnedTable idiom (border, muted header, hover rows, ghost-button
+ * action cell) so the browse surfaces stay visually consistent. Renders the
+ * same woven tool/course list the card layouts use — a course row carries a
+ * "Course" badge in the category column and deep-links to the course page,
+ * so the Table view stays in sync with Scroll/Grid when courses are woven in.
  */
-function ToolsTable({ tools }: { tools: ToolCatalogEntry[] }) {
+function ToolsTable({ items }: { items: WovenItem[] }) {
   const { t } = useTranslation();
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
@@ -359,11 +407,48 @@ function ToolsTable({ tools }: { tools: ToolCatalogEntry[] }) {
           </tr>
         </thead>
         <tbody>
-          {tools.map((rawTool) => {
-            const tool = localizeTool(rawTool, t);
+          {items.map((item) => {
+            if (item.kind === "course") {
+              const course = item.value;
+              const href = `/courses/${course.author.slug}/${course.slug}`;
+              return (
+                <tr
+                  key={item.key}
+                  className="border-b border-border last:border-0 hover:bg-muted/30"
+                >
+                  <td className="px-3 py-2">
+                    <Link
+                      to={href}
+                      className="font-medium hover:text-brand-purple"
+                    >
+                      {course.title}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Badge variant="secondary">
+                      {t("labels.tools.courseBadge", "Course")}
+                    </Badge>
+                  </td>
+                  <td className="max-w-md px-3 py-2 text-muted-foreground">
+                    <span className="line-clamp-1">{course.summary ?? ""}</span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button asChild variant="ghost" size="sm">
+                        <Link to={href}>
+                          {t("actions.open", "Open")}
+                          <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            }
+            const tool = localizeTool(item.value, t);
             return (
               <tr
-                key={tool.id}
+                key={item.key}
                 className="border-b border-border last:border-0 hover:bg-muted/30"
               >
                 <td className="px-3 py-2">
