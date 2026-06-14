@@ -112,8 +112,14 @@ The existing per-project publish dropdown already renders `publishDestinationsFo
 - One row per supported platform: Connected (handle + avatar + token expiry) / Connect (OAuth start) / Disconnect.
 - Reuses the OAuth start/callback/disconnect shape in [api/src/routes/oauth.ts](../../api/src/routes/oauth.ts) and the `youtube_accounts` precedent — generalized to a `social_connections` table (§6) keyed by `(ownerUserId|companyId, platform)`.
 
-### 4.4 External API — `/api/social/*`
-- `GET  /api/social/platforms` — supported platforms + per-user lane availability (cached per user, invalidated on connect/disconnect/plan change).
+### 4.4 SuperAdmin — Managed Accounts (`/admin/social-accounts`)
+- Powers Lane A (§5.0 layer 2). One row per platform: **Connect / Re-auth / Disconnect** hired.video's corporate brand account (the OAuth flow runs under the SA, token persists to `managed_accounts`).
+- Shows, per platform: brand-account handle + token health/expiry + granted scopes; **and** the developer-app status read-only from config (`client_id` present? required scopes? app-review state) so the SA can see *why* a platform's free lane is or isn't live.
+- Lane A moderation/approval queue (§5.3) + per-platform auto-publish-vs-review toggle live here too.
+- SuperAdmin-gated routes: `POST /api/admin/social/managed/:platform/auth-url`, `/callback`, `/disconnect`; `GET /api/admin/social/managed` (status board).
+
+### 4.5 External API — `/api/social/*`
+- `GET  /api/social/platforms` — supported platforms + per-user lane availability **+ `managedLaneReady` per platform** (whether layers 1+2 of §5.0 are satisfied so Lane A is live). Cached per user, invalidated on connect/disconnect/plan change/managed-account change.
 - `GET  /api/social/connections` — the caller's connected accounts.
 - `GET  /api/social/:platform/auth-url` — OAuth start (HMAC state, mirrors `oauth.ts`).
 - `POST /api/social/:platform/callback` — OAuth exchange + upsert `social_connections`.
@@ -127,7 +133,30 @@ The existing per-project publish dropdown already renders `publishDestinationsFo
 
 ## 5. Functional requirements
 
+### 5.0 Connection layers (the prerequisite the free lane depends on)
+
+There are **three** distinct "connections," at three different levels, and conflating them is a design trap. The free lane (Lane A) cannot work until layers 1 **and** 2 exist, in that order.
+
+| Layer | What it is | Stored where | Owner / cadence |
+|------|------------|--------------|-----------------|
+| **1. Platform developer app** (OAuth client) | hired.video's registered app on each platform → `client_id` + `client_secret` (+ redirect URIs, requested scopes, app-review status). **Prerequisite for BOTH lanes.** | **Cloudflare Worker Secrets** (`wrangler secret put TIKTOK_CLIENT_ID` …), read at runtime via `getEnv()`. Same mechanism as the existing `LINKEDIN_CLIENT_ID`/`YOUTUBE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` in [api/wrangler.toml](../../api/wrangler.toml) + [api/src/routes/oauth.ts](../../api/src/routes/oauth.ts). | Dev/ops, **one-time per platform**. App config — immutable between deploys. |
+| **2. hired.video brand account** (powers Lane A) | A SuperAdmin OAuth-connects hired.video's own corporate account (`@hired.video`, the LinkedIn Company Page, the YouTube brand channel, etc.) **once per platform** → an access/refresh **token** for that brand account. | **Database** — `managed_accounts`, tokens **encrypted at rest** (NOT Secrets: these rotate via refresh-token rotation and are mutable runtime data; Secrets are deploy-time config). | **SuperAdmin**, one-time per platform, via the SA "Managed Accounts" surface (§4 below). |
+| **3. End-user account** (powers Lane B) | Each Pro user OAuth-connects their **own** account. | **Database** — `social_connections`, tokens encrypted (the `oauthAccounts`/`youtube_accounts` precedent). | Each Pro user, self-serve at `/settings/connections`. |
+
+**The secret-vs-DB rule (explicit):** *client credentials* (one `client_id`/`client_secret` pair per platform, app-level config) live in **Secrets**; *account tokens* (brand **or** user, mutable, refreshed) live in **encrypted DB rows**. This is exactly the split the codebase already uses — `LINKEDIN_CLIENT_SECRET` is a secret; the per-user LinkedIn token lands in `oauthAccounts`.
+
+**Bring-up order for a platform's free lane:** (a) register the developer app + complete any app review → put `client_id`/`client_secret` in Secrets; (b) SuperAdmin connects hired.video's brand account via OAuth → token persisted in `managed_accounts`; (c) the free lane is now live for all users. Until (b), the Studio "Post via hired.video" option for that platform is **disabled with an "not yet available" state** (driven by a `GET /api/social/platforms` field — `managedLaneReady: boolean` — never a hardcoded flag).
+
+**SuperAdmin "Managed Accounts" surface** (new SA tab, §4.4 below also lists it): connect / re-auth / disconnect each platform's brand account; shows token health + expiry + which scopes were granted; surfaces the developer-app status (registered? scopes approved? app-review pending?) read-only from config so the SA knows *why* a platform isn't live. This is the SA-managed connection ritual the prior draft omitted.
+
+**Platform app-review / scope caveats (rollout-affecting):**
+- **TikTok** — Content Posting API requires app review; un-reviewed apps can only post to the developer's own sandbox accounts.
+- **Instagram** — Content Publishing API requires a **Business/Creator** account linked to a Facebook Page + Meta app review; personal IG accounts cannot be published to programmatically (→ manual-upload fallback, `directPublish:false`).
+- **X (Twitter)** — posting requires a paid API tier; budget + tier selection is an ops prerequisite.
+- **LinkedIn — Lane A ≠ Lane B scope.** "Share on LinkedIn" (`w_member_social`) posts to a *member's* feed (Lane B). Posting to hired.video's **Company Page** (Lane A) needs the **Community Management API** (`w_organization_social`), which is a **separate product** on the dev app, requires app review, and requires an organization admin to authorize the app against the Page. The adapter therefore carries lane-specific scope requirements, and the SA brand-account connect for LinkedIn must request the org scope, not the member scope.
+
 ### 5.1 The `SocialPublisher` DI seam + adapters
+One interface, one adapter per platform, resolved through a single factory (the `match-handlers.ts`/`LLMClient` pattern, [project_scraping_domain]/[project_llm_gateway_models]):
 One interface, one adapter per platform, resolved through a single factory (the `match-handlers.ts`/`LLMClient` pattern, [project_scraping_domain]/[project_llm_gateway_models]):
 
 ```
@@ -157,6 +186,7 @@ Server-side, in order, returning a typed error envelope on each stop (so the cli
 This generalizes the proven YouTube path (`publishVideoUseCase.ts`, already `requirePro` + connection-checked) to every platform; YouTube's existing route becomes one adapter behind the seam (no behavior change, dead bespoke code removed — [README dead-code rule]).
 
 ### 5.3 Lane A — publish via hired.video's managed account (free)
+**Prerequisite (per §5.0):** the platform's developer app is registered (`client_id`/`client_secret` in Secrets) **and** a SuperAdmin has connected hired.video's brand account (`managed_accounts` row present, token healthy). `GET /api/social/platforms` exposes `managedLaneReady` per platform; the "Post via hired.video" option is disabled (with an explanatory state) until both are true. The per-request flow:
 1. **Authorization** — `canActFor()` for ownership/attribution (we attribute the creator).
 2. **Moderation gate** — AI classifier (Claude via the LLM gateway, the same screen the Article Partner Program uses, [README]) scores the asset's caption + a frame/thumbnail + transcript for policy violations. Pass → optionally a SuperAdmin approval queue (configurable per platform: auto-publish vs review). Fail → rejected with reason, surfaced to the user.
 3. **Publish** under hired.video's managed account for that platform (`managed_accounts` table, SA-managed tokens), with non-removable attribution ("by @creator · made on hired.video") + a link back to the creator's hired.video profile, and a watermark on the asset variant (the watermark the Free tier already applies, per gap #1990).
@@ -193,13 +223,15 @@ Lane A is the free escape hatch *and* the owned-reach engine: every free user wh
 New tables (Drizzle + numbered SQL migration starting `0214_social_publishing.sql`, idempotent per [feedback_fix_root_cause_not_workaround] + `TEMPLATE.md`):
 
 - **`social_connections`** — `(id, ownerUserId, ownerCompanyId nullable, platform, externalAccountId, handle, displayName, avatarUrl, accessToken [encrypted], refreshToken [encrypted], tokenExpiresAt, scopes[], status, createdAt, updatedAt)`. Unique `(coalesce(ownerCompanyId,ownerUserId), platform)`. Generalizes `youtube_accounts`; the OAuth `oauthAccounts` storage pattern is the encryption precedent.
-- **`managed_accounts`** — hired.video's own per-platform brand accounts (SA-managed tokens, same column shape, `isManaged=true`). Platform-global, not tenant-scoped.
+- **`managed_accounts`** — hired.video's own per-platform brand accounts powering Lane A (SA-managed access/refresh **tokens**, same column shape as `social_connections`, `isManaged=true`). Platform-global, not tenant-scoped. **Holds tokens only** — the platform `client_id`/`client_secret` are NOT here; they are Worker Secrets (§5.0). One row per platform once a SuperAdmin connects the brand account.
 - **`social_publications`** — detail row extending `studio_project_publications`: `(id, projectId, destination, platform, lane 'managed'|'self', connectionId nullable, variantId, externalPostId, externalUrl, status, moderationStatus, publishedAt)`. (`studio_project_publications` stays the SSoT "where published"; this carries social-specific columns.)
 - **`social_post_variants`** — `(id, projectId, platform, assetContentHash, assetR2Key, aspect, durationSec, caption, title, hashtags[], thumbnailR2Key)`.
 - **`social_publish_jobs`** — the scheduler queue (§5.5).
 - **`external_post_metrics`** — `(id, publicationId, views, likes, shares, comments, fetchedAt)` (latest-snapshot upsert, not append).
 
 Plus: extend `PublishDestinationId` + `PUBLISH_DESTINATIONS` ([shared/media-kinds.ts](../../shared/media-kinds.ts)) with the social ids, and add `PLATFORM_PRESETS` (§5.4). ALTER the `studio_project_publications` destination CHECK constraint to admit the new ids (idempotent ALTER per #1625).
+
+**Secrets (not DB), one pair per platform** — wired the same way as the existing entries in [api/wrangler.toml](../../api/wrangler.toml): `TIKTOK_CLIENT_ID`/`TIKTOK_CLIENT_SECRET`, `META_APP_ID`/`META_APP_SECRET` (IG + FB), `X_CLIENT_ID`/`X_CLIENT_SECRET`, plus the already-present `YOUTUBE_*` and `LINKEDIN_*`. LinkedIn needs both the member scope (Lane B) and the org/Community-Management scope (Lane A) granted on the one dev app (§5.0).
 
 ---
 
@@ -214,11 +246,11 @@ Plus: extend `PublishDestinationId` + `PUBLISH_DESTINATIONS` ([shared/media-kind
 
 ---
 
-## 8. Phasing (maps to Consolidated Gap Register #2036–#2050)
+## 8. Phasing (maps to Consolidated Gap Register #2043–#2050)
 
-- **Phase 1 — Seam + YouTube refactor + Lane B gate (Now):** `SocialPublisher` seam + adapter interface; refactor the existing YouTube publish behind it (no behavior change, drop bespoke route code); generalize `requirePro` → `runSelfPublishGate` (entitlement → connection → publish); `social_connections` table + `/settings/connections` for YouTube. Proves the gate end-to-end on the one platform that already works.
-- **Phase 2 — TikTok + Shorts + Reels (Lane B) + presets + variants (Soon):** TikTok, YouTube Shorts, Instagram Reels adapters; `PLATFORM_PRESETS` + per-platform variant baking (9:16) + AI caption/hashtag gen; the lane chooser UI + `useSocialPublishEntitlement`.
-- **Phase 3 — Lane A managed accounts + moderation (Soon):** `managed_accounts`, the AI moderation gate + SA approval queue, attribution/watermark, "publish via hired.video" free lane, platform-reach analytics. This is the owned-reach engine.
+- **Phase 1 — Seam + YouTube refactor + Lane B gate (Now):** `SocialPublisher` seam + adapter interface; refactor the existing YouTube publish behind it (no behavior change, drop bespoke route code); generalize `requirePro` → `runSelfPublishGate` (entitlement → connection → publish); `social_connections` table + `/settings/connections` for YouTube. Includes the **per-platform Secrets convention** (§5.0 layer 1 — `*_CLIENT_ID`/`*_CLIENT_SECRET` wiring + the `getEnv()` lookup, mirroring the existing `YOUTUBE_*`/`LINKEDIN_*` entries) so adding a platform is a documented secret + adapter, never code-spelunking. Proves the gate end-to-end on the one platform that already works.
+- **Phase 2 — TikTok + Shorts + Reels (Lane B) + presets + variants (Soon):** TikTok, YouTube Shorts, Instagram Reels adapters; `PLATFORM_PRESETS` + per-platform variant baking (9:16) + AI caption/hashtag gen; the lane chooser UI + `useSocialPublishEntitlement`. Per-platform developer-app registration + app review is an ops prerequisite tracked alongside (§5.0 caveats).
+- **Phase 3 — Lane A managed accounts + SA connect surface + moderation (Soon):** `managed_accounts` table, the **SuperAdmin "Managed Accounts" surface** (§4.4 — SA OAuth-connects hired.video's brand account per platform; `managedLaneReady` gating), the AI moderation gate + SA approval queue, attribution/watermark, "publish via hired.video" free lane, platform-reach analytics. LinkedIn's brand-account connect requests the **org/Community-Management scope** (≠ the member scope used for Lane B). This is the owned-reach engine — and Lane A stays disabled per platform until its brand account is connected here.
 - **Phase 4 — Scheduling + batch + Distribution Hub (Mid):** `social_publish_jobs` + cron drainer (idempotent/retry-bounded), multi-destination compose, calendar/queue UI, native feed cross-post.
 - **Phase 5 — Analytics ingestion + remaining platforms (Mid):** `external_post_metrics` via webhooks + cron sync, dashboard fold-in; X, Facebook Page, LinkedIn real-post adapters; manual-upload fallback polish.
 

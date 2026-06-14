@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Globe2, Users, Eye, BarChart3, Loader2 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,8 @@ import GeoHotspotMap from "@/components/analytics/GeoHotspotMap";
 import ReferrerBreakdown from "@/components/analytics/ReferrerBreakdown";
 import MetricBadgeCluster from "@/components/shared/MetricBadgeCluster";
 import CreatorEnrollmentCTA from "@/components/creator/CreatorEnrollmentCTA";
+import { GaugeCard } from "@/components/dashboard/gauge/GaugeCard";
+import { buildCreatorGauge } from "@/lib/dashboard/gauge";
 import {
   fetchCreatorRollup,
   type CreatorRollup,
@@ -41,6 +44,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export default function CreatorDashboard() {
+  const { t } = useTranslation();
   const [rollup, setRollup] = useState<CreatorRollup | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +83,8 @@ export default function CreatorDashboard() {
   if (!rollup || rollup.totals.artifactCount === 0) {
     return (
       <div className="space-y-4">
+        {/* Momentum dial — motivates the first publish even at zero. */}
+        <GaugeCard model={buildCreatorGauge(rollup, t)} className="lg:max-w-md" />
         <CreatorEnrollmentCTA />
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
@@ -96,6 +102,8 @@ export default function CreatorDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Creator momentum dial — reach + volume rolled into one score. */}
+      <GaugeCard model={buildCreatorGauge(rollup, t)} className="lg:max-w-md" />
       <CreatorEnrollmentCTA />
       {/* Top stat strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

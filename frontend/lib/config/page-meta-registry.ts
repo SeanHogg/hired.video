@@ -82,6 +82,9 @@ export const PAGE_META_RULES: PageMetaRule[] = [
   // Interview practice
   { test: /^\/interview(\/|$)/, contextType: "interview-practice", seoKey: "/interview" },
 
+  // Help center + individual help articles (/help/:slug inherit /help SEO).
+  { test: /^\/help(\/|$)/, contextType: "general", seoKey: "/help" },
+
   // Tools catalogue + individual tool pages. Most tools have an exact
   // PAGE_SEO entry; this rule gives any uncovered/new tool a sensible
   // fallback to the /tools landing SEO instead of generic defaults.

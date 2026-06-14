@@ -4,9 +4,6 @@ import {
   MessageCircle,
   Mail,
   Phone,
-  Video,
-  Users,
-  Briefcase,
   Zap,
   BookOpen,
   ExternalLink,
@@ -39,8 +36,8 @@ import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
-import { helpService } from "@/lib/services/help-service";
+import { listHelpItems } from "@/lib/help/content";
+import Markdown from "@/components/Markdown";
 import { useContactPanel } from "@/components/ContactPanel";
 import TextNarrator from "@/components/audio/TextNarrator";
 import { textFromFAQ } from "@/lib/audio/narrator-text";
@@ -57,14 +54,19 @@ export default function Help() {  const location = useLocation();
   // meaningful.
   const { effective: searchQuery } = useSearchQueryParam();
 
-  // FAQs are the single DB-backed store now (kind='faq' articles, seeded
-  // by migration 0210) — replaced the static help-faqs.ts catalogue.
-  const { data: faqRes } = useQuery({
-    queryKey: ["help-faqs", i18n.language],
-    queryFn: () => helpService.listFaqs(),
-    staleTime: 10 * 60 * 1000,
-  });
-  const faqs = useMemo(() => faqRes?.data?.groups ?? [], [faqRes]);
+  // FAQs + guides come from the bundled content catalog (locale-resolved,
+  // EN fallback) — ZERO DB, zero fetch. Grouped by category for the accordion.
+  const faqs = useMemo(() => {
+    const byCat = new Map<string, { category: string; questions: { question: string; answer: string; slug: string }[] }>();
+    for (const item of listHelpItems(i18n.language, { kind: "faq" })) {
+      const group = byCat.get(item.category) ?? { category: item.category, questions: [] };
+      group.questions.push({ question: item.title, answer: item.body, slug: item.slug });
+      byCat.set(item.category, group);
+    }
+    return [...byCat.values()];
+  }, [i18n.language]);
+
+  const guides = useMemo(() => listHelpItems(i18n.language, { kind: "guide" }), [i18n.language]);
 
   // Inject FAQPage JSON-LD for all visible Q&As
   const faqSchema = useMemo(() => ({
@@ -130,37 +132,6 @@ export default function Help() {  const location = useLocation();
       action: t("actions.help.callNow"),
       available: "+1 (555) 123-4567",
       href: "tel:+15551234567",
-    },
-  ];
-
-  const resources = [
-    {
-      id: "gettingStarted",
-      icon: BookOpen,
-      title: t("headings.help.gettingStartedGuide"),
-      description: t("messages.help.gettingStartedGuide"),
-      link: "/guides/getting-started",
-    },
-    {
-      id: "videoBestPractices",
-      icon: Video,
-      title: t("headings.help.videoBestPractices"),
-      description: t("messages.help.videoBestPractices"),
-      link: "/guides/video-best-practices",
-    },
-    {
-      id: "networking",
-      icon: Users,
-      title: t("headings.help.networkingTips"),
-      description: t("messages.help.networkingTips"),
-      link: "/guides/networking",
-    },
-    {
-      id: "jobSearch",
-      icon: Briefcase,
-      title: t("headings.help.jobSearchStrategies"),
-      description: t("messages.help.jobSearchStrategies"),
-      link: "/guides/job-search",
     },
   ];
 
@@ -262,7 +233,9 @@ export default function Help() {  const location = useLocation();
                                   {faq.question}
                                 </AccordionTrigger>
                                 <AccordionContent className="text-muted-foreground">
-                                  {faq.answer}
+                                  <Markdown className="prose prose-sm dark:prose-invert max-w-none">
+                                    {faq.answer}
+                                  </Markdown>
                                 </AccordionContent>
                               </AccordionItem>
                             ))}
@@ -294,29 +267,25 @@ export default function Help() {  const location = useLocation();
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {resources.map((resource) => (
+                  {guides.map((guide) => (
                     <Card
-                      key={resource.id}
+                      key={guide.slug}
                       className="hover:shadow-md transition-shadow cursor-pointer"
                     >
                       <CardHeader>
                         <div className="flex items-start gap-4">
                           <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <resource.icon className="h-6 w-6 text-primary" />
+                            <BookOpen className="h-6 w-6 text-primary" />
                           </div>
                           <div className="flex-1">
-                            <CardTitle className="text-lg mb-2">
-                              {resource.title}
-                            </CardTitle>
-                            <CardDescription>
-                              {resource.description}
-                            </CardDescription>
+                            <CardTitle className="text-lg mb-2">{guide.title}</CardTitle>
+                            <CardDescription>{guide.summary}</CardDescription>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
                         <Button variant="outline" className="w-full gap-2" asChild>
-                          <Link to={resource.link}>
+                          <Link to={`/help/${guide.slug}`}>
                             {t("actions.help.readGuide")}
                             <ArrowRight className="h-4 w-4" />
                           </Link>
@@ -325,25 +294,6 @@ export default function Help() {  const location = useLocation();
                     </Card>
                   ))}
                 </div>
-
-                {/* Additional Resources */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{t("headings.help.videoTutorials")}</CardTitle>
-                    <CardDescription>
-                      {t("messages.help.videoTutorials")}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button className="gap-2" asChild>
-                      <Link to="/guides/tutorials">
-                        <Video className="h-4 w-4" />
-                        {t("actions.help.watchTutorials")}
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               {/* Contact Tab */}

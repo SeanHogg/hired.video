@@ -21,6 +21,8 @@ import { DashboardFeed } from "./DashboardFeed";
 import NewCandidatesCard from "./shared/NewCandidatesCard";
 import ScheduledInterviewsCard from "./shared/ScheduledInterviewsCard";
 import { HiringInsightsPanel } from "./HiringInsightsPanel";
+import { DashboardGaugeRow } from "./gauge/DashboardGaugeRow";
+import { buildHiringGauge } from "@/lib/dashboard/gauge";
 
 import type { EmployerDashboard as EmployerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -63,6 +65,9 @@ export function EmployerDashboard({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Role-aware speedometer hero — hiring-pipeline health + rewards. */}
+      <DashboardGaugeRow primary={buildHiringGauge(dashboardData, t)} />
+
       {/* SuperAdmin-curated feed for employers (silent when uncurated). */}
       <DashboardFeed />
 

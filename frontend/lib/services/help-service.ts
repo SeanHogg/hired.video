@@ -1,29 +1,21 @@
 /**
- * Context-aware help — frontend API client.
+ * Context-aware help — frontend API client (v2, meta only).
  *
- * Thin wrapper over the /api/help endpoints. The HelpDrawer uses the
- * public reads; the SuperAdmin curation page uses the mapping mutations.
- * Shapes come from the shared contract (DRY — no re-declaration).
+ * The API serves mapping + search META (slugs), never content. Help content
+ * comes from the bundled catalog in `lib/help/content.ts`. The drawer/admin
+ * join the slugs these calls return to that catalog.
  */
 
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
-import i18n from "@/lib/i18n/i18n";
 import type {
-  HelpArticleCard,
   HelpContextKey,
-  HelpFaqGroup,
+  HelpIndexItem,
   HelpMappingListItem,
+  HelpSearchResponse,
   ResolveHelpResponse,
   SetHelpMappingInput,
 } from "@shared/help";
-
-/** The active UI locale, appended to public help reads so content comes
- *  back localized (EN fallback server-side). Centralized here so callers
- *  never thread locale through (DRY). */
-function localeParam(): string {
-  return `locale=${encodeURIComponent(i18n.language || "en")}`;
-}
 
 export const helpService = {
   /** Active context keys that carry any help — cached app-wide so the
@@ -34,32 +26,18 @@ export const helpService = {
     >;
   },
 
-  /** Curated published article set for a page context (localized). */
+  /** Ordered content slugs curated for a page context. */
   resolve(context: HelpContextKey): Promise<ApiSuccessResponse<ResolveHelpResponse>> {
     return apiClient.get(
-      `/api/help/resolve?context=${encodeURIComponent(context)}&${localeParam()}`,
+      `/api/help/resolve?context=${encodeURIComponent(context)}`,
     ) as Promise<ApiSuccessResponse<ResolveHelpResponse>>;
   },
 
-  /** All published FAQs grouped by category, localized (DB-backed; replaced
-   *  the static help-faqs.ts). Drives the Help page accordion + card feed. */
-  listFaqs(): Promise<ApiSuccessResponse<{ groups: HelpFaqGroup[] }>> {
-    return apiClient.get(`/api/help/faqs?${localeParam()}`) as Promise<
-      ApiSuccessResponse<{ groups: HelpFaqGroup[] }>
-    >;
-  },
-
-  /** All published guide articles as localized cards (DB-backed; replaced HELP_GUIDES). */
-  listGuides(): Promise<ApiSuccessResponse<{ guides: HelpArticleCard[] }>> {
-    return apiClient.get(`/api/help/guides?${localeParam()}`) as Promise<
-      ApiSuccessResponse<{ guides: HelpArticleCard[] }>
-    >;
-  },
-
-  /** Search published help content (faq|guide), localized. */
-  search(q: string): Promise<ApiSuccessResponse<{ articles: HelpArticleCard[] }>> {
-    return apiClient.get(`/api/help/search?q=${encodeURIComponent(q)}&${localeParam()}`) as Promise<
-      ApiSuccessResponse<{ articles: HelpArticleCard[] }>
+  /** Semantic-search slug hits (Vectorize). `semantic:false` → the caller
+   *  should use its local keyword index instead. */
+  search(q: string): Promise<ApiSuccessResponse<HelpSearchResponse>> {
+    return apiClient.get(`/api/help/search?q=${encodeURIComponent(q)}`) as Promise<
+      ApiSuccessResponse<HelpSearchResponse>
     >;
   },
 
@@ -73,9 +51,9 @@ export const helpService = {
 
   setMapping(
     input: SetHelpMappingInput,
-  ): Promise<ApiSuccessResponse<{ contextKey: HelpContextKey; articleId: string }>> {
+  ): Promise<ApiSuccessResponse<{ contextKey: HelpContextKey; slug: string }>> {
     return apiClient.post("/api/help/mappings", input) as Promise<
-      ApiSuccessResponse<{ contextKey: HelpContextKey; articleId: string }>
+      ApiSuccessResponse<{ contextKey: HelpContextKey; slug: string }>
     >;
   },
 
@@ -85,11 +63,12 @@ export const helpService = {
     >;
   },
 
-  /** (Re)build semantic-search embeddings for all published help content
-   *  (Phase 2 / #2004). Returns how many were indexed + whether the
-   *  Vectorize binding is active. */
-  reindex(): Promise<ApiSuccessResponse<{ indexed: number; semantic: boolean }>> {
-    return apiClient.post("/api/help/reindex", {}) as Promise<
+  /** (Re)build semantic-search vectors from the bundled catalog (the caller
+   *  passes `helpIndexItems()`). Returns count + whether Vectorize is live. */
+  reindex(
+    items: HelpIndexItem[],
+  ): Promise<ApiSuccessResponse<{ indexed: number; semantic: boolean }>> {
+    return apiClient.post("/api/help/reindex", { items }) as Promise<
       ApiSuccessResponse<{ indexed: number; semantic: boolean }>
     >;
   },

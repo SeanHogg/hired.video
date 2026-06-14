@@ -14,6 +14,8 @@ import ApplicationStatistics from "./shared/ApplicationStatistics";
 import JobMatchesCard from "./shared/JobMatchesCard";
 import UpcomingInterviewsCard from "./shared/UpcomingInterviewsCard";
 import { DashboardFeed } from "./DashboardFeed";
+import { DashboardGaugeRow } from "./gauge/DashboardGaugeRow";
+import { buildJobSeekerGauge } from "@/lib/dashboard/gauge";
 
 import type { JobSeekerDashboard as JobSeekerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -56,6 +58,11 @@ export function JobSeekerDashboard({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+
+      {/* Role-aware speedometer hero — job-readiness dial + rewards
+          progress. Motivates posting a resume / video resume and turns
+          engagement into a single glanceable score. */}
+      <DashboardGaugeRow primary={buildJobSeekerGauge(dashboardData, t)} />
 
       {/* SuperAdmin-curated feed — fills the dashboard for new job seekers
           who have no activity yet, and surfaces featured tools / articles /

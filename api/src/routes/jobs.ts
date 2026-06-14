@@ -44,6 +44,36 @@ export const CreateJobSchema = z.object({
    *  as the skills field above — must be declared here or Zod strips
    *  it at the route boundary and the service never sees it. */
   sector: z.string().max(64).optional(),
+  // ---- Editable surface widened in #878 ----
+  // The whole job create/edit form ships these; before this they were
+  // silently stripped by Zod's default unknown-key removal, so a PUT
+  // returned 200 but persisted nothing. `jobService.buildJobColumnPatch`
+  // is the single source of truth that maps each to its `job_items`
+  // column (or the `details` jsonb bag). Keep this list and that mapper
+  // in lockstep.
+  company: z.string().max(255).optional(),
+  responsibilities: z.array(z.string()).optional(),
+  requirements: z.array(z.string()).optional(),
+  qualifications: z.array(z.string()).optional(),
+  benefits: z.array(z.string()).optional(),
+  // Accept single-or-array, any of the three legacy spellings — the
+  // mapper normalizes to the canonical kebab value (shared/employment-types).
+  employmentType: z.union([z.string(), z.array(z.string())]).optional(),
+  seniority: z.union([z.string(), z.array(z.string())]).optional(),
+  experienceLevel: z.string().optional(),
+  workSetting: z.string().optional(),
+  // Hybrid weekly split (#2069). Clamped to [0,7] by the service; only
+  // persisted when workSetting resolves to 'hybrid'.
+  onsiteDaysPerWeek: z.number().int().min(0).max(7).optional().nullable(),
+  remoteDaysPerWeek: z.number().int().min(0).max(7).optional().nullable(),
+  isRemote: z.boolean().optional(),
+  salaryMin: z.number().optional(),
+  salaryMax: z.number().optional(),
+  currency: z.string().max(10).optional(),
+  applyUrl: OptionalUrlSchema,
+  expirationDate: z.string().optional(),
+  status: z.string().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export const UpdateJobSchema = CreateJobSchema.partial();
@@ -110,6 +140,8 @@ async function publicJobsFromQuery(
       query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
     salaryMin: query.salaryMin ? Number(query.salaryMin) : undefined,
     salaryMax: query.salaryMax ? Number(query.salaryMax) : undefined,
+    // #2069 — candidate-facing work-setting facet (onsite/remote/hybrid).
+    workSetting: query.workSetting || undefined,
     sector: query.sector || undefined,
     entityIdAllowlist: allow,
   });

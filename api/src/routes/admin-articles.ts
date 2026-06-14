@@ -22,7 +22,6 @@ import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { scanContent } from "../services/moderation/contentScan.js";
 import { bumpSearchVersion } from "../utils/search-cache.js";
-import { upsertHelpEmbedding } from "../services/help/help-embeddings.js";
 
 const { articles, users, userProfiles, adminAuditLog, feedPosts } = schema;
 
@@ -164,22 +163,6 @@ adminArticleRoutes.post("/approve", async (c) => {
     eq(articles.status, "submitted"),
   )).returning();
   if (updatedRows.length > 0) bumpSearchVersion();
-
-  // Keep semantic help search fresh: index newly-published faq|guide
-  // content (#2004). Best-effort + no-op when Vectorize isn't bound.
-  await Promise.all(
-    updatedRows
-      .filter((r) => r.kind === "faq" || r.kind === "guide")
-      .map((r) =>
-        upsertHelpEmbedding({
-          articleId: r.id,
-          kind: r.kind,
-          title: r.title,
-          summary: r.summary ?? "",
-          body: r.bodyMd ?? "",
-        }),
-      ),
-  );
 
   // Award the article AUTHOR (not the approving admin) publish points.
   // Role is resolved from the DB since the earner isn't the JWT actor.

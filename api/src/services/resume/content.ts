@@ -91,7 +91,33 @@ function coerceNullArrays(value: unknown): unknown {
  *  Read-side only — no null coercion, no schema validation. Write-side
  *  callers must use `healAndValidateContent`. */
 export function normalizeContent(content: unknown): Record<string, unknown> {
-  const normalized = normalizeJsonResume(content);
+  let normalized: Record<string, unknown>;
+  if (!content || typeof content !== "object") {
+    normalized = {};
+  } else {
+    // Fast path (#1588) — skip the O(content-size) `remapKeys` deep-walk +
+    // full re-allocation for rows that are ALREADY canonical. Every write
+    // goes through `healAndValidateContent`, which lowercases the entire
+    // tree, so a camelCase top level implies a camelCase subtree; only
+    // legacy hired.video exports never re-saved since the migration carry
+    // PascalCase keys. Detect those by a cheap top-level-key scan (vs. the
+    // recursive walk that previously ran on every embed / detail load and
+    // dominated worker CPU on heavy resumes). `name`→`title` promotion is
+    // O(1) and replicated here so the fast path matches normalizeJsonResume.
+    const obj = content as Record<string, unknown>;
+    const isCanonical =
+      !("Name" in obj) &&
+      Object.keys(obj).every((k) => k === "" || k[0] === k[0].toLowerCase());
+    if (isCanonical) {
+      normalized = { ...obj };
+      if (typeof normalized.name === "string" && normalized.title === undefined) {
+        normalized.title = normalized.name;
+        delete normalized.name;
+      }
+    } else {
+      normalized = normalizeJsonResume(content);
+    }
+  }
   for (const [k, v] of Object.entries(EMPTY_CONTENT_DEFAULTS)) {
     if (!(k in normalized)) (normalized as Record<string, unknown>)[k] = v;
   }

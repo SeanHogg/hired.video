@@ -142,6 +142,7 @@ const TranscriptSearch = lazy(() => import("./pages/TranscriptSearch"));
 const HiringManagerPortal = lazy(() => import("./pages/HiringManagerPortal"));
 const PhoneDashboard = lazy(() => import("./pages/PhoneDashboard"));
 const Help = lazy(() => import("./pages/Help"));
+const HelpArticle = lazy(() => import("./pages/HelpArticle"));
 const GettingStartedGuide = lazy(() => import("./pages/guides/GettingStarted"));
 const VideoBestPracticesGuide = lazy(() => import("./pages/guides/VideoBestPractices"));
 const NetworkingTipsGuide = lazy(() => import("./pages/guides/NetworkingTips"));
@@ -1124,6 +1125,7 @@ const App = () => (
                       <Route path="/superadmin/ads"   element={<PaidMediaPage title="Paid Media (Internal Growth)" />} />
                       <Route path="/contributors" element={<Contributors />} />
                       <Route path="/help" element={<Help />} />
+                      <Route path="/help/:slug" element={<HelpArticle />} />
                       <Route path="/guides/getting-started" element={<GettingStartedGuide />} />
                       <Route path="/guides/video-best-practices" element={<VideoBestPracticesGuide />} />
                       <Route path="/guides/networking" element={<NetworkingTipsGuide />} />

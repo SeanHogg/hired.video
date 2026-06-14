@@ -22,7 +22,7 @@ import { studioTemplatesService } from "@/lib/services/studio-templates-service"
 import { eventsService } from "@/lib/services/events-service";
 import { getStaticTemplates } from "@/lib/templates/registry";
 import { BLOG_POSTS } from "@/data/blog-posts";
-import { helpService } from "@/lib/services/help-service";
+import { listHelpItems } from "@/lib/help/content";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
 import { localizeTool } from "@/lib/tools/localize-tool";
 import i18n from "@/lib/i18n/i18n";
@@ -467,11 +467,9 @@ async function fetchGuides(
   page: number,
   search = "",
 ): Promise<TypedFetchResult> {
-  // DB-backed guide articles (kind='guide'), merged into search so users
-  // never have to know the difference between "help" and "search". Single
-  // source of truth — replaced the static HELP_GUIDES list (#2002/#2003).
-  const res = await helpService.listGuides().catch(() => null);
-  const guides = res?.data?.guides ?? [];
+  // Bundled guide content (locale-resolved, EN fallback) — single source of
+  // truth, zero DB/fetch. Replaced the static HELP_GUIDES list (#2002/#2003).
+  const guides = listHelpItems(i18n.language, { kind: "guide" });
   const filtered = guides.filter((g) => matchesNeedle(search, g.title, g.summary));
   const start = Math.max(0, (page - 1) * limit);
   const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
@@ -480,11 +478,11 @@ async function fetchGuides(
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
       type: "guide",
-      id: guide.id,
+      id: guide.slug,
       name: guide.title,
       title: guide.title,
       summary: guide.summary,
-      href: `/articles/${guide.userId}/${guide.slug}`,
+      href: `/help/${guide.slug}`,
       createdAt,
       views: 0,
     } as RawApiItem;
@@ -538,13 +536,11 @@ async function fetchFaqs(
   page: number,
   search = "",
 ): Promise<TypedFetchResult> {
-  // DB-backed FAQ articles (kind='faq'), flattened so each Q&A is its own
-  // card and search can match individual answers. Single source of truth —
-  // replaced the static HELP_FAQS catalogue (#2002).
-  const res = await helpService.listFaqs().catch(() => null);
-  const flat = (res?.data?.groups ?? []).flatMap((cat) =>
-    cat.questions.map((q) => ({ category: cat.category, ...q })),
-  ).filter((q) => matchesNeedle(search, q.question, q.answer, q.category));
+  // Bundled FAQ content (locale-resolved, EN fallback) — single source of
+  // truth, zero DB/fetch. Replaced the static HELP_FAQS catalogue (#2002).
+  const flat = listHelpItems(i18n.language, { kind: "faq" }).filter((q) =>
+    matchesNeedle(search, q.title, q.summary, q.body, q.category),
+  );
   const start = Math.max(0, (page - 1) * limit);
   const baseTime = new Date("2026-03-01T00:00:00Z").getTime();
   const slice = flat.slice(start, start + limit);
@@ -552,12 +548,12 @@ async function fetchFaqs(
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
       type: "faq",
-      id: faq.id,
-      name: faq.question,
-      title: faq.question,
-      summary: faq.answer,
+      id: faq.slug,
+      name: faq.title,
+      title: faq.title,
+      summary: faq.summary,
       category: faq.category,
-      href: `/articles/${faq.userId}/${faq.slug}`,
+      href: `/help/${faq.slug}`,
       createdAt,
       views: 0,
     } as RawApiItem;

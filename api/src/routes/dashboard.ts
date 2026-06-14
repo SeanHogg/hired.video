@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, eq, gte, lt, sql, sum, desc } from "drizzle-orm";
+import { and, count, eq, gte, lt, sql, sum, desc, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppEnv } from "../types/index.js";
 import { success } from "../types/index.js";
@@ -54,33 +54,50 @@ dashboardRoutes.get("/jobseeker", async (c) => {
   const userId = c.var.user.sub;
   const db = getDb();
 
-  const [base, applications, profileStats, conversations, unreadCount] = await Promise.all([
-    buildBase(userId, c.var.user.roles?.[0] ?? "job_seeker"),
+  const [base, applications, profileStats, conversations, unreadCount, publishedResumes, videoResumes] =
+    await Promise.all([
+      buildBase(userId, c.var.user.roles?.[0] ?? "job_seeker"),
 
-    // All applications grouped by status
-    db
-      .select({ status: schema.jobApplications.status, total: count() })
-      .from(schema.jobApplications)
-      .where(eq(schema.jobApplications.userId, userId))
-      .groupBy(schema.jobApplications.status),
+      // All applications grouped by status
+      db
+        .select({ status: schema.jobApplications.status, total: count() })
+        .from(schema.jobApplications)
+        .where(eq(schema.jobApplications.userId, userId))
+        .groupBy(schema.jobApplications.status),
 
-    // Profile-view metrics — delegated to the SSoT so the dashboard,
-    // /api/users/:id/stats, and the profile page stay in lockstep and
-    // read from the unified artifact_views table (gap #1021).
-    getProfileStats(db, userId),
+      // Profile-view metrics — delegated to the SSoT so the dashboard,
+      // /api/users/:id/stats, and the profile page stay in lockstep and
+      // read from the unified artifact_views table (gap #1021).
+      getProfileStats(db, userId),
 
-    // Conversations this user participates in
-    db
-      .select({ conversationId: schema.conversationParticipants.conversationId })
-      .from(schema.conversationParticipants)
-      .where(eq(schema.conversationParticipants.userId, userId)),
+      // Conversations this user participates in
+      db
+        .select({ conversationId: schema.conversationParticipants.conversationId })
+        .from(schema.conversationParticipants)
+        .where(eq(schema.conversationParticipants.userId, userId)),
 
-    // Unread messages count via message read receipts
-    db
-      .select({ total: count() })
-      .from(schema.notifications)
-      .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.isRead, false))),
-  ]);
+      // Unread messages count via message read receipts
+      db
+        .select({ total: count() })
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.userId, userId), eq(schema.notifications.isRead, false))),
+
+      // Published résumés — privacyLevel < 10 means visible to someone
+      // (public / recruiter-only / connections), i.e. "posted" rather
+      // than a private draft. Drives the job-readiness gauge (#2073).
+      db
+        .select({ total: count() })
+        .from(schema.resumeInformation)
+        .where(and(eq(schema.resumeInformation.userId, userId), lt(schema.resumeInformation.privacyLevel, 10))),
+
+      // Video résumés — videos attached to one of the user's résumés.
+      // `video_resumes` was dropped in 0062; association now lives on
+      // videos.resumeId (see schema/videos.ts).
+      db
+        .select({ total: count() })
+        .from(schema.videos)
+        .where(and(eq(schema.videos.userId, userId), isNotNull(schema.videos.resumeId))),
+    ]);
 
   const byStatus = Object.fromEntries(applications.map((a) => [a.status, a.total]));
   const totalApplications = applications.reduce((s, a) => s + a.total, 0);
@@ -107,6 +124,10 @@ dashboardRoutes.get("/jobseeker", async (c) => {
         offersReceived,
         successRate,
         recentApplications: [],
+      },
+      resumeStats: {
+        publishedResumes: publishedResumes[0]?.total ?? 0,
+        videoResumes: videoResumes[0]?.total ?? 0,
       },
       jobMatches: [],
       upcomingInterviews: [],

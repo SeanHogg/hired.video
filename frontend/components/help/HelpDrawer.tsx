@@ -1,18 +1,13 @@
 /**
- * HelpDrawer (#1860-adjacent) — context-aware slide-out help.
+ * HelpDrawer — context-aware slide-out help (v2, content-as-files).
  *
- * Mounted once in AppShell. Self-gating per the DRY rule: it resolves the
- * help mapping for the *current page context* (AIContextType, via the same
- * route→context seam the AI brain uses) and renders a floating "?" trigger
- * only when the page (or the `general` fallback) carries any help. No
- * per-page wiring — a SuperAdmin curating a mapping makes help appear here
- * automatically.
+ * Mounted once in AppShell. Self-gating: renders a floating "?" trigger only
+ * when the current page-context (or the `general` fallback) carries help.
  *
- * Two reading modes inside the drawer:
- *   1. "For this page" — the curated article set for the context.
- *   2. Search — full-text search across all published help content.
- * Cards link to the canonical article page (reusing ArticleView — no second
- * markdown renderer).
+ * Content comes from the bundled catalog (`lib/help/content.ts`) — ZERO DB,
+ * zero fetch for content. The API supplies only META: which slugs map to
+ * this context (cached resolve) and optional semantic-search slug hits.
+ * Keyword search runs in-memory over the bundled corpus.
  */
 
 import { useMemo, useState } from "react";
@@ -32,18 +27,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { detectContextType } from "@/lib/config/page-meta-registry";
 import { helpService } from "@/lib/services/help-service";
+import { helpItemsForSlugs, searchHelpLocal, type HelpItem } from "@/lib/help/content";
 import { cn } from "@/lib/utils";
-import type { HelpArticleCard } from "@shared/help";
 
 const KIND_ICON: Record<string, typeof FileText> = {
   faq: HelpCircle,
   guide: BookOpen,
-  article: FileText,
 };
-
-function articleHref(a: HelpArticleCard): string {
-  return `/articles/${a.userId}/${a.slug}`;
-}
 
 export function HelpDrawer(): JSX.Element | null {
   const { pathname } = useLocation();
@@ -56,7 +46,7 @@ export function HelpDrawer(): JSX.Element | null {
   const contextKey = detectContextType(pathname);
 
   // One cheap, app-wide cached membership query — pages with no help never
-  // trigger the per-context resolve (mirrors MarketingPageVideo's pattern).
+  // trigger the per-context resolve.
   const { data: contextsRes } = useQuery({
     queryKey: ["help-contexts"],
     queryFn: () => helpService.listActiveContexts(),
@@ -67,39 +57,51 @@ export function HelpDrawer(): JSX.Element | null {
   const hasContextHelp = activeContexts.includes(contextKey);
   const hasGeneralHelp = activeContexts.includes("general");
   const hasAnyHelp = hasContextHelp || hasGeneralHelp;
-
-  // Resolve the curated set: prefer the specific context, fall back to general.
   const resolveKey = hasContextHelp ? contextKey : "general";
+
+  // Resolve = META only (slug list); cards come from the bundled catalog.
   const { data: resolveRes, isLoading: resolveLoading } = useQuery({
-    queryKey: ["help-resolve", resolveKey, lang],
+    queryKey: ["help-resolve", resolveKey],
     queryFn: () => helpService.resolve(resolveKey),
     enabled: open && hasAnyHelp,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-  const curated = resolveRes?.data?.articles ?? [];
+  const curated = useMemo<HelpItem[]>(
+    () => helpItemsForSlugs(resolveRes?.data?.slugs ?? [], lang),
+    [resolveRes, lang],
+  );
 
   const trimmed = query.trim();
-  const { data: searchRes, isFetching: searchFetching } = useQuery({
-    queryKey: ["help-search", trimmed, lang],
+  const searching = trimmed.length >= 2;
+
+  // Keyword search is instant + local (bundled corpus). Semantic is a META
+  // call to Vectorize; when it returns hits we render those, else we keep
+  // the local keyword results (graceful, zero-latency baseline).
+  const localResults = useMemo<HelpItem[]>(
+    () => (searching ? searchHelpLocal(trimmed, lang) : []),
+    [searching, trimmed, lang],
+  );
+  const { data: semanticRes } = useQuery({
+    queryKey: ["help-search", trimmed],
     queryFn: () => helpService.search(trimmed),
-    enabled: open && trimmed.length >= 2,
+    enabled: open && searching,
     staleTime: 60 * 1000,
     retry: false,
   });
+  const semanticItems = useMemo<HelpItem[]>(() => {
+    const r = semanticRes?.data;
+    if (!r?.semantic || r.slugs.length === 0) return [];
+    return helpItemsForSlugs(r.slugs, lang);
+  }, [semanticRes, lang]);
 
-  const searching = trimmed.length >= 2;
-  const results = useMemo<HelpArticleCard[]>(
-    () => (searching ? searchRes?.data?.articles ?? [] : curated),
-    [searching, searchRes, curated],
-  );
+  const results = searching ? (semanticItems.length > 0 ? semanticItems : localResults) : curated;
 
-  // Self-gate: render nothing on pages with no help at all.
   if (!hasAnyHelp) return null;
 
-  function openArticle(a: HelpArticleCard): void {
+  function openItem(item: HelpItem): void {
     setOpen(false);
-    navigate(articleHref(a));
+    navigate(`/help/${item.slug}`);
   }
 
   return (
@@ -134,25 +136,23 @@ export function HelpDrawer(): JSX.Element | null {
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto p-3">
-            {(resolveLoading || searchFetching) && results.length === 0 ? (
+            {resolveLoading && !searching ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
             ) : results.length === 0 ? (
               <div className="px-2 py-10 text-center text-sm text-muted-foreground">
-                {searching
-                  ? "No help articles match your search."
-                  : "No suggestions for this page yet."}
+                {searching ? "No help articles match your search." : "No suggestions for this page yet."}
               </div>
             ) : (
               <ul className="space-y-1">
-                {results.map((a) => {
-                  const Icon = KIND_ICON[a.kind] ?? FileText;
+                {results.map((item) => {
+                  const Icon = KIND_ICON[item.kind] ?? FileText;
                   return (
-                    <li key={a.id}>
+                    <li key={item.slug}>
                       <button
                         type="button"
-                        onClick={() => openArticle(a)}
+                        onClick={() => openItem(item)}
                         className={cn(
                           "w-full text-left rounded-lg p-3 transition-colors",
                           "hover:bg-muted focus:bg-muted focus:outline-none group",
@@ -162,16 +162,16 @@ export function HelpDrawer(): JSX.Element | null {
                           <Icon className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm leading-snug">{a.title}</span>
-                              {a.kind !== "article" && (
+                              <span className="font-medium text-sm leading-snug">{item.title}</span>
+                              {item.kind === "guide" && (
                                 <Badge variant="secondary" className="text-[10px] uppercase">
-                                  {a.kind}
+                                  guide
                                 </Badge>
                               )}
                             </div>
-                            {a.summary && (
+                            {item.summary && (
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                {a.summary}
+                                {item.summary}
                               </p>
                             )}
                           </div>

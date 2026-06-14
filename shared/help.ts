@@ -1,68 +1,48 @@
 /**
- * Context-aware help — shared contract.
+ * Context-aware help — shared contract (v2: content-as-files).
  *
- * A SuperAdmin curates which help articles surface on each *kind* of page.
- * The join key is the existing `AIContextType` (the route→context seam in
- * `frontend/lib/config/page-meta-registry.ts` and `@shared/ai-context-types`)
- * — we deliberately reuse that classification instead of inventing a second
- * route-matching scheme (DRY). On any page, the slide-out HelpDrawer resolves
- * its current context key and asks the API for the curated article set.
+ * ARCHITECTURE: help CONTENT (titles, bodies, per-locale variants) lives in
+ * Markdown files bundled into the frontend (`frontend/content/help/*.md`),
+ * served with zero DB/network work and cached as immutable static assets.
+ * The DB is a META store, used strictly for SEARCH + MAPPING:
+ *   - `help_mappings` (context → ordered slug list) — SuperAdmin-curated.
+ *   - Cloudflare Vectorize (vectors keyed by slug) — semantic search.
+ * The DB never stores help content. These DTOs therefore carry SLUGS, not
+ * bodies — the client joins slugs to the bundled content catalog.
  *
- * Lives in `shared/` because the contract is two-sided: the API route +
- * HelpMappingService produce it, the frontend HelpDrawer + admin curation
- * page consume it.
+ * The join key for mappings is `AIContextType` (the AI brain's route→context
+ * seam), reused so help + AI assistance share one route taxonomy.
  */
 
 import type { AIContextType } from "./ai-context-types.js";
 
-/** The page-context a help mapping is keyed on. Identical to the AI brain's
- *  context classification so help + AI assistance share one route taxonomy. */
+/** The page-context a help mapping is keyed on. */
 export type HelpContextKey = AIContextType;
 
-/** A help article projected for the drawer + search results. Mirrors the
- *  fields the article card needs — no body, kept light for list payloads. */
-export interface HelpArticleCard {
-  id: string;
-  slug: string;
-  title: string;
-  summary: string;
-  /** article | faq | guide — drives the card's icon + grouping. */
-  kind: string;
-  /** Author user id — the public article URL is /articles/:userId/:slug. */
-  userId: string;
-  readMinutes: number;
-}
+/** Help item kinds (mirrors the frontmatter `kind`). */
+export const HELP_KINDS = ["faq", "guide"] as const;
+export type HelpKind = (typeof HELP_KINDS)[number];
 
-/** GET /api/help/resolve?context=<key> — the curated set for a context. */
+/** GET /api/help/resolve?context=<key> — the curated slug list for a context.
+ *  The client renders cards by joining these slugs to the bundled catalog. */
 export interface ResolveHelpResponse {
   context: HelpContextKey;
-  articles: HelpArticleCard[];
+  slugs: string[];
 }
 
-/** A single FAQ — `question` is the article title, `answer` its body.
- *  GET /api/help/faqs returns these grouped by category. */
-export interface HelpFaqItem {
-  id: string;
-  slug: string;
-  userId: string;
-  question: string;
-  answer: string;
-}
-
-/** FAQs grouped by category — the shape the Help page's accordion +
- *  the card feed both consume (replaces the old static help-faqs.ts). */
-export interface HelpFaqGroup {
-  category: string;
-  questions: HelpFaqItem[];
+/** GET /api/help/search?q= — semantic-search slug hits (ranked). */
+export interface HelpSearchResponse {
+  slugs: string[];
+  /** True when results came from Vectorize; false when semantic search is
+   *  unavailable (client should fall back to its local keyword index). */
+  semantic: boolean;
 }
 
 /** A single curation row in the SuperAdmin management list. */
 export interface HelpMappingListItem {
   id: string;
   contextKey: HelpContextKey;
-  articleId: string;
-  articleTitle: string;
-  articleKind: string;
+  slug: string;
   position: number;
   isActive: boolean;
   updatedAt: string;
@@ -71,6 +51,16 @@ export interface HelpMappingListItem {
 /** Body for POST /api/help/mappings (SuperAdmin set/curate). */
 export interface SetHelpMappingInput {
   contextKey: HelpContextKey;
-  articleId: string;
+  slug: string;
   position?: number;
+}
+
+/** One item to (re)index for semantic search. The client reads the bundled
+ *  content and sends slug + text; the Worker embeds it (Workers AI) and
+ *  upserts the vector into Vectorize. Body text is transient on the server
+ *  (embedded, never persisted) — content of record stays in the files. */
+export interface HelpIndexItem {
+  slug: string;
+  /** Concatenated title + summary + body used to produce the embedding. */
+  text: string;
 }

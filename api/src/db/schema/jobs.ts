@@ -42,6 +42,15 @@ export const jobItems = pgTable("job_items", {
   // re-parsing description markdown.
   details: jsonb("details").default({}),
   isRemote: boolean("is_remote").default(false).notNull(),
+  // Where the role is performed (#2069). Canonical kebab vocabulary in
+  // shared/work-settings.ts: 'onsite' | 'remote' | 'hybrid'. `is_remote`
+  // above is kept as a derived convenience (work_setting === 'remote').
+  // Nullable for legacy rows until re-saved (migration 0216 backfills
+  // them from is_remote). The two day counts are only meaningful for
+  // hybrid — the weekly split, e.g. 2 on-site / 3 remote.
+  workSetting: varchar("work_setting", { length: 16 }),
+  onsiteDaysPerWeek: integer("onsite_days_per_week"),
+  remoteDaysPerWeek: integer("remote_days_per_week"),
   isActive: boolean("is_active").default(true).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   // Sponsored job listings — paid employer promotion

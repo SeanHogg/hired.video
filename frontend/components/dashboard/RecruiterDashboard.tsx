@@ -1,68 +1,37 @@
 import React from "react";
-import { Briefcase, Target, UserPlus } from "lucide-react";
+import { Users, Send, Award } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import { DashboardFeed } from "./DashboardFeed";
-import NewCandidatesCard from "./shared/NewCandidatesCard";
-import ScheduledInterviewsCard from "./shared/ScheduledInterviewsCard";
+import { DashboardGaugeRow } from "./gauge/DashboardGaugeRow";
+import { buildRecruiterGauge } from "@/lib/dashboard/gauge";
 
-import type { BaseDashboard } from "@/lib/services/dashboard-service";
+import type { RecruiterDashboard as RecruiterDashboardType } from "@/lib/services/dashboard-service";
 
 interface RecruiterDashboardProps {
-  dashboardData: BaseDashboard & {
-    candidateStats?: {
-      totalCandidates: number;
-      newCandidates: number;
-      qualifiedCandidates: number;
-      interviewedCandidates: number;
-    };
-    jobPostingStats?: {
-      activeJobs: number;
-      totalApplications: number;
-      filledPositions: number;
-      averageTimeToFill: number;
-    };
-    recruitmentMetrics?: {
-      placementsMade: number;
-      placementRate: number;
-      averageTimeToHire: number;
-      costPerHire: number;
-    };
-    newCandidates?: Array<{
-      userId: string;
-      name: string;
-      email?: string;
-      role?: string;
-      location?: string;
-      matchScore?: number;
-      appliedAt: Date;
-      jobTitle: string;
-    }>;
-    scheduledInterviews?: Array<{
-      id: string;
-      candidateName: string;
-      jobTitle: string;
-      date: string;
-      time: string;
-      type: string;
-      status: string;
-    }>;
-    messageStats?: {
-      unreadCount: number;
-      totalConversations: number;
-      recentMessages: Array<{
-        conversationId: string;
-        senderName: string;
-        preview: string;
-        sentAt: Date;
-        isRead: boolean;
-      }>;
-    };
-  };
+  dashboardData: RecruiterDashboardType;
   loading?: boolean;
   onRefresh?: () => void;
+}
+
+/** Compact stat tile — mirrors the muted-box idiom used by the other
+ *  role dashboards so the recruiter surface reads consistently. */
+function StatTile({
+  value,
+  label,
+  tone = "text-primary",
+}: {
+  value: React.ReactNode;
+  label: string;
+  tone?: string;
+}) {
+  return (
+    <div className="text-center p-3 bg-muted/30 rounded-lg">
+      <div className={`text-2xl font-bold ${tone}`}>{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
 }
 
 export function RecruiterDashboard({
@@ -96,8 +65,13 @@ export function RecruiterDashboard({
     );
   }
 
+  const { candidateStats, submissionStats, placementStats } = dashboardData;
+
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Role-aware speedometer hero — sourcing-pipeline health + rewards. */}
+      <DashboardGaugeRow primary={buildRecruiterGauge(dashboardData, t)} />
+
       {/* SuperAdmin-curated feed for recruiters (silent when uncurated). */}
       <DashboardFeed />
 
@@ -108,158 +82,69 @@ export function RecruiterDashboard({
         emptyMessage={t("messages.recruitmentMetricsEmpty")}
       />
 
-      {/* Candidate & Job Stats Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Candidate Statistics */}
-        {dashboardData.candidateStats && (
+        {/* Talent pool */}
+        {candidateStats && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
-                {t("headings.candidatePipeline")}
+                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                {t("dashboard.recruiter.talentPool")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                <StatTile value={candidateStats.totalCandidates} label={t("dashboard.recruiter.totalCandidates")} />
+                <StatTile value={candidateStats.activeCandidates} label={t("dashboard.recruiter.activeCandidates")} tone="text-green-600" />
+                <StatTile value={candidateStats.newCandidatesThisMonth} label={t("dashboard.recruiter.newThisMonth")} tone="text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Submission funnel */}
+        {submissionStats && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Send className="h-5 w-5" />
+                {t("dashboard.recruiter.submissionFunnel")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-primary">
-                    {dashboardData.candidateStats.totalCandidates}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.totalCandidates")}
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {dashboardData.candidateStats.newCandidates}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.newThisMonth")}
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {dashboardData.candidateStats.qualifiedCandidates}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{t("metrics.qualified")}</div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {dashboardData.candidateStats.interviewedCandidates}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.interviewed")}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Job Posting Statistics */}
-        {dashboardData.jobPostingStats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                {t("headings.jobPostingPerformance")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-primary">
-                    {dashboardData.jobPostingStats.activeJobs}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.activeJobs")}
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {dashboardData.jobPostingStats.totalApplications}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.totalApplications")}
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {dashboardData.jobPostingStats.filledPositions}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.filledPositions")}
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {dashboardData.jobPostingStats.averageTimeToFill}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {t("metrics.avgDaysToFill")}
-                  </div>
-                </div>
+                <StatTile value={submissionStats.submitted} label={t("dashboard.recruiter.submitted")} />
+                <StatTile value={submissionStats.interviewing} label={t("dashboard.recruiter.interviewing")} tone="text-blue-600" />
+                <StatTile value={submissionStats.offered} label={t("dashboard.recruiter.offered")} tone="text-amber-600" />
+                <StatTile value={submissionStats.placed} label={t("dashboard.recruiter.placed")} tone="text-green-600" />
               </div>
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* Recruitment Metrics */}
-      {dashboardData.recruitmentMetrics && (
+      {/* Placements */}
+      {placementStats && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              {t("headings.recruitmentPerformance")}
+              <Award className="h-5 w-5" />
+              {t("dashboard.recruiter.placements")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
-                  {t("metrics.placementsMade")}
-                </span>
-                <span className="font-semibold text-green-600">
-                  {dashboardData.recruitmentMetrics.placementsMade}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
-                  {t("metrics.placementRate")}
-                </span>
-                <span className="font-semibold">
-                  {dashboardData.recruitmentMetrics.placementRate.toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
-                  {t("metrics.avgTimeToHire")}
-                </span>
-                <span className="font-semibold">
-                  {t("labels.daysValue", { count: dashboardData.recruitmentMetrics.averageTimeToHire })}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-sm text-muted-foreground">
-                  {t("metrics.costPerHire")}
-                </span>
-                <span className="font-semibold">
-                  $
-                  {dashboardData.recruitmentMetrics.costPerHire.toLocaleString()}
-                </span>
-              </div>
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+              <StatTile value={placementStats.totalPlacements} label={t("dashboard.recruiter.totalPlacements")} />
+              <StatTile value={`${placementStats.placementRate}%`} label={t("dashboard.recruiter.placementRate")} tone="text-green-600" />
+              <StatTile
+                value={`$${placementStats.totalCommissionEarned.toLocaleString()}`}
+                label={t("dashboard.recruiter.commissionEarned")}
+                tone="text-purple-600"
+              />
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Lists Row - New Candidates, Interviews */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <NewCandidatesCard candidates={dashboardData.newCandidates} loading={loading} />
-        <ScheduledInterviewsCard interviews={dashboardData.scheduledInterviews} loading={loading} />
-      </div>
-
     </div>
   );
 }

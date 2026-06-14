@@ -1,12 +1,10 @@
 /**
- * HelpMappingService tests.
+ * HelpMappingService tests (v2, slug-keyed meta).
  *
  * Same chainable-Drizzle-stub approach as page-embed-service.test.ts: the
- * service takes its `db` by constructor injection, so we drive it with a
- * stub whose every builder method returns the same thenable and awaiting
- * resolves the next queued result set. We pin the PROJECTION + return
- * shapes (rows → HelpArticleCard, null summary → "", delete → boolean);
- * the SQL is Drizzle's concern.
+ * service takes its `db` by constructor injection. The service deals only in
+ * slugs + meta (content lives in files), so we pin the slug projections +
+ * return shapes; the SQL is Drizzle's concern.
  *
  * Distinct context keys per case avoid the in-isolate cache (getOrSetCached
  * L1 Map) returning a prior case's value.
@@ -37,41 +35,19 @@ function fakeDb(results: unknown[]): DbLike {
 }
 
 describe("HelpMappingService.resolveForContext()", () => {
-  it("projects joined rows into HelpArticleCard, coercing a null summary to ''", async () => {
+  it("returns the ordered slug list for a context", async () => {
     const svc = new HelpMappingService(
-      fakeDb([
-        [
-          {
-            id: "a1",
-            slug: "good-video-resume",
-            title: "What makes a good video resume?",
-            summary: null,
-            kind: "faq",
-            userId: "editorial",
-            readMinutes: 1,
-          },
-        ],
-      ]),
+      fakeDb([[{ slug: "good-video-resume" }, { slug: "edit-video-resume" }]]),
     );
-    const res = await svc.resolveForContext("resume-edit");
-    assert.equal(res.context, "resume-edit");
-    assert.equal(res.articles.length, 1);
-    assert.deepEqual(res.articles[0], {
-      id: "a1",
-      slug: "good-video-resume",
-      title: "What makes a good video resume?",
-      summary: "",
-      kind: "faq",
-      userId: "editorial",
-      readMinutes: 1,
-    });
+    assert.deepEqual(await svc.resolveForContext("resume-edit"), [
+      "good-video-resume",
+      "edit-video-resume",
+    ]);
   });
 
-  it("returns an empty article set for a context with no mappings", async () => {
+  it("returns an empty list for a context with no mappings", async () => {
     const svc = new HelpMappingService(fakeDb([[]]));
-    const res = await svc.resolveForContext("interview-practice");
-    assert.equal(res.context, "interview-practice");
-    assert.deepEqual(res.articles, []);
+    assert.deepEqual(await svc.resolveForContext("interview-practice"), []);
   });
 });
 
@@ -81,6 +57,19 @@ describe("HelpMappingService.listActiveContextKeys()", () => {
       fakeDb([[{ contextKey: "studio" }, { contextKey: "job-list" }]]),
     );
     assert.deepEqual(await svc.listActiveContextKeys(), ["studio", "job-list"]);
+  });
+});
+
+describe("HelpMappingService.searchSemantic()", () => {
+  it("returns no results + semantic:false for a too-short query (no Vectorize call)", async () => {
+    const svc = new HelpMappingService(fakeDb([]));
+    assert.deepEqual(await svc.searchSemantic("a"), { slugs: [], semantic: false });
+  });
+
+  it("reports semantic:false when Vectorize is unbound (local-dev fallback)", async () => {
+    const svc = new HelpMappingService(fakeDb([]));
+    // No VECTORIZE/AI bindings in the test env → semanticSearchHelpIds → null.
+    assert.deepEqual(await svc.searchSemantic("video resume"), { slugs: [], semantic: false });
   });
 });
 

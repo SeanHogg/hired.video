@@ -159,10 +159,20 @@ export const ApplicationStatsSchema = z.object({
   ),
 });
 
+// Résumé publish signals — feeds the job-readiness gauge so it reflects
+// the two actions the dashboard nudges: post a résumé + publish a video
+// résumé (gap #2073). `publishedResumes` counts non-private résumés;
+// `videoResumes` counts videos attached to the user's résumés.
+export const ResumeStatsSchema = z.object({
+  publishedResumes: z.number(),
+  videoResumes: z.number(),
+});
+
 // Job seeker dashboard schema
 export const JobSeekerDashboardSchema = BaseDashboardSchema.extend({
   profileStats: ProfileStatsSchema.optional(),
   applicationStats: ApplicationStatsSchema.optional(),
+  resumeStats: ResumeStatsSchema.optional(),
   jobMatches: z.array(
     z.object({
       jobId: z.string(),
@@ -263,6 +273,46 @@ export const EmployerDashboardSchema = BaseDashboardSchema.extend({
   messageStats: MessageStatsSchema,
 });
 
+// Recruiter dashboard schema — recruiters work a sourcing funnel
+// (talent pool → submissions → placements), NOT owned job postings, so
+// their payload is submission/placement-shaped. Previously the frontend
+// parsed this through BaseDashboardSchema, which silently stripped every
+// field below (gap #2072) — leaving the recruiter dashboard cards and
+// pipeline gauge empty even with live data.
+export const RecruiterCandidateStatsSchema = z.object({
+  totalCandidates: z.number(),
+  newCandidatesThisMonth: z.number(),
+  activeCandidates: z.number(),
+});
+
+export const SubmissionStatsSchema = z.object({
+  total: z.number(),
+  submitted: z.number(),
+  interviewing: z.number(),
+  offered: z.number(),
+  placed: z.number(),
+  withdrawn: z.number(),
+});
+
+export const PlacementStatsSchema = z.object({
+  totalPlacements: z.number(),
+  placementRate: z.number(),
+  totalCommissionEarned: z.number(),
+});
+
+export const RecruiterDashboardSchema = BaseDashboardSchema.extend({
+  candidateStats: RecruiterCandidateStatsSchema.optional(),
+  submissionStats: SubmissionStatsSchema.optional(),
+  placementStats: PlacementStatsSchema.optional(),
+  hiringSuccessMetrics: z
+    .object({
+      submissionToPlacementRate: z.number(),
+      averageTimeToHireDays: z.number(),
+      totalRevenue: z.number(),
+    })
+    .optional(),
+});
+
 // Legacy dashboard stats schema (for backward compatibility)
 export const DashboardStatsSchema = z.object({
   totalJobs: z.number(),
@@ -345,6 +395,8 @@ export type ProfileStats = z.infer<typeof ProfileStatsSchema>;
 export type ApplicationStats = z.infer<typeof ApplicationStatsSchema>;
 export type JobSeekerDashboard = z.infer<typeof JobSeekerDashboardSchema>;
 export type EmployerDashboard = z.infer<typeof EmployerDashboardSchema>;
+export type RecruiterDashboard = z.infer<typeof RecruiterDashboardSchema>;
+export type ResumeStats = z.infer<typeof ResumeStatsSchema>;
 
 // Dashboard service response wrapper
 export interface DashboardResponse<T> {
@@ -588,14 +640,22 @@ export class DashboardService {
   /**
    * Get recruiter specific dashboard data
    */
-  async getRecruiterDashboard(): Promise<DashboardResponse<BaseDashboard>> {
+  async getRecruiterDashboard(): Promise<DashboardResponse<RecruiterDashboard>> {
     try {
       const response = (await apiClient.get(
         "/api/userdashboard/recruiter",
       )) as { data: any };
-      const dashboard = BaseDashboardSchema.parse(response.data);
 
-      return { success: true, data: dashboard };
+      // Lenient parse (mirrors getJobSeekerDashboard) — keep the rich
+      // submission/placement payload even if a field drifts, rather than
+      // throwing the whole dashboard away.
+      const parsed = RecruiterDashboardSchema.safeParse(response.data);
+      if (!parsed.success) {
+        console.warn("[dashboard] Recruiter schema validation warning:", parsed.error.issues);
+        return { success: true, data: response.data as unknown as RecruiterDashboard };
+      }
+
+      return { success: true, data: parsed.data };
     } catch (error) {
       console.error("Error creating recruiter dashboard:", error);
       return {

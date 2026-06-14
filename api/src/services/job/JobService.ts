@@ -3,6 +3,7 @@ import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { classifyJobSector } from "../../../../shared/sectors.js";
 import { normalizeEmploymentType } from "../../../../shared/employment-types.js";
+import { normalizeWorkSetting, normalizeHybridDays } from "../../../../shared/work-settings.js";
 import type { LLMClient } from "../adapters/llm-client.js";
 import { canViewerManageJob } from "../jobs/jobOwnership.js";
 import { bumpSearchVersion } from "../../utils/search-cache.js";
@@ -304,6 +305,10 @@ export interface JobQuery {
   salaryMin?: number;
   salaryMax?: number;
   isRemote?: boolean;
+  /** Work-setting facet (#2069): 'onsite' | 'remote' | 'hybrid'. Maps to
+   *  `job_items.work_setting` via the partial index from migration 0216.
+   *  Lets candidates filter for hybrid roles, which `isRemote` could not. */
+  workSetting?: string;
   /** Sector filter (#1168). Maps to `job_items.sector` via the partial
    *  index from migration 0112. */
   sector?: string;
@@ -329,6 +334,15 @@ export interface JobEntity extends JobSummaryDTO {
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
+  // Structured sections from the `details` jsonb bag — always populated by
+  // `rowToJob` (empty arrays when absent). Declared here so consumers don't
+  // need an `as any` to read what the serializer guarantees.
+  responsibilities?: string[];
+  requirements?: string[];
+  qualifications?: string[];
+  benefits?: string[];
+  /** Backwards-compat JSON string of the four structured sections. */
+  jobSerialized?: string;
   /** Mirrors `createdBy` so frontend code keyed on `userId`
    *  (`useEntityOwnership`, `JobCard`, etc.) can derive ownership without
    *  every call site having to coalesce `createdBy || userId`. */
@@ -367,6 +381,11 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     salaryCurrency: row.salaryCurrency ?? "USD",
     skills: (row.skillsRequired as string[]) ?? [],
     isRemote: row.isRemote,
+    // #2069 — first-class work setting + hybrid day-split. Falls back to
+    // is_remote for legacy rows the 0216 backfill hasn't reached.
+    workSetting: (row as any).workSetting ?? (row.isRemote ? "remote" : "onsite"),
+    onsiteDaysPerWeek: (row as any).onsiteDaysPerWeek ?? null,
+    remoteDaysPerWeek: (row as any).remoteDaysPerWeek ?? null,
     isActive: row.isActive,
     slug: row.id,
     postedDate: new Date(row.createdAt).toISOString(),
@@ -450,6 +469,9 @@ export async function getPublicJobs(filters?: JobQuery,
       : undefined,
     filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,
     filters?.isRemote !== undefined ? eq(jobItems.isRemote, filters.isRemote) : undefined,
+    filters?.workSetting
+      ? eq((jobItems as any).workSetting, normalizeWorkSetting(filters.workSetting) ?? filters.workSetting)
+      : undefined,
     filters?.salaryMin !== undefined ? gte(jobItems.salaryMin as any, String(filters.salaryMin)) : undefined,
     filters?.salaryMax !== undefined ? lte(jobItems.salaryMax as any, String(filters.salaryMax)) : undefined,
     filters?.sector ? eq((jobItems as any).sector, filters.sector) : undefined);
@@ -501,20 +523,119 @@ export async function getJobById(id: string,
   return dto;
 }
 
+/** Keys that live inside the `job_items.details` jsonb bag rather than as
+ *  their own column. Single-sourced so create + update agree. */
+const DETAIL_KEYS = ["responsibilities", "requirements", "qualifications", "benefits"] as const;
+
+/** First non-empty value of a single-or-array wire field (the form ships
+ *  employmentType / seniority as arrays; the scraper ships single strings). */
+function firstOf(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v.find((x) => typeof x === "string" && x.trim() !== "");
+  return typeof v === "string" && v.trim() !== "" ? v : undefined;
+}
+
+/** Extract the subset of detail-bag keys present on the DTO. Returns
+ *  `undefined` when none are present so callers can skip touching the
+ *  `details` column entirely. */
+export function extractDetailsPatch(job: Partial<CreateJobDTO>): Record<string, string[]> | undefined {
+  let patch: Record<string, string[]> | undefined;
+  for (const key of DETAIL_KEYS) {
+    const val = (job as Record<string, unknown>)[key];
+    if (val !== undefined) {
+      (patch ??= {})[key] = Array.isArray(val) ? (val as string[]) : [];
+    }
+  }
+  return patch;
+}
+
+/**
+ * Single source of truth mapping the wire DTO → `job_items` scalar column
+ * patch (#878). Used by BOTH `createJob` and `updateJob` so the editable
+ * surface can never drift between the two paths again — the previous
+ * hand-rolled per-field SET clauses silently dropped ~15 fields on PUT.
+ *
+ * Only keys actually present on `job` are emitted, so it doubles as the
+ * partial-update patch. The `details` jsonb bag is handled separately
+ * (see `extractDetailsPatch`) because create writes a fresh object while
+ * update merges into the existing one.
+ */
+export function buildJobColumnPatch(job: Partial<CreateJobDTO>): Record<string, unknown> {
+  const p: Record<string, unknown> = {};
+  if (job.title !== undefined) p.title = job.title;
+  if (job.description !== undefined) p.description = job.description;
+  if (job.company !== undefined) p.company = job.company;
+  if (job.location !== undefined) p.location = job.location;
+  if (job.heroImageUrl !== undefined) p.heroImageUrl = job.heroImageUrl ?? null;
+  if (job.videoProjectId !== undefined) p.videoProjectId = job.videoProjectId ?? null;
+  if (job.sector !== undefined) p.sector = job.sector || null;
+  if (job.skills !== undefined) p.skillsRequired = job.skills;
+  if (job.applyUrl !== undefined) p.applyUrl = job.applyUrl || null;
+
+  // employmentType (single-or-array, any spelling) → canonical kebab job_type.
+  if (job.employmentType !== undefined) {
+    const first = firstOf(job.employmentType);
+    p.jobType = first ? (normalizeEmploymentType(first) ?? first) : null;
+  }
+  // seniority / experienceLevel (either wire name) → experience_level.
+  if (job.seniority !== undefined || job.experienceLevel !== undefined) {
+    p.experienceLevel = firstOf(job.seniority) ?? job.experienceLevel ?? null;
+  }
+  if (job.salaryMin !== undefined) p.salaryMin = job.salaryMin == null ? null : String(job.salaryMin);
+  if (job.salaryMax !== undefined) p.salaryMax = job.salaryMax == null ? null : String(job.salaryMax);
+  if (job.currency !== undefined) p.salaryCurrency = job.currency || "USD";
+
+  // Work setting (#2069): store the canonical 'onsite'|'remote'|'hybrid'
+  // value AND keep `is_remote` as a derived convenience. Hybrid carries a
+  // weekly day-split; the days are forced null for onsite/remote.
+  if (job.workSetting !== undefined) {
+    const ws = normalizeWorkSetting(job.workSetting);
+    p.workSetting = ws;
+    // isRemote derives from the setting unless the caller pinned it explicitly.
+    if (job.isRemote === undefined) p.isRemote = ws === "remote";
+    const { onsiteDaysPerWeek, remoteDaysPerWeek } = normalizeHybridDays(
+      ws,
+      job.onsiteDaysPerWeek,
+      job.remoteDaysPerWeek,
+    );
+    p.onsiteDaysPerWeek = onsiteDaysPerWeek;
+    p.remoteDaysPerWeek = remoteDaysPerWeek;
+  } else if (
+    (job.onsiteDaysPerWeek !== undefined || job.remoteDaysPerWeek !== undefined)
+  ) {
+    // Day-split edited without re-sending workSetting — clamp the raw values;
+    // they only render when the stored setting is hybrid.
+    if (job.onsiteDaysPerWeek !== undefined) {
+      p.onsiteDaysPerWeek = job.onsiteDaysPerWeek == null ? null : Math.max(0, Math.min(7, Math.round(job.onsiteDaysPerWeek)));
+    }
+    if (job.remoteDaysPerWeek !== undefined) {
+      p.remoteDaysPerWeek = job.remoteDaysPerWeek == null ? null : Math.max(0, Math.min(7, Math.round(job.remoteDaysPerWeek)));
+    }
+  }
+  // Explicit isRemote always wins when provided.
+  if (job.isRemote !== undefined) p.isRemote = job.isRemote;
+
+  // Publish state: `status` (Open=published) wins; else legacy isPublic.
+  if (job.status !== undefined) p.isActive = job.status.toLowerCase() === "open";
+  else if (job.isPublic !== undefined) p.isActive = job.isPublic;
+
+  if (job.expirationDate !== undefined) {
+    const d = job.expirationDate ? new Date(job.expirationDate) : null;
+    p.expiresAt = d && !Number.isNaN(d.getTime()) ? d : null;
+  }
+  return p;
+}
+
 export async function createJob(job: CreateJobDTO, userId: string,
   deps?: Partial<JobServiceDeps>): Promise<JobEntity> {
   const d = resolveDeps(deps); const db = d.db;
+  const detailsPatch = extractDetailsPatch(job);
   const [row] = await db
     .insert(jobItems)
     .values({
       postedByUserId: userId,
-      title: job.title,
-      description: job.description,
-      location: job.location,
-      heroImageUrl: job.heroImageUrl ?? null,
-      videoProjectId: (job as any).videoProjectId ?? null,
-      sector: job.sector ?? null,
-      isRemote: false,
+      ...buildJobColumnPatch(job),
+      // Fresh row: write the detail bag directly (no existing object to merge).
+      ...(detailsPatch ? { details: detailsPatch } : {}),
     } as any)
     .returning();
   bumpSearchVersion();
@@ -1241,18 +1362,20 @@ export async function updateJob(id: string,
   userId: string,
   deps?: Partial<JobServiceDeps>): Promise<JobEntity | null> {
   const d = resolveDeps(deps); const db = d.db;
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (jobData.title !== undefined) updates.title = jobData.title;
-  if (jobData.description !== undefined) updates.description = jobData.description;
-  if (jobData.location !== undefined) updates.location = jobData.location;
-  if (jobData.heroImageUrl !== undefined) updates.heroImageUrl = jobData.heroImageUrl;
-  if ((jobData as any).videoProjectId !== undefined) updates.videoProjectId = (jobData as any).videoProjectId;
-  if (jobData.sector !== undefined) updates.sector = jobData.sector || null;
-  // Wire field `skills` maps to DB column `skills_required`. Without
-  // this branch, the Skill Extractor's "Add to Job" save returned 200
-  // but never persisted anything — Zod stripped the unknown field at
-  // the route boundary AND the service ignored it (2026-05-04 fix).
-  if (jobData.skills !== undefined) updates.skillsRequired = jobData.skills;
+  // Single source of truth for the scalar column mapping — shared with
+  // createJob so the editable surface can't drift (#878). Previously this
+  // hand-rolled a 5-field SET clause and silently dropped requirements,
+  // responsibilities, employmentType, salary, status, expiry, etc.: the
+  // save returned 200 but persisted nothing.
+  const updates: Record<string, unknown> = { ...buildJobColumnPatch(jobData), updatedAt: new Date() };
+
+  // Detail-bag keys live in the `details` jsonb column. Merge (not
+  // replace) so editing only "requirements" doesn't wipe a previously
+  // saved "benefits" list. `|| '{}'` guards legacy null rows.
+  const detailsPatch = extractDetailsPatch(jobData);
+  if (detailsPatch) {
+    updates.details = sql`coalesce(${jobItems.details}, '{}'::jsonb) || ${JSON.stringify(detailsPatch)}::jsonb`;
+  }
 
   const [row] = await db
     .update(jobItems)

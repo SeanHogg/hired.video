@@ -94,6 +94,9 @@ export const CreateJobSchema = z.object({
     )
     .optional(),
   workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).optional(),
+  // Hybrid weekly split (#2069) — only sent/meaningful when workSetting is Hybrid.
+  onsiteDaysPerWeek: z.number().int().min(0).max(7).optional().nullable(),
+  remoteDaysPerWeek: z.number().int().min(0).max(7).optional().nullable(),
   expirationDate: z.string().optional(),
   status: z.enum(["Draft", "Open", "Closed", "Hired"]).optional(),
 });
@@ -115,6 +118,8 @@ export const JobFiltersSchema = z.object({
   salaryMin: z.number().optional(),
   salaryMax: z.number().optional(),
   isRemote: z.boolean().optional(),
+  // Work-setting facet (#2069): onsite | remote | hybrid.
+  workSetting: z.string().optional(),
   companyId: z.string().optional(),
   // AI-resilient sector filter (#1168). Backend `/api/Job/public` reads
   // this and joins against the partial sector index from migration 0112.

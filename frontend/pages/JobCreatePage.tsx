@@ -108,6 +108,10 @@ const buildJobCreateSchema = (t: (key: string) => string) =>
       )
       .min(1, t("errors.experienceLevelRequired")),
     workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).default("Onsite"),
+    // Hybrid weekly split (#2069) — e.g. 2 days on-site, 3 days remote.
+    // Only surfaced + sent when workSetting === "Hybrid".
+    onsiteDaysPerWeek: z.number().int().min(0).max(7).optional(),
+    remoteDaysPerWeek: z.number().int().min(0).max(7).optional(),
     isRemote: z.boolean().optional(),
     isPublic: z.boolean().optional(),
     salaryMin: z.number().optional(),
@@ -550,6 +554,12 @@ export default function JobCreatePage() {
         employmentType: data.employmentType,
         seniority: data.seniority,
         workSetting: data.workSetting,
+        // Only send the hybrid split for hybrid roles (#2069); the backend
+        // forces them null otherwise, but this keeps the payload honest.
+        onsiteDaysPerWeek:
+          data.workSetting === "Hybrid" ? data.onsiteDaysPerWeek : undefined,
+        remoteDaysPerWeek:
+          data.workSetting === "Hybrid" ? data.remoteDaysPerWeek : undefined,
         expirationDate: data.expirationDate,
         status: data.status,
         salaryMin: data.salaryMin,
@@ -1112,6 +1122,39 @@ export default function JobCreatePage() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* Hybrid weekly split (#2069) — only shown for Hybrid.
+                          Captures e.g. "2 days on-site, 3 days remote". */}
+                      {watchedValues.workSetting === "Hybrid" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="onsiteDaysPerWeek">
+                              {t("labels.workSetting.onsiteDaysPerWeek", "On-site days / week")}
+                            </Label>
+                            <Input
+                              id="onsiteDaysPerWeek"
+                              type="number"
+                              min={0}
+                              max={7}
+                              placeholder="2"
+                              {...register("onsiteDaysPerWeek", { valueAsNumber: true })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="remoteDaysPerWeek">
+                              {t("labels.workSetting.remoteDaysPerWeek", "Remote days / week")}
+                            </Label>
+                            <Input
+                              id="remoteDaysPerWeek"
+                              type="number"
+                              min={0}
+                              max={7}
+                              placeholder="3"
+                              {...register("remoteDaysPerWeek", { valueAsNumber: true })}
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       {/* Experience Level */}
                       <div className="space-y-2">

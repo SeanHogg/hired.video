@@ -56,38 +56,30 @@ async function embed(
   }
 }
 
-/** Upsert one help article's embedding. Best-effort no-op when bindings
- *  are absent or embedding fails — callers never depend on the result. */
+/** Upsert one help item's embedding, keyed by content slug. Best-effort
+ *  no-op when bindings are absent or embedding fails — callers never depend
+ *  on the result. The text is embedded then discarded; it is never stored. */
 export async function upsertHelpEmbedding(input: {
-  articleId: string;
-  kind: string;
-  title: string;
-  summary: string;
-  body: string;
+  slug: string;
+  text: string;
 }): Promise<void> {
   const b = getVectorizeBindings();
   if (!b) return;
-  const text = [input.title, input.summary, input.body]
-    .filter(Boolean)
-    .join("\n")
-    .slice(0, 4000);
-  const values = await embed(b.ai, text);
+  const values = await embed(b.ai, input.text.slice(0, 4000));
   if (!values) return;
   try {
-    await b.vectorize.upsert([
-      { id: input.articleId, values, metadata: { kind: input.kind } },
-    ]);
+    await b.vectorize.upsert([{ id: input.slug, values }]);
   } catch {
     /* best-effort */
   }
 }
 
-/** Remove an article's embedding (on unpublish / delete). */
-export async function deleteHelpEmbedding(articleId: string): Promise<void> {
+/** Remove a help item's embedding by slug. */
+export async function deleteHelpEmbedding(slug: string): Promise<void> {
   const b = getVectorizeBindings();
   if (!b) return;
   try {
-    await b.vectorize.deleteByIds([articleId]);
+    await b.vectorize.deleteByIds([slug]);
   } catch {
     /* best-effort */
   }

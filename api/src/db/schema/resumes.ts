@@ -64,8 +64,12 @@ export const resumeInformation = pgTable("resume_information", {
   // Partial index for the slug-keyed `/api/resumes/:id` lookup path —
   // see migration 0141 + gap #1588 (slug-keyed reads were sequentially
   // scanning the table and contributing to the Worker CPU exhaustion
-  // that took down save-draft on 2026-05-26).
-  index("resume_information_slug_idx").on(table.slug),
+  // that took down save-draft on 2026-05-26). `WHERE slug IS NOT NULL`
+  // keeps the index small (most rows have a NULL slug) and MUST match
+  // migration 0141 exactly so `db:push` doesn't try to recreate it.
+  index("resume_information_slug_idx")
+    .on(table.slug)
+    .where(sql`${table.slug} IS NOT NULL`),
 ]);
 
 export type ResumeInformation = typeof resumeInformation.$inferSelect;
