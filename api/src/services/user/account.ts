@@ -20,6 +20,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "../../middleware/e
 import { splitName } from "./userActor.js";
 import { sendInvitationEmail } from "../adapters/email.js";
 import { revokeAllSessionsForUser } from "../auth/sessions.js";
+import { UsageService } from "../usage/UsageService.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -998,6 +999,14 @@ export async function deleteAccount(userId: string,
   await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.userId, userId));
   await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.userId, userId));
   await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.userId, userId));
+
+  // GDPR erasure of usage history (gap #2067). The `usage_sessions.user_id` FK
+  // is ON DELETE SET NULL and this path soft-deletes (anonymizes) rather than
+  // hard-deleting the users row, so the cascade never fires — without an
+  // explicit erase, a leaving user's tracked sessions/events (cascade) would
+  // persist forever bound to their original id. Hard-DELETE here (not anonymize)
+  // because usage rows carry no standalone audit value once the human is gone.
+  await new UsageService(d.repos.usageTracking).eraseForUser(userId);
 
   return result;
 }

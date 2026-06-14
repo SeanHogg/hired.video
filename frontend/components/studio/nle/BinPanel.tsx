@@ -41,7 +41,7 @@ import { nleApi, type NleMediaSourceWithBin } from "@/lib/timeline/api";
 import { promptDialog } from "@/lib/dialogs";
 import { NLE_SOURCE_DRAG_MIME } from "@/lib/timeline/dnd";
 import { probeSource } from "@/lib/timeline/source-probe";
-import { generateProxy, isProxyGenerationAvailable } from "@/lib/timeline/proxy-generator";
+import { maybeGenerateAndUploadProxy } from "@/lib/timeline/source-upload";
 import {
   buildBinFolderTree,
   folderMatches,
@@ -50,10 +50,6 @@ import {
 } from "@/lib/timeline/bin-folder-tree";
 import { useToast } from "@/hooks/use-toast";
 import RelinkSourceDialog from "./RelinkSourceDialog";
-
-/** Heights above this trigger automatic proxy generation on upload (#355).
- *  Below this, scrubbing the master is already fast enough. */
-const AUTO_PROXY_HEIGHT_THRESHOLD = 1080;
 
 interface Props {
   /** Optional pre-fetched list — when present, the panel skips the
@@ -181,32 +177,26 @@ export default function BinPanel({ initial, onPickSource }: Props) {
               description: file.name,
             });
           }
-          // Auto-generate proxy in the background for tall masters that
-          // would scrub poorly. Skip when the row already carries a
-          // proxyUrl (server dedupe), when the source isn't video, or
-          // when WebCodecs is unavailable. Errors are swallowed —
-          // proxies are an optimisation, not a correctness gate.
-          if (
-            probed.kind === "video" &&
-            (probed.height ?? 0) > AUTO_PROXY_HEIGHT_THRESHOLD &&
-            !(upload.source as { proxyUrl?: string | null }).proxyUrl &&
-            isProxyGenerationAvailable()
-          ) {
-            void (async () => {
-              try {
-                const proxy = await generateProxy(file);
-                const updated = await nleApi.uploadProxy(upload.source.id, proxy.blob);
-                setSources((prev) =>
-                  prev.map((s) =>
-                    s.id === updated.source.id
-                      ? { ...updated.source, binFolder: s.binFolder, tags: s.tags }
-                      : s,
-                  ),
-                );
-              } catch (proxyErr) {
-                console.warn("[nle] auto-proxy generation failed:", proxyErr);
-              }
-            })();
+          // Auto-generate a scrubbing proxy in the background for tall
+          // masters. The decision + generate→upload glue lives in
+          // `maybeGenerateAndUploadProxy` (shared with the relink flow).
+          // Skip when server dedupe already returned a proxy for this same
+          // content — `forceRefresh` stays false so an existing proxy is
+          // left untouched.
+          if (!upload.source.proxyUrl) {
+            void maybeGenerateAndUploadProxy(upload.source.id, file, {
+              kind: probed.kind,
+              height: probed.height,
+            }).then((updated) => {
+              if (!updated) return;
+              setSources((prev) =>
+                prev.map((s) =>
+                  s.id === updated.id
+                    ? { ...updated, binFolder: s.binFolder, tags: s.tags }
+                    : s,
+                ),
+              );
+            });
           }
         } catch (err) {
           toast({

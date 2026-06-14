@@ -225,14 +225,14 @@ describe("handleGetNotifications", () => {
     assert.equal(typeof data.emailJobMatches, "boolean");
   });
 
-  it("maps stored email flags into the notification DTO keys", async () => {
+  it("hydrates the full granular matrix from legacy coarse columns (pre-migration row)", async () => {
     const deps = makeDeps({
       accountPreferences: [{
         id: "p1", userId: "user-1",
         emailNotificationsEnabled: true,
         weeklyDigestEnabled: false,
         marketingEmailsEnabled: true,
-        jobAlertEmailsEnabled: false,
+        // No notificationPreferences blob — simulates a row from before 0480.
       }],
     });
     const res = await handleGetNotifications(deps, "user-1");
@@ -241,7 +241,23 @@ describe("handleGetNotifications", () => {
     assert.equal(data.emailApplicationUpdates, true);
     assert.equal(data.emailWeeklyDigest, false);
     assert.equal(data.emailMarketingUpdates, true);
-    assert.equal(data.jobAlertEmailsEnabled, false);
+    // Push/SMS toggles fall back to defaults when there's no stored blob.
+    assert.equal(data.pushMessages, true);
+    assert.equal(data.smsImportantUpdates, false);
+  });
+
+  it("returns the stored granular blob verbatim when present (post-migration row)", async () => {
+    const deps = makeDeps({
+      accountPreferences: [{
+        id: "p1", userId: "user-1",
+        emailNotificationsEnabled: true,
+        notificationPreferences: { pushMessages: false, emailMarketingUpdates: true },
+      }],
+    });
+    const data = (await handleGetNotifications(deps, "user-1") as any).body.data;
+    assert.equal(data.pushMessages, false);           // from the blob
+    assert.equal(data.emailMarketingUpdates, true);   // from the blob
+    assert.equal(data.emailJobMatches, true);         // filled from defaults
   });
 
   it("returns 401 for anonymous callers", async () => {
@@ -252,19 +268,44 @@ describe("handleGetNotifications", () => {
 });
 
 describe("handleUpdateNotifications", () => {
-  it("persists the 4 underlying column flags derived from the DTO keys", async () => {
+  it("persists the full granular blob AND derives the coarse legacy columns", async () => {
     const deps = makeDeps();
     await handleUpdateNotifications(deps, "user-1", {
       emailJobMatches: true,
       emailWeeklyDigest: false,
       emailMarketingUpdates: true,
-      jobAlertEmailsEnabled: false,
+      pushMessages: false,
     });
     const row = deps._state.accountPreferences[0];
-    assert.equal(row.emailNotificationsEnabled, true);
+    // Granular blob persisted with the user's exact choices.
+    assert.equal(row.notificationPreferences.emailWeeklyDigest, false);
+    assert.equal(row.notificationPreferences.emailMarketingUpdates, true);
+    assert.equal(row.notificationPreferences.pushMessages, false);
+    // Coarse legacy columns derived from the granular matrix.
+    assert.equal(row.emailNotificationsEnabled, true);   // any transactional email on
     assert.equal(row.weeklyDigestEnabled, false);
     assert.equal(row.marketingEmailsEnabled, true);
-    assert.equal(row.jobAlertEmailsEnabled, false);
+  });
+
+  it("merges a partial patch over the current matrix instead of wiping the rest", async () => {
+    const deps = makeDeps({
+      accountPreferences: [{
+        id: "p1", userId: "user-1",
+        notificationPreferences: { pushMessages: false, emailMessages: false },
+      }],
+    });
+    // Patch only one toggle.
+    await handleUpdateNotifications(deps, "user-1", { pushMessages: true });
+    const blob = deps._state.accountPreferences[0].notificationPreferences;
+    assert.equal(blob.pushMessages, true);    // patched
+    assert.equal(blob.emailMessages, false);  // prior choice preserved
+  });
+
+  it("returns the merged matrix to the caller", async () => {
+    const deps = makeDeps();
+    const res = await handleUpdateNotifications(deps, "user-1", { pushMessages: false });
+    assert.equal(res.status, 200);
+    assert.equal((res.body as any).data.pushMessages, false);
   });
 });
 

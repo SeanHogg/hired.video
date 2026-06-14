@@ -14,6 +14,12 @@ import {
   defaultSecuritySettings,
   sanitizeAccountUpdates,
 } from "../services/user/settings.js";
+import { mergeNotificationPreferences } from "../../../shared/notification-preferences.js";
+import {
+  granularToLegacy,
+  invalidateNotificationPreferences,
+  resolvePreferencesFromRow,
+} from "../services/notifications/preferences.js";
 
 const { accountPreferences, cookiePreferences, jobPreferences, users, privacyPreferences } = schema;
 
@@ -65,16 +71,7 @@ settingsRoutes.get("/", async (c) => {
   const [user] = await db.select({ mfaEnabled: users.mfaEnabled }).from(users).where(eq(users.id, uid)).limit(1);
 
   return c.json(success({
-    notifications: {
-      emailJobMatches: prefs?.emailNotificationsEnabled ?? true,
-      emailApplicationUpdates: prefs?.emailNotificationsEnabled ?? true,
-      emailMessages: prefs?.emailNotificationsEnabled ?? true,
-      emailConnectionRequests: prefs?.emailNotificationsEnabled ?? true,
-      emailWeeklyDigest: prefs?.weeklyDigestEnabled ?? true,
-      emailMarketingUpdates: prefs?.marketingEmailsEnabled ?? false,
-      pushJobMatches: true, pushApplicationUpdates: true, pushMessages: true, pushConnectionRequests: true,
-      smsImportantUpdates: false, smsSecurityAlerts: true,
-    },
+    notifications: prefs ? resolvePreferencesFromRow(prefs) : defaultNotificationPreferences(),
     privacy: await loadPrivacy(uid),
     jobPreferences: jobPrefs ? {
       ...defaultJobPreferences(),
@@ -96,7 +93,7 @@ settingsRoutes.get("/notifications", async (c) => {
   const db = getDb();
   const [prefs] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
   if (!prefs) return c.json(success(defaultNotificationPreferences()), 200);
-  return c.json(success({ ...defaultNotificationPreferences(), emailJobMatches: prefs.emailNotificationsEnabled, emailApplicationUpdates: prefs.emailNotificationsEnabled, emailMessages: prefs.emailNotificationsEnabled, emailConnectionRequests: prefs.emailNotificationsEnabled, emailWeeklyDigest: prefs.weeklyDigestEnabled, emailMarketingUpdates: prefs.marketingEmailsEnabled, jobAlertEmailsEnabled: prefs.jobAlertEmailsEnabled }), 200);
+  return c.json(success(resolvePreferencesFromRow(prefs)), 200);
 });
 
 settingsRoutes.put("/notifications", async (c) => {
@@ -104,9 +101,15 @@ settingsRoutes.put("/notifications", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
-  const updates = { emailNotificationsEnabled: body.emailJobMatches ?? body.emailMessages ?? true, marketingEmailsEnabled: body.emailMarketingUpdates ?? false, jobAlertEmailsEnabled: body.jobAlertEmailsEnabled ?? true, weeklyDigestEnabled: body.emailWeeklyDigest ?? true, updatedAt: new Date() };
+  // Merge the partial patch over the user's current persisted matrix, then
+  // persist the full granular blob + the derived coarse columns and drop the
+  // dispatcher's cached copy. SSoT = shared/notification-preferences.ts (#254).
+  const [existing] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
+  const next = mergeNotificationPreferences(body, resolvePreferencesFromRow(existing));
+  const updates = { notificationPreferences: next, ...granularToLegacy(next), updatedAt: new Date() };
   await db.insert(accountPreferences).values({ userId: uid, ...updates } as any).onConflictDoUpdate({ target: accountPreferences.userId, set: updates as any });
-  return c.json(success({ ...defaultNotificationPreferences(), ...body }), 200);
+  invalidateNotificationPreferences(uid);
+  return c.json(success(next), 200);
 });
 
 settingsRoutes.get("/privacy", async (c) => {

@@ -49,6 +49,12 @@ import {
 } from "../../repositories/peopleGoalsRepository.js";
 import type { OneOnOneAgendaItem, KeyResult } from "../../../../shared/people-ops.js";
 import type { PeopleSegmentScope } from "../../services/people-ops/segment.js";
+import {
+  createPeopleOpsEventSink,
+  noopPeopleOpsEventSink,
+  type PeopleOpsEventSink,
+} from "./events.js";
+import { buildRepos } from "../../repositories/index.js";
 
 export type ServiceErrorCode =
   | "NOT_FOUND"
@@ -73,7 +79,15 @@ export interface PeopleOpsServiceDeps {
   /** Active company members (the billable-seat set) for the segment's
    *  company — drives roster materialization + billability. */
   getActiveCompanyMembers: (companyId: string) => Promise<MemberIdentity[]>;
+  /** Audit + inbox-notification sink for roster/1:1/action-item mutations
+   *  (#1824). Fire-and-forget; defaults to a no-op so tests need not wire it. */
+  events?: PeopleOpsEventSink;
   now: () => Date;
+}
+
+/** Display name for an audit/notification payload. */
+function employeeName(row: { firstName?: string | null; lastName?: string | null }): string {
+  return `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim() || "Employee";
 }
 
 function splitName(name: string): { firstName: string; lastName: string } {
@@ -111,12 +125,19 @@ async function fetchActiveCompanyMembers(companyId: string): Promise<MemberIdent
 
 export function defaultPeopleOpsServiceDeps(): PeopleOpsServiceDeps {
   const db = getDb();
+  const employees = new PeopleEmployeesRepository(db);
+  const repos = buildRepos(db);
   return {
-    employees: new PeopleEmployeesRepository(db),
+    employees,
     oneOnOnes: new PeopleOneOnOnesRepository(db),
     actionItems: new PeopleActionItemsRepository(db),
     goals: new PeopleGoalsRepository(db),
     getActiveCompanyMembers: fetchActiveCompanyMembers,
+    events: createPeopleOpsEventSink({
+      audit: repos.audit,
+      notify: { repos },
+      employees,
+    }),
     now: () => new Date(),
   };
 }
@@ -184,13 +205,27 @@ const ONE_ON_ONE_TEMPLATES: OneOnOneTemplate[] = [
 
 export class PeopleOpsService {
   private readonly now: () => Date;
+  private readonly events: PeopleOpsEventSink;
   constructor(private readonly deps: PeopleOpsServiceDeps) {
     this.now = deps.now ?? (() => new Date());
+    this.events = deps.events ?? noopPeopleOpsEventSink;
   }
 
   private scope(s: PeopleSegmentScope): SegmentScope {
     return { tenantId: s.tenantId, segmentId: s.segmentId };
   }
+
+  /** Names of the roster fields that constitute a "role change" — a change to
+   *  any of these on updateEmployee is treated as a promotion/move and both
+   *  audited and notified to the employee (#1824). */
+  private static readonly ROLE_CHANGE_FIELDS: {
+    key: keyof UpdateEmployeeInput;
+    label: string;
+  }[] = [
+    { key: "position", label: "position" },
+    { key: "department", label: "department" },
+    { key: "managerId", label: "manager" },
+  ];
 
   /** Materialize active company members into the roster (idempotent) and
    *  return the set of billable user ids. Called before every roster read so
@@ -233,7 +268,11 @@ export class PeopleOpsService {
    * brand-new user by email — creating an account_invitation — is a tracked
    * follow-up; this never auto-charges a seat.)
    */
-  async createEmployee(s: PeopleSegmentScope, input: NewEmployeeInput): Promise<RosterEmployee> {
+  async createEmployee(
+    s: PeopleSegmentScope,
+    input: NewEmployeeInput,
+    actorUserId?: string,
+  ): Promise<RosterEmployee> {
     const scope = this.scope(s);
     const billable = await this.syncMembers(s);
 
@@ -262,6 +301,12 @@ export class PeopleOpsService {
     if (input.managerId) await this.assertEmployeeInSegment(scope, input.managerId, "manager");
 
     const row = await this.deps.employees.insert(scope, { ...input, userId });
+    this.events.emit(this.eventCtx(s, actorUserId), {
+      kind: "employee_added",
+      employeeId: row.id,
+      recipientUserId: row.userId ?? null,
+      employeeName: employeeName(row),
+    });
     return this.withBillable([row], billable)[0];
   }
 
@@ -269,9 +314,10 @@ export class PeopleOpsService {
     s: PeopleSegmentScope,
     id: string,
     input: UpdateEmployeeInput,
+    actorUserId?: string,
   ): Promise<RosterEmployee> {
     const scope = this.scope(s);
-    await this.getEmployee(s, id); // 404 if not in segment
+    const before = await this.getEmployee(s, id); // 404 if not in segment
     if (input.managerId) {
       if (input.managerId === id) {
         throw new PeopleOpsServiceError("VALIDATION_ERROR", "An employee cannot manage themselves.");
@@ -286,15 +332,29 @@ export class PeopleOpsService {
     }
     const row = await this.deps.employees.update(scope, id, input);
     if (!row) throw new PeopleOpsServiceError("NOT_FOUND", "Employee not found.");
+    // A change to position / department / manager is a role move: audit it and
+    // tell the employee. Other field edits (notes, salary, rating) are silent.
+    const changes = PeopleOpsService.ROLE_CHANGE_FIELDS.filter(
+      (f) => input[f.key] !== undefined && (input as any)[f.key] !== (before as any)[f.key],
+    ).map((f) => f.label);
+    if (changes.length > 0) {
+      this.events.emit(this.eventCtx(s, actorUserId), {
+        kind: "employee_promoted",
+        employeeId: row.id,
+        recipientUserId: row.userId ?? null,
+        employeeName: employeeName(row),
+        changes,
+      });
+    }
     const billable = new Set(
       (await this.deps.getActiveCompanyMembers(s.companyId)).map((m) => m.userId),
     );
     return this.withBillable([row], billable)[0];
   }
 
-  async deleteEmployee(s: PeopleSegmentScope, id: string): Promise<void> {
+  async deleteEmployee(s: PeopleSegmentScope, id: string, actorUserId?: string): Promise<void> {
     const scope = this.scope(s);
-    await this.getEmployee(s, id); // 404 if not in segment
+    const before = await this.getEmployee(s, id); // 404 if not in segment
     // PO-1 acceptance: block delete while reports exist.
     const reports = await this.deps.employees.countDirectReports(scope, id);
     if (reports > 0) {
@@ -304,6 +364,11 @@ export class PeopleOpsService {
       );
     }
     await this.deps.employees.remove(scope, id);
+    this.events.emit(this.eventCtx(s, actorUserId), {
+      kind: "employee_removed",
+      employeeId: id,
+      employeeName: employeeName(before),
+    });
   }
 
   /** Org tree: roots are employees with no manager (or a manager outside the
@@ -390,7 +455,11 @@ export class PeopleOpsService {
     return row;
   }
 
-  async createOneOnOne(s: PeopleSegmentScope, input: NewOneOnOneInput): Promise<OneOnOneRow> {
+  async createOneOnOne(
+    s: PeopleSegmentScope,
+    input: NewOneOnOneInput,
+    actorUserId?: string,
+  ): Promise<OneOnOneRow> {
     const scope = this.scope(s);
     if (input.supervisorId === input.participantId) {
       throw new PeopleOpsServiceError(
@@ -400,7 +469,15 @@ export class PeopleOpsService {
     }
     await this.assertEmployeeInSegment(scope, input.supervisorId, "supervisor");
     await this.assertEmployeeInSegment(scope, input.participantId, "participant");
-    return this.deps.oneOnOnes.insert(scope, input);
+    const row = await this.deps.oneOnOnes.insert(scope, input);
+    this.events.emit(this.eventCtx(s, actorUserId), {
+      kind: "one_on_one_scheduled",
+      oneOnOneId: row.id,
+      supervisorEmployeeId: input.supervisorId,
+      participantEmployeeId: input.participantId,
+      scheduledDate: new Date(input.scheduledDate).toISOString(),
+    });
+    return row;
   }
 
   async updateOneOnOne(
@@ -492,7 +569,19 @@ export class PeopleOpsService {
       sourceType: "one_on_one",
       oneOnOneId,
     }));
-    return this.deps.actionItems.insertMany(scope, inputs);
+    const rows = await this.deps.actionItems.insertMany(scope, inputs);
+    const assigneeEmployeeIds = items
+      .map((i) => i.assigneeEmployeeId)
+      .filter((id): id is string => !!id);
+    if (assigneeEmployeeIds.length > 0) {
+      this.events.emit(this.eventCtx(s, createdBy), {
+        kind: "action_items_assigned",
+        oneOnOneId,
+        assigneeEmployeeIds,
+        count: assigneeEmployeeIds.length,
+      });
+    }
+    return rows;
   }
 
   // ── Goals / OKRs (PO-4) ─────────────────────────────────────────────────────
@@ -551,6 +640,15 @@ export class PeopleOpsService {
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────
+  /** Build the (scope, actor) context an event is emitted under. */
+  private eventCtx(s: PeopleSegmentScope, actorUserId?: string) {
+    return {
+      actorUserId: actorUserId ?? null,
+      scope: this.scope(s),
+      companyId: s.companyId,
+    };
+  }
+
   private async assertEmployeeInSegment(
     scope: SegmentScope,
     employeeId: string,

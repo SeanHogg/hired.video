@@ -202,10 +202,11 @@ peopleRoutes.post("/employees", async (c) => {
   }
   const { salary, ...rest } = parsed.data;
   try {
-    const row = await buildService().createEmployee(c.var.peopleCtx, {
-      ...rest,
-      salaryCents: salaryToCents(salary),
-    });
+    const row = await buildService().createEmployee(
+      c.var.peopleCtx,
+      { ...rest, salaryCents: salaryToCents(salary) },
+      c.var.user.sub,
+    );
     return c.json(success(serializeEmployee(row)), 201);
   } catch (e) {
     return mapError(c, e);
@@ -227,10 +228,12 @@ peopleRoutes.put("/employees/:id", async (c) => {
   }
   const { salary, ...rest } = parsed.data;
   try {
-    const row = await buildService().updateEmployee(c.var.peopleCtx, c.req.param("id"), {
-      ...rest,
-      salaryCents: salaryToCents(salary),
-    });
+    const row = await buildService().updateEmployee(
+      c.var.peopleCtx,
+      c.req.param("id"),
+      { ...rest, salaryCents: salaryToCents(salary) },
+      c.var.user.sub,
+    );
     return c.json(success(serializeEmployee(row)));
   } catch (e) {
     return mapError(c, e);
@@ -239,7 +242,7 @@ peopleRoutes.put("/employees/:id", async (c) => {
 
 peopleRoutes.delete("/employees/:id", async (c) => {
   try {
-    await buildService().deleteEmployee(c.var.peopleCtx, c.req.param("id"));
+    await buildService().deleteEmployee(c.var.peopleCtx, c.req.param("id"), c.var.user.sub);
     return c.json(success({ deleted: true }));
   } catch (e) {
     return mapError(c, e);
@@ -271,7 +274,10 @@ peopleRoutes.post("/one-on-ones", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
   }
   try {
-    return c.json(success(await buildService().createOneOnOne(c.var.peopleCtx, parsed.data)), 201);
+    return c.json(
+      success(await buildService().createOneOnOne(c.var.peopleCtx, parsed.data, c.var.user.sub)),
+      201,
+    );
   } catch (e) {
     return mapError(c, e);
   }

@@ -104,6 +104,8 @@ const SearchPage = lazy(() => import("./pages/Search"));
 const Settings = lazy(() => import("./pages/Settings"));
 const EmailPreferences = lazy(() => import("./pages/EmailPreferences"));
 const PaidMediaPage = lazy(() => import("./pages/paid-media/PaidMediaPage"));
+const ConnectionsPage = lazy(() => import("./pages/settings/Connections"));
+const SocialAccountsPage = lazy(() => import("./pages/admin/SocialAccounts"));
 const Contributors = lazy(() => import("./pages/Contributors"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
@@ -1096,6 +1098,7 @@ const App = () => (
                       <Route path="/admin/feed"              element={<AdminLayout><FeedManagement /></AdminLayout>} />
                       <Route path="/admin/dashboard-feed"    element={<AdminLayout><DashboardFeedCuration /></AdminLayout>} />
                       <Route path="/admin/role-access"       element={<AdminLayout><RoleAccessManager /></AdminLayout>} />
+                      <Route path="/admin/social-accounts"   element={<AdminLayout><SocialAccountsPage /></AdminLayout>} />
                       <Route path="/admin/active-users"      element={<AdminLayout><ActiveUsers /></AdminLayout>} />
                       <Route path="/admin/campaigns"         element={<AdminLayout><CampaignManager /></AdminLayout>} />
                       <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
@@ -1122,6 +1125,7 @@ const App = () => (
 
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/settings/ads"     element={<PaidMediaPage />} />
+                      <Route path="/settings/connections" element={<ConnectionsPage />} />
                       <Route path="/superadmin/ads"   element={<PaidMediaPage title="Paid Media (Internal Growth)" />} />
                       <Route path="/contributors" element={<Contributors />} />
                       <Route path="/help" element={<Help />} />

@@ -19,6 +19,12 @@ import {
   defaultExtensionSettings,
   mergeExtensionSettings,
 } from "../../routes/settings.js";
+import { mergeNotificationPreferences } from "../../../../shared/notification-preferences.js";
+import {
+  granularToLegacy,
+  invalidateNotificationPreferences,
+  resolvePreferencesFromRow,
+} from "../notifications/preferences.js";
 
 const { accountPreferences, jobPreferences, privacyPreferences } = schema;
 
@@ -101,16 +107,7 @@ export async function handleGetNotifications(
     .where(eq(accountPreferences.userId, auth.userId))
     .limit(1);
   if (!prefs) return ok(defaultNotificationPreferences());
-  return ok({
-    ...defaultNotificationPreferences(),
-    emailJobMatches: prefs.emailNotificationsEnabled,
-    emailApplicationUpdates: prefs.emailNotificationsEnabled,
-    emailMessages: prefs.emailNotificationsEnabled,
-    emailConnectionRequests: prefs.emailNotificationsEnabled,
-    emailWeeklyDigest: prefs.weeklyDigestEnabled,
-    emailMarketingUpdates: prefs.marketingEmailsEnabled,
-    jobAlertEmailsEnabled: prefs.jobAlertEmailsEnabled,
-  });
+  return ok(resolvePreferencesFromRow(prefs));
 }
 
 export async function handleUpdateNotifications(
@@ -120,19 +117,30 @@ export async function handleUpdateNotifications(
 ): Promise<HandlerResult> {
   const auth = requireAuth(viewerId);
   if ("status" in auth) return auth;
-  const src = (body ?? {}) as Record<string, unknown>;
+
+  // Merge the (possibly partial) patch over the user's CURRENT persisted
+  // matrix so a single toggle never wipes the others — then persist the
+  // full granular blob AND the derived coarse columns in one upsert, and
+  // drop the dispatcher's cached copy so the new prefs take effect now.
+  const [existing] = await deps.db
+    .select()
+    .from(accountPreferences)
+    .where(eq(accountPreferences.userId, auth.userId))
+    .limit(1);
+  const base = resolvePreferencesFromRow(existing);
+  const next = mergeNotificationPreferences(body, base);
+
   const updates = {
-    emailNotificationsEnabled: Boolean(src.emailJobMatches ?? src.emailMessages ?? true),
-    marketingEmailsEnabled: Boolean(src.emailMarketingUpdates ?? false),
-    jobAlertEmailsEnabled: Boolean(src.jobAlertEmailsEnabled ?? true),
-    weeklyDigestEnabled: Boolean(src.emailWeeklyDigest ?? true),
+    notificationPreferences: next,
+    ...granularToLegacy(next),
     updatedAt: deps.now(),
   };
   await deps.db
     .insert(accountPreferences)
     .values({ userId: auth.userId, ...updates } as any)
     .onConflictDoUpdate({ target: accountPreferences.userId, set: updates as any });
-  return ok({ ...defaultNotificationPreferences(), ...src });
+  invalidateNotificationPreferences(auth.userId);
+  return ok(next);
 }
 
 // ---------------------------------------------------------------------------

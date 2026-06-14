@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Upload, Link } from "lucide-react";
 import { nleApi, type NleMediaSourceWithBin } from "@/lib/timeline/api";
 import { probeSource } from "@/lib/timeline/source-probe";
+import { maybeGenerateAndUploadProxy } from "@/lib/timeline/source-upload";
 
 interface Props {
   source: NleMediaSourceWithBin;
@@ -83,7 +84,18 @@ export default function RelinkSourceDialog({ source, onClose, onRelinked }: Prop
         url: upload.source.url,
         filename: upload.source.filename,
       });
-      onRelinked(patched.source);
+      // The master content just changed under this row. Regenerate the
+      // scrubbing proxy so a stale proxy can't keep rendering the OLD
+      // file's pixels — `forceRefresh` only when one actually existed, so
+      // a relink to a small master with no prior proxy stays cheap. Same
+      // shared seam the bin uses; returns null (and we keep the patched
+      // row) when no proxy is warranted or generation fails.
+      const reproxied = await maybeGenerateAndUploadProxy(source.id, file, {
+        kind: probed.kind,
+        height: probed.height,
+        forceRefresh: Boolean(source.proxyUrl),
+      });
+      onRelinked(reproxied ?? patched.source);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");

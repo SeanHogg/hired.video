@@ -106,6 +106,10 @@ import {
   UsageTrackingRepository,
   type IUsageTrackingRepository,
 } from "./usageTrackingRepository.js";
+import {
+  SocialConnectionRepository,
+  type ISocialConnectionRepository,
+} from "./socialConnectionRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -174,6 +178,8 @@ export interface Repos {
   roleFeatureAccess: IRoleFeatureAccessRepository;
   // usage sessions + events for presence/engagement (migration 0215)
   usageTracking: IUsageTrackingRepository;
+  // social publishing connection layers: user + brand accounts (migration 0217)
+  socialConnections: ISocialConnectionRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -218,6 +224,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     emailConsent: new EmailConsentRepository(db, now),
     roleFeatureAccess: new RoleFeatureAccessRepository(db, now),
     usageTracking: new UsageTrackingRepository(db, now),
+    socialConnections: new SocialConnectionRepository(db, now),
   };
 }
 
@@ -263,6 +270,7 @@ export type {
   IFeedFeaturesRepository,
   IRoleFeatureAccessRepository,
   IUsageTrackingRepository,
+  ISocialConnectionRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────

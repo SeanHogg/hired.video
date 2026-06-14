@@ -367,17 +367,20 @@ export default function Career360() {
     [wheelHealth, t],
   );
 
-  // Inner ring = outcomes. We don't measure these yet (#413), so they
-  // stay "unknown" until score history shows up; that's intentional —
-  // better grey than misleading green.
+  // Inner ring = funnel outcomes (#421), derived server-side from the
+  // seeker's saved-jobs pipeline + active-target gap severities. Stays
+  // "unknown" (grey) until there's enough signal — better grey than a
+  // misleading green/red off one or two applications.
+  const outcomes = state?.outcomes;
   const inner: WheelSignal[] = useMemo(
     () =>
       INNER_BLUEPRINT.map((b) => ({
         ...b,
         label: t(`tools.career360.segment.${b.id}`, b.label),
-        health: "unknown" as SegmentHealth,
+        health: ((outcomes ?? []).find((o) => o.id === b.id)?.health ??
+          "unknown") as SegmentHealth,
       })),
-    [t],
+    [outcomes, t],
   );
 
   const counts = useMemo(() => {

@@ -8854,5 +8854,22 @@
   "gigs.bid.enterAmount": "Saisissez un montant d'offre",
   "gigs.bid.submitted": "Offre envoyée",
   "gigs.bid.submittedBody": "L'auteur du contrat examinera votre proposition.",
-  "gigs.bid.failed": "L'offre a échoué"
+  "gigs.bid.failed": "L'offre a échoué",
+  "auth.oauth.continueWith": "Continuer avec",
+  "auth.oauth.signupWith": "S'inscrire avec",
+  "auth.overlay.title.company": "Accéder à tous les détails de l'entreprise",
+  "auth.overlay.title.job": "Accéder à tous les détails du poste",
+  "auth.overlay.title.resume": "Accéder à tous les détails du CV",
+  "auth.overlay.title.person": "Accéder au profil complet",
+  "auth.overlay.title.ai-coach": "Accéder à l'accompagnement de carrière par IA",
+  "auth.overlay.title.tool": "Ouvrez une session pour utiliser cet outil",
+  "auth.overlay.title.default": "Accéder à tous les détails",
+  "auth.overlay.message.company": "Ouvrez une session pour voir tous les détails de l'entreprise, les avantages et communiquer avec les responsables du recrutement.",
+  "auth.overlay.message.job": "Ouvrez une session pour voir les descriptions complètes du poste, les informations salariales et postuler directement.",
+  "auth.overlay.message.resume": "Ouvrez une session pour voir les profils professionnels complets et l'expérience de travail détaillée.",
+  "auth.overlay.message.person": "Ouvrez une session pour voir les profils professionnels complets et communiquer avec des professionnels du secteur.",
+  "auth.overlay.message.ai-coach": "Ouvrez une session pour accéder à l'accompagnement de carrière par IA et à des conseils personnalisés.",
+  "auth.overlay.message.tool": "Ouvrez une session pour utiliser cet outil : nous conserverons les données que vous avez déjà saisies et vous reprendrez là où vous étiez.",
+  "auth.overlay.message.default": "Ouvrez une session pour accéder à tous les détails et débloquer toutes les fonctionnalités.",
+  "auth.overlay.footer": "Joignez-vous à des milliers de professionnels qui utilisent déjà notre plateforme"
 }

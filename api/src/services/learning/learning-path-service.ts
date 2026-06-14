@@ -110,15 +110,18 @@ export class LearningPathService {
   }
 
   /** Throws if adding (courseId, prerequisiteCourseId) would create a
-   *  cycle. BFS from the proposed prerequisite forward through existing
-   *  edges; if we ever reach `courseId`, abort.
+   *  cycle. The new edge "A requires B" closes a cycle iff B can already
+   *  reach A by following the existing requires-edges (B requires … requires
+   *  A) — because then A → B → … → A. So we BFS FORWARD along the
+   *  requires-relation starting at `prerequisiteCourseId` (B): from each
+   *  node we look up ITS prerequisites (rows whose `courseId` is in the
+   *  frontier, taking their `prerequisiteCourseId`). If we ever reach
+   *  `courseId` (A), the edge would create a cycle.
    *
-   *  N.B. an edge "A requires B" means we traverse FROM B to its
-   *  dependents (courses that already require B). Those dependents' own
-   *  prerequisites are irrelevant to the cycle check — we're following
-   *  the dependent-of relation, which is the reverse of the prerequisite-
-   *  of relation. So the BFS uses `prerequisiteCourseId = current` as
-   *  the traversal predicate. */
+   *  N.B. the traversal predicate is `courseId = current` (a node's own
+   *  prerequisites), NOT `prerequisiteCourseId = current` (its dependents).
+   *  Walking dependents is the reverse relation and would reject harmless
+   *  redundant edges while letting real cycles through (#1344). */
   private async assertNoCycle(
     courseId: CourseId,
     prerequisiteCourseId: CourseId,
@@ -131,20 +134,20 @@ export class LearningPathService {
     while (frontier.length > 0) {
       const next = await this.db
         .select({
-          courseId: coursePrerequisites.courseId,
+          prerequisiteCourseId: coursePrerequisites.prerequisiteCourseId,
         })
         .from(coursePrerequisites)
-        .where(inArray(coursePrerequisites.prerequisiteCourseId, frontier));
+        .where(inArray(coursePrerequisites.courseId, frontier));
       const newCourses: CourseId[] = [];
       for (const row of next) {
-        if (row.courseId === courseId) {
+        if (row.prerequisiteCourseId === courseId) {
           throw new Error(
             `Cycle: adding course ${courseId} → prereq ${prerequisiteCourseId} would create a cycle.`,
           );
         }
-        if (!visited.has(row.courseId)) {
-          visited.add(row.courseId);
-          newCourses.push(row.courseId);
+        if (!visited.has(row.prerequisiteCourseId)) {
+          visited.add(row.prerequisiteCourseId);
+          newCourses.push(row.prerequisiteCourseId);
         }
       }
       frontier = newCourses;

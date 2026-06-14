@@ -37,6 +37,9 @@ vi.mock("@/components/creator/PayoutProfileForm", () => ({
 vi.mock("@/components/creator/CreatorProfileForm", () => ({
   default: () => <div data-testid="stub-creator-profile-form" />,
 }));
+vi.mock("@/components/creator/CreatorEarningsBreakdown", () => ({
+  default: () => <div data-testid="stub-creator-earnings-breakdown" />,
+}));
 vi.mock("@/components/studio/shared/CreatorTemplateEarnings", () => ({
   default: () => <div data-testid="stub-creator-template-earnings" />,
 }));
@@ -110,25 +113,28 @@ describe("CreatorWorkspace — Payouts & Earnings tab consolidation", () => {
     expect(standaloneEarnings).toHaveLength(0);
   });
 
-  it("mounts BOTH the template-earnings card and the payout form inside the payouts tab content", async () => {
+  it("mounts the all-source breakdown, the template-earnings card and the payout form inside the payouts tab content", async () => {
     mount();
     await flushPromises();
     // Radix Tabs renders the active panel only — landing on
     // /services/creator/payouts makes the payouts panel active.
     const panel = screen.getByRole("tabpanel");
+    expect(within(panel).getByTestId("stub-creator-earnings-breakdown")).toBeInTheDocument();
     expect(within(panel).getByTestId("stub-creator-template-earnings")).toBeInTheDocument();
     expect(within(panel).getByTestId("stub-payout-form")).toBeInTheDocument();
   });
 
-  it("renders the earnings card ABOVE the payout form (daily-value before set-once setup)", async () => {
+  it("renders the earnings cards ABOVE the payout form (daily-value before set-once setup), breakdown first", async () => {
     mount();
     await flushPromises();
     const panel = screen.getByRole("tabpanel");
-    const earnings = within(panel).getByTestId("stub-creator-template-earnings");
+    const breakdown = within(panel).getByTestId("stub-creator-earnings-breakdown");
+    const templates = within(panel).getByTestId("stub-creator-template-earnings");
     const payout = within(panel).getByTestId("stub-payout-form");
-    // DOCUMENT_POSITION_FOLLOWING (4) means `payout` comes after `earnings`.
-    // Use a bitmask check to stay robust across nested DOM shapes.
-    expect(earnings.compareDocumentPosition(payout) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // DOCUMENT_POSITION_FOLLOWING (4) means the second node comes after the
+    // first. Order: breakdown → template card → payout form.
+    expect(breakdown.compareDocumentPosition(templates) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(templates.compareDocumentPosition(payout) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("treats the legacy /services/creator/earnings URL as an unknown tab — no crash, falls back to a visible tab", async () => {

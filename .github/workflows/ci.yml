@@ -78,6 +78,15 @@ jobs:
         # they're frozen in production.
         run: cd api && node scripts/lint-migrations.mjs
 
+      - name: Check gap-register totals
+        # Gap #791. The Consolidated Gap Register totals line is hand-maintained
+        # across many concurrent multi-session edits and silently drifts from
+        # the real rows. This recomputes the section-scoped totals (and the
+        # duplicate-id count, gap #2009) and fails if the machine-written
+        # totals block in README.md is missing or stale. Refresh locally with
+        # `cd api && npm run recount:gaps -- --write`.
+        run: cd api && npm run check:gaps
+
       - name: Run api tests
         # 1944 node:test cases via scripts/run-tests.mjs (gap #1617).
         # Previous hand-glob in package.json missed `__tests__/` dirs in

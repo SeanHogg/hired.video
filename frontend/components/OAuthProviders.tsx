@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { readAttribution } from "@/lib/attribution";
 
@@ -46,7 +47,8 @@ interface OAuthProvidersProps {
 }
 
 export default function OAuthProviders({ mode, redirect = "/dashboard" }: OAuthProvidersProps) {
-  const verb = mode === "login" ? "Continue with" : "Sign up with";
+  const { t } = useTranslation();
+  const verb = mode === "login" ? t("auth.oauth.continueWith") : t("auth.oauth.signupWith");
 
   return (
     <div className="grid grid-cols-2 gap-2">

@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
 import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
+import CreatorEarningsBreakdown from "@/components/creator/CreatorEarningsBreakdown";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
 import PromoteWithoutAuthToggle from "@/components/settings/PromoteWithoutAuthToggle";
@@ -229,13 +230,16 @@ export default function CreatorWorkspace({
           <CreatorProfileForm onProfileChange={onProfileChange} />
         </TabsContent>
 
-        {/* Payouts & Earnings — read-only template-marketplace revenue card
-            (self-gates to null when there are no published templates) sits
-            above the tax/payout config + balance ledger so the daily-visit
-            value (earnings) renders before the set-once setup. Same
+        {/* Payouts & Earnings — read-only revenue cards sit above the
+            tax/payout config + balance ledger so the daily-visit value
+            (earnings) renders before the set-once setup. The all-channel
+            CreatorEarningsBreakdown (#1185) answers "where did my money come
+            from" across every revenue source; CreatorTemplateEarnings keeps the
+            per-template drill-down. Both self-gate to null when empty. Same
             PayoutProfileForm is also rendered on /settings → Content Creator
             → Payouts. */}
         <TabsContent value="payouts" className="space-y-6">
+          <CreatorEarningsBreakdown />
           <CreatorTemplateEarnings />
           <PayoutProfileForm />
         </TabsContent>

@@ -41,6 +41,8 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "studio",   label: "Studio",    href: "/admin/studio",    icon: Video      },
   // Page → video embed placements (#1866) — gated on the studio resource.
   { resource: "studio",   label: "Page Videos", href: "/admin/page-embeds", icon: MonitorPlay },
+  // Managed brand accounts powering the free "Post via hired.video" lane (PRD §5.0).
+  { resource: "studio",   label: "Social Accounts", href: "/admin/social-accounts", icon: Megaphone },
   { resource: "storage",   label: "Storage",   href: "/admin/storage",   icon: HardDrive  },
   { resource: "billing",   label: "Billing",   href: "/admin/billing",   icon: CreditCard },
   { resource: "modules",   label: "Modules",   href: "/admin/modules",   icon: Package    },

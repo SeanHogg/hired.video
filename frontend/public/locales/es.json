@@ -8808,5 +8808,22 @@
   "gigs.bid.enterAmount": "Introduce un importe de puja",
   "gigs.bid.submitted": "Puja enviada",
   "gigs.bid.submittedBody": "Quien publicó el encargo revisará tu propuesta.",
-  "gigs.bid.failed": "La puja falló"
+  "gigs.bid.failed": "La puja falló",
+  "auth.oauth.continueWith": "Continuar con",
+  "auth.oauth.signupWith": "Registrarse con",
+  "auth.overlay.title.company": "Acceder a los detalles completos de la empresa",
+  "auth.overlay.title.job": "Acceder a los detalles completos del empleo",
+  "auth.overlay.title.resume": "Acceder a los detalles completos del currículum",
+  "auth.overlay.title.person": "Acceder al perfil completo",
+  "auth.overlay.title.ai-coach": "Acceder al coaching profesional con IA",
+  "auth.overlay.title.tool": "Inicia sesión para usar esta herramienta",
+  "auth.overlay.title.default": "Acceder a todos los detalles",
+  "auth.overlay.message.company": "Inicia sesión para ver los detalles completos de la empresa, los beneficios y conectar con los responsables de contratación.",
+  "auth.overlay.message.job": "Inicia sesión para ver las descripciones completas del empleo, la información salarial y postularte directamente.",
+  "auth.overlay.message.resume": "Inicia sesión para ver perfiles profesionales completos y la experiencia laboral detallada.",
+  "auth.overlay.message.person": "Inicia sesión para ver perfiles profesionales completos y conectar con profesionales del sector.",
+  "auth.overlay.message.ai-coach": "Inicia sesión para acceder al coaching profesional con IA y orientación personalizada.",
+  "auth.overlay.message.tool": "Inicia sesión para usar esta herramienta: conservaremos los datos que ya ingresaste y continuarás justo donde lo dejaste.",
+  "auth.overlay.message.default": "Inicia sesión para acceder a todos los detalles y desbloquear todas las funciones.",
+  "auth.overlay.footer": "Únete a miles de profesionales que ya usan nuestra plataforma"
 }

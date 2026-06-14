@@ -9067,5 +9067,22 @@
   "gigs.bid.enterAmount": "Enter a bid amount",
   "gigs.bid.submitted": "Bid submitted",
   "gigs.bid.submittedBody": "The poster will review your proposal.",
-  "gigs.bid.failed": "Bid failed"
+  "gigs.bid.failed": "Bid failed",
+  "auth.oauth.continueWith": "Continue with",
+  "auth.oauth.signupWith": "Sign up with",
+  "auth.overlay.title.company": "Access Full Company Details",
+  "auth.overlay.title.job": "Access Full Job Details",
+  "auth.overlay.title.resume": "Access Full Resume Details",
+  "auth.overlay.title.person": "Access Full Profile Details",
+  "auth.overlay.title.ai-coach": "Access AI Career Coaching",
+  "auth.overlay.title.tool": "Sign In to Use This Tool",
+  "auth.overlay.title.default": "Access Full Details",
+  "auth.overlay.message.company": "Sign in to view complete company details, benefits, and connect with hiring managers.",
+  "auth.overlay.message.job": "Sign in to view full job descriptions, salary information, and apply directly.",
+  "auth.overlay.message.resume": "Sign in to view complete professional profiles and detailed work experience.",
+  "auth.overlay.message.person": "Sign in to view full professional profiles and connect with industry professionals.",
+  "auth.overlay.message.ai-coach": "Sign in to access AI-powered career coaching and personalized guidance.",
+  "auth.overlay.message.tool": "Sign in to run this tool — we'll keep the inputs you've already entered and pick up right where you left off.",
+  "auth.overlay.message.default": "Sign in to access complete details and unlock all features.",
+  "auth.overlay.footer": "Join thousands of professionals already using our platform"
 }

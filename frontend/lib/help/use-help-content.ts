@@ -35,18 +35,14 @@ export function loadHelpContent(): Promise<HelpContentModule> {
 export function useHelpContent(): HelpContentModule | null {
   const [mod, setMod] = useState<HelpContentModule | null>(cached);
   useEffect(() => {
-    if (cached) {
-      if (mod !== cached) setMod(cached);
-      return;
-    }
     let active = true;
+    // Memoized — resolves instantly when already cached.
     loadHelpContent().then((m) => {
       if (active) setMod(m);
     });
     return () => {
       active = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return mod;
 }

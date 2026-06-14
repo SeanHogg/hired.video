@@ -803,6 +803,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Customize your hired.video experience. Manage privacy, notifications, and account preferences.",
     robots: "noindex, nofollow",
   },
+  "/settings/connections": {
+    title: "Connected accounts — hired.video",
+    description:
+      "Connect your TikTok, YouTube, Instagram, LinkedIn, Facebook, and X accounts to publish your Studio content directly to them.",
+    robots: "noindex, nofollow",
+  },
   "/privacy-policy": {
     title: "Privacy Policy — hired.video",
     description:

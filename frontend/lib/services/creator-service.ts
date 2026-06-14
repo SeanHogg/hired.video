@@ -19,6 +19,7 @@ import type {
   PayoutProfileDTO,
   PayoutProfileUpdateInput,
 } from "@shared/payout-profile";
+import type { CreatorEarningsRollupDTO } from "@shared/creator-earnings";
 
 export { CREATOR_PROGRAMS };
 export type { CreatorProgram };
@@ -32,6 +33,11 @@ export type {
   TaxFormType,
   PayoutProvider,
 } from "@shared/payout-profile";
+export type {
+  CreatorEarningsRollupDTO,
+  CreatorEarningsSourceRow,
+  EarningsSourceKey,
+} from "@shared/creator-earnings";
 export {
   ENTITY_TYPES,
   TAX_ID_TYPES,
@@ -196,6 +202,13 @@ export const creatorService = {
 
   async updatePayoutProfile(input: PayoutProfileUpdateInput): Promise<PayoutProfileDTO> {
     const res = await apiClient.patch<PayoutProfileDTO>("/api/creators/me/payout-profile", input);
+    return res.data;
+  },
+
+  // Lifetime earnings broken out by revenue source (#1185) — backs the
+  // multi-source CreatorEarningsBreakdown card on the Payouts & Earnings tab.
+  async getEarningsRollup(): Promise<CreatorEarningsRollupDTO> {
+    const res = await apiClient.get<CreatorEarningsRollupDTO>("/api/creators/me/earnings-rollup");
     return res.data;
   },
 };

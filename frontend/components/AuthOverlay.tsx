@@ -8,6 +8,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -30,6 +31,7 @@ export default function AuthOverlay({
   message,
   returnTo,
 }: AuthOverlayProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const redirectTarget = returnTo ?? `${location.pathname}${location.search}`;
   const redirectQuery = `?redirect=${encodeURIComponent(redirectTarget)}`;
@@ -52,24 +54,14 @@ export default function AuthOverlay({
     }
   };
 
-  const getDefaultMessage = () => {
-    switch (contentType) {
-      case "company":
-        return "Sign in to view complete company details, benefits, and connect with hiring managers.";
-      case "job":
-        return "Sign in to view full job descriptions, salary information, and apply directly.";
-      case "resume":
-        return "Sign in to view complete professional profiles and detailed work experience.";
-      case "person":
-        return "Sign in to view full professional profiles and connect with industry professionals.";
-      case "ai-coach":
-        return "Sign in to access AI-powered career coaching and personalized guidance.";
-      case "tool":
-        return "Sign in to run this tool — we'll keep the inputs you've already entered and pick up right where you left off.";
-      default:
-        return "Sign in to access complete details and unlock all features.";
-    }
-  };
+  // Per-contentType title + message live in the i18n catalogue
+  // (`auth.overlay.title.<type>` / `auth.overlay.message.<type>`) so every
+  // gated surface localizes; fall back to the `.default` key for any type
+  // without a dedicated string. An explicit prop still wins over both.
+  const resolvedTitle =
+    title ?? t(`auth.overlay.title.${contentType}`, t("auth.overlay.title.default"));
+  const resolvedMessage =
+    message ?? t(`auth.overlay.message.${contentType}`, t("auth.overlay.message.default"));
 
   return (
     <>
@@ -91,11 +83,10 @@ export default function AuthOverlay({
               {/* Title */}
               <div>
                 <h3 className="text-lg font-semibold mb-2">
-                  {title ||
-                    `Access Full ${contentType === "person" ? "Profile" : contentType.charAt(0).toUpperCase() + contentType.slice(1)} Details`}
+                  {resolvedTitle}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {message || getDefaultMessage()}
+                  {resolvedMessage}
                 </p>
               </div>
 
@@ -104,13 +95,13 @@ export default function AuthOverlay({
                 <Button asChild className="flex-1" size="sm">
                   <Link to={`/login${redirectQuery}`}>
                     <LogIn className="h-4 w-4 mr-2" />
-                    Sign In
+                    {t("actions.signIn")}
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="flex-1" size="sm">
                   <Link to={`/signup${redirectQuery}`}>
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Create Account
+                    {t("actions.createAccount")}
                   </Link>
                 </Button>
               </div>
@@ -118,7 +109,7 @@ export default function AuthOverlay({
               {/* Additional CTA */}
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground">
-                  Join thousands of professionals already using our platform
+                  {t("auth.overlay.footer")}
                 </p>
               </div>
             </div>

@@ -278,6 +278,14 @@ export const accountPreferences = pgTable("account_preferences", {
   marketingEmailsEnabled: boolean("marketing_emails_enabled").default(false).notNull(),
   jobAlertEmailsEnabled: boolean("job_alert_emails_enabled").default(true).notNull(),
   weeklyDigestEnabled: boolean("weekly_digest_enabled").default(true).notNull(),
+  // Granular per-channel × per-category notification toggles (the shape the
+  // Settings form renders). Stored as a JSONB blob so the matrix can grow
+  // without a column-per-toggle migration; the coarse *_enabled booleans
+  // above are kept as derived projections for legacy readers. NULL until the
+  // user saves — readers fall back to defaults via mergeNotificationPreferences.
+  // Shape = shared/notification-preferences.ts NotificationPreferences. (#254)
+  notificationPreferences: jsonb("notification_preferences")
+    .$type<Record<string, boolean>>(),
   theme: varchar("theme", { length: 50 }).default("light").notNull(),
   language: varchar("language", { length: 10 }).default("en").notNull(),
   // IANA timezone name (e.g. "America/Los_Angeles", "Europe/London"). "UTC" is

@@ -22,9 +22,19 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import type { PayoutBalanceDTO } from "../../../../shared/payout-profile.js";
+import {
+  buildEarningsRollup,
+  type CreatorEarningsRollupDTO,
+} from "../../../../shared/creator-earnings.js";
 
 const { payoutLedgerEntries, payouts, payoutProfiles, creatorProfiles } = schema;
+
+/** Cache key for a creator's earnings-by-source rollup. Invalidated whenever a
+ *  new accrual posts for the user (the only event that can change it). */
+const earningsRollupKey = (userId: string) => `creator-earnings-rollup:${userId}`;
+const EARNINGS_ROLLUP_TTL_SECONDS = 300;
 
 export type LedgerSourceKind =
   | "promo_project"
@@ -107,6 +117,10 @@ export class PayoutLedgerService {
           sql`${creatorProfiles.endedAt} IS NULL`,
         ),
       );
+
+    // A new accrual changes the per-source rollup — drop the cached read so the
+    // Payouts & Earnings card reflects the new revenue on next load.
+    invalidateCachedKey(earningsRollupKey(input.userId));
 
     return { entryId: entry.id, created: true };
   }
@@ -217,6 +231,50 @@ export class PayoutLedgerService {
       minPayoutThresholdCents,
       isAboveThreshold: availableCents >= minPayoutThresholdCents,
     };
+  }
+
+  /**
+   * Lifetime earnings broken out by revenue source (#1185). Groups accrual
+   * ledger rows by `source_kind`, then folds related kinds into the
+   * human-facing buckets defined in shared/creator-earnings.ts (e.g. base
+   * promo project + paid extra revision → "Promo videos"). Read-through cached
+   * (L1 isolate Map + L2 KV); invalidated by `recordAccrual` on every new
+   * accrual for the user, so it stays warm between earning events.
+   */
+  async getEarningsRollup(userId: string): Promise<CreatorEarningsRollupDTO> {
+    return getOrSetCached<CreatorEarningsRollupDTO>({
+      key: earningsRollupKey(userId),
+      ttlSeconds: EARNINGS_ROLLUP_TTL_SECONDS,
+      loader: () => this.computeEarningsRollup(userId),
+    });
+  }
+
+  private async computeEarningsRollup(userId: string): Promise<CreatorEarningsRollupDTO> {
+    const db = getDb();
+
+    const [aggregates, [profile]] = await Promise.all([
+      db
+        .select({
+          sourceKind: payoutLedgerEntries.sourceKind,
+          earningsCents: sql<number>`coalesce(sum(${payoutLedgerEntries.amountCents}), 0)::int`,
+          salesCount: sql<number>`count(*)::int`,
+        })
+        .from(payoutLedgerEntries)
+        .where(
+          and(
+            eq(payoutLedgerEntries.userId, userId),
+            eq(payoutLedgerEntries.kind, "accrual"),
+          ),
+        )
+        .groupBy(payoutLedgerEntries.sourceKind),
+      db
+        .select({ payoutCurrency: payoutProfiles.payoutCurrency })
+        .from(payoutProfiles)
+        .where(eq(payoutProfiles.userId, userId))
+        .limit(1),
+    ]);
+
+    return buildEarningsRollup(aggregates, profile?.payoutCurrency ?? "USD");
   }
 }
 

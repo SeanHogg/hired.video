@@ -273,24 +273,62 @@ export default [
     },
   },
 
-  // react-three-fiber surface (3D world game studio). R3F renders
-  // three.js objects through lowercase intrinsic JSX elements
+  // react-three-fiber surfaces (3D world game studio + CAD 3D stage). R3F
+  // renders three.js objects through lowercase intrinsic JSX elements
   // (<mesh>, <boxGeometry>, <ambientLight>, …) whose props
   // (`args`, `position`, `castShadow`, `attach`, `intensity`, …) are
   // not DOM attributes — so `react/no-unknown-property` flags every
   // one as "unknown". The rule is simply not applicable to R3F's
-  // reconciler. Disable it for this folder; every other component in
-  // the app still gets the rule.
+  // reconciler. Disable it for these folders (#1872 — cad-3d hit the
+  // same 18 false positives world-3d already had); every other
+  // component in the app still gets the rule.
   {
-    files: ["components/studio/game/world-3d/**/*.{ts,tsx}"],
+    files: [
+      "components/studio/game/world-3d/**/*.{ts,tsx}",
+      "components/studio/cad-3d/**/*.{ts,tsx}",
+    ],
     rules: {
       "react/no-unknown-property": "off",
     },
   },
 
+  // Plain-JS studio game runtime (#1872). These files (runtime-core.js,
+  // block-interp.js, …) are shipped as hand-authored browser JS — they run
+  // in the page/iframe at game-play time, not through tsc, so TypeScript's
+  // ambient browser-lib resolution never applies and the generic
+  // `**/*.{js,jsx}` block (which only knows React/JSX) flags every browser
+  // global (`window`, `performance`, `Image`, `requestAnimationFrame`, …)
+  // as `no-undef`. Declare the browser runtime so genuine typos still fail
+  // but the ambient globals don't. `no-unused-vars` stays ON so real dead
+  // bindings are still caught.
+  {
+    files: ["lib/studio/game/**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        window: "readonly",
+        document: "readonly",
+        performance: "readonly",
+        Image: "readonly",
+        requestAnimationFrame: "readonly",
+        cancelAnimationFrame: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        console: "readonly",
+        navigator: "readonly",
+        URL: "readonly",
+        Audio: "readonly",
+        fetch: "readonly",
+      },
+    },
+  },
+
   // Script files (Node.js environment)
   {
-    files: ["scripts/**/*.{js,mjs,ts}"],
+    files: ["scripts/**/*.{js,mjs,cjs,ts}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

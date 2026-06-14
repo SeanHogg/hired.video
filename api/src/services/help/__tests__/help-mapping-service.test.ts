@@ -73,6 +73,44 @@ describe("HelpMappingService.searchSemantic()", () => {
   });
 });
 
+describe("HelpMappingService.reindex() pruning (#2076)", () => {
+  it("upserts current items and deletes vectors for slugs no longer present", async () => {
+    const deleted: string[] = [];
+    const upserted: string[] = [];
+    let recorded: string[] | null = null;
+    const prevEnv = (globalThis as any).__ENV;
+    (globalThis as any).__ENV = {
+      KV_CACHE: {
+        get: async () => ["old-removed", "keep-me"], // ledger from last reindex
+        put: async (_k: string, v: string) => {
+          recorded = JSON.parse(v);
+        },
+      },
+      AI: { run: async () => ({ data: [[0.1, 0.2, 0.3]] }) },
+      VECTORIZE: {
+        upsert: async (vs: Array<{ id: string }>) => upserted.push(...vs.map((v) => v.id)),
+        deleteByIds: async (ids: string[]) => deleted.push(...ids),
+        query: async () => ({ matches: [] }),
+      },
+    };
+    try {
+      const svc = new HelpMappingService(fakeDb([]));
+      const count = await svc.reindex([
+        { slug: "keep-me", text: "kept content" },
+        { slug: "new-one", text: "new content" },
+      ]);
+      assert.equal(count, 2);
+      assert.deepEqual(upserted.sort(), ["keep-me", "new-one"]);
+      // "old-removed" was in the ledger but not in the new set → pruned.
+      assert.deepEqual(deleted, ["old-removed"]);
+      // The new ledger records exactly the current slugs.
+      assert.deepEqual(recorded!.sort(), ["keep-me", "new-one"]);
+    } finally {
+      (globalThis as any).__ENV = prevEnv;
+    }
+  });
+});
+
 describe("HelpMappingService.remove()", () => {
   it("returns true when a row was deleted, false when none matched", async () => {
     const ok = new HelpMappingService(fakeDb([[{ contextKey: "dashboard" }]]));

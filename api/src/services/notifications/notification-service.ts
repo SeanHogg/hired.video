@@ -16,6 +16,8 @@
 
 import { getDb, schema } from "../../db/index.js";
 import { sendPushToUser } from "../push/web-push.js";
+import { isChannelAllowed } from "../../../../shared/notification-preferences.js";
+import { loadNotificationPreferences } from "./preferences.js";
 
 export type NotificationType =
   | "badge"
@@ -73,11 +75,24 @@ export const NotificationService = {
     }
 
     if (input.push !== false) {
-      await sendPushToUser(input.userId, {
-        title: input.title,
-        body: message,
-        url: input.url,
-      }).catch(() => undefined);
+      // Honour the user's push preference for this notification's category
+      // (gap #254). The durable row above is ALWAYS written — only the
+      // outbound push is gated. A prefs lookup failure errs toward sending
+      // so a cache/DB hiccup never silently swallows a notification.
+      let pushAllowed = true;
+      try {
+        const prefs = await loadNotificationPreferences(input.userId);
+        pushAllowed = isChannelAllowed(prefs, "push", input.type);
+      } catch {
+        pushAllowed = true;
+      }
+      if (pushAllowed) {
+        await sendPushToUser(input.userId, {
+          title: input.title,
+          body: message,
+          url: input.url,
+        }).catch(() => undefined);
+      }
     }
 
     return id;

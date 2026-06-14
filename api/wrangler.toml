@@ -129,6 +129,17 @@ PAYMENT_PROVIDER = "helcim"
 # wrangler secret put MICROSOFT_CLIENT_ID     # Azure Portal → App registrations
 # wrangler secret put MICROSOFT_CLIENT_SECRET # Callback: https://api.hired.video/api/auth/oauth/microsoft/callback
 # wrangler secret put API_URL                 # https://api.hired.video (used to build OAuth callback URLs)
+# -- Social publishing connection layer (PRD §5.0) --
+# Layer-1 developer-app creds. Self-lane callback:    https://api.hired.video/api/social/oauth/callback
+#                              Managed-lane callback:  https://api.hired.video/api/admin/social/oauth/callback
+# YouTube reuses YOUTUBE_CLIENT_ID/SECRET; Instagram + Facebook reuse META_APP_ID/SECRET;
+# LinkedIn reuses LINKEDIN_CLIENT_ID/SECRET (enable BOTH w_member_social and the
+# Community Management API product so Lane A can post to the Company Page).
+# wrangler secret put TIKTOK_CONTENT_CLIENT_KEY     # TikTok for Developers → Content Posting API app (NOT the ads app)
+# wrangler secret put TIKTOK_CONTENT_CLIENT_SECRET  # open.tiktokapis.com — distinct from TIKTOK_APP_ID (ads)
+# wrangler secret put X_CLIENT_ID                   # X developer portal (OAuth 2.0, paid tier) — PKCE
+# wrangler secret put X_CLIENT_SECRET
+# wrangler secret put SOCIAL_KMS_KEY                # token-column envelope key (falls back to PAID_MEDIA_KMS_KEY)
 # wrangler secret put TURNSTILE_SECRET_KEY    # Cloudflare dashboard → Turnstile → site → Secret key.
                                               # Paired with the frontend's VITE_TURNSTILE_SITE_KEY (managed via
                                               # frontend/scripts/inject-build-env.mjs). Gates every unauthenticated

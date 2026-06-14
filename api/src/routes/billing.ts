@@ -610,10 +610,14 @@ billingRoutes.get("/company/:companyId", async (c) => {
     ));
   const seatsUsed = Number(usedRow?.total ?? 0);
 
+  // No subscription yet → preview at the real configured seat price
+  // (admin-editable, defaults to $9.95) rather than a stale hardcoded $49,
+  // so the "before you buy" number matches what the PATCH below will charge.
+  const pricing = await getPricingConfig();
   const plan = companySub ?? {
     planTier: "starter",
     seatCount: 1,
-    pricePerSeatCents: 4900,
+    pricePerSeatCents: pricing.seatPriceCents,
     status: "none",
     billingInterval: "monthly",
   };

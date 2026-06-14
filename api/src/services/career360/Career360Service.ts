@@ -15,11 +15,12 @@
  * roadmap against the current state.
  */
 
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "../../db/index.js";
 import { createLLMClient, defineLenientIngest } from "../adapters/llm-client.js";
 import { recordTokenUsage } from "../billing/BillingService.js";
+import { getOrSetCached } from "../../utils/edge-cache.js";
 import {
   CareerTargetDocSchema,
   EvaluateRequestSchema,
@@ -28,10 +29,13 @@ import {
   SuggestTargetsResponseSchema,
   TargetRubricSchema,
   type CareerTargetDoc,
+  type Career360Outcomes,
   type Career360StateResponse,
   type EvaluateRequest,
   type EvaluationResult,
   type Gap,
+  type OutcomeSegmentId,
+  type OutcomeSignal,
   type RoadmapStep,
   type ScoreHistorySeries,
   type SelectedTarget,
@@ -42,7 +46,7 @@ import { ResumeContentSchema } from "../../../../shared/resume.js";
 import type { JwtPayload } from "../../types/index.js";
 import type { LLMEnv } from "../adapters/llm-client.js";
 
-const { users, userProfiles, toolRuns, resumeInformation } = schema;
+const { users, userProfiles, toolRuns, resumeInformation, savedJobs } = schema;
 
 // Tool ids whose `tool_runs.score` we plot as a sparkline under the
 // wheel. Stays in one place so adding a new "scored" tool is one line.
@@ -170,9 +174,14 @@ interface SeekerSnapshot {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function getCareer360State(userId: string): Promise<Career360StateResponse> {
-  const doc = await loadDoc(userId);
-  const history = await loadScoreHistory(userId);
-  return { doc, history };
+  // Independent reads — fan out so the funnel aggregate doesn't serialise
+  // behind the doc/history loads.
+  const [doc, history, funnel] = await Promise.all([
+    loadDoc(userId),
+    loadScoreHistory(userId),
+    loadFunnelCounts(userId),
+  ]);
+  return { doc, history, outcomes: computeOutcomes(funnel, doc) };
 }
 
 /** Generate 3 candidate targets from the seeker's profile + resume +
@@ -667,6 +676,142 @@ function clampScore(n: number): number {
   if (n > 100) return 100;
   if (n < 0) return 0;
   return Math.round(n);
+}
+
+// ── Inner-ring outcomes (#421) ───────────────────────────────────────────────
+//
+// The wheel's inner ring tracks OUTCOMES (did applications convert?),
+// distinct from the outer ring's readiness gaps. We derive them from the
+// seeker's own funnel tracker — the `saved_jobs` pipeline — which is the
+// only table that models the full applied → interviewing → offered →
+// accepted lifecycle for a given user (`job_applications` is a flat
+// apply-record with no terminal outcome; `placements` is recruiter-side,
+// not the seeker's offers). Goal-fit is read straight off the active
+// target's gap severities. Until a user has enough applications the
+// signal stays "unknown" so a sample of one can't paint the ring.
+
+/** Below this many real applications, callback / offer rates are noise. */
+const MIN_APPLIED_FOR_SIGNAL = 3;
+/** Below this many reached-interview rows, conversion is noise. */
+const MIN_INTERVIEWS_FOR_SIGNAL = 2;
+/** Band cut-offs per signal (numerator/denominator → good ≥ / moderate ≥,
+ *  else poor). Loose industry benchmarks; centralised so tuning is one
+ *  edit. */
+const CALLBACK_THRESHOLDS = { good: 0.3, moderate: 0.12 } as const;
+const INTERVIEW_THRESHOLDS = { good: 0.4, moderate: 0.15 } as const;
+const OFFER_THRESHOLDS = { good: 0.12, moderate: 0.04 } as const;
+/** Goal-fit is a 0..1 score (1 = no gaps); these are its band cut-offs. */
+const GOALFIT_THRESHOLDS = { good: 0.7, moderate: 0.34 } as const;
+/** Funnel aggregate TTL. Short because `saved_jobs` status changes live
+ *  in the jobs domain and don't invalidate this key (see register #421
+ *  follow-up); 2 minutes bounds staleness without re-querying per load. */
+const OUTCOMES_CACHE_TTL_SECONDS = 120;
+
+export interface FunnelCounts {
+  /** Rows that represent a real submitted application (excludes "tracked"
+   *  = saved-not-applied and "cancelled" = job pulled). */
+  applied: number;
+  /** Rows that reached the interview stage or beyond. */
+  interviewed: number;
+  /** Rows that produced an offer (offered / accepted / declined-by-user). */
+  offered: number;
+}
+
+/** Read-through cached funnel aggregate. One `GROUP BY status` query per
+ *  miss — never per-status fan-out. */
+async function loadFunnelCounts(userId: string): Promise<FunnelCounts> {
+  return getOrSetCached<FunnelCounts>({
+    key: `c360:funnel:${userId}`,
+    ttlSeconds: OUTCOMES_CACHE_TTL_SECONDS,
+    loader: () => computeFunnelCounts(userId),
+  });
+}
+
+async function computeFunnelCounts(userId: string): Promise<FunnelCounts> {
+  const db = getDb();
+  const rows = await db
+    .select({ status: savedJobs.status, n: sql<number>`count(*)::int` })
+    .from(savedJobs)
+    .where(eq(savedJobs.userId, userId))
+    .groupBy(savedJobs.status);
+
+  const byStatus = new Map<string, number>();
+  for (const row of rows) byStatus.set(row.status, Number(row.n) || 0);
+  const n = (status: string) => byStatus.get(status) ?? 0;
+
+  const interviewed = n("interviewing") + n("offered") + n("accepted") + n("declined");
+  const offered = n("offered") + n("accepted") + n("declined");
+  // `rejected` / `withdrawn` were applied to but never reached interview;
+  // they count toward the denominator only.
+  const applied = interviewed + n("applied") + n("rejected") + n("withdrawn");
+  return { applied, interviewed, offered };
+}
+
+/** Build the four inner-ring outcomes. Pure — goal-fit reads the freshly
+ *  loaded `doc` (so selecting/refreshing a target updates it without
+ *  touching the funnel cache); the three funnel signals read `counts`.
+ *  Exported for unit coverage of the banding/floor math. */
+export function computeOutcomes(counts: FunnelCounts, doc: CareerTargetDoc | null): Career360Outcomes {
+  return [
+    funnelSignal(
+      "callback-rate",
+      counts.interviewed,
+      counts.applied,
+      CALLBACK_THRESHOLDS,
+      MIN_APPLIED_FOR_SIGNAL,
+    ),
+    funnelSignal(
+      "interview-conversion",
+      counts.offered,
+      counts.interviewed,
+      INTERVIEW_THRESHOLDS,
+      MIN_INTERVIEWS_FOR_SIGNAL,
+    ),
+    funnelSignal(
+      "offer-rate",
+      counts.offered,
+      counts.applied,
+      OFFER_THRESHOLDS,
+      MIN_APPLIED_FOR_SIGNAL,
+    ),
+    goalFitSignal(doc),
+  ];
+}
+
+function funnelSignal(
+  id: OutcomeSegmentId,
+  numerator: number,
+  denominator: number,
+  thresholds: { good: number; moderate: number },
+  minDenominator: number,
+): OutcomeSignal {
+  if (denominator < minDenominator) {
+    return { id, health: "unknown", rate: null, sampleSize: denominator };
+  }
+  const rate = denominator > 0 ? numerator / denominator : 0;
+  const health =
+    rate >= thresholds.good ? "good" : rate >= thresholds.moderate ? "moderate" : "poor";
+  return { id, health, rate, sampleSize: denominator };
+}
+
+/** Goal-fit blends the active target's gap severities into a single 0..1
+ *  fit score (1 = no high-severity gaps). No active target / no gaps →
+ *  "unknown". */
+function goalFitSignal(doc: CareerTargetDoc | null): OutcomeSignal {
+  const gaps = doc?.selected?.gaps ?? [];
+  if (!doc?.selected || gaps.length === 0) {
+    return { id: "goal-fit", health: "unknown", rate: null, sampleSize: gaps.length };
+  }
+  const weight = { low: 0, medium: 1, high: 2 } as const;
+  const meanSeverity =
+    gaps.reduce((sum, g) => sum + weight[g.severity], 0) / gaps.length;
+  // Invert: more/severe gaps → lower fit. meanSeverity ∈ [0,2] → fit ∈ [0,1].
+  const fit = 1 - meanSeverity / 2;
+  const health =
+    fit >= GOALFIT_THRESHOLDS.good ? "good"
+    : fit >= GOALFIT_THRESHOLDS.moderate ? "moderate"
+    : "poor";
+  return { id: "goal-fit", health, rate: fit, sampleSize: gaps.length };
 }
 
 // ── Prompts ──────────────────────────────────────────────────────────────────

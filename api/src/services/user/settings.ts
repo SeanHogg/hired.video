@@ -1,18 +1,9 @@
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "../../../../shared/notification-preferences.js";
+
+/** Canonical default notification matrix. SSoT is
+ *  shared/notification-preferences.ts so the dispatcher + frontend agree. */
 export function defaultNotificationPreferences() {
-  return {
-    emailJobMatches: true,
-    emailApplicationUpdates: true,
-    emailMessages: true,
-    emailConnectionRequests: true,
-    emailWeeklyDigest: true,
-    emailMarketingUpdates: false,
-    pushJobMatches: true,
-    pushApplicationUpdates: true,
-    pushMessages: true,
-    pushConnectionRequests: true,
-    smsImportantUpdates: false,
-    smsSecurityAlerts: true,
-  };
+  return { ...DEFAULT_NOTIFICATION_PREFERENCES };
 }
 
 export function defaultPrivacyPreferences() {

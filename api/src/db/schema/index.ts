@@ -91,3 +91,4 @@ export * from "./resumeFeedback.js";
 export * from "./feedFeatures.js";
 export * from "./roleFeatureAccess.js";
 export * from "./usageTracking.js";
+export * from "./social.js";

@@ -9,6 +9,7 @@
 import { z } from "zod";
 import {
   CareerTargetDocSchema,
+  Career360OutcomesSchema,
   EvaluationResultSchema,
   SuggestTargetsResponseSchema,
   TargetSuggestionSchema,
@@ -36,6 +37,9 @@ const ScoreHistorySeriesSchema = z.object({
 const StateResponseSchema = z.object({
   doc: z.union([CareerTargetDocSchema, z.null()]),
   history: z.array(ScoreHistorySeriesSchema),
+  // Inner-ring funnel outcomes (#421). Defaulted so a payload from an
+  // older API build (pre-outcomes) still validates as "no signal yet".
+  outcomes: Career360OutcomesSchema.default([]),
 });
 
 // Inferred shape matches Zod's union output: `doc` may be undefined

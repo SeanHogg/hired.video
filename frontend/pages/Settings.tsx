@@ -1469,6 +1469,27 @@ function SettingsContent() {
               </TabsContent>
 
               <TabsContent value="integrations" className="space-y-6">
+                {/* Social publishing connections (PRD §5.0, Lane B). The full
+                    connect/disconnect surface lives at /settings/connections;
+                    this card is the discoverable entry point. */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Share2 className="h-5 w-5" />
+                      Social publishing
+                    </CardTitle>
+                    <CardDescription>
+                      Connect your TikTok, YouTube, Instagram, LinkedIn, Facebook, or X
+                      accounts to publish your Studio content directly to them.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button asChild variant="outline">
+                      <Link to="/settings/connections">Manage connected accounts</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
                 {/* SuperAdmin: Company YouTube Channel Configuration */}
                 {isSuperAdmin && (
                   <Card>

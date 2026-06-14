@@ -431,6 +431,17 @@ async function getOrCreatePayoutProfile(db: ReturnType<typeof getDb>, userId: st
   return created;
 }
 
+// GET /me/earnings-rollup — lifetime earnings broken out by revenue source
+// (#1185). Aggregates the payout ledger's accrual rows per source_kind and
+// folds them into human-facing buckets (promo video / voice / template /
+// service / course / article / contract). Cached read-through in the service.
+creatorRoutes.get("/me/earnings-rollup", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const rollup = await payoutLedgerService.getEarningsRollup(userId);
+  return c.json(success(rollup), 200);
+});
+
 // GET /me/payout-profile — read or lazily create the caller's payout row.
 creatorRoutes.get("/me/payout-profile", async (c) => {
   const userId = requireAuth(c);

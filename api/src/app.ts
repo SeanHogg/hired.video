@@ -49,6 +49,10 @@ import {
   liveScreenRecruiterRoutes,
   liveScreenPublicRoutes,
 } from "./routes/live-screen.js";
+import {
+  screeningRoutes,
+  screeningPublicRoutes,
+} from "./routes/screening.js";
 import { matchRoutes } from "./routes/match.js";
 import { messageRoutes } from "./routes/messages.js";
 import { notificationRoutes } from "./routes/notifications.js";
@@ -184,6 +188,8 @@ import { verifyRoutes } from "./routes/verify.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
 import { paidMediaRoutes } from "./routes/paid-media.js";
+import { socialRoutes } from "./routes/social.js";
+import { adminSocialRoutes } from "./routes/admin-social.js";
 import { clickIdCaptureMiddleware } from "./middleware/clickIdCapture.js";
 import { careerRoutes } from "./routes/career.js";
 import { phoneRoutes } from "./routes/phone.js";
@@ -342,6 +348,12 @@ export function createApp() {
     // /oauth/start (POST) stays auth-required.
     "/api/paid-media/oauth/callback",
     "/api/paid-media/pixels/public",
+    // Social connection OAuth callbacks — top-level browser navigations that
+    // ride the signed `state` (no Authorization header survives the consent
+    // redirect). The platform + lane + owner are inside the signed state; a
+    // managed-scope state can only have been minted by the SA-gated auth-url.
+    "/api/social/oauth/callback",
+    "/api/admin/social/oauth/callback",
     // Pre-signup security checks. Geo eligibility is the gate that hides
     // the signup form for sanctioned regions / shows the waitlist for
     // not-yet-launched ones (`<RegisterGate>` reads it). The waitlist POST
@@ -487,6 +499,16 @@ export function createApp() {
   // intended behavior.
   const EVENTS_PUBLIC_ROUTE = /^\/api\/events(?:\/(?:slug\/[^/]+|[^/]+))?(?:$|\?)/;
 
+  // Candidate-screening portal: a candidate opens the magic link from their
+  // invite email at /api/public/screening/:token before (or without) signing
+  // in. Optional auth — the token in the path is the access grant, but a
+  // present JWT lets the handler bind the request to the signed-in user and
+  // pull already-on-file items (pull-don't-ask). GET (portal view), POST
+  // /claim (binds the user — 401s itself when anonymous), and POST
+  // /items/:id/satisfy all share this mode. NOT in PUBLIC_PREFIXES on purpose:
+  // a "public" classification would never attach the user, breaking the bind.
+  const SCREENING_PORTAL_ROUTE = /^\/api\/public\/screening(?:\/|$)/;
+
   // Resume-feedback share link: a peer/coach opens GET /api/resume-feedback/link/:token
   // before (or without) signing in. Optional auth so the handler can claim the
   // link for an authenticated visitor; the share token is the access grant.
@@ -536,6 +558,7 @@ export function createApp() {
     if (COURSES_SCORM_ASSET_ROUTE.test(path)) return "public";
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
+    if (SCREENING_PORTAL_ROUTE.test(path)) return "optional-auth";
     if (USAGE_TRACK_ROUTE.test(path)) return "optional-auth";
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (method === "GET" && RESUME_FEEDBACK_LINK_ROUTE.test(path)) return "optional-auth";
@@ -815,8 +838,10 @@ export function createApp() {
   app.route("/api/ats", atsRoutes);
   app.route("/api/recruit", candidatesRoutes);
   app.route("/api/recruit/pitch-decks", pitchDeckRoutes);
+  app.route("/api/recruit/screening", screeningRoutes);
   app.route("/api/public/candidate-resume", candidateResumePublicRoutes);
   app.route("/api/public/pitch-deck", pitchDeckPublicRoutes);
+  app.route("/api/public/screening", screeningPublicRoutes);
   app.route("/api/assessments", assessmentRoutes);
   app.route("/api/predictive-assessments", predictiveAssessmentRoutes);
   app.route("/api/audit", userAuditRoutes);
@@ -851,6 +876,8 @@ export function createApp() {
   // for the redemption UI; debit happens server-side from boosts.ts.
   app.route("/api/campaign-dollars", campaignDollarsRoutes);
   app.route("/api/paid-media", paidMediaRoutes);
+  app.route("/api/admin/social", adminSocialRoutes); // SA managed brand accounts (Lane A, layer 2)
+  app.route("/api/social", socialRoutes); // social connection layer + Lane B (PRD §5.0)
   app.route("/api/career", careerRoutes);
   app.route("/api/phone", phoneRoutes);
   app.route("/api/modules", publicModuleRoutes);

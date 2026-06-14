@@ -82,6 +82,20 @@ export interface Env {
   PAID_MEDIA_KMS_KEY?: string;
   // Base URL of the API (used to build OAuth redirect URIs).
   BASE_URL?: string;
+  // ─── Social publishing connection layer (PRD §5.0) ──────────────────────
+  // Layer-1 developer-app credentials, one pair per platform. YouTube +
+  // LinkedIn + Meta reuse the keys declared above. TikTok's *organic*
+  // Content Posting API uses a DISTINCT app from the ads TIKTOK_APP_ID above
+  // (open.tiktokapis.com, not business-api) — hence its own keys.
+  TIKTOK_CONTENT_CLIENT_KEY?: string;
+  TIKTOK_CONTENT_CLIENT_SECRET?: string;
+  X_CLIENT_ID?: string;
+  X_CLIENT_SECRET?: string;
+  // Envelope-encryption key for social_connections / managed_accounts token
+  // columns. Falls back to PAID_MEDIA_KMS_KEY when unset (services/social/secrets.ts).
+  SOCIAL_KMS_KEY?: string;
+  // Absolute API origin used to build social OAuth redirect URIs.
+  API_URL?: string;
 }
 
 // ── Hono context variables ───────────────────────────────────────────────────

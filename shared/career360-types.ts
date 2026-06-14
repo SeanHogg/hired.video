@@ -258,9 +258,44 @@ export interface ScoreHistorySeries {
   points: ScoreHistoryPoint[];
 }
 
+// ── Inner-ring outcomes (#421) ───────────────────────────────────────────────
+
+/** The four inner-ring segment ids — funnel outcomes the wheel colors
+ *  in once there's enough real signal. Mirrors `INNER_BLUEPRINT` in the
+ *  Career 360 page so the server and the wheel agree on the keys. */
+export const OUTCOME_SEGMENT_IDS = [
+  "callback-rate",
+  "interview-conversion",
+  "offer-rate",
+  "goal-fit",
+] as const;
+export type OutcomeSegmentId = (typeof OUTCOME_SEGMENT_IDS)[number];
+
+/** One inner-ring outcome. `rate` is the underlying 0..1 ratio when the
+ *  signal is funnel-derived (callback / interview-conversion / offer) or
+ *  the 0..1 goal-fit score; `null` when there's no measurable rate.
+ *  `sampleSize` is the denominator the rate was computed over — 0 (or
+ *  below the per-signal floor) yields `health: "unknown"` so a couple of
+ *  applications can't paint the ring a misleading green or red. */
+export const OutcomeSignalSchema = z.object({
+  id: z.enum(OUTCOME_SEGMENT_IDS),
+  health: z.enum(["good", "moderate", "poor", "unknown"]),
+  rate: z.number().nullable(),
+  sampleSize: z.number().int().nonnegative(),
+});
+export type OutcomeSignal = z.infer<typeof OutcomeSignalSchema>;
+
+/** The four inner-ring outcomes, in `OUTCOME_SEGMENT_IDS` order. */
+export const Career360OutcomesSchema = z.array(OutcomeSignalSchema);
+export type Career360Outcomes = z.infer<typeof Career360OutcomesSchema>;
+
 export interface Career360StateResponse {
   doc: CareerTargetDoc | null;
   history: ScoreHistorySeries[];
+  /** Inner-ring funnel outcomes (#421). Empty only for ancient clients /
+   *  payloads predating the field; the page treats a missing entry as
+   *  "unknown". */
+  outcomes: Career360Outcomes;
 }
 
 // ── Per-item re-evaluation ───────────────────────────────────────────────────

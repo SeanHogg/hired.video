@@ -44,6 +44,11 @@ import type {
   UpdateGoalInput,
 } from "../../../repositories/peopleGoalsRepository.js";
 import type { PeopleSegmentScope } from "../../../services/people-ops/segment.js";
+import type {
+  PeopleOpsEventSink,
+  PeopleOpsEvent,
+  PeopleOpsEventContext,
+} from "../events.js";
 
 let _id = 0;
 const uid = () => `00000000-0000-4000-8000-${String(++_id).padStart(12, "0")}`;
@@ -265,15 +270,29 @@ function build(members: Member[] = []) {
   const oneOnOnes = new FakeOneOnOnes();
   const actionItems = new FakeActionItems();
   const goals = new FakeGoals();
+  const events = new SpyEventSink();
   const svc = new PeopleOpsService({
     employees,
     oneOnOnes,
     actionItems,
     goals,
     getActiveCompanyMembers: async () => members,
+    events,
     now: () => new Date("2026-06-01T00:00:00Z"),
   });
-  return { svc, employees, oneOnOnes, actionItems, goals };
+  return { svc, employees, oneOnOnes, actionItems, goals, events };
+}
+
+/** Captures every emitted (ctx, event) so tests can assert the audit/notify
+ *  fan-out is triggered with the right shape (#1824). */
+class SpyEventSink implements PeopleOpsEventSink {
+  calls: { ctx: PeopleOpsEventContext; event: PeopleOpsEvent }[] = [];
+  emit(ctx: PeopleOpsEventContext, event: PeopleOpsEvent) {
+    this.calls.push({ ctx, event });
+  }
+  byKind(kind: PeopleOpsEvent["kind"]) {
+    return this.calls.filter((c) => c.event.kind === kind);
+  }
 }
 
 const scopeA: PeopleSegmentScope = {
@@ -574,5 +593,96 @@ describe("PeopleOpsService — Goals / OKRs (PO-4)", () => {
       () => ctx.svc.getGoal(scopeB, goal.id),
       (e) => e instanceof PeopleOpsServiceError && e.code === "NOT_FOUND",
     );
+  });
+});
+
+// ── Audit + notification emission (#1824) ─────────────────────────────────────
+describe("PeopleOpsService — events emission (#1824)", () => {
+  const actor = "user-actor";
+
+  it("emits employee_added on roster add with the linked user as recipient", async () => {
+    const { svc, events } = build();
+    const row = await svc.createEmployee(scopeA, baseEmp({ userId: "user-jane" }), actor);
+    const added = events.byKind("employee_added");
+    assert.equal(added.length, 1);
+    assert.equal(added[0].ctx.actorUserId, actor);
+    assert.equal(added[0].ctx.companyId, "cA");
+    assert.equal((added[0].event as any).employeeId, row.id);
+    assert.equal((added[0].event as any).recipientUserId, "user-jane");
+    assert.equal((added[0].event as any).employeeName, "Jane Doe");
+  });
+
+  it("emits employee_promoted only when position/department/manager changes", async () => {
+    const { svc, events } = build();
+    const e = await svc.createEmployee(scopeA, baseEmp({ userId: "user-jane" }), actor);
+
+    // Silent edit: notes only → no promote event.
+    await svc.updateEmployee(scopeA, e.id, { notes: "great q" }, actor);
+    assert.equal(events.byKind("employee_promoted").length, 0);
+
+    // Role move: position change → one promote event listing the changed field.
+    await svc.updateEmployee(scopeA, e.id, { position: "Staff Engineer" }, actor);
+    const promoted = events.byKind("employee_promoted");
+    assert.equal(promoted.length, 1);
+    assert.deepEqual((promoted[0].event as any).changes, ["position"]);
+    assert.equal((promoted[0].event as any).recipientUserId, "user-jane");
+  });
+
+  it("emits employee_removed (audit-only payload, no recipient field) on delete", async () => {
+    const { svc, events } = build();
+    const e = await svc.createEmployee(scopeA, baseEmp({ userId: "user-jane" }), actor);
+    await svc.deleteEmployee(scopeA, e.id, actor);
+    const removed = events.byKind("employee_removed");
+    assert.equal(removed.length, 1);
+    assert.equal((removed[0].event as any).employeeId, e.id);
+    assert.equal((removed[0].event as any).employeeName, "Jane Doe");
+  });
+
+  it("emits one_on_one_scheduled carrying both participant + supervisor employee ids", async () => {
+    const { svc, events } = build();
+    const sup = await svc.createEmployee(scopeA, baseEmp({ email: "sup@a.com" }), actor);
+    const part = await svc.createEmployee(scopeA, baseEmp({ email: "part@a.com" }), actor);
+    const session = await svc.createOneOnOne(
+      scopeA,
+      { supervisorId: sup.id, participantId: part.id, scheduledDate: new Date("2026-06-10T00:00:00Z") },
+      actor,
+    );
+    const scheduled = events.byKind("one_on_one_scheduled");
+    assert.equal(scheduled.length, 1);
+    assert.equal((scheduled[0].event as any).oneOnOneId, session.id);
+    assert.equal((scheduled[0].event as any).supervisorEmployeeId, sup.id);
+    assert.equal((scheduled[0].event as any).participantEmployeeId, part.id);
+  });
+
+  it("emits action_items_assigned only for items that have an assignee", async () => {
+    const { svc, events } = build();
+    const sup = await svc.createEmployee(scopeA, baseEmp({ email: "sup@a.com" }), actor);
+    const part = await svc.createEmployee(scopeA, baseEmp({ email: "part@a.com" }), actor);
+    const session = await svc.createOneOnOne(
+      scopeA,
+      { supervisorId: sup.id, participantId: part.id, scheduledDate: new Date() },
+      actor,
+    );
+    await svc.addOneOnOneActionItems(scopeA, session.id, actor, [
+      { title: "Assigned task", assigneeEmployeeId: part.id },
+      { title: "Unassigned note" },
+    ]);
+    const assigned = events.byKind("action_items_assigned");
+    assert.equal(assigned.length, 1);
+    assert.deepEqual((assigned[0].event as any).assigneeEmployeeIds, [part.id]);
+    assert.equal((assigned[0].event as any).count, 1);
+  });
+
+  it("does not emit action_items_assigned when no item has an assignee", async () => {
+    const { svc, events } = build();
+    const sup = await svc.createEmployee(scopeA, baseEmp({ email: "sup@a.com" }), actor);
+    const part = await svc.createEmployee(scopeA, baseEmp({ email: "part@a.com" }), actor);
+    const session = await svc.createOneOnOne(
+      scopeA,
+      { supervisorId: sup.id, participantId: part.id, scheduledDate: new Date() },
+      actor,
+    );
+    await svc.addOneOnOneActionItems(scopeA, session.id, actor, [{ title: "No assignee" }]);
+    assert.equal(events.byKind("action_items_assigned").length, 0);
   });
 });

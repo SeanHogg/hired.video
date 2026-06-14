@@ -35,9 +35,9 @@ const {
 
 /** Universal seat price per `[[project_pricing_seats]]` — $9.95/mo. Canonical
  *  value lives in shared/pricing.ts `SEAT_PRICE_CENTS`; aliased here so the
- *  existing call sites stay terse. The 4900¢ default on
- *  companySubscriptions.pricePerSeatCents is stale; workforce rows always
- *  stamp the correct 995¢ at create time. */
+ *  existing call sites stay terse. The companySubscriptions.pricePerSeatCents
+ *  column default was realigned from the stale 4900¢ to SEAT_PRICE_CENTS in
+ *  migration 0320; workforce rows still stamp 995¢ explicitly at create time. */
 const WORKFORCE_SEAT_PRICE_CENTS = SEAT_PRICE_CENTS;
 
 // ---------------------------------------------------------------------------

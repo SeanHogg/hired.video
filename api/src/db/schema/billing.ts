@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
+import { SEAT_PRICE_CENTS } from "../../../../shared/pricing.js";
 
 export const subscriptionPlans = pgTable("subscription_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -173,8 +174,11 @@ export const companySubscriptions = pgTable("company_subscriptions", {
   // which raises the limit. Distinct from seatCount (the count actually
   // billed). Default 0 = the first employee seat needs confirmation.
   seatLimit: integer("seat_limit").default(0).notNull(),
-  // Price in cents per seat per month (e.g. 4900 = $49)
-  pricePerSeatCents: integer("price_per_seat_cents").default(4900).notNull(),
+  // Price in cents per seat per month. Canonical default = SEAT_PRICE_CENTS
+  // ($9.95) per [[project_pricing_seats]] — every seat is the same Pro price.
+  // (Was a stale 4900¢/$49 default that contradicted the product; migration
+  // 0320 realigns the DB default + backfills the leftover 4900 rows.)
+  pricePerSeatCents: integer("price_per_seat_cents").default(SEAT_PRICE_CENTS).notNull(),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
   stripeCustomerId: text("stripe_customer_id"),
   status: varchar("status", { length: 50 }).default("active").notNull(),

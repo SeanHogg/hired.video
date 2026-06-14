@@ -29,7 +29,9 @@ import {
   TOKEN_PACKS,
   INBOX_SYNC_INCLUDED_ACCOUNTS,
   INBOX_SYNC_EXTRA_ACCOUNT_PRICE,
+  SEAT_PRICE_CENTS,
 } from "../../../../shared/pricing.js";
+import { companySubscriptions } from "../../db/schema/billing.js";
 import { isAdminRole, deriveAudience, deriveTier } from "../../domains/billing/audience.js";
 import type { JwtPayload } from "../../types/index.js";
 
@@ -68,6 +70,30 @@ describe("Pricing constants", () => {
     // these two constants — pin them so the add-on contract can't drift.
     assert.equal(INBOX_SYNC_INCLUDED_ACCOUNTS, 3);
     assert.equal(INBOX_SYNC_EXTRA_ACCOUNT_PRICE, 5);
+  });
+
+  it("Every seat is the canonical $9.95 (995¢) — no stale $49 default (project_pricing_seats)", () => {
+    // SEAT_PRICE_CENTS is the SSoT for the seat soft-cap prompt, the workforce
+    // reconciler, the PricingConfig default, and the company_subscriptions
+    // column default. Pin it + assert the per-seat dollar value matches Pro.
+    assert.equal(SEAT_PRICE_CENTS, 995);
+    assert.equal(SEAT_PRICE_CENTS, Math.round(PRO_MONTHLY_PRICE * 100));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// company_subscriptions seat-price default (migration 0320)
+//
+// The column shipped with a stale 4900¢ ($49) default that contradicted the
+// product. The Drizzle default must now equal SEAT_PRICE_CENTS so a row
+// inserted without an explicit price bills the right amount.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("company_subscriptions.pricePerSeatCents default", () => {
+  it("defaults to SEAT_PRICE_CENTS (995¢), not the retired 4900¢", () => {
+    const def = (companySubscriptions.pricePerSeatCents as unknown as { default: number }).default;
+    assert.equal(def, SEAT_PRICE_CENTS);
+    assert.notEqual(def, 4900);
   });
 });
 
