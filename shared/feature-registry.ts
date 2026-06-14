@@ -43,6 +43,13 @@ export interface FeatureRegistryEntry {
   href?: string;
   /** Icon-name SSoT — the frontend maps this to a Lucide component. */
   icon?: string;
+  /** Capability (RBAC verb) this surface ALSO requires — the reconcile of the
+   *  capability axis (rolePermissionOverrides / userPermissionOverrides) with
+   *  surface visibility (#2042). When set, the surface is visible only if the
+   *  role-access manifest allows it AND the viewer holds this capability. No
+   *  current entry sets it (forward seam); the resolver only gates when both a
+   *  capability is required and the caller supplies the capability set. */
+  requiresCapability?: string;
 }
 
 /** Every manageable role, in admin-UI display order (product personas first,
@@ -175,6 +182,27 @@ export function getRegistryEntry(key: string): FeatureRegistryEntry | undefined 
 export function isKnownFeatureKey(key: string): boolean {
   return REGISTRY_BY_KEY.has(key);
 }
+
+/**
+ * Optional per-role primary mobile CTA (#2048). The mobile bottom bar has only
+ * ~5 slots, so a role's single most-important action (employer → Post a Job,
+ * staff → Admin) is surfaced here rather than as a nav rail item. One shared
+ * data map (not a per-role `switch` in the component) keeps it DRY; the
+ * frontend maps `icon` to a component. Roles with no entry get no CTA slot.
+ */
+export interface MobileCta {
+  labelKey: string;
+  label: string;
+  href: string;
+  icon: string;
+}
+
+export const MOBILE_PRIMARY_CTA: Partial<Record<UserRole, MobileCta>> = {
+  [USER_ROLES.EMPLOYER]: { labelKey: "labels.postJob", label: "Post Job", href: "/post-a-job", icon: "PlusSquare" },
+  [USER_ROLES.RECRUITER]: { labelKey: "labels.postJob", label: "Post Job", href: "/post-a-job", icon: "PlusSquare" },
+  [USER_ROLES.ADMIN]: { labelKey: "labels.adminPanel", label: "Admin", href: "/admin/dashboard", icon: "Shield" },
+  [USER_ROLES.SUPER_ADMIN]: { labelKey: "labels.adminPanel", label: "Admin", href: "/admin/dashboard", icon: "Shield" },
+};
 
 /** Dynamic kinds whose entries are built at runtime from a frontend catalog
  *  (so they aren't in the static shared registry) but are still valid override

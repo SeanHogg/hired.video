@@ -76,12 +76,13 @@ export function moduleGateByPath(
     const map = await getModuleStatusMap();
     if (map.get(slug) === false) return forbidden(c, slug);
 
-    // Per-role disable (role_feature_access, #2039) — absorbs the global module
-    // gate into the per-role manifest. Reads the role's cached overrides, so
-    // this stays cheap on the hot path.
+    // Per-role disable (role_feature_access, #2039) + per-user grant precedence
+    // (#2042) — absorbs the global module gate into the per-role manifest. Reads
+    // cached per-role overrides + per-user assignments, so it stays cheap.
     const role = resolveAccessRole(c.var.user?.roles);
-    const svc = new RoleAccessService(buildRepos(getDb()).roleFeatureAccess);
-    if (!(await svc.isFeatureEnabledForRole(role, `module:${slug}`))) {
+    const repos = buildRepos(getDb());
+    const svc = new RoleAccessService(repos.roleFeatureAccess, repos.authz);
+    if (!(await svc.isFeatureEnabledForUser(c.var.user?.sub, role, `module:${slug}`))) {
       return forbidden(c, slug);
     }
     return next();

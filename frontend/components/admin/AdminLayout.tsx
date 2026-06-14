@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
+import { useRoleAccess } from "@/hooks/use-role-access";
 import { AppShell } from "@/components/AppShell";
 
 const TABS: { resource: AdminResource; label: string; href: string; icon: React.ElementType }[] = [
@@ -55,11 +56,17 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { hasAnyAccess, canAccess } = useAdminPermissions();
+  const { canSee } = useRoleAccess();
 
   // No admin access at all — send back to dashboard
   if (!hasAnyAccess) return <Navigate to="/dashboard" replace />;
 
-  const visibleTabs = TABS.filter(({ resource }) => canAccess(resource));
+  // A tab shows when the role has CRUD read access (admin-permissions) AND the
+  // SuperAdmin hasn't hidden it for this role via the role-access manifest
+  // (#2040). canSee fail-opens, so this is zero-regression by default.
+  const visibleTabs = TABS.filter(
+    ({ resource }) => canAccess(resource) && canSee(`admin_tab:${resource}`),
+  );
 
   return (
     <AppShell bgClassName="bg-background">

@@ -8,10 +8,14 @@ import {
   LogIn,
   Video,
   Wrench,
+  PlusSquare,
+  Shield,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { useRoleAccess } from "@/hooks/use-role-access";
+import { MOBILE_PRIMARY_CTA } from "@shared/feature-registry";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -41,6 +45,9 @@ const MIDDLE_CANDIDATES: { label: string; href: string; icon: LucideIcon; key: s
 const HOME: NavItem = { label: "Home", href: "/", icon: Home };
 const DASHBOARD: NavItem = { label: "Dashboard", href: "/dashboard", icon: TrendingUp };
 
+/** Icon-name → component for the per-role mobile CTA (#2048). */
+const CTA_ICONS: Record<string, LucideIcon> = { PlusSquare, Shield };
+
 const ANON_ITEMS: NavItem[] = [
   HOME,
   { label: "Jobs", href: "/jobs", icon: Briefcase },
@@ -51,15 +58,26 @@ const ANON_ITEMS: NavItem[] = [
 
 export default function MobileBottomNav() {
   const location = useLocation();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
-  const { canSee } = useRoleAccess();
+  const { canSee, role } = useRoleAccess();
+
+  // Per-role primary CTA (employer → Post Job, staff → Admin). Takes one slot,
+  // leaving 2 for visible middle items so the bar stays at 5 (#2048).
+  const ctaDef = MOBILE_PRIMARY_CTA[role];
+  const cta: NavItem | null = ctaDef
+    ? {
+        label: t(ctaDef.labelKey, { defaultValue: ctaDef.label }),
+        href: ctaDef.href,
+        icon: CTA_ICONS[ctaDef.icon] ?? PlusSquare,
+        accent: true,
+      }
+    : null;
+
+  const middle = MIDDLE_CANDIDATES.filter((c) => canSee(c.key)).slice(0, cta ? 2 : 3);
 
   const items: NavItem[] = isAuthenticated
-    ? [
-        HOME,
-        ...MIDDLE_CANDIDATES.filter((c) => canSee(c.key)).slice(0, 3),
-        DASHBOARD,
-      ]
+    ? [HOME, ...(cta ? [cta] : []), ...middle, DASHBOARD]
     : ANON_ITEMS;
 
   return (

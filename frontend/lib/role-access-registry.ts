@@ -9,15 +9,36 @@
  */
 import {
   STATIC_REGISTRY,
+  ALL_ROLES,
   buildToolRegistryEntries,
   type FeatureRegistryEntry,
 } from "@shared/feature-registry";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
+import { ADMIN_RESOURCES, RESOURCE_LABELS } from "@/lib/admin-permissions";
+
+/** `admin_tab:` surfaces, one per admin resource. Override-only hard gate
+ *  layered on top of the admin CRUD matrix (admin-permissions.ts) — defaults
+ *  ALL_ROLES so nothing changes until a SuperAdmin hides a tab for a role
+ *  (#2040). Built client-side because the resource list + labels live here. */
+function buildAdminTabEntries(): FeatureRegistryEntry[] {
+  return ADMIN_RESOURCES.map((r, i) => ({
+    key: `admin_tab:${r}`,
+    kind: "admin_tab" as const,
+    group: "Admin",
+    labelKey: `admin.tab.${r}`,
+    label: RESOURCE_LABELS[r],
+    defaultRoles: ALL_ROLES,
+    defaultEnabled: true,
+    enforce: false,
+    order: 300 + i,
+  }));
+}
 
 let cached: FeatureRegistryEntry[] | null = null;
 
-/** Combined registry (static nav+modules + catalog tools). Memoised — the
- *  catalog is module-constant, so this is built once per session. */
+/** Combined registry (static nav+modules + catalog tools + admin tabs).
+ *  Memoised — all inputs are module-constant, so this is built once per
+ *  session. */
 export function getClientFeatureRegistry(): FeatureRegistryEntry[] {
   if (!cached) {
     cached = [
@@ -25,6 +46,7 @@ export function getClientFeatureRegistry(): FeatureRegistryEntry[] {
       ...buildToolRegistryEntries(
         TOOLS_CATALOG.map((t) => ({ id: t.id, title: t.title })),
       ),
+      ...buildAdminTabEntries(),
     ];
   }
   return cached;

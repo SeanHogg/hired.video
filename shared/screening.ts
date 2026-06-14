@@ -23,7 +23,6 @@
  */
 
 import { z } from "zod";
-import { USER_ROLES, type UserRole } from "./user-roles.js";
 import { type AssessmentKind, isAssessmentKind } from "./assessments/kinds.js";
 
 // ---------------------------------------------------------------------------
@@ -114,13 +113,7 @@ export interface ScreeningCatalogEntry {
   /** Whether the item carries structured config (assessment kind, question
    *  list, reference count, tool id). */
   needsConfig: boolean;
-  /** Audience that authors this item. Screening is a hire-side workflow, so
-   *  every entry is recruiter/employer; kept explicit for parity with the
-   *  tools catalog audience model. */
-  audienceRoles: UserRole[];
 }
-
-const HIRE_SIDE: UserRole[] = [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER];
 
 export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
   {
@@ -130,7 +123,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: true,
     needsRef: false,
     needsConfig: false,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "contact_info",
@@ -139,7 +131,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: true,
     needsRef: false,
     needsConfig: false,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "predictive_assessment",
@@ -148,7 +139,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: false,
     needsRef: false,
     needsConfig: true,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "competency_test",
@@ -157,7 +147,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: false,
     needsRef: true,
     needsConfig: false,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "video_interview",
@@ -166,7 +155,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: false,
     needsRef: true,
     needsConfig: false,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "references",
@@ -175,7 +163,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: false,
     needsRef: false,
     needsConfig: true,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "tool_run",
@@ -184,7 +171,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: false,
     needsRef: false,
     needsConfig: true,
-    audienceRoles: HIRE_SIDE,
   },
   {
     itemType: "application_questions",
@@ -194,7 +180,6 @@ export const SCREENING_ITEM_CATALOG: ScreeningCatalogEntry[] = [
     alwaysRequired: false,
     needsRef: false,
     needsConfig: true,
-    audienceRoles: HIRE_SIDE,
   },
 ];
 

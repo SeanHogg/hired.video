@@ -3,6 +3,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { AUDIT_ACTIONS } from "../../utils/audit.js";
 import { invalidateModuleStatusCache } from "./moduleStatus.js";
+import { invalidateUserModulesCache } from "../admin/RoleAccessService.js";
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
 type Module = InferSelectModel<typeof schema.modules>;
@@ -152,6 +153,10 @@ export async function assignModuleToUser(
     metadata: { moduleId, moduleName: mod.name },
   });
 
+  // Per-user feature gate (#2042) caches a user's module slugs — drop it so the
+  // grant takes effect immediately rather than after the 120s TTL.
+  invalidateUserModulesCache(userId);
+
   return { ok: true, moduleName: mod.name };
 }
 
@@ -171,4 +176,7 @@ export async function removeModuleFromUser(
     targetId: userId,
     metadata: { moduleId },
   });
+
+  // Per-user feature gate (#2042) — drop the cached module slugs on revoke.
+  invalidateUserModulesCache(userId);
 }

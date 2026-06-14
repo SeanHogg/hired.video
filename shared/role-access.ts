@@ -82,13 +82,29 @@ export function resolveRoleAccess(
   role: UserRole,
   overrides: readonly RoleFeatureAccessRow[],
   registry: readonly FeatureRegistryEntry[] = STATIC_REGISTRY,
+  opts?: {
+    /** Per-USER deltas, applied as the highest-precedence tier over the role
+     *  overrides (#2042). Same shape; rows whose role !== the viewer's role are
+     *  ignored, so callers can pass the user's rows tagged with their role. */
+    userOverrides?: readonly RoleFeatureAccessRow[];
+    /** Capabilities (RBAC verbs) the viewer holds. When provided, a surface
+     *  with `requiresCapability` is hidden unless its capability is present.
+     *  Omit to skip capability gating entirely (zero regression). */
+    capabilities?: ReadonlySet<string>;
+  },
 ): RoleAccessManifest {
   const byKey = new Map<string, RoleFeatureAccessRow>();
   for (const o of overrides) {
     if (o.role === role) byKey.set(o.featureKey, o);
   }
+  // Per-user tier wins over role tier.
+  for (const o of opts?.userOverrides ?? []) {
+    if (o.role === role) byKey.set(o.featureKey, o);
+  }
 
-  const surfaces = registry.map((entry) => resolveOne(entry, role, byKey.get(entry.key)));
+  const surfaces = registry.map((entry) =>
+    resolveOne(entry, role, byKey.get(entry.key), opts?.capabilities),
+  );
   return { role, surfaces };
 }
 
@@ -102,9 +118,17 @@ function resolveOne(
   entry: FeatureRegistryEntry,
   role: UserRole,
   o: RoleFeatureAccessRow | undefined,
+  capabilities?: ReadonlySet<string>,
 ): ResolvedSurface {
   const defVisible = defaultVisibleForRole(entry, role);
-  const visible = o?.visible ?? defVisible;
+  // Capability gate (#2042): a surface that requires a capability is hidden
+  // when the caller supplies a capability set lacking it — applied on top of
+  // the visibility override (capability wins, it's authorization).
+  const capabilityOk =
+    !entry.requiresCapability ||
+    capabilities === undefined ||
+    capabilities.has(entry.requiresCapability);
+  const visible = (o?.visible ?? defVisible) && capabilityOk;
   const enabled = o?.enabled ?? entry.defaultEnabled;
   const rank = o?.rank ?? entry.order;
   const overridden =

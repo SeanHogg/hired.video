@@ -14,6 +14,7 @@ import type {
   IRoleFeatureAccessRepository,
   RoleFeatureAccessRow as DbRow,
 } from "../../repositories/roleFeatureAccessRepository.js";
+import type { IAuthzRepository } from "../../repositories/index.js";
 import { getOrSetCached, invalidateCachedKey } from "../../utils/edge-cache.js";
 import {
   resolveRoleAccess,
@@ -30,6 +31,13 @@ import type { UserRole } from "../../../../shared/user-roles.js";
 const CACHE_VERSION = "v1";
 const CACHE_TTL_SECONDS = 300;
 const cacheKey = (role: string) => `role-access:${CACHE_VERSION}:${role}`;
+const userModulesKey = (userId: string) => `user-modules:${CACHE_VERSION}:${userId}`;
+
+/** Drop a user's cached module-assignment slugs — call on grant/revoke so the
+ *  per-user feature gate (#2042) reflects the change immediately. */
+export function invalidateUserModulesCache(userId: string): void {
+  invalidateCachedKey(userModulesKey(userId));
+}
 
 /** Admin DTO — one stored override row, ISO-stamped for the wire. */
 export interface RoleAccessOverrideDto {
@@ -42,7 +50,11 @@ export interface RoleAccessOverrideDto {
 }
 
 export class RoleAccessService {
-  constructor(private readonly repo: IRoleFeatureAccessRepository) {}
+  constructor(
+    private readonly repo: IRoleFeatureAccessRepository,
+    /** Optional — only needed for the per-user feature gate (#2042). */
+    private readonly authz?: IAuthzRepository,
+  ) {}
 
   /** A role's raw override deltas (resolver-shaped), cached per role. This is
    *  the single cached read both `/me` (client resolves the combined registry
@@ -80,6 +92,38 @@ export class RoleAccessService {
     if (o?.enabled != null) return o.enabled;
     const entry = getRegistryEntry(key);
     return entry ? entry.defaultEnabled : true;
+  }
+
+  /**
+   * Per-user precedence over the role gate (#2042): an explicit module
+   * assignment (userModuleAssignments) enables a `module:<slug>` for that user
+   * even if their role disabled it. Falls through to the role gate otherwise.
+   * The per-user assignment slugs are cached (120s) — invalidate on
+   * grant/revoke via `invalidateUserModulesCache`.
+   */
+  async isFeatureEnabledForUser(
+    userId: string | undefined | null,
+    role: string,
+    key: string,
+  ): Promise<boolean> {
+    if (userId && this.authz && key.startsWith("module:")) {
+      const slug = key.slice("module:".length);
+      if ((await this.userModuleSlugs(userId)).includes(slug)) return true;
+    }
+    return this.isFeatureEnabledForRole(role, key);
+  }
+
+  private async userModuleSlugs(userId: string): Promise<string[]> {
+    if (!this.authz) return [];
+    const authz = this.authz;
+    return getOrSetCached<string[]>({
+      key: userModulesKey(userId),
+      ttlSeconds: 120,
+      loader: async () => {
+        const rows = await authz.findActiveAssignmentsForUser(userId);
+        return rows.map((r) => r.slug).filter(Boolean);
+      },
+    });
   }
 
   /** Every override row — the admin curation read. The admin UI resolves each
