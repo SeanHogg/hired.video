@@ -22,6 +22,30 @@ function isAdminRole(c: AppCtx): boolean {
   );
 }
 
+/** The slice of RoleAccessService the path gate actually calls (ISP). */
+type RoleAccessGate = Pick<RoleAccessService, "isFeatureEnabledForUser">;
+
+// Lazily-built singleton — the path gate runs on every /api/* request, so we
+// construct repos + service once per isolate (they're stateless, HTTP-backed)
+// rather than rebuilding `buildRepos(getDb())` per request. Same singleton
+// convention as `defaultApiDeps`. Tests override it via the seam below so the
+// gate never touches a real DB.
+let _roleAccessGate: RoleAccessGate | null = null;
+
+function getRoleAccessGate(): RoleAccessGate {
+  if (!_roleAccessGate) {
+    const repos = buildRepos(getDb());
+    _roleAccessGate = new RoleAccessService(repos.roleFeatureAccess, repos.authz);
+  }
+  return _roleAccessGate;
+}
+
+/** Test seam — inject a fake role-access gate (or `null` to reset to the real,
+ *  DB-backed singleton). Mirrors `__setModuleStatusCacheForTests`. */
+export function __setRoleAccessGateForTests(gate: RoleAccessGate | null): void {
+  _roleAccessGate = gate;
+}
+
 function forbidden(c: AppCtx, slug: string): Response {
   return c.json(
     {
@@ -80,9 +104,13 @@ export function moduleGateByPath(
     // (#2042) — absorbs the global module gate into the per-role manifest. Reads
     // cached per-role overrides + per-user assignments, so it stays cheap.
     const role = resolveAccessRole(c.var.user?.roles);
-    const repos = buildRepos(getDb());
-    const svc = new RoleAccessService(repos.roleFeatureAccess, repos.authz);
-    if (!(await svc.isFeatureEnabledForUser(c.var.user?.sub, role, `module:${slug}`))) {
+    if (
+      !(await getRoleAccessGate().isFeatureEnabledForUser(
+        c.var.user?.sub,
+        role,
+        `module:${slug}`,
+      ))
+    ) {
       return forbidden(c, slug);
     }
     return next();

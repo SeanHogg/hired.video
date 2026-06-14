@@ -24,6 +24,7 @@ import {
 import {
   requireModuleActive,
   moduleGateByPath,
+  __setRoleAccessGateForTests,
 } from "../../middleware/moduleGate.js";
 import type { Variables } from "../../types/index.js";
 
@@ -152,7 +153,15 @@ describe("requireModuleActive", () => {
 // middleware/moduleGate.ts — moduleGateByPath
 // ═══════════════════════════════════════════════════════════════════════════
 describe("moduleGateByPath", () => {
-  beforeEach(() => __clearModuleStatusCacheForTests());
+  // The path gate consults RoleAccessService.isFeatureEnabledForUser for the
+  // per-role (#2039) + per-user (#2042) layer once a module clears the global
+  // switch. Inject a fake so the suite never touches a DB; the global-switch
+  // tests want it to pass-through (everything enabled), while the dedicated
+  // per-role tests below substitute their own stub.
+  beforeEach(() => {
+    __clearModuleStatusCacheForTests();
+    __setRoleAccessGateForTests({ isFeatureEnabledForUser: async () => true });
+  });
 
   const registry = {
     "/api/ads": "ads",
@@ -227,5 +236,33 @@ describe("moduleGateByPath", () => {
     // Non-admin path matches /api/ads → ads (inactive) — should 403.
     const configRes = await app.request("/api/ads/config");
     assert.equal(configRes.status, 403);
+  });
+
+  it("403s when the module clears the global switch but the role gate denies it (#2039)", async () => {
+    setStatuses([["ads", true]]); // global switch ON
+    __setRoleAccessGateForTests({ isFeatureEnabledForUser: async () => false });
+    const app = buildApp(["job_seeker"]);
+
+    const res = await app.request("/api/ads/config");
+    assert.equal(res.status, 403);
+    const body = (await res.json()) as any;
+    assert.equal(body.error.code, "MODULE_DISABLED");
+    assert.equal(body.error.slug, "ads");
+  });
+
+  it("passes the user's id + resolved role + module key to the role gate (#2042)", async () => {
+    setStatuses([["ads", true]]);
+    const calls: Array<[string | undefined | null, string, string]> = [];
+    __setRoleAccessGateForTests({
+      isFeatureEnabledForUser: async (userId, role, key) => {
+        calls.push([userId, role, key]);
+        return true; // per-user grant wins even though the role disabled it
+      },
+    });
+    const app = buildApp(["job_seeker"]);
+
+    const res = await app.request("/api/ads/config");
+    assert.equal(res.status, 200);
+    assert.deepEqual(calls, [["u1", "job_seeker", "module:ads"]]);
   });
 });
