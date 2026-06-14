@@ -409,6 +409,7 @@ export default function Career360() {
     setState((prev) => ({
       doc: { ...(prev?.doc ?? {}), selected: next },
       history: prev?.history ?? [],
+      outcomes: prev?.outcomes ?? [],
     }));
     void recordRun(buildCareer360RunRecord(next));
   };
@@ -424,6 +425,7 @@ export default function Career360() {
           suggestedAt: new Date().toISOString(),
         },
         history: prev?.history ?? [],
+        outcomes: prev?.outcomes ?? [],
       }));
     } catch (err) {
       console.error("[career360] suggest failed", err);
