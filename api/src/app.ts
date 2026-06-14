@@ -162,6 +162,8 @@ import { articleRoutes } from "./routes/articles.js";
 import { adminArticleRoutes } from "./routes/admin-articles.js";
 import { feedFeatureRoutes } from "./routes/feed-features.js";
 import { adminFeedFeatureRoutes } from "./routes/admin-feed-features.js";
+import { roleAccessRoutes } from "./routes/role-access.js";
+import { adminRoleAccessRoutes } from "./routes/admin-role-access.js";
 import { adminCampaignRoutes } from "./routes/admin-campaigns.js";
 import { campaignsPublicRoutes } from "./routes/campaigns-public.js";
 import { emailPreferencesRoutes } from "./routes/email-preferences.js";
@@ -680,6 +682,7 @@ export function createApp() {
   app.route("/api/chat", messageRoutes); // legacy AI chat endpoint alias
   app.route("/api/feed", feedRoutes);
   app.route("/api/feed-features", feedFeatureRoutes); // SA-curated dashboard feed (read)
+  app.route("/api/role-access", roleAccessRoutes); // per-role feature/nav manifest (read)
   app.route("/api/notifications", notificationRoutes);
   app.route("/api/inbox", inboxRoutes);
   app.route("/api/integrations/email", emailIntegrationRoutes);
@@ -751,6 +754,7 @@ export function createApp() {
   app.route("/api/admin/job-sources", jobScraperAdminRoutes);
   app.route("/api/admin/articles", adminArticleRoutes);
   app.route("/api/admin/feed-features", adminFeedFeatureRoutes); // SA dashboard-feed curation
+  app.route("/api/admin/role-access", adminRoleAccessRoutes); // SA per-role feature/nav access
   app.route("/api/admin/campaigns", adminCampaignRoutes); // SA email-campaign manager
   app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/admin/community-resources", adminCommunityResourceRoutes);

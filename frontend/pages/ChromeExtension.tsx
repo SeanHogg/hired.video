@@ -238,7 +238,6 @@ export default function ChromeExtension() {
                       <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
                         <Briefcase className="h-3 w-3 mr-1" /> {t("labels.chromeExtension.jobSeeker")}
                       </Badge>
-                      <Badge variant="secondary">v2.1</Badge>
                     </div>
                     <CardTitle className="text-2xl">{t("headings.chromeExtension.jobSeekerCard")}</CardTitle>
                     <CardDescription className="text-base">
@@ -270,7 +269,6 @@ export default function ChromeExtension() {
                       <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                         <Users className="h-3 w-3 mr-1" /> {t("labels.chromeExtension.recruiterEmployer")}
                       </Badge>
-                      <Badge variant="secondary">v1.7</Badge>
                     </div>
                     <CardTitle className="text-2xl">{t("headings.chromeExtension.recruiterCard")}</CardTitle>
                     <CardDescription className="text-base">

@@ -199,6 +199,149 @@ async function processFollowUps(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Recruiter outreach sender (#2015)
+// Mirrors processFollowUps but for recruiter_outreach_enrollments, whose steps
+// live as a JSONB array on the sequence. Reuses the shared personalizeMessage
+// helper and the same MarketingConsentService gate as the nurture drip.
+// ---------------------------------------------------------------------------
+
+type OutreachStep = {
+  channel: "email" | "message" | "sms";
+  delayDays: number;
+  subject?: string;
+  body: string;
+  aiPersonalize?: boolean;
+};
+
+async function processRecruiterOutreach(): Promise<void> {
+  const db = getDb();
+  const now = new Date();
+
+  // Join the candidate in the same query so the per-row loop never N+1s for
+  // recipient email/name/company.
+  const due = await db
+    .select({
+      enrollment: schema.recruiterOutreachEnrollments,
+      sequence: schema.recruiterOutreachSequences,
+      candidateEmail: schema.talentPoolCandidates.candidateEmail,
+      candidateName: schema.talentPoolCandidates.candidateName,
+      candidateCompany: schema.talentPoolCandidates.currentCompany,
+    })
+    .from(schema.recruiterOutreachEnrollments)
+    .innerJoin(
+      schema.recruiterOutreachSequences,
+      eq(schema.recruiterOutreachEnrollments.sequenceId, schema.recruiterOutreachSequences.id),
+    )
+    .innerJoin(
+      schema.talentPoolCandidates,
+      eq(schema.recruiterOutreachEnrollments.talentPoolCandidateId, schema.talentPoolCandidates.id),
+    )
+    .where(
+      and(
+        eq(schema.recruiterOutreachEnrollments.status, "active"),
+        isNotNull(schema.recruiterOutreachEnrollments.nextSendAt),
+        lte(schema.recruiterOutreachEnrollments.nextSendAt, now),
+      ),
+    )
+    .limit(100);
+
+  if (due.length === 0) return;
+
+  const provider = getEmailProvider();
+  const consent = new MarketingConsentService(buildRepos(db).emailConsent as any);
+  const env = (globalThis as any).__ENV ?? {};
+
+  const completeEnrollment = (id: string) =>
+    db
+      .update(schema.recruiterOutreachEnrollments)
+      .set({ status: "completed", completedAt: now } as any)
+      .where(eq(schema.recruiterOutreachEnrollments.id, id));
+
+  for (const row of due) {
+    const { enrollment, sequence } = row;
+    try {
+      const steps = (sequence.steps ?? []) as OutreachStep[];
+      const step = steps[enrollment.currentStep];
+
+      if (!step) {
+        await completeEnrollment(enrollment.id);
+        continue;
+      }
+
+      const name = row.candidateName?.trim() || "there";
+      const company = row.candidateCompany ?? "";
+      let body = step.body
+        .replace(/\{\{name\}\}/gi, name)
+        .replace(/\{\{company\}\}/gi, company)
+        .replace(/\{\{(\w+)\}\}/g, () => "");
+
+      if (step.channel === "email") {
+        // No address to reach, or recipient suppressed → stop the sequence so it
+        // doesn't spin forever on an undeliverable candidate.
+        if (!row.candidateEmail || !(await consent.isMailable(row.candidateEmail, null))) {
+          await completeEnrollment(enrollment.id);
+          continue;
+        }
+        if (step.aiPersonalize) {
+          body = await personalizeMessage(env, undefined, {
+            body,
+            recipientName: name,
+            subject: step.subject,
+            context: { company },
+          });
+        }
+        if (provider) {
+          await provider
+            .send({
+              to: row.candidateEmail,
+              subject: step.subject || "Following up",
+              html: `<p>${body.replace(/\n/g, "<br>")}</p>`,
+            })
+            .catch((err: any) =>
+              console.error(`[outreach] send failed for ${enrollment.id}:`, err?.message ?? err),
+            );
+        }
+      }
+      // channel "message" / "sms" have no live transport yet — they advance the
+      // sequence (logged as an interaction) without delivery.
+
+      // Record the touch on the candidate timeline (reuses candidate_interactions).
+      await db
+        .insert(schema.candidateInteractions)
+        .values({
+          recruiterId: enrollment.recruiterId,
+          candidateId: enrollment.recruiterId, // placeholder until candidate links an account
+          talentPoolId: enrollment.talentPoolCandidateId,
+          type: "outreach_sent",
+          subject: step.subject || `Outreach step ${enrollment.currentStep + 1}`,
+          notes: body.slice(0, 500),
+          metadata: { sequenceId: sequence.id, step: enrollment.currentStep, channel: step.channel } as any,
+        } as any)
+        .catch(() => undefined);
+
+      // Advance to the next step (or complete).
+      const nextStep = steps[enrollment.currentStep + 1];
+      const nextSendAt = nextStep
+        ? new Date(now.getTime() + (nextStep.delayDays || 0) * 24 * 60 * 60 * 1000)
+        : null;
+      await db
+        .update(schema.recruiterOutreachEnrollments)
+        .set({
+          currentStep: enrollment.currentStep + 1,
+          nextSendAt: nextSendAt ?? undefined,
+          status: nextStep ? "active" : "completed",
+          completedAt: nextStep ? undefined : now,
+        } as any)
+        .where(eq(schema.recruiterOutreachEnrollments.id, enrollment.id));
+    } catch (err) {
+      console.error(`[scheduled] Error processing outreach enrollment ${enrollment.id}:`, err);
+    }
+  }
+
+  console.log(`[scheduled] Processed ${due.length} recruiter outreach enrollment(s).`);
+}
+
+// ---------------------------------------------------------------------------
 // Email campaign send loop (migration 0204)
 // ---------------------------------------------------------------------------
 // Every /5 tick: promote due `scheduled` campaigns to `sending`, then drain a
@@ -743,7 +886,7 @@ async function processModelCatalogDrift(): Promise<void> {
  *  always-on work (scraper, registered workers).
  *
  *  Cadence:
- *   - every /5 tick:    followups, job queue, event reminders,
+ *   - every /5 tick:    followups, recruiter outreach, job queue, event reminders,
  *                       partner-payout dispatch (each bounded by
  *                       small per-call limits)
  *   - every /15 tick:   registered workers dispatcher (each worker
@@ -763,6 +906,7 @@ export async function runScheduled(): Promise<void> {
   const now = new Date();
   const sweeps: Array<Promise<unknown>> = [
     processFollowUps(),
+    processRecruiterOutreach(),
     processCampaigns(),
     processJobQueue(),
     processEventReminders(),

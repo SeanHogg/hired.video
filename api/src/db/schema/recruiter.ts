@@ -443,6 +443,9 @@ export const recruiterOutreachSequences = pgTable("recruiter_outreach_sequences"
     delayDays: number;
     subject?: string;
     body: string;
+    /** Opt this step into AI rewrite of the rendered body at send time
+     *  (services/outreach/personalize.ts). Defaults off. */
+    aiPersonalize?: boolean;
   }>>(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

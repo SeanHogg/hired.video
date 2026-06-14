@@ -34,6 +34,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "users",     label: "Users",     href: "/admin/users",     icon: Users      },
   { resource: "companies", label: "Companies", href: "/admin/companies", icon: Building2   },
   { resource: "roles",     label: "Roles",     href: "/admin/roles",     icon: Shield     },
+  { resource: "roleAccess", label: "Role Access", href: "/admin/role-access", icon: ShieldCheck },
   { resource: "jobs",      label: "Jobs",      href: "/admin/jobs",      icon: Briefcase  },
   { resource: "studio",   label: "Studio",    href: "/admin/studio",    icon: Video      },
   // Page → video embed placements (#1866) — gated on the studio resource.

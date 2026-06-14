@@ -174,7 +174,7 @@ export default function LocationLandingPage(): JSX.Element {
         schemaId="in-location-faq"
         items={[
           { question: `Is this page just for ${headerTitle}?`, answer: "Yes — jobs, articles, templates, and video resumes tagged with this location appear here. Content is filtered geographically, not just by free-text matching." },
-          { question: "How do you decide which cities get pages?", answer: "Cities with at least 10 active jobs or 1 tagged article get an auto-generated page. The top metros also get hand-curated relocation guides and key-employer lists." },
+          { question: "How do you decide which cities get pages?", answer: "Any location with jobs, articles, templates, or video resumes tagged to it surfaces a page here; the more content tagged to a city, the richer its page. Popular metros may also feature community-written relocation guides." },
           { question: "I want to write a relocation guide. How?", answer: "Authenticated users with residency tenure on this location can submit relocation guides through the article publish flow — they earn the 'City Guide' badge plus points when accepted." },
         ]}
       />

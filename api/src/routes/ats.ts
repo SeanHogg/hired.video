@@ -254,11 +254,52 @@ async function fetchLeverCandidates(apiKey: string): Promise<NormalizedCandidate
 }
 
 /**
+ * Workday Recruiting has no single REST candidates endpoint — integration is
+ * per-tenant via Report-as-a-Service (RaaS). The connection stores the full
+ * RaaS report URL + ISU username in `config`; `apiKey` is the ISU password.
+ * RaaS returns `{ Report_Entry: [...] }` when `?format=json` is appended.
+ * Because report field names are tenant-defined, callers may supply
+ * `config.fieldMap` to override the defaults below.
+ */
+async function fetchWorkdayCandidates(
+  password: string,
+  config: Record<string, unknown>,
+): Promise<NormalizedCandidate[]> {
+  const raasUrl = typeof config.raasUrl === "string" ? config.raasUrl : "";
+  const username = typeof config.username === "string" ? config.username : "";
+  if (!raasUrl || !username) {
+    throw new Error("Workday requires config.raasUrl + config.username");
+  }
+  const url = `${raasUrl}${raasUrl.includes("?") ? "&" : "?"}format=json`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}`, Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`Workday ${res.status}`);
+  const data = (await res.json()) as { Report_Entry?: any[] };
+  const rows = Array.isArray(data.Report_Entry) ? data.Report_Entry : [];
+  const fieldMap = (config.fieldMap ?? {}) as Record<string, string>;
+
+  const pick = (r: any, key: string, fallbacks: string[]): string | null => {
+    const keys = [fieldMap[key], ...fallbacks].filter(Boolean) as string[];
+    for (const k of keys) {
+      if (r[k] != null && String(r[k]).trim()) return String(r[k]).trim();
+    }
+    return null;
+  };
+
+  return rows
+    .slice(0, PROVIDER_PAGE_SIZE * PROVIDER_MAX_PAGES)
+    .map((r) => ({
+      name: pick(r, "name", ["candidateName", "Candidate", "Worker", "fullName", "Full_Name", "Legal_Name"]) ?? "(unnamed)",
+      email: pick(r, "email", ["email", "Email", "emailAddress", "Email_Address", "primaryEmail", "Primary_Email"]),
+      title: pick(r, "title", ["title", "Title", "jobTitle", "Job_Title", "currentTitle", "Job_Profile"]),
+      company: pick(r, "company", ["company", "Company", "currentCompany", "Current_Company", "employer", "Employer"]),
+    }));
+}
+
+/**
  * Fetches candidates from the provider and upserts them into the owner's
- * talent pool. Dedup is by email within the owner's pool (one batched query,
- * never N+1). Email-less candidates are imported once per name (best effort).
- * Mirrors the extension-capture pattern: candidateId is the owner's id as a
- * placeholder until the candidate links a real hired.video account.
+ * talent pool via `upsertCandidatesForOwner` (email-deduped, no N+1).
  */
 async function importFromProvider(
   db: Db,
@@ -276,48 +317,76 @@ async function importFromProvider(
       candidates = await fetchLeverCandidates(apiKey);
       break;
     case "workday":
-      // Workday Recruiting has no single REST candidates endpoint — integration
-      // is per-tenant SOAP / Report-as-a-Service. Honest stub until a tenant
-      // URL + RaaS report are configured (gap register).
-      return {
-        candidatesImported: 0,
-        skippedDuplicates: 0,
-        note: config?.tenantUrl
-          ? "Workday RaaS pull not yet implemented — tenant configured."
-          : "Workday sync requires a tenant URL + RaaS report. Not configured.",
-      };
+      if (!config?.raasUrl || !config?.username) {
+        return {
+          candidatesImported: 0,
+          skippedDuplicates: 0,
+          note: "Workday sync requires config.raasUrl + config.username (RaaS report + ISU). Not configured.",
+        };
+      }
+      candidates = await fetchWorkdayCandidates(apiKey, config);
+      break;
     default:
       return { candidatesImported: 0, skippedDuplicates: 0, note: "Unknown provider." };
   }
 
-  if (candidates.length === 0) {
-    return { candidatesImported: 0, skippedDuplicates: 0, note: `${provider}: no candidates returned.` };
-  }
+  const { imported, skipped } = await upsertCandidatesForOwner(db, ownerId, candidates, provider);
+  return {
+    candidatesImported: imported,
+    skippedDuplicates: skipped,
+    note: `${provider}: imported ${imported}, skipped ${skipped} duplicate(s).`,
+  };
+}
+
+/**
+ * Upserts normalized candidates into the owner's talent pool, deduped by email
+ * within that pool (one batched query, never N+1). Returns counts plus an
+ * email→talentPoolCandidateId map covering BOTH pre-existing and newly inserted
+ * rows, so webhook callers can resolve the candidate id without a re-query.
+ * Mirrors the extension-capture pattern: candidateId is the owner's id as a
+ * placeholder until the candidate links a real hired.video account.
+ *
+ * Shared by the manual pull (`importFromProvider`) and the inbound webhook
+ * handler so the two paths can't drift on dedup or insert shape.
+ */
+async function upsertCandidatesForOwner(
+  db: Db,
+  ownerId: string,
+  candidates: NormalizedCandidate[],
+  provider: Provider,
+): Promise<{ imported: number; skipped: number; idByEmail: Map<string, string> }> {
+  const idByEmail = new Map<string, string>();
+  if (candidates.length === 0) return { imported: 0, skipped: 0, idByEmail };
 
   // Dedup by email against the owner's existing pool in one batched query.
   const emails = Array.from(
     new Set(candidates.map((c) => c.email?.toLowerCase()).filter((e): e is string => !!e)),
   );
-  const existingEmails = new Set<string>();
+  const existing = new Set<string>();
   if (emails.length) {
     const rows = await db
-      .select({ email: schema.talentPoolCandidates.candidateEmail })
+      .select({ id: schema.talentPoolCandidates.id, email: schema.talentPoolCandidates.candidateEmail })
       .from(schema.talentPoolCandidates)
       .where(and(
         eq(schema.talentPoolCandidates.recruiterId, ownerId),
         inArray(schema.talentPoolCandidates.candidateEmail, emails),
       ))
-      .catch(() => [] as Array<{ email: string | null }>);
-    for (const r of rows) if (r.email) existingEmails.add(r.email.toLowerCase());
+      .catch(() => [] as Array<{ id: string; email: string | null }>);
+    for (const r of rows) {
+      if (!r.email) continue;
+      const key = r.email.toLowerCase();
+      existing.add(key);
+      idByEmail.set(key, r.id);
+    }
   }
 
   const toInsert = candidates.filter((c) => {
     const key = c.email?.toLowerCase();
-    if (key && existingEmails.has(key)) return false;
-    if (key) existingEmails.add(key); // collapse in-batch duplicates too
+    if (key && existing.has(key)) return false;
+    if (key) existing.add(key); // collapse in-batch duplicates too
     return true;
   });
-  const skippedDuplicates = candidates.length - toInsert.length;
+  const skipped = candidates.length - toInsert.length;
 
   let imported = 0;
   if (toInsert.length) {
@@ -334,19 +403,16 @@ async function importFromProvider(
         status: "active",
         tags: [`ats:${provider}`],
       })) as any)
-      .returning({ id: schema.talentPoolCandidates.id })
+      .returning({ id: schema.talentPoolCandidates.id, email: schema.talentPoolCandidates.candidateEmail })
       .catch((e) => {
         console.error(`[ats:${provider}] upsert failed:`, e);
-        return [] as Array<{ id: string }>;
+        return [] as Array<{ id: string; email: string | null }>;
       });
     imported = inserted.length;
+    for (const r of inserted) if (r.email) idByEmail.set(r.email.toLowerCase(), r.id);
   }
 
-  return {
-    candidatesImported: imported,
-    skippedDuplicates,
-    note: `${provider}: imported ${imported}, skipped ${skippedDuplicates} duplicate(s).`,
-  };
+  return { imported, skipped, idByEmail };
 }
 
 // ─── Inbound webhooks (provider → platform) ──────────────────────────────────
@@ -368,25 +434,39 @@ atsRoutes.post("/webhook/:provider", async (c) => {
   // Signature verification (Greenhouse uses X-Greenhouse-Signature, Lever uses X-Lever-Signature)
   const sig = c.req.header("x-greenhouse-signature") ?? c.req.header("x-lever-signature") ?? null;
 
-  // Find the matching connection by provider to get webhookSecret
   const db = getDb();
   const table = getAtsTable();
-  if (table && sig) {
-    const [conn] = await db
-      .select({ webhookSecret: table.webhookSecret })
-      .from(table)
-      .where(eq(table.provider, providerName))
-      .limit(1);
+  if (!table) return c.json({ received: true }, 200);
 
-    if (conn?.webhookSecret) {
-      const valid = await verifyHmacSignature(sig, JSON.stringify(body), conn.webhookSecret);
-      if (!valid) return c.json(error("UNAUTHORIZED", "Invalid webhook signature"), 401);
-    }
+  // Resolve the connection for this provider (carries webhookSecret + the
+  // company whose owner the candidate mirrors into). NOTE: webhooks don't carry
+  // our connection id, so we use the first connection for the provider — see
+  // gap register #2016 for per-connection attribution.
+  const [conn] = await db
+    .select({ companyId: table.companyId, webhookSecret: table.webhookSecret })
+    .from(table)
+    .where(eq(table.provider, providerName))
+    .limit(1);
+
+  if (conn?.webhookSecret && sig) {
+    const valid = await verifyHmacSignature(sig, JSON.stringify(body), conn.webhookSecret);
+    if (!valid) return c.json(error("UNAUTHORIZED", "Invalid webhook signature"), 401);
   }
 
-  // Route event type
   const eventType: string = body.action ?? body.event ?? body.type ?? "unknown";
-  await handleWebhookEvent(providerName, eventType, body);
+
+  if (conn?.companyId) {
+    const [company] = await db
+      .select({ ownerId: schema.companyProfiles.ownerId })
+      .from(schema.companyProfiles)
+      .where(eq(schema.companyProfiles.id, conn.companyId))
+      .limit(1);
+    if (company?.ownerId) {
+      await handleWebhookEvent(db, providerName, company.ownerId, eventType, body);
+    }
+  } else {
+    console.info(`[ats:${providerName}] webhook event=${eventType} — no connection, not processed`);
+  }
 
   return c.json({ received: true }, 200);
 });
@@ -404,10 +484,86 @@ async function verifyHmacSignature(sig: string, payload: string, secret: string)
   }
 }
 
-async function handleWebhookEvent(provider: Provider, eventType: string, payload: unknown): Promise<void> {
-  // Log event — in production, route to a queue/durable object for processing
-  console.info(`[ats:${provider}] webhook event=${eventType}`, typeof payload === "object" ? JSON.stringify(payload).slice(0, 200) : "");
-  // Future: upsert candidate stage changes into jobApplications table
+/** Best-effort candidate extraction from a provider webhook payload. Returns
+ *  null when the event carries no identifiable candidate (the shapes are thin
+ *  and vary by event type, so every access is defensive). */
+function extractCandidateFromWebhook(provider: Provider, body: any): NormalizedCandidate | null {
+  if (provider === "greenhouse") {
+    const p = body.payload ?? {};
+    const cand = p.candidate ?? p.application?.candidate ?? null;
+    if (!cand) return null;
+    const name = [cand.first_name, cand.last_name].filter(Boolean).join(" ").trim() || cand.name || "(unnamed)";
+    const email = cand.email_addresses?.find((e: any) => e?.value)?.value ?? cand.email ?? null;
+    return {
+      name,
+      email: email ? String(email) : null,
+      title: cand.title ?? p.application?.jobs?.[0]?.name ?? null,
+      company: cand.company ?? null,
+    };
+  }
+  if (provider === "lever") {
+    const d = body.data ?? body ?? {};
+    const cand = d.contact ?? d.candidate ?? d.opportunity ?? d;
+    const name = cand?.name ? String(cand.name) : null;
+    const email = Array.isArray(cand?.emails) && cand.emails[0] ? String(cand.emails[0]) : (cand?.email ?? null);
+    if (!name && !email) return null;
+    return {
+      name: name ?? "(unnamed)",
+      email: email ? String(email) : null,
+      title: cand?.headline ? String(cand.headline) : null,
+      company: cand?.headline ? String(cand.headline) : null,
+    };
+  }
+  return null;
+}
+
+/** Best-effort pipeline-stage extraction (for the interaction note). */
+function extractStage(provider: Provider, body: any): string | null {
+  if (provider === "greenhouse") {
+    return body.payload?.application?.current_stage?.name ?? null;
+  }
+  if (provider === "lever") {
+    return body.data?.toStage?.text ?? body.data?.toStageId ?? null;
+  }
+  return null;
+}
+
+/**
+ * Processes an inbound ATS webhook: mirrors the candidate into the owner's
+ * talent pool (via the shared upsert, deduped by email) and records the event
+ * on the candidate timeline (`candidate_interactions`). This replaces the old
+ * log-only no-op so stage-change / new-candidate events actually land in
+ * hired.video between manual `POST /sync` pulls.
+ */
+async function handleWebhookEvent(
+  db: Db,
+  provider: Provider,
+  ownerId: string,
+  eventType: string,
+  body: any,
+): Promise<void> {
+  console.info(`[ats:${provider}] webhook event=${eventType}`);
+
+  const candidate = extractCandidateFromWebhook(provider, body);
+  let talentPoolId: string | null = null;
+  if (candidate && (candidate.email || candidate.name !== "(unnamed)")) {
+    const { idByEmail } = await upsertCandidatesForOwner(db, ownerId, [candidate], provider);
+    talentPoolId = candidate.email ? idByEmail.get(candidate.email.toLowerCase()) ?? null : null;
+  }
+
+  const stage = extractStage(provider, body);
+  await db
+    .insert(schema.candidateInteractions)
+    .values({
+      recruiterId: ownerId,
+      candidateId: ownerId, // placeholder until the candidate links an account
+      talentPoolId: talentPoolId ?? undefined,
+      type: "ats_webhook",
+      subject: eventType,
+      notes: stage ? `ATS ${provider} stage: ${stage}` : `ATS ${provider} event: ${eventType}`,
+      metadata: { provider, eventType, stage } as any,
+    } as any)
+    .catch((e) => console.error(`[ats:${provider}] interaction insert failed:`, e));
 }
 
 atsRoutes.all("*", (c) =>

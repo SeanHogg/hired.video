@@ -27,8 +27,7 @@ import { Button } from "@/components/ui/button";
 import { AuthButtons } from "@/components/AuthButtons";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useAuth } from "@/lib/auth";
-import { useEffectiveRole } from "@/hooks/use-effective-role";
-import { USER_ROLES, type UserRole } from "@shared/user-roles";
+import { useRoleAccess } from "@/hooks/use-role-access";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
@@ -36,6 +35,24 @@ import { AITokenPill } from "@/components/AITokenPill";
 import { PointsPill } from "@/components/PointsPill";
 import { UpgradeAccountButton } from "@/components/UpgradeAccountButton";
 import { useAdminPermissions } from "@/lib/admin-permissions";
+
+// Icon-name → component map. The Feature Registry (shared/feature-registry.ts)
+// stores icon names as strings (it can't import React components); the Sidebar
+// resolves them here. A missing/unknown name falls back to a neutral icon.
+const NAV_ICONS: Record<string, typeof TrendingUp> = {
+  TrendingUp,
+  Palette,
+  Wrench,
+  FileText,
+  Briefcase,
+  Building2,
+  Users,
+  CheckSquare,
+  Send,
+  Store,
+  Handshake,
+  ShoppingBag,
+};
 
 interface SidebarProps {
   isOpen: boolean;
@@ -55,55 +72,22 @@ export default function Sidebar({
   const { isAuthenticated, user } = useAuth();
   const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
   const { isPro } = useSubscription();
-  const effectiveRole = useEffectiveRole();
   const location = useLocation();
   const { t } = useTranslation();
 
-  // Main navigation items. `hideForRoles` trims the rail for the narrow
-  // personas so each role only sees relevant features (#1995) — the SSoT
-  // complaint was that every logged-in user saw every item. We deny-list
-  // (rather than allow-list) so the established roles (job_seeker /
-  // recruiter / employer / admin) keep their full menu with zero regression;
-  // only `affiliate` (and lightly `creator`) get a reduced set. An affiliate
-  // is here to refer + earn, so studio/resumes/companies/outreach/gigs are
-  // noise for them — their workspace lives under My Services.
-  const navigation: {
-    name: string;
-    href: string;
-    icon: typeof TrendingUp;
-    exactMatch: boolean;
-    hideForRoles?: UserRole[];
-  }[] = [
-    {
-      name: t("labels.dashboard"),
-      href: "/dashboard",
-      icon: TrendingUp,
-      exactMatch: false,
-    },
-    { name: t("labels.studio"), href: "/studio", icon: Palette, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE] },
-    { name: t("labels.tools"), href: "/tools", icon: Wrench, exactMatch: false },
-    { name: t("labels.resumes"), href: "/resumes", icon: FileText, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE] },
-    { name: t("labels.jobs"), href: "/jobs", icon: Briefcase, exactMatch: false },
-    {
-      name: t("labels.companies"),
-      href: "/companies",
-      icon: Building2,
-      exactMatch: false,
-      hideForRoles: [USER_ROLES.AFFILIATE],
-    },
-    { name: t("labels.people"), href: "/people", icon: Users, exactMatch: false },
-    { name: t("labels.tasksAndEvents", { defaultValue: "Tasks / Events" }), href: "/tasks", icon: CheckSquare, exactMatch: false },
-    { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE, USER_ROLES.CREATOR] },
-    { name: t("labels.marketplace"), href: "/search", icon: Store, exactMatch: false },
-    { name: t("labels.gigs", { defaultValue: "Gigs" }), href: "/gigs", icon: Handshake, exactMatch: false, hideForRoles: [USER_ROLES.AFFILIATE] },
-    { name: t("labels.myServices"), href: "/services", icon: ShoppingBag, exactMatch: false },
-  ];
-
-  // Self-gating per active role (respects impersonation / persona preview via
-  // useEffectiveRole). Items with no `hideForRoles` show for everyone.
-  const visibleNavigation = navigation.filter(
-    (item) => !item.hideForRoles?.includes(effectiveRole as UserRole),
-  );
+  // Main navigation is now resolved from the SuperAdmin-curated, per-role
+  // manifest (Feature Registry ⊕ role_feature_access overrides), so each role
+  // only sees its relevant items and the owner can tune any role's menu live
+  // from /admin/role-access — no code change. useRoleAccess keys on the
+  // effective role, so it respects SuperAdmin impersonation + Preview-as-role.
+  // Replaces the old hardcoded `hideForRoles` deny-list (#1995 → #2037).
+  const { navItems } = useRoleAccess();
+  const visibleNavigation = navItems().map((s) => ({
+    name: t(s.labelKey, { defaultValue: s.label }),
+    href: s.href ?? "#",
+    icon: NAV_ICONS[s.icon ?? ""] ?? TrendingUp,
+    exactMatch: false,
+  }));
 
   // Additional navigation for unauthenticated users (mobile)
   const publicNavigation = [

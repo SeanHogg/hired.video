@@ -1782,6 +1782,8 @@ const OutreachStepSchema = z.object({
 	delayDays: z.number().int().min(0).max(365),
 	subject: z.string().optional(),
 	body: z.string().min(1),
+	// Opt this step into AI personalization at send time (processRecruiterOutreach).
+	aiPersonalize: z.boolean().optional(),
 });
 
 const OutreachSequenceSchema = z.object({

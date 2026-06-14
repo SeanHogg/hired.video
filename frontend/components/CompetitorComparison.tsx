@@ -294,7 +294,7 @@ export const FEATURE_ROWS: FeatureRow[] = [
     feature: "Recruiter commission ledger + split fanout (multi-recruiter sourcer/manager splits)",
     icon: Wallet,
     values: { hired: "yes", loxo: "partial", linkedin: "no", greenhouse: "no", bullhorn: "yes" },
-    note: "placements.commission{Percentage,Amount,Status,PaidDate} + placement_splits fan a single placement out to multiple recruiters; on timesheet approval, PayoutLedgerService.recordAccrual writes to the payout ledger. Recruiter Commissions dashboard at /recruiter/commissions.",
+    note: "placements.commission{Percentage,Amount,Status,PaidDate} + placement_splits fan a single placement out to multiple recruiters; on timesheet approval, PayoutLedgerService.recordAccrual writes to the payout ledger, surfaced on the recruiter placement detail screen.",
   },
   {
     feature: "Validated AI hiring assessments (predictive science)",

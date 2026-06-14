@@ -98,6 +98,10 @@ import {
   EmailConsentRepository,
   type IEmailConsentRepository,
 } from "./emailConsentRepository.js";
+import {
+  RoleFeatureAccessRepository,
+  type IRoleFeatureAccessRepository,
+} from "./roleFeatureAccessRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -162,6 +166,8 @@ export interface Repos {
   campaigns: ICampaignRepository;
   // marketing email consent: preference ledger + hard suppression (migration 0205)
   emailConsent: IEmailConsentRepository;
+  // SuperAdmin per-role feature/nav access overrides (migration 0214)
+  roleFeatureAccess: IRoleFeatureAccessRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -204,6 +210,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     feedFeatures: new FeedFeaturesRepository(db, now),
     campaigns: new CampaignRepository(db, now),
     emailConsent: new EmailConsentRepository(db, now),
+    roleFeatureAccess: new RoleFeatureAccessRepository(db, now),
   };
 }
 
@@ -247,6 +254,7 @@ export type {
   ICommunityResourcesRepository,
   IResumeFeedbackRepository,
   IFeedFeaturesRepository,
+  IRoleFeatureAccessRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────

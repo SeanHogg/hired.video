@@ -85,6 +85,7 @@ const ForRecruiters = lazy(() => import("./pages/ForRecruiters"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const People = lazy(() => import("./pages/People"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Features = lazy(() => import("./pages/Features"));
 const Competitors = lazy(() => import("./pages/Competitors"));
 const AudienceLandingPage = lazy(() => import("./pages/landing/AudienceLandingPage"));
 const ForIndex = lazy(() => import("./pages/ForIndex"));
@@ -303,6 +304,7 @@ const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const DashboardFeedCuration = lazy(() => import("./pages/admin/DashboardFeedCuration"));
+const RoleAccessManager = lazy(() => import("./pages/admin/RoleAccessManager"));
 const CampaignManager = lazy(() => import("./pages/admin/CampaignManager"));
 const PostDetail = lazy(() => import("./pages/PostDetail"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -703,10 +705,7 @@ const App = () => (
                       <Route path="/feed" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/feed/:id" element={<PostDetail />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
-                      <Route
-                        path="/features"
-                        element={<Navigate to="/pricing" replace />}
-                      />
+                      <Route path="/features" element={<Features />} />
                       <Route path="/pricing" element={<Pricing />} />
                       <Route path="/vs-competitors" element={<Competitors />} />
                       <Route path="/for" element={<ForIndex />} />
@@ -1094,6 +1093,7 @@ const App = () => (
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
                       <Route path="/admin/feed"              element={<AdminLayout><FeedManagement /></AdminLayout>} />
                       <Route path="/admin/dashboard-feed"    element={<AdminLayout><DashboardFeedCuration /></AdminLayout>} />
+                      <Route path="/admin/role-access"       element={<AdminLayout><RoleAccessManager /></AdminLayout>} />
                       <Route path="/admin/campaigns"         element={<AdminLayout><CampaignManager /></AdminLayout>} />
                       <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
                       <Route path="/admin/companies"         element={<AdminLayout><CompanyManagement /></AdminLayout>} />

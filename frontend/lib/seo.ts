@@ -438,6 +438,13 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Sworn officer paths, federal agent roles (FBI/DEA/ATF), corrections, dispatch, and specialty units. POST certification + academy pathways.",
     keywords: "law enforcement jobs, police careers, fbi careers, corrections officer, sheriff deputy",
   },
+  "/security": {
+    title: "Security & Trust — hired.video",
+    description:
+      "How hired.video protects your data: encryption in transit and at rest, passkeys/WebAuthn, OAuth, Cloudflare WAF/DDoS, granular access controls, and our compliance roadmap (SOC 2, ISO 27001).",
+    keywords:
+      "hired.video security, data protection, encryption, passkeys, webauthn, soc 2 roadmap, iso 27001, gdpr, trust center",
+  },
   "/sectors/security": {
     title: "Security & Protective Services Careers — hired.video",
     description:
