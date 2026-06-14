@@ -1,6 +1,6 @@
 # PRD — Context-Aware Help System
 
-**Status:** Phases 1–2 shipped 2026-06-13 (gaps #2001–#2007). Remaining items tracked at the end + in the Consolidated Gap Register.
+**Status:** v2 (content-as-files + caching-first) built 2026-06-13 (gaps #2001–#2009; v2 = #2009 supersedes the v1 DB-content build). tsc + lint clean both projects; help-service (6) + content (10) unit tests pass. NOT runtime-verified (needs migration 0210 applied; semantic search needs the Vectorize index provisioned). Remaining items at the end + in the Consolidated Gap Register.
 **Owner:** Platform
 **Related:** [[project_context_aware_help]] memory, [page → video](./.) (#1860), Consolidated Gap Register #2001–#2008.
 
@@ -89,7 +89,7 @@ Per `shared/i18n.ts` (`en`, `es`, `fr-CA`). Localization happens at the **file**
 
 | Ref | Item | Notes |
 |-----|------|-------|
-| **rearch** | **Build v2 (this rearchitecture)** | Author content MD files, `lib/help/content.ts` seam, re-key `help_mappings` to slug, move search to bundled keyword + Vectorize-by-slug. See §9 migration. |
+| ~~rearch~~ ✅ | **Build v2 (this rearchitecture)** — DONE 2026-06-13 | Content MD files (63), `lib/help/content.ts` seam, `help_mappings` re-keyed to slug, search = bundled keyword + Vectorize-by-slug, `/help/:slug` reader. |
 | #2004 (activate) | **Provision Vectorize** | Create the `help-content` index, bind `VECTORIZE` + `AI`, run reindex (now walks the file manifest, not DB rows). Keyword (client-side) works without it. |
 | #2003 (decision) | **Retire bespoke `/guides/*` React pages?** | Once guides are MD files, the rich pages either become the rendered MD or stay as bespoke deep-dives. Product call. |
 | new | **Curation-assist** | "Suggest items for this route" in `/admin/help-mappings` via semantic nearest-to-context. Depends on #2004. |
