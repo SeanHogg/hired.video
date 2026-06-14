@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import GigBidDialog from "@/components/gigs/GigBidDialog";
+import ServicesNav from "@/components/services/ServicesNav";
 import { useSEO } from "@/lib/seo";
 import { gigService, type GigProject, type GigBid } from "@/lib/services/gig-service";
 
@@ -72,7 +73,8 @@ export default function GigMarketplace() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className="p-6 space-y-5">
+      <div className="p-4 md:p-8 w-full space-y-5">
+        <ServicesNav />
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -81,7 +83,7 @@ export default function GigMarketplace() {
             </h1>
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{t("gigs.marketplace.intro")}</p>
           </div>
-          <Link to="/gigs/new">
+          <Link to="/services/gigs/new">
             <Button>
               <Plus className="w-4 h-4 mr-1" /> {t("gigs.marketplace.postGig")}
             </Button>
@@ -118,7 +120,7 @@ export default function GigMarketplace() {
                 <Card key={p.id}>
                   <CardContent className="pt-5 space-y-3">
                     <div className="flex items-start justify-between gap-3">
-                      <Link to={`/gigs/${p.id}`} className="font-semibold hover:underline">
+                      <Link to={`/services/gigs/${p.id}`} className="font-semibold hover:underline">
                         {p.title}
                       </Link>
                       <Badge variant="secondary" className="font-semibold whitespace-nowrap">
@@ -156,7 +158,7 @@ export default function GigMarketplace() {
           ) : (
             <div className="space-y-2">
               {mine.map((p) => (
-                <Link key={p.id} to={`/gigs/${p.id}`}>
+                <Link key={p.id} to={`/services/gigs/${p.id}`}>
                   <Card className="hover:border-primary/40 transition-colors">
                     <CardContent className="py-3 flex items-center justify-between gap-3">
                       <div>
@@ -177,7 +179,7 @@ export default function GigMarketplace() {
         ) : (
           <div className="space-y-2">
             {myBids.map(({ bid, project }) => (
-              <Link key={bid.id} to={`/gigs/${project.id}`}>
+              <Link key={bid.id} to={`/services/gigs/${project.id}`}>
                 <Card className="hover:border-primary/40 transition-colors">
                   <CardContent className="py-3 flex items-center justify-between gap-3">
                     <div>

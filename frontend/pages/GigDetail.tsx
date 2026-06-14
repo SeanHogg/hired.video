@@ -103,7 +103,7 @@ export default function GigDetail() {
         <div className="p-6">
           <div className="rounded-lg border bg-muted/30 p-10 text-center">
             <h3 className="font-semibold">{t("gigs.detail.notFound")}</h3>
-            <Link to="/gigs" className="text-sm text-primary hover:underline mt-2 inline-block">
+            <Link to="/services/gigs" className="text-sm text-primary hover:underline mt-2 inline-block">
               {t("gigs.detail.back")}
             </Link>
           </div>

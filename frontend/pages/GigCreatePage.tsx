@@ -83,7 +83,7 @@ export default function GigCreatePage() {
         items: cleanItems,
       });
       toast({ title: t("gigs.create.postedTitle"), description: t("gigs.create.postedBody") });
-      navigate(`/gigs/${project.id}`);
+      navigate(`/services/gigs/${project.id}`);
     } catch (e) {
       toast({
         title: t("gigs.create.errPost"),
@@ -195,7 +195,7 @@ export default function GigCreatePage() {
         </Card>
 
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => navigate("/gigs")} disabled={submitting}>
+          <Button variant="outline" onClick={() => navigate("/services/gigs")} disabled={submitting}>
             {t("gigs.common.cancel")}
           </Button>
           <Button onClick={submit} disabled={submitting}>

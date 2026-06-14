@@ -11,8 +11,10 @@
 // URL now redirects there.
 
 import { Link, useLocation } from "react-router-dom";
-import { Inbox, TrendingUp, Video } from "lucide-react";
+import { Inbox, TrendingUp, Video, Handshake } from "lucide-react";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
+import { USER_ROLES } from "@shared/user-roles";
 
 interface Tab {
   to: string;
@@ -20,6 +22,8 @@ interface Tab {
   icon: React.ComponentType<{ className?: string }>;
   /** Match the tab as active when the URL starts with any of these. */
   matchPrefixes?: string[];
+  /** Roles this tab is hidden from (mirrors the old nav deny-list). */
+  hideForRoles?: readonly string[];
 }
 
 const TABS: readonly Tab[] = [
@@ -32,11 +36,21 @@ const TABS: readonly Tab[] = [
     icon: Video,
     matchPrefixes: ["/services/creator", "/services/offerings"],
   },
+  // Gigs marketplace folded into the hub (was the standalone /gigs nav item).
+  // It kept its affiliate deny-list from the old feature-registry entry.
+  {
+    to: "/services/gigs",
+    label: "Gigs",
+    icon: Handshake,
+    matchPrefixes: ["/services/gigs"],
+    hideForRoles: [USER_ROLES.AFFILIATE],
+  },
   { to: "/services/inquiries", label: "Inquiries", icon: Inbox },
 ] as const;
 
 export default function ServicesNav() {
   const location = useLocation();
+  const effectiveRole = useEffectiveRole();
 
   // Dashboard is the index — only active when path is exactly /services or
   // /services/. Every other tab uses prefix-matching so detail pages
@@ -51,10 +65,14 @@ export default function ServicesNav() {
     return prefixes.some((p) => location.pathname.startsWith(p));
   };
 
+  const visibleTabs = TABS.filter(
+    (tab) => !tab.hideForRoles?.includes(effectiveRole ?? ""),
+  );
+
   return (
     <nav className="mb-6 border-b">
       <ul className="flex gap-1 -mb-px overflow-x-auto">
-        {TABS.map(({ to, label, icon: Icon, matchPrefixes }) => {
+        {visibleTabs.map(({ to, label, icon: Icon, matchPrefixes }) => {
           const active = isActive({ to, label, icon: Icon, matchPrefixes });
           // #332 — consume the shared `tabItemClass` + `TabItemContent`
           // primitive so this nav stays visually identical to `PageHeader`

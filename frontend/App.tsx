@@ -265,6 +265,12 @@ function ServicesPitchDeckRedirect() {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={`/people/pitch-decks/${id}`} replace />;
 }
+// Gigs moved into the My Services hub (/services/gigs). The detail route
+// carries an :id, so a tiny wrapper rewrites the legacy /gigs/:id deep-link.
+function GigDetailRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/services/gigs/${id}`} replace />;
+}
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
 const StudioProjectRoute = lazy(() =>
@@ -790,9 +796,11 @@ const App = () => (
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />
                       <Route path="/sourcing/browse" element={<SourcingBrowse />} />
-                      <Route path="/gigs" element={<GigMarketplace />} />
-                      <Route path="/gigs/new" element={<GigCreatePage />} />
-                      <Route path="/gigs/:id" element={<GigDetail />} />
+                      {/* Gigs folded into the My Services hub (/services/gigs);
+                          the old top-level /gigs URLs redirect below. */}
+                      <Route path="/gigs" element={<Navigate to="/services/gigs" replace />} />
+                      <Route path="/gigs/new" element={<Navigate to="/services/gigs/new" replace />} />
+                      <Route path="/gigs/:id" element={<GigDetailRedirect />} />
                       <Route path="/transcripts/search" element={<TranscriptSearch />} />
                       <Route path="/pipeline/portal/:token" element={<HiringManagerPortal />} />
                       <Route path="/jobs/create" element={<JobCreatePage />} />
@@ -1013,6 +1021,12 @@ const App = () => (
                       <Route path="/services/creator/:subtab" element={<ServicesManagement />} />
                       <Route path="/services/offerings" element={<ServicesManagement />} />
                       <Route path="/services/inquiries" element={<ServicesManagement />} />
+                      {/* Gigs marketplace — a tab of the My Services hub (see
+                          ServicesNav). Browse/post briefs + bid; detail + create
+                          are deep pages under the same prefix. */}
+                      <Route path="/services/gigs" element={<GigMarketplace />} />
+                      <Route path="/services/gigs/new" element={<GigCreatePage />} />
+                      <Route path="/services/gigs/:id" element={<GigDetail />} />
                       {/* Pool list moved to /resumes?tab=sourced (see EntityHubShell
                           + gap #400). The per-candidate detail page stays here for
                           deep-link compatibility with `RecruitCandidateRedirect`. */}

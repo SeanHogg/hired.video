@@ -86,7 +86,7 @@ export default function GigsPanel() {
           </h2>
           <p className="text-sm text-muted-foreground">{t("gigs.panel.intro")}</p>
         </div>
-        <Link to="/gigs">
+        <Link to="/services/gigs">
           <Button variant="outline" size="sm">
             {t("gigs.panel.browseMarketplace")} <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
@@ -96,7 +96,7 @@ export default function GigsPanel() {
       {projects.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {projects.map((p) => (
-            <Link key={p.id} to={`/gigs/${p.id}`}>
+            <Link key={p.id} to={`/services/gigs/${p.id}`}>
               <Badge variant="secondary" className={STATUS_BADGE[p.status]}>
                 {p.title}
               </Badge>
@@ -111,7 +111,7 @@ export default function GigsPanel() {
             <Briefcase className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
             <h3 className="font-semibold">{t("gigs.panel.emptyTitle")}</h3>
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">{t("gigs.panel.emptyBody")}</p>
-            <Link to="/gigs" className="inline-block mt-4">
+            <Link to="/services/gigs" className="inline-block mt-4">
               <Button size="sm">{t("gigs.panel.browseOpen")}</Button>
             </Link>
           </CardContent>

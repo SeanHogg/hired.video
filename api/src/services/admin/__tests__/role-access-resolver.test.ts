@@ -40,7 +40,8 @@ const LEGACY_NAV: { key: string; hideForRoles: UserRole[] }[] = [
   { key: "nav:tasks", hideForRoles: [] },
   { key: "nav:outreach", hideForRoles: [USER_ROLES.AFFILIATE, USER_ROLES.CREATOR] },
   { key: "nav:marketplace", hideForRoles: [] },
-  { key: "nav:gigs", hideForRoles: [USER_ROLES.AFFILIATE] },
+  // Gigs folded into the My Services hub (/services/gigs); the standalone
+  // nav:gigs entry was retired, so it no longer appears in the manifest.
   { key: "nav:services", hideForRoles: [] },
 ];
 
