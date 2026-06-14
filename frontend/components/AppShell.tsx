@@ -8,6 +8,7 @@ import { GeoLocaleSuggestionBanner } from "@/components/i18n/GeoLocaleSuggestion
 import { MarketingPageVideo } from "@/components/MarketingPageVideo";
 import { HelpDrawer } from "@/components/help/HelpDrawer";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useUsageTracker } from "@/hooks/use-usage-tracker";
 import { useAuth, useVerificationBlocked } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +103,10 @@ export function AppShell({
   const showAppChrome = useShouldRenderAppChrome();
   // Always call useSidebar so hook order stays stable across variant flips.
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  // Usage tracking (#2044) — every page (marketing + authed) through one seam;
+  // self-gates on analytics consent. Called unconditionally to keep hook order
+  // stable across the variant branches below.
+  useUsageTracker();
   const bg = bgClassName ?? DEFAULT_BG;
 
   if (variant === "bare") {

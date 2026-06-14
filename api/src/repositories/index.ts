@@ -102,6 +102,10 @@ import {
   RoleFeatureAccessRepository,
   type IRoleFeatureAccessRepository,
 } from "./roleFeatureAccessRepository.js";
+import {
+  UsageTrackingRepository,
+  type IUsageTrackingRepository,
+} from "./usageTrackingRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -168,6 +172,8 @@ export interface Repos {
   emailConsent: IEmailConsentRepository;
   // SuperAdmin per-role feature/nav access overrides (migration 0214)
   roleFeatureAccess: IRoleFeatureAccessRepository;
+  // usage sessions + events for presence/engagement (migration 0215)
+  usageTracking: IUsageTrackingRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -211,6 +217,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     campaigns: new CampaignRepository(db, now),
     emailConsent: new EmailConsentRepository(db, now),
     roleFeatureAccess: new RoleFeatureAccessRepository(db, now),
+    usageTracking: new UsageTrackingRepository(db, now),
   };
 }
 
@@ -255,6 +262,7 @@ export type {
   IResumeFeedbackRepository,
   IFeedFeaturesRepository,
   IRoleFeatureAccessRepository,
+  IUsageTrackingRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────

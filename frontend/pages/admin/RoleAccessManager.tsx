@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { roleAccessService } from "@/lib/services/role-access-service";
+import { usageService } from "@/lib/services/usage-service";
 import { getClientFeatureRegistry } from "@/lib/role-access-registry";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import { usePermissionDebugger } from "@/providers/PermissionDebuggerProvider";
@@ -53,6 +54,7 @@ export default function RoleAccessManager() {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [usage, setUsage] = useState<Record<string, number>>({});
 
   const { personaPreview, setPersonaPreview } = usePersonaPreview();
   const { debugMode, toggleDebugMode } = usePermissionDebugger();
@@ -70,6 +72,20 @@ export default function RoleAccessManager() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  // Usage→access hints (#2046): per-feature 30-day event counts for the active
+  // role, so the SuperAdmin can see which surfaces a role barely uses before
+  // deciding to hide them. Best-effort; cached server-side.
+  useEffect(() => {
+    let active = true;
+    usageService
+      .adminFeatureUsage(role)
+      .then((u) => active && setUsage(u))
+      .catch(() => active && setUsage({}));
+    return () => {
+      active = false;
+    };
+  }, [role]);
 
   // Resolve the active role's manifest with the shared resolver over the
   // COMBINED client registry (shared nav surfaces + tool surfaces from the
@@ -276,6 +292,7 @@ export default function RoleAccessManager() {
                           key={s.key}
                           surface={s}
                           busy={busyKey === s.key}
+                          uses={usage[s.key]}
                           onToggleVisible={(v) => patchSurface(s.key, { visible: v })}
                           onToggleEnabled={(v) => patchSurface(s.key, { enabled: v })}
                           reorder={
@@ -312,12 +329,14 @@ interface ReorderControls {
 function SurfaceRow({
   surface,
   busy,
+  uses,
   onToggleVisible,
   onToggleEnabled,
   reorder,
 }: {
   surface: ResolvedSurface;
   busy: boolean;
+  uses?: number;
   onToggleVisible: (v: boolean) => void;
   onToggleEnabled: (v: boolean) => void;
   reorder?: ReorderControls;
@@ -367,6 +386,15 @@ function SurfaceRow({
             <Badge variant="destructive" className="text-[10px]">
               Disabled
             </Badge>
+          )}
+          {/* Usage→access hint (#2046): flag surfaces this role barely uses. */}
+          {surface.visible && uses !== undefined && uses === 0 && (
+            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+              rarely used
+            </Badge>
+          )}
+          {uses !== undefined && uses > 0 && (
+            <span className="text-[10px] text-muted-foreground">{uses} uses · 30d</span>
           )}
         </div>
       </div>

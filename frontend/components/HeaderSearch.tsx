@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { trackUsageEvent } from "@/lib/usage-tracker";
 import {
   useHeaderFiltersRegistry,
   type FilterField,
@@ -227,6 +228,14 @@ export default function HeaderSearch({ onQueryChange }: HeaderSearchProps = {}) 
       params.set(key, trimmed);
     }
     const qs = params.toString();
+    // Usage tracking (#2044) — a search is a high-intent signal for the
+    // presence/engagement surface. Self-gates on consent.
+    if (query.trim()) {
+      trackUsageEvent("search", {
+        path: current.path,
+        payload: { query: query.trim(), context: current.path },
+      });
+    }
     navigate(qs ? `${current.path}?${qs}` : current.path);
   };
 

@@ -21,6 +21,7 @@ import {
   Puzzle,
   MonitorPlay,
   Sparkles,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
@@ -50,6 +51,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "settings",  label: "Settings",  href: "/admin/settings",  icon: Settings   },
   { resource: "moderation", label: "Moderation", href: "/admin/moderation", icon: ShieldCheck },
   { resource: "accountAnalytics", label: "Account Analytics", href: "/admin/account-analytics", icon: Mail },
+  { resource: "accountAnalytics", label: "Active Users", href: "/admin/active-users", icon: Activity },
   { resource: "extensionTelemetry", label: "Extension", href: "/admin/extension-telemetry", icon: Puzzle },
 ];
 

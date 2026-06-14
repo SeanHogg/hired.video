@@ -138,3 +138,24 @@ describe("RoleAccessService — isFeatureEnabledForRole (#2039 gate)", () => {
     assert.equal(repo.rows.length, 1);
   });
 });
+
+describe("RoleAccessService — per-user module grant (#2042)", () => {
+  // Minimal authz stub: only the method the per-user gate calls.
+  const authz = {
+    findActiveAssignmentsForUser: async (userId: string) =>
+      userId === "u-grant" ? [{ slug: "ads" } as any] : [],
+  } as any;
+
+  it("a per-user module grant overrides a role-level disable", async () => {
+    const repo = new FakeRepo();
+    const svc = new RoleAccessService(repo, authz);
+    await svc.upsert({ role: USER_ROLES.RECRUITER, featureKey: "module:ads", enabled: false });
+
+    // Role-level: disabled.
+    assert.equal(await svc.isFeatureEnabledForRole(USER_ROLES.RECRUITER, "module:ads"), false);
+    // User with an explicit assignment: enabled despite the role disable.
+    assert.equal(await svc.isFeatureEnabledForUser("u-grant", USER_ROLES.RECRUITER, "module:ads"), true);
+    // User without a grant: falls through to the role gate (disabled).
+    assert.equal(await svc.isFeatureEnabledForUser("u-none", USER_ROLES.RECRUITER, "module:ads"), false);
+  });
+});

@@ -164,6 +164,8 @@ import { feedFeatureRoutes } from "./routes/feed-features.js";
 import { adminFeedFeatureRoutes } from "./routes/admin-feed-features.js";
 import { roleAccessRoutes } from "./routes/role-access.js";
 import { adminRoleAccessRoutes } from "./routes/admin-role-access.js";
+import { usageRoutes } from "./routes/usage.js";
+import { adminUsageRoutes } from "./routes/admin-usage.js";
 import { adminCampaignRoutes } from "./routes/admin-campaigns.js";
 import { campaignsPublicRoutes } from "./routes/campaigns-public.js";
 import { emailPreferencesRoutes } from "./routes/email-preferences.js";
@@ -502,6 +504,11 @@ export function createApp() {
   // via the default branch.
   const REVIEWS_PUBLIC_ROUTE = /^\/api\/reviews(?:\/|$)/;
 
+  // Usage tracking ingestion (#2044) — anon visitors AND authed users both
+  // beacon here; optional-auth attaches the user when a JWT is present so the
+  // session links to user_id, retaining the pre-signup journey.
+  const USAGE_TRACK_ROUTE = /^\/api\/usage\/track$/;
+
   // ─── Single source of truth: access mode per request ────────────────
   // Replaces the three parallel exemption lists that previously sat in
   // front of authMiddleware / emailVerifiedMiddleware / passwordChange-
@@ -529,6 +536,7 @@ export function createApp() {
     if (COURSES_SCORM_ASSET_ROUTE.test(path)) return "public";
 
     if (STUDIO_PUBLIC_ROUTE.test(path)) return "optional-auth";
+    if (USAGE_TRACK_ROUTE.test(path)) return "optional-auth";
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return "optional-auth";
     if (method === "GET" && RESUME_FEEDBACK_LINK_ROUTE.test(path)) return "optional-auth";
     if (
@@ -683,6 +691,7 @@ export function createApp() {
   app.route("/api/feed", feedRoutes);
   app.route("/api/feed-features", feedFeatureRoutes); // SA-curated dashboard feed (read)
   app.route("/api/role-access", roleAccessRoutes); // per-role feature/nav manifest (read)
+  app.route("/api/usage", usageRoutes); // usage tracking ingestion (optional-auth)
   app.route("/api/notifications", notificationRoutes);
   app.route("/api/inbox", inboxRoutes);
   app.route("/api/integrations/email", emailIntegrationRoutes);
@@ -755,6 +764,7 @@ export function createApp() {
   app.route("/api/admin/articles", adminArticleRoutes);
   app.route("/api/admin/feed-features", adminFeedFeatureRoutes); // SA dashboard-feed curation
   app.route("/api/admin/role-access", adminRoleAccessRoutes); // SA per-role feature/nav access
+  app.route("/api/admin/usage", adminUsageRoutes); // SA presence + usage analytics
   app.route("/api/admin/campaigns", adminCampaignRoutes); // SA email-campaign manager
   app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/admin/community-resources", adminCommunityResourceRoutes);

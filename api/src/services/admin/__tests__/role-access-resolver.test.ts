@@ -18,7 +18,10 @@ import {
   findSurface,
   type RoleFeatureAccessRow,
 } from "../../../../../shared/role-access.js";
-import { ALL_ROLES } from "../../../../../shared/feature-registry.js";
+import {
+  ALL_ROLES,
+  type FeatureRegistryEntry,
+} from "../../../../../shared/feature-registry.js";
 import { USER_ROLES, type UserRole } from "../../../../../shared/user-roles.js";
 
 /**
@@ -112,6 +115,47 @@ describe("resolveRoleAccess — override merge", () => {
     ];
     // Resolving for recruiter must ignore the affiliate row.
     const s = findSurface(resolveRoleAccess(USER_ROLES.RECRUITER, overrides), "nav:jobs")!;
+    assert.equal(s.visible, true);
+  });
+});
+
+describe("resolveRoleAccess — per-user tier + capability (#2042)", () => {
+  const REG: FeatureRegistryEntry[] = [
+    { key: "nav:x", kind: "nav", group: "g", labelKey: "k", label: "X", defaultRoles: ALL_ROLES, defaultEnabled: true, enforce: false, order: 0 },
+  ];
+  const CAP_REG: FeatureRegistryEntry[] = [
+    { key: "nav:c", kind: "nav", group: "g", labelKey: "k", label: "C", defaultRoles: ALL_ROLES, defaultEnabled: true, enforce: false, order: 0, requiresCapability: "can_c" },
+  ];
+
+  it("per-user override wins over the role override", () => {
+    const roleOv: RoleFeatureAccessRow[] = [
+      { role: USER_ROLES.RECRUITER, featureKey: "nav:x", visible: true, enabled: null, rank: null },
+    ];
+    const userOv: RoleFeatureAccessRow[] = [
+      { role: USER_ROLES.RECRUITER, featureKey: "nav:x", visible: false, enabled: null, rank: null },
+    ];
+    const s = findSurface(
+      resolveRoleAccess(USER_ROLES.RECRUITER, roleOv, REG, { userOverrides: userOv }),
+      "nav:x",
+    )!;
+    assert.equal(s.visible, false);
+  });
+
+  it("capability gate hides a surface when the capability is absent", () => {
+    const hidden = findSurface(
+      resolveRoleAccess(USER_ROLES.RECRUITER, [], CAP_REG, { capabilities: new Set() }),
+      "nav:c",
+    )!;
+    assert.equal(hidden.visible, false);
+    const shown = findSurface(
+      resolveRoleAccess(USER_ROLES.RECRUITER, [], CAP_REG, { capabilities: new Set(["can_c"]) }),
+      "nav:c",
+    )!;
+    assert.equal(shown.visible, true);
+  });
+
+  it("capability gate is skipped when no capability set is supplied (zero regression)", () => {
+    const s = findSurface(resolveRoleAccess(USER_ROLES.RECRUITER, [], CAP_REG), "nav:c")!;
     assert.equal(s.visible, true);
   });
 });

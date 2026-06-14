@@ -6,7 +6,8 @@
  * Shapes come from the shared contract (DRY — no re-declaration).
  */
 
-import { apiClient, type ApiSuccessResponse } from "../api-client";
+import { apiClient } from "../api-client";
+import type { ApiSuccessResponse } from "@shared/api";
 import i18n from "@/lib/i18n/i18n";
 import type {
   HelpArticleCard,
