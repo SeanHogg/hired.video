@@ -11,7 +11,7 @@ import {
   GraduationCap,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useDefaultBreadcrumbs } from "@/lib/seo";
@@ -21,98 +21,21 @@ import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
-import { useEffectiveRole } from "@/hooks/use-effective-role";
-import { useRoleAccess } from "@/hooks/use-role-access";
-import { useSearchQueryParam } from "@/hooks/use-search-query-param";
-import { ToolCard } from "@/components/ToolCard";
-import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
+import { ToolsBrowser } from "@/components/ToolsBrowser";
 import { ToolsLearningGrid } from "@/components/ToolsLearningGrid";
-import { CategoryFilterBar } from "@/components/CategoryFilterBar";
-import ViewModeToggle, { BROWSE_VIEW_MODES } from "@/components/ViewModeToggle";
+import ViewModeToggle from "@/components/ViewModeToggle";
 import { useViewMode } from "@/lib/hooks/useViewMode";
-import { HorizontalScroller } from "@/components/HorizontalScroller";
 import LearningPanel, { LEARNING_VIEW_MODES } from "@/components/courses/LearningPanel";
 import ClassroomsPanel from "@/components/courses/ClassroomsPanel";
-import {
-  TOOLS_CATALOG,
-  audienceForRole,
-  isToolInAudience,
-  type ToolAudience,
-  type ToolCatalogEntry,
-  type ToolCategory,
-  type ToolTier,
-} from "@/data/tools-catalog";
-import { localizeTool } from "@/lib/tools/localize-tool";
-
-type TierFilter = "all" | ToolTier;
-type AudienceFilter = "for_me" | "all" | ToolAudience;
-type CategoryFilter = "all" | ToolCategory;
-
-// Order categories in the chip row by how broadly applicable they are
-// — Resume tops the list because most users start there, Extension
-// tails because the extension is a launcher more than a tool.
-const CATEGORY_ORDER: ToolCategory[] = [
-  "Resume",
-  "Job",
-  "Profile",
-  "Career",
-  "Interview",
-  "Salary",
-  "Application",
-  "Extension",
-];
-
-function parseCategoryFilter(raw: string | null): CategoryFilter {
-  if (!raw) return "all";
-  if (raw === "all") return "all";
-  if ((CATEGORY_ORDER as string[]).includes(raw)) return raw as ToolCategory;
-  return "all";
-}
-
-const TIER_OPTIONS = [
-  { value: "free", labelKey: "labels.free" },
-  { value: "pro", labelKey: "labels.paid" },
-];
-
-const AUDIENCE_OPTIONS = [
-  { value: "for_me", labelKey: "labels.tools.audienceForMe" },
-  { value: "job_seeker", labelKey: "labels.tools.audienceJobSeekers" },
-  { value: "recruiter_employer", labelKey: "labels.tools.audienceRecruitersEmployers" },
-  { value: "all", labelKey: "labels.tools.audienceShowAll" },
-];
-
-function parseAudienceFilter(raw: string | null): AudienceFilter {
-  if (
-    raw === "for_me" ||
-    raw === "all" ||
-    raw === "job_seeker" ||
-    raw === "recruiter_employer"
-  ) {
-    return raw;
-  }
-  return "for_me";
-}
 
 export default function Tools() {
   const location = useLocation();
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
-  const effectiveRole = useEffectiveRole();
-  const { canSeeTool } = useRoleAccess();
 
   // SEO for tools page
   useSEO(location.pathname);
   useDefaultBreadcrumbs();
-
-  // Layout switcher for the AI-tools catalog list (Scroll / Grid / Table),
-  // matching the Studio landing pattern. Persisted per-surface so the
-  // choice survives reloads. Scoped to the default "tools" tab; the
-  // learning + classrooms tabs render their own panels.
-  const [viewMode, setViewMode] = useViewMode(
-    "tools.browse",
-    "grid",
-    BROWSE_VIEW_MODES,
-  );
 
   // Learning sub-tab's layout switcher. Lifted up here (instead of living
   // inside LearningPanel) so the toggle can render next to the global search
@@ -125,14 +48,6 @@ export default function Tools() {
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
-  // Gate at 2 chars via the shared hook so single-keystroke ?q=A
-  // doesn't narrow the tools grid to noise.
-  const { effective: toolQuery } = useSearchQueryParam();
-  const tierParam = searchParams.get("tier") ?? "";
-  const tierFilter: TierFilter =
-    tierParam === "free" || tierParam === "pro" ? tierParam : "all";
-  const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
-  const categoryFilter = parseCategoryFilter(searchParams.get("category"));
   // Sub-tab on /tools:
   //   "tools"      — default AI-tool grid
   //   "learning"   — consolidated learning home: your in-progress + assigned
@@ -168,93 +83,6 @@ export default function Tools() {
     }
     if (changed) setSearchParams(next, { replace: true });
   }, [tabParam, searchParams, setSearchParams]);
-
-  const setCategoryFilter = (next: CategoryFilter) => {
-    const params = new URLSearchParams(searchParams);
-    if (next === "all") params.delete("category");
-    else params.set("category", next);
-    setSearchParams(params, { replace: true });
-  };
-
-  // #472 — audience + tier filters used to live in the PageHeader as
-  // select dropdowns via `useHeaderFilters`; category was already a
-  // chip row in-page. Filters now agree on chip-row UX (chips scan
-  // faster than nested dropdowns), so the header-filter slot for
-  // /tools is empty and all three filters live in the same column.
-  const setAudienceFilter = (next: AudienceFilter | "all") => {
-    const params = new URLSearchParams(searchParams);
-    // The "for_me" default is implicit — drop the param when the user
-    // hits the For-me chip so URLs stay clean.
-    if (next === "for_me") params.delete("audience");
-    else params.set("audience", next);
-    setSearchParams(params, { replace: true });
-  };
-  const setTierFilter = (next: TierFilter | "all") => {
-    const params = new URLSearchParams(searchParams);
-    if (next === "all") params.delete("tier");
-    else params.set("tier", next);
-    setSearchParams(params, { replace: true });
-  };
-
-  // Resolve the active audience bucket. "for_me" maps the viewer's
-  // effective role onto the bucket (job_seeker / recruiter_employer);
-  // when the role doesn't bucket cleanly (admin, anonymous), fall back
-  // to "all" so the page stays useful instead of going empty.
-  const resolvedAudience: ToolAudience | "all" = useMemo(() => {
-    if (audienceFilter === "all") return "all";
-    if (audienceFilter === "for_me") {
-      return audienceForRole(effectiveRole) ?? "all";
-    }
-    return audienceFilter;
-  }, [audienceFilter, effectiveRole]);
-
-  // Tools that pass every filter EXCEPT category. Used both for the
-  // visible grid (further narrowed by the active category chip) AND for
-  // the per-chip count, so the chips reflect what the user would see if
-  // they switched chips — not a stale total.
-  const toolsByCategory = useMemo(() => {
-    const q = toolQuery.trim().toLowerCase();
-    return TOOLS_CATALOG.filter((tool) => {
-      // Role-access hard gate (SuperAdmin per-role override) applies first,
-      // before the user-driven audience/tier browse filters (#2038).
-      if (!canSeeTool(tool.id)) return false;
-      if (!isToolInAudience(tool, resolvedAudience)) return false;
-      if (tierFilter !== "all" && tool.tier !== tierFilter) return false;
-      if (q === "") return true;
-      // Search the LOCALIZED copy so a user typing in their language
-      // matches what the cards actually show (not the English source).
-      const lt = localizeTool(tool, t);
-      const haystack =
-        `${lt.title} ${lt.description} ${lt.features?.join(" ") ?? ""} ${lt.statusBadge?.label ?? ""}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [toolQuery, tierFilter, resolvedAudience, t, canSeeTool]);
-
-  const categoryCounts = useMemo(() => {
-    const map = new Map<ToolCategory, number>();
-    for (const t of toolsByCategory) {
-      map.set(t.category, (map.get(t.category) ?? 0) + 1);
-    }
-    return map;
-  }, [toolsByCategory]);
-
-  const filteredTools = useMemo(() => {
-    if (categoryFilter === "all") return toolsByCategory;
-    return toolsByCategory.filter((t) => t.category === categoryFilter);
-  }, [toolsByCategory, categoryFilter]);
-
-  const isFiltering =
-    toolQuery.trim() !== "" ||
-    tierFilter !== "all" ||
-    audienceFilter !== "for_me" ||
-    categoryFilter !== "all";
-
-  // Single card renderer shared by the Grid and Scroll layouts so the
-  // card JSX lives in exactly one place (ToolCard). The scroll track
-  // wraps each in a fixed-width snap cell at the call site.
-  const renderToolCard = (tool: ToolCatalogEntry) => (
-    <ToolCard key={tool.id} tool={tool} />
-  );
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -301,14 +129,12 @@ export default function Tools() {
                 </div>
               </div>
 
-              {/* Intermixed Tools + Learning grid — surfaced directly under
-                  the hero (ahead of the stats band) so signed-out visitors
-                  see BOTH the AI tools and the bundled course library in the
-                  first row, above the fold. Previously tools and courses
-                  lived in two stacked sections and the course section sat
-                  below the fold where visitors never scrolled. The grid
-                  forces a course into the second slot on every breakpoint —
-                  see ToolsLearningGrid. */}
+              {/* Filterable tools browser — the SAME audience / tier /
+                  category chips + Scroll / Grid / Table view switcher the
+                  authenticated tools tab renders, so signed-out visitors get
+                  the identical browse experience (consistency) and can filter
+                  the catalog before signing up. Shares ToolsBrowser with the
+                  authenticated path so the filter logic lives in one place. */}
               <div className="mb-12 sm:mb-16">
                 <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
                   {t("headings.tools.careerToolsCourses")}
@@ -316,7 +142,24 @@ export default function Tools() {
                 <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
                   {t("messages.tools.careerToolsCoursesDesc")}
                 </p>
-                <ToolsLearningGrid tools={TOOLS_CATALOG} courseLimit={12} />
+                <ToolsBrowser roleGated={false} />
+              </div>
+
+              {/* Built-in courses showcase. The tools browser above is a
+                  tool-only catalog (it filters on tool axes), so courses are
+                  kept in their own strip here to preserve the above-the-fold
+                  course discovery the signed-out page is built around.
+                  ToolsLearningGrid weaves tools + courses; with an empty tools
+                  list it degrades to a courses-only grid (see weave()), so we
+                  reuse it without duplicating the tools shown above. */}
+              <div className="mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
+                  {t("headings.tools.coursesShowcase")}
+                </h2>
+                <p className="text-center text-muted-foreground mb-8 sm:mb-12 max-w-3xl mx-auto">
+                  {t("messages.tools.coursesShowcaseDesc")}
+                </p>
+                <ToolsLearningGrid tools={[]} courseLimit={9} />
               </div>
 
               {/* Stats Section */}
@@ -595,205 +438,11 @@ export default function Tools() {
             ) : tabParam === "classrooms" ? (
               <ClassroomsPanel />
             ) : (
-              <>
-            {/* Audience filter — chip row (#472). Counts are not shown
-                because the audience axis is mutually exclusive with the
-                viewer's effective role; the For-me default already
-                resolves to the right bucket. */}
-            <CategoryFilterBar
-              className="mb-2"
-              value={audienceFilter}
-              onChange={setAudienceFilter}
-              allLabel={t("labels.tools.audienceShowAll")}
-              allCount={0}
-              hideZeroCounts={false}
-              options={AUDIENCE_OPTIONS.filter((o) => o.value !== "all").map((o) => ({
-                value: o.value,
-                label: t(o.labelKey),
-                count: 0,
-              }))}
-            />
-
-            {/* Tier filter — chip row (#472). Counts elided for the same
-                reason: tier is a small enum and counts would be noisy. */}
-            <CategoryFilterBar
-              className="mb-3"
-              value={tierFilter}
-              onChange={setTierFilter}
-              allLabel={t("labels.tools.anyTier")}
-              allCount={0}
-              hideZeroCounts={false}
-              options={TIER_OPTIONS.map((o) => ({
-                value: o.value,
-                label: t(o.labelKey),
-                count: 0,
-              }))}
-            />
-
-            {/* Per-chip count reflects the audience+tier+search filters
-                applied above so the chips never claim a count the grid
-                won't honour. Categories with zero matches drop out. */}
-            <CategoryFilterBar
-              className="mb-4"
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              allCount={toolsByCategory.length}
-              options={CATEGORY_ORDER.map((cat) => ({
-                value: cat,
-                label: cat,
-                count: categoryCounts.get(cat) ?? 0,
-              }))}
-            />
-
-            {isFiltering && (
-              <div className="mb-4">
-                <p className="text-sm text-muted-foreground">
-                  {toolQuery.trim() !== ""
-                    ? t("messages.tools.countMatch", { count: filteredTools.length })
-                    : t("messages.tools.count", { count: filteredTools.length })}
-                  {toolQuery.trim() !== "" && (
-                    <>
-                      {" "}
-                      <span className="font-medium text-foreground">
-                        &quot;{toolQuery}&quot;
-                      </span>
-                    </>
-                  )}
-                  {tierFilter !== "all" && (
-                    <>
-                      {" "}{t("messages.tools.filterIn")}{" "}
-                      <span className="font-medium text-foreground">
-                        {tierFilter === "free" ? t("labels.free") : t("labels.paid")}
-                      </span>
-                    </>
-                  )}
-                  {audienceFilter !== "for_me" && (
-                    <>
-                      {" "}{t("messages.tools.filterFor")}{" "}
-                      <span className="font-medium text-foreground">
-                        {t(
-                          AUDIENCE_OPTIONS.find((o) => o.value === audienceFilter)?.labelKey ??
-                            "labels.tools.audienceEveryone",
-                        )}
-                      </span>
-                    </>
-                  )}
-                  {categoryFilter !== "all" && (
-                    <>
-                      {" "}{t("messages.tools.filterIn")}{" "}
-                      <span className="font-medium text-foreground">
-                        {categoryFilter}
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-            )}
-
-            {/* Unified Tools list — Scroll / Grid / Table. The layout
-                switcher sits in the list header (consistent with the
-                Studio landing + Resumes browse pages) and is scoped to
-                this AI-tools catalog. */}
-            <div className="mb-8 sm:mb-12">
-              <div className="mb-3 flex items-center justify-end">
-                <ViewModeToggle
-                  value={viewMode}
-                  onChange={setViewMode}
-                  modes={BROWSE_VIEW_MODES}
-                />
-              </div>
-              {filteredTools.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-                  <p>{t("messages.tools.noMatch")}</p>
-                </div>
-              ) : viewMode === "table" ? (
-                <ToolsTable tools={filteredTools} />
-              ) : viewMode === "scroll" ? (
-                <HorizontalScroller itemCount={filteredTools.length}>
-                  {filteredTools.map((tool) => (
-                    <div key={tool.id} className="w-72 shrink-0 snap-start">
-                      {renderToolCard(tool)}
-                    </div>
-                  ))}
-                </HorizontalScroller>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {filteredTools.map((tool) => renderToolCard(tool))}
-                </div>
-              )}
-            </div>
-              </>
+              <ToolsBrowser />
             )}
           </div>
         </div>
     </AppShell>
-  );
-}
-
-/**
- * Dense table layout for the AI-tools catalog — the Table view of the
- * /tools browse switcher. Mirrors the ResumeOwnedTable idiom (border,
- * muted header, hover rows, ghost-button action cell) so the browse
- * surfaces stay visually consistent. Each row deep-links to the tool's
- * canonical href.
- */
-function ToolsTable({ tools }: { tools: ToolCatalogEntry[] }) {
-  const { t } = useTranslation();
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">{t("labels.name", "Name")}</th>
-            <th className="px-3 py-2 font-medium">
-              {t("labels.category", "Category")}
-            </th>
-            <th className="px-3 py-2 font-medium">
-              {t("labels.description", "Description")}
-            </th>
-            <th className="px-3 py-2 text-right font-medium">
-              {t("labels.actions", "Actions")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {tools.map((rawTool) => {
-            const tool = localizeTool(rawTool, t);
-            return (
-            <tr
-              key={tool.id}
-              className="border-b border-border last:border-0 hover:bg-muted/30"
-            >
-              <td className="px-3 py-2">
-                <Link
-                  to={tool.href}
-                  className="font-medium hover:text-brand-purple"
-                >
-                  {tool.title}
-                </Link>
-              </td>
-              <td className="px-3 py-2">
-                <ToolCategoryBadge category={tool.category} />
-              </td>
-              <td className="max-w-md px-3 py-2 text-muted-foreground">
-                <span className="line-clamp-1">{tool.description}</span>
-              </td>
-              <td className="px-3 py-2">
-                <div className="flex items-center justify-end gap-2">
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to={tool.href}>
-                      {t("actions.open", "Open")}
-                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                </div>
-              </td>
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

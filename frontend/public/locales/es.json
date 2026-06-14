@@ -6661,6 +6661,8 @@
   "actions.tryFreeTool": "Probar herramienta gratis",
   "headings.tools.careerToolsCourses": "Herramientas de IA para tu carrera + cursos integrados",
   "messages.tools.careerToolsCoursesDesc": "Herramientas de IA gratuitas con un solo propósito y una biblioteca de aprendizaje incluida, lado a lado. Puntúa tu currículum en segundos y luego profundiza con cursos sobre IA, RAG y las habilidades imprescindibles que buscan los empleadores. No se requiere una licencia aparte.",
+  "headings.tools.coursesShowcase": "Cursos integrados",
+  "messages.tools.coursesShowcaseDesc": "Incluidos en todos los planes: profundiza con cursos sobre IA, RAG, ingeniería de prompts y las habilidades imprescindibles que buscan los empleadores.",
   "labels.tools.statAiTools": "Herramientas con IA",
   "labels.tools.statResumesAnalyzed": "Currículums analizados",
   "labels.tools.statAccuracyRate": "Tasa de precisión",
