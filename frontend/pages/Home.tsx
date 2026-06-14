@@ -22,7 +22,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 
-import DiscoverPreview from "@/components/DiscoverPreview";
+import UnifiedSearch from "@/components/UnifiedSearch";
 import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ToolCard } from "@/components/ToolCard";
@@ -193,7 +193,7 @@ function HomeMarketingPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {HOME_STATS.map((s) => (
                 <div key={s.stat} className="text-center">
                   <div className="text-3xl font-bold text-primary mb-2">
@@ -203,12 +203,16 @@ function HomeMarketingPage() {
                 </div>
               ))}
             </div>
+          </div>
 
-            {/* Discover — unified search preview surfaced alongside the CTA.
-             * Submitting or clicking any chip deep-links into /search so the
-             * homepage and the dedicated search page share one index. */}
-            <DiscoverPreview className="mb-16" />
+          {/* Discover — the SAME unified search control the homepage root (/)
+           * renders (see Index.tsx), so the dashboard and home share ONE
+           * search surface — card | list | scroll views + every category +
+           * pagination — instead of a parallel preview panel. Self-contained:
+           * reads/writes ?q & ?category on the URL. */}
+          <UnifiedSearch />
 
+          <div className="px-4 pb-16 pt-8">
             {/* Features */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-4">

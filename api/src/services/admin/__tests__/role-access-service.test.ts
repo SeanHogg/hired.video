@@ -88,7 +88,7 @@ describe("RoleAccessService — cache + write invalidation", () => {
     const role = USER_ROLES.CREATOR;
 
     await svc.upsert({ role, featureKey: "nav:studio", visible: false });
-    await svc.upsert({ role, featureKey: "nav:gigs", visible: false });
+    await svc.upsert({ role, featureKey: "nav:services", visible: false });
     assert.equal((await svc.getOverridesForRole(role)).length, 2);
 
     const removed = await svc.resetRole(role);
